@@ -2,7 +2,7 @@
 
 # PROJECT GUILTY SPARK
 
-### One doorway to everything you need to mod Halo 1.
+### ALL THE TOOLS, AND THEN SOME.
 
 **One Halo. Every World. Every Tool. Together.**
 
@@ -49,9 +49,10 @@ We're building toward a place where the Halo 1 community can do far more:
 | Area | Current state |
 | --- | --- |
 | Map inspection, supported edits, native builds, and tool handoffs | Working in validated, target-specific workflows |
+| [Arena Evolved](docs/fixtures/arena-evolved-0.7.7.json) | Separate version-pinned setup/profile; installed executable, launch, game and peer acceptance remain pending |
 | [Runtime profiles and compatible shared content](docs/RUNTIME_INTEGRATION_20261107.md) | Native Windows setup verified for installed OpenCE/Faber/Chupathingy and owned CE banks; game/peer acceptance remains separate |
 | Visual worldbuilding, native doors/triggers, and detachable workspaces | Working in scoped workflows; broader editing remains in progress |
-| [File → New: Multiplayer Map / MegaWorld](docs/DOUBLE_ACTION_20261107.md) | Shared creators, restart recovery and native combined-BSP build/readback verified; game acceptance remains open |
+| [File → New: Multiplayer Map / MegaWorld](docs/DOUBLE_ACTION_20261107.md) | Shared creators, source-bound two-region viewport, restart recovery and native combined-BSP build/readback verified; game acceptance remains open |
 | MegaWorld traversal, full Firefight/Zombie gameplay, shared AI, and cross-engine play | In development or research; game and peer acceptance remain open |
 | Public downloads | No verified GitHub Release assets yet; the preserved C49 Windows preview is an earlier local candidate |
 

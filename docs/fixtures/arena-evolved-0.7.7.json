@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "upstream-interface-research-not-game-acceptance",
+  "release": "v0.7.7-beta",
+  "revision": "f7a4a306e4a3ccc651ba447e81ea5c7f2ec00a5e",
+  "url": "https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta",
+  "publishedAt": "2026-11-07T18:23:54Z",
+  "license": "AGPL-3.0-or-later",
+  "sparkLicense": "MIT",
+  "implementationBoundary": "Independent metadata/profile adapter; no upstream engine implementation incorporated",
+  "windowsPackage": {
+    "name": "arena-evolved-0.7.7-beta-windows64.zip",
+    "bytes": 113999663,
+    "publishedSha256": "f1b80622aa222291c5e7a5c7bb6e5a95f3d5bb55b77caa2f46580f8674de66db",
+    "downloaded": false,
+    "executableSha256": null
+  },
+  "inputCacheVersions": [
+    5,
+    609,
+    13
+  ],
+  "network": {
+    "releaseDeclared": 41,
+    "olderReadmeDeclared": 39,
+    "conflict": "Use versioned release notes; supplied network/version strings never attest an installed executable",
+    "localGameAccepted": false,
+    "unmodifiedMccCrossplay": false
+  },
+  "interfaces": {
+    "genericClient": "Separate installed executable; automatic launch blocked until independent executable verification",
+    "dedicatedServer": "halo --server, HOST A SERVER; guidance only, not automatically executed",
+    "data": "HALO_DATA_ROOT",
+    "customMaps": "HALO_CUSTOM_MAPS_ROOT",
+    "mcc": "HALO_MCC_PATH / game.mcc_path; engine reads owned installation, no copying by Spark"
+  },
+  "limitations": [
+    "No local Arena installation found in configured runtime roots",
+    "Intermittent joining-in-progress failure during map download is documented",
+    "Arena modes/packs and ae_content.aecache may require matching clients",
+    "Independent bot control, stats, authored Firefight, Live Link, native game loading and gameplay remain unaccepted"
+  ]
+}

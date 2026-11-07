@@ -109,3 +109,6 @@ New arenas assign owned Halo preview defaults before entering the editor. Materi
 5. Advance the independent live engine, game-peer/AI and all-runtime conversion work. Preserve failed research and use the ledger's explicit gates.
 
 The [feature catalog in the app](../src/featureCatalog.ts) supplies the short how-to entries. [Repository About text](REPOSITORY_ABOUT.md) is prepared separately from the README; GitHub metadata requires its own publication step.
+
+
+7November additive native milestone: [shared original-region viewport and source-bound material retention](DOUBLE_ACTION_20261107.md#current-native-preview-acceptance) now pass the real Windows File/New/restart/edit/Undo workflow. [Arena Evolved0.7.7-beta](fixtures/arena-evolved-0.7.7.json) has a separate setup/profile and documented-source contract; no installed executable, launch, game, bot/stats or peer acceptance is claimed. All original requirements and earlier gameplay/release gates remain.

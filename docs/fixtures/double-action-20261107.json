@@ -85,7 +85,6 @@
       "status": "Reproduced native lightmap failure repaired; R16 native compilation and independent readback pass"
     },
     "missing": [
-      "Shared prebuild donor-geometry viewport",
       "Distinct mountain road and infantry cave",
       "Compiled materials/visibility and donor gameplay objects",
       "Walk/return, Warthog drive and cross-region sniper hit"
@@ -111,6 +110,23 @@
       "gameplayVerified": false,
       "debugLogSha256": "8000c6df09a0cbedf4e827573e0b1459b0efb359b3b672e9ac629ca89edd801d",
       "nativeEvidence": "Scenario command and default vehicle spawning reached; no fatal reason in bounded log"
+    },
+    "sharedPrebuildViewport": {
+      "accepted": true,
+      "evidence": "vision-r5.json",
+      "screenshot": "docs/screenshots/20261107/shared-native-regions.png",
+      "sourceHashes": [
+        "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+        "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+      ],
+      "shaders": 21,
+      "lightmapPages": 26,
+      "fullProcessRestart": true,
+      "transformAndUndoRetainSource": true,
+      "actualTextureAllocationRetained": true,
+      "generatedConnectionRendered": false,
+      "nativeCollisionChanged": false,
+      "gameplayAccepted": false
     }
   },
   "verification": {
@@ -161,6 +177,127 @@
       "originalInputsRehashed": 6,
       "retainedDuplicateCache": false,
       "commonFatalCauseEstablished": false
+    },
+    "followThrough": {
+      "date": "2026-11-07",
+      "implementationCommit": "c737e40b2076d7c346efd275b37861290371d1bb",
+      "runtimeSourceFingerprint": "e82ba78224c4f62ac0b0064be10b81af995ac9454f9c18813745f397f3dd52b4",
+      "appSha256": "6a264743a1e31753d8536cd51522c8f7ab3c3b14bfe84dd35cb139271657c18d",
+      "appBytes": 47571456,
+      "appBuildMs": 189200,
+      "evidence": [
+        "vision-r2.json",
+        "vision-r2.log",
+        "vision-r5.json",
+        "vision-r5.log",
+        "vision-browser-r5.log",
+        "vision-r6.json",
+        "vision-r6.log",
+        "vision-preservation-r3.json",
+        "vision-preservation-final.json"
+      ],
+      "rust": {
+        "passed": 822,
+        "ignored": 9,
+        "suiteResults": 55,
+        "run": "vision-r2",
+        "wholeRunAccepted": false,
+        "note": "Rust stage passed; subsequent UI contract failures were corrected and independently rerun. No Rust changed afterward."
+      },
+      "frontend": {
+        "passed": 433,
+        "files": 98,
+        "typeScript": true,
+        "sourceModuleContracts": 3,
+        "offline": 59,
+        "storage": 35
+      },
+      "browser": {
+        "passed": 206,
+        "wholeRunAccepted": true
+      },
+      "nativeEdit": {
+        "passed": 2,
+        "mockedIpc": false,
+        "independentInvaderReadback": true,
+        "originalUnchanged": true,
+        "compilerRan": false
+      },
+      "nativeMegaWorld": {
+        "passed": 3,
+        "mockedIpc": false,
+        "fullProcessRestart": true,
+        "widthYawUndoRedoSave": true,
+        "sourceClearance": {
+          "accepted": true,
+          "scope": "Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance",
+          "summary": "Source clearance checked at 423 points · 32,117 triangles."
+        },
+        "nativeCompilerRerun": false,
+        "gameplayAccepted": false
+      },
+      "nativeWorkspace": {
+        "passed": 12,
+        "mockedIpc": false,
+        "threeIndependentWindows": true,
+        "restartRecovery": true,
+        "singleWriter": true,
+        "actualTabPointerDrag": true,
+        "secondaryMonitorPlacementTested": true,
+        "physicalMonitorDisconnectTested": false,
+        "physicalSecondaryMonitorTransferTested": false,
+        "parkedGlClearsOver650ms": 0,
+        "minimizedGlClearsOver650ms": 0
+      },
+      "performance": {
+        "donorReadyMs": 7415,
+        "condition": "Reopened-document navigation to source-material ready, warm OS file cache, concurrent browser regressions; one local sample.",
+        "textureAllocationRetainedDuringTransformAndUndo": true,
+        "beforeAfterSpeedupMeasured": false
+      },
+      "safeguards": {
+        "continuityAndNativeDependencyTests": 9,
+        "sourceEntrypoints": 1023,
+        "sourceEntrypointIssues": 0,
+        "requirementIds": 475,
+        "numberedPrompts": 25,
+        "identitySha256": "a47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a"
+      },
+      "arena": {
+        "fixture": "arena-evolved-0.7.7.json",
+        "adapterTestsPassed": true,
+        "browserBoundaryPassed": true,
+        "installedExecutableVerified": false,
+        "downloaded": false,
+        "gameplayAccepted": false,
+        "engineSourceCopied": false
+      },
+      "cleanup": {
+        "ownedTemporaryOutputDisposed": true,
+        "wholeSdkCopied": false,
+        "releaseReplaced": false,
+        "pushed": false,
+        "published": false
+      }
+    },
+    "sdkBaseline": {
+      "evidence": [
+        "final-action-sdk-baseline-r4.json",
+        "final-action-sdk-baseline-r5.json",
+        "final-action-sdk-baseline-r6.json"
+      ],
+      "runtime": "Installed H1A Standalone with original publisher Blood Gulch source",
+      "executableSha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "controlExitCodes": [
+        1,
+        1,
+        1
+      ],
+      "visualSceneAccepted": false,
+      "commonFatalCauseEstablished": false,
+      "completeSdkCopied": false,
+      "originalInputHashesUnchanged": true,
+      "ownedScratchDisposed": true
     }
   },
   "preservation": {
@@ -189,7 +326,11 @@
     "r15": "Thirty isolated save-race tests pass; strengthened full-suite case also checks exact bytes and dirty Undo",
     "r16": "All source/browser/native Windows suites and native combined build/readback pass; missing retention reason rejects export and disposes cache. Overall run failed.",
     "r17": "Creation/restart/edit/Undo/Save/native compile/readback/retention and original hashes pass; optional Standalone exits1. No game frame or gameplay accepted.",
-    "r18": "Small CE-to-MCC authoring/control compile and independent readback pass; Standalone exits1. Window inspection approval times out; no gameplay accepted."
+    "r18": "Small CE-to-MCC authoring/control compile and independent readback pass; Standalone exits1. Window inspection approval times out; no gameplay accepted.",
+    "vision-r1": "Expected registry cardinality failed after additive Arena identity; updated explicit profile contract without removing assertions.",
+    "vision-r2": "Rust/native-source/frontend stages passed; browser found cardinality updates and a hidden Studio menu prerequisite. Corrected and all 206 browser cases rerun.",
+    "vision-r3": "Fresh native edit/readback and initial workspace cases passed; final pointer readiness failed. Gesture now uses current native geometry and records actual coordinates; all 12 cases pass in R6.",
+    "vision-r4": "Real source viewport refused generic BSP render labels as native tag identity. Fixed using scenario-ordered native collision-section identity, exact-path precedence and ambiguity refusal; focused tests and real R5 acceptance pass."
   },
   "implementationCommit": "e7664286a74992a5fd810e5c99efe9d78a405e73"
 }

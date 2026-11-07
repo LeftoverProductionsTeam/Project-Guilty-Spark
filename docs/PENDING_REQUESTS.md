@@ -2,11 +2,13 @@
 
 ## Overnight continuation — 5 November 2026
 
-**7 November active priority — Double Action 3d646d84:** Exact instructions: Master Engineering Prompts/GS_2026-11-07_Double_Action_Engineering.md; scoped results/open gates: DOUBLE_ACTION_20261107.md. Shared File/New creators, saved-donor recovery and repaired native combined-world compilation/readback pass. Standalone exits1; both flagship gameplay tracks remain unaccepted. Retain all Zombie/runtime steering and older gates below; no19-map expansion.
+**ac4a9da1 — Arena/vision:** Full instructions: Master Engineering Prompts/GS_2026-11-07_Original_Vision_Arena_Evolved.md. e6193377/184480fc match earlier hashes. Preserve both flagships/475IDs/25prompts. Native donor preview and Arena/setup tests pass; no Arena/gameplay proof.
+
+**7 November active — Double Action e2b01771/3d646d84:** Full instructions: Master Engineering Prompts/GS_2026-11-07_Double_Action_Final_Acceptance.md and GS_2026-11-07_Double_Action_Engineering.md. Evidence: DOUBLE_ACTION_20261107.md. File/New, donor recovery and native compile/readback pass. Standalone exits1; both gameplay tracks unaccepted. All Zombie/runtime/older gates retained; no19-map expansion.
 
 **7 November runtime steering, scoped milestone verified:** Retain the owner's Faber/fork compatibility, bot/Firefight/Zombie stats, crash, shared folders, Chupathingy CE banks, map-download offers and deep integration requests. RUNTIME_INTEGRATION_20261107.md/fixture records six fresh native-app cases, full/focused safeguards, the corrected download key and unchanged originals. Faber's light crash is diagnosed, not fixed. Shared-root game joins, real bot/stats control and original Zombie gameplay remain open. No engine/source import, account write, game launch or original-runtime changes occurred.
 
-**7 November directory/File follow-up:** All configured runtime donors, source-aware supported conversion on drop, Maps-before-tabs and New workspace window pass scoped R32 acceptance (97751de). Preserve R16 CE→MCC native/restart evidence. Wider edition/game gates remain open; source identity never follows the hosting selector.
+**Directory/File:** R32(97751de) verifies donor discovery, supported conversion on drop, Maps-before-tabs and New window. R16 CE→MCC native/restart retained. Hosting never overrides source. Wider edition/game gates open.
 
 **c3ad4850 creator milestone verified:** Exact instructions: Master Engineering Prompts/GS_2026-11-07_Complete_Creator_Workflows.md. CREATOR_WORKFLOWS_20261107.md preserves two real CE donor→MCC pointer imports, dependencies, edit/copy/Undo/Save/restart, H1A compile/readback and negative cases. R30/R32 is committed97751de; this does not accept every authoring/runtime/game gate. Existing66656a27 Prompt06 and9491f29a window/keyboard work remain, with physical/human gates in FEATURE_COMPLETION_20261106.md. No replacement systems or publication.
 
