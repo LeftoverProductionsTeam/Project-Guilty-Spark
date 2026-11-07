@@ -490,5 +490,143 @@
       "closure-preservation.json",
       "closure-windows-r1.json"
     ]
+  },
+  "atlasPlanning": {
+    "sourceBase": "6c0c62fd65b4ec1d88ed2c191007376dd412bae3",
+    "status": "nativePlanningAcceptedGeometryPending",
+    "supersedingDirective": "338c79d5",
+    "regions": 19,
+    "sourceHashes": [
+      {
+        "name": "beavercreek",
+        "sha256": "fcbcf73a22fd2e819c5f670edb333eff529ca1b7980ebbffbf6b21cf12b56db4"
+      },
+      {
+        "name": "bloodgulch",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c"
+      },
+      {
+        "name": "boardingaction",
+        "sha256": "c3a21a0ccead064aebac3d1a7ff52fa005b1ac89f23bc1f02d2b273ad69b4b77"
+      },
+      {
+        "name": "carousel",
+        "sha256": "8d78e0d23398fb467ceaedb4dd76e80c048f7d8859ec9a7e70d35818d71374b8"
+      },
+      {
+        "name": "chillout",
+        "sha256": "f550090182b34abce50f9c00e4f36b2781cdfeedaf1791156a9ce1e60176fe06"
+      },
+      {
+        "name": "damnation",
+        "sha256": "419b2b53736b6900dd62137232e8e76ff03ca98cf81d5eede0d43d9b0f84735b"
+      },
+      {
+        "name": "dangercanyon",
+        "sha256": "9e433796015ac2857a43ef180b3ba300d3b711defb5f0bb0e8dd96f5e2b06cc2"
+      },
+      {
+        "name": "deathisland",
+        "sha256": "f9684cb7e5436fd2901b7ea226726a6089957b91459923421264a5436f743244"
+      },
+      {
+        "name": "gephyrophobia",
+        "sha256": "1853a4443594190e3adb204a20f1f18ba4dbb52e86c4abaad9f0d2fb4a621216"
+      },
+      {
+        "name": "hangemhigh",
+        "sha256": "df9a1410571c4ec921c0a05f00d18034ac39cc06d992537e6df307025b620af4"
+      },
+      {
+        "name": "icefields",
+        "sha256": "0e1336fd76c30563d86bef0229ec97930ca93cef882e108a5e646cf2a67ac9f0"
+      },
+      {
+        "name": "infinity",
+        "sha256": "2ce5b0407f013fc498f280188779360f09abd1d98c3864348a9b40b88e76f7c6"
+      },
+      {
+        "name": "longest",
+        "sha256": "40470c1e315e3da87b4beceba97ed26b629127f5edf7aa742c983172b95854d9"
+      },
+      {
+        "name": "prisoner",
+        "sha256": "9f54e66406b9dfc25399507400621640804de8f57f6c084fcde5bcd62778b1eb"
+      },
+      {
+        "name": "putput",
+        "sha256": "25c427f0a12a0c7851dbbee9c42041766c9a0268eac2051e1c817d100a1f30e3"
+      },
+      {
+        "name": "ratrace",
+        "sha256": "03a483b50ba3c50aa1071a0a13b24927a9ed1d3acd2528802ac4eb20a388c670"
+      },
+      {
+        "name": "sidewinder",
+        "sha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+      },
+      {
+        "name": "timberland",
+        "sha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea"
+      },
+      {
+        "name": "wizard",
+        "sha256": "9e9b29ae235458bf8f3cf0b69f6748883ed53f37cae5919e0d5cdd8a421a29ae"
+      }
+    ],
+    "hexClusterDraft": true,
+    "compactFieldsShareRow": true,
+    "scanAndAdmissionMs": 14534,
+    "undoRedoImmediateSave": true,
+    "fullProcessRestart": true,
+    "sourceMapsUnchanged": true,
+    "nativeConnectionNotChanged": true,
+    "nativeCompilation": false,
+    "gameplayAccepted": false,
+    "verifiedTraversableConnections": 0,
+    "qaApplication": {
+      "directory": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Engineering-d49eb02588bf\\atlas-app-r3",
+      "sourceCommit": "6c0c62fd65b4ec1d88ed2c191007376dd412bae3",
+      "workingTreeDirty": true,
+      "files": [
+        {
+          "file": "GuiltySpark.exe",
+          "bytes": 47140352,
+          "sha256": "d4b2b30b951e84add57f06c177961eeaca0331fc477aaf655b1b0c170fbfa66b"
+        }
+      ],
+      "runtimeSourceFingerprint": "1566fac6ea9d812e1177b0718c2f97d9da1e3334f5bfe189764c9487283c2602",
+      "purpose": "One temporary source-pinned QA executable; not a release"
+    },
+    "regressions": {
+      "rustPassed": 830,
+      "rustIgnored": 9,
+      "frontendPassed": 444,
+      "browserBeforeHexStyleChange": 210,
+      "postChangeAtlasBrowser": 1,
+      "offline": 59,
+      "storage": 35,
+      "nativeCases": 3
+    },
+    "evidence": [
+      "atlas-source-r1.json",
+      "atlas-browser-r1.json",
+      "atlas-native-r3.json"
+    ],
+    "failedRuns": [
+      {
+        "run": "atlas-native-r1",
+        "reason": "MegaWorld-only entered old door benchmark; existing native harness routing fixed, same binary r2 source workflow passed."
+      },
+      {
+        "run": "focused browser first attempt",
+        "reason": "Polled asynchronous Save receipt without null guard; assertion corrected, Save implementation unchanged."
+      }
+    ],
+    "boundaries": [
+      "Region bounds planning is not native seam construction.",
+      "No random teleporter implementation/game/peer pass.",
+      "OpenH1 in-headset Forge requires engine integration and actual headset acceptance."
+    ]
   }
 }

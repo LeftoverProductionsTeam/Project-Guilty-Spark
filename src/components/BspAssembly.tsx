@@ -173,7 +173,7 @@ export default function BspAssembly({
       {open && (
         <div className="bsp-assembly-body">
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
-          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256}/>
+          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           <p>
             Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one MCC world
             with collision and new lightmaps. Your original maps stay preserved. Campaign actors and scripts

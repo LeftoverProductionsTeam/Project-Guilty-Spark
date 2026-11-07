@@ -236,6 +236,8 @@ export interface Project {
   powerups?: import('./powerups').CustomPowerup[];
   gameplayControls?: import('./gameplay').GameplayControls | null;
   bspAssembly?: import('./bspAssembly').BspAssembly | null;
+  /** Reversible Atlas plans only; native geometry and build identity stay separate. */
+  megaworldLayout?: import('./megaworldLayout').MegaworldLayout | null;
   animations?: import('./animation').AnimationAsset[];
   animationAssignments?: import('./animation').AnimationAssignment[];
   renderFeatures?: import('./renderFeatures').RenderFeatures | null;

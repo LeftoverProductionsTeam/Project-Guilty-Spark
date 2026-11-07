@@ -19,6 +19,41 @@ pub struct CacheRecord {pub path:PathBuf,pub runtime:String,pub sha256:Option<St
 #[derive(Clone,Serialize,Deserialize,Default)]
 #[serde(rename_all="camelCase")]
 pub struct Atlas {pub schema_version:u32,pub regions:Vec<Region>,pub caches:Vec<CacheRecord>,pub elapsed_ms:u64,pub limitations:Vec<String>}
+
+/// Optional Spark layout metadata, not compiled BSP geometry or runtime state.
+/// Sources are readmitted by full cache hash before native import/build.
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct LayoutRegion {
+    pub region_id:String,pub cache_sha256:String,pub cache_version:u32,pub bsp_index:usize,
+    pub map_name:String,pub bsp_name:String,pub minimum:[f64;3],pub maximum:[f64;3],
+    pub translation:[f64;3],pub yaw_degrees:f64,
+}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct Layout {pub schema_version:u32,pub regions:Vec<LayoutRegion>}
+impl Layout {
+    pub fn validate(&self)->Result<()> {
+        if self.schema_version!=1||self.regions.len()>64{return invalid("Atlas layout supports schema 1 and at most 64 region plans");}
+        let mut seen=BTreeSet::new();
+        for r in &self.regions {
+            if r.cache_sha256.len()!=64||!r.cache_sha256.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b))
+                ||r.region_id!=format!("{}:{}",r.cache_sha256,r.bsp_index)||!seen.insert(&r.region_id)
+                ||r.bsp_index>=64||![5,6,7,13,609].contains(&r.cache_version) {
+                return invalid("Atlas region identity is invalid or duplicated");
+            }
+            if [&r.map_name,&r.bsp_name].iter().any(|s|s.is_empty()||s.len()>512||s.chars().any(char::is_control)) {
+                return invalid("Atlas region labels are invalid");
+            }
+            if r.minimum.iter().chain(&r.maximum).chain(&r.translation).any(|n|!n.is_finite()||n.abs()>1_000_000.)
+                ||!r.yaw_degrees.is_finite()||r.yaw_degrees.abs()>360_000.
+                ||(0..3).any(|a|r.minimum[a]>r.maximum[a]) {
+                return invalid("Atlas layout has invalid bounds or transform");
+            }
+        }Ok(())
+    }
+}
+
 pub fn regions(path:&Path,runtime:&str,i:&MapInspection,mesh:&MeshData)->Result<Vec<Region>>{
     let mut out=vec![];
     for (index,part) in mesh.parts.iter().enumerate(){

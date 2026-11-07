@@ -1369,6 +1369,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         {bspMode ? (
           <BspWorkshop
             projectId={project.id}
+            atlasLayout={project.megaworldLayout}
+            onAtlasLayout={(layout,description)=>{if(studioRole!=='viewer')props.edit({...project,megaworldLayout:layout},description);}}
             document={doc}
             mesh={snapshot?.document === doc ? snapshot.mesh : null}
             report={validatedDoc === doc ? report : null}

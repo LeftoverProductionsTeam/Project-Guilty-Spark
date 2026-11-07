@@ -51,6 +51,8 @@ import type { ForgeMesh, GeometryReport, QuickForgeDocument } from '../forge';
 import type { Vec3, OpenProject } from '../types';
 import '../bspWorkshop.css';
 interface Props {
+  atlasLayout?: import('../megaworldLayout').MegaworldLayout | null;
+  onAtlasLayout: (layout: import('../megaworldLayout').MegaworldLayout, description:string) => void;
   projectId: string;
   document: QuickForgeDocument;
   mesh: ForgeMesh | null;
@@ -1033,7 +1035,7 @@ export default function BspWorkshop(props: Props) {
             if (!brush && w.brushes[0]) setSelection({brushId: w.brushes[0].id});
             requestAnimationFrame(() => {nameInput.current?.focus(); nameInput.current?.select();});
           }} objects={props.onAssets} build={props.onBuildSettings}/>
-          <MegaworldAtlas projectId={projectId} />
+          <MegaworldAtlas projectId={projectId} layout={props.atlasLayout} onLayout={props.onAtlasLayout} readOnly={props.readOnly}/>
           <div className="bsp-source-list">
             <b>Named volumes <small>{w.brushes.length} editable</small></b>
             {w.brushes.map((b) => (

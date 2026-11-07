@@ -28,7 +28,8 @@ const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const logicOnly=process.env.SPARK_LIFECYCLE_LOGIC==='1';
-const crossRuntime=process.env.SPARK_LOGIC_CROSS_RUNTIME==='1';
+// MegaWorld-only acceptance uses the source-creation path, not the door benchmark.
+const crossRuntime=process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'||process.env.SPARK_QA_MEGAWORLD_ONLY==='1';
 if(crossRuntime&&!logicOnly)throw Error('Cross-runtime asset acceptance uses the existing native logic workflow');
 if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('Native logic authoring requires its own bounded run');
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
@@ -446,6 +447,7 @@ try{
     const sharedViewportStarted=performance.now();
     const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount);
     await chooseTool(main,'Map library');await main.locator('.map-card').filter({has:main.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(main,'Level editor');await openDrawer(main,'Construction');
+    if(report.megaWorldCreation.atlasLayout){expect(world.megaworldLayout).toEqual(report.megaWorldCreation.atlasLayout.expected);const atlas=main.locator('.megaworld-atlas');if(await atlas.getAttribute('open')===null)await atlas.locator(':scope>summary').click();await expect(atlas.getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);report.megaWorldCreation.atlasLayout.fullProcessRestart=true;delete report.megaWorldCreation.atlasLayout.expected;}
     await expect(main.getByLabel('BSP donor map',{exact:true})).toHaveValue(world.bspAssembly.donorProjectId);
     await expect(main.getByLabel('Donor BSP section',{exact:true})).toHaveValue(String(world.bspAssembly.donorBspIndex));
     await expect(main.locator('.bsp-assembly .bsp-error')).toHaveCount(0);

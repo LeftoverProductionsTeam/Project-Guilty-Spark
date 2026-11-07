@@ -245,7 +245,7 @@ try {
         }finally{
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
           if(receiptFile&&(report.logic?.crossRuntime||report.logic?.megaWorldCreation)){
-            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-shared-viewport.png','megaworld-compiled-routes.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
+            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-shared-viewport.png','megaworld-compiled-routes.png','megaworld-atlas-layout.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
               const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(!info)continue;
               if(!info.isFile()||info.size>(name.endsWith('.map')?256:4)*1024**2)throw Error('Selected native acceptance evidence exceeds its bounded export');
               const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));

@@ -3139,3 +3139,20 @@ test('Machinima greenscreen capture is saved editor metadata with Undo and reope
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.machinima?.greenScreen)).toBe(true);
  await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'Machinima');await openDrawer(page,'Lens & composition');await expect(green).toBeChecked();
 });
+
+
+test('Atlas plans all19 original sources with one-action transforms, overlap review and immediate Undo Save',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,names=['beavercreek','bloodgulch','boardingaction','carousel','chillout','damnation','dangercanyon','deathisland','gephyrophobia','hangemhigh','icefields','infinity','longest','prisoner','putput','ratrace','sidewinder','timberland','wizard'];w.__sparkMock.atlasSources=names.map((mapName,index)=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName,bspName:mapName,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['Custom Edition']}));w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='megaworld_atlas'?{regions:structuredClone(w.__sparkMock.atlasSources),caches:[],elapsedMs:1,limitations:[]}:invoke(command,args);});
+ await chooseTool(page,'Level editor');await openDrawer(page,'Construction');await page.locator('.bsp-assembly>summary').click();await page.locator('.megaworld-atlas>summary').click();
+ await page.getByRole('button',{name:'Scan installed maps',exact:true}).click();await page.getByLabel('Atlas runtime',{exact:true}).selectOption('Custom Edition');await page.getByRole('button',{name:'Add originals to layout',exact:true}).click();
+ const layout=page.getByLabel('Saved region layout',{exact:true});await expect(layout.getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);await expect(layout).toContainText('19/19');
+ const x=layout.getByLabel('Atlas region X',{exact:true});await x.fill('125');await x.press('Tab');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.megaworldLayout?.regions[0]?.translation[0])).toBe(125);
+ await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect(x).toHaveValue('0');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.megaworldLayout?.regions[0]?.translation[0])).toBe(0);
+ await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');await expect(x).toHaveValue('125');
+ const yaw=layout.getByLabel('Atlas region Yaw',{exact:true});await yaw.fill('37');await yaw.press('Tab');await layout.getByRole('button',{name:'Hex cluster draft',exact:true}).click();await expect(layout).toContainText('0 overlapping bounds');await page.keyboard.press('Control+s');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.saved.megaworldLayout.regions.length)).toBe(19);expect(await page.evaluate(()=>(window as any).__sparkMock.atlasSources.every((r:any)=>r.translation.every((n:number)=>n===0)&&r.yawDegrees===0))).toBe(true);
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
+ await expect(page.getByLabel('Saved region layout',{exact:true}).getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);
+});

@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {originalMultiplayerMaps,overlappingRegions} from '../src/megaworldLayout.ts';
 import {PerspectiveCamera,Vector3} from 'three';
 import {openDrawer,chooseTool,createMultiplayerMap} from '../tests/ui/helpers/navigation.ts';
 export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,call,receipt,expect,resume=false,run,verifyEditedAsset=false,reviewControl}){
@@ -493,5 +494,30 @@ export async function nativeMegaWorldCreation({page,call,receipt,expect,baseFile
  }
  receipt.projectId=world.id;receipt.sourceHash=world.source.sha256;receipt.donorHash=world.bspAssembly.donorSource.sha256;receipt.plan=world.bspAssembly;receipt.sourceObjectCount=world.scene.length;receipt.fileNewActualGestures=true;receipt.nativeCompilation=false;receipt.gameplayAccepted=false;
  for(const input of originals)expect(await hash(input.file)).toBe(input.sha256);receipt.originals=originals;receipt.originalSourceProjectsUnchanged=true;
+ if(process.env.SPARK_QA_ATLAS_LAYOUT==='1')await nativeAtlasLayout({page,call,receipt,expect,root});
  await page.reload();await page.locator('.map-card').filter({has:page.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(page,'Level editor');await openDrawer(page,'Construction');await expect(page.locator('.bsp-assembly')).toHaveAttribute('open','');receipt.sameProcessReopen=true;
+}
+
+async function nativeAtlasLayout({page,call,receipt,expect,root}){
+ const before=(await call('open_project',{id:receipt.projectId})).project,folder=path.join(process.env.SPARK_QA_RUNTIME_ROOT,'Halo Custom Edition','maps');
+ const hashes=[];for(const name of originalMultiplayerMaps){const file=path.join(folder,name+'.map'),sha256=crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');hashes.push({name,sha256});}
+ const atlas=page.locator('.megaworld-atlas');if(await atlas.getAttribute('open')===null)await atlas.locator(':scope>summary').click();
+ const started=performance.now();await atlas.getByRole('button',{name:'Scan installed maps',exact:true}).click();
+ const runtime=atlas.getByLabel('Atlas runtime',{exact:true});await expect.poll(async()=>await runtime.locator('option').count(),{timeout:180000}).toBeGreaterThan(1);
+ const ce=await runtime.locator('option').evaluateAll(rows=>rows.find(row=>/Custom.?Edition/i.test(row.textContent))?.value);expect(ce,'Actual connected CE source label').toBeTruthy();await runtime.selectOption(ce);
+ await atlas.getByRole('button',{name:'Add originals to layout',exact:true}).click();const layout=atlas.getByLabel('Saved region layout',{exact:true});
+ await expect(layout.getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);const scanMs=Math.round(performance.now()-started);
+ const x=layout.getByLabel('Atlas region X',{exact:true});await x.fill('125');await x.press('Tab');await page.keyboard.press('Control+s');
+ await expect.poll(async()=>(await call('open_project',{id:before.id})).project.megaworldLayout?.regions[0].translation[0]).toBe(125);
+ await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect(x).toHaveValue('0');
+ await expect.poll(async()=>(await call('open_project',{id:before.id})).project.megaworldLayout.regions[0].translation[0]).toBe(0);
+ await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');await expect(x).toHaveValue('125');
+ const yaw=layout.getByLabel('Atlas region Yaw',{exact:true});await yaw.fill('37');await yaw.press('Tab');await layout.getByRole('button',{name:'Hex cluster draft',exact:true}).click();
+ await expect(layout).toContainText('0 overlapping bounds');const xBox=await x.boundingBox(),yBox=await layout.getByLabel('Atlas region Y',{exact:true}).boundingBox();expect(Math.abs(xBox.y-yBox.y)).toBeLessThan(2);expect(yBox.x).toBeGreaterThan(xBox.x+xBox.width-2);await page.keyboard.press('Control+s');
+ await expect.poll(async()=>(await call('read_workspace_history',{projectId:before.id})).history?.head.dirty).toBe(false);
+ const saved=(await call('open_project',{id:before.id})).project;expect(saved.megaworldLayout.regions).toHaveLength(19);expect(overlappingRegions(saved.megaworldLayout.regions)).toEqual([]);
+ for(const source of hashes){const region=saved.megaworldLayout.regions.find(r=>r.mapName===source.name);expect(region.cacheSha256).toBe(source.sha256);expect(region.regionId).toBe(source.sha256+':0');expect(crypto.createHash('sha256').update(await fs.readFile(path.join(folder,source.name+'.map'))).digest('hex')).toBe(source.sha256);}
+ expect(saved.source).toEqual(before.source);expect(saved.bspAssembly).toEqual(before.bspAssembly);expect(saved.scene).toEqual(before.scene);
+ receipt.atlasLayout={actualControls:true,originalRegions:19,sourceHashes:hashes,scanAndAdmissionMs:scanMs,hexClusterDraft:true,compactFieldsShareRow:true,expected:saved.megaworldLayout,undoRedoImmediateSave:true,sourceMapsUnchanged:true,nativeConnectionNotChanged:true,nativeCompilation:false,gameplayAccepted:false};
+ await page.screenshot({path:path.join(root,'megaworld-atlas-layout.png')});
 }
