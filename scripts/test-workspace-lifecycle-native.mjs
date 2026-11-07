@@ -58,6 +58,10 @@ const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TA
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
 async function launchNative(){
   const started=performance.now();
+  if(!report.applicationIcon){
+    const readback=await runOwned('pwsh.exe',['-NoProfile','-File',path.resolve('scripts/verify-app-icon.ps1'),'-Executable',app,'-ExpectedIco',path.resolve('src-tauri/icons/icon.ico'),'-OutputPng',path.join(root,'application-icon.png')],{windowsHide:true,timeout:30000});
+    report.applicationIcon=JSON.parse(readback.stdout);expect(report.applicationIcon.matchesExpectedMonitor).toBe(true);
+  }
   const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
   child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
   await finishStorage.trackProcess(child);
@@ -78,7 +82,7 @@ async function nextPage(before){let page;await expect.poll(()=>{page=pages().fin
   await expect.poll(async()=>(await invoke(page,'workspace_window_inventory')).some(window=>window.label===label)).toBe(true);
   return page;}
 async function state(page,id){const status=await invoke(page,'read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(s=>s.key===status.history.head.current)?.project};}
-function step(name,data={}){report.cases.push({name,...data});console.log(JSON.stringify({passed:name,...data}));}
+function step(name,data={}){report.cases.push({name,...data});console.log(JSON.stringify({passed:name}));}
 async function storageSample(phase){
   const overview=await invoke(main,'storage_overview'),folders=[];
   for(const folder of overview.folders.filter(folder=>['Projects & preserved originals','Existing native jobs'].includes(folder.label))){
@@ -119,6 +123,88 @@ async function close(page,choice){
     await review.getByRole('button',{name:'Save changes',exact:true}).click();
   }
   await expect.poll(()=>page.isClosed()).toBe(true);
+}
+async function independentNativeWindows(id){
+  const original=main,orb=page=>page.getByRole('button',{name:'Toggle workspace navigation',exact:true});
+  await original.getByRole('tab',{name:'C59 map A',exact:true}).click();await inspector(original);await expect(x(original)).toHaveValue('1.5');
+  const originLabel=await original.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
+  await invoke(original,'focus_workspace_window',{label:originLabel});await expect.poll(()=>original.evaluate(()=>document.hasFocus())).toBe(true);
+  const tab=original.getByRole('tab',{name:'C59 map A',exact:true}),start=await tab.boundingBox(),count=pages().length;
+  const lift=async()=>{await original.mouse.move(start.x+start.width/2,start.y+start.height/2);await original.mouse.down();await original.mouse.move(start.x+start.width/2,start.y+130,{steps:10});};
+  const history=await state(original,id);await lift();await expect(original.locator('[data-tab-drag-phase=ready]')).toBeVisible();
+  await original.screenshot({path:path.join(root,'tab-lift.png')});await original.keyboard.press('Escape');await original.mouse.up();
+  expect(pages().length).toBe(count);expect((await state(original,id)).history.head).toEqual(history.history.head);await expect(tab).toBeVisible();
+  let before=new Set(pages());await lift();await original.mouse.up();
+  await original.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1,clientX:300,clientY:180})));
+  let editor=await nextPage(before);await inspector(editor);expect(pages().length).toBe(count+1);await expect(tab).toHaveCount(0);
+  expect((await state(editor,id)).writable).toBe(true);expect((await state(original,id)).writable).toBe(false);
+  await chooseTool(original,'Map library');before=new Set(pages());const work=await original.getByRole('button',{name:'Open work and workspace windows',exact:true}).boundingBox();
+  await original.mouse.move(work.x+work.width/2,work.y+work.height/2);await original.mouse.down();await original.mouse.move(work.x+work.width/2,work.y+130,{steps:10});await original.mouse.up();
+  const independent=await nextPage(before);await chooseTool(independent,'Features & workflows');
+  for(const page of [original,editor,independent])await expect(orb(page)).toHaveAttribute('aria-expanded','false');
+  await orb(original).click();await expect(orb(original)).toHaveAttribute('aria-expanded','true');
+  // Force an ordinary shared appearance update too; transient menus must not
+  // follow it, while the intentionally shared color must reach every window.
+  await chooseTool(editor,'Settings & tools');await editor.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  await editor.getByLabel('Monitor eye color',{exact:true}).fill('#f07abb');
+  for(const page of [original,editor,independent])await expect.poll(()=>page.locator('html').evaluate(root=>getComputedStyle(root).getPropertyValue('--gs-monitor-eye-color').trim())).toBe('#f07abb');
+  await expect(orb(original)).toHaveAttribute('aria-expanded','true');for(const page of [editor,independent])await expect(orb(page)).toHaveAttribute('aria-expanded','false');
+  await orb(editor).click();await expect(orb(editor)).toHaveAttribute('aria-expanded','true');await expect(orb(independent)).toHaveAttribute('aria-expanded','false');
+  await original.keyboard.press('Escape');await expect(orb(original)).toHaveAttribute('aria-expanded','false');await expect(orb(editor)).toHaveAttribute('aria-expanded','true');
+  await editor.keyboard.press('Escape');await orb(independent).click();await expect(orb(original)).toHaveAttribute('aria-expanded','false');await expect(orb(editor)).toHaveAttribute('aria-expanded','false');await independent.keyboard.press('Escape');
+  await expect(original.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');await expect(independent.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','features');
+  const portrait=original.locator('[data-spark-emblem="app-monitor"]');await expect(portrait).toBeVisible();
+  const portraitSource=await portrait.getAttribute('src');await expect(original.locator('.gs-spark-eye')).toBeVisible();
+  expect(await portrait.evaluate(image=>image.complete&&image.naturalWidth===256&&image.naturalHeight===256)).toBe(true);
+  // The native image is displayed through img-src self; do not weaken the
+  // app's connect-src policy or add a rendering context to read it back.
+  expect(portraitSource).toContain('/assets/icon-');
+  const png=await fs.readFile(path.resolve('src-tauri/icons/icon.png'));
+  await fs.writeFile(path.join(root,'monitor-source.png'),png,{flag:'wx'});
+  await fs.writeFile(path.join(root,'monitor-source.json'),JSON.stringify({pngSha256:crypto.createHash('sha256').update(png).digest('hex'),capture:'Permanent application portrait served to the native WebView; no 3D header capture or source reads'}),{flag:'wx'});
+  await original.screenshot({path:path.join(root,'monitor-pink.png')});
+  await editor.getByLabel('Monitor eye color',{exact:true}).fill('#57dfff');
+  for(const page of [original,editor,independent])await expect.poll(()=>page.locator('html').evaluate(root=>getComputedStyle(root).getPropertyValue('--gs-monitor-eye-color').trim())).toBe('#57dfff');
+  expect(await portrait.getAttribute('src')).toBe(portraitSource);await expect(original.locator('.gs-spark-capture')).toHaveCount(0);
+  await orb(original).hover();await original.screenshot({path:path.join(root,'monitor-glow.png')});
+  const thirdLabel=await independent.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
+  await invoke(independent,'plugin:window|minimize',{label:thirdLabel});await expect.poll(()=>invoke(editor,'plugin:window|is_minimized',{label:thirdLabel})).toBe(true);
+  await expect(orb(original)).toHaveAttribute('aria-expanded','false');await expect(editor.getByLabel('Monitor eye color',{exact:true})).toBeVisible();
+  await invoke(editor,'plugin:window|unminimize',{label:thirdLabel});await invoke(independent,'plugin:window|maximize',{label:thirdLabel});await expect.poll(()=>invoke(independent,'plugin:window|is_maximized',{label:thirdLabel})).toBe(true);
+  await invoke(independent,'plugin:window|unmaximize',{label:thirdLabel});
+  const inventory=await invoke(original,'workspace_window_inventory'),beforeFailed=await state(editor,id);
+  const refused=await invoke(editor,'open_project_window',{id,workspace:'unsupported-route',another:true}).then(()=>'',String);
+  expect(refused).not.toBe('');expect((await invoke(original,'workspace_window_inventory')).map(w=>w.label).sort()).toEqual(inventory.map(w=>w.label).sort());
+  expect((await state(editor,id)).history.head).toEqual(beforeFailed.history.head);expect((await state(editor,id)).writable).toBe(true);
+  await editor.keyboard.press('F1');await expect(editor.getByRole('dialog',{name:'A familiar spark of possibility.',exact:true})).toBeVisible();
+  for(const page of [original,independent])await expect(page.getByRole('dialog')).toHaveCount(0);
+  await editor.keyboard.press('Escape');await editor.getByRole('button',{name:'Toggle workspace navigation',exact:true}).focus();await editor.keyboard.press('ArrowDown');
+  await expect(orb(editor)).toHaveAttribute('aria-expanded','true');await expect(orb(original)).toHaveAttribute('aria-expanded','false');await expect(orb(independent)).toHaveAttribute('aria-expanded','false');
+  await editor.keyboard.press('Escape');await expect(orb(editor)).toBeFocused();await editor.keyboard.press('F6');expect(await editor.evaluate(()=>!!document.activeElement?.closest('main.main-content'))).toBe(true);
+  expect((await state(editor,id)).history.head).toEqual(beforeFailed.history.head);
+  step('Native keyboard Help, workspace-menu arrows and F6 focus stay local without changing the shared source or Undo head',{windows:3,sourceUnchanged:true});
+  await chooseTool(editor,'Level editor');await inspector(editor);await setX(editor,1.75);await acknowledged(editor,id,1.75);
+  await editor.keyboard.press('Control+z');await expect(x(editor)).toHaveValue('1.5');await editor.keyboard.press('Control+y');await expect(x(editor)).toHaveValue('1.75');await editor.keyboard.press('Control+s');
+  await original.locator('.gs-view-menu>summary').click();await original.getByRole('button',{name:'Save workspace windows',exact:true}).click();
+  let layout;await expect.poll(async()=>{try{layout=await invoke(original,'read_workspace_layout');return layout.windows.length;}catch{return 0;}}).toBeGreaterThanOrEqual(3);
+  expect(layout.windows.filter(w=>w.ownedDocuments?.includes(id))).toHaveLength(1);
+  report.windowIndependence={nativeWindows:inventory.map(w=>({label:w.label,workspace:w.workspace,project:w.project,writable:w.writable})),cancelledDrag:true,duplicatePointerUpCreatedOneWindow:true,invalidRouteRefused:refused,singleWriter:true,sharedAppearanceOnly:true,cachedPortraitUnchanged:true,savedLayoutWindows:layout.windows.length};
+  step('Three actual native windows keep Monitor menus, navigation and controls independent; eye tint shares appearance without recapturing its portrait; cancelled, duplicate and refused handoffs preserve one writer',report.windowIndependence);
+  await close(original,'save');expect(editor.isClosed()).toBe(false);expect(independent.isClosed()).toBe(false);expect((await state(editor,id)).writable).toBe(true);
+  await setX(editor,2);await acknowledged(editor,id,2);await editor.keyboard.press('Control+s');await expect.poll(async()=>(await state(editor,id)).history.head.dirty).toBe(false);const saved=await state(editor,id),pid=child.pid;
+  for(const page of [...pages()].reverse())if(!page.isClosed())await close(page,'save');
+  await waitForQaExit(child);await browser.close();await launchNative();
+  await main.locator('.gs-view-menu>summary').click();await main.getByRole('button',{name:'Restore workspace windows',exact:true}).click();
+  await expect.poll(()=>pages().length).toBeGreaterThanOrEqual(3);
+  await expect.poll(()=>{editor=pages().find(page=>new URL(page.url()).searchParams.get('project')===id);return !!editor;}).toBe(true);await expect(editor.locator('.forge-viewport canvas')).toBeVisible();await inspector(editor);
+  await expect(x(editor)).toHaveValue('2');const restored=await state(editor,id);expect(restored.history.head).toEqual(saved.history.head);expect(restored.writable).toBe(true);
+  for(const page of pages())await expect(orb(page)).toHaveAttribute('aria-expanded','false');
+  const after=await invoke(editor,'workspace_window_inventory');expect(after.filter(w=>w.project===id&&w.writable)).toHaveLength(1);expect(after.some(w=>w.project===null&&w.workspace==='features')).toBe(true);
+  await expect.poll(()=>editor.locator('html').evaluate(root=>getComputedStyle(root).getPropertyValue('--gs-monitor-eye-color').trim())).toBe('#57dfff');
+  await expect(editor.locator('[data-spark-emblem="app-monitor"]')).toBeVisible();expect(await editor.locator('[data-spark-emblem="app-monitor"]').getAttribute('src')).toBe(portraitSource);
+  await expect(editor.locator('.gs-spark-capture')).toHaveCount(0);
+  report.windowIndependence.restart={stoppedPid:pid,restartedPid:child.pid,restoredWindows:after.length,historyPreserved:true,sourcePreserved:true,menusClosed:true,eyeTintPreserved:true,cachedPortraitReused:true};
+  step('Detached native editor keeps editing after the original closes; normal application restart restores the saved independent layout and exact source/Undo head',report.windowIndependence.restart);
 }
 async function projectDirectories(){return fs.readdir(path.join(root,'library/projects')).catch(error=>{if(error.code==='ENOENT')return[];throw error;});}
 async function nativeMemoryLifecycle(){
@@ -188,6 +274,35 @@ async function nativeTagAnimation(opened){
       report.tagAnimation={actorPath:actor.path,clips:clipCount,bones:initial.bones,source:initial.source,pausedTime:paused.time,sameCanvas:true,gameplayAccepted:false};
       step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
 }
+async function reviewNativeScene(id,label,requireNormalExit=false){
+      // Explicit, bounded operator review of the existing installed-tool UI.
+      // Process launch/exit never asserts game loading or trigger traversal.
+      const testScene=main.locator('.runtime-dock').getByRole('button',{name:/^Test Scene/});
+      // The dock resolves real source/tool readiness asynchronously on reopen.
+      // A setup action remains clickable to explain missing prerequisites.
+      await expect(testScene).toContainText('Ready');await testScene.click();
+      const dialog=main.getByRole('dialog',{name:'Open Standalone scene test',exact:true});await expect(dialog).toBeVisible();
+      await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Open tool',exact:true}).click();
+      let game;await expect.poll(async()=>{game=(await invoke(main,'runtime_tool_processes')).find(p=>p.projectId===id&&p.actionId==='testScene');return !!game;}).toBe(true);
+      const trial={label,projectId:id,processId:game.processId,executable:game.executable,executableSha256:game.executableSha256,tagsDirectory:game.tagsDirectory,gameLoaded:null,gameplayVerified:false,startedAt:new Date().toISOString()};
+      await fs.writeFile(path.join(root,`logic-${label}-game-review.json`),JSON.stringify(trial,null,2),{flag:'wx'});console.log('NATIVE_GAME_REVIEW',JSON.stringify(trial));
+      await expect.poll(async()=>{game=(await invoke(main,'runtime_tool_processes')).find(p=>p.processId===trial.processId);return game?.status;},{timeout:180000,intervals:[1000,2500]}).not.toBe('running');
+      const diagnostics=[];
+      for(const name of ['debug.txt','reports/debug.txt']){
+        const file=path.join(path.dirname(trial.tagsDirectory),name),info=await fs.lstat(file).catch(()=>null);
+        if(!info?.isFile()||info.isSymbolicLink()||info.size>4*1024**2)continue;
+        const bytes=await fs.readFile(file);diagnostics.push({file:name,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),tail:bytes.subarray(-65536).toString('utf8')});
+      }
+      // Preserve the actual failed exit and bounded native diagnostics before
+      // disposal too. A failed game must never leave only a launch receipt.
+      const result={...trial,status:game?.status??'unknown',exitCode:game?.exitCode??null,closedAt:new Date().toISOString(),diagnostics};
+      // Retain the actual native failure before asserting; a rejected exit
+      // must not throw away the diagnostics we just collected.
+      if(label==='authored')report.logicRoundTrip.standaloneProcessTrial=result;
+      else report.logicRoundTrip.controlTrial=result;
+      if(requireNormalExit)expect(game?.exitCode,'Close the observed game normally; a process exit is not gameplay acceptance').toBe(0);
+      step(`Installed Standalone ${label} process observed; scene loading and gameplay require separate visual evidence`,result);return result;
+}
 try{
   await physicalSample('before-launch');
   await launchNative();
@@ -201,10 +316,18 @@ try{
   if(logicOnly){
     const {nativeLogicRoundTrip}=await import('./native-logic-roundtrip.mjs');
     report.logicRoundTrip={appSha256:report.appSha256,sourceCacheSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex'),mockedIpc:false,gameplayVerified:false,externalGuiEdited:false};
-    await nativeLogicRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT??''),tags:path.resolve(process.env.SPARK_LOGIC_TAGS??''),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),call:(command,args)=>invoke(main,command,args),receipt:report.logicRoundTrip,expect,run:runOwned,verifyEditedAsset:true});
+    await nativeLogicRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT??''),tags:path.resolve(process.env.SPARK_LOGIC_TAGS??''),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),call:(command,args)=>invoke(main,command,args),receipt:report.logicRoundTrip,expect,run:runOwned,verifyEditedAsset:true,reviewControl:process.env.SPARK_LOGIC_GAME_REVIEW==='1'?id=>reviewNativeScene(id,'control'):undefined});
     step('Actual edited native asset import, door/trigger authoring, Undo/Save/reopen and native build',report.logicRoundTrip);
+    const {nativeWorldMachineRoundTrip}=await import('./native-logic-roundtrip.mjs');report.worldMachineRoundTrip={};
+    const nativeDonor=(await invoke(main,'open_project',{id:report.logicRoundTrip.projectId})).project.nativeAssetImports.find(binding=>binding.tagClass==='mach');
+    expect(nativeDonor,'Use the validated edited-copy donor, not the source with pending tag edits').toBeTruthy();
+    await nativeWorldMachineRoundTrip({page:main,root,cache:path.resolve(nativeMap),compiled:report.logicRoundTrip.nativeBuild.build.output,donorProjectId:nativeDonor.sourceProjectId,call:(command,args)=>invoke(main,command,args),receipt:report.worldMachineRoundTrip,expect,run:runOwned,invader:path.resolve(invaderDirectory)});
+    step('Actual imported-map World native door drop, copied placement, Undo/Save/reopen and independent scenario readback',report.worldMachineRoundTrip);
+
     const id=report.logicRoundTrip.projectId,before=await invoke(main,'open_project',{id}),beforeHistory=await state(main,id),pid=child.pid;
-    await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();
+    report.logicRoundTrip.beforeProcessClose={inventory:await invoke(main,'workspace_window_inventory'),pages:await Promise.all(pages().map(async page=>({url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label)})))};
+    for(const view of [...pages()].reverse())if(!view.isClosed())await close(view,'save');
+    await waitForQaExit(child);await browser.close();await launchNative();
     const reopened=await invoke(main,'open_project',{id}),restored=await state(main,id);
     expect(reopened.project.quickForge).toEqual(before.project.quickForge);expect(reopened.project.nativeAssetImports).toEqual(before.project.nativeAssetImports);
     expect(reopened.project.builds).toEqual(before.project.builds); // Native metadata must survive independently of an authored dirty flag.
@@ -215,31 +338,7 @@ try{
     const canvas=main.locator('.forge-viewport canvas');await expect(canvas).toBeVisible();
     report.logicRoundTrip.processReopen={stoppedPid:pid,restartedPid:child.pid,sourceAndImportsPreserved:true,undoHeadPreserved:true,nativeWindowReopened:true};
     step('Authored native asset and logic survive a normal process close/restart with the same Undo head',report.logicRoundTrip.processReopen);
-    if(process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
-      // Explicit, bounded operator review of the existing installed-tool UI.
-      // Process launch/exit never asserts game loading or trigger traversal.
-      const testScene=main.locator('.runtime-dock').getByRole('button',{name:/^Test Scene/});
-      // The dock resolves real source/tool readiness asynchronously on reopen.
-      // A setup action remains clickable to explain missing prerequisites.
-      await expect(testScene).toContainText('Ready');await testScene.click();
-      const dialog=main.getByRole('dialog',{name:'Open Standalone scene test',exact:true});await expect(dialog).toBeVisible();
-      await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Open tool',exact:true}).click();
-      let game;await expect.poll(async()=>{game=(await invoke(main,'runtime_tool_processes')).find(p=>p.projectId===id&&p.actionId==='testScene');return !!game;}).toBe(true);
-      const trial={projectId:id,processId:game.processId,executable:game.executable,executableSha256:game.executableSha256,tagsDirectory:game.tagsDirectory,gameLoaded:null,gameplayVerified:false,startedAt:new Date().toISOString()};
-      await fs.writeFile(path.join(root,'logic-game-review.json'),JSON.stringify(trial,null,2),{flag:'wx'});console.log('NATIVE_GAME_REVIEW',JSON.stringify(trial));
-      await expect.poll(async()=>{game=(await invoke(main,'runtime_tool_processes')).find(p=>p.processId===trial.processId);return game?.status;},{timeout:180000,intervals:[1000,2500]}).not.toBe('running');
-      const diagnostics=[];
-      for(const name of ['debug.txt','reports/debug.txt']){
-        const file=path.join(path.dirname(trial.tagsDirectory),name),info=await fs.lstat(file).catch(()=>null);
-        if(!info?.isFile()||info.isSymbolicLink()||info.size>4*1024**2)continue;
-        const bytes=await fs.readFile(file);diagnostics.push({file:name,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),tail:bytes.subarray(-65536).toString('utf8')});
-      }
-      // Preserve the actual failed exit and bounded native diagnostics before
-      // disposal too. A failed game must never leave only a launch receipt.
-      report.logicRoundTrip.standaloneProcessTrial={...trial,status:game?.status??'unknown',exitCode:game?.exitCode??null,closedAt:new Date().toISOString(),diagnostics};
-      expect(game?.exitCode,'Close the observed game normally; a process exit is not gameplay acceptance').toBe(0);
-      step('Installed Standalone source-test launch and normal exit observed; scene and gameplay require separate visual evidence',report.logicRoundTrip.standaloneProcessTrial);
-    }
+    if(process.env.SPARK_LOGIC_GAME_REVIEW==='1')report.logicRoundTrip.standaloneProcessTrial=await reviewNativeScene(id,'authored',true);
   }
   if(!nativeOnly&&!geometryOnly&&!logicOnly&&!launchOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -357,6 +456,29 @@ try{
   }
   await close(detached,'save');await inspector(main);
   step('Native size/position survive close and reopen; an offscreen saved window is recovered onto an available monitor',{placement,recovered});
+  // Exercise the actual pointer entrypoints, rather than invoking the window
+  // command as a substitute for tab/current-workspace tear-off.
+  const beforeTabTear=await state(main,a.project.id);
+  await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  prior=new Set(pages());const tab=await main.getByRole('tab',{name:'C59 map A',exact:true}).boundingBox();
+  await main.mouse.move(tab.x+tab.width/2,tab.y+tab.height/2);await main.mouse.down();await main.mouse.move(tab.x+tab.width/2,tab.y+120,{steps:12});await main.mouse.up();
+  const tornTab=await nextPage(prior);await expect(tornTab.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','settings');
+  await expect(tornTab.getByRole('tab',{name:'Interface Studio',exact:true})).toHaveAttribute('aria-selected','true');
+  const tornState=await state(tornTab,a.project.id);expect(tornState.project.quickForge).toEqual(beforeTabTear.project.quickForge);expect(tornState.history.head.current).toBe(beforeTabTear.history.head.current);expect(tornState.writable).toBe(true);
+  await close(tornTab,'save');await openProject(main,'C59 map A');await inspector(main);await expect(x(main)).toHaveValue('1.5');
+  await main.keyboard.press('Control+z');await expect(x(main)).toHaveValue('1.25');await main.keyboard.press('Control+y');await expect(x(main)).toHaveValue('1.5');
+  await chooseTool(main,'Map library');prior=new Set(pages());const work=await main.getByRole('button',{name:'Open work and workspace windows',exact:true}).boundingBox();
+  await main.mouse.move(work.x+work.width/2,work.y+work.height/2);await main.mouse.down();await main.mouse.move(work.x+work.width/2,work.y+120,{steps:12});await main.mouse.up();
+  const tornWorkspace=await nextPage(prior);await expect(tornWorkspace.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');
+  await chooseTool(tornWorkspace,'Features & workflows');await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');await close(tornWorkspace);
+  report.compactHeader=await main.locator('#gs-window-header').evaluate(header=>{
+    const r=header.getBoundingClientRect(),children=[...header.children].map(child=>child.getBoundingClientRect()).filter(c=>c.width>0&&c.height>0);
+    return{height:r.height,width:r.width,childrenContained:children.every((c,i)=>c.left>=r.left-1&&c.right<=r.right+1&&c.top>=r.top-1&&c.bottom<=r.bottom+1&&(!i||children[i-1].right<=c.left+1)),dragWidth:header.querySelector('.gs-titlebar-drag-space').getBoundingClientRect().width};
+  });
+  expect(report.compactHeader.height).toBe(32);expect(report.compactHeader.childrenContained).toBe(true);expect(report.compactHeader.dragWidth).toBeGreaterThanOrEqual(48);
+  await main.screenshot({path:path.join(root,'compact-header.png')});
+  step('Real map-tab tear-off preserves current workspace, settings section and Undo; current-workspace drag opens an independent native window; the 32px header stays aligned',report.compactHeader);
+  await chooseTool(main,'Level editor');await inspector(main);
   prior=new Set(pages());await invoke(main,'open_workspace_window',{workspace:'learning',context:null,section:null});const learning=await nextPage(prior);await openDrawer(learning,'Help');
   const beforeHelp=new Set(pages());await learning.getByRole('button',{name:'Detach Help',exact:true}).click();const help=await nextPage(beforeHelp);await expect(help.locator('.gs-workspace-shell')).toHaveAttribute('data-detached-panel','help');await help.getByRole('button',{name:'Return panel to workspace',exact:true}).click();await expect.poll(()=>help.isClosed()).toBe(true);await expect(learning.getByRole('region',{name:'Help panel',exact:true})).toBeVisible();await close(learning);
   step('A non-map drawer returns to the native window that opened it, including nested pop-outs');
@@ -369,6 +491,7 @@ try{
   step('Online exposes source collaboration separately from game hosting; production Steam test identities are refused natively');
   await main.screenshot({path:path.join(root,'online-collaboration.png')});
   await chooseTool(main,'Level editor');await inspector(main);await acknowledged(main,a.project.id,1.5);
+  await independentNativeWindows(a.project.id);
   }
   if(nativeMap&&!geometryOnly&&!logicOnly){
     if(!readOnly&&!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
@@ -674,7 +797,9 @@ try{
     }
   }
   expect(report.errors).toEqual([]);report.complete=true;
-}catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser)for(const [i,page]of pages().entries())await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});}
+}catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser){
+  report.failureWindows=await Promise.all(pages().map(async(page,i)=>{await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});return{url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label).catch(()=>null),workspace:await page.locator('.gs-workspace-shell').getAttribute('data-workspace').catch(()=>null),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,2500)};}));
+}}
 finally{
   // Successful acceptance closes the actual application normally before
   // sealing its regenerable cache. Abrupt termination leaves WebView writers

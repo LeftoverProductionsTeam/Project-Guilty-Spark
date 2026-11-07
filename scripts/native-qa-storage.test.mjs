@@ -30,6 +30,19 @@ test('inline owned operations record their actual origin and clean their disposa
   assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
 });
 
+test('a second process preserves another startup namespace before its receipt is published', async () => {
+  const env={...process.env};
+  for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
+  const {root}=await readDevelopmentStorage();await fs.mkdir(root,{recursive:true});
+  const pending=await fs.mkdtemp(path.join(root,'run-'));
+  try {
+    const source=new URL('./native-qa-storage.mjs',import.meta.url).href;
+    const run=spawnSync(process.execPath,['--input-type=module','-e',`import fs from 'node:fs/promises';import assert from 'node:assert/strict';import {withDevelopmentWorkspace} from ${JSON.stringify(source)};await withDevelopmentWorkspace('pending-admission-regression',async()=>{assert.ok((await fs.stat(${JSON.stringify(pending)})).isDirectory(),'Another process owns the unpublished namespace');},{reservationBytes:8*1024**2});`],{env,encoding:'utf8',windowsHide:true});
+    assert.equal(run.status,0,run.stderr);assert.ok((await fs.stat(pending)).isDirectory());
+    assert.deepEqual(await fs.readdir(pending),[]);
+  } finally {await fs.rmdir(pending).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+});
+
 test('stdin operations use the real storage API identity and leave no generated tree', () => {
   const env={...process.env};
   for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
@@ -38,6 +51,47 @@ test('stdin operations use the real storage API identity and leave no generated 
     input:`import fs from 'node:fs/promises';import {withDevelopmentWorkspace} from ${JSON.stringify(source)};await withDevelopmentWorkspace('stdin-regression',async c=>{await fs.writeFile(c.directory+'/tiny.txt','stdin output');},{reservationBytes:8*1024**2});`});
   assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
 });
+
+test('live allocation sampling shares child deletion while pinning the root and validating its identity', {
+  skip:process.platform!=='win32',
+},()=>withDevelopmentWorkspace('live-directory-sharing',async context=>{
+  await fixture(async parent=>{
+    const root=await mkdir(path.join(parent,'live-root'));
+    const child=await mkdir(path.join(root,'compiler-temp'));
+    const script=String.raw`
+      $ErrorActionPreference='Stop'
+      Add-Type -Path $env:SPARK_METER_SOURCE
+      $flags=[System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Static
+      [SparkPhysicalAudit].GetField('summaryMode',$flags).SetValue($null,$true)
+      $visit=[SparkPhysicalAudit].GetMethod('OpenVisitDirectory',$flags)
+      $open=[SparkPhysicalAudit].GetMethod('Open',$flags)
+      if($visit){$handle=$visit.Invoke($null,@($env:SPARK_LIVE_CHILD,1))}else{$handle=$open.Invoke($null,@($env:SPARK_LIVE_CHILD,$true))}
+      try {[System.IO.Directory]::Delete($env:SPARK_LIVE_CHILD);[Console]::WriteLine('child-delete-shared')} finally {$handle.Dispose()}
+      [System.IO.Directory]::CreateDirectory($env:SPARK_LIVE_CHILD)|Out-Null
+      $moving=$visit.Invoke($null,@($env:SPARK_LIVE_CHILD,1))
+      try {
+        $infoArgs=[object[]]@($moving,$null)
+        $readOk=[SparkPhysicalAudit].GetMethod('GetFileInformationByHandle',$flags).Invoke($null,$infoArgs)
+        if(-not $readOk){throw 'Cannot read owned directory identity'}
+        [System.IO.Directory]::Move($env:SPARK_LIVE_CHILD,$env:SPARK_LIVE_CHILD+'-original')
+        [System.IO.Directory]::CreateDirectory($env:SPARK_LIVE_CHILD)|Out-Null
+        try {[SparkPhysicalAudit].GetMethod('RecheckLiveDirectory',$flags).Invoke($null,@($env:SPARK_LIVE_CHILD,$infoArgs[1]));throw 'Replacement identity unexpectedly accepted'}
+        catch {if($_.Exception.GetBaseException().GetType().Name -ne 'MovingDirectoryException'){throw};[Console]::WriteLine('replacement-identity-refused')}
+      } finally {$moving.Dispose()}
+      $rootHandle=$visit.Invoke($null,@($env:SPARK_LIVE_ROOT,0))
+      try {
+        try {[System.IO.Directory]::Move($env:SPARK_LIVE_ROOT,$env:SPARK_LIVE_ROOT+'-moved');throw 'Root unexpectedly moved'}
+        catch {if(($_.Exception.GetBaseException().HResult -band 65535) -ne 32){throw};[Console]::WriteLine('root-still-pinned')}
+      } finally {$rootHandle.Dispose()}
+      $regular=$open.Invoke($null,@($env:SPARK_LIVE_ROOT,$true))
+      try { [Console]::WriteLine('original-open-contract-preserved') } finally {$regular.Dispose()}
+    `;
+    const run=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,encoding:'utf8',env:{...process.env,SPARK_METER_SOURCE:path.resolve('scripts/maintenance/physical-audit.cs'),SPARK_LIVE_ROOT:root,SPARK_LIVE_CHILD:child}});
+    assert.equal(run.status,0,run.stdout+'\n'+run.stderr);
+    assert.match(run.stdout,/child-delete-shared/);assert.match(run.stdout,/root-still-pinned/);assert.match(run.stdout,/original-open-contract-preserved/);assert.match(run.stdout,/replacement-identity-refused/);
+    assert.ok((await fs.stat(child)).isDirectory());assert.ok((await fs.stat(root)).isDirectory());
+  });
+},{reservationBytes:8*1024**2}));
 
 test('real Windows allocation summaries retain resident bytes, deduplicate file IDs and refuse junctions', {
   skip: process.platform !== 'win32',

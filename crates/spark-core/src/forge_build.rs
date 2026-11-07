@@ -50,6 +50,51 @@ pub struct QuickForgeBuildReceipt {
     pub build: Option<BuildRecord>,
     pub tool_identities: BTreeMap<String,String>,
 }
+/// H1A loads these native tags outside the scenario's recursive cache closure.
+/// Keep this exact SDK contract separate from CE or Xbox runtime resources.
+pub fn h1a_scene_roots(scenario_type:u16)->Result<Vec<&'static str>> {
+    let collection=match scenario_type {
+        0=>"ui/ui_tags_loaded_solo_scenario_type.tag_collection",
+        1=>"ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection",
+        2=>"ui/ui_tags_loaded_mainmenu_scenario_type.tag_collection",
+        _=>return invalid("Unsupported H1A scenario type for a Standalone source test"),
+    };
+    let mut roots=vec!["ui/ui_tags_loaded_all_scenario_types.tag_collection",collection,
+        "ui/shell/bitmaps/background.bitmap","ui/shell/strings/loading.unicode_string_list",
+        "ui/shell/bitmaps/trouble_brewing.bitmap","sound/sfx/ui/cursor.sound",
+        "sound/sfx/ui/forward.sound","sound/sfx/ui/back.sound"];
+    if scenario_type==1 {roots.extend(["ui/shell/main_menu/mp_map_list.unicode_string_list",
+        "ui/shell/bitmaps/team_icon_slayer.bitmap","ui/shell/bitmaps/team_background.bitmap"]);}
+    Ok(roots)
+}
+/// Read-only launch preflight, not game or semantic acceptance. Native builds
+/// recursively validate/hash the complete optional closure when it is available.
+pub fn h1a_scene_preflight(tags:&Path,scenario_type:u16)->Result<()> {
+    use std::io::Read;
+    crate::reject_links(tags)?;let mut missing=vec![];
+    for relative in h1a_scene_roots(scenario_type)? {
+        let file=tags.join(safe_relative(relative)?);crate::reject_links(&file)?;
+        let usable=(||->Result<bool>{
+            let mut input=match fs::File::open(&file){Ok(input)=>input,Err(error) if error.kind()==std::io::ErrorKind::NotFound=>return Ok(false),Err(error)=>return Err(error.into())};
+            let metadata=input.metadata()?;if !metadata.is_file()||metadata.len()<64||metadata.len()>64*1024*1024{return Ok(false);}
+            let mut header=[0u8;64];input.read_exact(&mut header)?;
+            let class=std::str::from_utf8(&header[36..40]).unwrap_or("");
+            Ok(&header[60..64]==b"blam"&&crate::tag_exchange::extension(class).ok()==file.extension().and_then(|s|s.to_str()))
+        })()?;
+        if !usable{missing.push(relative);}
+    }
+    if !missing.is_empty(){return invalid(format!("Standalone needs {} matching H1A UI/shell source tag(s): {}. Choose the matching legal SDK tags and rebuild; the native cache and editable source were retained. A valid cache alone does not include these extra source-test dependencies.",missing.len(),missing.into_iter().take(4).collect::<Vec<_>>().join("; ")));}
+    Ok(())
+}
+fn reuse_has_scene_sources(tools:&ForgeToolchain,receipt:&QuickForgeBuildReceipt,document:&quickforge::QuickForgeDocument)->bool {
+    if tools.hek_flavor.as_deref()!=Some("h1aEk"){return true;}
+    let source=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
+    let kind=quickforge::native_scenario_type(document);
+    // An SDK may intentionally provide only a cache-build subset. Do not make
+    // optional Standalone UI data a requirement for those existing builds.
+    if source.as_ref().is_none_or(|tags|h1a_scene_preflight(tags,kind).is_err()){return true;}
+    receipt.sources.as_ref().is_some_and(|s|h1a_scene_preflight(&s.directory.join("tags"),kind).is_ok())
+}
 // Re-derive console grammar from the validated document. Receipt metadata is not authority.
 fn workshop_playtest_scenario(document:&quickforge::QuickForgeDocument,receipt_path:&str)->Result<String>{
     let expected=quickforge::scenario_path(document)?;
@@ -73,6 +118,7 @@ pub fn workshop_playtest_with_debug(receipt:&QuickForgeBuildReceipt,kit:&Path,de
     let project=project::load_project(&sources.directory.join("project.gsproject"))?;
     if project.fingerprint()?!=receipt.project_fingerprint||project.quick_forge.as_ref().is_none_or(|d|d.workshop.is_none()||d.runtime_id!=RuntimeId::MccSteam) {return invalid("Workshop source is not the exact compiled MCC project");}
     let scenario=workshop_playtest_scenario(project.quick_forge.as_ref().unwrap(),&sources.scenario_path)?;
+    h1a_scene_preflight(&sources.directory.join("tags"),quickforge::native_scenario_type(project.quick_forge.as_ref().unwrap()))?;
     let exe=kit.join("halo_tag_test.exe");crate::reject_links(&exe)?;
     let alias=crate::native_workspace::Alias::new(&sources.directory)?;
     let init_name=format!("spark-workshop-{}.txt",uuid::Uuid::new_v4());
@@ -291,7 +337,7 @@ pub fn run_prepared_job(
     let started=Instant::now();
     let jobs_root=future_jobs_root(jobs_root)?;
     if !export_only&&prepared.is_none()&&extra_blockers.is_empty(){
-        if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root){
+        if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root).filter(|receipt|reuse_has_scene_sources(tools,receipt,document)){
             if !custom.models.is_empty(){let output=receipt.build.as_ref().and_then(|build|build.output.as_deref()).ok_or_else(||SparkError::Invalid("Reused model build has no native output".into()))?;custom.inspect_cache(&maps::inspect_map(output,None)?,output)?;custom.verify_sources()?;}
             on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);
         }
@@ -310,8 +356,12 @@ pub fn run_prepared_job(
             crate::reject_links(&dependency_tool)?;
             let dependency_tool_sha256=maps::hash_file(&dependency_tool)?;
             let (selected,model_class_bindings)=if let Some(expected)=prepared{validate_prepared_inventory(tags,&all,expected)?;(all.clone(),BTreeMap::new())}else{
+                let mut extra=crate::powerups::source_dependencies(project).into_iter().collect::<std::collections::BTreeSet<_>>();
+                if tools.hek_flavor.as_deref()==Some("h1aEk")&&h1a_scene_preflight(tags,quickforge::native_scenario_type(document)).is_ok() {
+                    extra.extend(h1a_scene_roots(quickforge::native_scenario_type(document))?.into_iter().map(str::to_owned));
+                }
                 dependency_subset(tags,&all,&requirements,&generated,&imported_names,
-                    crate::powerups::source_dependencies(project).into_iter().collect(),tools.hek_flavor.as_deref()==Some("h1aEk"),
+                    extra,tools.hek_flavor.as_deref()==Some("h1aEk"),
                     |requested|runner.run(&dependency_tool,&["-r".into(),"-t".into(),tags.to_string_lossy().into_owned(),requested.into()],tags,"dependencies",2))?
             };
             if maps::hash_file(&dependency_tool)?!=dependency_tool_sha256{return invalid("Native dependency tool changed while planning; no staging was allocated");}
@@ -605,6 +655,30 @@ mod tool_generation_tests {
         fs::write(&source,b"new authored source bytes").unwrap();
         assert!(run("changed",&expected).contains("source hash changed"));
         assert_eq!(fs::read(&source).unwrap(),b"new authored source bytes");
+    }
+    #[test]
+    fn h1a_source_test_requires_exact_extra_shell_roots_without_mutating_source() {
+        let temp=tempfile::tempdir().unwrap();let tags=temp.path().join("tags");
+        assert!(h1a_scene_preflight(&tags,1).unwrap_err().to_string().contains("UI/shell"));assert!(!tags.exists());
+        for path in h1a_scene_roots(1).unwrap(){let file=tags.join(path);fs::create_dir_all(file.parent().unwrap()).unwrap();
+            let class=if path.ends_with(".tag_collection"){b"tagc"}else if path.ends_with(".bitmap"){b"bitm"}else if path.ends_with(".sound"){b"snd!"}else{b"ustr"};
+            let mut bytes=[0u8;64];bytes[36..40].copy_from_slice(class);bytes[60..64].copy_from_slice(b"blam");fs::write(file,bytes).unwrap();}
+        // This synthetic header fixture tests admission, not native semantics or gameplay.
+        h1a_scene_preflight(&tags,1).unwrap();
+        let document=quickforge::create_arena("Reuse shell","smallIndoorArena").unwrap();
+        let tools=ForgeToolchain{hek_tags_directory:Some(tags.clone()),hek_flavor:Some("h1aEk".into()),..Default::default()};
+        let receipt=QuickForgeBuildReceipt{schema_version:1,job_id:uuid::Uuid::new_v4().to_string(),project_id:uuid::Uuid::new_v4().to_string(),project_fingerprint:String::new(),source_document_sha256:None,current:None,status:"validated".into(),duration_ms:0,sources:None,blockers:vec![],warnings:vec![],build:None,tool_identities:Default::default()};
+        assert!(!reuse_has_scene_sources(&tools,&receipt,&document),"a previously cache-only receipt must not suppress newly available scene dependencies");
+        let missing=tags.join("ui/shell/bitmaps/team_background.bitmap");fs::write(&missing,b"truncated").unwrap();
+        assert!(h1a_scene_preflight(&tags,1).is_err());assert_eq!(fs::read(missing).unwrap(),b"truncated");
+        assert!(h1a_scene_roots(0).unwrap().contains(&"ui/ui_tags_loaded_solo_scenario_type.tag_collection"));
+        assert!(h1a_scene_roots(2).unwrap().contains(&"ui/ui_tags_loaded_mainmenu_scenario_type.tag_collection"));
+        assert!(h1a_scene_roots(7).is_err());
+    }
+    #[test]
+    fn native_source_mode_and_scene_launcher_share_the_campaign_decision() {
+        let mut doc=quickforge::create_arena("Source mode","smallIndoorArena").unwrap();assert_eq!(quickforge::native_scenario_type(&doc),1);
+        for mode in ["firefight","zombie"] {doc.game_mode=mode.into();assert_eq!(quickforge::native_scenario_type(&doc),0);}
     }
     #[test]
     fn workshop_receipt_cannot_inject_console_grammar_or_select_another_scenario(){

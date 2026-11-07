@@ -447,13 +447,13 @@ impl Runner<'_> {
                 || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"|"tag-renaming"))
                 || (name.eq_ignore_ascii_case("invader-extract.exe") && phase=="extract")
                 || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"|"tag-renaming"))
-                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"asset-dependencies"|"tag-renaming"))
+                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"dependencies"|"asset-dependencies"|"tag-renaming"))
                 || (matches!(phase,"recovery-readback"|"recovery-dependencies"|"recovery-data") && ["invader-edit.exe","invader-dependency.exe","invader-recover.exe"].contains(&name.as_ref()))
         }) {
             Some(crate::native_workspace::Alias::new(cwd)?)
         } else {None};
         #[cfg(windows)]
-        let extraction_args = if matches!(phase,"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data") {
+        let extraction_args = if matches!(phase,"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data") {
             native_alias.as_ref().map(|alias|crate::native_workspace::extraction_arguments(args,cwd,alias.path())).transpose()?
         } else {None};
         #[cfg(windows)]

@@ -58,7 +58,7 @@ export default function InterfaceStudio({
     <div id="interface-category" role="tabpanel" aria-labelledby={`interface-${section}`} className={`interface-section-grid interface-section-${section}`}>
     {section==='appearance'&&<>
     <section className="analysis-card">
-      <h2><Palette size={19}/> Visual identity</h2>
+      <div className="interface-visual-heading"><h2><Palette size={19}/> Visual identity</h2><label className="interface-monitor-eye" title="Color of the Monitor menu button's eye and glow">Monitor eye <input type="color" aria-label="Monitor eye color" value={preferences.monitorEyeColor} onChange={event=>onChange({...preferences,monitorEyeColor:event.target.value})}/></label></div>
       {homeModelSettings}
       <div className="interface-theme-grid">
         {themes.map((theme) => <button

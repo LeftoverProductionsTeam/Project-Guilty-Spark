@@ -1,7 +1,7 @@
 import AssetSourceBrowser from './AssetSourceBrowser';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import LibraryAssetPreview from './LibraryAssetPreview';
-import {WorkspacePanel,useRevealWorkspacePanel} from './WorkspacePanels';
+import {WorkspacePanel,useWorkspacePanelOpen} from './WorkspacePanels';
 import {viewportAssetCatalog,placeLibraryModel} from '../viewportAssets';
 import type {ViewportAsset} from '../viewportAssets';
 import {beginAssetTransfer} from '../assetDragRegistry';
@@ -14,25 +14,19 @@ import type { ForgeAsset } from '../forge';
 import { Notice } from './ui';
 export type TransferSelection =
   { kind: 'tag'; asset: ForgeAsset } | { kind: 'obj'; sourceId: string; assetId: string } | {kind:'sound';item:Exclude<ViewportAsset,{kind:'model'}>};
-export default function AssetTransfer({
-  data,
-  documents,
-  target,
-  busy,
-  onTransfer,
-  onClose,
-  onTags,
-}: {
-  data: Bootstrap;
-  documents: MapDocument[];
-  target: Project;
-  busy: boolean;
-  onTransfer: (selection: TransferSelection) => Promise<void>;
-  onClose: () => void;
-  onTags: () => void;
-}) {
-  const reveal=useRevealWorkspacePanel();
-  useEffect(()=>{reveal('asset-transfer');},[target.id]);
+interface AssetTransferProps {
+  data:Bootstrap;
+  documents:MapDocument[];
+  target:Project;
+  busy:boolean;
+  onTransfer:(selection:TransferSelection)=>Promise<void>;
+  onTags:()=>void;
+}
+export default function AssetTransfer(props:AssetTransferProps){
+  const open=useWorkspacePanelOpen('asset-transfer');
+  return <WorkspacePanel id="asset-transfer" label="Transfer assets" defaultDock="right">{open&&<TransferContents {...props}/>}</WorkspacePanel>;
+}
+function TransferContents({data,documents,target,busy,onTransfer,onTags}:AssetTransferProps){
   const librarySources = useAssetLibrarySources(documents);
   const sources = [
       ...data.entries,
@@ -76,7 +70,6 @@ export default function AssetTransfer({
     : [];
   const assets=open?viewportAssetCatalog([{history:{current:open.project},inspection:open.inspection}]).filter(item=>(item.name+' '+item.path).toLowerCase().includes(query.toLowerCase())):[];
   return (
-    <WorkspacePanel id="asset-transfer" label="Transfer assets" defaultDock="right">
       <section className="asset-transfer-panel" aria-label="Transfer map assets">
         <header>
           <div>
@@ -86,7 +79,6 @@ export default function AssetTransfer({
               available.
             </p>
           </div>
-          <button onClick={onClose}>Close transfers</button>
         </header>
         <AssetSourceBrowser
           onLoaded={(source) => {
@@ -160,7 +152,6 @@ export default function AssetTransfer({
           Open recursive tag extraction & staging
         </button>
       </section>
-    </WorkspacePanel>
   );
 }
 export function transferTag(project: Project, asset: ForgeAsset): Project {

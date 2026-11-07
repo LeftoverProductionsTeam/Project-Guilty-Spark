@@ -1,5 +1,6 @@
 mod common;
 use spark_core::{library::Library,maps};
+use rusqlite::OptionalExtension;
 #[test]
 fn runtime_material_previews_stay_read_only_and_outside_the_editable_workspace_library(){
     let temp=tempfile::tempdir().unwrap();let root=temp.path().join("application");let input=temp.path().join("owned.map");
@@ -149,4 +150,37 @@ fn a_clean_reopen_restores_only_matching_recorded_native_build_metadata() {
     // this metadata-only fixture intentionally creates no playable map.
     receipt.status="exported".into();let library=Library::workspace(&root).unwrap();library.set_setting(&format!("quickforge.receipt.{}",p.id),&receipt).unwrap();drop(library);
     assert!(Library::workspace(&root).unwrap().get(&p.id).unwrap().builds.is_empty());
+}
+
+#[test]
+fn malformed_optional_build_metadata_keeps_source_and_undo_accessible() {
+    use spark_core::{quickforge,workspace_history::{Session,Head,Snapshot}};
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("library");
+    let library=Library::workspace(&root).unwrap();let mut p=library.create("Recoverable source").unwrap();
+    p.quick_forge=Some(quickforge::create_arena("Recoverable source","smallIndoorArena").unwrap());
+    library.save(&p,None).unwrap();let mut history=Session::default();let key=uuid::Uuid::new_v4().to_string();
+    let dir=library.project_dir(&p.id).unwrap();let journal=dir.join("window-history");
+    let head=Head{current:key.clone(),past:vec![],future:vec![],dirty:true,limit:100};
+    history.commit(&journal,&p,0,head,vec![Snapshot{key:key.clone(),project:p.clone()}]).unwrap();
+    let file=library.save_with_history(&mut history,&p).unwrap().project_path;
+    let original=std::fs::read(&file).unwrap();let saved_head=std::fs::read(journal.join("head.json")).unwrap();drop(library);
+    let name=format!("quickforge.receipt.{}",p.id);
+    for raw in [None,Some("{".to_owned()),Some("[]".to_owned()),Some("null".to_owned()),Some("x".repeat(4194305))] {
+        let db=rusqlite::Connection::open(root.join("library.sqlite3")).unwrap();
+        db.execute("DELETE FROM settings WHERE key=?1",[&name]).unwrap();
+        if let Some(raw)=&raw {db.execute("INSERT INTO settings(key,value) VALUES(?1,?2)",rusqlite::params![name,raw]).unwrap();}
+        let reopened=Library::workspace(&root).unwrap();
+        let editable=reopened.get(&p.id).expect("optional build metadata must not make valid source inaccessible");
+        assert_eq!(editable.quick_forge,p.quick_forge);assert!(editable.builds.is_empty());
+        let view=Session::default().read(&journal,&editable).unwrap().unwrap();assert_eq!(view.head.current,key);assert!(!view.head.dirty);
+        assert_eq!(std::fs::read(&file).unwrap(),original);assert_eq!(std::fs::read(journal.join("head.json")).unwrap(),saved_head);
+        let retained:Option<String>=db.query_row("SELECT value FROM settings WHERE key=?1",[&name],|r|r.get(0)).optional().unwrap();
+        assert_eq!(retained,raw,"damaged metadata is evidence, not permission to overwrite or delete it");
+    }
+    // Recovery of an optional field must not relax an independent source writer.
+    let library=Library::workspace(&root).unwrap();let mut editable=library.get(&p.id).unwrap();
+    let mut external=editable.clone();external.title="Independent external source".into();
+    spark_core::project::save_project(&file,&external).unwrap();let external_bytes=std::fs::read(&file).unwrap();
+    editable.title="Local unacknowledged change".into();assert!(library.save_explicit(&editable,None).is_err());
+    assert_eq!(std::fs::read(&file).unwrap(),external_bytes);
 }

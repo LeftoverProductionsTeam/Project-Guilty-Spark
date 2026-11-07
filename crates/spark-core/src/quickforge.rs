@@ -52,6 +52,11 @@ pub struct QuickForgeDocument {
     #[serde(default = "draft")]
     pub build_quality: String,
 }
+/// The native scenario writer and tool launcher must agree on game generation.
+pub fn native_scenario_type(doc:&QuickForgeDocument)->u16 {
+    if ["firefight","zombie"].contains(&doc.game_mode.as_str()){0}else{1}
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EditorEnvironment {
@@ -1731,7 +1736,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             format!("tags/{}.scenario", scenario.replace('\\', "/")),
         ],
     }];
-    let campaign = ["firefight", "zombie"].contains(&doc.game_mode.as_str());
+    let campaign = native_scenario_type(doc) == 0;
     let mut initial = vec![];
     add_set(
         &mut initial,

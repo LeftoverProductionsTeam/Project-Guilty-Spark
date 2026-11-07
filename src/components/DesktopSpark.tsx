@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import applicationMonitor from '../../src-tauri/icons/icon.png';
 import {getCurrentWindow} from '@tauri-apps/api/window';
 import {call} from '../api';
 import type {Bootstrap} from '../types';
@@ -10,13 +11,13 @@ import './desktopSpark.css';
 let bootstrap:Promise<Bootstrap>|undefined;
 /** A shortcut into this application's command hub, not another project host. */
 export default function DesktopSpark(){
-  const [image,setImage]=useState(''),[error,setError]=useState('');
+  const [image,setImage]=useState(applicationMonitor),[error,setError]=useState('');
   const press=useRef<{x:number;y:number}|null>(null),dragged=useRef(false);
   useEffect(()=>{
     let alive=true,scope='';
     const refresh=()=>{
       applyInterfacePreferences(readInterfacePreferences(),document.documentElement);
-      if(scope)setImage(readSparkEmblemPicture(scope)?.png??'');
+      if(scope)setImage(readSparkEmblemPicture(scope)?.png??applicationMonitor);
     };
     void (bootstrap??=call<Bootstrap>('bootstrap')).then(data=>{
       if(!alive)return;scope=JSON.stringify([data.dataDirectory,data.installation.mccPath??null]);refresh();

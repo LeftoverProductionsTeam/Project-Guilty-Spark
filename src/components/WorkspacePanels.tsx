@@ -1,3 +1,4 @@
+import {navigateComposite} from '../keyboardNavigation';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from 'react';
@@ -237,7 +238,7 @@ export default function WorkspacePanels({
             buttons[next]?.focus();
           }}>
             <summary aria-label="More workspace drawers" title="Workspace tools and panels">Tools <span aria-hidden="true">▾</span>{Object.values(counts).some(count=>count>0)&&<span className="gs-panel-count" aria-label="Tools need review">•</span>}</summary>
-            <div role="menu" aria-label="Workspace drawers">{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</div>
+            <div role="menu" aria-label="Workspace drawers" onKeyDown={navigateComposite}>{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</div>
           </details>}
           <div className="gs-layout-actions">
             {actions}
@@ -295,6 +296,11 @@ export default function WorkspacePanels({
       </div>
     </Context.Provider>
   );
+}
+/** Register expensive drawers without loading their contents while closed. */
+export function useWorkspacePanelOpen(id:string){
+  const context=useContext(Context),{active}=useWorkspaceActivity();
+  return active&&context?.panels[id]?.open===true;
 }
 /** Reveal an existing overlay without changing the map, camera or focus layout. */
 export function useRevealWorkspacePanel() {

@@ -685,6 +685,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
 
   const [receipt, setReceipt] = useState<QuickForgeBuildReceipt | null>(null),
     [buildError, setBuildError] = useState(''),
+    [receiptError, setReceiptError] = useState(''),
     [exporting, setExporting] = useState(false),
     [expandedBuild, setExpandedBuild] = useState(false);
   const latestProject = useRef(project);
@@ -815,10 +816,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     let alive = true;
     call<QuickForgeBuildReceipt | null>('quickforge_build_report', { projectId: project.id })
       .then((value) => {
-        if (alive) setReceipt(value);
+        if (alive) { setReceipt(value); setReceiptError(''); }
       })
       .catch((e) => {
-        if (alive) setBuildError(String(e));
+        if (alive) { setReceipt(null); setReceiptError(String(e)); }
       });
     return () => {
       alive = false;
@@ -2665,9 +2666,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             <Pill tone={receipt?.status === 'validated' && !staleReceipt ? 'green' : 'muted'}>
               {props.activeJob
                 ? (lastLog?.phase ?? 'Building')
-                : staleReceipt
+                : staleReceipt && props.dirty
                   ? 'Last result · edits changed'
-                  : (receipt?.status ?? 'Not built')}
+                  : receipt?.status === 'validated' && staleReceipt
+                    ? 'Rebuild required'
+                    : (receipt?.status ?? 'Not built')}
             </Pill>
             <span>
               {report
@@ -2725,7 +2728,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             <div style={{ width: `${Math.max(lastLog?.progress ?? 0, 2)}%` }} />
           </div>
         )}
-        {(expandedBuild || !!geometryError || !!buildError) && (
+        {(expandedBuild || !!geometryError || !!buildError || !!receiptError) && (
           <div className="forge-build-content">
             {project && (
               <BuildTargets
@@ -3196,7 +3199,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               </div>
 
               {geometryError && <Notice>{geometryError}</Notice>}
-              {buildError && <Notice>{buildError}</Notice>}
+              {(buildError || receiptError) && <Notice>{buildError || receiptError}</Notice>}
               {report?.issues.map((issue, i) => (
                 <button
                   className={`forge-issue ${issue.severity}`}

@@ -98,6 +98,9 @@ const report = {
   args,
   pid: child.pid,
   result,
+  // Keep bounded exact native diagnostics even when the helper fails before
+  // producing an acceptance receipt. Disposable source cleanup stays enabled.
+  nativeDiagnostics:['native.stdout.log','native.stderr.log'].map(name=>{const bytes=fs.readFileSync(path.join(output,name));return{name,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),tail:bytes.subarray(-65536).toString('utf8')};}),
   durationMs: Date.now() - started,
   peakSampledCombinedWorkingSet: Math.max(0, ...summed),
   processPeakWorkingSet: Math.max(

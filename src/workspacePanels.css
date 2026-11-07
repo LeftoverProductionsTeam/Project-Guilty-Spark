@@ -576,14 +576,14 @@ html[data-gs-fullscreen='true'] .gs-navigation-drawer {
   }
 }
 .application.gs-drawers {
-  grid-template-rows: 40px minmax(0, 1fr) auto !important;
+  grid-template-rows: var(--gs-header-height, 32px) minmax(0, 1fr) auto !important;
 }
 .application.gs-drawers[data-header-open='false'] {
   grid-template-rows: 0 minmax(0, 1fr) auto !important;
 }
 :root .application.gs-drawers > .gs-compact-header {
   position: relative;
-  height: 40px !important;
+  height: var(--gs-header-height, 32px) !important;
   min-height: 0;
   visibility: visible;
   overflow: visible;
@@ -673,10 +673,10 @@ html[data-gs-focus-mode='true'] .application.gs-drawers > .gs-compact-header[dat
   padding: 6px;
 }
 html[data-gs-fullscreen='true'] .application.gs-drawers {
-  grid-template-rows: 34px minmax(0, 1fr) auto !important;
+  grid-template-rows: var(--gs-header-height, 32px) minmax(0, 1fr) auto !important;
 }
 html[data-gs-fullscreen='true'] .application.gs-drawers[data-header-open='false'] { grid-template-rows: 0 minmax(0, 1fr) auto !important; }
-html[data-gs-fullscreen='true'] .application.gs-drawers > .gs-compact-header { height: 34px !important; }
+html[data-gs-fullscreen='true'] .application.gs-drawers > .gs-compact-header { height: var(--gs-header-height, 32px) !important; }
 html[data-gs-fullscreen='true'] .gs-workspace-tools > .gs-window-controls { top: 5px; }
 html[data-gs-fullscreen='true'] .application .map-tab-bar { min-height: 30px; }
 html[data-gs-fullscreen='true'] .runtime-dock-heading { min-height: 15px; font-size: 9px; }

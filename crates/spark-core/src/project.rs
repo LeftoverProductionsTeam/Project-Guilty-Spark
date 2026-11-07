@@ -307,7 +307,7 @@ impl Project {
         for object in &self.scene {
             if let Some(source) = &object.source_model {
                 uuid::Uuid::parse_str(&source.project_id).map_err(|_| crate::SparkError::Invalid("Invalid source model project".into()))?;
-                if source.source_sha256.len()!=64 || !source.source_sha256.bytes().all(|b|b.is_ascii_hexdigit()) || source.path.is_empty() || source.path.len()>512 || source.path.chars().any(char::is_control) || !matches!(source.class.as_str(),"scen"|"weap"|"eqip"|"vehi"|"bipd"|"itmc") {
+                if source.source_sha256.len()!=64 || !source.source_sha256.bytes().all(|b|b.is_ascii_hexdigit()) || source.path.is_empty() || source.path.len()>512 || source.path.chars().any(char::is_control) || !matches!(source.class.as_str(),"scen"|"weap"|"eqip"|"vehi"|"bipd"|"itmc"|"mach") {
                     return invalid("Invalid source model identity");
                 }
             }

@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "continuation": "66656a27 native completion plus9491f29a independent windows, tab handoff and saved Monitor eye tint",
+  "sourceCommitBase": "d64f3e7dc65ae1f0c555ad0070a611130912b71c",
+  "sourceRevision": "Containing local commit; exact revision and sealed source are in the external review manifest",
+  "tests": {
+    "rust": {
+      "passed": 801,
+      "ignored": 9,
+      "suites": 53,
+      "evidence": "window-independence-r19.json/log"
+    },
+    "frontend": {
+      "passed": 416,
+      "files": 96,
+      "typeScript": true,
+      "sourceModuleContracts": 3,
+      "storageOwnership": 35,
+      "offlineChecks": 59
+    },
+    "browser": {
+      "passed": 189,
+      "evidence": "window-keyboard-r23.json/log"
+    },
+    "actualNativeWindows": {
+      "cases": 12,
+      "mockedIpc": false,
+      "appSha256": "22e4c216ec49dd9675d1109de5ca43e71526de1f2673b92d71fbdd1f19c218ff",
+      "header": {
+        "height": 32,
+        "width": 1482,
+        "childrenContained": true,
+        "dragWidth": 393.03125
+      },
+      "gracefulAppClose": true,
+      "physicalMonitorDisconnectTested": false,
+      "physicalSecondaryMonitorTransferTested": false
+    },
+    "currentNativeRun": {
+      "complete": true,
+      "stages": [
+        {
+          "name": "TypeScript",
+          "milliseconds": 1010
+        },
+        {
+          "name": "Frontend tests",
+          "milliseconds": 2023
+        },
+        {
+          "name": "Source module contracts",
+          "milliseconds": 978
+        },
+        {
+          "name": "Offline regressions",
+          "milliseconds": 4596
+        },
+        {
+          "name": "Storage ownership",
+          "milliseconds": 12263
+        },
+        {
+          "name": "Native storage helper build",
+          "milliseconds": 65325
+        },
+        {
+          "name": "Real H1A compile, unchanged reuse, external corruption recovery and native readback",
+          "milliseconds": 212959
+        },
+        {
+          "name": "Embedded desktop build",
+          "milliseconds": 140111
+        },
+        {
+          "name": "Actual retained multiwindow workspace lifecycle and route regressions",
+          "milliseconds": 38150
+        },
+        {
+          "name": "Actual native tag edit, asset drop, door/trigger logic, Undo/Save/reopen, compile and independent readback",
+          "milliseconds": 167964
+        }
+      ],
+      "mockedIpc": false,
+      "appSha256": "22e4c216ec49dd9675d1109de5ca43e71526de1f2673b92d71fbdd1f19c218ff",
+      "independentNativeJobs": 2
+    }
+  },
+  "windowInteractions": {
+    "nativeWindows": [
+      {
+        "label": "main",
+        "workspace": "library",
+        "project": "55a863fd-eba7-4ed9-a258-579c5db1f750",
+        "writable": true
+      },
+      {
+        "label": "editor-1e63038d-17f2-4de5-9639-6066bd60835f",
+        "workspace": "settings",
+        "project": "56178150-7eab-4828-a742-b47f99f2391e",
+        "writable": true
+      },
+      {
+        "label": "workspace-cfff2d5a-a80b-41b1-b594-125983623a79",
+        "workspace": "features",
+        "project": null,
+        "writable": false
+      }
+    ],
+    "cancelledDrag": true,
+    "duplicatePointerUpCreatedOneWindow": true,
+    "invalidRouteRefused": "Error: page.evaluate: Unknown Spark workspace",
+    "singleWriter": true,
+    "sharedAppearanceOnly": true,
+    "cachedPortraitUnchanged": true,
+    "savedLayoutWindows": 3,
+    "restart": {
+      "stoppedPid": 23056,
+      "restartedPid": 32112,
+      "restoredWindows": 3,
+      "historyPreserved": true,
+      "sourcePreserved": true,
+      "menusClosed": true,
+      "eyeTintPreserved": true,
+      "cachedPortraitReused": true
+    }
+  },
+  "keyboardNavigation": {
+    "shortcuts": [
+      "Ctrl+Tab / Ctrl+Shift+Tab",
+      "Ctrl+PageDown / Ctrl+PageUp",
+      "Ctrl+W",
+      "F6 / Shift+F6",
+      "F1",
+      "Shift+F10",
+      "menu arrows and type-ahead",
+      "tablist arrows and Home/End"
+    ],
+    "browserWorkflowCases": 3,
+    "modalAndTextOwnership": true,
+    "nativeThreeWindowLocality": true
+  },
+  "applicationIcon": {
+    "nativeReadback": {
+      "width": 32,
+      "height": 32,
+      "transparentPixels": 434,
+      "matchesExpectedMonitor": true,
+      "method": "Windows Icon.ExtractAssociatedIcon, pixel comparison with generated ICO"
+    },
+    "portraitSha256": "b11cbc7b9ec0accf581b3da367ef17c7b6befe2cfdbbb624a295dc70cf335971",
+    "provenance": "src-tauri/icons/app-icon-provenance.json",
+    "firstRunPictureWithoutHalo": true,
+    "newInstallerOrPublication": false
+  },
+  "sourceAndBehavior": {
+    "receiptRecovery": true,
+    "ownedOutputAndReceiptValidation": true,
+    "lateNavigationProtection": true,
+    "concurrentScratchAdmissionProtection": true,
+    "nativeMachineUndoValidation": true,
+    "windowLocalMonitorMenus": true,
+    "windowScopedBrowseChoices": true,
+    "acknowledgedAnimatedTabHandoff": true,
+    "savedMonitorEyeTint": true,
+    "portraitNotRecapturedForTint": true,
+    "permanentHeaderPictureWithoutNativeReads": true,
+    "transferDrawerToolsOnly": true,
+    "conventionalKeyboardNavigation": true,
+    "liveSamplerDoesNotPinCompilerTemporaryDirectories": true,
+    "liveSamplerRevalidatesPathIdentity": true
+  },
+  "nativeAssetAndLogic": {
+    "sourcePropertyEdit": {
+      "tagId": 3783655442,
+      "original": 0.5,
+      "requested": 0.75,
+      "undoRedoSave": true
+    },
+    "importedPropertyReadback": {
+      "value": 0.75,
+      "expected": 0.75,
+      "sourceSha256": "f9629c6b209ae6670a0d8efe03f8d6ff2813eb01dc1a5875c2404c440e77d4ef",
+      "receiptSha256": "b756f38ca945941b38f53c1dcb555bf045b5bf8070b097e566bb1ac2aa8d4039"
+    },
+    "saveReopenPreservesLogic": true,
+    "triggerTransformUndo": true,
+    "nativeOutputSha256": "428792d3a6b1d682f6f04197ecab5111cdc83d61fe5b9a199e8ab0517b4feff7",
+    "nativeScriptNames": [
+      "gs_logic_init",
+      "gs_evt_b13c534ba94f"
+    ],
+    "independentNativeReadback": {
+      "boundingRadius": 0.75,
+      "triggerDimensions": [
+        6,
+        3,
+        3
+      ],
+      "scriptNames": [
+        "gs_logic_init",
+        "gs_evt_b13c534ba94f"
+      ],
+      "deviceManualControl": true,
+      "crcMismatch": 0,
+      "standardMachineTag": true,
+      "standardScenarioTag": true
+    },
+    "originalCacheUnchanged": true,
+    "processReopen": {
+      "stoppedPid": 22872,
+      "restartedPid": 27124,
+      "sourceAndImportsPreserved": true,
+      "undoHeadPreserved": true,
+      "nativeWindowReopened": true
+    }
+  },
+  "nativeWorldMachine": {
+    "stage": "native compilation and independent readback passed",
+    "projectId": "c3a2f462-abca-4548-b6f0-b93d722b264c",
+    "donorProjectId": "6fdeaa39-1130-4aa4-b968-acd2a6139ba2",
+    "pointerDrop": {
+      "from": {
+        "x": 26,
+        "y": 489.15625,
+        "width": 166,
+        "height": 84
+      },
+      "to": {
+        "x": 705.5439427333215,
+        "y": 471.52027780605727
+      },
+      "pose": {
+        "type": "PerspectiveCamera",
+        "position": [
+          44.8,
+          -37.4,
+          31.1
+        ],
+        "quaternion": [
+          0.466687,
+          0.167431,
+          0.29326,
+          0.817416
+        ],
+        "zoom": 1,
+        "target": [
+          14,
+          0,
+          2.5
+        ]
+      }
+    },
+    "nativeBuild": {
+      "id": "0407276a-3d6a-4897-ae88-0c7c79884787",
+      "target": "mcc-cea",
+      "status": "validated",
+      "projectFingerprint": "841b4a9db531212bb527bd2831ab94b10af7af4c367527ae43acf74555fe1e65"
+    },
+    "nativeMachineCount": 2,
+    "outputSha256": "394d80a4374e48237e6bd2f917f8393e439f49871898f9d0945ed984474293a0",
+    "authoredPlacements": [
+      {
+        "id": "5b50f36b-7a4f-4107-9e93-f38803318960",
+        "position": [
+          8,
+          2,
+          0.05
+        ],
+        "rotation": [
+          0.61086524,
+          0.17453292,
+          -0.08726646
+        ]
+      },
+      {
+        "id": "fa73b645-dd6f-420e-ab3e-20ef6f35bd5e",
+        "position": [
+          9,
+          2,
+          0.05
+        ],
+        "rotation": [
+          0.61086524,
+          0.17453292,
+          -0.08726646
+        ]
+      }
+    ],
+    "independentScenarioMachineCount": 3,
+    "groups": [
+      {
+        "power": "65535",
+        "position": "65535"
+      },
+      {
+        "power": "65535",
+        "position": "65535"
+      }
+    ],
+    "sourceSha256": "428792d3a6b1d682f6f04197ecab5111cdc83d61fe5b9a199e8ab0517b4feff7",
+    "donorSha256": "f9629c6b209ae6670a0d8efe03f8d6ff2813eb01dc1a5875c2404c440e77d4ef",
+    "realPointerDrop": true,
+    "copyPaste": true,
+    "oneActionUndoRedoSave": true,
+    "dependencyBindings": 1,
+    "sourceUnchanged": true,
+    "gameplayVerified": false
+  },
+  "nativeIndexContract": {
+    "sourceCommit": "696830ff80af227e84e7237c2ef26eb2301ed110",
+    "definition": "include/invader/hek/data_type.hpp",
+    "sha256": "e625306ab1137bc5958367951f4f485917957df3efe5b737981183a9540e92f8",
+    "indexType": "uint16",
+    "unassignedBits": "0xFFFF",
+    "writerText": "-1",
+    "observedReadbackText": "65535",
+    "nativeBytesChangedForReadbackTest": false
+  },
+  "disposableSdk": {
+    "files": 1800,
+    "logicalBytes": 107744329,
+    "sourceArchiveSha256": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4",
+    "originalArchiveUnchanged": true,
+    "retainedSdkTree": false
+  },
+  "gameTrial": {
+    "lastObserved": "native-scene-comparison-r3.json",
+    "controlExitCode": 1,
+    "authoredExitCode": 1,
+    "sourceShellMissingUiErrorsRemoved": true,
+    "gameplayVerified": false,
+    "laterRepair": "Pins only the selected official kit steam_appid.txt identity1532190; post-repair game loading remains untested",
+    "humanKnownGoodControl": false
+  },
+  "ledger": {
+    "requirements": 475,
+    "numberedPrompts": 25,
+    "identitySha256": "a47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a",
+    "sharedSubsystemCommandTraces": 465,
+    "researchRows": 10,
+    "wiringIsBehaviorAcceptance": false
+  },
+  "release": {
+    "newReleaseBuilt": false,
+    "newReleasePublished": false,
+    "acceptedC49Preserved": true
+  },
+  "highestImpactNextAction": "Resume Prompt06 within the existing World/Logic native authoring path. Keep real Halo playback, independent GUI-editor readback and physical multi-computer/monitor gates pending; do not treat compilation as gameplay.",
+  "knownFailedAttempts": [
+    "R23:189 browser checks and2native compiler jobs passed, then Rust temporary-archive deletion failed with Win32 sharing32. The live metadata sampler pinned descendant directories. The exact owned regression fails before repair and passes after; roots/full audits/reparse and replaced-identity refusal remain protected. R24 reruns native acceptance.",
+    "R21: the new native drag-ready assertion lacked explicit OS focus. R23 focuses the exact owning native window before lifting.",
+    "R22:185/186 browser cases passed; removing the Transfer duplicate left24.94px of reserved tab-strip width. The allowance now matches the remaining controls; original no-overlap/drag-region assertions remain.",
+    "R19: three-window controls passed; the new restart helper attempted Inspector before the restored viewport was ready. R20 waits for the real viewport.",
+    "R20: normal restart restored source and Undo identity; the test captured its baseline before Save acknowledged the clean flag. R21 waits for that acknowledgment and still compares the complete head.",
+    "R16: native World compilation/readback passed, then normal process exit remained pending with another WebView visible; final harness records all window labels and closes all owned windows before restart.",
+    "R17: added color row overflowed compact Appearance by45px; replaced with existing-heading control, then exact layout regression passed.",
+    "R18: aggregate storage guard correctly refused overlapping12GiB reservations before allocating another workspace; R19 runs sequentially.",
+    "R10: supported machine was rejected by project/Undo class validation; repaired with a rejecting-unknown-class regression",
+    "R11: obsolete artificial test namespace failed existing production validation; corrected to gs_assets without loosening validation",
+    "R12: old strict fullscreen shrink test failed because normal mode is already compact; now requires28px in both modes and verifies viewport expansion",
+    "R13: direct cache import lacked matching editable scenario source; native rebuild correctly refused. R14 uses the existing verified Open built map entrypoint to retain its exact tagset.",
+    "R14: the new native cache passed machine transform readback, but independent extraction reused the earlier same-name scenario. R15 uses a fresh owned directory and checks exact machine count before fields.",
+    "R15: correct native null device-group indices read back as unsigned65535, not the textual -1 used for writing. R16 checks the documented uint16 NULL_INDEX0xFFFF without modifying native bytes."
+  ]
+}

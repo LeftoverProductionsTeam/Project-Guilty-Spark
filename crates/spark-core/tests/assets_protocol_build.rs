@@ -160,3 +160,29 @@ fn changed_recorded_resource_identity_blocks_the_build() {
         .iter()
         .any(|b| b.contains("sounds.map changed or is missing")));
 }
+
+#[test]
+fn machine_readback_requires_each_authored_instance_not_just_a_matching_tag() {
+    use spark_core::{maps,native_asset_imports as native,project::Project};
+    let dir=tempfile::tempdir().unwrap();let file=dir.path().join("identity.map");common::write_map(&file,13);
+    let before=maps::hash_file(&file).unwrap();let library=Library::open(&dir.path().join("library")).unwrap();
+    let (_,mut compiled)=library.import_map(&file,None).unwrap();
+    let mut project=Project::new("Imported machine identity");let id=uuid::Uuid::new_v4().to_string();let source=uuid::Uuid::new_v4().to_string();
+    let binding=native::Binding{id:id.clone(),source_project_id:source.clone(),source_sha256:"a".repeat(64),tag_id:42,tag_class:"mach".into(),tag_path:"devices/door".into(),native_path:format!("gs_assets_{}/devices/door",id.replace('-',"")),receipt_sha256:"b".repeat(64),file_count:1};
+    let mut tag=compiled.tags[0].clone();tag.id=4242;tag.class="mach".into();tag.path=binding.native_path.clone();compiled.tags.push(tag);
+    let object=maps::SceneObject{id:uuid::Uuid::new_v4().to_string(),name:"Door".into(),kind:"Machine".into(),tag_id:Some(42),position:[8.,2.,0.],rotation:[0.;3],scale:[1.;3],visible:true,source_offset:None,rotation_offset:None,asset_id:None,source_model:Some(maps::SourceModelReference{project_id:source,source_sha256:"a".repeat(64),tag_id:42,path:"devices/door".into(),class:"mach".into()})};
+    project.native_asset_imports.push(binding);project.scene.push(object.clone());
+    project.validate().expect("The supported native door must survive project/Undo validation");
+    let mut unknown=project.clone();unknown.scene[0].source_model.as_mut().unwrap().class="xxxx".into();assert!(unknown.validate().is_err(),"Unknown native classes remain refused");
+    assert!(native::allowed_addition(&project,&object,&compiled));
+    assert!(native::verify_compiled(&project,&compiled).is_err(),"A tag without a native scenario instance is not a placed door");
+    let mut output=object.clone();output.tag_id=Some(4242);output.source_model=None;compiled.objects=vec![output.clone()];
+    native::verify_compiled(&project,&compiled).unwrap();
+    compiled.objects[0].position[0]+=1.;assert!(native::verify_compiled(&project,&compiled).is_err());compiled.objects[0]=output.clone();
+    compiled.objects[0].rotation[0]=0.5;assert!(native::verify_compiled(&project,&compiled).is_err());compiled.objects[0]=output.clone();
+    let mut copy=object;copy.id=uuid::Uuid::new_v4().to_string();project.scene.push(copy);
+    assert!(native::verify_compiled(&project,&compiled).is_err(),"One output cannot satisfy two coincident authored instances");
+    compiled.objects.push(output);native::verify_compiled(&project,&compiled).unwrap();
+    compiled.objects[1].tag_id=Some(123);assert!(native::verify_compiled(&project,&compiled).is_err());
+    assert_eq!(maps::hash_file(&file).unwrap(),before);
+}

@@ -59,7 +59,17 @@ struct ToolResource { relative_path:String, sha256:String, bytes:u64 }
 /// derived job as cwd (short relative tag paths), with only the exact installed
 /// kit's shader resources. Never copy a complete kit or overwrite user files.
 fn tool_resources(kit:&Path)->Reply<Vec<ToolResource>> {
-    ["shaders/fx.bin","shaders/psh.bin","shaders/vsh.bin"].into_iter().map(|relative|{
+    let mut files=vec!["shaders/fx.bin","shaders/psh.bin","shaders/vsh.bin"];
+    // The publisher's Steam tool identity is resolved relative to cwd by
+    // SteamAPI_Init. Preserve that exact installed file for isolated launches;
+    // never invent an application ID or copy authentication/session data.
+    let app_id=kit.join("steam_appid.txt");core::reject_links(&app_id).map_err(error)?;
+    if app_id.try_exists().map_err(error)? {
+        let bytes=bounded_read(&app_id,64)?;
+        if std::str::from_utf8(&bytes).map_err(error)?.trim()!="1532190" {return Err("The selected H1A kit has an unexpected Steam tool identity; verify its official installation".into());}
+        files.push("steam_appid.txt");
+    }
+    files.into_iter().map(|relative|{
         let file=kit.join(relative);core::reject_links(&file).map_err(error)?;
         let metadata=fs::metadata(&file).map_err(error)?;
         if !metadata.is_file()||!(1..=16*1024*1024).contains(&metadata.len()){return Err("H1A shader resource is missing or exceeds 16 MiB; verify the installed kit".into());}
@@ -205,6 +215,11 @@ fn owned_child(root: &Path, candidate: &Path) -> Reply<PathBuf> {
         return Err("Editable source must stay inside its own build job".into());
     }
     Ok(candidate)
+}
+
+fn source_scenario_type(state:&AppState,project:&Project)->Reply<u16> {
+    if let Some(document)=&project.quick_forge {Ok(core::quickforge::native_scenario_type(document))}
+    else{Ok(inspect(state,project)?.header.scenario_type)}
 }
 
 fn source_context(state: &AppState, project: &Project) -> Reply<SourceContext> {
@@ -483,7 +498,7 @@ pub(super) async fn runtime_workbench_report(
             .transpose()?;
         if let Some(project) = &project {
             observation.project.scenario_type = if project.quick_forge.is_some() {
-                Some(1)
+                Some(source_scenario_type(&state,project)?)
             } else if project.source.is_some() {
                 Some(inspect(&state, project)?.header.scenario_type)
             } else {
@@ -551,7 +566,17 @@ pub(super) async fn runtime_workbench_report(
                 });
             }
         }
-        let report = adapters::capability_report(&observation);
+        let mut report = adapters::capability_report(&observation);
+        if runtime_id==runtime::RuntimeId::MccSteam {
+            if let (Some(project),Ok(Some(context)))=(&project,&context) {
+                if let Err(issue)=source_scenario_type(&state,project).and_then(|kind|core::forge_build::h1a_scene_preflight(&context.tags,kind).map_err(error)) {
+                    if let Some(capability)=report.capabilities.iter_mut().find(|c|c.operation==adapters::RuntimeOperation::TestScene) {
+                        capability.availability=adapters::ActionAvailability::SetupRequired;
+                        capability.detail=issue;capability.next_action="Choose the matching H1A SDK tag source and rebuild. Source/cache editing remains available; no game acceptance is inferred.".into();
+                    }
+                }
+            }
+        }
         let mut actions = adapters::dock_actions(&report);
         let observed = processes(&state)?;
         for action in &mut actions {
@@ -636,8 +661,10 @@ pub(super) async fn prepare_runtime_tool(
         // have short path buffers and do not consistently accept Win32 \\?\ paths.
         let mut arguments=vec!["-tags_dir".into(),"tags".into()];
         let startup_script=if action_id=="testScene" {
+            let kind=source_scenario_type(&state,&project)?;
+            core::forge_build::h1a_scene_preflight(&context.tags,kind).map_err(error)?;
             let scenario=console_scenario(&context.scenario_path)?;
-            let multiplayer=if project.quick_forge.is_some(){true}else{inspect(&state,&project)?.header.scenario_type==1};
+            let multiplayer=kind==1;
             let contents=format!("; Spark scene test, owned derived source\r\n{}map_name \"{scenario}\"\r\n",if multiplayer{"game_variant slayer\r\n"}else{""});
             arguments.extend(["-window".into(),"-data_dir".into(),"data".into(),"-exec".into(),format!("spark-scene-{id}.txt")]);
             Some(contents)
@@ -686,6 +713,7 @@ pub(super) async fn launch_runtime_tool(
             workbench.processes.retain(|p|p.view.status=="running");
             if workbench.processes.len()>=16{return Err("Close an existing tool before opening another (16 running tool limit)".into());}
         }
+        if plan.view.action_id=="testScene"{core::forge_build::h1a_scene_preflight(&context.tags,source_scenario_type(&state,&project)?).map_err(error)?;}
         if !plan.view.resources.is_empty(){stage_tool_resources(&kit,&context.workspace,&plan.view.resources)?;}
         if let Some(contents)=&plan.startup_script {
             let script=context.workspace.join(format!("spark-scene-{}.txt",plan.view.id));
@@ -738,7 +766,7 @@ pub(super) async fn build_working_tags(
         let tools=build::Toolchain{invader_directory:settings.invader_directory.clone(),..Default::default()};
         let invader_info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
         verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
-        let scenario_type=if project.quick_forge.is_some(){1}else{inspect(&state,&project)?.header.scenario_type};
+        let scenario_type=source_scenario_type(&state,&project)?;
         let mut input=core::working_tags::WorkingTagsInput{expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
@@ -1101,7 +1129,11 @@ mod tests {
         fs::create_dir_all(kit.join("shaders")).unwrap();fs::create_dir(&job).unwrap();
         for name in ["fx.bin","psh.bin","vsh.bin"]{fs::write(kit.join("shaders").join(name),name.as_bytes()).unwrap();}
         fs::write(kit.join("shaders/unrelated.exe"),b"never copy").unwrap();
-        let pins=tool_resources(&kit).unwrap();
+        fs::write(kit.join("steam_appid.txt"),b"1532190\r\n").unwrap();
+        let pins=tool_resources(&kit).unwrap();assert_eq!(pins.len(),4);
+        fs::write(kit.join("steam_appid.txt"),b"480").unwrap();
+        assert!(stage_tool_resources(&kit,&job,&pins).is_err());assert!(!job.join("steam_appid.txt").exists());
+        fs::write(kit.join("steam_appid.txt"),b"1532190\r\n").unwrap();
         fs::write(kit.join("shaders/vsh.bin"),b"changed").unwrap();
         assert!(stage_tool_resources(&kit,&job,&pins).is_err());assert!(!job.join("shaders").exists());
         fs::write(kit.join("shaders/vsh.bin"),b"vsh.bin").unwrap();

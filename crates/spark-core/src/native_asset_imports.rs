@@ -556,6 +556,24 @@ pub fn verify_compiled(project: &Project, compiled: &maps::MapInspection) -> Res
         if !used {
             continue;
         }
+        if binding.tag_class == "mach" {
+            let requested:Vec<_>=project.scene.iter().filter(|object|object.source_model.as_ref().and_then(|source|find(project,source)).is_some_and(|value|value.id==binding.id)).collect();
+            if !requested.is_empty() {
+                let native=compiled.tags.iter().find(|tag|tag.class=="mach"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&binding.native_path));
+                let placed:Vec<_>=compiled.objects.iter().filter(|object|object.kind=="Machine"&&object.tag_id==native.map(|tag|tag.id)).collect();
+                if native.is_none()||placed.len()!=requested.len() {
+                    return invalid("Compiled scenario lost an imported native machine placement");
+                }
+                // Match each output at most once, including coincident copies.
+                let mut remaining=placed;
+                for object in requested {
+                    let Some(index)=remaining.iter().position(|output|output.position.iter().zip(object.position).all(|(a,b)|(*a-b).abs()<=0.0001)&&output.rotation.iter().zip(object.rotation).all(|(a,b)|((*a-b+std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)-std::f32::consts::PI).abs()<=0.0001)) else {
+                        return invalid("Compiled native machine transform differs from its authored placement");
+                    };
+                    remaining.remove(index);
+                }
+            }
+        }
         if !compiled.tags.iter().any(|tag| {
             tag.class == binding.tag_class
                 && tag
@@ -671,7 +689,7 @@ pub(crate) fn append_scenario(
             set(
                 &mut args,
                 format!("{prefix}.facing"),
-                object.rotation[2].to_string(),
+                object.rotation[0].to_string(),
             );
             set(&mut args, format!("{prefix}.team_index"), "0".into());
             set(&mut args, format!("{prefix}.spawn_time"), "30".into());
@@ -686,6 +704,7 @@ pub(crate) fn append_scenario(
                     "bipd" => ("bipeds", "biped_palette"),
                     "weap" => ("weapons", "weapon_palette"),
                     "eqip" => ("equipment", "equipment_palette"),
+                    "mach" => ("machines", "machine_palette"),
                     _ => return invalid(
                         "This asset needs a native scenario translation that is not implemented",
                     ),
@@ -706,15 +725,24 @@ pub(crate) fn append_scenario(
             set(&mut args, format!("{palette}[{pi}].name"), reference);
             set(&mut args, format!("{prefix}.type"), pi.to_string());
             set(&mut args, format!("{prefix}.name"), "-1".into());
+            if binding.tag_class == "mach" {
+                // Same standard native device defaults as QuickForge: no
+                // inherited group index from an unrelated source scenario.
+                set(&mut args, format!("{prefix}.power_group"), "-1".into());
+                set(&mut args, format!("{prefix}.position_group"), "-1".into());
+            }
             set(
                 &mut args,
                 format!("{prefix}.position"),
                 vector(object.position),
             );
+            // Imported World SceneObject rotations already use Halo Y/P/R,
+            // as read by maps.rs and displayed by World's native ZYX basis.
+            // QuickForge placements have an independent intrinsic XYZ format.
             set(
                 &mut args,
                 format!("{prefix}.rotation"),
-                vector(quickforge::scenario_rotation(object.rotation)),
+                vector(object.rotation),
             );
             if binding.tag_class == "vehi" {
                 set(&mut args, format!("{prefix}.body_vitality"), "1".into());

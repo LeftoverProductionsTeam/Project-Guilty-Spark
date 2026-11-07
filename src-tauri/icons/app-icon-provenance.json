@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "description": "Actual front-facing Monitor portrait captured by the existing SparkEmblem / NativeModelPreview from a connected user-owned Halo source; requested as application icon on 6 November 2026.",
+  "pngSha256": "b11cbc7b9ec0accf581b3da367ef17c7b6befe2cfdbbb624a295dc70cf335971",
+  "captureEvidence": "window-independence-r20.json; native owned-monitor element read directly from its verified cached portrait",
+  "capture": "Existing NativeModelPreview front portrait from the connected owned Halo source",
+  "identityNote": "The native QA validated the owned portrait; the optional source-reference JSON was not copied before disposable-profile cleanup. No unrecorded tag ID or source hash is inferred.",
+  "width": 256,
+  "height": 256,
+  "sourceFile": "icon.png",
+  "encodingTool": "@tauri-apps/cli 2.12.4",
+  "generatedTargets": [
+    {
+      "file": "128x128.png",
+      "bytes": 18555,
+      "sha256": "37e4c94007db42927dcdc25d8fd93b57e71d19e0ae830a325e4a88e62e77c470"
+    },
+    {
+      "file": "128x128@2x.png",
+      "bytes": 47781,
+      "sha256": "425a95a511a24760e138f394b1b050d52cf427c9a11e92a1f62bc8c3c245e1c1"
+    },
+    {
+      "file": "32x32.png",
+      "bytes": 2090,
+      "sha256": "bf20a9d6f7dbe3a7694367d9d6d0466769716250736ce122356e69b1434ee8f8"
+    },
+    {
+      "file": "64x64.png",
+      "bytes": 6230,
+      "sha256": "3b5e6d0ff7169a053ed779245f781114ca29b8c69bef7043e974bc7e0766b39a"
+    },
+    {
+      "file": "icon.icns",
+      "bytes": 858472,
+      "sha256": "331f43c7df22c5f64b9c26bebae9a3cc2d37dc89885f8c077c68d668f4a84e2e"
+    },
+    {
+      "file": "icon.ico",
+      "bytes": 62426,
+      "sha256": "9ca7f40a84ceade75c95d20b48385780a87907f1bc6af4dcead81ed46d4b8563"
+    },
+    {
+      "file": "icon.png",
+      "bytes": 61304,
+      "sha256": "b11cbc7b9ec0accf581b3da367ef17c7b6befe2cfdbbb624a295dc70cf335971"
+    },
+    {
+      "file": "Square107x107Logo.png",
+      "bytes": 13953,
+      "sha256": "92221fff0a5ca04e75fc4de9c20a3e4916887d763c00fe981d22afe3931e1737"
+    },
+    {
+      "file": "Square142x142Logo.png",
+      "bytes": 21770,
+      "sha256": "ea7f193938285a81e51cbaeb6f5159f1b293714f0fdc24f5a42fc6d8f95f4c38"
+    },
+    {
+      "file": "Square150x150Logo.png",
+      "bytes": 23541,
+      "sha256": "ea7a11881a7d5ed99f463e656ef39d114f2e39acb23738771aa3c5011bd44556"
+    },
+    {
+      "file": "Square284x284Logo.png",
+      "bytes": 63929,
+      "sha256": "f48f74580262769f5408751a5bbf1a272866b1826944bb820d5cf2520978b232"
+    },
+    {
+      "file": "Square30x30Logo.png",
+      "bytes": 1869,
+      "sha256": "85fd5495f19b5086281aad242400b4809f7f42688ad0f64a79d4915dc5c8fb5e"
+    },
+    {
+      "file": "Square310x310Logo.png",
+      "bytes": 72958,
+      "sha256": "d0d6a0a52ae477e2f14d0ab4756549aef69edddf47a6c36f127dc1f4c72606ff"
+    },
+    {
+      "file": "Square44x44Logo.png",
+      "bytes": 3424,
+      "sha256": "94094b3fe68e6564b469e6cfeaa802eeddae332855361d0abf96f7ef78000e49"
+    },
+    {
+      "file": "Square71x71Logo.png",
+      "bytes": 7301,
+      "sha256": "a26fb5de36d2a48195c21c5f6cfc5c3acd32d76db3c1d1c56ee8739c1ae1db25"
+    },
+    {
+      "file": "Square89x89Logo.png",
+      "bytes": 10527,
+      "sha256": "883249beeb1a7c8dd5254860f7929d53bb83f122c1b7f9a3b583c6da5de96693"
+    },
+    {
+      "file": "StoreLogo.png",
+      "bytes": 4133,
+      "sha256": "9fcbb44999515e880dd8b21ca8528efc88a63a60830dfe5262e3d65de56df268"
+    }
+  ],
+  "artworkAttribution": "Halo and the Monitor character/game artwork belong to Microsoft. This is rendered application-icon artwork; no native Halo models, maps or tags are bundled. The code license does not grant rights to Microsoft artwork."
+}

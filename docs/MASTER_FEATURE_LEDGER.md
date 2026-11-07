@@ -1,5 +1,13 @@
 # Canonical cumulative feature and evidence ledger
 
+## Current reconciliation - 6 November 2026
+
+The canonical CSV retains **475 original requirement IDs and feature wordings**, their originating documents, historical evidence and open gates. Eight added columns link each row to preserved #04-#28 prompt families, current UI/state owners, registered UI-to-Tauri paths, core declarations, output boundaries and related requirements. Shared-subsystem wiring is **not** requirement-specific functional acceptance. Ten research rows explicitly have no completed native workflow. No requirement closes merely through this reconciliation.
+
+Run `node scripts/update-feature-ledger.mjs` to refresh current-source traces. `--check` inspects without writing; `--html=<external file>` produces a searchable derived review outside the repository. The default preserves current evidence instead of regenerating old historical assessments over it. Legacy `--rebuild-history` refuses to overwrite the richer columns. The application does not load this engineering CSV during startup.
+
+C49 warehouse counts are retained as historical assessment rather than current recoverability claims. C51 Xbox reader references now identify canonical modules. Original source identities and all25 numbered prompt hashes remain preserved.
+
 [P0 repository recovery](P0_REPOSITORY_RECOVERY_20261104.md) removes verified obsolete staging after preservation, repairs bounded native/QA ownership and proves post-cleanup native editing. It does not change any475 cumulative CSV requirement or promote gameplay/release gates.
 
 The 475-row cumulative CSV and committed evidence history below remain authoritative. The supplied [provisional v8 requirements audit](REQUIREMENTS_AUDIT_V8_PROVISIONAL_20261104.md) and [requirements source index](Guilty_Spark_Requirements_Source_Index_2026-11-04.md) are preserved additions for reconciliation, not replacement acceptance evidence or instructions overriding the current P0 recovery. Their historical cleanup restrictions and uninspected repository assumptions do not supersede the owner's explicit repair directive. No queued initiative is accepted by preserving its text.

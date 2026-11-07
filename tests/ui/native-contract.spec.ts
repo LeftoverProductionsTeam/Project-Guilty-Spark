@@ -743,6 +743,72 @@ test('each workspace exposes one pop-out and retains Learning and Settings secti
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'learning',section:'glossary',context:null});
 });
 
+test('the Monitor selector stays local across three windows sharing WebView storage',async({page})=>{
+ await mockDesktop(page);const peers=[await page.context().newPage(),await page.context().newPage()];for(const peer of peers)await mockDesktop(peer);
+ const orb=(view:Page)=>view.getByRole('button',{name:'Toggle workspace navigation',exact:true});
+ const barrier=async(writer:Page,reader:Page)=>{
+  await reader.evaluate(()=>{(window as any).__uiStorageBarrier=new Promise<void>(resolve=>{const event=(e:StorageEvent)=>{if(e.key==='spark-window-ui-barrier'){window.removeEventListener('storage',event);resolve();}};window.addEventListener('storage',event);});});
+  await writer.evaluate(()=>localStorage.setItem('spark-window-ui-barrier',crypto.randomUUID()));
+  await reader.evaluate(async()=>{await(window as any).__uiStorageBarrier;await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));});
+ };
+ await orb(page).click();for(const peer of peers){await barrier(page,peer);await expect(orb(peer)).toHaveAttribute('aria-expanded','false');}
+ await orb(peers[0]).click();await barrier(peers[0],page);await expect(orb(page)).toHaveAttribute('aria-expanded','true');await expect(orb(peers[1])).toHaveAttribute('aria-expanded','false');
+ await page.keyboard.press('Escape');await barrier(page,peers[0]);await expect(orb(peers[0])).toHaveAttribute('aria-expanded','true');
+ await chooseTool(peers[0],'Learning center');await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');
+ await orb(page).click();await peers[1].reload();await expect(orb(peers[1])).toHaveAttribute('aria-expanded','false');await expect(orb(page)).toHaveAttribute('aria-expanded','true');
+ for(const peer of peers)await peer.close();
+});
+
+test('tab lifting previews the detach threshold, cancels safely and waits for native acknowledgement',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const tab=page.getByRole('tab',{name:'Synthetic baseline',exact:true}),box=await tab.boundingBox(),start={x:box!.x+box!.width/2,y:box!.y+box!.height/2};
+ await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(start.x+2,start.y+1);await expect(page.locator('.gs-tab-tear-preview')).toHaveCount(0);
+ await page.mouse.move(start.x+10,start.y,{steps:3});await expect(page.locator('[data-tab-drag-phase=dragging]')).toBeVisible();await expect(tab.locator('..')).toHaveAttribute('data-dragging','true');
+ await page.mouse.move(start.x+20,start.y+120,{steps:8});await expect(page.locator('[data-tab-drag-phase=ready]')).toContainText('Release to open in another window');await expect(tab).toBeVisible();
+ const preview=await page.locator('.gs-tab-tear-preview').boundingBox();expect(preview!.y).toBeGreaterThan((await page.locator('#gs-window-header').boundingBox())!.height);
+ await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('.gs-tab-tear-preview')).toHaveCount(0);await expect(tab).toBeVisible();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_project_window'))).toHaveLength(0);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{if(command==='open_project_window'){w.__tearCalls=(w.__tearCalls??0)+1;await new Promise<void>(resolve=>{w.__tearResolve=resolve;});}return invoke(command,args);};});
+ await page.mouse.move(start.x,start.y);await page.mouse.down();await page.mouse.move(start.x,start.y+120,{steps:8});await page.mouse.up();
+ await expect(page.locator('[data-tab-drag-phase=transferring]')).toContainText('Opening window');await expect(tab).toBeVisible();
+ await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1,clientX:600,clientY:150})));expect(await page.evaluate(()=>(window as any).__tearCalls)).toBe(1);
+ await page.evaluate(()=>(window as any).__tearResolve());await expect(tab).toHaveCount(0);
+});
+
+test('failed native tab creation retains the document and reduced-motion feedback stays still',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('23');await velocity.press('Tab');await page.evaluate(()=>{document.documentElement.dataset.gsReducedMotion='true';const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='open_project_window'?Promise.reject(Error('Close the native tool before moving this map')):invoke(command,args);});
+ const tab=page.getByRole('tab',{name:'Synthetic baseline',exact:true}),box=await tab.boundingBox();await page.mouse.move(box!.x+50,box!.y+10);await page.mouse.down();await page.mouse.move(box!.x+60,box!.y+120,{steps:8});
+ await expect(page.locator('[data-tab-drag-phase=ready]')).toBeVisible();expect(await page.locator('.gs-tab-tear-preview').evaluate(element=>getComputedStyle(element).animationName)).toBe('none');await page.mouse.up();
+ await expect(page.locator('[data-tab-drag-phase=failed]')).toContainText('Your tab is retained');await expect(tab).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('23');await expect(page.getByText(/Close the native tool before moving this map/)).toBeVisible();
+});
+
+test('the menu Monitor eye color is saved appearance and never recaptures its native portrait',async({page})=>{
+ await mockDesktop(page);await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+ const eye=page.getByLabel('Monitor eye color',{exact:true});await expect(eye).toBeVisible();await eye.fill('#f07abb');
+ await expect.poll(()=>page.locator('html').evaluate(root=>getComputedStyle(root).getPropertyValue('--gs-monitor-eye-color').trim())).toBe('#f07abb');
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('guilty-spark:interface-v1')!).monitorEyeColor)).toBe('#f07abb');
+ await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();await expect(page.getByLabel('Monitor eye color',{exact:true})).toHaveValue('#f07abb');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='commit_workspace_history'||c.command==='save_project'))).toHaveLength(0);
+});
+
+test('dragging a map tab tears off its current workspace and section into a new window',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Settings & tools');
+  await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  const box=await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).boundingBox();
+  await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down();await page.mouse.move(box!.x+box!.width/2,box!.y+110,{steps:8});await page.mouse.up();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_project_window').at(-1)?.args)).toEqual({id:'a',workspace:'settings',section:'interface',another:true});
+});
+
+test('the current workspace can be dragged into a native window with no map open',async({page})=>{
+  await mockDesktop(page);
+  for(const [name,workspace] of [['Map library','library'],['Features & workflows','features'],['Community maps','map-finder'],['Online','runtimes'],['Machinima','machinima'],['Tag editor','tags'],['Level editor','quickforge'],['Settings & tools','settings']]){
+    await chooseTool(page,name);const box=await page.getByRole('button',{name:'Open work and workspace windows',exact:true}).boundingBox();
+    await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down();await page.mouse.move(box!.x+box!.width/2,box!.y+110,{steps:8});await page.mouse.up();
+    await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_workspace_window').at(-1)?.args.workspace)).toBe(workspace);
+    expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_workspace_window').at(-1)?.args.another)).toBe(true);
+    await expect(page.getByRole('dialog',{name:'Open work',exact:true})).toBeHidden();
+  }
+});
+
 test('popping out a map editor stages the focused edit without a disk Save before transferring its document',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{(window as any).__sparkMock.enforceTransfer=true;});
@@ -950,7 +1016,7 @@ test('C35 empty Level editor asks for an editing context without assuming an ins
 
 test('one compact header contains map tabs and lowered reachable window actions',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
- const header=page.locator('#gs-window-header');await expect(header).toBeVisible();expect((await header.boundingBox())!.height).toBeLessThanOrEqual(40);
+ const header=page.locator('#gs-window-header');await expect(header).toBeVisible();expect((await header.boundingBox())!.height).toBeLessThanOrEqual(32);
  await expect(header.getByRole('tablist',{name:'Open maps',exact:true})).toBeVisible();await expect(page.locator('.main-content > .map-tab-bar')).toHaveCount(0);
  for(const label of ['Window','Focus mode','Collapse top bar','Show top bar'])await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
  const controls=await page.getByRole('group',{name:'Window controls',exact:true}).boundingBox();const headerBox=await header.boundingBox();expect(Math.abs((controls!.y+controls!.height/2)-(headerBox!.y+headerBox!.height/2))).toBeLessThanOrEqual(1);expect(controls!.height).toBeLessThanOrEqual(28);await page.getByRole('button',{name:'Close window',exact:true}).click({trial:true});
@@ -982,7 +1048,7 @@ test('the single header reserves map-tab space and keeps overflow drawers reacha
   const header=page.locator('#gs-window-header');
   await expect.poll(()=>header.evaluate(element=>{
    const rect=element.getBoundingClientRect(),children=[...element.children].map(child=>child.getBoundingClientRect()).filter(child=>child.width>0&&child.height>0);
-   return children.every((child,index)=>child.left>=rect.left-1&&child.right<=rect.right+1&&(!index||children[index-1].right<=child.left+1));
+   return children.every((child,index)=>child.left>=rect.left-1&&child.right<=rect.right+1&&child.top>=rect.top-1&&child.bottom<=rect.bottom+1&&(!index||children[index-1].right<=child.left+1));
   })).toBe(true);
   const tabs=page.getByRole('tablist',{name:'Open maps',exact:true}),active=page.getByRole('tab',{name:'Synthetic candidate',exact:true});
   const bar=await page.locator('.map-tab-bar').boundingBox();expect(bar!.width).toBeGreaterThanOrEqual(144);
@@ -1128,7 +1194,7 @@ test('C35 F11 uses native fullscreen and Escape closes navigation before restori
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();const original=await viewport.boundingBox(),normalStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();
  await page.keyboard.press('F11');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
- const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(original!.height);const fullStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();expect(fullStrip!.height).toBeLessThan(normalStrip!.height);expect(fullStrip!.height).toBeLessThanOrEqual(32);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();await expect(page.getByRole('tablist',{name:'Open maps'})).toBeVisible();await expect(page.locator('.viewport-toolbar')).toBeVisible();await expect(page.locator('.runtime-dock')).toBeVisible();
+ const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(original!.height);const fullStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();expect(normalStrip!.height).toBe(28);expect(fullStrip!.height).toBe(normalStrip!.height);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();await expect(page.getByRole('tablist',{name:'Open maps'})).toBeVisible();await expect(page.locator('.viewport-toolbar')).toBeVisible();await expect(page.locator('.runtime-dock')).toBeVisible();
  await page.mouse.move(100,2);await openDrawer(page,'Inspector');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  await page.keyboard.press('Control+Backslash');await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.locator('.gs-navigation-drawer')).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
@@ -2239,6 +2305,21 @@ test('maps retain independent tag views, tool profiles and last workspace; a lat
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(search).toHaveValue('test');await expect(page.getByRole('combobox',{name:'Filter tag class',exact:true})).toHaveValue('weap');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(0)).toHaveValue('Map A kit');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(2)).toHaveValue('C:/MapA/tags');
   await chooseTool(page,"Level editor");await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(search).toHaveValue('candidate');await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
 });
+test('a late map load cannot overwrite navigation away and back to its starting workspace',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Map library');
+  await page.evaluate(()=>{
+    const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='open_project'&&args.id==='b')await new Promise<void>(resolve=>{w.releaseDelayedMap=resolve;});
+      return invoke(command,args);
+    };
+  });
+  await page.locator('.map-card[data-project-id="b"]').click();await expect(page.locator('.busy-indicator')).toBeVisible();
+  await chooseTool(page,'Features & workflows');await chooseTool(page,'Map library');
+  await page.evaluate(()=>(window as any).releaseDelayedMap());
+  await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toBeVisible();
+  await expect(page.locator('.busy-indicator')).toBeHidden();await expect(page.locator('.library-page')).toBeVisible();
+});
 test('settings Browse survives a bootstrap refresh without erasing other drafts', async ({ page }) => {
   await mockDesktop(page);
   await chooseTool(page,"Settings & tools");
@@ -2707,4 +2788,55 @@ test('a late old-session receipt cannot populate new live undo or replay its que
   await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeDisabled();
   expect(await page.evaluate(()=>(window as any).__lateLive.calls)).toEqual(['original-connection']);
   expect(await page.evaluate(()=>(window as any).__lateLive.object.position)).toEqual([100,2,3]);
+});
+
+
+test('Transfer assets remains in Tools without a duplicate titlebar button and can reopen safely',async({page})=>{
+ await mockDesktop(page);await openFixture(page);await expect(page.locator('#gs-window-header').getByRole('button',{name:'Transfer assets',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('region',{name:'Transfer assets panel',exact:true})).toBeHidden();
+ await openDrawer(page,'Transfer assets');const panel=page.getByRole('region',{name:'Transfer assets panel',exact:true});await expect(panel).toBeVisible();await expect(panel.getByRole('heading',{name:'Transfer assets into Synthetic baseline',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Close Transfer assets',exact:true}).click();await expect(panel).toBeHidden();await openDrawer(page,'Transfer assets');await expect(panel).toBeVisible();
+ const writes=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='save_project'||c.command==='commit_workspace_history'));
+ expect(writes.filter((c:any)=>c.command==='save_project')).toHaveLength(0);expect(writes.every((c:any)=>c.args.head.dirty===false&&c.args.head.past.length===0&&c.args.head.future.length===0)).toBe(true);
+});
+
+
+test('keyboard navigation switches maps without losing edits, exposes tab actions and closes through the save guard',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('24');await velocity.press('Tab');
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+ await page.keyboard.press('Control+PageUp');await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');await expect(velocity).toHaveValue('24');
+ await page.keyboard.press('Control+Tab');await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+ await page.keyboard.press('Control+Shift+Tab');const tab=page.getByRole('tab',{name:'Synthetic baseline',exact:true});await expect(tab).toHaveAttribute('aria-selected','true');await expect(tab).toBeFocused();
+ await page.keyboard.press('Shift+F10');const actions=page.getByRole('menu',{name:'Map tab actions',exact:true});await expect(actions).toBeVisible();await expect(actions.getByRole('menuitem',{name:'Pin tab',exact:true})).toBeFocused();
+ await page.keyboard.press('End');await expect(actions.getByRole('menuitem',{name:'Close map',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(actions).toHaveCount(0);await expect(tab).toBeFocused();
+ await page.keyboard.press('Control+w');const prompt=page.getByRole('dialog',{name:'Save changes before closing?',exact:true});await expect(prompt).toBeVisible();await expect(prompt.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();
+ await page.keyboard.press('Control+Tab');await expect(tab).toHaveAttribute('aria-selected','true');await page.keyboard.press('Escape');await expect(prompt).toHaveCount(0);await expect(velocity).toHaveValue('24');
+ await velocity.focus();await page.keyboard.press('Control+z');await expect(velocity).toHaveValue('10');await page.keyboard.press('Control+y');await expect(velocity).toHaveValue('24');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(24);
+ await page.keyboard.press('Control+w');await expect(tab).toHaveCount(0);await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+});
+
+test('keyboard navigation opens Help and cycles visible work areas while retaining text-field and modal ownership',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(()=>{document.body.tabIndex=-1;document.body.focus();});await page.keyboard.press('Shift+F6');expect(await page.evaluate(()=>!!document.activeElement?.closest('.runtime-dock'))).toBe(true);await page.keyboard.press('F6');expect(await page.evaluate(()=>!!document.activeElement?.closest('#gs-window-header'))).toBe(true);
+ const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.focus();await page.keyboard.press('F1');
+ const help=page.getByRole('dialog',{name:'A familiar spark of possibility.',exact:true});await expect(help).toBeVisible();await expect(help).toContainText('F6 / Shift + F6');
+ const focus=page.getByRole('button',{name:'Close help',exact:true});await expect(focus).toBeFocused();await page.keyboard.press('Shift+Tab');await expect(help.getByRole('button',{name:'Back to the workbench',exact:true})).toBeFocused();await page.keyboard.press('Tab');await expect(focus).toBeFocused();
+ await page.keyboard.press('F6');await expect(focus).toBeFocused();await page.keyboard.press('Escape');await expect(help).toHaveCount(0);await expect(field).toBeFocused();
+ await openDrawer(page,'Changes');await page.keyboard.press('Escape'); // dismiss only an open menu if one remains
+ await openDrawer(page,'Changes');await field.focus();
+ const seen=new Set<string>();for(let i=0;i<5;i++){await page.keyboard.press('F6');seen.add(await page.evaluate(()=>document.activeElement?.closest('#gs-window-header,.gs-workspace-panel,.runtime-dock,main.main-content')?.getAttribute('class')??''));}
+ expect([...seen].some(value=>value.includes('app-header'))).toBe(true);expect([...seen].some(value=>value.includes('runtime-dock'))).toBe(true);expect([...seen].some(value=>value.includes('gs-workspace-panel'))).toBe(true);
+ await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).focus();await page.keyboard.press('F6');await expect(field).toBeFocused();
+ const search=page.getByRole('textbox',{name:'Search tags',exact:true});await search.fill('test');await search.focus();await page.keyboard.press('Home');expect(await search.evaluate((input:HTMLInputElement)=>input.selectionStart)).toBe(0);await page.keyboard.press('End');expect(await search.evaluate((input:HTMLInputElement)=>input.selectionStart)).toBe(4);await expect(search).toHaveValue('test');
+});
+
+test('keyboard navigation uses workspace initials and arrow keys in existing Tools and section tabs',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const orb=page.getByRole('button',{name:'Toggle workspace navigation',exact:true});
+ await orb.focus();await page.keyboard.press('ArrowDown');await expect(orb).toHaveAttribute('aria-expanded','true');await expect(page.locator('#gs-workspace-navigation [aria-current="page"]')).toBeFocused();
+ await page.keyboard.type('set');await expect(page.locator('#gs-workspace-navigation').getByRole('button',{name:'Settings & tools',exact:true})).toBeFocused();await page.keyboard.press('Enter');await expect(orb).toHaveAttribute('aria-expanded','false');
+ await chooseTool(page,'Creator Studio');const tabs=page.getByRole('tablist',{name:'Creator Studio sections',exact:true});await tabs.getByRole('tab',{name:'Mission director',exact:true}).focus();await page.keyboard.press('ArrowRight');await expect(tabs.getByRole('tab',{name:'Cinematic timeline',exact:true})).toHaveAttribute('aria-selected','true');await expect(tabs.getByRole('tab',{name:'Cinematic timeline',exact:true})).toBeFocused();await page.keyboard.press('End');await expect(tabs.getByRole('tab',{name:'Playtest lab',exact:true})).toHaveAttribute('aria-selected','true');
+ const tools=page.getByLabel('More workspace drawers',{exact:true});await tools.focus();await page.keyboard.press('ArrowDown');await page.keyboard.type('trans');const transfer=page.getByRole('menuitemcheckbox',{name:'Transfer assets',exact:true});await expect(transfer).toBeFocused();await page.keyboard.press('Enter');await expect(page.getByRole('region',{name:'Transfer assets panel',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Transfer assets panel',exact:true})).toBeHidden();await expect(tools).toBeFocused();
 });

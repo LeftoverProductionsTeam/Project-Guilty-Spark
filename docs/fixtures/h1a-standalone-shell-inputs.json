@@ -1,0 +1,2352 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Exact owner-installed H1A Standalone multiplayer UI/shell recursive closure. No proprietary tag bytes; readback and game acceptance remain separate.",
+  "sourceArchive": {
+    "file": "HCEEK.7z",
+    "bytes": 1030150472,
+    "sha256": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4"
+  },
+  "roots": [
+    "ui/ui_tags_loaded_all_scenario_types.tag_collection",
+    "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection",
+    "ui/shell/bitmaps/background.bitmap",
+    "ui/shell/strings/loading.unicode_string_list",
+    "ui/shell/main_menu/mp_map_list.unicode_string_list",
+    "ui/shell/bitmaps/trouble_brewing.bitmap",
+    "ui/shell/bitmaps/team_icon_slayer.bitmap",
+    "ui/shell/bitmaps/team_background.bitmap",
+    "sound/sfx/ui/cursor.sound",
+    "sound/sfx/ui/forward.sound",
+    "sound/sfx/ui/back.sound"
+  ],
+  "tagFiles": [
+    {
+      "path": "sound/sfx/ui/back.sound",
+      "bytes": 4528,
+      "sha256": "c6f49616d5c6add087caef480ba2f2c4a9dc7d7b8b7cc2c558d19571a72d92aa"
+    },
+    {
+      "path": "sound/sfx/ui/cursor.sound",
+      "bytes": 3304,
+      "sha256": "d9430ba077b61073d46004b57c71c06f695f8bd6b84ac994bcf94744691708f2"
+    },
+    {
+      "path": "sound/sfx/ui/forward.sound",
+      "bytes": 3376,
+      "sha256": "3af268768d6ac7d6fd0f39edb95ecdb0ce6d0f1cd771469d3b750cc0d2ec1290"
+    },
+    {
+      "path": "ui/device_defaults/cysco.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "2af6f87581ac9d96a5af1e27a4401bd61c728ce70c8527b977d55bd26f768d26"
+    },
+    {
+      "path": "ui/device_defaults/eg.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "d7500493d5586f8bd37df2c027db972d8327029ca0c06cce33bb1fa3c91b2029"
+    },
+    {
+      "path": "ui/device_defaults/gvsdestx.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "0995791268e636810e81d257fe94b45ba34cf2f2947e3b1deae5b9e5738df6b2"
+    },
+    {
+      "path": "ui/device_defaults/ltffwheel.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "a9b003a2a4d4c2971fd2f5381a6532d78e7b304122f48f601ba974cd44894242"
+    },
+    {
+      "path": "ui/device_defaults/ltfreejs.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "03703ac5e6d6add700de87748aaaed6d77fd521c3f5bf8d362252b2d850110b2"
+    },
+    {
+      "path": "ui/device_defaults/msffwheel.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "3954b372d36b1c329fa4208519603539bec61aa37415e9780c36153cb02c3441"
+    },
+    {
+      "path": "ui/device_defaults/mssw.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "5cb62f8e1af95520e3a4f2ebf8b441e3bd2aec340b4a10f87bb2d72b8172d54c"
+    },
+    {
+      "path": "ui/device_defaults/mssw3d.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "149fec38273d7aeec2dcede278b3df96c9c635ed4f8d99ae45848f603fe2fdff"
+    },
+    {
+      "path": "ui/device_defaults/msswds.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "4aba42327f8ce17413ff55f19d52f79ee97d2d11ee8723ea782981b0de1c38be"
+    },
+    {
+      "path": "ui/device_defaults/msswff2.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "26a210a411a952a24fad60e208275ab1185997b0d70bc0ec0d27bee8a19a316c"
+    },
+    {
+      "path": "ui/device_defaults/msswffw2.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "47bd49a3a5940b219f4ad9436866f4afc978a4b5a70d69b70f666508804d0d73"
+    },
+    {
+      "path": "ui/device_defaults/msswfs.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "cf29c99f46c8ddbf16a430940f50b6e1a6a670036840110bc639c0560836846d"
+    },
+    {
+      "path": "ui/device_defaults/msswfspro.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "d04e4534f78a24441feb09245863b925daf5bae12951822321e124235d96be9d"
+    },
+    {
+      "path": "ui/device_defaults/msswgp.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "ba5632470273ce322494ae0c2abb12e6fae7afc0fd6b247710574410d732d306"
+    },
+    {
+      "path": "ui/device_defaults/msswjs.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "1d9040c58c5b28349369544c91dc61284591c0f75f5030b9becbe6cac0513fe7"
+    },
+    {
+      "path": "ui/device_defaults/msswpnpgp.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "8f4487cc54f9b9bab4eb1e299f572ffb44c92a355218f05782336a6946ec996f"
+    },
+    {
+      "path": "ui/device_defaults/reichert.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "1c23ab8e24db18f518962c2caa2b3d2a350e4c36552d639971bf71b5dc4ed360"
+    },
+    {
+      "path": "ui/device_defaults/sfsfcjs.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "7044cd3fc62d1fd2a7ef8b58ea336981b855fa63f4ea24e24169e4ec1a193af2"
+    },
+    {
+      "path": "ui/device_defaults/stekcybor3d.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "202859b6ed17b38ff51f65c6848e89eb888640fbf3eaad6b47de35cf15cb55ef"
+    },
+    {
+      "path": "ui/device_defaults/tmtopgunf2.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "7368fca4309b912eceee92674bb07f94c3e031ce23ce8a77595c55fff46e88be"
+    },
+    {
+      "path": "ui/device_defaults/vatoloco.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "8fe6f61dd08498df3db19a2e70c6e363a4faa272c1ecd1fae03de1c31b8d0f4a"
+    },
+    {
+      "path": "ui/device_defaults/wmcordless.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "bb005045106fb0ddd0e0a231fb5b4ea1745cd4db865f844093ba7e5a5a0b0367"
+    },
+    {
+      "path": "ui/device_defaults/xbox.input_device_defaults",
+      "bytes": 8312,
+      "sha256": "d9cb594accd8ddcca2881545eef98db6a3ff15e70402af3a1a00745f8653e45f"
+    },
+    {
+      "path": "ui/large_ui.font",
+      "bytes": 38238,
+      "sha256": "a256653084b5aafffe48cff55390bfcd9b83698f47951c0564a859b14cff56d7"
+    },
+    {
+      "path": "ui/multiplayer_game_text.unicode_string_list",
+      "bytes": 9840,
+      "sha256": "e01daf456868f00200ffa2b3cd58071cb2bf9b7aa65f394fcc99521db81918ce"
+    },
+    {
+      "path": "ui/random_player_names.unicode_string_list",
+      "bytes": 1442,
+      "sha256": "28a4d5e99c7b841949ce186638e503daee121a0339139076a81bc0c8aba7c204"
+    },
+    {
+      "path": "ui/saved_game_file_strings.unicode_string_list",
+      "bytes": 218,
+      "sha256": "447c09d28ce938e20ca5c965b326ed80efe9968022db0e0c4f9a611af744ee77"
+    },
+    {
+      "path": "ui/shell/bitmaps/a_butn_sm.bitmap",
+      "bytes": 5360,
+      "sha256": "1a735e1bfef5733e4241abbeb5e645ce05577d5d3ccf84b3a277f4c417070df9"
+    },
+    {
+      "path": "ui/shell/bitmaps/alert_bkd.bitmap",
+      "bytes": 266717,
+      "sha256": "990c615e4371cbf448daaec677f27ba80beb8924264e2641af1f0829823e28c3"
+    },
+    {
+      "path": "ui/shell/bitmaps/arrow_sm_down.bitmap",
+      "bytes": 3682,
+      "sha256": "d7688eb07be35bb5e394c8d605e694d71a143d5efb182cee3f770ee83336bf4b"
+    },
+    {
+      "path": "ui/shell/bitmaps/arrow_sm_left.bitmap",
+      "bytes": 7518,
+      "sha256": "de0eda21aa82f3d17f2dae4c33bf21764893979968211ccf85e4c7d6a0afc060"
+    },
+    {
+      "path": "ui/shell/bitmaps/arrow_sm_right.bitmap",
+      "bytes": 7453,
+      "sha256": "cc558aa7c8e4d360f613372890fc8d582e2a3da0a39fd2033f9fd1f90150d7ed"
+    },
+    {
+      "path": "ui/shell/bitmaps/arrow_sm_up.bitmap",
+      "bytes": 4179,
+      "sha256": "76ab1d66b91899ca5a07161f8a9ea8a59247c9ec1228f6fa51408dfc711cf8bd"
+    },
+    {
+      "path": "ui/shell/bitmaps/b_butn_sm.bitmap",
+      "bytes": 5331,
+      "sha256": "737448bd78e4575b467662dcc92edfeb11c287b2eab5fb90d12ce352f21342f5"
+    },
+    {
+      "path": "ui/shell/bitmaps/background.bitmap",
+      "bytes": 446301,
+      "sha256": "69d1d1d2b4d075e407175fd9200160037e08e1629c1d2eacdcb355a808b0a12b"
+    },
+    {
+      "path": "ui/shell/bitmaps/black.bitmap",
+      "bytes": 352,
+      "sha256": "ea82f8e1d7091ce56dad103a5f136fc3d8745078f9c3ab29ca1507010dc046ab"
+    },
+    {
+      "path": "ui/shell/bitmaps/controller_border.bitmap",
+      "bytes": 556628,
+      "sha256": "51eb08e628813391807fcea2dcfc7697525c275e23d13fd7ccf0fd79a2431ec8"
+    },
+    {
+      "path": "ui/shell/bitmaps/cursor.bitmap",
+      "bytes": 5219,
+      "sha256": "e61a7bb211073453a3b41a7515cc707f60ae234b5f686f03472e186b1ce5c3b3"
+    },
+    {
+      "path": "ui/shell/bitmaps/device_border.bitmap",
+      "bytes": 564115,
+      "sha256": "0d8700034c6226429288b9ed6a65d537d32bbaad9f38abe5415b6814727fab52"
+    },
+    {
+      "path": "ui/shell/bitmaps/game_type_grafix.bitmap",
+      "bytes": 825533,
+      "sha256": "6b4a153ccaf4b431cd5f7c13f78e0e521c3366e313c2489416df2b4db96efc44"
+    },
+    {
+      "path": "ui/shell/bitmaps/gradient.bitmap",
+      "bytes": 9655,
+      "sha256": "2f929af7361623aec70010c8b4fe83afa5de1163693fb443950d3ffaf91298d4"
+    },
+    {
+      "path": "ui/shell/bitmaps/list_field.bitmap",
+      "bytes": 265799,
+      "sha256": "f425796c77977c84e5920fe616ecdd1d72e6e5c22d0885d35ef5483ec0a22af5"
+    },
+    {
+      "path": "ui/shell/bitmaps/list_item_bkd.bitmap",
+      "bytes": 13218,
+      "sha256": "bc34f8f4b84518782594556c557c8bc9d388dad4ae9c9f4f6be093f3148580d5"
+    },
+    {
+      "path": "ui/shell/bitmaps/list_item_bkd_top.bitmap",
+      "bytes": 13212,
+      "sha256": "38b70c4110b96401f1d334a6cf540581386a02a6d938b28a7bbe1b4cbb264db8"
+    },
+    {
+      "path": "ui/shell/bitmaps/locked_gametype.bitmap",
+      "bytes": 824,
+      "sha256": "9561fcba5f53671a893ba58b988a2f3e975c090d25faad272e483608c7d09e4d"
+    },
+    {
+      "path": "ui/shell/bitmaps/menu_bkds.bitmap",
+      "bytes": 17437,
+      "sha256": "6fd0dc78dbec48f690987beb9da132d0738d2cceec25ba0262baec2085c18968"
+    },
+    {
+      "path": "ui/shell/bitmaps/mp_map_grafix.bitmap",
+      "bytes": 1210081,
+      "sha256": "fe777a9828fd02d2c8c525f3b67bacb3cdc27ce43a5208448819bf6f713cfcb0"
+    },
+    {
+      "path": "ui/shell/bitmaps/option_bkds.bitmap",
+      "bytes": 66777,
+      "sha256": "db38cc47c48ee190a6b189d5326f2610d2e402e3c3f54b5834b7f9817a50033c"
+    },
+    {
+      "path": "ui/shell/bitmaps/option_bkds_sm.bitmap",
+      "bytes": 33882,
+      "sha256": "d308c6625e81d423cf7e736dcf23d0ed6fa49f2a1665c49b51af00a21d55290f"
+    },
+    {
+      "path": "ui/shell/bitmaps/pausebox5_center.bitmap",
+      "bytes": 4597,
+      "sha256": "dee0b0d7c33f04ff63d9759a59df1f200afb569702b106c6d6f815ecca04984b"
+    },
+    {
+      "path": "ui/shell/bitmaps/pausebox5_left.bitmap",
+      "bytes": 17072,
+      "sha256": "75ec6f1712dd406ccc85f04e0aee73669ef29e4448b2d68c4ee67e8b1e7e4714"
+    },
+    {
+      "path": "ui/shell/bitmaps/pausebox5_right.bitmap",
+      "bytes": 17068,
+      "sha256": "7cb031e19cb2419363e64a5e02b5ecb7c128103b93bf7d0396fb5f697ebbfad6"
+    },
+    {
+      "path": "ui/shell/bitmaps/sel_list_desc_bkd.bitmap",
+      "bytes": 133685,
+      "sha256": "6e21acb3b609887ad91f4cd86609be4b94bac66937273555076ca349e22152c0"
+    },
+    {
+      "path": "ui/shell/bitmaps/sel_list_item_bkd.bitmap",
+      "bytes": 38433,
+      "sha256": "a2787a3a91aae833b01b83a66c78407b7df018066005d49f3305935e3fdca65a"
+    },
+    {
+      "path": "ui/shell/bitmaps/sel_list_item_bkd_top.bitmap",
+      "bytes": 38431,
+      "sha256": "69e29b9ab93832086fff2f571ffd6ff26783a607c9beced0dcdf9958fbc6c9d6"
+    },
+    {
+      "path": "ui/shell/bitmaps/semi_transparent_grey.bitmap",
+      "bytes": 363,
+      "sha256": "8a9eecf5156ecd1a5754324f93499f998401dc530eba9c9b111378d395966d48"
+    },
+    {
+      "path": "ui/shell/bitmaps/spinner_list_3_wide_item_background.bitmap",
+      "bytes": 268298,
+      "sha256": "fa70f79a71321ca8447050175a1e678b8999a69d2c6b0d3ceed3beca7bfb857e"
+    },
+    {
+      "path": "ui/shell/bitmaps/team_background.bitmap",
+      "bytes": 541680,
+      "sha256": "2ab92690704d46cf9454b963432996f253b6d394b0be33e3062415927f6e3335"
+    },
+    {
+      "path": "ui/shell/bitmaps/team_icon_ctf.bitmap",
+      "bytes": 69044,
+      "sha256": "6ff2a78d88dc0381bde145fb9fef7f3104ae0c96ae78421c10d224267c3fa68e"
+    },
+    {
+      "path": "ui/shell/bitmaps/team_icon_king.bitmap",
+      "bytes": 69050,
+      "sha256": "6a1e98624b3049436ebbc7d13db0ad5ab230f8987e5c5506e4328b1975d0e96e"
+    },
+    {
+      "path": "ui/shell/bitmaps/team_icon_oddball.bitmap",
+      "bytes": 70195,
+      "sha256": "341ee19038b13df6c3e59638c94451676ae0d5338bf54fe1d65bff12caac8e01"
+    },
+    {
+      "path": "ui/shell/bitmaps/team_icon_race.bitmap",
+      "bytes": 69502,
+      "sha256": "8bbb386755e923701396b066e61caad1201e88f0004fcb7704d21a95d1987b98"
+    },
+    {
+      "path": "ui/shell/bitmaps/team_icon_slayer.bitmap",
+      "bytes": 69903,
+      "sha256": "5eb6ad1919d7dc15ce888622265be0526cadd4a958dc64f44f5f9468e3225de0"
+    },
+    {
+      "path": "ui/shell/bitmaps/text_button_background.bitmap",
+      "bytes": 17843,
+      "sha256": "43add9fc9ddc1abe2d16b792ed8138d8866cc8852c9dbf9619c38a5f4759c243"
+    },
+    {
+      "path": "ui/shell/bitmaps/trouble_brewing.bitmap",
+      "bytes": 8864,
+      "sha256": "966e2054632cd79aad4054c48ddd14bec3531e4dbcc39ca4dbf03e93e1c5b18d"
+    },
+    {
+      "path": "ui/shell/bitmaps/white.bitmap",
+      "bytes": 352,
+      "sha256": "22d7242901cded00671d4512aac9b58628bb73bc09a93a227d395651fe7d63f0"
+    },
+    {
+      "path": "ui/shell/bitmaps/xdemos_wait.bitmap",
+      "bytes": 343357,
+      "sha256": "2705ca491273df0efb5bd779690504440202ae58b96590ac841024c883977ab7"
+    },
+    {
+      "path": "ui/shell/common_button_back.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "4a79db290abd793c968a5184efc9508a32b0c381e1170ea2ed4d25c487877c81"
+    },
+    {
+      "path": "ui/shell/common_button_cancel.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "38bf4b4b7dbf84ca9d9174bd9a60bddb15aaf25cc5924d2c5c30a6a50f1eb150"
+    },
+    {
+      "path": "ui/shell/error/aborting_to_dashboard_please_wait.ui_widget_definition",
+      "bytes": 1313,
+      "sha256": "47884ce7798c34760851ec1417bff203203463ebd2f492e52b86debfe0aaad60"
+    },
+    {
+      "path": "ui/shell/error/error_abort_to_dashboard.ui_widget_definition",
+      "bytes": 1508,
+      "sha256": "1ec0b42fdffb887ecf01946c032b5a3b6ddb70bd1ced578754b05fa0dbc33d91"
+    },
+    {
+      "path": "ui/shell/error/error_abort_to_dashboard_you_have_no_choice.ui_widget_definition",
+      "bytes": 1606,
+      "sha256": "ea6f587217f85f0472ad8b960fc3160ec6029db9b6a7e97aba4604888d60d8fa"
+    },
+    {
+      "path": "ui/shell/error/error_headers.unicode_string_list",
+      "bytes": 404,
+      "sha256": "6670b54a8298904e036218c21c4796b61cf7df70fc0e51250bba5b2e041d9903"
+    },
+    {
+      "path": "ui/shell/error/error_modal.ui_widget_definition",
+      "bytes": 1286,
+      "sha256": "8a942826a3511c784d8db354a73277ec1a8fc3851ce4a38ed2ce273aa61919a7"
+    },
+    {
+      "path": "ui/shell/error/error_modal_button_bar.ui_widget_definition",
+      "bytes": 1185,
+      "sha256": "5e126fd35c793ec2ed503b84f5f93f3d8d4725f89f44b610ba19d1f1817f11e9"
+    },
+    {
+      "path": "ui/shell/error/error_modal_button_ok.ui_widget_definition",
+      "bytes": 1232,
+      "sha256": "1f939abdcc1272c56b7535eaacd6239b7f3e27d7e4fc3becc1c589d26586d1b2"
+    },
+    {
+      "path": "ui/shell/error/error_modal_fullscreen.ui_widget_definition",
+      "bytes": 1502,
+      "sha256": "2ee1b811ecf149933b711fbf8cfee67e024b7f9f45c8dc2722f484f7d14d09a1"
+    },
+    {
+      "path": "ui/shell/error/error_modal_halfscreen.ui_widget_definition",
+      "bytes": 1358,
+      "sha256": "bdfcff9a01e3bb05770168caa6762f67ef11ac5644d26bb76e26847397ba653f"
+    },
+    {
+      "path": "ui/shell/error/error_modal_qtrscreen.ui_widget_definition",
+      "bytes": 1358,
+      "sha256": "76f488cddf8620cd1f697609a33be0d1fd238aaf21b079930477ea3ede63077f"
+    },
+    {
+      "path": "ui/shell/error/error_non_modal.ui_widget_definition",
+      "bytes": 1325,
+      "sha256": "b4b1879e2bc402505c66e817afd8f7fe2efb20475197f8ccbbfeec368518de64"
+    },
+    {
+      "path": "ui/shell/error/error_non_modal_qtr.ui_widget_definition",
+      "bytes": 1430,
+      "sha256": "5c6c945693d66ab81be8d4325e920c0c6aa27c008d13ae94b9bb311e5a6a5809"
+    },
+    {
+      "path": "ui/shell/error/error_nonmodal_fullscreen.ui_widget_definition",
+      "bytes": 1441,
+      "sha256": "5baf51a55680be9897dd4b2828f271e65be5fb7c0334f488a02a9d0d613b7379"
+    },
+    {
+      "path": "ui/shell/error/error_nonmodal_halfscreen.ui_widget_definition",
+      "bytes": 1323,
+      "sha256": "77af1e2aa615ff3bf9dca7674fba31dcdb7deaee9cd67cdfb052723b2d975590"
+    },
+    {
+      "path": "ui/shell/error/error_nonmodal_qtrscreen.ui_widget_definition",
+      "bytes": 1366,
+      "sha256": "fcd3d204b09d55e6d8ba5c16d563eef43f4237e0f90933b0a75c69857541fb34"
+    },
+    {
+      "path": "ui/shell/error/error_text_box.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "2945b0d8dcfe28ee87dffffd940815b802d107a813477606f8df252d802466e3"
+    },
+    {
+      "path": "ui/shell/error/header_are_you_sure.ui_widget_definition",
+      "bytes": 1109,
+      "sha256": "5633b66d64c13529c02810633887201cd2ae5efaab790ce63fcaf505ea9fc34a"
+    },
+    {
+      "path": "ui/shell/error/header_error.ui_widget_definition",
+      "bytes": 1109,
+      "sha256": "3d0076f5a9ca4b6414118695960db7c8f40c3d5f0f6187c4a40e10b3169b53a3"
+    },
+    {
+      "path": "ui/shell/error/header_saving.ui_widget_definition",
+      "bytes": 1109,
+      "sha256": "b52bcc7b17932561174e7ba9e330e7a3e88579f2e5a6e3172952310b18e0c232"
+    },
+    {
+      "path": "ui/shell/error/header_warning.ui_widget_definition",
+      "bytes": 1109,
+      "sha256": "563f8dd56a0d5babb9643557b6402a40a61011f0230edee29bf33e6ff1035351"
+    },
+    {
+      "path": "ui/shell/error/warning_pre_testing_video_screen.ui_widget_definition",
+      "bytes": 1343,
+      "sha256": "bcb2649f2fedf6735ad7c050207e67f692b652747b4362176dbc528ce7c7b366"
+    },
+    {
+      "path": "ui/shell/error/warning_pre_testing_video_text.ui_widget_definition",
+      "bytes": 1149,
+      "sha256": "cfd88eff8bb948505bfc993e351a0f1e6bebe57dcbec75c5ebc0f3195bfce1f4"
+    },
+    {
+      "path": "ui/shell/error/warning_saving_file_screen.ui_widget_definition",
+      "bytes": 1480,
+      "sha256": "4226373d980cbe4990c5fefb3c3c5feb15b62f9b125dde9bb7bd77510e6bba10"
+    },
+    {
+      "path": "ui/shell/error/warning_saving_file_text.ui_widget_definition",
+      "bytes": 1149,
+      "sha256": "15150fb54ee3f85dd544ec193040bc698d66cda7aedb6c308611070948fba89f"
+    },
+    {
+      "path": "ui/shell/error/warning_testing_video_screen.ui_widget_definition",
+      "bytes": 1344,
+      "sha256": "3181520e9f2bbe04210254b6b20b90fbb77315036cb6b7618700ad000dd930bf"
+    },
+    {
+      "path": "ui/shell/error/warning_testing_video_text.ui_widget_definition",
+      "bytes": 1149,
+      "sha256": "ee71199070a4ce76ad38c16a225d8229e00d7e7d6900931961ece4653fddfaa1"
+    },
+    {
+      "path": "ui/shell/main_menu/=cancel_sm.ui_widget_definition",
+      "bytes": 1110,
+      "sha256": "25b530ff840dead47df97b9660dc9cc7a5afb3a0223cdbd37b48430ef193f446"
+    },
+    {
+      "path": "ui/shell/main_menu/=select_sm.ui_widget_definition",
+      "bytes": 1110,
+      "sha256": "3a76c8fd7d5934655cb6c80836aa04998c34e2ee87a33a659b56f2b24c8d05ad"
+    },
+    {
+      "path": "ui/shell/main_menu/a_butn_sm.ui_widget_definition",
+      "bytes": 1095,
+      "sha256": "550d286c16f2d968d863a01b02b95a5fa3846a125e0abdace1cf0b7a29805f26"
+    },
+    {
+      "path": "ui/shell/main_menu/b_butn_sm.ui_widget_definition",
+      "bytes": 1095,
+      "sha256": "3537dc458f59688de273b5d1c9607bb9b311e2d31b7beba1534e2cc39e76bf4c"
+    },
+    {
+      "path": "ui/shell/main_menu/button_key.unicode_string_list",
+      "bytes": 676,
+      "sha256": "7f0a9f14f056029e0a795ac420de411550bbe4e3b181a783ac5d6e9be3275ff1"
+    },
+    {
+      "path": "ui/shell/main_menu/button_key_sm.ui_widget_definition",
+      "bytes": 1506,
+      "sha256": "c6a6f386590fa956216ed6dbb00ae9eb095ddd4eceb06aca9b9ab2ea7539fdde"
+    },
+    {
+      "path": "ui/shell/main_menu/current_profile_name.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "70d200197bb8ef82630d7b1b19f019756e4e9cb25e4e449319f901f1dd99629a"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_descriptions.unicode_string_list",
+      "bytes": 1108,
+      "sha256": "aa07419bc96683fcfe243bf1724d1937121d3bd7069b77d82338c9bb35534886"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_ext_desc.ui_widget_definition",
+      "bytes": 1501,
+      "sha256": "173ad468d8f0b7741a2d58f96f4e66fa379a4c3d9e5068974bde59345046148a"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_extended_description.ui_widget_definition",
+      "bytes": 1141,
+      "sha256": "d42f2ffd6b3b77ad17f062878114132633fc3e7e842a7bbeb99ec8c90385cb93"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_options.bitmap",
+      "bytes": 409727,
+      "sha256": "98f06428639bc6bc25214034c92d7f2b97c0d548760dba065f6fd778b4aca419"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_options.ui_widget_definition",
+      "bytes": 1124,
+      "sha256": "82ad0544b4e9a8daecaf0855d3ee0a486647422c6e8544102ad0181ee4ff6d1f"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_options.unicode_string_list",
+      "bytes": 214,
+      "sha256": "09e15468a9f15efabcf7d53fc05c0b31933b30776e7475393b5ffc72dc061991"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_select_button_bar.ui_widget_definition",
+      "bytes": 1357,
+      "sha256": "b4b86f3890f5a546f05a266e7735d409e7148f341d0005a844052c014af15302"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_select_button_ok.ui_widget_definition",
+      "bytes": 1682,
+      "sha256": "21c7ac0c2f2e73584d602b340656739c7ee94ffb78122f9928aa38b39ba51447"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_select_list.ui_widget_definition",
+      "bytes": 1947,
+      "sha256": "6fccc3d91b03396001833024588d9663c5b7ec4580fc6645375e15f6dd35c5b0"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/difficulty_select_list_screen.ui_widget_definition",
+      "bytes": 1545,
+      "sha256": "f3cb0b75159f5b76ee23af06763da2d53d75b5324a851cb7d50a168812306911"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/hard_difficulty_item.ui_widget_definition",
+      "bytes": 1383,
+      "sha256": "88bcec8537e0dbe3c64d244eaaf0de3219920f2485c5e2398235766ed82fbdd9"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/header_choose_difficulty.bitmap",
+      "bytes": 43175,
+      "sha256": "17e24243b0a70381eab4980a12b572716feed3a21a83135f4f696590d5f379cc"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/header_choose_difficulty.ui_widget_definition",
+      "bytes": 1130,
+      "sha256": "0e86d41c504fbb684bd5c5fe974dd0ecd3974e719719f44db588e3424deba35f"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/impossible_difficulty_item.ui_widget_definition",
+      "bytes": 1383,
+      "sha256": "c898937bfde3bd85bb38b2fff93d2448db5483f584f6db1e38eb35ae789f6aed"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/kindergarten_difficulty_item.ui_widget_definition",
+      "bytes": 1387,
+      "sha256": "945345f7caeaaf2f629bd0324122a37b32e861611aed075226f3a551355e5c87"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/normal_difficulty_item.ui_widget_definition",
+      "bytes": 1383,
+      "sha256": "5fa8db70436f61ee14445717657832d240bf3b436524dbfaa83db00c25de53e3"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/warning_message.ui_widget_definition",
+      "bytes": 1133,
+      "sha256": "457fec38cbb6ae518305a5da535b820bf6a60167ee3d3cab1c0e667c5585a94b"
+    },
+    {
+      "path": "ui/shell/main_menu/difficulty_select/warning_message.unicode_string_list",
+      "bytes": 296,
+      "sha256": "82bb81f1b8b72a16917b128581967657e75fb263fcebbcac56db3b3166daca07"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_extended_desc.ui_widget_definition",
+      "bytes": 1323,
+      "sha256": "6de0c736d6c47f406ada109cb3e230ff56e5472cf73256a0f19472ebd2e6f979"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_right_data.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "b4d1f1085f3e84a88889b64331af10de5e34f35053a19fc2cc98226fa99bea0d"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_right_item.ui_widget_definition",
+      "bytes": 1661,
+      "sha256": "0937f4de4321c2fa9399a413752430b2832f4fd4007accdbab80d34562635d57"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_right_name.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "2742bce92068a86973fe130336473155ddd90654f858f6158f65a873fa5ee1ba"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_right_pic.ui_widget_definition",
+      "bytes": 1102,
+      "sha256": "cef47b77de9ad7c5c6de2f8e2442e54d3625cca51d181cc9115b3e1034e2ee4f"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_select_button_bar.ui_widget_definition",
+      "bytes": 1353,
+      "sha256": "7534df0c9c2122764449d1ede3de5bd3826de27d8f49da8a1d204bc085e9af2f"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_select_button_ok.ui_widget_definition",
+      "bytes": 1540,
+      "sha256": "30338a714116514decbf5edaa158af3cb2bf1fd0557d1fb0474da90dc8c00621"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_select_list_2.ui_widget_definition",
+      "bytes": 2958,
+      "sha256": "94e65ba46291f394bf1bb6ed02478f05356178db65f998f136ef4a59a8723e4c"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/gametype_select_screen.ui_widget_definition",
+      "bytes": 1570,
+      "sha256": "893fcb7f5e274e4bea8302c3cbea04409b77a44c10ecfaece6ab92399870e01c"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/header_select_gametype.bitmap",
+      "bytes": 43899,
+      "sha256": "db31f09719a548c1e62e196ea28bc8e0c59bb70e2ede40f816bbb1d7cc1d4fc2"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/header_select_gametype.ui_widget_definition",
+      "bytes": 1126,
+      "sha256": "c46a7bcc238f7478c2736dadfc3b44a7d340ed4a0de651304fa820b991e12360"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/list_item_0_chooser.ui_widget_definition",
+      "bytes": 1255,
+      "sha256": "5b6f493c8e23d8751a15b850c78366cb852eec6488b6b639fcb231597d0b5017"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/list_item_0_chooser_spinner.ui_widget_definition",
+      "bytes": 1269,
+      "sha256": "61def895e24e4418dbf854d9742db2ed7f68a6b62fcc05326bbb255693feeda6"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/locked_gametype_icon.ui_widget_definition",
+      "bytes": 1101,
+      "sha256": "86c69aed0d41ee902b64e4d1d6ae5838a20b80d3f324525a967bad1ef19f4865"
+    },
+    {
+      "path": "ui/shell/main_menu/gametype_select/var_gametype_banks.unicode_string_list",
+      "bytes": 184,
+      "sha256": "255151168d16b3f7882b5680be8b2153031c861dada1f52ce7855c253883d991"
+    },
+    {
+      "path": "ui/shell/main_menu/mp_map_list.unicode_string_list",
+      "bytes": 952,
+      "sha256": "de080a75bac6a96f113156dd2042332d797f45a1bf2c12ec67520a50dcfc311c"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/connected/connected_map_select_postgame_wrapper.ui_widget_definition",
+      "bytes": 1302,
+      "sha256": "4283e2aed6ef5a9c8452371728999cc416567ff63e4980e379b944ee2fe961fa"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/connected/connected_map_select_wrapper.ui_widget_definition",
+      "bytes": 1226,
+      "sha256": "e07cdce8d460790cae0631098649ffda6789d0dd8c8d40fb826d613be97a16e3"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/connected/gametype_select_screen_wrapper.ui_widget_definition",
+      "bytes": 1206,
+      "sha256": "9376e80a29603e943719963eaaeeb3f43fb5be1e36fc65a1ffe4b4bead3b7f96"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/header_select_map.bitmap",
+      "bytes": 42209,
+      "sha256": "c1a4ff92f6497f8e5594655b19a2eb8d2961dad10af77ed8b9bee130a4402a64"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/header_select_map.ui_widget_definition",
+      "bytes": 1143,
+      "sha256": "f4824c0f1d435f3299302ddedd835589c40cf033bc7168b626f7e095b6d1d280"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/map_data.unicode_string_list",
+      "bytes": 2456,
+      "sha256": "306e30213283a581126f2eaf6e9a7896d55711cd1ce26cf9fd6b89e2b030b1a5"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_extended_desc.ui_widget_definition",
+      "bytes": 1343,
+      "sha256": "fde84f0cc29ef77b9e91b0f900fbfbb80d9dc9c4697c8e869282d645db9d8f48"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_right_data.ui_widget_definition",
+      "bytes": 1146,
+      "sha256": "de70180d3576205d8695a201142d9206b74a23589d9ae336f15fde216fb1f664"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_right_item.ui_widget_definition",
+      "bytes": 1585,
+      "sha256": "920acead248fde9d4ed1b8003bc0faeaf4e851ebcba1bd1ddbc66659ab323f5c"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_right_name.ui_widget_definition",
+      "bytes": 1111,
+      "sha256": "e55b8e6a4fcc5258a2cb4d34ff66a0457a62daaed63e67df1be6e5813327291d"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_right_pic.ui_widget_definition",
+      "bytes": 1099,
+      "sha256": "97d793c9f849c861436232d98b4fdf515d8b4321084afcfdcf557e3843794170"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_select_button_bar.ui_widget_definition",
+      "bytes": 1373,
+      "sha256": "017130970f3d97c031b9541663a7a147d8251f03ebf675a5109628fde4b53a09"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_select_button_ok.ui_widget_definition",
+      "bytes": 1544,
+      "sha256": "e107514581299ca016773cdd715621d49102a32976b9de4960b641816d3e505f"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_select_list_2.ui_widget_definition",
+      "bytes": 2987,
+      "sha256": "530f4f672ea5a178b369ab10dfa02a30ef6d31e26d92b0ca77b32f15fc1566f2"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/mp_map_select/mp_map_select_screen.ui_widget_definition",
+      "bytes": 1607,
+      "sha256": "c1237d17710683703f7305178fa21f3af6e06eff5d689db95cee03c1085cf12c"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/cap_server_settings_options.unicode_string_list",
+      "bytes": 2772,
+      "sha256": "5f605f1b3ea9c3af02cfc2febed7eea7c401c85031a179457c6691cdf4a2bb61"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/connection_type_label.ui_widget_definition",
+      "bytes": 1184,
+      "sha256": "a9853b006d1ab4b3ac955b34c2a73d210d80a995756620be05e727918cc3217c"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/connection_type_spinner.ui_widget_definition",
+      "bytes": 1317,
+      "sha256": "35f581acb1400c2ea18025eaa32b3773254c768a73e1d316c443d292411b507d"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/header_server_settings.bitmap",
+      "bytes": 43444,
+      "sha256": "72e97b355b19a46c633d8b13162a6b7cb7c97be6bf82dd3c081a161de162d701"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/header_server_settings.ui_widget_definition",
+      "bytes": 1150,
+      "sha256": "72fb4949954915a0dc73c9069ca30edf3b3e10c6851fb3b08028e965f972eeaf"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/max_players_label.ui_widget_definition",
+      "bytes": 1163,
+      "sha256": "a6f5d528d7e35a3d52b32ec796991984917cfe2c661c9cfc48eebee12fa6e901"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/max_players_spinner.ui_widget_definition",
+      "bytes": 1290,
+      "sha256": "4148a8d0b7dd8d02145b2500b7c865fe1c16907acb4f3e97fe7e789d0ab63ff2"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/op_connection_type.ui_widget_definition",
+      "bytes": 1421,
+      "sha256": "ecf53f1e70b574641e3ce7c3434f9102c1191090f36e3fa3d5ff66306436bad0"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/op_max_players.ui_widget_definition",
+      "bytes": 1413,
+      "sha256": "73dea006daed4e125350ca8da732d4171cd79368b8da820c8335b92cbc7c064f"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/op_server_ip.ui_widget_definition",
+      "bytes": 1413,
+      "sha256": "5fe70a713ba84359b791787a9187ad685d763ab4038816df59a59b8fc42d514c"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/op_server_name.ui_widget_definition",
+      "bytes": 1489,
+      "sha256": "710abea83acc5132df0d34cfd8d1c99fea4b09074406a82ed073697ba3e8600d"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/op_server_password.ui_widget_definition",
+      "bytes": 1497,
+      "sha256": "8185e5c1fdb25feca123ae9ea93e6b54996a0a11320f801e3ebf9b645c47af2e"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_ip_label.ui_widget_definition",
+      "bytes": 1163,
+      "sha256": "2a22acc566131247e88bd818dc65b75f1ba1901fd7d21c2d3a52d9549addc942"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_ip_value_label.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "25f1cf0da91a421997a82e0894b947463822db9eba2f737850e3ddc1e3d700f9"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_name_label.ui_widget_definition",
+      "bytes": 1163,
+      "sha256": "d750dd46c210cc4c44f063badb8177735474fc1f670298e60c49def060b12590"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_name_value_label.ui_widget_definition",
+      "bytes": 1224,
+      "sha256": "17a6ba8badae96fe0c38ce1adbd3f524d41c5ab5424d352ecdd85f01ef509b2d"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_password_label.ui_widget_definition",
+      "bytes": 1163,
+      "sha256": "1b195305f64d5fda2bd17c82a2f7cef2cf954a0ca54c5a687a6eee69a6b497fb"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_password_value_label.ui_widget_definition",
+      "bytes": 1224,
+      "sha256": "3f08f6cc649fa31563cf1dc6029a0fecbcf2f0305407023cb8dbea7e5060718e"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_button_bar.ui_widget_definition",
+      "bytes": 1382,
+      "sha256": "23a1dfae7111acf491aae4b3eda9882e23da77b7de8d0c63327e1651023f8e89"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_button_start.ui_widget_definition",
+      "bytes": 1419,
+      "sha256": "d9bf4d99aa155ad6739390caee82f79219506838b46a05a89aa27d79fc33f7bc"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_help.ui_widget_definition",
+      "bytes": 1353,
+      "sha256": "903ac5a2cd2b27c0d8b923b54eb129faadee6782e98005fdb1b345cf08c3f95c"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_help_text.ui_widget_definition",
+      "bytes": 1167,
+      "sha256": "89a4dfa0df0075a80aa7f71e9669def8d3c84a4142f5e9a9a905703f47ec9801"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_menu.ui_widget_definition",
+      "bytes": 2198,
+      "sha256": "36750bded00e58c4d3fdf43c14e74c19d240f0337910fb8924a0ae67ef1693ba"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_options.unicode_string_list",
+      "bytes": 328,
+      "sha256": "2bb27e82197b6bf3545873e419e589f3ddeebb9a6370d9864d97005be4f29542"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/server_settings_screen.ui_widget_definition",
+      "bytes": 1416,
+      "sha256": "8db9d165c80e3e058589364fba029797dae3adce7429ce4c5a2ee81b70568078"
+    },
+    {
+      "path": "ui/shell/main_menu/multiplayer_type_select/server_settings/var_max_players.unicode_string_list",
+      "bytes": 450,
+      "sha256": "25e6a22cf166c91089ce68766e5d4afe5de78b1d986d86ad4853e139b82fa96e"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_0.ui_widget_definition",
+      "bytes": 1843,
+      "sha256": "ac1a43aa9021de80885e084b6bb49012d807769c403331d96642f4d7cc1fb21c"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_1.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "dc659afc59a3fc94d98f3d6ca21d14837aca0655e4bc14821e8c9bcd410ace3f"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_10.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "69a05ed7d3c76dc2334dfde3d5217bbc07119882b5762911b8bfc1d391a5b01b"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_2.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "47dadecb742f9d864e3721b860723b8c56ac7895873b27981afb044d7bd96aac"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_3.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "fe51edbea81d697579c7487bc2c888e8e4d3ba6d672d2cabd8df6ce2d15ab426"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_4.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "12338e009568572a3c5816ec1e72fbc03552d51686d1396308d3fdc81d37bee3"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_5.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "c323e489828786b794ca53b7eb95f75bc60008fb188fe3728d1e289543cea6d0"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_6.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "5bf5d63f8047ccf9828c8543229124f60cc577d638be4c5a64f656c7ee0fceb8"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_7.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "744a0d6b335f255f5b106af507a3902ed31960c08503cf54e73597252f660cbc"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_8.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "c1efc98e08689f129b4cba754ae8895e80e3f3d257953dd9dd71fffa24c3b432"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_9.ui_widget_definition",
+      "bytes": 1839,
+      "sha256": "a55120a50fcafc062284512ddf35e7643fd5e9b860339961d9cb44ce1a95023a"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_arrows.ui_widget_definition",
+      "bytes": 1821,
+      "sha256": "fe6a79ee89b1d2eee606b54c3147162e7bf5015cec4b2ec9e31cff4e755f7f64"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/list_item_text.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "74fd3465aabe4d2b87869421484a6e32c17b82f6ac37b663d67236e5b69569c4"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/scroll_down_arrow.ui_widget_definition",
+      "bytes": 1099,
+      "sha256": "b46b4c83fb03ffd50831aa7b70ec84d77f61a1e43b1f39e0e925d86bbcc55f03"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/scroll_down_button.ui_widget_definition",
+      "bytes": 1228,
+      "sha256": "f3ccc41335c8252fcc19c3a245c08b43f014f75f55b81b833baebc6710fe7b47"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/scroll_up_arrow.ui_widget_definition",
+      "bytes": 1097,
+      "sha256": "e8bc82dde8ac19ff4f1275d68350ee9848d183bf0ac4255ae722b1b5124963ea"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/scroll_up_button.ui_widget_definition",
+      "bytes": 1226,
+      "sha256": "3641c51304db6c4d991d1b8d918b30a2de55ac8a5e8583e2bd3bd0d0771aaedf"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/sel_arrow_left.ui_widget_definition",
+      "bytes": 1099,
+      "sha256": "3f3dcebf892b70fc8bd94990b7afb4ff4d9ebfb1cbf3b43e979bf6253f805333"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/sel_arrow_right.ui_widget_definition",
+      "bytes": 1100,
+      "sha256": "f432c8ab3554cf15d84e477a1fe45664510cfa5bd54d3d47ee22792919513b2e"
+    },
+    {
+      "path": "ui/shell/main_menu/new_select/sel_list_desc_bkd.ui_widget_definition",
+      "bytes": 1103,
+      "sha256": "4c81e91ac4fd3c6375d29e8938b1d1294d3532805cbd57980d0f6462bf8798b2"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/about_item.ui_widget_definition",
+      "bytes": 1272,
+      "sha256": "d6398d11631f565865d58fbdedab7a5f3ff09a2f9e95c9a0d89eece8beaf3dbf"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_button_bar.ui_widget_definition",
+      "bytes": 1578,
+      "sha256": "c335434ff3816426d6c2df949d0744ad49a530ed79e535da3438b87492f3bab0"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_button_defaults.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "fea17550420e881e91eb70764af48336f3699826193f4db6611f0f356b634c5b"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "033b92e7f1231133b073612d980065e3296e46b3299fb4eb9fd926799929971d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_option_labels.unicode_string_list",
+      "bytes": 454,
+      "sha256": "217e609452bfea6c56ec9cd9282e5d31a17b24abcc0b4e42d88d7f6e49137e92"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_options_menu.ui_widget_definition",
+      "bytes": 2808,
+      "sha256": "c454b4a7b729e49e96cef5afad1daf285d3b501b9c68e6d629fb687be7617461"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_settings_help.ui_widget_definition",
+      "bytes": 1190,
+      "sha256": "81f8ea2fae70206c99cfaf25a3971e8eb1ebe6c25004235b623832593fdb8109"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_settings_screen.ui_widget_definition",
+      "bytes": 1469,
+      "sha256": "e6fdf0b78edfbf0e560733c616a503ab8decf1db8661e177305e992a91cd9db5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/cap_audio_settings_strings.unicode_string_list",
+      "bytes": 2340,
+      "sha256": "b61561dfc13d99313fd998b62dc807f5a840fbeff106b70ecc0285abdf99a6ad"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/effects_volume_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "5b491799940fab74402c262278027a1e7e16a757648e5886d19754158f4b7aa0"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/effects_volume_spinner.ui_widget_definition",
+      "bytes": 1310,
+      "sha256": "c9f92abf73c6b75ffd67ab5283f084a8a4b90dd652d6836a0ea8f6e0e0ffbcf7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/environmental_sound_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "0f6c54a80a580944fba1169485763ec82f15f4e83938639bf724cf49c939f5ae"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/environmental_sound_spinner.ui_widget_definition",
+      "bytes": 1322,
+      "sha256": "5b040dd05cf07d78361253f04f6528d0a0aca61d8334623686e007b762c76e5c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/header_profile_audio_settings.bitmap",
+      "bytes": 43371,
+      "sha256": "fcc4d1558254cd69cde3ea2239eee351004a7006812d2e4a9bb34a2775858676"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/header_profile_audio_settings.ui_widget_definition",
+      "bytes": 1181,
+      "sha256": "c8060592f308258a1fff9f508ef62f01f6a09faca2b67c7ee69797bf97a25444"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/master_volume_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "d99ddf574d1d9740e3cae344bacaf07450af6bc969a6384bdc900c8e39e75518"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/master_volume_spinner.ui_widget_definition",
+      "bytes": 1310,
+      "sha256": "eec4a19e97d0aaeabb87a9370b1c13b21210d83fce7f11ca7ca9ce09bd4f8ce9"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/music_volume_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "9356a3514da2a13590edec529d892b20064bffa3b02d351ae9947a712d655669"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/music_volume_spinner.ui_widget_definition",
+      "bytes": 1310,
+      "sha256": "ed51ef3b350bf7fd02303978484103d5aa85c353182a882008ef8990fe714302"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_effects_volume.ui_widget_definition",
+      "bytes": 1467,
+      "sha256": "eaa4f4cf8aeb29f35f8a93f82ae0cb2f57df24ea44640830a93aeba7d9776b14"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_environmental_sound.ui_widget_definition",
+      "bytes": 1477,
+      "sha256": "513439183a2aa4a5b0c90e14884106849ffe940725e806995ec62f3966999657"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_master_volume.ui_widget_definition",
+      "bytes": 1465,
+      "sha256": "ecf3cb1b0421927240a5231f986647157a3caef87075de7f21f02ac3b713b1e5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_music_volume.ui_widget_definition",
+      "bytes": 1463,
+      "sha256": "55dc425eabf784a35555a8a89398f2b6f3baa6a13af3df96fd5e7c4a253f1f7f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_software_buffers.ui_widget_definition",
+      "bytes": 1471,
+      "sha256": "69973279bbd36c9b4a328f94e8c72cda8c438ac349b0bbc88fbb7d6df0b49d83"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_sound_variety.ui_widget_definition",
+      "bytes": 1465,
+      "sha256": "a82fa054a676bdbecbe4560f37fabc16dd5cb205511f924e554efad47880902a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/op_supplementary_buffers.ui_widget_definition",
+      "bytes": 1481,
+      "sha256": "808161d0755ca5246a8531b83ebc5067d84d168252b9d41a6a93e9fc18c50747"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/software_buffers_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "c1c57517a5fb01761272910857a9542175f4c3bc811cc16e821f24a3010b6bb8"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/software_buffers_spinner.ui_widget_definition",
+      "bytes": 1244,
+      "sha256": "f71b410add4096b6fbeea68a607439ef6afcda8a0b7cac67785651a76db62dfc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_variety_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "8c902633efe161a0ab0048c497f310ed707367acf84cffcc00bf2de6b5520fb9"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_variety_spinner.ui_widget_definition",
+      "bytes": 1324,
+      "sha256": "2d39d5928531324fe7fdb14885d56b682f7390cfd13aa04901fd569a77ac9fb9"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/supplementary_buffers_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "e145be632fc1da041c6c232882dbc1f88e9009f7811bda412093ae34099743d6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/supplementary_buffers_spinner.ui_widget_definition",
+      "bytes": 1324,
+      "sha256": "e4fafe224cc0632abd71b0009dd48004a3062b2c9fc925ac38b2e19aec1829f8"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_environmental_sound.unicode_string_list",
+      "bytes": 132,
+      "sha256": "94efada112095a70afb6fd69bbb4dcc597078b5961e81d209c5ba881cbbd39ca"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_supplementary_buffers.unicode_string_list",
+      "bytes": 168,
+      "sha256": "df9b5ffe2bd7c7c91307508f742c166f72d2e3ffebc40d35c34db1efa6846ee1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/var_volumes.unicode_string_list",
+      "bytes": 342,
+      "sha256": "b972ca9c8cd4dac21cc8a05bb3a1a5759e5a75004d320412bfb179fcc556d010"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings_profile_item.ui_widget_definition",
+      "bytes": 1626,
+      "sha256": "e54f8940dd7c1d4c481e129c05a5d0c52b939d01995a224d48f9a9293869ac49"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_right_item.ui_widget_definition",
+      "bytes": 1472,
+      "sha256": "64dad9e5ac5917a2501087399d66e2abd28f8f438a30345fad7e294ba01089e0"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_right_name.ui_widget_definition",
+      "bytes": 1171,
+      "sha256": "0ebbd7a1db0beb13a8a7d2da20f6b17c6ca0670aae08ee9b0ab4265ab0f7058b"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_right_pic.ui_widget_definition",
+      "bytes": 1173,
+      "sha256": "009b639fa15e5c867c59d89cd032b3c0df76417d92f55942d572a6ae46193f20"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_select_button_bar.ui_widget_definition",
+      "bytes": 1394,
+      "sha256": "c9b1ece5880db10d42ee84de438634ed02d2ef0f1ae2681f4f101e39cb52f82f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_select_button_ok.ui_widget_definition",
+      "bytes": 1510,
+      "sha256": "304023a44aef07a8523ee395e5041050008b80eb32fbb2dc5278e3b20cefaecc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_select_extended_desc.ui_widget_definition",
+      "bytes": 1364,
+      "sha256": "cb02b3b614f3c3f0ec8540484e19da4f990d8bb952f5e21070078c5f38a2e0c5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_select_list_2.ui_widget_definition",
+      "bytes": 2952,
+      "sha256": "450a2039f7a966b5b0b8a3fce8169cbc46b5808c37774836b69f9c24fb485e00"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/color_select_screen.ui_widget_definition",
+      "bytes": 1581,
+      "sha256": "9ec45e5f841cb1d73207a8de91dc9c101751d54a9d56ba9236437b0cf9af2adc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/colors_list.unicode_string_list",
+      "bytes": 644,
+      "sha256": "3c9362770783b837f6cac2b39c3878ca65941ead921d1cc30ecf77f092f1b45f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/header_profile_color.bitmap",
+      "bytes": 45015,
+      "sha256": "178cbcaa6bb343a3d9c68f0241db022c9bb204a08eac3f3c4e02b8ce468cfc84"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/header_profile_color.ui_widget_definition",
+      "bytes": 1168,
+      "sha256": "34265bec6273d776895a4db61c0e1523a25d76b8d5615ac9e9abe745e3afbbaa"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/player_color_marine_large.bitmap",
+      "bytes": 3156033,
+      "sha256": "8362a0031575726d296d23c0af23aae1701a6f982454bb036756338fa1df9b8b"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/color_profile_item.ui_widget_definition",
+      "bytes": 1614,
+      "sha256": "5ee7abf71fb4eb4785ffa3cfe347c3665a5d1d09c021ce2bffbc2c0d46900d9d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controller_edit/header_profile_controller_setting.bitmap",
+      "bytes": 43865,
+      "sha256": "cbb28c3f0024a6b82a89528db3076d2db4f04b42e7cfa6cb020bb89e8b0022c5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controller_setup_profile_item.ui_widget_definition",
+      "bytes": 1632,
+      "sha256": "719d7eeb322b5859894af1471b3f4f37e7c95e34550b2dc5f625942a6bfb2738"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/advanced_button_bar.ui_widget_definition",
+      "bytes": 1602,
+      "sha256": "334653b6d37ee1c14b682f8f263001bfe061ffffd618d15ad9efa0fa90a9e859"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/advanced_button_defaults.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "ce4ce5bd800740dbf623055a06897cea82b805c38bdf6fe799ecdb0dc804e309"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/advanced_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "4d0fbc2247bfe67e615d53b0998d588865676586539a241b87c6aca30958716a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/advanced_options_menu.ui_widget_definition",
+      "bytes": 1793,
+      "sha256": "e32d65b84dcb0091c237928daad08a3db900c1ea84a21c599d1f98debe30ea65"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/advanced_settings_screen.ui_widget_definition",
+      "bytes": 1288,
+      "sha256": "f4bf51adf2b1716014a6a7f0a7bf3ebf6f18b2b9b26a65562a0fe1f7b928c85f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/horizontal_sensitivity_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "d884a1993c861664053640dcdc7e0ed9fe4652e86b13acd51e3fa4a0223b5380"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/horizontal_sensitivity_spinner.ui_widget_definition",
+      "bytes": 1320,
+      "sha256": "e09972819e8186f3a4493a26d8a7e52ecb286b2da710effa40d1d3ec39989e11"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/op_horizontal_sensitivity.ui_widget_definition",
+      "bytes": 1501,
+      "sha256": "55caf9b3e124291fb05588c02303009a07c5bd7f35f5a3ab523021cb0acb22ff"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/op_vertical_sensitivity.ui_widget_definition",
+      "bytes": 1497,
+      "sha256": "69d177a6de9a9c3a64b54d859c094f4f96b525e731bf5f84c673e2656bb2ee21"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/vertical_sensitivity_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "ddb24cd8da990a09fcd38b6fbe133a2f1517fbbba8ae71ada478f075183de5b1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/vertical_sensitivity_spinner.ui_widget_definition",
+      "bytes": 1320,
+      "sha256": "3a7b9202a0e1266c4f5d8b0659f27f16fd69ffa9488f2f6e442bed5b3aa0a06b"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/cap_controls_setup_strings.unicode_string_list",
+      "bytes": 676,
+      "sha256": "d5c6c37bdfe45e3bdcc348405df1a9b97f1e86ab6ed35d5f853d2bd4cc91c962"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_1_button.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "d66ce5a1ab0a611960b85f58f447d1ca925b825a3fc17586b6c37c247421dcc4"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_1_label.ui_widget_definition",
+      "bytes": 1187,
+      "sha256": "4e8019e21c3c20ba166dec09aea6dfad36058dcdd4034bcc1c6eda0e4cdbc8c7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_group_label.ui_widget_definition",
+      "bytes": 1186,
+      "sha256": "b163985e890dcfb9716f82d47cea71567937cdf62dbcdadffc223e14e49a844a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_group_spinner.ui_widget_definition",
+      "bytes": 1317,
+      "sha256": "054d5ac7f9d1e27920421bb9ce51a8487f482440476c49206bdeea870add9fc1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_mk_button_container.ui_widget_definition",
+      "bytes": 1452,
+      "sha256": "751e6e55b19fdb06d93ae0c89b1f384782dc55bb5babc2f1b1ccb421a20e04ac"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_mk_button_text.ui_widget_definition",
+      "bytes": 1080,
+      "sha256": "81af2424080433c5bbccae837efbf50a6e91fb11fbbfbc4760b81789d1d41f5f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_axis_direction_names.unicode_string_list",
+      "bytes": 124,
+      "sha256": "4cfe8371b7bf14969f906de1c8c637cd6a324f4aa347d4c7566e23c616c0fa3c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_binding_labels.unicode_string_list",
+      "bytes": 1230,
+      "sha256": "134b675338a418a7ea4a6f7dbfde01927a8336212b77a26b544b6b58f7b89dbc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_button_advanced.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "dc1cf581b27c889831adf8ee4cb500c6535c944305860b98330b7d9c581d7d79"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_button_bar.ui_widget_definition",
+      "bytes": 1772,
+      "sha256": "5723c5b9054569f264520b0961d2451dccc6476672a0fe3b024b9e82fd9084fe"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_button_defaults.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "f87292d12fde0e93c93182c3cb71175ebc7f896a9cbd6ca2550576eacae88f75"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "6ebd795f9a5bca086c33b3d472fd69ec38f84f7c43f5341afdcab4f7b536d6c0"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_device_labels.unicode_string_list",
+      "bytes": 158,
+      "sha256": "caeb3c0d61d443300d185756f496164943fba0486abb046086d20b72f7d01f19"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_gamepad_names.unicode_string_list",
+      "bytes": 380,
+      "sha256": "2b50a2df2bdf6e1ea47bf6eae7eea70bf03e8c30aa59c600a54368d2d17184b7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_keyboard_button_names.unicode_string_list",
+      "bytes": 3406,
+      "sha256": "0bdfdef8211167c1e02f91128ecb21c3c3ad7efa233174dd4b6c346db04311ef"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_mouse_button_names.unicode_string_list",
+      "bytes": 522,
+      "sha256": "07a5fc2cf219b164993e09ce0d40e3275935c616656ca72f4cf108f06790aca4"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_option_labels.unicode_string_list",
+      "bytes": 152,
+      "sha256": "564b42671ff4850b40d60ae617bfe1fa1ad825951c6743f920ec76c2c0fb6caa"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_options_menu.ui_widget_definition",
+      "bytes": 3186,
+      "sha256": "284a37bf19c76e9a2226f5a226d74e5f4182ef1fb4e7c7b4a599d5579f88492f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_settings_screen.ui_widget_definition",
+      "bytes": 1960,
+      "sha256": "98a24defc58dd723192c2b38ca776b35b9fac8520d0f55444ccbf6fc93ef8fdd"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/controls_setup_help.ui_widget_definition",
+      "bytes": 1190,
+      "sha256": "bdcd8101b49ab5ae9e80f3e2c08ce2c440e8124d1678bad0b35dbc952a3b9d0d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/device_label.ui_widget_definition",
+      "bytes": 1186,
+      "sha256": "7443ed30a145cacbe35dc665cb87d15ea434ff785d3fe81975d18dcf030f478e"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/device_spinner.ui_widget_definition",
+      "bytes": 1215,
+      "sha256": "40564bd50809bce0c14da6bc976a11d5203519f7e581122f63c4fa65fd2f4f3f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings.bitmap",
+      "bytes": 46197,
+      "sha256": "1c4d21d15f3c1331da0e61de43ea317bd22be3ca922699d0951b86fc46ba09d0"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings.ui_widget_definition",
+      "bytes": 1184,
+      "sha256": "94e45ab53552a5f943a8de11706aab756b158472d916bb64560d6615d7ad1ee6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_1.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "48056b71f6dacdceba6fdb75ea894a51c4d69710b080eacd3bffd0f62be163a5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_2.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "24236ff0d46f0fb2416160c4b1f88c5f356a3196049393469befcb02fde95e15"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_3.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "1afabb07ad3095a3a6b308e3f3f1f32966c9e0f7c2cfc26df2855885d02bd82f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_4.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "98a283da4cd6a57a23fa016fd4419aec391a48ae7e933632e0ebadd41f444231"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_5.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "7e1530b2aee0491058007f4eecf0175959c308137b60254c8f0a13dfb6c89c09"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_6.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "5bac035d45e36bbb1810bf71eb3dfb48293e3fbef88619f1ba22e922ab8dc4fc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_7.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "9b7771bc8b54513c0b4bd15afb27dc4e6841b83d8b4975bb48aff80bd505aa6d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_8.ui_widget_definition",
+      "bytes": 1791,
+      "sha256": "bab31155aa38be728c3fd09a06dceecd8c4db2ba5b14f6fcb61e5d8f1a610347"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_group.ui_widget_definition",
+      "bytes": 1465,
+      "sha256": "eb0a6fcb26f82123016f1f481d9d7c53e1dfc6dc3778c3ce7e8c16bc4e423eb9"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_device.ui_widget_definition",
+      "bytes": 1451,
+      "sha256": "ccbf93cd331778737954b403f00ef9fe2bf7a71bad4229f1442047ef7719a769"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/var_command_groups.unicode_string_list",
+      "bytes": 216,
+      "sha256": "5d57d74435f09f17ebb26c5d2dc01f1b5b8da04e0263536be3d2dbc4cb8cf92c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/cap_gamepad_setup_strings.unicode_string_list",
+      "bytes": 404,
+      "sha256": "b69681d1bc645f75397cabe2337d03f2d9e39f8a3394b641c05aa4368ccd9061"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_1.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_2.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_3.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_4.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_5.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_6.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_7.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_item_8.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "63334e8777a66786a828c16dff3fd7ff5e55ab009dab5afc5ce568f61044ee34"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "dbdeeaadb4609ff2a748e2d6badf7f5bb180d344912b39d7598d9409141c04de"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_avail_list.ui_widget_definition",
+      "bytes": 2568,
+      "sha256": "7dc63db30abe59311ceedb49f151cc6292a4f7ca8ff43d1ee06d25f96d9512ca"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "99bba2ba5f98bfe7c9ac36732631faf03fe0e92183b66f2e23e6f91ccf9bd9eb"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_item_label.ui_widget_definition",
+      "bytes": 1296,
+      "sha256": "cda6a221e946a3a97497665aa02859bfded0ab2373074f1643d3a20858f38c9b"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_setup_help.ui_widget_definition",
+      "bytes": 1188,
+      "sha256": "eb2b6aa5b4be8346ae12a6bbcdac53707955c07c6ee05ec8a911dce157616dfb"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_setup_labels.unicode_string_list",
+      "bytes": 190,
+      "sha256": "e9f34c949168b9dace830eb890ca00a51800f51bccf0ed2d2f2f9289af01fbae"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_setup_options.ui_widget_definition",
+      "bytes": 2111,
+      "sha256": "6f65e9ebe46abc8c4e246cf7af3bb8417f70b6bd1abc6760987ea73f5d684cd6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_setup_screen.ui_widget_definition",
+      "bytes": 1837,
+      "sha256": "05ae311a04e1a69b2a400518c2b31c68878f229743b1cebbbbbaf6c548a066dc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_used_item_1.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "105d412d8caa90a61169398da6e97415a3d9b7c723f92bb68fc5fd7e5110923c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_used_item_2.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "105d412d8caa90a61169398da6e97415a3d9b7c723f92bb68fc5fd7e5110923c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_used_item_3.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "105d412d8caa90a61169398da6e97415a3d9b7c723f92bb68fc5fd7e5110923c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_used_item_4.ui_widget_definition",
+      "bytes": 1509,
+      "sha256": "105d412d8caa90a61169398da6e97415a3d9b7c723f92bb68fc5fd7e5110923c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_used_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "88005bb403ec843258849349bae82e865104d16395e631617ac9492452b46cc3"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gamepad_used_list.ui_widget_definition",
+      "bytes": 1832,
+      "sha256": "ce4f6aab23fc373cee8011f17514f726f6b71c1b7d04047d56baddc308a2a3d7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/header_profile_controller_setting.ui_widget_definition",
+      "bytes": 1186,
+      "sha256": "145d89019c996cc62934e2c8eab5f6e7941101af5a740a882cf6f3d40aa004fd"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/gamepads_profile_item.ui_widget_definition",
+      "bytes": 1622,
+      "sha256": "fb6b243abb3fb60cffac448ba25cfaa3561bb68520b6b117b068f2a0c1c228e3"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/header_edit_profile_settings.bitmap",
+      "bytes": 44677,
+      "sha256": "15042597a0ccb70257c3b9a2ed756e28bdef2597c6263686762f36c7fdb337b9"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/header_profile_settings.ui_widget_definition",
+      "bytes": 1165,
+      "sha256": "acce875cc3efb2f911dfd9d9d1119ecdd17aedad43650a93d49915a750d531e7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/cap_mouse_settings_strings.unicode_string_list",
+      "bytes": 3070,
+      "sha256": "48dc9d08bbd4fbaeb437d031ec81590f991b9a919a434c36e522bffcd82ea987"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/header_profile_mouse_settings.bitmap",
+      "bytes": 42811,
+      "sha256": "ecf8bbc5ab9b2fe675e85a564f5200716a033c1193f939b653ef4e92691bf673"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/header_profile_mouse_settings.ui_widget_definition",
+      "bytes": 1181,
+      "sha256": "cd5814eae18b790bcfce283ade2d700b7c4e7dde122a81e505a7bb1100a0c57c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/horizontal_sensitivity_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "d884a1993c861664053640dcdc7e0ed9fe4652e86b13acd51e3fa4a0223b5380"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/horizontal_sensitivity_spinner.ui_widget_definition",
+      "bytes": 1320,
+      "sha256": "7d26748b4953cd6b8190145b37274ed2f3898e0746d2a02ea9d399dbf9e2c01d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_vertical_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "45af8987d0be173d158fc8021c2d2e89db635acf47d1eaff98e9d131b3ec3cb2"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_vertical_spinner.ui_widget_definition",
+      "bytes": 1244,
+      "sha256": "0f8d279a019159d460497545e6583710d04ec49cf7d02e717d92d08fc1a11132"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_button_bar.ui_widget_definition",
+      "bytes": 1578,
+      "sha256": "09f9d681d9a6245eafe1b8ca0a78e1409d02c8dbbb8b739e7d8cb2b5a3f1e7b2"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_button_defaults.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "760ce92a109d2f75f0b06d9c00c85ac2de972ea3b7ef131268577e7495524b4d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "96ad01a0cbc4017424f1734e3ca0e7291e0be0eea3a97d00351543e334de37da"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_option_labels.unicode_string_list",
+      "bytes": 272,
+      "sha256": "f9d6e8011ad03a6713f69e8136cbe99e6d1c08e1926ae0bbf5c8757fb1ce05f6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_options_menu.ui_widget_definition",
+      "bytes": 2017,
+      "sha256": "8f7468823fbd99397f00ddd1a26f920d6aa2f53962df9f632c21825edc0b1f63"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_settings_help.ui_widget_definition",
+      "bytes": 1190,
+      "sha256": "8b4f6862af989b1f894c3202548b4f5c20478538c00c7e3e736b8beec2805dca"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_settings_screen.ui_widget_definition",
+      "bytes": 1469,
+      "sha256": "744ab0debdf9c270b7c899217014e49af673d425356642e3bf929136ce6565fc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_horizontal_sensitivity.ui_widget_definition",
+      "bytes": 1483,
+      "sha256": "4803592b6f9755856e811ee42f94950898ebda6d7f52f6dcfabcc9139616a8bf"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_invert_vertical.ui_widget_definition",
+      "bytes": 1469,
+      "sha256": "2179856f1fe6782893c8b5737f0c9917c765ee9fccd82ecf9481f43ce5a0cd70"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_vertical_sensitivity.ui_widget_definition",
+      "bytes": 1479,
+      "sha256": "a58cc8ffe5cb593bf397ba2af5cf41905115fcecf94b29cdcde61931c0f80e51"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/var_mouse_sensitivity.unicode_string_list",
+      "bytes": 318,
+      "sha256": "a7bc34957e674a9615f362ad1b2f47423e4d4701554de0424ead141ed2773030"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/vertical_sensitivity_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "ddb24cd8da990a09fcd38b6fbe133a2f1517fbbba8ae71ada478f075183de5b1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/vertical_sensitivity_spinner.ui_widget_definition",
+      "bytes": 1320,
+      "sha256": "0c9946162e9d181955daa1191786b0d605148f8770716008a91018e3c94a0c87"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings_profile_item.ui_widget_definition",
+      "bytes": 1626,
+      "sha256": "c8592eb9fe30bbc6b840018b400f012e95095565ba187be5ef1521a47e1baac6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name.bitmap",
+      "bytes": 42493,
+      "sha256": "e6707e4b212465aad3863ec00e383f3d077c65828df3f790dedf966b910405e9"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name.ui_widget_definition",
+      "bytes": 1166,
+      "sha256": "eead892b84766e29459717e35b9bb401637832a3f012a14a76e81893a42c9d2a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/name_edit/profile_name_screen.ui_widget_definition",
+      "bytes": 1344,
+      "sha256": "9f5f859543cef78842bbb5664c889fdb6761cf7fa82105cd277895d55f6c2cd7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/name_profile_item.ui_widget_definition",
+      "bytes": 1616,
+      "sha256": "1ef336b5a8c5aa0a437e8cabece6517b371c2408a14fedfe281c9718d3b0fdd0"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_settings_profile_item.ui_widget_definition",
+      "bytes": 1628,
+      "sha256": "6be0486a83f7c11cc4bc82d60749f2922807a73610d6927db3101e49a9afc808"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/cap_network_settings_strings.unicode_string_list",
+      "bytes": 2564,
+      "sha256": "8052642f3536b25a6dc69958074e150425d53c1f61ee316c294003d9ed5bc205"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/client_port_label.ui_widget_definition",
+      "bytes": 1184,
+      "sha256": "b0c395e835020563c31b502385d60dee65f34110e9a0574b67a9833eff64c9e2"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/client_port_value.ui_widget_definition",
+      "bytes": 1287,
+      "sha256": "1a89ceb7bc62062e5b56d7a338197d85fd14a148963db5b8bc9590e9779888d6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/connection_type_label.ui_widget_definition",
+      "bytes": 1184,
+      "sha256": "a9853b006d1ab4b3ac955b34c2a73d210d80a995756620be05e727918cc3217c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/connection_type_spinner.ui_widget_definition",
+      "bytes": 1317,
+      "sha256": "344e7110148c252e81c02dac965d9709bd18e5f69c5f95033d68f131662404da"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/header_profile_network_settings.bitmap",
+      "bytes": 46585,
+      "sha256": "c70e4a8aed8364da1821df01001e5dec985f0ef1e38aa1ddca464f28e8715072"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/header_profile_network_settings.ui_widget_definition",
+      "bytes": 1182,
+      "sha256": "0feb6abbc1c1bfe2ca1353ecb755960bb49feeb8f2c32046b5d6da89d23ba4ef"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_button_bar.ui_widget_definition",
+      "bytes": 1580,
+      "sha256": "a8924b7c5c2f2b2e6f20455599292c417d063d287753567481e7cad656e7586d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_button_defaults.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "26c7488b02761829e39a3e49261d7e803f6a99938cbe5eb2407a92b95fd54015"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "76dee02bad0653138525e64905a2accd25f567570a85ecff126029ff90cb1b72"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_option_labels.unicode_string_list",
+      "bytes": 222,
+      "sha256": "421f7c475464f2b40eb5863c94ffb33dfecbb57a1bbc2d155d9568659d1c9637"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_options_menu.ui_widget_definition",
+      "bytes": 1996,
+      "sha256": "8d4133a09e451bc2d3740d51bd0cc173469fbc3c35a25c265591ab9a44ae75c1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_settings_help.ui_widget_definition",
+      "bytes": 1191,
+      "sha256": "a0af12cb7ad6e612a964620a56ab43c0bd72a5c07ea51fffa4a598b9217f8c9e"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/network_settings_screen.ui_widget_definition",
+      "bytes": 1471,
+      "sha256": "6588f55e56d6d0c2058b4190b3f1c5788f632fb051ced5fe7e0b8272952b8fab"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_client_port.ui_widget_definition",
+      "bytes": 1457,
+      "sha256": "e212d0dbc225e368f08eb04037fd1279c82d7e7636e10679db46cef3cabdba4f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_connection_type.ui_widget_definition",
+      "bytes": 1467,
+      "sha256": "a76488d1127aa30b089b1e0ad016789c164168b48de2811c689041ca48ef8e43"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_server_port.ui_widget_definition",
+      "bytes": 1457,
+      "sha256": "b5c9d8b81541c68598dfbb2424cedbd8346628ab48f80a87e5df67dcd6be2bac"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/server_port_label.ui_widget_definition",
+      "bytes": 1184,
+      "sha256": "7fae52d57add8f4dc93a17667e43cd6f9613fae4426a538d39f7473d9160317e"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/server_port_value.ui_widget_definition",
+      "bytes": 1287,
+      "sha256": "c2c44283b8ef18273e9c4a1a2f89e288197cb1cd87eef527c49ec28311ce29eb"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/var_connection_type.unicode_string_list",
+      "bytes": 296,
+      "sha256": "9e1b5f9df8aee8e19887b03f5a8255254c19ba0003b3f4de609f4f7f9f3b11cc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen.ui_widget_definition",
+      "bytes": 1817,
+      "sha256": "bb01cf66bcbc1f07eee9c4a131fcec2f09c6e6939724f5e9ba62512e204b79d2"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_button_bar.ui_widget_definition",
+      "bytes": 1385,
+      "sha256": "7586de1b1b703672bf27c05c917746e43f16b0f828fb5bd849c3d1aac445d52a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_button_ok.ui_widget_definition",
+      "bytes": 1460,
+      "sha256": "db83e8baf15bdab988494f7bdc38dc56e9332da06fac9162276c0e135c960f16"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_descriptions.unicode_string_list",
+      "bytes": 1202,
+      "sha256": "dcde67d09d670c2b44d2e458b92be357d4d97177ab9c1c5b4fb156a62e49cea5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_extended_desc_pic.ui_widget_definition",
+      "bytes": 1152,
+      "sha256": "bdfb85815c1b3a9e84b32c7fe4d0b5f72c571b9dca875c27a755c99175f7af81"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_extended_desc_text.ui_widget_definition",
+      "bytes": 1242,
+      "sha256": "4b121133b8f638070175d20e7eef75eb949f7207de0129a6aa3fa6ae3db39d4a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_extended_description.ui_widget_definition",
+      "bytes": 1455,
+      "sha256": "e033798c1a137efb081e9ca983e7040629c2f599145282400515047cf813e521"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_options.unicode_string_list",
+      "bytes": 516,
+      "sha256": "3916364b92dbc47832d87bdf97e5f9375bf02dddbc5bfd7e43fada7948c3f283"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_edit_select_list.ui_widget_definition",
+      "bytes": 2924,
+      "sha256": "cd6fac30de7fcda9984c05485330af649935e4756813649a8584ed281ccdfbd5"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_label.ui_widget_definition",
+      "bytes": 1116,
+      "sha256": "aea1aabb7c9318df0ff2162a0c05207cc010f33f91fa75098046b8d63096e7a7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options.bitmap",
+      "bytes": 1732130,
+      "sha256": "eb444bdc3406f67f4167f38a52b34b99033031b2bc832b1f59a59d98c3067202"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/cap_video_settings_strings.unicode_string_list",
+      "bytes": 2920,
+      "sha256": "485e0e8700e9d64aaab0cba9d5b049337a4dbbcf5fcf9c3ae943ec3fd1877adc"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/decals_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "7ade0867a20c61d40a608dff0dbb5857b95b3b0bb332dd69023beac642447b5c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/decals_spinner.ui_widget_definition",
+      "bytes": 1244,
+      "sha256": "03f29bce19b227d58232a0aa743dc6df6160a5dc142107c9b3ad96d587366636"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/framerate_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "668b13af5e9fc621c489c891881023be62389ab322234f4431930e70b3a96b1e"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/framerate_spinner.ui_widget_definition",
+      "bytes": 1312,
+      "sha256": "5b99b7e80a08472a9decb678e14802641d681a41a50bfea68b5ba13961a247bb"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/gamma_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "0c13dbe04d4a0f1e7c21361d520b0f243507b114bd745ecf231a23b57ff3e08c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/gamma_spinner.ui_widget_definition",
+      "bytes": 1308,
+      "sha256": "1a91396780e9fa2dbbd84a24e1fc62838c66a19c9c83b9f40f2a1d247a977d78"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings.bitmap",
+      "bytes": 46763,
+      "sha256": "da3f88f88857981feb50c8f108a789f676c35e5f7ba36747833ee6d557d35677"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings.ui_widget_definition",
+      "bytes": 1181,
+      "sha256": "92caaeb67a0e6f11e6ef97e4e1e3fad680cf1fc77d43c1d4afb63666b3193b4a"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_decals.ui_widget_definition",
+      "bytes": 1451,
+      "sha256": "58b46d1b5fb06d1573557a38f175ff41c3685b9d2412c9e7f68264b0b76cff26"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_framerate.ui_widget_definition",
+      "bytes": 1457,
+      "sha256": "bf48e8869e8e94cacd33abdc1c6037c631aecadef88e71d8023c7075b892bb2e"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_gamma.ui_widget_definition",
+      "bytes": 1449,
+      "sha256": "1f2976df88ad67ebd66ffc3c83737fa16164ebec3ca802f834d4bfb7011f393f"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_particles.ui_widget_definition",
+      "bytes": 1457,
+      "sha256": "6e02e03e7b3bc861e299a90153c50435c43876c1bd323035a087e6d6fc743f9c"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_refresh.ui_widget_definition",
+      "bytes": 1453,
+      "sha256": "6b789d2e537504008f04463ee6a194c0de5d7fca0114105a1b3b15fb4167ea3d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_resolution.ui_widget_definition",
+      "bytes": 1459,
+      "sha256": "4734c71116027857c7023d9c27b8c1a1b806c18d41d3fdc3dfb574b86fcd85e8"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_shadows.ui_widget_definition",
+      "bytes": 1453,
+      "sha256": "1235f598e2893f3317294145a9dea2894b5573f377d96fc85fb16b595f577eca"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_specular.ui_widget_definition",
+      "bytes": 1455,
+      "sha256": "c8bb6098487f9bef6f6b4d56e562bb98fb99ec6fced25a2e0b7f46e320cdb11b"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_texture_quality.ui_widget_definition",
+      "bytes": 1469,
+      "sha256": "5c6dbd79975cf6ae65009db86a19731714dcefdda376300ec365fb4e01aa65df"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/particles_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "1eab6ac1e60a1fe40d7010cf3f42caf36bab81f008b77c36fcc69b3319d15401"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/particles_spinner.ui_widget_definition",
+      "bytes": 1312,
+      "sha256": "8f5a310e1bd122abaaf4ce595660bcd6b82439ac8ca3945b4462afc18b250e9e"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/refresh_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "ca2702fe90df17e38332d646382d96f44941d5425a95d42214e63256e67a2e66"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/refresh_spinner.ui_widget_definition",
+      "bytes": 1215,
+      "sha256": "d09e5baa4474effd489ac0d452fe61b6ab39a4bd664b52506ada46ea688a562d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/resolution_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "d255bb0448e9c62cbe91afdf16362a8bba062406dda245e30ed3b8c56982f0da"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/resolution_spinner.ui_widget_definition",
+      "bytes": 1215,
+      "sha256": "b661ba63ecdc3c55238a621a4daeb47991fff2494dcab4162edbc413a837ab55"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/shadows_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "9616cca6ceda1aea76bd1585df1dd5033aa6bfdb380eb49e59c4ce9a6e6edcb3"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/shadows_spinner.ui_widget_definition",
+      "bytes": 1244,
+      "sha256": "683f558c77e91eb59a624d38df545e58fa9f8f0bdb177c7ca749226dea611792"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/specular_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "645c1900d7c88cf63d4a0207ae9a45f41883b823a0b5c28024a4ebf63b2820b1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/specular_spinner.ui_widget_definition",
+      "bytes": 1244,
+      "sha256": "bff88f994942ba015187e7bb5e15ad28bdf8f069c856f5e520c3ec55931eab05"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/texture_quality_label.ui_widget_definition",
+      "bytes": 1183,
+      "sha256": "7109383e61199bc32702eca221e10b5b5cfc0a97e5fc7761adfd736b5e8aac83"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/texture_quality_spinner.ui_widget_definition",
+      "bytes": 1324,
+      "sha256": "ef04e3436937ddb91882298cc1e448c63e075394f61a1b6dec2f3c2e6ee6a3d1"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_environmental_effects.unicode_string_list",
+      "bytes": 168,
+      "sha256": "74dded614732dac8b9f186f1687a6f7857250bb10eadde3648d32e308ed049a3"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_framerate.unicode_string_list",
+      "bytes": 180,
+      "sha256": "a7b15fe8d348222fdf22ec2c0f637d2c62f7f927c4adea3bf223b27ea1d050f8"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_gamma.unicode_string_list",
+      "bytes": 188,
+      "sha256": "b3e85b3bf99e893bcc4f974a4f5c6dcd69781fc25ec84c4d008b6faef82df807"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/var_particles.unicode_string_list",
+      "bytes": 162,
+      "sha256": "9ac3b94fd96780848698e448ff9cbb4a5689b3fb1a08eab0178246d02f9190db"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_button_bar.ui_widget_definition",
+      "bytes": 1578,
+      "sha256": "0c390c5f5e555236d82c7f11c455ff1aaa5e9ca190fee3807feb59e50024fe37"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_button_defaults.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "e7e410f8e5fb793344bf71ded3d2d5f59bcf8e784e3a1f9753d6abc15451b8c6"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_button_ok.ui_widget_definition",
+      "bytes": 1590,
+      "sha256": "a6ab5d937c1aeb94d7c7941de1ae16118994b59d3c3ab58d44d70b39c8d01639"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_option_labels.unicode_string_list",
+      "bytes": 602,
+      "sha256": "3ec5adfd0bdb8f15ce86597ffee1910d39fd5fd4ceadcb12d4d490deecfa5e54"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_options_menu.ui_widget_definition",
+      "bytes": 3110,
+      "sha256": "786bffde8305e58fb8fe5f565f151121dbf717e297cc0c1b93ac5701e2ddcc35"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_settings_help.ui_widget_definition",
+      "bytes": 1190,
+      "sha256": "77e1d89f9cc6decf8e85c71ffa20a2671c8d7731341222193e6eb93a58b279a7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_settings_pre_test.ui_widget_definition",
+      "bytes": 1515,
+      "sha256": "e1bd1d3029c82edb5dded6b6899209bef77ca187e2ad916219d4c8edfdcc86ab"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_settings_screen.ui_widget_definition",
+      "bytes": 1469,
+      "sha256": "b39c116c86ba2556e1e0984dd6db1f45619c9fe2d7e47116d9f5784075a14d00"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_settings_test.ui_widget_definition",
+      "bytes": 1635,
+      "sha256": "e579f304148a2d58d25440040efea000c47933abe284992de5dbace4c4288217"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_settings_test_button_bar.ui_widget_definition",
+      "bytes": 1371,
+      "sha256": "384302a301b9def2ae8d20c62839dee83e20a1ce9b6672cc65647adf47e8baa7"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/video_settings_test_button_ok.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "bc6c6d0f8ebf60c6a3145f19c4e6ea4e6ac92b9e8ab86cc41ec8b5345812bc0d"
+    },
+    {
+      "path": "ui/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings_profile_item.ui_widget_definition",
+      "bytes": 1626,
+      "sha256": "9a58bb713ffd6855470379dd680dff0616f01c5824f6b14c1d95ea6a73ada9b1"
+    },
+    {
+      "path": "ui/shell/multiplayer.ui_widget_collection",
+      "bytes": 739,
+      "sha256": "a9048e32c7b91b928c92d4c4b78a239ee9e4ffea78ea2a072ccfbaed24656b68"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/1p_pause_game.ui_widget_definition",
+      "bytes": 1516,
+      "sha256": "04a6283ccd607b3bf4b63d5027fd5b306fbf6d68848214eb3907c823918c3b40"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/2p_pause_game.ui_widget_definition",
+      "bytes": 1629,
+      "sha256": "f1d3d4dd596d752ff5cdf62f4e150ee87924354f03ba369b8d3fd4014d4cf235"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/4p_pause_game.ui_widget_definition",
+      "bytes": 1629,
+      "sha256": "5c6336b31a0c2875e1cdc709964512d68323d4c1c87ac9787a7ff791a7d68038"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/back_button.ui_widget_definition",
+      "bytes": 1307,
+      "sha256": "3029dfdc69b683171af5f626db2e4708b7e587c6c9407f2880b477d9c9e4ca8a"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/blue_team_button.ui_widget_definition",
+      "bytes": 1307,
+      "sha256": "b03de20fc2091411df8074ed5ce955127e4baeb4498f23b58bea7deb6679d3c4"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/change_settings_button.ui_widget_definition",
+      "bytes": 1395,
+      "sha256": "dfec35aee584d61a1ab208edfc360859883ded5d58eb412590b79fd0630f4fa7"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/choose_team.ui_widget_definition",
+      "bytes": 1513,
+      "sha256": "bf3001a4f6ab48d8be1d28ce5b03f92e185909305bdd18f89017f30d81c383fa"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/choose_team_button.ui_widget_definition",
+      "bytes": 1356,
+      "sha256": "285e729da269cc1edfecf6c8455ee546e45003cec9c776ade3d0fe8b4029d077"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/choose_team_header.ui_widget_definition",
+      "bytes": 1136,
+      "sha256": "7f5f42649a7f699dd19f589cd4fc12012be7d4a3fabb7b445f30e602ad3bd97e"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/choose_team_list.ui_widget_definition",
+      "bytes": 1443,
+      "sha256": "e4554b7d6593e86fffd68ad3daa93d319a6273384bcd763e5aea93e9ce60f4bd"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/game_options.ui_widget_definition",
+      "bytes": 1376,
+      "sha256": "4b45522447e9d48d9ff8c974250efbfa8091a913caab8493b6b60c84f8eab886"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/game_options_button.ui_widget_definition",
+      "bytes": 1357,
+      "sha256": "5a1d7f8822248a8419850f2da89df4740ab896df639800e73d7e035d069a2d26"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/game_options_list.ui_widget_definition",
+      "bytes": 1675,
+      "sha256": "8288013572c8933e8185772aac2eaac41bdbff8e4ec0f5000a929fc9907fb83b"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/mp_pause_list.ui_widget_definition",
+      "bytes": 1690,
+      "sha256": "6aaaee271b7206b129423af6ef19c468de942d7d80e5819d6226b9e2e19b2fbd"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/new_game_button.ui_widget_definition",
+      "bytes": 1398,
+      "sha256": "5ccdc46ff24eb5e40f222e5bc366d0cc0d29b6f87a6276948b9553a020bad05e"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/pause_dialog_bkd.ui_widget_definition",
+      "bytes": 1451,
+      "sha256": "781260749124058c0373c501a94c571629066b4e6c9b31312df8517e6f37a973"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/pause_dialog_bkd_2.ui_widget_definition",
+      "bytes": 1095,
+      "sha256": "1192aca7a6c37b012cc6f00921eb571e31218cd22602652a27f5090ea1ddc071"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/pause_game_options.unicode_string_list",
+      "bytes": 444,
+      "sha256": "a36f0f3ff49227704f4f212e1878e7cdd597e112e780f1969c2e01143ec51d8a"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/quit_netgame_button.ui_widget_definition",
+      "bytes": 1379,
+      "sha256": "ac452310eb1d06c8acd43af76b5a317b637eebe91ea8adaf10c8698443096b36"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/red_team_button.ui_widget_definition",
+      "bytes": 1307,
+      "sha256": "37d1be675f66c22603e6714dbd2fc7b03f9e4d5cd18e730cca718a1d2fcaa729"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/restart_game_button.ui_widget_definition",
+      "bytes": 1307,
+      "sha256": "da6941c8cff66e46d57af1a0d41430e76eaedbf73ac0dae469d61d1d236fa042"
+    },
+    {
+      "path": "ui/shell/multiplayer_game/pause_game/resume_game_button.ui_widget_definition",
+      "bytes": 1372,
+      "sha256": "9d08807332749e51cb23ba415d070ccafb14a8e5065c6efb1801fcff20b8623a"
+    },
+    {
+      "path": "ui/shell/solo_game/pause_game/pause_game_options.unicode_string_list",
+      "bytes": 540,
+      "sha256": "289cefc921b6946806611c589d070a2a62d27b9a378f5f894bf5d77635cb258d"
+    },
+    {
+      "path": "ui/shell/solo_game/pause_game/pausebox4_left.ui_widget_definition",
+      "bytes": 1100,
+      "sha256": "cea7c3d1f5e79462073504d1c2738aeb9cdb6a70f30d324c335fa6e972af0299"
+    },
+    {
+      "path": "ui/shell/solo_game/pause_game/pausebox4_left_center.ui_widget_definition",
+      "bytes": 1102,
+      "sha256": "56a46dd9aaf158a5344b6f6f7b9ad06f0c9c885389f2b67e02465acc0fb7d6c0"
+    },
+    {
+      "path": "ui/shell/solo_game/pause_game/pausebox4_right.ui_widget_definition",
+      "bytes": 1101,
+      "sha256": "3cec2c3b893a3fbdc50f4b0027a3c55586f9ee75c507fbc795807a148bd12b3d"
+    },
+    {
+      "path": "ui/shell/strings/common_button_captions.unicode_string_list",
+      "bytes": 356,
+      "sha256": "1b235788071fa293b1d95373c0cad80caf9e5bae72aeb15730aa760217cac927"
+    },
+    {
+      "path": "ui/shell/strings/displayed_error_messages.unicode_string_list",
+      "bytes": 7036,
+      "sha256": "b0790949adaa1714e61c505a92e46f5c5d15010b863b8dd6d9b904a9c532ea16"
+    },
+    {
+      "path": "ui/shell/strings/game_variant_descriptions.unicode_string_list",
+      "bytes": 8802,
+      "sha256": "12f4b9d879f2f706d32f0b7007bd9c601deb253a19f3e6d06635089189573cbc"
+    },
+    {
+      "path": "ui/shell/strings/loading.unicode_string_list",
+      "bytes": 986,
+      "sha256": "00e435225f27bc7d1438d6e49fb1a85c90c36a6235dfdbd236f9e917fae9a257"
+    },
+    {
+      "path": "ui/shell/strings/var_boolean.unicode_string_list",
+      "bytes": 130,
+      "sha256": "be76cf3a0bcb358cfa6685ad620d7533d192334257f42ff8b29ac889b5d4fb02"
+    },
+    {
+      "path": "ui/small_ui.font",
+      "bytes": 25788,
+      "sha256": "3bc1d954e31ff77890516527541a1ed2812c4a6b890b7401fcfe10e9714af5b2"
+    },
+    {
+      "path": "ui/ui_default_profiles.tag_collection",
+      "bytes": 243,
+      "sha256": "db2e3ffae3ef37a8b05787a54cf84d4b231f5c648ec1ec29b35abe39c158de8a"
+    },
+    {
+      "path": "ui/ui_input_device_defaults.tag_collection",
+      "bytes": 903,
+      "sha256": "f7eb9dbb2bf00a2b17088ed182cf9049a8cff756360ed0b328235d5e7f029782"
+    },
+    {
+      "path": "ui/ui_tags_loaded_all_scenario_types.tag_collection",
+      "bytes": 952,
+      "sha256": "e67083fa45b609e270d1732758894ce77d0b780e8142bdef1b8e77bec70c0584"
+    },
+    {
+      "path": "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection",
+      "bytes": 504,
+      "sha256": "b44f13a1336a516ad58de6547f501439dea1e8e87f8a7f7942549dee67c463e0"
+    }
+  ],
+  "logicalTagBytes": 12772968,
+  "nativeDependencyToolSha256": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554",
+  "probeEnvelope": "Dependency closure and hashes verified; initial outer allocation-meter check failed after disposal. Reverify every input in the native acceptance runner."
+}

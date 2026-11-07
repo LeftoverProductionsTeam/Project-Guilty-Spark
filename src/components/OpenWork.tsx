@@ -8,6 +8,7 @@ import {baboonSessionEvent,type BaboonDashboard,type BaboonPoll} from '../baboon
 import type {ToolProcessView} from '../runtimeWorkbench';
 import type {WorkflowRoute} from '../workflowHistory';
 import type {WorkspaceWindow} from '../useWorkspaceWindows';
+import {shouldDetachTab} from '../tabDetach';
 import './openWork.css';
 
 export default function OpenWork({workspace,documents,entries,windows,recent,error,jobs,onNavigate,onSelect,onRecent,onFocus,onRefresh,onWindow}:{
@@ -21,6 +22,7 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
   const [handoff,setHandoff]=useState<{projectId:string;tag:string;status:string}|null>(null),[processes,setProcesses]=useState<ToolProcessView[]>([]);
   const handoffCache=useRef(new Map<string,{at:number;value:typeof handoff}>());
   const root=useRef<HTMLDivElement>(null),button=useRef<HTMLButtonElement>(null),search=useRef<HTMLInputElement>(null);
+  const drag=useRef<{pointer:number;x:number;y:number}|null>(null),suppressClick=useRef(false);
   const close=()=>{setOpen(false);button.current?.focus();};
   // Focus before paint. A deferred animation-frame callback could steal focus
   // after the user had already moved to the last control with the keyboard.
@@ -69,7 +71,12 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
   const failed=latestJobs.filter(job=>job.severity==='error'||['failed','blocked'].includes(job.phase)).slice(0,3);
   const choose=(action:()=>void)=>{setOpen(false);action();};
   return <div className="gs-open-work" ref={root}>
-    <button ref={button} aria-label="Open work and workspace windows" aria-expanded={open} title={`${workspaceLabel(workspace)} · Open work (Ctrl+Shift+P)`} onClick={()=>setOpen(value=>!value)}><AppWindow size={14}/><span>Work</span>{!!running.length&&<small aria-label={`${running.length} running task${running.length===1?'':'s'}`}>●</small>}<ChevronDown size={10}/></button>
+    <button ref={button} aria-label="Open work and workspace windows" aria-expanded={open} title={`${workspaceLabel(workspace)} · drag out for another workspace window; click for Open work (Ctrl+Shift+P)`}
+      onPointerDown={event=>{if(event.button!==0)return;drag.current={pointer:event.pointerId,x:event.clientX,y:event.clientY};event.currentTarget.setPointerCapture(event.pointerId);}}
+      onPointerMove={event=>{const start=drag.current;if(start?.pointer===event.pointerId)root.current?.toggleAttribute('data-detaching',shouldDetachTab(start,{x:event.clientX,y:event.clientY},event.currentTarget.getBoundingClientRect()));}}
+      onPointerUp={event=>{const start=drag.current;drag.current=null;root.current?.removeAttribute('data-detaching');if(start?.pointer===event.pointerId&&shouldDetachTab(start,{x:event.clientX,y:event.clientY},event.currentTarget.getBoundingClientRect())){suppressClick.current=true;setOpen(false);onWindow(workspace,true);}}}
+      onPointerCancel={()=>{drag.current=null;root.current?.removeAttribute('data-detaching');}}
+      onClick={()=>{if(suppressClick.current){suppressClick.current=false;return;}setOpen(value=>!value);}}><AppWindow size={14}/><span>Work</span>{!!running.length&&<small aria-label={`${running.length} running task${running.length===1?'':'s'}`}>●</small>}<ChevronDown size={10}/></button>
     {open&&<section className="gs-open-work-popup" role="dialog" aria-label="Open work">
       <header><strong>Open work</strong><button aria-label="Close open work" onClick={close}><X size={14}/></button></header>
       <label className="gs-open-work-search"><Search size={14}/><input ref={search} type="search" placeholder="Map, workspace or window…" aria-label="Search open work" value={query} maxLength={160} onChange={e=>setQuery(e.target.value)}/></label>

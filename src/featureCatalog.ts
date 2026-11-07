@@ -290,7 +290,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     true,
     [
       'Open the source and destination maps.',
-      'Choose Transfer assets in the Open maps bar.',
+      'Choose Tools → Transfer assets.',
       'Select the source asset and destination, then review the transfer. Undo belongs to the destination.',
     ],
     'Supported drags extract and validate complete native dependencies. Unverified classes, missing dependencies and incompatible runtime/source combinations are refused; game loading remains a separate test.',

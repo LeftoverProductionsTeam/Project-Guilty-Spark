@@ -40,3 +40,8 @@
 .application .interface-compact .interface-cue-row span{min-width:0;}
 .application .interface-compact .interface-cue-row small{overflow-wrap:anywhere;}
 @media(max-width:700px){.application .interface-compact .interface-section-grid{grid-template-columns:minmax(0,1fr);}.application .interface-section-appearance>section:first-child{grid-row:auto;}.application .interface-sound-options{grid-template-columns:1fr;gap:4px;}}
+
+.application .interface-visual-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px;margin-bottom:5px;flex-wrap:wrap;}
+.application .interface-visual-heading>h2{margin:0;}
+.application .interface-visual-heading .interface-monitor-eye{display:flex;align-items:center;gap:6px;margin:0;font-size:10px;}
+.application .interface-monitor-eye input[type=color]{width:32px;height:24px;padding:2px;}

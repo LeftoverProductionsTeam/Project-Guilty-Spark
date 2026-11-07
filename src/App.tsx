@@ -1,3 +1,4 @@
+import {cycleWorkArea,hasKeyboardDialog,navigateComposite} from './keyboardNavigation';
 import { retainAssetSource } from './assetSources';
 import {previewBudgets} from './resourceBudgets';
 import {runtimeTextureSource,defaultPreviewMaterials} from './runtimeTexturePreview';
@@ -14,7 +15,7 @@ import OpenWork from './components/OpenWork';
 import type {LearningSection,WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
 import {projectMutationPending} from './projectMutation';
-import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -75,7 +76,7 @@ import type {
 import type {ViewportAsset} from './viewportAssets';
 import {createEmitter,emptySoundScene} from './spatialAudio';
 import { browserBootstrap, call, native } from './api';
-import { applyInterfacePreferences, readInterfacePreferences, saveInterfacePreferences } from './interfacePreferences';
+import { applyInterfacePreferences, readInterfacePreferences, saveInterfacePreferences, INTERFACE_STORAGE_KEY } from './interfacePreferences';
 import type { CueName, LocalCueReference } from './interfacePreferences';
 import { UiCuePlayer } from './uiCuePlayer';
 import { pinOwnedInterfaceBitmap, matchesOwnedInterfaceBitmap, decodeBoundedInterfaceBitmap } from './ownedInterfaceBitmap';
@@ -177,15 +178,17 @@ export default function App() {
   useEffect(()=>writeMapSession('global','learning.section',learningSection),[learningSection]);
   const [sharedHistory,setSharedHistory]=useState<Record<string,{undo:boolean;redo:boolean}>>({});
   useEffect(()=>{const update=(event:Event)=>{const {projectId,view,paused}=(event as CustomEvent).detail??{};if(typeof projectId!=='string')return;setSharedHistory(old=>({...old,[projectId]:{undo:!paused&&!!view?.canUndo,redo:!paused&&!!view?.canRedo}}));};window.addEventListener('guilty-spark-studio-status',update);return()=>window.removeEventListener('guilty-spark-studio-status',update);},[]);
-  const[sidebarOpen,setSidebarOpen]=useMapState('global','chrome.sidebar',false);
+  // Menu visibility belongs to this WebView, never shared persisted preferences.
+  const[sidebarOpen,setSidebarOpen]=useState(false);
+  useLayoutEffect(()=>{if(sidebarOpen)(document.querySelector<HTMLElement>('#gs-workspace-navigation [aria-current="page"]')??document.querySelector<HTMLElement>('#gs-workspace-navigation .nav-item'))?.focus();},[sidebarOpen]);
   const toggleNavigation=()=>setSidebarOpen(open=>!open);
   useEffect(()=>{if(!sidebarOpen)return;const dismiss=(event:globalThis.PointerEvent)=>{if((event.target as HTMLElement).closest('#gs-workspace-navigation,.gs-navigation-toggle'))return;setSidebarOpen(false);};document.addEventListener('pointerdown',dismiss,true);return()=>document.removeEventListener('pointerdown',dismiss,true);},[sidebarOpen,setSidebarOpen]);
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&sidebarOpen&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(open=>!open);}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,setSidebarOpen]);
   const [settingsTab,setSettingsTabState]=useState<WorkflowRoute['settingsTab']>(()=>{const section=new URLSearchParams(location.search).get('section');return section==='dependencies'||section==='interface'||section==='storage'?section:'tools';});
-  const setWorkspace=useCallback((next:Workspace)=>{if(next==='how-to'||next==='academy'){setLearningSection(next==='academy'?'academy':'guides');next='learning';}if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
-  const setSettingsTab=useCallback((next:WorkflowRoute['settingsTab'])=>setSettingsTabState(next),[]);
-  const workspaceRef=useRef(workspace);
+  const workspaceRef=useRef(workspace),workspaceNavigation=useRef(0);
   workspaceRef.current=workspace;
+  const setWorkspace=useCallback((next:Workspace)=>{workspaceNavigation.current++;if(next==='how-to'||next==='academy'){setLearningSection(next==='academy'?'academy':'guides');next='learning';}if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
+  const setSettingsTab=useCallback((next:WorkflowRoute['settingsTab'])=>setSettingsTabState(next),[]);
   const bootRouteHandled=useRef(false);
   useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started'&&!requestedWorkspace())setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
   const [focusTagId, setFocusTagId] = useMapState<number | null>(activeMap?.id??'no-map','tags.focus',null);
@@ -202,6 +205,7 @@ export default function App() {
     saveInterfacePreferences(interfacePreferences);
     applyInterfacePreferences(interfacePreferences, document.documentElement);
   }, [interfacePreferences]);
+  useEffect(()=>{const changed=(event:StorageEvent)=>{if(event.key===INTERFACE_STORAGE_KEY)setInterfacePreferences(readInterfacePreferences());};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
   useEffect(() => () => { audioPlayer.current?.dispose(); audioPlayer.current = null; }, []);
   useEffect(()=>{if(!native||!ready)return;const timer=setTimeout(()=>{void startLaunchVoice(data,()=>interfacePreferencesRef.current);},300);return()=>clearTimeout(timer);},[ready,data.dataDirectory]);
   useEffect(()=>{if(native&&(!interfacePreferences.launchVoiceEnabled||interfacePreferences.launchVoiceVolume<=0))void call('stop_launch_voice').catch(()=>{});},[interfacePreferences.launchVoiceEnabled,interfacePreferences.launchVoiceVolume]);
@@ -211,7 +215,6 @@ export default function App() {
   const [activeJob, setActiveJob] = useState<string | null>(null);
   const [epoch, setEpoch] = useState(0);
   const [createModal, setCreateModal] = useState(false);
-  const [assetTransferOpen,setAssetTransferOpen]=useState(false);
   const [studioGuide,setStudioGuide]=useState(false);
   const returnPanelRequested=useRef(false);
   useEffect(()=>{
@@ -303,7 +306,7 @@ export default function App() {
     const target=documentsRef.current.documents.find(d=>d.id===route.projectId)?.history.current;
     if(mapWorkspaces.includes(route.workspace)&&!restoreWorkflowPlace(route,target)){notice('This place belongs to an older source revision. The current map stays open.','warning');return;}
     if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
-    setSettingsTabState(route.settingsTab);if(route.learningSection)setLearningSection(route.learningSection);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
+    setSettingsTabState(route.settingsTab);if(route.learningSection)setLearningSection(route.learningSection);workspaceNavigation.current++;workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
   },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId),route=>mapWorkspaces.includes(route.workspace)?captureWorkflowPlace(route,documentsRef.current.documents.find(d=>d.id===route.projectId)?.history.current):route);
   const workspaceWindows=useWorkspaceWindows({workspace,project:activeMap?.id??null,section:workspace==='learning'?learningSection:workspace==='settings'?settingsTab:null,dirty:history.dirty,documents:documents.documents.map(d=>d.id)},ready&&initialDocumentReady,()=>documentsRef.current.documents.flatMap(document=>{
     const project=document.history.current;if(!project)return [];
@@ -701,6 +704,16 @@ export default function App() {
   },[data.memoryFirst,data.entries,data.settings.snapshotRetention,current?.id,current?.automaticBackupRetention,history.dirty,notice]);
   useEffect(() => {
     function key(e: KeyboardEvent) {
+      if(e.defaultPrevented||e.isComposing)return;
+      if(e.key==='F6'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+        e.preventDefault();if(!hasKeyboardDialog())cycleWorkArea(e.shiftKey);return;
+      }
+      if(e.key==='F1'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey){
+        e.preventDefault();if(!hasKeyboardDialog())setHelp(true);return;
+      }
+      if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='w'){
+        e.preventDefault();if(!hasKeyboardDialog()&&!busy&&!closingRef.current&&documentsRef.current.activeId)void closeMap(documentsRef.current.activeId);return;
+      }
       if(e.ctrlKey&&e.altKey&&e.key.toLowerCase()==='o'){e.preventDefault();setInterfacePreferences(p=>({...p,windowOpacity:1,windowTintStrength:0}));return;}
       if (closingRef.current&&!closeChoice.current) {
         e.preventDefault();
@@ -747,7 +760,7 @@ export default function App() {
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [save,help,createModal,applyHistory]);
+  }, [save,help,createModal,applyHistory,busy]);
   function edit(project: Project, description: string) {
     if(native&&!windowHistories.current.writable(project.id)){notice('This view follows the editing window. Choose Edit here in Changes to take over safely.');return;}
     dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
@@ -811,14 +824,15 @@ export default function App() {
     }catch(error){notice(String(error),'error');}finally{setBusy(false);}
   }
   async function openProject(id: string, stayInWorkspace?: Workspace) {
-    const requestedFrom=workspaceRef.current;
+    const requestedNavigation=workspaceNavigation.current;
     const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){dispatchDocument({type:'select',id});setWorkspace(stayInWorkspace??rememberedWorkspace(existing.history.current!,existing.inspection));return;}
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
       const open = await call<OpenProject>('open_project', { id });
       await load(open);
-      if(workspaceRef.current===requestedFrom)setWorkspace(stayInWorkspace ?? rememberedWorkspace(open.project,open.inspection));
+      // Compare navigation intent, including leaving and returning to the same route.
+      if(workspaceNavigation.current===requestedNavigation)setWorkspace(stayInWorkspace ?? rememberedWorkspace(open.project,open.inspection));
     } catch (e) {
       notice(String(e), 'error');
     } finally {
@@ -870,8 +884,10 @@ export default function App() {
     }catch(error){notice(String(error),'error');return false;}
     finally{if(id)closingDocuments.current.delete(id);setBusy(false);}
   }
-  async function closeMap(id:string,separateWindow:boolean|'main'=false){
-    if(closingDocuments.current.has(id))return;
+  async function closeMap(id:string,separateWindow:boolean|'main'=false,another=false){
+    if(closingDocuments.current.has(id))return false;
+    const handoffWorkspace=separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,
+      handoffSection=handoffWorkspace==='settings'?settingsTab:handoffWorkspace==='learning'?learningSection:null;
     // Stop background journal writes before transferring the native writer
     // lease. Saving the focused edit below is the final acknowledged write.
     closingDocuments.current.add(id);
@@ -881,12 +897,12 @@ export default function App() {
       const document=documentsRef.current.documents.find(doc=>doc.id===id);
       if(!separateWindow&&document?.history.dirty&&windowHistories.current.writable(id)){
         const choice=await chooseClose(document.history.current?[document.history.current]:[]);
-        if(choice==='cancel')return;
+        if(choice==='cancel')return false;
         if(choice==='save')await save(true,id);
         else if(native){await call('discard_project_changes',{id});windowHistories.current.block(id);}
       }
-      if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call(separateWindow==='main'?'return_project_to_main':'open_project_window',{id,workspace:separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,...(separateWindow==='main'?{panel:new URLSearchParams(location.search).get('panel')}:{} )});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});
-    }catch(e){notice(String(e),'error');}finally{closingDocuments.current.delete(id);setBusy(false);}
+      if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call(separateWindow==='main'?'return_project_to_main':'open_project_window',{id,workspace:handoffWorkspace,...(handoffSection&&separateWindow!=='main'?{section:handoffSection}:{}),...(another?{another:true}:{}),...(separateWindow==='main'?{panel:new URLSearchParams(location.search).get('panel')}:{} )});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});return true;
+    }catch(e){notice(String(e),'error');return false;}finally{closingDocuments.current.delete(id);setBusy(false);}
   }
   async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{const section=workspaceRef.current==='learning'?learningSection:workspaceRef.current==='settings'?settingsTab:null;await call('open_workspace_window',{workspace:workspaceRef.current,section,context:section==='academy'?readMapSession<string>('global','learning.lesson','preservation'):null});notice('Workspace opened in a resizable window. Drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   async function openWorkspaceView(target:Workspace,another=false){
@@ -1393,7 +1409,7 @@ export default function App() {
   const orbWorkspaceTitle = workspaceLabel(orbWorkspace);
   return (
     <>
-      <div className="gs-window-content">
+      <div className="gs-window-content" onKeyDown={navigateComposite}>
         <div className="application gs-drawers" data-panel-window={requestedPanel(location.search,workspace)??undefined} inert={closing || undefined} onWheelCapture={event=>{const field=event.target;if(field instanceof HTMLInputElement&&field.type==='number'&&document.activeElement===field)field.blur();}}>
           <header
             id="gs-window-header"
@@ -1409,8 +1425,8 @@ export default function App() {
                 : undefined
             }
           >
-            <button className="brand gs-spark-navigation gs-navigation-toggle" onClick={()=>setSidebarOpen(value=>!value)} aria-label="Toggle workspace navigation" aria-expanded={sidebarOpen} aria-controls="gs-workspace-navigation">
-              <SparkEmblem data={data}/>
+            <button className="brand gs-spark-navigation gs-navigation-toggle" onClick={()=>setSidebarOpen(value=>!value)} aria-label="Toggle workspace navigation" aria-expanded={sidebarOpen} aria-controls="gs-workspace-navigation" aria-keyshortcuts="Control+\" onKeyDown={event=>{if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setSidebarOpen(true);}}}>
+              <SparkEmblem/>
             </button>
             {documents.documents.length ? (
               <MapTabs
@@ -1419,16 +1435,9 @@ export default function App() {
                 onSelect={selectMap}
                 onReorder={ids=>dispatchDocument({type:'reorder',ids})}
                 onClose={(id) => void closeMap(id)}
-                onWindow={(id) => void closeMap(id, true)}
+                onWindow={(id) => closeMap(id, true, true)}
                 onReturn={native&&getCurrentWindow().label.startsWith('editor-')?(id)=>void closeMap(id,'main'):undefined}
-                onAssets={() => {
-                  setAssetTransferOpen(true);
-                  requestAnimationFrame(() =>
-                    window.dispatchEvent(
-                      new CustomEvent('guilty-spark-reveal-drawer', { detail: { id: 'asset-transfer' } }),
-                    ),
-                  );
-                }}
+
               />
             ) : (
               <div className="header-context">
@@ -1452,7 +1461,7 @@ export default function App() {
               onFocus={label=>void workspaceWindows.focus(label).catch(e=>notice(String(e),'error'))} onRefresh={()=>void workspaceWindows.refresh()} onWindow={(target,another)=>void openWorkspaceView(target,another)}/>
             <details className="gs-studio-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={headerMenuKeyDown}>
               <summary aria-label="Studio options" title="Halo runtime, collaboration, tools and help">Studio <span aria-hidden="true">▾</span></summary>
-            <div className="header-actions" onClickCapture={event=>{
+            <div className="header-actions" role="menu" aria-label="Studio commands" onClickCapture={event=>{
               if(!(event.target instanceof Element)||!event.target.closest('button'))return;
               const menu=event.currentTarget.closest('details')!;menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();
             }}>
@@ -1475,7 +1484,7 @@ export default function App() {
                 <Search size={15} />
                 Find tools <kbd>Ctrl K</kbd>
               </button>
-              <button onClick={() => setHelp(true)}><CircleHelp size={16}/><span>Help & shortcuts</span></button>
+              <button onClick={() => setHelp(true)} aria-keyshortcuts="F1"><CircleHelp size={16}/><span>Help & shortcuts</span></button>
             </div>
             </details>
             <div id="gs-window-actions" className="gs-window-actions" />
@@ -1708,7 +1717,7 @@ export default function App() {
                     onRevision={adoptExternalRevision}
                   />
                 </WorkspacePanel>
-                {assetTransferOpen && current && (
+                {current && (
                   <AssetTransfer
                     key={current.id}
                     data={data}
@@ -1716,9 +1725,7 @@ export default function App() {
                     target={current}
                     busy={busy}
                     onTransfer={transferAsset}
-                    onClose={() => setAssetTransferOpen(false)}
                     onTags={() => {
-                      setAssetTransferOpen(false);
                       setWorkspace('tags');
                     }}
                   />
@@ -1896,7 +1903,14 @@ export default function App() {
                     ['Workspace guidance', 'Help drawer'],
                     ['Workspace navigation', 'Ctrl + \\'],
                     ['Back / Forward through your workflow', 'Alt + Left / Right or mouse side buttons'],
-                    ['Window and project header', 'Ctrl + Shift + \\'],
+                    ['Open work and workspace windows', 'Ctrl + Shift + P'],
+                    ['Next / previous map', 'Ctrl + Tab / Ctrl + Shift + Tab'],
+                    ['Next / previous map (alternative)', 'Ctrl + Page Down / Page Up'],
+                    ['Close map (with save prompt)', 'Ctrl + W'],
+                    ['Next / previous work area', 'F6 / Shift + F6'],
+                    ['Menus and workspace tabs', 'Arrow keys · Home / End · Enter / Space'],
+                    ['Menu item by name', 'Type its first letters'],
+                    ['Help & shortcuts', 'F1'],
                     ['Fullscreen / restore', 'F11 / Escape'],
                     ['Dismiss help tooltip', 'Esc while focused'],
                     ['Save project', 'Ctrl + S'],

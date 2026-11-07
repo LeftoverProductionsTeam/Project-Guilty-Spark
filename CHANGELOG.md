@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Native workflow reliability and ledger integration, 6 November 2026
+
+- Keep source and Undo accessible when optional native build metadata is malformed or oversized; retain damaged metadata for review.
+- Verify owned build output and receipt identity before reporting a current native build. Keep receipt lookup errors separate from build failures.
+- Preserve newer workspace navigation after slow map loads, including leaving and returning to the same page. Protect concurrent unpublished development-workspace ownership.
+- Resolve exact bounded H1A shell dependencies and long Invader paths through existing staging and short aliases. Pin the installed kit's optional Steam identity file without modifying the original installation. Standalone exit1 remains unresolved.
+- Add standard native machine placement serialization/readback in the imported-map World path, retaining yaw/pitch/roll and device group defaults. Native acceptance and remaining limits are recorded in the [current evidence report](docs/FEATURE_COMPLETION_20261106.md).
+- Align the normal/fullscreen title bar at 32px with matching compact controls and overflow menus. Retain the active workspace/section when tearing off a map tab; drag the existing Work control to open an independent current-workspace window.
+- Keep Monitor/workspace menus local to each native window, while existing window-labeled storage isolates browsing choices and intentionally shared source/appearance remain shared.
+- Add pointer-following tab lift/detach feedback, cancellation, acknowledged handoff and failure retention without replacing native window/history ownership.
+- Use an actual captured front-facing Monitor for the application icon, favicon and immediate first-run menu artwork. Save its menu eye/aura color in Interface Studio → Appearance; reuse the permanent lossless picture with no header renderer, native reads or recapture; retain reduced-motion behavior.
+- Keep Transfer assets in its existing Tools drawer, remove its duplicate titlebar button and load transfer contents only when opened.
+- Add standard window-local keyboard navigation: Ctrl+Tab/PageUp/PageDown map switching, guarded Ctrl+W, F6/Shift+F6 work areas, F1 Help, Shift+F10 map actions, and consistent menu/tab arrows and type-ahead. Preserve text input, modal focus and author-owned Undo/Save.
+- Let live storage sampling share compiler-temporary directory deletion and recheck path identity. Keep operation roots/ancestors, full audits, reparse rejection and budgets protected; a real Windows regression reproduces the former build-blocking lock.
+- Preserve all 475 requirement IDs and 25 numbered prompts while linking their current source/UI/native owners and explicit open gates. No new runtime registry, release or publication.
+
 ## Unreleased — P0 Save recovery and C71 native authoring, 6 November 2026
 
 - Coordinate explicit descriptor/Undo publication; recover a hash-bound interrupted first Save, retain concurrent external edits and preserve dirty RAM on refusal. Repair SQLite-wait races and first-Save-before-Undo shutdown.

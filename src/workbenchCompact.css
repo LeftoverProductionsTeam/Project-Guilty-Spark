@@ -148,11 +148,11 @@
   .application .studio-guide{grid-template-columns:1fr;}
 }
 /* C50 unified chrome: one persistent row, with overflow drawers kept reachable. */
-:root .application.gs-drawers>.gs-compact-header{display:flex;align-items:center;gap:5px;overflow:visible;padding:0 5px;height:36px!important;z-index:160;}
+:root .application.gs-drawers>.gs-compact-header{display:flex;align-items:center;gap:5px;overflow:visible;padding:0 5px;height:var(--gs-header-height)!important;z-index:160;}
 :root[data-gs-native-frame='true']:not([data-gs-maximized='true']):not([data-gs-fullscreen='true']) .application{width:calc(100vw - 16px);height:calc(100vh - 16px);margin:16px 0 0 16px;}
 :root[data-gs-native-frame='true']:not([data-gs-maximized='true']):not([data-gs-fullscreen='true']) .gs-window-tint{inset:16px 0 0 16px;}
-.application.gs-drawers{grid-template-rows:36px minmax(0,1fr) auto!important;}
-.application .gs-compact-header .gs-spark-navigation{position:relative;align-self:flex-start;flex:none;min-width:68px;width:68px;height:36px;min-height:0;margin:-2px 0 0;padding:0;border:0;background:transparent;overflow:visible;}
+.application.gs-drawers{--gs-header-height:32px;grid-template-rows:var(--gs-header-height) minmax(0,1fr) auto!important;}
+.application .gs-compact-header .gs-spark-navigation{position:relative;align-self:flex-start;flex:none;min-width:68px;width:68px;height:var(--gs-header-height);min-height:0;margin:0;padding:0;border:0;background:transparent;overflow:visible;}
 :root .application.gs-drawers>.gs-compact-header .gs-spark-navigation,
 :root .application.gs-drawers>.gs-compact-header .gs-spark-navigation:is(:hover,:active,[aria-expanded='true']){background:transparent!important;border-color:transparent;box-shadow:none!important;}
 .gs-spark-anchor{display:block;width:100%;height:100%;pointer-events:none;}
@@ -178,14 +178,14 @@
 .application.gs-drawers>.gs-navigation-drawer .nav-item[aria-current='page']::before{display:none;}
 .gs-workspace-current-mark{flex:none;margin-left:auto;color:var(--accent);}
 #gs-header-workspace-tools{display:flex;flex:0 0 auto;min-width:0;align-items:center;justify-content:flex-end;margin-left:auto;}
-#gs-header-workspace-tools .gs-workspace-tools{height:32px;min-height:32px;padding:0;gap:3px;border:0;background:transparent;flex:0 0 auto;min-width:0;}
+#gs-header-workspace-tools .gs-workspace-tools{height:28px;min-height:28px;padding:0;gap:3px;border:0;background:transparent;flex:0 0 auto;min-width:0;}
 #gs-header-workspace-tools .gs-workspace-tools>button{width:28px;min-width:28px;height:28px;min-height:28px;padding:4px;}
 #gs-header-workspace-tools .gs-panel-buttons{overflow:hidden;max-width:clamp(0px,calc(100vw - 1200px),260px);}
 #gs-header-workspace-tools .gs-panel-buttons button{min-height:26px;padding:3px 6px;font-size:10px;}
 #gs-header-workspace-tools .gs-layout-actions{gap:3px;margin:0;}
-:root .application.gs-drawers>.gs-compact-header .map-tab-bar{flex:0 1 auto;max-width:none;min-width:144px;margin:0;padding:0;border:0;background:transparent;gap:4px;}
+:root .application.gs-drawers>.gs-compact-header .map-tab-bar{flex:0 1 auto;max-width:none;min-width:144px;height:28px;min-height:28px;align-self:center;margin:0;padding:0;border:0;background:transparent;gap:4px;}
 .gs-titlebar-drag-space{flex:1 0 clamp(48px,6vw,112px);align-self:stretch;min-height:28px;cursor:grab;}
-.application .gs-compact-header .map-tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
+.application .gs-compact-header .map-tabs{height:28px;min-height:0;align-items:center;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
 .application .gs-compact-header .map-tab-bar>.small-button{flex:none;width:28px;min-width:28px;padding:4px;font-size:0;gap:0;}
 .application .gs-compact-header .map-tab button[role=tab]{flex:1;min-width:0;}
 .application.gs-drawers>.gs-compact-header .map-tab{flex:1 0 144px;width:auto;min-width:min(120px,100%);max-width:180px;margin-top:0;}
@@ -236,8 +236,8 @@
 .application .gs-window-actions .gs-window-close:hover{background:#b3364599!important;}
 html[data-gs-fullscreen=true],html[data-gs-fullscreen=true] body,html[data-gs-fullscreen=true] #root,html[data-gs-fullscreen=true] .gs-window-content{width:100%;height:100%;margin:0;padding:0;border:0;border-radius:0;}
 html[data-gs-fullscreen=true] .gs-window-tint{border-radius:0!important;}
-html[data-gs-fullscreen=true] .application.gs-drawers{grid-template-rows:32px minmax(0,1fr) auto!important;}
-html[data-gs-fullscreen=true] .application.gs-drawers>.gs-compact-header{height:32px!important;}
+html[data-gs-fullscreen=true] .application.gs-drawers{--gs-header-height:32px;grid-template-rows:var(--gs-header-height) minmax(0,1fr) auto!important;}
+html[data-gs-fullscreen=true] .application.gs-drawers>.gs-compact-header{height:var(--gs-header-height)!important;}
 html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-workspace-tools{height:28px;min-height:28px;}
 html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-panel-buttons button{min-height:24px;}
 .application .compare-page{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden;gap:4px;padding:7px 10px;}
@@ -391,3 +391,17 @@ html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-panel-buttons butto
 .application .gs-render-quality label{display:flex;align-items:center;gap:5px;margin:0;font-size:11px;}
 .application .gs-render-quality input[type=range]{width:110px;min-width:50px;margin:0;}
 .application .gs-render-quality small{flex-basis:100%;font-size:10px;line-height:1.35;}
+
+/* One titlebar baseline. These are top-row controls, never popup contents. */
+#gs-window-header .gs-open-work>button,#gs-window-header :is(.gs-tools-menu,.gs-view-menu,.gs-studio-menu,.gs-layout-menu,.gs-panel-overflow,.gs-map-overflow)>summary{display:flex;align-items:center;box-sizing:border-box;height:28px;min-height:28px;padding:3px 6px;line-height:18px;}
+#gs-window-header .gs-open-work>button{cursor:grab;touch-action:none;}
+#gs-window-header .gs-open-work[data-detaching]>button{cursor:grabbing;outline:1px dashed var(--accent);opacity:.7;}
+#gs-window-header .map-tab button{height:26px;min-height:26px;line-height:18px;}
+#gs-window-header .map-tab .map-tab-action{padding:3px;width:22px;}
+
+/* The cached portrait keeps its original pixels. Only the application-menu
+   eye/aura uses the saved interface tint; no native model is recolored. */
+.gs-spark-emblem[data-portrait=true]{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--gs-monitor-eye-color,#57dfff) 55%,transparent));transition:filter .15s ease,transform .15s ease;}
+.gs-spark-eye{position:absolute;left:50%;top:47%;width:12px;height:12px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,#fff 0 12%,var(--gs-monitor-eye-color,#57dfff) 42%,transparent 75%);box-shadow:0 0 8px var(--gs-monitor-eye-color,#57dfff),0 0 17px color-mix(in srgb,var(--gs-monitor-eye-color,#57dfff) 65%,transparent);pointer-events:none;}
+body:has(.gs-spark-navigation:is(:hover,:focus-visible,[aria-expanded=true])) .gs-spark-emblem[data-portrait=true]{filter:drop-shadow(0 0 7px var(--gs-monitor-eye-color,#57dfff));transform:scale(1.04);}
+html[data-gs-reduced-motion=true] .gs-spark-emblem{transition:none;}@media(prefers-reduced-motion:reduce){.gs-spark-emblem{transition:none;}}

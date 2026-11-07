@@ -155,3 +155,10 @@ test('peer notifications retain object identity and ignore unrelated or malforme
   expect(changed).toHaveBeenCalledTimes(2);expect(other).toHaveBeenCalledTimes(1);
   expect(session.readMapSession('a','layout','reset')).toBe('reset');
 });
+
+test('window browsing and category choices do not follow another live window',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('global','library.query','main-map');session.writeMapSession('global','interface.section','appearance');session.writeMapSession('a','hosting.runtime','mccSteam');
+ session.configureMapViewWindow('editor-two');expect(session.readMapSession('global','library.query','')).toBe('main-map');session.writeMapSession('global','library.query','other-map');session.writeMapSession('global','interface.section','sounds');session.writeMapSession('a','hosting.runtime','haloCustomEdition');
+ session.configureMapViewWindow('main');expect(session.readMapSession('global','library.query','')).toBe('main-map');expect(session.readMapSession('global','interface.section','')).toBe('appearance');expect(session.readMapSession('a','hosting.runtime','')).toBe('mccSteam');
+ session.writeMapSession('global','home.model','johnson');session.configureMapViewWindow('editor-two');expect(session.readMapSession('global','home.model','')).toBe('johnson');
+});

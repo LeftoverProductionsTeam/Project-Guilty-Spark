@@ -775,12 +775,30 @@ fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
         let _=app.emit("spark:library-changed",());
     });Ok(returned)
 }
+fn quickforge_report(state:&AppState,project:&Project)->Reply<Option<forge_build::QuickForgeBuildReceipt>> {
+    let receipt=lock(&state.library)?.quickforge_receipt(&project.id).map_err(error)?;
+    let fingerprint=project.fingerprint().map_err(error)?;
+    Ok(receipt.map(|mut r|{
+        let identity=r.schema_version==1&&r.project_id==project.id&&r.project_fingerprint==fingerprint;
+        let reviewed=if !identity {Err("This receipt belongs to another source revision or unsupported schema".into())}
+            else if r.status=="validated" {
+                r.build.as_ref().ok_or_else(||"The validated receipt has no native output".to_owned()).and_then(|build|{
+                    if r.job_id!=build.id||build.project_fingerprint!=fingerprint||build.status!="validated" {return Err("Native build and receipt identities differ".into());}
+                    let actual=verified_build(state,project,&build.id)?;
+                    if actual.output!=build.output||actual.sha256!=build.sha256||actual.target!=build.target {return Err("Native output and optional receipt disagree".into());}
+                    Ok(())
+                })
+            }else if r.status=="exported" {Ok(())} // Current source export is never a compiled build.
+            else{Err("The last native build did not pass validation".into())};
+        r.current=Some(reviewed.is_ok());
+        if let Err(reason)=reviewed {r.warnings.push(format!("{reason}. Rebuild the current source; previous receipts and editable content were retained."));}
+        r
+    }))
+}
 #[tauri::command]
 fn quickforge_build_report(state:State<AppState>,project_id:String)->Reply<Option<forge_build::QuickForgeBuildReceipt>> {
     let project=lock(&state.library)?.get(&project_id).map_err(error)?;
-    let receipt:Option<forge_build::QuickForgeBuildReceipt>=lock(&state.library)?.setting(&format!("quickforge.receipt.{project_id}")).map_err(error)?;
-    // A prior receipt is useful evidence but must never describe current edits as built.
-    Ok(receipt.map(|mut r|{r.current=Some(r.project_fingerprint==project.fingerprint().unwrap_or_default());if r.current==Some(false){r.warnings.push("This receipt is for an earlier project revision; export or build the current saved edits.".into());}r}))
+    quickforge_report(&state,&project)
 }
 #[tauri::command]
 fn create_project(state: State<AppState>, title: String) -> Reply<OpenProject> {
@@ -3349,6 +3367,35 @@ mod readiness_tests {
         assert_eq!(current_build(&state,&p).unwrap().id,direct.id);
         assert_eq!(current_native_build(&state,&p).unwrap().id,native.id);
         fs::write(native.output.unwrap(),b"tampered").unwrap();assert!(current_native_build(&state,&p).is_err());
+    }
+    fn record_quickforge_receipt(state:&AppState,p:&Project,record:&BuildRecord)->forge_build::QuickForgeBuildReceipt {
+        let receipt=forge_build::QuickForgeBuildReceipt{schema_version:1,job_id:record.id.clone(),project_id:p.id.clone(),project_fingerprint:p.fingerprint().unwrap(),source_document_sha256:None,current:None,status:"validated".into(),duration_ms:0,sources:None,blockers:vec![],warnings:vec![],build:Some(record.clone()),tool_identities:Default::default()};
+        lock(&state.library).unwrap().set_setting(&format!("quickforge.receipt.{}",p.id),&receipt).unwrap();receipt
+    }
+    #[test]
+    fn quickforge_current_report_requires_actual_owned_output_integrity() {
+        let(_temp,state,p,record)=fixture();record_quickforge_receipt(&state,&p,&record);
+        assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(true));
+        let output=record.output.as_ref().unwrap();let original=fs::read(output).unwrap();
+        fs::write(output,b"changed disposable output").unwrap();
+        let changed=quickforge_report(&state,&p).unwrap().unwrap();assert_eq!(changed.current,Some(false));assert!(!changed.warnings.is_empty());
+        fs::write(output,&original).unwrap();fs::remove_file(output).unwrap();assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(false));
+        fs::write(output,&original).unwrap();assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(true));
+        let file=state.root.join("jobs").join(&record.id).join("receipt.json");fs::write(&file,b"{corrupt receipt").unwrap();assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(false));
+        fs::write(&file,serde_json::to_vec(&record).unwrap()).unwrap();assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(true));
+    }
+    #[test]
+    fn quickforge_current_report_refuses_foreign_or_inconsistent_optional_identity() {
+        let(_temp,state,p,record)=fixture();let good=record_quickforge_receipt(&state,&p,&record);
+        for variant in ["project","schema","job","fingerprint","record","status","no-build"] {
+            let mut receipt=good.clone();match variant {
+                "project"=>receipt.project_id=uuid::Uuid::new_v4().to_string(),"schema"=>receipt.schema_version=2,
+                "job"=>receipt.job_id=uuid::Uuid::new_v4().to_string(),"fingerprint"=>receipt.project_fingerprint="f".repeat(64),
+                "record"=>receipt.build.as_mut().unwrap().sha256=Some("e".repeat(64)),"status"=>receipt.status="failed".into(),_=>receipt.build=None,
+            }
+            lock(&state.library).unwrap().set_setting(&format!("quickforge.receipt.{}",p.id),&receipt).unwrap();
+            assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(false),"{variant}");
+        }
     }
     #[test]
     fn readiness_rejects_stale_current_content_and_tampered_artifact() {

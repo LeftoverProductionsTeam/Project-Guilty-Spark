@@ -64,3 +64,10 @@ describe('local Halo interface profiles', () => {
     expect(values.get('--gs-glow-blur')).toBe('0px');
   });
 });
+
+it('saves the menu eye tint safely without changing native source references',()=>{
+ const prefs=sanitizeInterfacePreferences({...DEFAULT_INTERFACE,monitorEyeColor:'#F07ABB'});expect(prefs.monitorEyeColor).toBe('#f07abb');
+ expect(sanitizeInterfacePreferences({...prefs,monitorEyeColor:'url(bad)'}).monitorEyeColor).toBe(DEFAULT_INTERFACE.monitorEyeColor);
+ const values=new Map<string,string>(),storage={getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>values.set(key,value)};saveInterfacePreferences(prefs,storage);expect(readInterfacePreferences(storage).monitorEyeColor).toBe('#f07abb');
+ const root={dataset:{},style:{setProperty:(key:string,value:string)=>values.set(key,value)}} as unknown as HTMLElement;applyInterfacePreferences(prefs,root);expect(values.get('--gs-monitor-eye-color')).toBe('#f07abb');expect(prefs.bitmap).toBeNull();
+});

@@ -1,16 +1,10 @@
-import {lazy,Suspense,useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {LoaderCircle} from 'lucide-react';
-import {native} from '../api';
-import {preloadHomeModels,isHaloMonitor} from '../homeShowcase';
-import type {Bootstrap} from '../types';
-import type {ForgeAsset} from '../forge';
-import {useMapState} from '../mapSession';
-import {useTextureResourceScope} from '../textureResourceScope';
-import {validSparkEmblemPicture,readSparkEmblemPicture,saveSparkEmblemPicture} from '../sparkEmblemCache';
-import type {SparkEmblemPicture} from '../sparkEmblemCache';
-const NativeModelPreview=lazy(()=>import('./NativeModelPreview'));
-export default function SparkEmblem({data}:{data:Bootstrap}){
+import applicationMonitor from '../../src-tauri/icons/icon.png';
+
+/** Permanent, lossless application artwork. No native source read, 3D renderer
+ * or capture is needed for the menu button. Asset/showcase previews stay separate. */
+export default function SparkEmblem(){
   const anchor=useRef<HTMLSpanElement>(null),[position,setPosition]=useState<{left:number;top:number}|null>(null);
   useLayoutEffect(()=>{
     const target=anchor.current;if(!target)return;
@@ -21,34 +15,6 @@ export default function SparkEmblem({data}:{data:Bootstrap}){
     window.addEventListener('resize',update);window.addEventListener('scroll',update,true);
     return()=>{observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};
   },[]);
-  const [monitor,setMonitor]=useState<ForgeAsset|null>(null),[unavailable,setUnavailable]=useState(!native);
-  const resources=useTextureResourceScope(monitor?.sourceProjectId);
-  const [cached,setCached]=useMapState<SparkEmblemPicture|null>('global','corner.monitorPortrait',()=>null);
-  const libraryScope=JSON.stringify([data.dataDirectory,data.installation.mccPath??null]);
-  const [saved,setSaved]=useState(()=>readSparkEmblemPicture(libraryScope));
-  useEffect(()=>{setSaved(readSparkEmblemPicture(libraryScope));},[libraryScope]);
-  const matched=monitor&&resources&&validSparkEmblemPicture(saved,monitor.sourceSha256??'',monitor.tagId??0,resources);
-  const legacy=monitor&&resources&&validSparkEmblemPicture(cached,monitor.sourceSha256??'',monitor.tagId??0,resources)?cached:null;
-  // Show the last locally captured decorative portrait immediately. Background
-  // source verification can refresh it if the actual source/resource pins change.
-  const image=saved?.png??legacy?.png??'';
-  useEffect(()=>{if(!legacy||matched)return;saveSparkEmblemPicture(libraryScope,legacy);setSaved(legacy);setCached(null);},[legacy,matched,libraryScope,setCached]);
-  useEffect(()=>{
-    if(!native)return;
-    let alive=true;setUnavailable(false);
-    void preloadHomeModels(data).then(assets=>{if(!alive)return;const owned=assets.find(isHaloMonitor);setMonitor(owned??null);setUnavailable(!owned);}).catch(()=>{if(alive)setUnavailable(true);});
-    return()=>{alive=false;};
-  },[data.dataDirectory,data.installation.mccPath]);
-  // The menu button owns input/layout. Only the visual escapes the rounded
-  // application and its optional window glass/tint; it never intercepts tabs.
-  const visual=image?<img src={image} alt="" data-spark-emblem="owned-monitor"/>:<>
-    {unavailable?<span className="gs-spark-label" title="Link an owned Halo source containing the monitor to show Guilty Spark here.">SPARK</span>:<LoaderCircle className="gs-spark-loading" aria-label="Loading Guilty Spark model"/>}
-  </>;
-  return <><span className="gs-spark-anchor" ref={anchor} aria-hidden="true"/>{position&&createPortal(<>
-    <span className="gs-spark-emblem" style={position} aria-hidden="true">{visual}</span>
-    {monitor&&resources&&!unavailable&&!matched&&!legacy&&<span className="gs-spark-capture" aria-hidden="true"><Suspense fallback={null}><NativeModelPreview asset={monitor} showcase portrait animate={false} live={false} onSnapshot={png=>{
-      const picture:SparkEmblemPicture={version:2,sourceHash:monitor.sourceSha256??'',tagId:monitor.tagId??0,resources,png};
-      if(validSparkEmblemPicture(picture,picture.sourceHash,picture.tagId,resources)){saveSparkEmblemPicture(libraryScope,picture);setSaved(picture);setCached(null);}
-    }}/></Suspense></span>}
-  </>,document.body)}</>;
+  return <><span className="gs-spark-anchor" ref={anchor} aria-hidden="true"/>{position&&createPortal(
+    <span className="gs-spark-emblem" data-portrait="true" style={position} aria-hidden="true"><img src={applicationMonitor} alt="" width={256} height={256} decoding="sync" fetchPriority="high" draggable={false} data-spark-emblem="app-monitor"/><span className="gs-spark-eye"/></span>,document.body)}</>;
 }

@@ -230,3 +230,14 @@ test('Dark Glow saves custom colors and keeps text white on dark surfaces',async
   await strength.focus();await strength.press('Home');
   await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--gs-glow-percent').trim())).toBe('0%');
 });
+
+
+test('the application Monitor portrait and glowing menu are available before any Halo is connected',async({page})=>{
+ await page.goto('/');const image=page.locator('[data-spark-emblem="app-monitor"]');await expect(image).toBeVisible();
+ expect(await image.evaluate((node:HTMLImageElement)=>node.complete&&node.naturalWidth===256&&node.naturalHeight===256)).toBe(true);
+ await expect(page.locator('.gs-spark-eye')).toBeVisible();await expect(page.getByLabel('Loading Guilty Spark model',{exact:true})).toHaveCount(0);
+ await expect(page.locator('.gs-spark-capture,.gs-spark-emblem canvas')).toHaveCount(0);await chooseTool(page,'Features & workflows');await expect(image).toBeVisible();await expect(page.locator('.gs-spark-capture,.gs-spark-emblem canvas')).toHaveCount(0);
+ const idle=await page.locator('.gs-spark-emblem').evaluate(node=>getComputedStyle(node).filter);await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).hover();
+ await expect.poll(()=>page.locator('.gs-spark-emblem').evaluate(node=>getComputedStyle(node).filter)).not.toBe(idle);
+ const favicon=page.locator('link[rel=icon]');await expect(favicon).toHaveAttribute('type','image/png');
+});

@@ -51,8 +51,15 @@ try {
       if (stages.includes('compiler')||stages.includes('geometry')||stages.includes('logic')) {
         if(tags.toLowerCase().endsWith('.7z')){
           const spec=JSON.parse(await fs.readFile(new URL('../docs/fixtures/source-only-h1a-inputs.json',import.meta.url),'utf8'));
+          if(stages.includes('logic')&&process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
+            const shell=JSON.parse(await fs.readFile(new URL('../docs/fixtures/h1a-standalone-shell-inputs.json',import.meta.url),'utf8'));
+            if(JSON.stringify(shell.sourceArchive)!==JSON.stringify(spec.sourceArchive))throw Error('Standalone shell uses a different SDK archive');
+            const rows=new Map(spec.tagFiles.map(row=>[row.path,row]));
+            for(const row of shell.tagFiles){const old=rows.get(row.path);if(old&&JSON.stringify(old)!==JSON.stringify(row))throw Error('Conflicting native source manifests');rows.set(row.path,row);}
+            spec.tagFiles=[...rows.values()];spec.logicalTagBytes=spec.tagFiles.reduce((n,row)=>n+row.bytes,0);
+          }
           const hash=async file=>{const digest=crypto.createHash('sha256');for await(const chunk of createReadStream(file))digest.update(chunk);return digest.digest('hex');};
-          if(spec.tagFiles.length>2048||spec.logicalTagBytes>128*1024**2||(await fs.stat(tags)).size!==spec.sourceArchive.bytes||await hash(tags)!==spec.sourceArchive.sha256)
+          if(spec.tagFiles.length>4096||spec.logicalTagBytes>128*1024**2||(await fs.stat(tags)).size!==spec.sourceArchive.bytes||await hash(tags)!==spec.sourceArchive.sha256)
             throw Error('The selected native SDK archive does not match the verified dependency manifest');
           for(const row of spec.tagFiles)if(!row.path||row.path.startsWith('/')||/[\\:\r\n\0]/.test(row.path)||row.path.split('/').some(s=>!s||s==='.'||s==='..'))throw Error('Unsafe SDK dependency path');
           const sdk=path.join(context.directory,'sdk-input');await fs.mkdir(sdk);
@@ -152,7 +159,13 @@ try {
           await run('Actual retained multiwindow workspace lifecycle and route regressions',[
             'scripts/test-workspace-lifecycle-native.mjs',path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,
           ],{SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0'});
-        }finally{const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.workspace=JSON.parse(receipt);}
+        }finally{const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.workspace=JSON.parse(receipt);
+        if(receiptFile){
+          for(const name of ['application-icon.png','compact-header.png','tab-lift.png','monitor-pink.png','monitor-glow.png','monitor-source.png','monitor-source.json','failure-window-0.png','failure-window-1.png','failure-window-2.png']){
+            const image=path.join(output,name),stat=await fs.stat(image).catch(()=>null);
+            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(image,target);(report.workspaceScreenshots??=[]).push({file:target,bytes:stat.size});if(name==='compact-header.png')report.workspaceScreenshot={file:target,bytes:stat.size};}
+          }
+        }}
         if(!report.workspace?.complete)throw Error('Actual native workspace lifecycle did not pass');
       }
       if(stages.includes('geometry')){
@@ -180,7 +193,7 @@ try {
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
           if(receiptFile)for(const name of ['logic-inspector.png','failure-window-0.png']){
             const source=path.join(output,name),stat=await fs.stat(source).catch(()=>null);
-            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),'c71-'+name);await fs.copyFile(source,target);(report.logicScreenshots??=[]).push({file:target,bytes:stat.size});}
+            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(source,target);(report.logicScreenshots??=[]).push({file:target,bytes:stat.size});}
           }
         }
         if(!report.logic?.complete)throw Error('Actual native object/logic acceptance did not pass');

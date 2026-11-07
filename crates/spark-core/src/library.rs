@@ -201,14 +201,15 @@ impl Library {
             // Its existing persistent receipt can restore the current build on
             // reopen without rewriting source or scanning historical job trees.
             if project.quick_forge.is_some() {
-                let encoded=match self.db.query_row("SELECT CASE WHEN length(CAST(value AS BLOB))<=4194304 THEN value ELSE NULL END FROM settings WHERE key=?1",[format!("quickforge.receipt.{id}")],|row|row.get::<_,Option<String>>(0)) {
-                    Ok(Some(value))=>Some(value),
-                    Ok(None)=>return invalid("Native build metadata exceeds 4 MiB; source and receipt retained for review"),
-                    Err(rusqlite::Error::QueryReturnedNoRows)=>None,
-                    Err(error)=>return Err(error.into()),
+                // The native build receipt is optional recovery metadata. A
+                // damaged record stays intact and is reported by the build UI;
+                // it must not make the independent editable source inaccessible.
+                let receipt=match self.quickforge_receipt(id) {
+                    Ok(receipt)=>receipt,
+                    Err(crate::SparkError::Invalid(_))=>None,
+                    Err(error)=>return Err(error),
                 };
-                if let Some(encoded)=encoded {
-                    let receipt:crate::forge_build::QuickForgeBuildReceipt=serde_json::from_str(&encoded)?;
+                if let Some(receipt)=receipt {
                     if receipt.schema_version==1&&receipt.project_id==project.id&&receipt.status=="validated"&&receipt.project_fingerprint==project.fingerprint()? {
                         if let Some(build)=receipt.build {
                             if build.status=="validated"&&build.id==receipt.job_id&&build.project_fingerprint==receipt.project_fingerprint&&!project.builds.iter().any(|old|old.id==build.id) {project.builds.push(build);}
@@ -222,6 +223,18 @@ impl Library {
             session.set_setting(&format!("savedBaseline.{id}"),&project::FileRevision::capture(&file)?)?;
         }
         Ok(project)
+    }
+    /// Read only bounded optional native build metadata. Retain malformed bytes
+    /// for review; callers may still open source and separately show this error.
+    pub fn quickforge_receipt(&self,id:&str)->Result<Option<crate::forge_build::QuickForgeBuildReceipt>> {
+        self.project_dir(id)?;
+        let encoded=match self.db.query_row("SELECT CASE WHEN length(CAST(value AS BLOB))<=4194304 THEN value ELSE NULL END FROM settings WHERE key=?1",[format!("quickforge.receipt.{id}")],|row|row.get::<_,Option<String>>(0)) {
+            Ok(Some(value))=>value,
+            Ok(None)=>return invalid("Saved native build metadata exceeds 4 MiB. Your editable source is intact; rebuild to replace the damaged receipt."),
+            Err(rusqlite::Error::QueryReturnedNoRows)=>return Ok(None),
+            Err(error)=>return Err(error.into()),
+        };
+        serde_json::from_str(&encoded).map_err(|_|crate::SparkError::Invalid("Saved native build metadata is damaged. Your editable source and Undo are intact; rebuild to replace the receipt.".into()))
     }
     pub fn setting<T: serde::de::DeserializeOwned + Default>(&self, key: &str) -> Result<T> {
         if let Some(session)=&self.session{

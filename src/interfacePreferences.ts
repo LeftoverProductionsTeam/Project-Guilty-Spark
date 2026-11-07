@@ -34,6 +34,7 @@ export interface InterfacePreferences {
   glowPrimary:string;
   glowSecondary:string;
   glowIntensity:number;
+  monitorEyeColor:string;
   cues: Partial<Record<CueName, LocalCueReference>>;
   /** A user-selected Halo tag ID and exact source hash, NEVER image bytes. */
   bitmap: LocalInterfaceBitmapRef | null;
@@ -55,6 +56,7 @@ export const DEFAULT_INTERFACE: InterfacePreferences = {
   glowPrimary:'#57dfff',
   glowSecondary:'#bb83ff',
   glowIntensity:0.65,
+  monitorEyeColor:'#57dfff',
   cues: {},
   bitmap: null,
 };
@@ -95,6 +97,7 @@ export function sanitizeInterfacePreferences(v: unknown): InterfacePreferences {
     windowOpacity:typeof v.windowOpacity==='number'&&Number.isFinite(v.windowOpacity)?Math.max(.1,Math.min(1,v.windowOpacity)):1,
     windowTint:typeof v.windowTint==='string'&&/^#[0-9a-f]{6}$/i.test(v.windowTint)?v.windowTint.toLowerCase():DEFAULT_INTERFACE.windowTint,
     windowTintStrength:typeof v.windowTintStrength==='number'&&Number.isFinite(v.windowTintStrength)?Math.max(0,Math.min(.5,v.windowTintStrength)):0,
+    monitorEyeColor:color(v.monitorEyeColor,DEFAULT_INTERFACE.monitorEyeColor),
     glowPrimary:color(v.glowPrimary,DEFAULT_INTERFACE.glowPrimary),
     glowSecondary:color(v.glowSecondary,DEFAULT_INTERFACE.glowSecondary),
     glowIntensity:typeof v.glowIntensity==='number'&&Number.isFinite(v.glowIntensity)?Math.max(0,Math.min(1,v.glowIntensity)):DEFAULT_INTERFACE.glowIntensity,
@@ -129,6 +132,7 @@ export function applyInterfacePreferences(preferences: InterfacePreferences, roo
   root.style.setProperty('--gs-window-opacity',String(preferences.windowOpacity));
   root.style.setProperty('--gs-window-tint',preferences.windowTint);
   root.style.setProperty('--gs-window-tint-strength',String(preferences.windowTintStrength));
+  root.style.setProperty('--gs-monitor-eye-color',preferences.monitorEyeColor);
   root.style.setProperty('--gs-glow-primary',preferences.glowPrimary);
   root.style.setProperty('--gs-glow-secondary',preferences.glowSecondary);
   root.style.setProperty('--gs-glow-percent',`${Math.round(preferences.glowIntensity*35)}%`);

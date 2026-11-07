@@ -1296,12 +1296,11 @@ export async function withDevelopmentWorkspace(
       throw error;
     });
     if (text === null) {
-      // Admission can fail before its receipt exists. An actually empty
-      // namespace contains no source to preserve; rmdir refuses new contents.
-      if ((await fs.readdir(prior)).length === 0) {
-        await fs.rmdir(prior);
-        continue;
-      }
+      // Another live process can be between mkdtemp and receipt publication.
+      // Empty does not prove abandonment. Only the creator may retire its
+      // unpublished directory after its own admission fails.
+      const names=await fs.readdir(prior).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+      if (names===null || names.length===0) continue;
       throw Error('Unrecognized temporary build contents are protected');
     }
     const row = JSON.parse(text);
@@ -1312,19 +1311,27 @@ export async function withDevelopmentWorkspace(
       !row.writers.some(isLive)
     )
       await recoverQaScratch(prior, { storageRoot: base });
-    const final = JSON.parse(await fs.readFile(file, 'utf8'));
+    const finalText=await fs.readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+    if(finalText===null)continue; // Its active owner may have completed normally.
+    const final = JSON.parse(finalText);
     if (final.workflow === 'source-development' && !final.active)
       await removeDevelopmentReceipt(base, prior, final);
   }
   const run = await fs.mkdtemp(path.join(base, 'run-'));
-  const finish = await beginQaStorage(run, {
+  let finish;
+  try {finish = await beginQaStorage(run, {
     workflow: 'source-development',
     operation: 'build',
     nativeAllocation: true,
     appSha256: await fileHash(new URL('./native-qa-storage.mjs', import.meta.url)),
     reservationBytes,
     storageRoot: base,
-  });
+  });} catch(error) {
+    // This process created the directory. rmdir refuses any published receipt
+    // or unexpected contents; never recursively remove a failed admission.
+    await fs.rmdir(run).catch(cleanup=>{if(!['ENOENT','ENOTEMPTY','EEXIST'].includes(cleanup.code))throw cleanup;});
+    throw error;
+  }
   const directory = await finish.createScratch('output');
   // Pinned Tauri still emits four ACL schemas at a hard-coded source-relative
   // path. Preserve pre-existing bytes in RAM and retire only this build's new

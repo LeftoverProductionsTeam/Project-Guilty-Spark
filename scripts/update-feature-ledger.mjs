@@ -14,11 +14,89 @@ import {continuation39Requirements,continuation39Overrides} from './continuation
 import {continuation38Requirements,continuation38Overrides} from './continuation38-evidence.mjs';
 // Reconcile historical requirement sources without equating their different IDs.
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {API} from 'typescript/unstable/sync';
+import {SyntaxKind} from 'typescript/unstable/ast';
+import {visitEachChild} from 'typescript/unstable/ast/visitor';
+import {workflowTraces,workflowTopicAliases} from './feature-ledger-evidence.mjs';
 import { evidenceTopics, evidenceTopic, continuedRequirements, allRuntimeRequirements, runtimeContinuationRequirements, rowEvidenceOverrides } from './feature-ledger-evidence.mjs';
 import {continuation35Requirements,continuation35Overrides} from './continuation35-evidence.mjs';
 import {continuation36Requirements,continuation36Overrides} from './continuation36-evidence.mjs';
 import {continuation37Requirements,continuation37Overrides} from './continuation37-evidence.mjs';
 function parseCsv(text){let rows=[],row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(cell);cell='';}else if(c==='\n'&&!quoted){row.push(cell.replace(/\r$/,''));if(row.some(Boolean))rows.push(row);row=[];cell='';}else cell+=c;}if(cell||row.length){row.push(cell);rows.push(row);}if(quoted)throw new Error('Unclosed CSV cell');return rows;}
+
+const ledgerPath='docs/MASTER_FEATURE_LEDGER.csv';
+const traceHeaders=['Prompt queue links','Workflow entry point','Frontend state / owner','Verified UI command paths','Native/core declaration paths','Native result / boundary','Related requirement IDs','Integration review'];
+const slash=value=>value.split(String.fromCharCode(92)).join('/');
+const csvQuote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
+async function reconcileCurrent(){
+ const originalText=await fs.readFile(ledgerPath,'utf8'),table=parseCsv(originalText),headers=table.shift();
+ if(table.length!==475||new Set(table.map(row=>row[0])).size!==475)throw Error('Preserve all475 distinct requirement IDs before integration');
+ if(headers.length!==19&&headers.slice(19).join('|')!==traceHeaders.join('|'))throw Error('Unreviewed CSV columns; refuse to discard them');
+ const identity=rows=>crypto.createHash('sha256').update(JSON.stringify(rows.map(row=>row.slice(0,4)))).digest('hex');
+ const originalIdentity=identity(table),before=table.map(row=>row.slice(0,19));
+ const manifest=JSON.parse(await fs.readFile('docs/Master Engineering Prompts/MANIFEST.json','utf8'));
+ if(manifest.length!==25||manifest.some((row,index)=>row.index!==index+4))throw Error('Numbered prompt manifest differs');
+ for(const item of manifest){const bytes=await fs.readFile(path.join('docs/Master Engineering Prompts',item.filename));if(bytes.length!==item.bytes||crypto.createHash('sha256').update(bytes).digest('hex')!==item.sha256)throw Error('Preserved prompt changed: '+item.filename);}
+ const names=execFileSync('rg',['--files','src','src-tauri/src','src-tauri/examples','crates','-g','*.ts','-g','*.tsx','-g','*.rs'],{encoding:'utf8',maxBuffer:1024**2}).trim().split(/\r?\n/).map(slash);
+ const sources=new Map();for(const name of names){const stat=await fs.lstat(name);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>4*1024**2)throw Error('Unexpected source '+name);sources.set(name,await fs.readFile(name,'utf8'));}
+ const declaredKinds=new Map();
+ for(const row of table)for(let file of row[6].split(';').map(value=>value.trim().replaceAll('`','')).filter(Boolean)){
+  if(file==='src-tauri/examples/qa_opence_ai')file+='.rs';
+  const info=await fs.lstat(file).catch(()=>null);if(info?.isSymbolicLink())throw Error('Linked owner '+file);
+  if(info?.isFile()){if(info.size>4*1024**2)throw Error('Declared owner too large '+file);declaredKinds.set(file,'file');if(!sources.has(file))sources.set(file,await fs.readFile(file,'utf8'));}
+  else if(info?.isDirectory())declaredKinds.set(file,'directory');
+ }
+ const app=sources.get('src-tauri/src/app.rs'),marker='tauri::generate_handler![',registryText=app.slice(app.indexOf(marker)+marker.length).split(']')[0];
+ if(!registryText.includes('bootstrap'))throw Error('Tauri registration source not recognized');
+ const registered=new Map([...registryText.matchAll(/\b(?:\w+::)*\w+\b/g)].map(match=>[match[0].split('::').at(-1),match[0]]));
+ const ipc=new Map(),api=new API();
+ try{const snapshot=api.updateSnapshot({openProjects:[path.resolve('tsconfig.json')]});
+  for(const [file,text] of sources){if(!file.startsWith('src/')||! /\.tsx?$/.test(file))continue;
+   const source=snapshot.getProjects().map(project=>project.program.getSourceFile(path.resolve(file))).find(Boolean);if(!source)continue;
+   const calls=[];let owner='module';const line=pos=>text.slice(0,pos).split('\n').length;
+   function scan(node){const previous=owner;if([SyntaxKind.FunctionDeclaration,SyntaxKind.ArrowFunction,SyntaxKind.FunctionExpression,SyntaxKind.MethodDeclaration].includes(node.kind))owner=node.name?.text??node.parent?.name?.text??'callback';
+    if(node.kind===SyntaxKind.CallExpression&&node.expression?.text==='call'&&node.arguments?.[0]?.kind===SyntaxKind.StringLiteral){calls.push({command:node.arguments[0].text,file,line:line(node.pos),owner});}
+    visitEachChild(node,child=>{scan(child);return child;});owner=previous;
+   }scan(source);ipc.set(file,calls);
+  }snapshot.dispose();
+ }finally{api.close();}
+ const line=(text,pos)=>text.slice(0,pos).split('\n').length;
+ const handler=command=>{const registeredName=registered.get(command);if(!registeredName)return null;const parts=registeredName.split('::'),file=parts.length>1?`src-tauri/src/${parts.at(-2)}.rs`:'src-tauri/src/app.rs',text=sources.get(file);if(!text)return null;const match=new RegExp(String.raw`\bfn\s+`+command+String.raw`\b`).exec(text);return match?`${file}:${line(text,match.index)}::${command}`:null;};
+ const expand=(file,depth=0,visited=new Set())=>{if(visited.has(file)||!sources.has(file))return visited;visited.add(file);if(depth>=2)return visited;for(const match of sources.get(file).matchAll(/from\s+['"](\.[^'"]+)['"]/g)){const base=slash(path.posix.normalize(path.posix.join(path.posix.dirname(file),match[1])));for(const name of [base,base+'.tsx',base+'.ts'])if(sources.has(name)){expand(name,depth+1,visited);break;}}return visited;};
+ const reviews=[],out=table.map((row,index)=>{
+  const topic=row[3],family=workflowTopicAliases[topic]??topic,workflow=workflowTraces[family];if(!workflow)throw Error('Unmapped workflow '+row[0]+'/'+topic);
+  const roots=workflow.ui.map(name=>`src/components/${name}.tsx`);for(const file of roots)if(!sources.has(file))throw Error('Missing UI owner '+file);
+  const files=new Set(roots.flatMap(file=>[...expand(file)]));
+  const commands=[...files].flatMap(file=>ipc.get(file)??[]).filter(value=>handler(value.command));
+  const uniqueCommands=[...new Map(commands.map(value=>[value.command,value])).values()].sort((a,b)=>a.command.localeCompare(b.command));
+  const trace=(family==='research'?[]:uniqueCommands.slice(0,12)).map(value=>`${value.file}:${value.line}::${value.owner} -> ${value.command} -> ${handler(value.command)}`);
+  const declared=row[6].split(';').map(value=>value.trim().replaceAll('`','')).filter(Boolean),core=[];const missing=[];
+  for(let file of declared){if(file==='src-tauri/examples/qa_opence_ai')file+='.rs';if(sources.has(file)||file.startsWith('crates/')){let text=sources.get(file);if(!text){try{text=execFileSync('git',['show','HEAD:'+file],{encoding:'utf8',maxBuffer:4*1024**2});}catch{missing.push(file);continue;}}const functions=[...text.matchAll(/\bpub(?:\([^)]*\))?\s+(?:async\s+)?fn\s+([A-Za-z_]\w*)/g)].slice(0,12);core.push(functions.length?functions.map(match=>`${file}:${line(text,match.index)}::${match[1]}`).join('; '):file);}
+   else if(declaredKinds.get(file)==='directory')core.push(file+' (existing source directory)');else if(!declaredKinds.has(file))missing.push(file);
+  }
+  // A subsystem path proves wiring only. The original row's native/game gates
+  // are retained and must be demonstrated before its status can be promoted.
+  const review=(family==='research'?'Research capability has no completed native workflow. ':'Shared subsystem source path inspected; requirement-specific behavioral acceptance remains as recorded. ')+(missing.length?'Historical owner reference needs repair: '+missing.join('; ')+'. ':'')+(trace.length?`Registered native IPC found (${uniqueCommands.length} owner-slice commands; first12 shown).`:'Local UI/state or script workflow; no direct registered native IPC found in the two-hop owner slice.');
+  reviews.push({id:row[0],family,commands:trace.length,missing});
+  const prompts=workflow.prompts.map(number=>'docs/Master Engineering Prompts/'+manifest.find(item=>item.index===number).filename).join('; ');
+  const related=table.filter(other=>other[0]!==row[0]&&(workflowTopicAliases[other[3]]??other[3])===family).map(other=>other[0]).join('; ');
+  return [...before[index],prompts,workflow.screen,workflow.state+'; '+roots.join('; '),trace.join('\n')||'No direct native command in this UI slice',core.join('; ')||'See preserved Implementation files; native implementation is not established by this row',workflow.result,related||'No overlapping family row',review];
+ });
+ if(identity(out)!==originalIdentity||out.some((row,index)=>JSON.stringify(row.slice(0,19))!==JSON.stringify(before[index])))throw Error('Integration changed an original requirement or evidence field');
+ const result={requirements:out.length,numberedPrompts:manifest.length,identitySha256:originalIdentity,withNativeCommandPaths:reviews.filter(row=>row.commands>0).length,researchRows:reviews.filter(row=>row.family==='research').map(row=>row.id),unresolvedHistoricalOwners:reviews.filter(row=>row.missing.length),nativeGameplayNewlyAccepted:false};
+ const serialized=[...headers.slice(0,19),...traceHeaders];const csv=[serialized,...out].map(row=>row.map(csvQuote).join(',')).join('\n')+'\n';
+ if(process.argv.includes('--check')){if(originalText!==csv)throw Error('Feature workflow cross-reference is stale. Reconcile the current ledger before accepting this check.');}
+ else if(originalText!==csv)await fs.writeFile(ledgerPath,csv);
+ const htmlArgument=process.argv.find(argument=>argument.startsWith('--html='));
+ if(htmlArgument){const output=path.resolve(htmlArgument.slice(7)),relative=path.relative(path.resolve('.'),output);if(!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative))throw Error('Choose an external derived review HTML; no runtime catalog is created');const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');await fs.writeFile(output,`<!doctype html><meta charset="utf-8"><title>Spark requirement workflow cross-reference</title><style>body{font:14px system-ui;background:#111b24;color:#ddebf2;margin:24px}input{width:90%;padding:10px}details{padding:10px;border-bottom:1px solid #456}dt{font-weight:bold;margin-top:12px}dd{white-space:pre-wrap;margin:4px 0;color:#bcd}summary{cursor:pointer}</style><h1>475 preserved requirements: source workflow cross-reference</h1><p>Derived from MASTER_FEATURE_LEDGER.csv. Wiring evidence does not establish native/game/peer/release acceptance. ${escape(result.identitySha256)}</p><input aria-label="Filter requirements" placeholder="Requirement ID, feature, file, command, prompt or gate"><main>${out.map(row=>`<details><summary>${escape(row[0])} - ${escape(row[1])}</summary><dl>${serialized.map((header,index)=>`<dt>${escape(header)}</dt><dd>${escape(row[index])}</dd>`).join('')}</dl></details>`).join('')}</main><script>document.querySelector('input').oninput=event=>{const query=event.target.value.toLowerCase();document.querySelectorAll('details').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(query);});};</script>`);}
+ console.log(JSON.stringify({...result,unresolvedHistoricalOwners:result.unresolvedHistoricalOwners.map(row=>({id:row.id,missing:row.missing}))}));
+}
+if(!process.argv.includes('--rebuild-history')){await reconcileCurrent();process.exit(0);}
+if(parseCsv(await fs.readFile(ledgerPath,'utf8'))[0].length!==19)throw Error('Historical rebuild cannot overwrite integrated current evidence. Use the default current-ledger reconciliation.');
+
 const rows=[];
 const historic=await fs.readFile('docs/ORIGINAL_92_REQUIREMENTS_RECONSTRUCTION.md','utf8');
 for(const line of historic.split(/\r?\n/)){
