@@ -8,6 +8,7 @@ import { useMapState } from '../mapSession';
 import { Notice, Pill } from './ui';
 import OwnedContentProbe from './OwnedContentProbe';
 import InvitationJoin from './InvitationJoin';
+import ExternalBrowserLink from './ExternalBrowserLink';
 import CommunityMapSetup from './CommunityMapSetup';
 import { matchesLobbyFilter, type LobbyFilter } from '../lobbyFilters';
 import '../runtimeWorkbench.css';
@@ -32,13 +33,13 @@ export default function PlayAndServers({
   const [provider, setProvider] = useMapState<'community' | 'mcc' | 'private'>(
     project?.id ?? 'global',
     'servers.provider',
-    runtime==='mccSteam'?'mcc':runtime==='haloCustomEdition'?'private':'community',
+    runtime==='mccSteam'?'mcc':runtime==='haloCustomEdition'||runtime==='arenaEvolved'?'private':'community',
   );
   const [filter, setFilter] = useMapState(project?.id ?? 'global', 'servers.filter', '');
   const [players,setPlayers]=useMapState(project?.id??'global','servers.players','all');
   const [sort,setSort]=useMapState(project?.id??'global','servers.sort','players');
   const runtimeAtMount=useRef(runtime);
-  useEffect(()=>{const valid=provider==='private'||runtime==='mccSteam'&&provider==='mcc'||(runtime==='openCe'||runtime==='chupathingyCe')&&provider==='community';if(runtimeAtMount.current===runtime&&valid)return;runtimeAtMount.current=runtime;setProvider(runtime==='mccSteam'?'mcc':runtime==='haloCustomEdition'?'private':'community');setSelected(null);},[runtime,provider]);
+  useEffect(()=>{const valid=provider==='private'||runtime==='mccSteam'&&provider==='mcc'||(runtime==='openCe'||runtime==='chupathingyCe')&&provider==='community';if(runtimeAtMount.current===runtime&&valid)return;runtimeAtMount.current=runtime;setProvider(runtime==='mccSteam'?'mcc':runtime==='haloCustomEdition'||runtime==='arenaEvolved'?'private':'community');setSelected(null);},[runtime,provider]);
   const [lobbyFilter, setLobbyFilter] = useMapState<LobbyFilter>(
     project?.id ?? 'global',
     'servers.lobbyFilter',
@@ -77,10 +78,10 @@ export default function PlayAndServers({
     }
   }, []);
   useEffect(() => {
-    if (native && provider === 'community' && !view) void refresh();
-  }, [provider, refresh]);
+    if (native && runtime!=='arenaEvolved' && provider === 'community' && !view) void refresh();
+  }, [runtime, provider, refresh]);
   useEffect(()=>{
-    if(!native||provider!=='community'||!view?.fetching||listingBusy)return;
+    if(!native||runtime==='arenaEvolved'||provider!=='community'||!view?.fetching||listingBusy)return;
     let stopped=false;const request=listingGeneration.current;
     // Another map window can own the bounded HTTPS refresh. Read its shared
     // result without starting a second provider request or waiting for the TTL.
@@ -89,7 +90,7 @@ export default function PlayAndServers({
       setView(next);setSelected(previous=>previous?(next.listing?.servers.find(server=>server.id===previous.id)??null):null);
     }).catch(e=>{if(!stopped&&request===listingGeneration.current)setError(String(e));}),500);
     return()=>{stopped=true;clearTimeout(timer);};
-  },[provider,view,listingBusy]);
+  },[runtime,provider,view,listingBusy]);
   useEffect(() => {
     setAssessment(null);
     setConfirmed(false);
@@ -177,6 +178,13 @@ export default function PlayAndServers({
       setBusy(false);
     }
   }
+  if(runtime==='arenaEvolved')return <section className="analysis-card" aria-label="Arena Evolved online">
+    <div className="section-heading"><h2>Arena Evolved</h2><button onClick={onSetup}>Connect runtime</button></div>
+    <p>Use Arena Evolved’s own server browser or LAN menu to join. Its master list is separate from the Chupathingy Delta List.</p>
+    <div className="button-row"><button onClick={onHost}>Host &amp; map setup</button><ExternalBrowserLink href="https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta">Release &amp; compatibility guide</ExternalBrowserLink></div>
+    <p className="subtle">0.7.7-beta declares network 41; compatible maps, modes and packs still matter. MCC map support is not crossplay with the MCC executable. Joining during map downloads has a documented intermittent failure.</p>
+    <p className="subtle">Spark has not verified an installed Arena executable or gameplay. Automatic launch, server control, bot commands and stats integration remain unavailable.</p>
+  </section>;
   return (
     <div className="play-servers-workspace">
       <details className="compact-invitation"><summary>Join by invitation or address</summary><InvitationJoin

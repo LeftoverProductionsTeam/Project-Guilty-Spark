@@ -351,6 +351,7 @@ pub fn profile_id(id: RuntimeId) -> &'static str {
         RuntimeId::MccSteam => "halo1-mcc-steam",
         RuntimeId::ChupathingyCe => "halo1-chupathingy-ce",
         RuntimeId::OpenCe => "halo1-open-ce",
+        RuntimeId::ArenaEvolved => "halo1-arena-evolved",
         RuntimeId::HaloPc => "halo1-pc-retail",
         RuntimeId::HaloCustomEdition => "halo1-custom-edition",
         RuntimeId::MacRetail => "halo1-mac-retail",
@@ -367,6 +368,7 @@ pub fn profile_version(id: RuntimeId) -> u32 {
         RuntimeId::MccSteam => 1,
         RuntimeId::ChupathingyCe => 1,
         RuntimeId::OpenCe => 1,
+        RuntimeId::ArenaEvolved => 1,
         RuntimeId::HaloPc => 1,
         RuntimeId::HaloCustomEdition => 1,
         RuntimeId::MacRetail => 1,
@@ -382,6 +384,7 @@ pub fn target_for(id: RuntimeId, host: &str) -> RuntimeTarget {
         RuntimeId::MccSteam => ("mccHalo1", host, "steam", "x86_64"),
         RuntimeId::ChupathingyCe => ("chupathingyCe", host, "community", "unknown"),
         RuntimeId::OpenCe => ("openCe", host, "community", "unknown"),
+        RuntimeId::ArenaEvolved => ("arenaEvolved", host, "community", "unknown"),
         RuntimeId::HaloPc => ("retail", "windows", "retail", "x86"),
         RuntimeId::HaloCustomEdition => ("customEdition", "windows", "standalone", "x86"),
         RuntimeId::MacRetail => ("retail", "macos", "retail", "unknown"),
@@ -405,6 +408,7 @@ pub fn resource_generation(id: RuntimeId) -> &'static str {
         RuntimeId::MccSteam => "mcc-halo1",
         RuntimeId::ChupathingyCe => "chupathingy-ce",
         RuntimeId::OpenCe => "open-ce",
+        RuntimeId::ArenaEvolved => "arena-evolved",
         RuntimeId::HaloPc => "halo-pc-retail",
         RuntimeId::HaloCustomEdition => "halo-custom-edition",
         RuntimeId::MacRetail => "halo-mac-retail",
@@ -430,6 +434,7 @@ pub fn registry() -> Vec<RuntimeAdapterProfile> {
         RuntimeId::MccSteam,
         RuntimeId::ChupathingyCe,
         RuntimeId::OpenCe,
+        RuntimeId::ArenaEvolved,
         RuntimeId::HaloPc,
         RuntimeId::HaloCustomEdition,
         RuntimeId::MacRetail,
@@ -450,6 +455,7 @@ pub fn registry() -> Vec<RuntimeAdapterProfile> {
             RuntimeId::MccSteam => vec![13],
             RuntimeId::ChupathingyCe => vec![5, 7, 609],
             RuntimeId::OpenCe => vec![5, 609],
+            RuntimeId::ArenaEvolved => vec![5, 609, 13],
             RuntimeId::HaloPc | RuntimeId::MacRetail | RuntimeId::HaloMd => vec![7],
             RuntimeId::HaloCustomEdition => vec![609],
             RuntimeId::MacDemo | RuntimeId::HaloPcTrial => vec![6],
@@ -810,6 +816,7 @@ pub fn capability_report(observation: &RuntimeObservation) -> RuntimeCapabilityR
             ["windows", "linux", "macos"].contains(&observation.target.platform.as_str())
         }
         RuntimeId::OpenCe => ["windows", "linux"].contains(&observation.target.platform.as_str()),
+        RuntimeId::ArenaEvolved => false, // Published interface reviewed; no installed executable acceptance yet.
         _ => false,
     };
     capabilities.push(capability(Detect, Implemented, if observation.detected { Ready } else { SetupRequired }, "Read-only installation discovery and explicit registrations are separate from playable content or a process attachment.", "Connect the matching installed Halo or register a compatible community runtime."));
@@ -1338,8 +1345,9 @@ mod tests {
         let profiles = registry();
         assert_eq!(
             profiles.iter().filter(|p| p.runtime_id.is_some()).count(),
-            10
+            11
         );
+        assert!(profiles.iter().any(|p|p.runtime_id==Some(RuntimeId::ArenaEvolved)&&p.cache_versions==vec![5,609,13]));
         for profile in profiles
             .iter()
             .filter(|p| p.target.family != GameFamily::Halo1)

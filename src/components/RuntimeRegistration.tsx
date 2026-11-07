@@ -277,10 +277,10 @@ export default function Registration({
           </button>
           <button
             className="primary"
-            disabled={inspection?.validation !== 'pass' || inspected !== fingerprint}
+            disabled={!inspection || (inspection.validation !== 'pass' && report.id !== 'arenaEvolved') || inspected !== fingerprint}
             onClick={() => void register()}
           >
-            Save registration
+            {report.id==='arenaEvolved'?'Save folders (launch unverified)':'Save registration'}
           </button>
         </div>
       </fieldset>

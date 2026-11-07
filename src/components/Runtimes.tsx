@@ -28,7 +28,7 @@ import CommunityHostAdapter from './CommunityHostAdapter';
 import CustomEditionHost from './CustomEditionHost';
 import {useMapState} from '../mapSession';
 
-const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'haloPc', 'haloCustomEdition']);
+const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'arenaEvolved', 'haloPc', 'haloCustomEdition']);
 const labels: Record<string, string> = {
   importMaps: 'Import maps',
   convertMaps: 'Convert content',

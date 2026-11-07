@@ -457,7 +457,7 @@ impl Library {
             return session.import_map(path,resources);
         }
         let transaction=self.db.unchecked_transaction()?;
-        let (project,inspection,mut files)=self.import_map_internal(path,resources,true,false)?;
+        let (project,inspection,mut files)=self.import_map_internal(path,resources,true,false,None)?;
         if let Err(reason)=transaction.commit(){return Err(abort_import(&mut files,reason.into()));}
         if let Some(files)=&mut files{files.accepted=true;}
         Ok((project,inspection))
@@ -466,22 +466,34 @@ impl Library {
     /// Retain its verified source identity in RAM for the existing decoders.
     pub fn preview_map(&self,path:&Path,resources:Option<&Path>)->Result<(Project,maps::MapInspection)> {
         validate_local_input_path(path)?;crate::reject_links(path)?;
-        let (project,inspection,_)=self.import_map_internal(path,resources,false,true)?;
+        let (project,inspection,_)=self.import_map_internal(path,resources,false,true,None)?;
         Ok((project,inspection))
     }
-    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool,preview:bool)->Result<(Project,maps::MapInspection,Option<ImportFiles>)> {
+    /// Reuse the ordinary RAM preview path while retaining an already admitted
+    /// source's exact resource pins. Hosting preferences never select its banks.
+    pub fn preview_source(&self,source:&Source)->Result<(Project,maps::MapInspection)> {
+        for path in [&source.original_path,&source.preserved_path].into_iter().chain(source.resource_directory.iter()).chain(source.audio_resources.iter().map(|a|&a.directory)) {validate_local_input_path(path)?;crate::reject_links(path)?;}
+        let (project,inspection,_)=self.import_map_internal(&source.preserved_path,source.resource_directory.as_deref(),false,true,Some(source))?;
+        Ok((project,inspection))
+    }
+    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool,preview:bool,bound_source:Option<&Source>)->Result<(Project,maps::MapInspection,Option<ImportFiles>)> {
         // Persist the location now, so later app working directories cannot
         // reinterpret a relative map/resource selection. Missing resources are
         // still allowed; their absolute location remains explicit.
         let resource_directory=std::path::absolute(resources.or(path.parent()).filter(|p|!p.as_os_str().is_empty()).unwrap_or(Path::new(".")))?;
         let resource_directory=if resource_directory.is_dir(){fs::canonicalize(resource_directory)?}else{resource_directory};
         let inspection = maps::inspect_map(path, Some(&resource_directory))?;
+        if let Some(source)=bound_source {
+            if !preview||source.sha256!=inspection.sha256||source.cache_version!=inspection.header.version||source.scenario_path!=inspection.scenario_path{return invalid("The source preview does not match its admitted native identity");}
+        }
         if preview {
+            let expected=bound_source.map(serde_json::to_value).transpose()?;
             let original=fs::canonicalize(path)?;
             let mut rows=self.db.prepare("SELECT value FROM preview_documents")?;
             for text in rows.query_map([],|row|row.get::<_,String>(0))?{
                 let project:Project=serde_json::from_str(&text?)?;
-                if project.source.as_ref().is_some_and(|source|source.sha256==inspection.sha256&&source.original_path==original){return Ok((project,inspection,None));}
+                let matches=if let Some(expected)=&expected {project.source.as_ref().map(serde_json::to_value).transpose()?.as_ref()==Some(expected)}else{project.source.as_ref().is_some_and(|source|source.sha256==inspection.sha256&&source.original_path==original)};
+                if matches{return Ok((project,inspection,None));}
             }
         }
         if let Some(entry) = self
@@ -563,6 +575,7 @@ impl Library {
             audio_resources: None,
             resource_sha256,
         });
+        if let Some(source)=bound_source{p.source=Some(source.clone());}
         p.scene = inspection.objects.clone();
         if let Some(files)=&mut files{files.expect_project(&p)?;}
         let saved=self.save_internal(&p, Some(&inspection),preview);
@@ -612,7 +625,7 @@ impl Library {
                     return invalid("Project resources changed; restore them or select resources in the original project before exporting");
                 }
             }
-            let (mut imported,_,files)=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false,false)?;
+            let (mut imported,_,files)=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false,false,None)?;
             if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}(imported,files)
         } else {
             let p=Project::new(&incoming.title);

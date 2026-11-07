@@ -398,6 +398,7 @@ export type RuntimeId =
   | 'mccSteam'
   | 'chupathingyCe'
   | 'openCe'
+  | 'arenaEvolved'
   | 'haloPc'
   | 'haloCustomEdition'
   | 'macRetail'

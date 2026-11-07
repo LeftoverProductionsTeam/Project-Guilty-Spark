@@ -133,8 +133,14 @@ async function independentNativeWindows(id){
   await original.getByRole('tab',{name:'C59 map A',exact:true}).click();await inspector(original);await expect(x(original)).toHaveValue('1.5');
   const originLabel=await original.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
   await invoke(original,'focus_workspace_window',{label:originLabel});await expect.poll(()=>original.evaluate(()=>document.hasFocus())).toBe(true);
-  const tab=original.getByRole('tab',{name:'C59 map A',exact:true}),start=await tab.boundingBox(),count=pages().length;
-  const lift=async()=>{await original.mouse.move(start.x+start.width/2,start.y+start.height/2);await original.mouse.down();await original.mouse.move(start.x+start.width/2,start.y+130,{steps:10});};
+  const tab=original.getByRole('tab',{name:'C59 map A',exact:true}),count=pages().length;
+  const lift=async()=>{
+    const start=await tab.boundingBox(),strip=await original.locator('.map-tabs').boundingBox(),height=await original.evaluate(()=>innerHeight);
+    const cx=start.x+start.width/2,endY=Math.min(height-48,Math.max(start.y+130,strip.y+strip.height+96));
+    await original.evaluate(()=>{window.__nativeTearEvents=[];window.__nativeTearRecord=event=>{window.__nativeTearEvents.push({x:event.clientX,y:event.clientY,buttons:event.buttons});window.__nativeTearEvents=window.__nativeTearEvents.slice(-12);};window.addEventListener('pointermove',window.__nativeTearRecord);});
+    try{await original.mouse.move(cx,start.y+start.height/2);await original.mouse.down();await original.mouse.move(cx,endY,{steps:10});await original.mouse.move(cx+1,endY+1);report.independentWindowDrag={start,strip,endY,events:await original.evaluate(()=>window.__nativeTearEvents)};}
+    finally{await original.evaluate(()=>window.removeEventListener('pointermove',window.__nativeTearRecord));}
+  };
   const history=await state(original,id);await lift();await expect(original.locator('[data-tab-drag-phase=ready]')).toBeVisible();
   await original.screenshot({path:path.join(root,'tab-lift.png')});await original.keyboard.press('Escape');await original.mouse.up();
   expect(pages().length).toBe(count);expect((await state(original,id)).history.head).toEqual(history.history.head);await expect(tab).toBeVisible();
@@ -402,16 +408,36 @@ try{
   }
 
   if(report.megaWorldCreation){
+    const sharedViewportStarted=performance.now();
     const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount);
     await chooseTool(main,'Map library');await main.locator('.map-card').filter({has:main.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(main,'Level editor');await openDrawer(main,'Construction');
     await expect(main.getByLabel('BSP donor map',{exact:true})).toHaveValue(world.bspAssembly.donorProjectId);
     await expect(main.getByLabel('Donor BSP section',{exact:true})).toHaveValue(String(world.bspAssembly.donorBspIndex));
     await expect(main.locator('.bsp-assembly .bsp-error')).toHaveCount(0);
     report.megaWorldCreation.fullProcessRestart=true;report.megaWorldCreation.reopenedNativeDonorControls=true;
+    const donorStatus=main.getByTestId('assembly-source-status');
+    await expect(donorStatus).toHaveAttribute('data-source-sha',report.megaWorldCreation.donorHash,{timeout:120000});
+    await expect(donorStatus).toHaveAttribute('data-ready','true',{timeout:180000});
+    await expect(donorStatus).toContainText('2 source regions');
+    const previewId=await donorStatus.getAttribute('data-preview-id');expect(previewId).toBeTruthy();expect(previewId).not.toBe(world.id);expect(previewId).not.toBe(world.bspAssembly.donorProjectId);
+    const counts={shaders:Number(await donorStatus.getAttribute('data-shaders')),lightmaps:Number(await donorStatus.getAttribute('data-lightmaps'))};expect(counts.shaders).toBeGreaterThan(0);expect(counts.lightmaps).toBeGreaterThan(0);
+    const donorTextureId=await donorStatus.getAttribute('data-texture-id');expect(donorTextureId).toBeTruthy();const sharedViewportReadyMs=Math.round(performance.now()-sharedViewportStarted);
     const field=main.getByRole('spinbutton',{name:'Tunnel width',exact:true});await field.fill('2.5');await field.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();
     const saved=async()=>{await main.getByLabel('File menu',{exact:true}).click();await main.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await state(main,world.id)).history?.head.dirty).toBe(false);return (await invoke(main,'open_project',{id:world.id})).project;};
     expect((await saved()).bspAssembly.tunnelWidth).toBe(2.5);await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.tunnelWidth).toBe(2);await main.keyboard.press('Control+y');expect((await saved()).bspAssembly.tunnelWidth).toBe(2.5);
     report.megaWorldCreation.editedAfterRestart=true;report.megaWorldCreation.undoRedoImmediateSave=true;
+    const yaw=main.getByRole('spinbutton',{name:'BSP section yaw',exact:true});await yaw.fill('2');await yaw.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();expect((await saved()).bspAssembly.yawDegrees).toBe(2);
+    await expect(donorStatus).toHaveAttribute('data-preview-id',previewId);await expect(donorStatus).toHaveAttribute('data-ready','true');
+    await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.yawDegrees).toBe(world.bspAssembly.yawDegrees);
+    await expect(donorStatus).toHaveAttribute('data-preview-id',previewId);await expect(donorStatus).toHaveAttribute('data-ready','true');
+    await expect(donorStatus).toHaveAttribute('data-texture-id',donorTextureId);
+    report.megaWorldCreation.sharedViewport={sourceSha256:report.megaWorldCreation.sourceHash,donorSha256:report.megaWorldCreation.donorHash,donorPreviewId:previewId,...counts,initialReadyMs:sharedViewportReadyMs,sourceRetainedDuringTransformAndUndo:true,textureAllocationRetained:true,gameplayAccepted:false};
+    await main.getByRole('button',{name:'Close Construction',exact:true}).click();
+    await main.getByRole('button',{name:'Frame both regions (F)',exact:true}).click();
+    await main.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await main.screenshot({path:path.join(root,'megaworld-shared-viewport.png')});
+    await openDrawer(main,'Construction');
+    step('Original base and donor render together with source-specific native materials and lightmaps; moving and undoing retain the donor preview',report.megaWorldCreation.sharedViewport);
     await main.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();
     await expect.poll(async()=>await main.locator('.bsp-assembly .bsp-error').count()?'blocked':(await main.locator('.bsp-assembly').innerText()).includes('Source clearance checked at')?'checked':'working',{timeout:180000}).not.toBe('working');
     const failure=main.locator('.bsp-assembly .bsp-error');if(await failure.count()){report.megaWorldCreation.sourceClearance={accepted:false,error:await failure.innerText()};throw Error('Native source clearance failed: '+report.megaWorldCreation.sourceClearance.error);}

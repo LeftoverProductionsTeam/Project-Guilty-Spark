@@ -1601,7 +1601,7 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
 });
-test('home exposes four Halos and connects a discovered client only after an exact-identity action', async ({ page }) => {
+test('home exposes existing Halos plus Arena Evolved and connects a discovered client only after an exact-identity action', async ({ page }) => {
   await mockDesktop(page);
   await page.evaluate(() => {
     const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
@@ -1626,7 +1626,7 @@ test('home exposes four Halos and connects a discovered client only after an exa
   await chooseTool(page, 'Settings & tools');
   await chooseTool(page,'Map library');
   const homes = page.getByRole('group', { name: 'Your Halo installations', exact: true });
-  await expect(homes.getByRole('button')).toHaveCount(4);
+  await expect(homes.getByRole('button')).toHaveCount(5);
   await homes.getByRole('button', { name: 'OpenCE · Detected', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'OpenCE tools', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'OpenCE · Detected', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -1688,7 +1688,7 @@ test('games and tools scopes connected Halo versions, editors and map handoffs',
     };
   });
   await chooseTool(page, 'Settings & tools');
-  await expect(page.getByRole('group', { name: 'Halo versions' }).getByRole('button')).toHaveCount(4);
+  await expect(page.getByRole('group', { name: 'Halo versions' }).getByRole('button')).toHaveCount(5);
   await expect(page.getByRole('button', { name: 'MCC Halo 1 · Connected', exact: true })).toHaveAttribute('data-connected', 'true');
   await expect(page.getByRole('button', { name: 'OpenCE · Not connected', exact: true })).toHaveAttribute('data-connected', 'false');
   await expect(page.getByRole('button', { name: /Halo PC · / })).toHaveCount(0);
@@ -2156,13 +2156,13 @@ test('onboarding keeps a failed save on its step and remembers completed Halo an
   await page.getByRole('button',{name:'Change Halo or tools',exact:true}).click();await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true})).toHaveValue('C:/owned/working-tags');
 });
 
-test('onboarding keeps four primary runtimes and does not inherit MCC guidance for Custom Edition', async ({page}) => {
+test('onboarding preserves primary runtimes plus Arena Evolved and does not inherit MCC guidance for Custom Edition', async ({page}) => {
   await mockDesktop(page);
   await page.evaluate(() => localStorage.setItem('spark-test-settings', JSON.stringify({hekFlavor:'h1aEk',hekDirectory:'C:/owned/HCEEK'})));
   await page.goto('/?workspace=get-started');
   const choices = page.getByRole('group',{name:'Your Halo edition',exact:true});
-  await expect(choices.getByRole('button')).toHaveCount(4);
-  for (const name of ['Halo CE in MCC','Halo Custom Edition','OpenCE','ChupathingyCE']) {
+  await expect(choices.getByRole('button')).toHaveCount(5);
+  for (const name of ['Halo CE in MCC','Halo Custom Edition','OpenCE','ChupathingyCE','Arena Evolved']) {
     const card=choices.getByRole('button',{name:new RegExp(name)});
     await expect(card).toBeVisible();
     await expect(card.locator('.gs-halo-emblem svg')).toHaveCount(1);
@@ -3092,4 +3092,14 @@ test('saved MegaWorld keeps its donor controls bound to the saved source when th
  await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Construction');await page.locator('.bsp-assembly>summary').click();
  await expect(page.getByLabel('BSP donor map',{exact:true})).toHaveValue('retired-source-document');await expect(page.getByLabel('BSP donor map',{exact:true}).locator('option:checked')).toContainText('Saved Sidewinder');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='bsp_assembly_options'&&row.args.projectId==='retired-source-document')?.args)).toEqual({projectId:'retired-source-document',assemblyProjectId:'a'});
+});
+
+
+test('Arena Evolved uses a separate setup/provider boundary without launching or querying Delta',async({page})=>{
+ await mockDesktop(page);const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('arenaEvolved');await studio.getByLabel('Studio options',{exact:true}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Join server',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Arena Evolved online',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Arena Evolved',exact:true})).toBeVisible();
+ await expect(page.getByText('Spark has not verified an installed Arena executable or gameplay.',{exact:false})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Release & compatibility guide',exact:true})).toHaveAttribute('href','https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta');
+ await expect(page.getByRole('region',{name:'Community server browser',exact:true})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'Invitation',exact:true})).toHaveCount(0);
+ const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>['community_listing','launch_registered_runtime','community_join','community_host_start'].includes(c.command))).toBe(false);
 });

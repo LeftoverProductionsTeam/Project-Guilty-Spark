@@ -184,3 +184,20 @@ fn malformed_optional_build_metadata_keeps_source_and_undo_accessible() {
     editable.title="Local unacknowledged change".into();assert!(library.save_explicit(&editable,None).is_err());
     assert_eq!(std::fs::read(&file).unwrap(),external_bytes);
 }
+
+#[test]
+fn bound_preview_preserves_exact_source_resources_without_adopting_the_editable_donor(){
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("application");let file=temp.path().join("owned.map");let bytes=common::fixture(13);std::fs::write(&file,&bytes).unwrap();
+    let library=Library::workspace(&root).unwrap();let (donor,_)=library.import_map(&file,None).unwrap();let mut source=donor.source.clone().unwrap();
+    source.resource_sha256.insert("mcc-textures".into(),"a".repeat(64));
+    let(a,inspection)=library.preview_source(&source).unwrap();assert_ne!(a.id,donor.id);assert!(library.is_preview(&a.id).unwrap());assert_eq!(a.source.as_ref().unwrap().resource_sha256,source.resource_sha256);assert_eq!(inspection.sha256,source.sha256);
+    assert_eq!(library.preview_source(&source).unwrap().0.id,a.id);
+    source.resource_sha256.insert("mcc-textures".into(),"b".repeat(64));let(b,_)=library.preview_source(&source).unwrap();assert_ne!(a.id,b.id);
+    assert_eq!(library.get(&a.id).unwrap().source.unwrap().resource_sha256["mcc-textures"],"a".repeat(64));assert_eq!(library.get(&donor.id).unwrap().source.unwrap().resource_sha256,donor.source.unwrap().resource_sha256);
+    assert_eq!(library.list().unwrap().len(),1);assert!(!root.join("projects").exists());assert_eq!(std::fs::read(&file).unwrap(),bytes);
+}
+#[test]
+fn bound_source_preview_rejects_changed_original_before_creating_a_new_identity(){
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("application");let file=temp.path().join("owned.map");let mut bytes=common::fixture(13);std::fs::write(&file,&bytes).unwrap();let library=Library::workspace(&root).unwrap();let(donor,_)=library.import_map(&file,None).unwrap();
+    bytes[100]^=1;std::fs::write(&file,&bytes).unwrap();assert!(library.preview_source(donor.source.as_ref().unwrap()).unwrap_err().to_string().contains("native identity"));assert_eq!(library.list().unwrap().len(),1);assert!(!root.join("projects").exists());assert_eq!(std::fs::read(file).unwrap(),bytes);
+}

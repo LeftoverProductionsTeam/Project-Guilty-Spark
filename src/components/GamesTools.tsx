@@ -1,5 +1,6 @@
 import {useState,type ReactNode} from 'react';
 import RuntimeRegistration from './RuntimeRegistration';
+import ExternalBrowserLink from './ExternalBrowserLink';
 import { Check, FolderOpen, Gamepad2, RefreshCw, Settings2 } from 'lucide-react';
 import { native } from '../api';
 import { useMapState } from '../mapSession';
@@ -92,6 +93,7 @@ export default function GamesTools({
           );
         })}
       </div>
+      {runtime==='arenaEvolved'&&<Notice tone="info">Arena Evolved 0.7.7-beta can read owned MCC, Xbox and CE content. Connect its folders below; executable launch is awaiting release verification. <ExternalBrowserLink href="https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta">Official release &amp; setup</ExternalBrowserLink></Notice>}
       <div className="games-tools-context">
         <label>
           Map

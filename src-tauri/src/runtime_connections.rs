@@ -46,7 +46,7 @@ fn nearby_roots(anchors: impl IntoIterator<Item=PathBuf>) -> Vec<PathBuf> {
     let mut roots=Vec::new();let mut seen=std::collections::HashSet::new();
     for anchor in anchors {
         for parent in anchor.ancestors().take(6) {
-            let names=["Halo Custom Edition","opencehalo-windows-release","chupathingyce-windows64-release","OpenCE","ChupathingyCE","Chupathingy"];
+            let names=["Halo Custom Edition","opencehalo-windows-release","chupathingyce-windows64-release","OpenCE","ChupathingyCE","Chupathingy","Arena Evolved","ArenaEvolved"];
             let children=names.into_iter().map(|name|parent.join(name))
                 .chain(names.into_iter().map(|name|parent.join("Runtimes").join(name)));
             for candidate in std::iter::once(parent.to_path_buf()).chain(children) {

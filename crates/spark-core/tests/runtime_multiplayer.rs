@@ -277,7 +277,7 @@ fn registrations_reject_scripts_escape_and_preservation_only_profiles() {
 #[test]
 fn upstream_and_preservation_descriptors_never_claim_local_ai_verification() {
     let reports = report(&steam::Installation::default(), &[]).unwrap();
-    assert_eq!(reports.len(), 10);
+    assert_eq!(reports.len(), 11);
     for runtime in &reports {
         assert!(runtime.installation.is_none());
         assert!(runtime
@@ -423,4 +423,31 @@ fn mcc_build_identity_requires_a_matching_bounded_steam_manifest() {
     )
     .unwrap();
     assert!(steam::mcc_build_id(&installation).is_err());
+}
+
+#[test]
+fn arena_profile_keeps_mcc_content_separate_from_opence_and_game_evidence(){
+    assert_eq!(serde_json::to_string(&RuntimeId::ArenaEvolved).unwrap(),"\"arenaEvolved\"");
+    assert!(supports_map_version(RuntimeId::ArenaEvolved,13));assert!(supports_map_version(RuntimeId::ArenaEvolved,609));assert!(supports_map_version(RuntimeId::ArenaEvolved,5));
+    assert!(!supports_map_version(RuntimeId::OpenCe,13));assert!(!supports_map_version(RuntimeId::ChupathingyCe,13));assert!(!supports_map_version(RuntimeId::ArenaEvolved,6));
+    let reports=report(&steam::Installation::default(),&[]).unwrap();let arena=reports.iter().find(|r|r.id==RuntimeId::ArenaEvolved).unwrap();assert!(arena.installation.is_none());
+    assert_eq!(arena.capabilities.iter().find(|c|c.key=="launchRuntime").unwrap().status,SupportStatus::Unknown);
+    assert_eq!(arena.capabilities.iter().find(|c|c.key=="networkedAi").unwrap().status,SupportStatus::Unknown);
+    let plan=hosting_plan(RuntimeId::ArenaEvolved,HostingAction::DedicatedServer);assert!(!plan.automatic);assert_eq!(plan.test_status,TestStatus::Untested);
+    assert!(plan.steps.iter().any(|s|s.contains("halo --server")));assert!(plan.sources.iter().any(|s|s.revision.as_deref()==Some("f7a4a306e4a3ccc651ba447e81ea5c7f2ec00a5e")));
+    assert!(plan.limitations.iter().any(|s|s.contains("not unmodified MCC crossplay")));
+}
+#[test]
+fn naming_an_executable_arena_and_declaring_its_version_never_enables_launch(){
+    let temp=tempfile::tempdir().unwrap();let mut selected=registration(temp.path());selected.id="arena-test".into();selected.runtime_id=RuntimeId::ArenaEvolved;selected.version=Some("0.7.7-beta".into());selected.network_version=Some("41".into());
+    let before=fs::read(&selected.executable).unwrap();let checked=inspect_registration(&selected).unwrap();assert_eq!(checked.validation,TestStatus::Blocked);assert_eq!(checked.identity,"userDeclared");
+    assert!(prepare_launch(&selected).unwrap_err().to_string().contains("identity verification"));assert!(shared_content_interface(RuntimeId::ArenaEvolved,checked.executable_sha256.as_deref().unwrap()).is_none());
+    let mut profiles=vec![];let mut other=selected.clone();other.id="existing-open-ce".into();other.runtime_id=RuntimeId::OpenCe;remember_registration(&mut profiles,other).unwrap();remember_registration(&mut profiles,selected).unwrap();assert_eq!(profiles.len(),2);assert_eq!(profiles[1].runtime_id,RuntimeId::OpenCe);assert_eq!(fs::read(checked.executable.unwrap()).unwrap(),before);
+}
+#[test]
+fn arena_inventory_uses_real_cache_headers_and_keeps_mcc_compilation_independent(){
+    let temp=tempfile::tempdir().unwrap();let mut selected=registration(temp.path());selected.runtime_id=RuntimeId::ArenaEvolved;fs::create_dir(temp.path().join("maps")).unwrap();
+    for (name,version) in [("owned-mcc.map",13),("owned-ce.map",609),("owned-xbox.map",5)]{fs::write(temp.path().join("maps").join(name),common::fixture(version)).unwrap();}
+    let inventory=inventory_maps(&selected).unwrap();assert_eq!(inventory.maps.len(),3);assert!(inventory.maps.iter().all(|m|m.valid));assert!(inventory.maps.iter().any(|m|m.cache_version==Some(13)));assert!(temp.path().join("maps").read_dir().unwrap().count()==3);
+    let mut manifest=peer();manifest.runtime_id=RuntimeId::ArenaEvolved;manifest.runtime_build=Some("0.7.7-beta".into());manifest.network_version=Some("41".into());let compared=compare(&manifest,&manifest).unwrap();assert_ne!(compared.status,TestStatus::Pass);assert!(!compared.gameplay_verified);
 }

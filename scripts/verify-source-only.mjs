@@ -10,7 +10,7 @@ import { withDevelopmentWorkspace, runDevelopmentCommand, exportDevelopmentBuild
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
-if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime'].includes(s)))
+if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime', 'baseline'].includes(s)))
   throw Error('Unknown source-only verification stage');
 if (stages.includes('native') && ![sourceMap, kit, tags, invader].every(Boolean))
   throw Error('Native verification requires the selected owned map, kit, small tag source and Invader paths');
@@ -84,6 +84,11 @@ try {
           report.disposableSdk={files:spec.tagFiles.length,logicalBytes:spec.logicalTagBytes,sourceArchiveSha256:spec.sourceArchive.sha256,originalArchiveUnchanged:await hash(tags)===spec.sourceArchive.sha256,retainedSdkTree:false};
           if(!report.disposableSdk.originalArchiveUnchanged)throw Error('Original SDK archive changed');
         }
+      }
+      if(stages.includes('baseline')){
+        if(![kit,tags,invader].every(Boolean))throw Error('Baseline requires the owner-installed SDK archive, kit and Invader');
+        const {nativeStandaloneBaseline}=await import('./native-standalone-baseline.mjs');report.standaloneBaseline={};
+        await nativeStandaloneBaseline({context,archive:tags,kit,invader,report:report.standaloneBaseline});
       }
       if (stages.includes('compiler')) {
         await run('Native storage helper build', [
@@ -178,6 +183,7 @@ try {
             {
               SPARK_LIFECYCLE_LOGIC: '0',
               SPARK_LIFECYCLE_NATIVE_ONLY: '1',
+              SPARK_LOGIC_CROSS_RUNTIME: '0', SPARK_QA_MEGAWORLD_ONLY: '0',
             },
           );
         } finally {
@@ -226,8 +232,8 @@ try {
              SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_TAGS:path.resolve(tagSource),SPARK_LOGIC_KIT:path.resolve(kit)});
         }finally{
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
-          if(receiptFile&&report.logic?.crossRuntime){
-            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
+          if(receiptFile&&(report.logic?.crossRuntime||report.logic?.megaWorldCreation)){
+            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-shared-viewport.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
               const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(!info)continue;
               if(!info.isFile()||info.size>(name.endsWith('.map')?256:4)*1024**2)throw Error('Selected native acceptance evidence exceeds its bounded export');
               const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));

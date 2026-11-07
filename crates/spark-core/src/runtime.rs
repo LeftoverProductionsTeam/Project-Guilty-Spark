@@ -18,6 +18,7 @@ pub enum RuntimeId {
     MccSteam,
     ChupathingyCe,
     OpenCe,
+    ArenaEvolved,
     HaloPc,
     HaloCustomEdition,
     MacRetail,
@@ -32,6 +33,7 @@ impl RuntimeId {
             Self::MccSteam => "Steam MCC / Halo 1",
             Self::ChupathingyCe => "ChupathingyCE",
             Self::OpenCe => "OpenCE",
+            Self::ArenaEvolved => "Arena Evolved",
             Self::HaloPc => "Halo PC Retail",
             Self::HaloCustomEdition => "Halo Custom Edition",
             Self::MacRetail => "Halo Mac Retail (preservation)",
@@ -44,7 +46,7 @@ impl RuntimeId {
     pub fn allows_registration(self) -> bool {
         matches!(
             self,
-            Self::ChupathingyCe | Self::OpenCe | Self::HaloPc | Self::HaloCustomEdition
+            Self::ChupathingyCe | Self::OpenCe | Self::ArenaEvolved | Self::HaloPc | Self::HaloCustomEdition
         )
     }
     pub fn is_native(self) -> bool {
@@ -125,7 +127,20 @@ pub fn hosting_plan_for(runtime_id: RuntimeId, action: HostingAction, scenario_t
             "A successful export, generic runtime launch or source-level capability does not prove a compiled map is playable.".into(),
         ],
     };
-    if runtime_id.is_native() {
+    if runtime_id == RuntimeId::ArenaEvolved {
+        plan.evidence=EvidenceKind::UpstreamSource;plan.sources=source(runtime_id);
+        plan.title="Arena Evolved 0.7.7-beta — runtime menu handoff".into();
+        plan.status=SupportStatus::Supported;
+        plan.steps.push("Connect your separately installed Arena Evolved release in Games & tools. Its own menus discover owned MCC/Workshop content; Custom Edition maps still need compatible resource banks.".into());
+        plan.steps.push(match action {
+            DedicatedServer=>"The pinned release documents halo --server / HOST A SERVER. Spark does not start a server, expose its admin interface or change its configuration automatically.",
+            JoinFriend=>"Use Arena Evolved's server browser, LAN list or its documented address/invitation interface. Spark's Chupathingy Delta List is not Arena Evolved's master list.",
+            HostLan|HostPrivateOnline=>"Use MULTIPLAYER > CREATE GAME in Arena Evolved. Choose LAN or HOST ONLINE and review privacy, map sharing, bot settings and compatible gametype in the runtime.",
+            TestSolo=>"Choose a compatible owned map and solo/bot lobby in Arena Evolved. Spark's source preview and successful native build do not prove game loading.",
+        }.into());
+        plan.limitations.push("Release 0.7.7-beta declares network 41. Shared stock behavior and compatible content are required; Arena-specific gametypes/packs need matching clients. This is not unmodified MCC crossplay.".into());
+        plan.limitations.push("The release reports intermittent joining-in-progress failures when downloading a map. No Arena game, bots, stats, Live Link or multiplayer acceptance is attached.".into());
+    } else if runtime_id.is_native() {
         let (repo, revision) = if runtime_id == RuntimeId::ChupathingyCe {
             (
                 "ChupathingyCE/chupathingyce",
@@ -387,6 +402,7 @@ pub fn version_token(value: &str) -> bool {
 fn source(id: RuntimeId) -> Vec<SourceReference> {
     let (title, url, revision) = match id {
         RuntimeId::ChupathingyCe => ("ChupathingyCE audited README", "https://github.com/ChupathingyCE/chupathingyce/blob/d7fafc81f824886d7fccd58fcf954691df6c6901/README.md", Some("d7fafc81f824886d7fccd58fcf954691df6c6901")),
+        RuntimeId::ArenaEvolved => ("Arena Evolved 0.7.7-beta release contract", "https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta", Some("f7a4a306e4a3ccc651ba447e81ea5c7f2ec00a5e")),
         RuntimeId::OpenCe => ("OpenCE audited README", "https://github.com/OpenCommunityEdition/OpenCE/blob/7fb941b0b205edb1f7ecbb0aa6c2d7f5b884732d/README.md", Some("7fb941b0b205edb1f7ecbb0aa6c2d7f5b884732d")),
         RuntimeId::MccSteam => ("Official MCC anti-cheat-disabled launch", "https://support.halowaypoint.com/hc/en-us/articles/360037475251-How-to-Launch-Halo-The-Master-Chief-Collection-with-Easy-Anti-Cheat-EAC-Disabled", None),
         _ => ("H1 cache format reference", "https://c20.reclaimers.net/h1/maps/", None),
@@ -454,6 +470,7 @@ fn descriptor(id: RuntimeId) -> RuntimeReport {
         }
         RuntimeId::ChupathingyCe => ["windows", "linux", "macos"].contains(&platform()),
         RuntimeId::OpenCe => ["windows", "linux"].contains(&platform()),
+        RuntimeId::ArenaEvolved => ["windows", "linux", "macos"].contains(&platform()),
         _ => false,
     };
     if !host_supported {
@@ -463,6 +480,10 @@ fn descriptor(id: RuntimeId) -> RuntimeReport {
                 "This profile has no established launch integration on the current host platform."
                     .into();
         }
+    }
+    if id==RuntimeId::ArenaEvolved {
+        if let Some(launch)=capabilities.iter_mut().find(|c|c.key=="launchRuntime") {launch.status=Unknown;launch.detail="Arena Evolved 0.7.7-beta interfaces are reviewed; this adapter has no independently verified installed executable. Connect folders for read-only source discovery; launch and automatic hosting remain blocked.".into();}
+        if let Some(ai)=capabilities.iter_mut().find(|c|c.key=="networkedAi") {ai.status=Unknown;ai.detail="Published bot gameplay does not establish Spark-authored encounter, Firefight, Zombie or multiplayer AI lifecycle acceptance.".into();}
     }
     let families = [
         ("xbox", vec![5]),
@@ -508,6 +529,7 @@ pub fn supports_map_version(id: RuntimeId, version: u32) -> bool {
         RuntimeId::MccSteam => version == 13,
         RuntimeId::ChupathingyCe => [5, 7, 609].contains(&version),
         RuntimeId::OpenCe => [5, 609].contains(&version),
+        RuntimeId::ArenaEvolved => [5, 609, 13].contains(&version),
         RuntimeId::HaloPc | RuntimeId::MacRetail | RuntimeId::HaloMd => version == 7,
         RuntimeId::HaloCustomEdition => version == 609,
         RuntimeId::MacDemo | RuntimeId::HaloPcTrial => version == 6,
@@ -526,6 +548,7 @@ pub fn report(
         RuntimeId::MccSteam,
         RuntimeId::ChupathingyCe,
         RuntimeId::OpenCe,
+        RuntimeId::ArenaEvolved,
         RuntimeId::HaloPc,
         RuntimeId::HaloCustomEdition,
         RuntimeId::MacRetail,
@@ -690,6 +713,8 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
         diagnostics.push("Native network protocol version is unknown.".into());
     }
     diagnostics.push("Data root is explicit or installation-root default; config.toml overrides are not automatically interpreted.".into());
+    let arena=registration.runtime_id==RuntimeId::ArenaEvolved;
+    if arena {diagnostics.push("Arena Evolved 0.7.7-beta is a separate AGPL-3.0-or-later engine. Its publisher package is reviewed, but this executable has not been independently verified; launch/shared-root control remains blocked. MCC input support does not imply OpenCE or unmodified MCC network compatibility.".into());}
     Ok(RuntimeInstallation {
         registration_id: registration.id.clone(),
         root,
@@ -699,7 +724,7 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
         version: registration.version.clone(),
         network_version: registration.network_version.clone(),
         identity: "userDeclared".into(),
-        validation: if binary_platform == platform() {
+        validation: if arena { TestStatus::Blocked } else if binary_platform == platform() {
             TestStatus::Pass
         } else {
             TestStatus::Blocked
@@ -720,6 +745,7 @@ pub fn map_directories(id: RuntimeId) -> &'static [(&'static str, &'static str)]
             ("md_maps", "haloMd"),
             ("custom_maps", "customEdition"),
         ],
+        RuntimeId::ArenaEvolved => &[("maps", "xbox"), ("maps_ce", "customEdition"), ("custom_maps", "customEdition"), ("maps/ce", "customEdition")],
         RuntimeId::OpenCe => &[("maps", "xbox"), ("custom_maps", "customEdition"), ("maps_ce", "customEdition")],
         RuntimeId::HaloPc => &[("maps", "pcRetail")],
         RuntimeId::HaloCustomEdition => &[("maps", "customEdition")],
@@ -890,6 +916,9 @@ pub fn shared_content_interface(id: RuntimeId, executable_sha256: &str) -> Optio
 
 pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> {
     let installed = inspect_registration(registration)?;
+    if registration.runtime_id == RuntimeId::ArenaEvolved {
+        return invalid("Arena Evolved launch is pending executable identity verification against its reviewed release. A filename or supplied version is not proof. Source inspection and the runtime setup guide remain available; no game was started.");
+    }
     if installed.validation != TestStatus::Pass {
         return invalid("Executable format is not supported on this host");
     }

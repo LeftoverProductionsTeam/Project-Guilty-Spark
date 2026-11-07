@@ -22,6 +22,7 @@ export const runtimeNames: Record<RuntimeId, string> = {
   mccSteam: 'MCC Halo 1',
   chupathingyCe: 'ChupathingyCE',
   openCe: 'OpenCE',
+  arenaEvolved: 'Arena Evolved',
   haloPc: 'Halo PC',
   haloCustomEdition: 'Custom Edition',
   macRetail: 'Halo Mac retail',

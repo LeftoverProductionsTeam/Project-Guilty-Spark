@@ -514,6 +514,21 @@ async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project
     }).await.map_err(error)?
 }
 #[tauri::command]
+async fn open_bsp_assembly_donor(app:tauri::AppHandle,project_id:String)->Reply<OpenProject>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let owner=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let plan=owner.bsp_assembly.as_ref().ok_or("This project has no saved donor region")?;
+        let donor=core::bsp_assembly::referenced_donor(&owner,&plan.donor_project_id).map_err(error)?.ok_or("Saved donor is unavailable")?;
+        let source=donor.source.as_ref().ok_or("Saved donor has no source")?;
+        // Existing preview documents are RAM-only and use their own identity.
+        // Never adopt the saved donor UUID or overwrite its editable document.
+        let (preview,inspection)=lock(&state.library)?.preview_source(source).map_err(error)?;
+        if inspection.sha256!=source.sha256{return Err("Donor source changed during preview admission".into());}
+        lock(&state.inspections)?.insert(preview.id.clone(),Arc::new(inspection.clone()));
+        Ok(OpenProject{project:preview,inspection:Some(inspection)})
+    }).await.map_err(error)?
+}
+#[tauri::command]
 async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_assembly::AssemblyReport>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;core::bsp_assembly::generate_project(&p,&i,&AtomicBool::new(false)).map(|g|g.report).map_err(error)}).await.map_err(error)?
 }
@@ -3132,6 +3147,7 @@ pub fn run() {
             plan_bsp_assembly,
             create_megaworld_project,
             preview_bsp_assembly,
+            open_bsp_assembly_donor,
             workspace_windows::claim_project_document,
             workspace_history_native::read_workspace_history,
             workspace_history_native::commit_workspace_history,

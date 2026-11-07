@@ -31,6 +31,12 @@ const halos: { id: RuntimeId; name: string; icon: LucideIcon; description: strin
     offers: ['Online campaign co-op', 'Split-screen', 'Community servers'],
   },
   {
+    id: 'arenaEvolved', name: 'Arena Evolved', icon: Users,
+    description: 'An independent community Halo runtime with bots, custom modes and owned MCC map support.',
+    bestFor: 'Exploring Arena Evolved multiplayer and dedicated hosting.',
+    offers: ['Owned MCC & CE content', 'Bots & custom modes', 'Version-specific compatibility'],
+  },
+  {
     id: 'openCe',
     name: 'OpenCE',
     icon: Globe2,

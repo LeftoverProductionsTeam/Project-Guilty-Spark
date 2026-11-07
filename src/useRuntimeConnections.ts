@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, native } from './api';
 import type { Bootstrap, RuntimeId, RuntimeReport } from './types';
 
-export const primaryRuntimes = ['mccSteam', 'haloCustomEdition', 'openCe', 'chupathingyCe'] as const satisfies readonly RuntimeId[];
+export const primaryRuntimes = ['mccSteam', 'haloCustomEdition', 'openCe', 'chupathingyCe', 'arenaEvolved'] as const satisfies readonly RuntimeId[];
 export interface DetectedHalo {
   runtimeId: RuntimeId;
   root: string;
