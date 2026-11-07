@@ -227,7 +227,7 @@ export async function nativeWorldMachineRoundTrip({page,root,cache,compiled,dono
 // Two distinct, real CE donors through the existing QuickForge and imported-map
 // World writers. Setup IPC only opens owned fixtures; all authored edits/drop,
 // history and builds below use visible controls and the actual native backend.
-export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invader,cache,donors,call,receipt,expect,run,retain}) {
+export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invader,cache,donors,call,receipt,expect,run,retain,reviewControl}) {
  const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
  const tool=name=>path.join(invader,name+'.exe'), normalize=value=>value.replaceAll('\\','/').toLowerCase();
  const originalFiles=[...new Set([cache,...donors,...donors.flatMap(file=>['bitmaps.map','sounds.map','loc.map'].map(name=>path.join(path.dirname(file),name)))])];
@@ -423,11 +423,13 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
   // The owner requests one independently checked native output. Keep the
   // first only within the existing256MiB fixture budget; the second cache is
   // reproducible and its full dependency/position/hash receipt is sufficient.
-  if(index===0){const retained=path.join(root,'native-output','cross-runtime-1.map');await fs.copyFile(result.output,retained,fs.constants.COPYFILE_EXCL);expect(await hash(retained)).toBe(record.outputSha256);await retain(retained,'Owner-requested first independently extracted CE-to-MCC native asset output');record.retainedOutput='native-output/cross-runtime-1.map';record.outputBytes=(await fs.stat(retained)).size;}
+  // Source-game controls reuse this fixture; do not retain another copy.
+  if(index===0&&!reviewControl){const retained=path.join(root,'native-output','cross-runtime-1.map');await fs.copyFile(result.output,retained,fs.constants.COPYFILE_EXCL);expect(await hash(retained)).toBe(record.outputSha256);await retain(retained,'Owner-requested first independently extracted CE-to-MCC native asset output');record.retainedOutput='native-output/cross-runtime-1.map';record.outputBytes=(await fs.stat(retained)).size;}
   record.independentNativeReadback={scenario,nativePath,placementCount:count,paletteEntries:Number(roots),palettePaths,nativePositions,dependencyPaths,boundingRadius:radius,crcMismatch:crc};record.stage='MCC native compile and independent readback passed';
   const saved=await project(id);record.savedProject=saved;record.savedHistory=(await call('read_workspace_history',{projectId:id})).history;
   if(index===0){const steps=saved.quickForge.workshop.brushes.filter(brush=>/^Stairs.*step \d+$/.test(brush.name));expect(steps).toHaveLength(8);expect(steps.every(brush=>brush.role==='solid'&&brush.worldUv)).toBe(true);receipt.nativeShapeDrop.compiledWithFirstPair=true;receipt.nativeShapeDrop.persistedTreads=steps.length;}
   console.log('CROSS_RUNTIME_PASS',JSON.stringify({pair:index+1,assetClass:spec.class,files:binding.fileCount,outputSha256:record.outputSha256,buildMs:record.buildMs}));
+  if(index===0&&reviewControl){await open(id);await reviewControl(id,record);}
   if(index===0){target=output;await open(spec.source.project.id);await open(target.project.id);}
  }
  for(const input of originalInputs)expect(await hash(input.file)).toBe(input.sha256);

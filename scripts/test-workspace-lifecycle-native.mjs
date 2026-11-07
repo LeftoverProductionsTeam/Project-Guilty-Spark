@@ -323,7 +323,7 @@ try{
     if(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'&&(!process.env.SPARK_QA_MEGAWORLD_BASE||!process.env.SPARK_QA_MEGAWORLD_DONOR))throw Error('Select the two owned MegaWorld source maps');
     if(process.env.SPARK_QA_MEGAWORLD_ONLY!=='1'){
     const donors=[process.env.SPARK_LOGIC_CE_SCENERY,process.env.SPARK_LOGIC_CE_VEHICLE];if(!donors.every(Boolean))throw Error('Select two owned CE donor caches');
-    await nativeCrossRuntimeAssetRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT),tags:path.resolve(process.env.SPARK_LOGIC_TAGS),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),donors:donors.map(value=>path.resolve(value)),call:(command,args)=>invoke(main,command,args),receipt:report.crossRuntime,expect,run:runOwned,retain:finishStorage.retain});
+    await nativeCrossRuntimeAssetRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT),tags:path.resolve(process.env.SPARK_LOGIC_TAGS),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),donors:donors.map(value=>path.resolve(value)),call:(command,args)=>invoke(main,command,args),receipt:report.crossRuntime,expect,run:runOwned,retain:finishStorage.retain,reviewControl:process.env.SPARK_LOGIC_GAME_REVIEW==='1'?(id,record)=>reviewNativeScene(id,'control',true,record):undefined});
     step('Two real CE donor asset classes drag into separate MCC authoring documents and compile independently');
     }
     if(process.env.SPARK_QA_MEGAWORLD_BASE&&process.env.SPARK_QA_MEGAWORLD_DONOR){

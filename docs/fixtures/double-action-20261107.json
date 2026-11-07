@@ -127,9 +127,8 @@
       "unresolvedStripPreservedAsNegative": true
     },
     "activeRun": {
-      "evidence": "double-action-r17.json",
-      "status": "nativeCompilerReadbackAndRetentionPassed_gameReviewFailed",
-      "wholeRunAccepted": false,
+      "evidence": "double-action-r17.json; double-action-r18-control.json",
+      "status": "finished_nativeCompilationVerified_standaloneBlocked",
       "sourcePinnedAppSha256": "86e4d7c1bd1c032a38fd1421521b4c0ea1e83c76a99f744c8e9ba7c0d4223e96",
       "runtimeSourceFingerprint": "cb5e73e747c95c6320407597e46a4c604dd743fd30fe4c342a2d773803239e5f"
     },
@@ -145,6 +144,23 @@
       "browserPassed": 205,
       "nativeWindowsPassed": 12,
       "nativeCompilerAndReadbackPassed": true
+    },
+    "standaloneControl": {
+      "evidence": "double-action-r18-control.json",
+      "wholeRunAccepted": false,
+      "nativeCompilerAndIndependentReadbackPassed": true,
+      "nativeBuildMs": 59964,
+      "placementCount": 2,
+      "boundingRadius": 0.756476,
+      "crcMismatch": 0,
+      "executableSha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "exitCode": 1,
+      "debugLogSha256": "f042dca4736fe1d92501136b81923d035fb38624be78a5e04d7f3d169279ecb4",
+      "windowInspection": "Computer Use app approval timed out",
+      "visualSceneObserved": false,
+      "originalInputsRehashed": 6,
+      "retainedDuplicateCache": false,
+      "commonFatalCauseEstablished": false
     }
   },
   "preservation": {
@@ -172,6 +188,8 @@
     "r14": "Save wording assertion failed after external data was preserved; test strengthened",
     "r15": "Thirty isolated save-race tests pass; strengthened full-suite case also checks exact bytes and dirty Undo",
     "r16": "All source/browser/native Windows suites and native combined build/readback pass; missing retention reason rejects export and disposes cache. Overall run failed.",
-    "r17": "Creation/restart/edit/Undo/Save/native compile/readback/retention and original hashes pass; optional Standalone exits1. No game frame or gameplay accepted."
-  }
+    "r17": "Creation/restart/edit/Undo/Save/native compile/readback/retention and original hashes pass; optional Standalone exits1. No game frame or gameplay accepted.",
+    "r18": "Small CE-to-MCC authoring/control compile and independent readback pass; Standalone exits1. Window inspection approval times out; no gameplay accepted."
+  },
+  "implementationCommit": "e7664286a74992a5fd810e5c99efe9d78a405e73"
 }
