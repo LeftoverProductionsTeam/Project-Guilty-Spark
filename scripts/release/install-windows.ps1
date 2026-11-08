@@ -22,7 +22,23 @@ if ($Uninstall) {
   if ($uninstallers.Count -ne 1) { throw 'Expected one owned NSIS uninstaller.' }
   $process = Start-Process -FilePath $uninstallers[0].FullName -ArgumentList '/S' -WindowStyle Hidden -PassThru
   if (!$process.WaitForExit(120000) -or $process.ExitCode -ne 0) { throw 'Owned NSIS uninstaller failed.' }
-  [IO.File]::WriteAllText((Join-Path $root 'uninstall.json'), '{"complete":true}', [Text.UTF8Encoding]::new($false))
+  # The NSIS launcher may exit before its temporary uninstaller finishes.
+  # Accept removal only after the owned payload and registration disappear.
+  $wait = [Diagnostics.Stopwatch]::StartNew()
+  $registrationKeys = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')
+  do {
+    $remainingRegistration = @($registrationKeys | ForEach-Object {
+      Get-ChildItem -LiteralPath $_ -ErrorAction SilentlyContinue | Get-ItemProperty | Where-Object {
+        $_.InstallLocation -and ([IO.Path]::GetFullPath($_.InstallLocation).TrimEnd('\') -eq $install.TrimEnd('\'))
+      }
+    })
+    $removed = !(Test-Path -LiteralPath $app) -and !(Test-Path -LiteralPath $uninstallers[0].FullName) -and !$remainingRegistration.Count
+    if ($removed) { break }
+    if ($wait.ElapsedMilliseconds -ge 120000) { throw 'Owned NSIS uninstall returned before payload and registration removal completed.' }
+    Start-Sleep -Milliseconds 100
+  } while ($true)
+  $result = @{schemaVersion=1;complete=$true;payloadRemoved=$true;registrationRemoved=$true;removalWaitMs=$wait.ElapsedMilliseconds}
+  [IO.File]::WriteAllText((Join-Path $root 'uninstall.json'), ($result | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
   exit
 }
 if (Test-Path -LiteralPath $root) { throw 'Use a fresh installation-test directory.' }
