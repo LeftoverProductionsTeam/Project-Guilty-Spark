@@ -443,14 +443,18 @@ try{
   }
   if(logicOnly&&rebuildOnly){
     const {nativeLiveRebuild}=await import('./native-live-rebuild.mjs');report.liveRebuild={mockedIpc:false,humanGameplayAccepted:false};
-    await nativeLiveRebuild({page:main,root,kit:process.env.SPARK_LOGIC_KIT,invader:invaderDirectory,cache:nativeMap,call:(command,args)=>invoke(main,command,args),receipt:report.liveRebuild,expect,run:runOwned});
-    step('Actual Chupathingy compiled playtest, source edit, Live Rebuild, failed-build preservation and stop',report.liveRebuild);
+    await nativeLiveRebuild({page:main,root,kit:process.env.SPARK_LOGIC_KIT,invader:invaderDirectory,cache:nativeMap,call:(command,args)=>invoke(main,command,args),receipt:report.liveRebuild,expect,run:runOwned,afterInitialCompile:process.env.SPARK_QA_DEDICATED_SERVER==='1'?async({compiled})=>{const {nativeDedicatedServer}=await import('./native-dedicated-server.mjs');await nativeDedicatedServer({page:main,root,call:(command,args)=>invoke(main,command,args),expect,receipt:report,compiled,trackProcess:child=>finishStorage.trackProcess(child),createScratch:name=>finishStorage.createScratch(name)});}:undefined});
+    step(report.nativeDedicated?'Actual native CE authoring, Windows dedicated deployment, two independent game clients and typed restart/rollback':'Actual Chupathingy compiled playtest, source edit, Live Rebuild, failed-build preservation and stop',report.nativeDedicated??report.liveRebuild);
     const id=report.liveRebuild.projectId,before=(await invoke(main,'open_project',{id})).project;
     await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();
     const reopened=(await invoke(main,'open_project',{id})).project;
     expect(reopened.quickForge).toEqual(before.quickForge);expect(reopened.builds).toEqual(before.builds);
     expect(await invoke(main,'runtime_rebuild_status')).toBeNull();
-    await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${id}"]`).click();await chooseTool(main,'Level editor');await openDrawer(main,'Game connection');
+    if(report.nativeDedicated){expect((await invoke(main,'community_server_installation')).installed).toBe(true);expect(await invoke(main,'community_server_status')).toBeNull();report.nativeDedicated.installationSurvivesAppRestart=true;report.nativeDedicated.noAutomaticServerRestart=true;}
+
+    await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${id}"]`).click();
+    if(report.nativeDedicated){await chooseTool(main,'Online');await main.getByRole('button',{name:'Host game',exact:true}).click();const host=main.getByRole('region',{name:'Private Chupathingy dedicated server',exact:true});await revealPagedControl(host.locator('summary').filter({hasText:'Local trial routing'}));await host.getByText('Local trial routing',{exact:true}).click();await expect(host.getByRole('textbox',{name:'Private trial client addresses',exact:true})).toHaveValue('127.0.0.3,127.0.0.4');report.nativeDedicated.routingSurvivesAppRestart=true;}
+    await chooseTool(main,'Level editor');await openDrawer(main,'Game connection');
     const controls=main.getByRole('region',{name:'Chupathingy Live Rebuild',exact:true});
     await revealPagedControl(controls.getByRole('button',{name:'Start compiled playtest',exact:true,includeHidden:true}));
     await expect(controls.getByRole('button',{name:'Start compiled playtest',exact:true})).toBeEnabled();
@@ -458,8 +462,9 @@ try{
     step('Live Rebuild source and independent build history persist across actual application restart without restarting the game');
     // Keep only the exact accepted native cache until the parent exports it.
     // The rest of this test library remains disposable, including old builds.
-    const accepted=before.builds.find(build=>build.id===report.liveRebuild.rebuiltSession.gameBuildId);
-    expect(accepted.sha256).toBe(report.liveRebuild.rebuiltSession.gameSha256);
+    const expected=report.nativeDedicated?{gameBuildId:report.liveRebuild.firstBuild.build.id,gameSha256:report.liveRebuild.firstBuild.build.sha256}:report.liveRebuild.rebuiltSession;
+    const accepted=before.builds.find(build=>build.id===expected.gameBuildId);
+    expect(accepted.sha256).toBe(expected.gameSha256);
     expect(crypto.createHash('sha256').update(await fs.readFile(accepted.output)).digest('hex')).toBe(accepted.sha256);
     await finishStorage.retain(accepted.output,'One accepted Live Rebuild native cache for the bounded parent evidence export');
 

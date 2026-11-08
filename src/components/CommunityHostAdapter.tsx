@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import CommunityDedicatedServer from './CommunityDedicatedServer';
 import { useMapState } from '../mapSession';
 import { Server, Save, RefreshCw, Unplug } from 'lucide-react';
 import { call, native } from '../api';
@@ -176,7 +177,7 @@ export default function CommunityHostAdapter({
         <Pill>Private by default</Pill>
       </div>
       <p>
-        Choose a map and mode, then check and save a private server profile. This does not start a server.
+        Choose a map and mode. Start a verified private dedicated trial, or save a profile for a separately managed host.
       </p>
       {!['chupathingyCe', 'openCe'].includes(runtime) && (
         <Notice tone="info">
@@ -253,6 +254,7 @@ export default function CommunityHostAdapter({
           Check host adapter
         </button>
       </div>
+      {runtime==='chupathingyCe'&&mode==='multiplayer'&&<CommunityDedicatedServer project={project} request={request}/>}
       <p className="subtle community-host-capacity">
         Player limits are requested settings; 128-player multiplayer and eight-player campaign / Firefight
         remain unverified.
@@ -292,8 +294,7 @@ export default function CommunityHostAdapter({
           )}
           <p className="subtle">
             Tested game players: {plan.testedPlayers ?? 'No accepted game test'}. Actual game outcome:{' '}
-            {plan.gameOutcome}. Dedicated hosting currently targets the upstream Linux server; Windows does
-            not silently install or launch WSL.
+            {plan.gameOutcome}. The Windows dedicated trial uses its own verified package; Linux host profiles remain separately reviewed.
           </p>
         </div>
       )}

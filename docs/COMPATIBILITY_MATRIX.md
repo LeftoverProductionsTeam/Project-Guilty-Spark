@@ -1,5 +1,7 @@
 # Runtime and operation compatibility — Continuation 42
 
+8 November private dedicated milestone: [Windows Chupathingy v0.9.0c](CHUPATHINGY_DEDICATED_20261108.md) now installs through the existing downloader, stages verified CE banks/native content and runs an isolated private server. R184 proves two separate game clients spawning, guarded native map restart, changed-cache rejection, original-input preservation, eight scaled native window sizes and full Spark restart persistence. Ordinary multiplayer is separate from AI Apocalypse/persistent Extraction or human gameplay acceptance.
+
 ## November 7 — source-native asset transfer acceptance
 
 | Exact source → destination | Asset / required native closure | Proven endpoint | Remaining gate |

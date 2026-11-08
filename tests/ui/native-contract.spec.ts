@@ -3612,3 +3612,26 @@ for(const failSave of [false,true])test(`native lighting bake ${failSave?'stops 
   await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).not.toHaveAttribute('aria-description','Unsaved changes');
  }
 });
+
+test('private dedicated controls install a server separately and retain typed session ownership',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,base=w.__TAURI_INTERNALS__.invoke;let installed=false,session:any=null;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='runtime_report'){const rows=await base(command,args);return [...rows,{...rows[0],id:'chupathingyCe',name:'Synthetic Chupathingy'}];}
+   if(command.startsWith('community_server_'))w.__sparkMock.calls.push({command,args});
+   if(command==='community_server_installation')return {installed,version:'v0.9.0c',downloadBytes:22043087,executable:installed?'synthetic/server.exe':null};
+   if(command==='community_server_install'){installed=true;return {installed,version:'v0.9.0c',downloadBytes:22043087,executable:'synthetic/server.exe'};}
+   if(command==='community_server_start'){session={id:'synthetic-private-session',phase:'ready',detail:'Synthetic native IPC contract only',map:args.request.entries[0].map,gameType:'slayer',processId:42,mapSha256:'a'.repeat(64),serverSha256:'b'.repeat(64),copiedBytes:12,sourceBuildId:null,restarts:0,originalInputsUnchanged:null,status:{version:'0.9.0c',state:'lobby',map:'bloodgulch',gameType:'slayer',players:0,maximumPlayers:2,networkVersion:32,public:false}};return session;}
+   if(command==='community_server_status')return session;
+   if(command==='community_server_action'){if(args.id!==session.id)throw Error('Not this session');if(args.action==='restart')session.restarts++;else if(args.action==='stop'){session.phase='stopped';session.originalInputsUnchanged=true;}else throw Error('Invalid action');return null;}
+   return base(command,args);
+  };
+ });
+ await openFixture(page);const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('chupathingyCe');await studio.getByLabel('Studio options',{exact:true}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Host game',exact:true}).click();
+ const host=page.getByRole('region',{name:'Private Chupathingy dedicated server',exact:true});
+ await expect(host.getByRole('button',{name:'Start private dedicated server',exact:true})).toBeDisabled();await host.getByRole('button',{name:'Download verified server · 21 MB',exact:true}).click();
+ await expect(host.getByRole('checkbox',{name:/Use current CE build/})).toBeDisabled();
+ await host.getByRole('button',{name:'Start private dedicated server',exact:true}).click();await expect(host.getByRole('button',{name:'Stop server',exact:true})).toBeVisible();await host.getByRole('button',{name:'Restart map',exact:true}).click();await host.getByRole('button',{name:'Stop server',exact:true}).click();await expect(host.getByRole('button',{name:'Start private dedicated server',exact:true})).toBeEnabled({timeout:10000});
+ const calls=await page.evaluate(()=>(window as any).__sparkMock.calls),start=calls.find((c:any)=>c.command==='community_server_start');expect(start.args.request).toMatchObject({runtimeId:'chupathingyCe',mode:'multiplayer',network:'lan',public:false,listGames:false});expect(start.args.projectId).toBeNull();expect(start.args.clientAddresses).toEqual(['127.0.0.3']);expect(calls.filter((c:any)=>c.command==='community_server_action').map((c:any)=>c.args)).toEqual([{id:'synthetic-private-session',action:'restart'},{id:'synthetic-private-session',action:'stop'}]);expect(calls.some((c:any)=>c.command==='install_runtime_engine_download'||c.command==='launch_registered_runtime')).toBe(false);
+ await expect(host).toContainText('persistent Extraction are not supplied by a playlist');
+});

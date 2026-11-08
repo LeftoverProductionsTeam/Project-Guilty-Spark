@@ -1,0 +1,221 @@
+# PROJECT GUILTY SPARK
+# ALL THE TOOLS, AND THEN SOME.
+## COMPLETE PRODUCT ENGINEERING & MANDATORY END-TO-END ACCEPTANCE
+### Master directive — Updated November 2026
+
+Continue developing Project Guilty Spark from the exact current canonical local master.
+
+**This is a complete-product engineering directive. It includes every previously approved requirement, all existing numbered engineering prompts, the 475 tracked requirement IDs, subsequent owner corrections and the latest additions.**
+
+Do not replace the existing requirements ledger. Reconcile and preserve it.
+
+The goal is a fully integrated Halo 1 creation studio, not a collection of editor mockups, feature toggles or individually passing unit tests.
+
+**Open → Inspect → Create → Edit → Import → Script → Collaborate → Save → Compile → Launch → Play → Live Edit → Verify → Share.**
+
+Nothing is accepted merely because a UI button, backend function or test fixture exists.
+
+## 1. Permanent project rules
+
+- Continue from actual HEAD, inspect uncommitted work and running tests, and preserve all successful engineering.
+- Use the existing canonical master and established components. No duplicate editors, competing runtime managers, unnecessary worktrees or nested repositories.
+- Protect every user-selected Halo ISO, runtime, map, original tag, editing kit, mod, saved project and accepted build.
+- Never modify the only copy of original content.
+- Use source-safe staging, native validation, version-pinned adapters and bounded disposable build storage.
+- Preserve Git history, original requirements, recovery evidence and previous-good releases.
+- Respect engine licenses, maintainer contribution policies and proprietary game content.
+- Never introduce unauthorized injection, security bypasses or unsafe executable modifications.
+- Keep implementation, automated tests, native compilation, actual gameplay, peer networking and human acceptance as separate evidence levels.
+- Do not fabricate engine capabilities or declare unfinished functionality complete.
+
+## 2. Complete all existing Guilty Spark features
+
+Finish and validate the entire existing feature set:
+
+- Map and tag inspection, editing, extraction and importing.
+- Asset Library, models, bitmaps, shaders, lighting, audio and animations.
+- Level Editor, QuickForge, BSP Workshop and terrain construction.
+- Collision, visibility, portals, geometry joins and native map rebuilding.
+- External tool integration, validated source handoffs and recovery.
+- Multiplayer gametypes, objectives, placements and scripting.
+- Firefight, Zombie Apocalypse, First Contact and custom campaigns.
+- AI creation, encounters, synchronization and multiplayer behavior.
+- Machinima, Recording Director, greenscreen and game camera integration.
+- Multiplayer hosting, browser, map sharing and gameplay launching.
+- Runtime manager and one shared user-facing Halo content library.
+- SparkLink collaboration and Live Link game integration.
+- OpenH1 immersive VR Forge and supported VR gameplay handoff.
+- Cross-platform Windows, Linux, macOS and legacy Mac goals.
+- Complete first-run setup, Learning Center and walkthrough.
+- Fully customizable Interface Studio.
+- The 19-map MegaWorld and persistent extraction experience.
+- Every other approved feature and research objective retained in the ledger.
+
+Do not replace verified implementations with new systems simply to satisfy another prompt.
+
+## 3. Finish the compact UI and Interface Studio
+
+Complete the existing compact responsive UI refactor.
+
+Workspaces, application menus, workspace menus and drawer-control surfaces should not require scrolling to reach commands.
+
+Use tabs, search, paging, contextual sections and dedicated viewers for extensive content.
+
+Test real Windows window sizes from 800×600 through 5120×1440, including widescreen, ultrawide and multi-monitor configurations.
+
+Expand the existing Interface Studio with visual Design Mode.
+
+Users must be able to customize supported icons, text, typography, tabs, columns, panels, toolbar arrangements, box dimensions, spacing, colors, backgrounds and workspace layouts.
+
+Support visual selection, drag/reorder, resize, immediate preview, Undo/Redo, named presets, safe import/export and full reset/recovery.
+
+Store validated versioned layout configuration, not arbitrary executable CSS or scripts.
+
+A custom layout must never permanently hide Save, Undo, navigation or window controls.
+
+## 4. Complete native runtime integration
+
+Support the established Halo runtimes using version-specific contracts:
+
+- ChupathingyCE — preferred standard gameplay runtime.
+- OpenH1 — preferred immersive VR runtime.
+- OpenCE and OpenCE Faber.
+- Halo PC and Custom Edition.
+- MCC Halo 1 Anniversary and supported editing tools.
+- Xbox and legacy HaloMD/Mac source formats.
+- Other compatible community engines and toolchains.
+
+Allow user-owned runtime folders or one Spark-managed dynamic runtime location.
+
+Use one shared authoritative Halo content library where compatible, with isolated runtime executables, DLLs, profiles, saves and required support files.
+
+Finish safe verified runtime download, installation, discovery, launch, switching, updates and rollback.
+
+Complete per-runtime mod pack discovery, installation, enable/disable, load ordering and persistence.
+
+Only expose functional runtime features when actual engine support is verified.
+
+**Every integrated engine must have its own real user-workflow and native launch acceptance.**
+
+## 5. Complete the 19-map MegaWorld
+
+Finish the existing Atlas and physical BSP integration.
+
+All 19 original Halo multiplayer regions must be arranged in the agreed 3–4–5–4–3 cluster layout.
+
+Build real, naturally blended terrain connections, mountain routes, caves, infantry tunnels, vehicle roads, doors, sniper positions and multiple neighboring-region entrances.
+
+Preserve recognizable original architecture and terrain.
+
+Implement correct geometry, materials, lighting, collision, visibility, portals and supported native navigation.
+
+Fix the outstanding Timberland–Sidewinder native compilation problems before accepting its natural seam.
+
+Expand progressively through all 19 regions.
+
+A saved Atlas layout does not count as a compiled world.
+
+A compiler pass does not count as gameplay acceptance.
+
+**Real players must traverse the connections, and real Warthog gameplay must verify the intended vehicle network.**
+
+Add the randomized teleporter web with valid destinations, host-authoritative selection, weighted pools, anti-loop protection and actual multiplayer synchronization.
+
+Investigate safe optimization for complex combined BSP geometry and large multiplayer populations without blindly degrading original content.
+
+## 6. Complete persistent MegaWorld extraction
+
+Build an actual opt-in, persistent PvPvE extraction game mode.
+
+The experience must include:
+
+- No raid timer.
+- Persistent world and defined world-state lifecycle.
+- Default plasma-pistol start with no shields.
+- Configurable pre-deployment inventory.
+- Lootable weapons, ammunition, equipment and valuable items.
+- Health packs and overshields as meaningful survival resources.
+- Inventory capacity and persistence.
+- Extraction locations and item banking.
+- Configurable death, loss and recovery rules.
+- Covenant and Flood encounters.
+- Hostile and cooperative player interactions.
+- Native PvPvE combat.
+- Optional dual wielding and sprint where genuinely supported.
+- Server-authoritative player and loot state.
+- Reconnection and intended server-restart persistence.
+- Optional proximity voice once supported by the engine.
+
+Use Chupathingy as the first preferred gameplay target, with separate OpenCE/Faber integration as supported.
+
+Coordinate missing engine functionality upstream rather than assuming unsupported features exist.
+
+### Mandatory extraction map creation workflow
+
+**This is a required end-to-end feature, not a backend configuration screen.**
+
+A creator must be able to launch Spark and complete the following through real mouse, keyboard and menu controls:
+
+1. Choose **File → New → Extraction Map**, or convert a compatible existing map into an extraction project without altering its original source.
+2. Select the target runtime and native map format.
+3. Create or import the playable BSP environment.
+4. Add and edit terrain, roads, caves, buildings, doors and other supported geometry.
+5. Place player deployment points and define no-shield/plasma-pistol starting rules.
+6. Configure the inventory system and starting equipment.
+7. Place weapon, ammo, health, overshield and valuable-loot objects.
+8. Configure loot tables, rarity, respawn and item persistence.
+9. Place extraction zones, interaction points and inventory-banking behavior.
+10. Place Covenant, Flood and supported bot/AI encounters.
+11. Configure AI spawns, factions, difficulty, aggression, patrols and combat behavior.
+12. Configure PvP, teams, friendly fire and player re-entry rules.
+13. Configure dual wield, sprint and other supported mode-specific mechanics.
+14. Configure persistent world, death, extraction, disconnect and restart rules.
+15. Preview the environment, actors, inventory placements, triggers and extraction areas.
+16. Save, Undo/Redo, close Spark, reopen the project and verify every authored setting persists.
+17. Validate native tags, dependencies, scripts and runtime-specific configuration.
+18. Compile an actual supported `.map` and any separately required game-mode/server package.
+19. Independently read back the native output and verify its authored contents.
+20. Launch the correct runtime directly from Spark.
+21. Host a real extraction session and connect two actual game clients.
+22. Verify real AI combat, PvP, looting, inventory banking, extraction and persistence.
+23. Return to Spark, modify the map/game mode, rebuild or live-update through supported interfaces, and verify the resulting gameplay changes.
+
+**No extraction creation workflow is accepted until the creator can perform and verify its actual supported operations.**
+
+If an engine requires additional services or a supported extension for persistence and multiplayer rules, package and configure them explicitly. Never misrepresent a plain `.map` as supplying functionality that requires engine-side code.
+
+## 7. True sprint, dual wielding and proximity voice
+
+Dual wielding must support two simultaneous weapons, correct firing inputs, independent ammunition and reload behavior, animations, HUD integration and multiplayer replication.
+
+Sprint must use a real input-driven movement state, with appropriate movement, collision, animation and synchronized multiplayer behavior.
+
+Both must remain optional and preserve standard Halo when disabled.
+
+Investigate Chupathingy's actual voice architecture. Its upstream voice-chat work is not currently a verified shipping proximity-voice interface.
+
+Develop proximity voice through an opt-in, supported engine extension or maintainer collaboration when feasible.
+
+Test positional attenuation, mute, consent, moderation, reconnection and multiplayer behavior.
+
+Do not call planned upstream work implemented.
+
+## 8. OpenH1 VR Forge
+
+Spark owns editing, project history, native assets and compilation.
+
+OpenH1 provides its supported VR runtime and gameplay capabilities.
+
+Implement and verify in-headset map inspection, navigation, native object placement, dragging, rotating, snapping, supported tag editing, Undo/Redo, Save and native output.
+
+Launch compiled content into supported OpenH1 VR for actual gameplay testing.
+
+Return to Spark and continue the same authoritative project.
+
+Do not duplicate the OpenH1 runtime or assume a public external editor interface exists.
+
+Windows OpenH1 VR remains unverified until a compatible upstream implementation and actual hardware testing exist.
+
+## 9. MANDATORY LIVELINK AND SPARKLINK INTEGRATION TESTS
+
+**This section is a hard acceptance requirement. Do not omit, defer

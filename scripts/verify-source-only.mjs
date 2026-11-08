@@ -286,7 +286,7 @@ try {
             const bytes=await fs.readFile(source.file);if(bytes.length!==source.bytes||crypto.createHash('sha256').update(bytes).digest('hex')!==source.sha256)throw Error('Failed native source changed before diagnostic export');
             const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-native-source.jms');await fs.writeFile(target,bytes,{flag:'wx'});(report.nativeSourceDiagnostics??=[]).push({file:target,bytes:bytes.length,sha256:source.sha256});
           }
-          if(receiptFile)for(const name of ['logic-inspector.png','native-lighting-baked.png','live-rebuild-first.png','live-rebuild-updated.png','failure-window-0.png']){
+          if(receiptFile)for(const name of ['native-dedicated-800x600.png','native-dedicated-1500x950.png','native-dedicated-3440x1440.png','native-dedicated-5120x1440.png','native-dedicated-ready.png','native-dedicated-two-clients.png','logic-inspector.png','native-lighting-baked.png','live-rebuild-first.png','live-rebuild-updated.png','failure-window-0.png']){
             const source=path.join(output,name),stat=await fs.stat(source).catch(()=>null);
             if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));await fs.copyFile(source,target);(report.logicScreenshots??=[]).push({file:target,bytes:stat.size});}
           }

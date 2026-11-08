@@ -14,7 +14,8 @@ use std::{
     path::PathBuf,
 };
 
-pub const ADAPTER_VERSION: u32 = 1;
+pub const ADAPTER_VERSION: u32 = 2;
+pub const WINDOWS_SERVER_REVISION: &str = "b506ba7439463d23f6e6d97192c68ece97adbab3";
 pub const CHUPATHINGY_REVISION: &str = "c5a07c69589ab8d40180fc99eac993bc06b06ebb";
 pub const MAX_CONTROL_BYTES: usize = 1024 * 1024;
 pub const MAX_COMMAND_BODY_BYTES: usize = 4096;
@@ -230,6 +231,15 @@ fn linux_absolute(path: &std::path::Path) -> bool {
         && !text.contains(['\0', '\n', '\r', '\\'])
         && !text.split('/').any(|c| c == ".." || c == ".")
 }
+fn host_absolute(path:&std::path::Path, platform:&str)->bool {
+    if platform=="linux" {return linux_absolute(path);}
+    let text=path.to_string_lossy();
+    let ordinary=text.strip_prefix(r"\\?\").unwrap_or(&text);
+    let bytes=ordinary.as_bytes();
+    platform=="windows" && bytes.len()>3 && bytes[0].is_ascii_alphabetic() && bytes[1]==b':' && matches!(bytes[2],b'/'|b'\\')
+        && ordinary.len()<=2048 && !ordinary.contains(['\0','\r','\n'])
+        && !ordinary.split(['/', '\\']).any(|s|s==".."||s==".")
+}
 fn community_runtime(runtime: RuntimeId) -> Result<()> {
     if !matches!(runtime, RuntimeId::ChupathingyCe | RuntimeId::OpenCe) {
         return invalid("This host operation requires a community H1 runtime. MCC-to-other-H1 wire translation is not implemented; a config or invitation cannot provide it");
@@ -343,22 +353,25 @@ pub fn plan_host(
         .into(),
     );
     if request.runtime_id != RuntimeId::ChupathingyCe {
-        plan.gates.push(gate("dedicatedProviderRequired","This dedicated/control implementation is Chupathingy's Linux server. OpenCE clients may join only after exact protocol/content checks; no OpenCE server binary API is assumed."));
+        plan.gates.push(gate("dedicatedProviderRequired","This dedicated/control implementation is Chupathingy's reviewed native server. OpenCE clients may join only after exact protocol/content checks; no OpenCE server binary API is assumed."));
     }
-    if installation.platform != "linux" {
-        plan.gates.push(gate("linuxServerRequired","The pinned standalone dedicated binary is Linux. Windows/WSL support is not established; Spark will not install or start WSL automatically."));
+    if installation.platform != "linux" && !(installation.platform == "windows" && installation.architecture == "x86_64") {
+        plan.gates.push(gate("serverPlatformRequired","Select the reviewed native Linux server or the official Windows x64 dedicated package. No WSL or service installation is performed."));
     }
     if !matches!(
         installation.architecture.as_str(),
         "x86_64" | "aarch64" | "x86"
     ) {
-        plan.gates.push(gate("serverArchitectureRequired","Identify the selected Linux server's exact architecture; do not infer it from the client."));
+        plan.gates.push(gate("serverArchitectureRequired","Identify the selected dedicated server's exact architecture; do not infer it from the client."));
+    }
+    if installation.platform=="windows" && installation.executable_sha256.as_deref()!=Some(crate::runtime_packages::community_server_package().executable_sha256) {
+        plan.gates.push(gate("windowsServerIdentityRequired","This Windows adapter supports only the publisher-pinned Chupathingy v0.9.0c dedicated executable."));
     }
     if !installation.server_identity_verified
         || installation
             .executable
             .as_ref()
-            .is_none_or(|p| !linux_absolute(p))
+            .is_none_or(|p| !host_absolute(p,&installation.platform))
         || installation
             .executable_sha256
             .as_deref()
@@ -371,11 +384,11 @@ pub fn plan_host(
         || installation
             .data_root
             .as_ref()
-            .is_none_or(|p| !linux_absolute(p))
+            .is_none_or(|p| !host_absolute(p,&installation.platform))
         || installation
             .save_root
             .as_ref()
-            .is_none_or(|p| !linux_absolute(p))
+            .is_none_or(|p| !host_absolute(p,&installation.platform))
         || installation.data_root == installation.save_root
     {
         plan.gates.push(gate("ownedServerRootsRequired","Use separate verified writable derived data/save roots; never SDK/game installation masters or another server's saves."));
@@ -398,14 +411,14 @@ pub fn plan_host(
             plan.gates.push(gate("sourceMapArchitectureRequired","CE/PC/HaloMD source-map hosting requires the separately checked x64/arm64 server and classic CE resources."));
         }
     }
-    if let Some(data) = installation.data_root.as_ref().filter(|p|linux_absolute(p)) {
+    if let Some(data) = installation.data_root.as_ref().filter(|p|host_absolute(p,&installation.platform)) {
         env.insert("HALO_DATA_ROOT".into(), data.to_string_lossy().into_owned());
         env.insert(
             "HALO_LOG_ROOT".into(),
             format!("{}/logs",data.to_string_lossy().trim_end_matches('/')),
         );
     }
-    if let Some(save) = installation.save_root.as_ref().filter(|p|linux_absolute(p)) {
+    if let Some(save) = installation.save_root.as_ref().filter(|p|host_absolute(p,&installation.platform)) {
         env.insert("HALO_SAVE_ROOT".into(), save.to_string_lossy().into_owned());
         env.insert(
             "HALO_CACHE_ROOT".into(),
@@ -434,7 +447,8 @@ pub fn plan_host(
             requires_final_owner_review: true,
         });
     }
-    plan.client_steps=vec!["Review the exact Linux binary/content identity, derived writable roots, private settings and private startup credential handling before starting a server.".into(),"Matching native clients join through the game's private invitation/System Link lobby. Browser clients have their own startup/content/protocol/capacity gates.".into(),"Verify two real clients first, then controlled8/16/32/64/128 stages. Keep actual frame/network/AI/recovery acceptance separate from maximum_players.".into()];
+    if installation.platform=="windows" {plan.evidence.push(format!("Windows server release source {WINDOWS_SERVER_REVISION}; dedicated executable independently pinned, not an interactive client."));}
+    plan.client_steps=vec!["Review the exact dedicated binary/content identity, derived writable roots, private settings and private startup credential handling before starting a server.".into(),"Matching native clients join through the game's private invitation/System Link lobby. Browser clients have their own startup/content/protocol/capacity gates.".into(),"Verify two real clients first, then controlled8/16/32/64/128 stages. Keep actual frame/network/AI/recovery acceptance separate from maximum_players.".into()];
     Ok(plan)
 }
 
@@ -660,6 +674,28 @@ pub fn parse_status(bytes: &[u8]) -> Result<ServerStatus> {
         uptime_seconds: value.uptime_seconds,
     })
 }
+/// Explicit receiver routes for same-computer private trials; never arbitrary LAN/public targets.
+pub fn private_client_addresses(values:&[String])->Result<String>{
+    use std::net::Ipv4Addr;
+    if values.is_empty()||values.len()>8{return invalid("Select one to eight local trial client addresses");}
+    let mut result=BTreeSet::new();
+    for value in values {
+        let address:Ipv4Addr=value.parse().map_err(|_|crate::SparkError::Invalid("Trial client addresses must be literal IPv4 loopback addresses".into()))?;
+        if !address.is_loopback()||address==Ipv4Addr::LOCALHOST||address==Ipv4Addr::new(127,0,0,2)||address.octets()[3]==0||address.octets()[3]==255 {
+            return invalid("Use distinct loopback client addresses such as 127.0.0.3; localhost is redirected, 127.0.0.2 is the server, and broadcast addresses are refused");
+        }
+        if !result.insert(address.to_string()){return invalid("A trial client address is duplicated");}
+    }
+    Ok(result.into_iter().collect::<Vec<_>>().join(","))
+}
+/// The isolated v0.9.0c server uses its built-in OpenCE announcement (32).
+/// This is not Delta's wire version and is not taken from another profile's cache.
+pub fn verify_owned_windows_status(status:&ServerStatus)->Result<()> {
+    if status.public || status.version!="0.9.0c" || status.network_version!=32 {
+        return invalid(format!("Private dedicated identity mismatch: API version {}, OpenCE announcement {}, public {}. Expected pinned v0.9.0c with built-in announcement32 and private listing.",status.version,status.network_version,status.public));
+    }
+    Ok(())
+}
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerMaps {
@@ -868,6 +904,41 @@ mod tests {
                 resources_ready: true,
             }],
         }
+    }
+    #[test]
+    fn windows_server_requires_its_own_publisher_identity_and_owned_absolute_roots(){
+        let mut evidence=installed();evidence.platform="windows".into();
+        evidence.executable=Some(r"C:\Spark servers\engine\chupathingyce-server.exe".into());
+        evidence.data_root=Some(r"C:\Spark servers\data".into());evidence.save_root=Some(r"C:\Spark servers\save".into());
+        let refused=plan_host(&request(),&evidence).unwrap();
+        assert!(refused.launch.is_none());assert!(refused.gates.iter().any(|g|g.code=="windowsServerIdentityRequired"));
+        evidence.executable_sha256=Some(crate::runtime_packages::community_server_package().executable_sha256.into());
+        let launch=plan_host(&request(),&evidence).unwrap().launch.unwrap();
+        assert!(launch.arguments.is_empty());assert_eq!(launch.environment["HALO_NET_ONLINE"],"false");
+        assert_eq!(launch.environment["HALO_SAVE_ROOT"],r"C:\Spark servers\save");
+        assert!(launch.clear_inherited_halo_environment&&launch.private_startup_output_required);
+        for bad in [r"C:relative",r"C:\..\original",r"relative\server",r"\\network\share"]{
+            evidence.data_root=Some(bad.into());assert!(plan_host(&request(),&evidence).unwrap().launch.is_none());
+        }
+    }
+    #[test]
+    fn dedicated_package_is_not_an_interactive_runtime_choice(){
+        let server=crate::runtime_packages::community_server_package();
+        assert_eq!(server.version,"v0.9.0c");assert!(!crate::runtime_packages::catalog().iter().any(|p|p.id==server.id));
+        assert_ne!(server.executable_sha256,crate::runtime_packages::package("chupathingy").unwrap().executable_sha256);
+    }
+    #[test]
+    fn private_windows_status_uses_observed_builtin_announcement_not_a_cached_cli_number(){
+        let mut observed=status();observed.version="0.9.0c".into();observed.network_version=32;observed.public=false;
+        verify_owned_windows_status(&observed).unwrap();
+        observed.network_version=41;assert!(verify_owned_windows_status(&observed).is_err());
+        observed.network_version=32;observed.public=true;assert!(verify_owned_windows_status(&observed).is_err());
+        observed.public=false;observed.version="dev".into();assert!(verify_owned_windows_status(&observed).is_err());
+    }
+    #[test]
+    fn local_trial_routing_is_explicit_distinct_and_cannot_advertise_off_machine(){
+        assert_eq!(private_client_addresses(&["127.0.0.4".into(),"127.0.0.3".into()]).unwrap(),"127.0.0.3,127.0.0.4");
+        for values in [vec![],vec!["127.0.0.1".into()],vec!["127.0.0.2".into()],vec!["192.168.1.2".into()],vec!["example.com".into()],vec!["127.0.0.255".into()],vec!["127.0.0.3".into(),"127.0.0.3".into()]]{assert!(private_client_addresses(&values).is_err());}
     }
     fn status() -> ServerStatus {
         parse_status(br#"{"name":"Spark","version":"0.8.0","network_version":33,"state":"in_game","map":"bloodgulch","game_type":"slayer","playlist":"playlists/spark_private.txt","players":2,"maximum_players":128,"minimum_players":1,"public":false,"uptime_seconds":10}"#).unwrap()

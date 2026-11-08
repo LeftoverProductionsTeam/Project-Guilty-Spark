@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createMultiplayerMap,openDrawer,openStudioMenu,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
-export async function nativeLiveRebuild({page,root,kit,invader,cache,call,receipt,expect,run}) {
+export async function nativeLiveRebuild({page,root,kit,invader,cache,call,receipt,expect,run,afterInitialCompile}) {
  const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
  const runtime=path.resolve(process.env.SPARK_TEST_CHUPATHINGY_ROOT??'');
  if(!process.env.SPARK_TEST_CHUPATHINGY_ROOT)throw Error('Select the owner-installed Chupathingy package');
@@ -96,6 +96,8 @@ export async function nativeLiveRebuild({page,root,kit,invader,cache,call,receip
  await expect.poll(async()=>(await call('read_workspace_history',{projectId:id})).history?.head.dirty,{message:'Baking must leave the explicitly saved source acknowledged; no new author edit occurred',timeout:15000}).toBe(false);
  expect((await call('quickforge_build_report',{projectId:id})).current).toBe(true);
  await page.screenshot({path:path.join(root,'logic-inspector.png')});
+ if(afterInitialCompile){receipt.projectId=id;await afterInitialCompile({id,compiled:first});receipt.originalsUnchanged=(await Promise.all(receipt.originals.map(async row=>await hash(row.file)===row.sha256))).every(Boolean);expect(receipt.originalsUnchanged).toBe(true);return;}
+
 
 
  await openStudioMenu(page);await(await use(page,'combobox','Active Halo runtime')).selectOption('chupathingyCe');await openDrawer(page,'Game connection');

@@ -1,5 +1,7 @@
 # Pending engineering requests
 
+Current8Nov continuation:16cf955d/3383e186 are preserved exactly as GS_2026-11-08_Complete_Product_End_To_End.txt and GS_2026-11-08_AI_Apocalypse_Combined_Workflow_Proof.txt under Master Engineering Prompts. First input is physically truncated mid-section9; complete addendum retained. Priority is actual dedicated AI Apocalypse/persistent Extraction plus the combined SparkLink→native build→Chupathingy→two-game-client path. Existing Windows host adapter is being extended for official v0.9.0c; ordinary hosting is a prerequisite, not AI/persistence acceptance. All prior human-only seam,19-region,VR and platform gates remain open. No new scheduler, request completion or wholesale requeue is implied.
+
 ## Overnight continuation — 5 November 2026
 
 **8 November first-seam priority (607600b0):** Complete instruction text is preserved in `Master Engineering Prompts/GS_2026-11-08_Make_Megaworld_Seam_Work.md`. Finish the current first Timberland/Sidewinder native seam before 19-region expansion. Preserve three separate travel routes. Use a coarse flat connector between actual source edges, then editable grade/width/elevation/shoulders and native material/UV shaping. Do not raise conditioning limits or label source checks as Halo compilation/gameplay. Four compact UI checks pass R53; Monitor/frame/left-spacing and flat-connector controls pass R57. Native path/compiler, human/Warthog/sniper, engine-loaded mods and wider format/runtime gates remain independent. Latest specifics belong in ACTIVE_TASK.md.

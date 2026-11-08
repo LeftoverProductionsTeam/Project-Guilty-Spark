@@ -40,7 +40,9 @@ pub fn chupathingy_playtest_members()->&'static [(&'static str,&'static str,u64)
  ("glslang-LICENSE.txt","17e70c676e1521ff3e4686f04a2053d93a7e28a33be8de7ec37ab0ff72feb677",54615),
 ] }
 pub fn supported_host()->bool{cfg!(all(target_os="windows",target_arch="x86_64"))}
-pub fn package(id:&str)->Result<Package>{catalog().into_iter().find(|p|p.id==id).ok_or_else(||crate::SparkError::Invalid("Unknown reviewed runtime package".into()))}
+/// Dedicated packages are not selectable interactive clients.
+pub fn community_server_package()->Package{Package{id:"chupathingy-server",name:"Chupathingy dedicated server",version:"v0.9.0c",runtime_id:RuntimeId::ChupathingyCe,url:"https://github.com/ChupathingyCE/chupathingyce/releases/download/v0.9.0c/chupathingyce-server-windows-x64.zip",release_page:"https://github.com/ChupathingyCE/chupathingyce/releases/tag/v0.9.0c",repository:"https://github.com/ChupathingyCE/chupathingyce",sha256:"04477e903be8ecfbf732a50bbb2f317dfc021cfd36aff5eda9f8f995608f6e4a",bytes:22043087,executable:"chupathingyce-server.exe",executable_sha256:"25a206c6c7d6454a6f6a41a8a5987a1e30334db7404e8bf895f1e8429485ce85",license:"GPL-3.0-or-later; bundled notices retained; no engine code linked into Spark",vr_verified:false}}
+pub fn package(id:&str)->Result<Package>{catalog().into_iter().chain([community_server_package()]).find(|p|p.id==id).ok_or_else(||crate::SparkError::Invalid("Unknown reviewed runtime package".into()))}
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct Plan {pub package:Package,pub files:usize,pub expanded_bytes:u64,pub omitted_aliases:Vec<String>}

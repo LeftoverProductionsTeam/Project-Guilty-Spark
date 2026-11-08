@@ -67,3 +67,15 @@ Prerequisites: a current source-matched desktop app; an editable QuickForge/BSP 
 5. Close/reopen Spark. Confirm lighting choices and the baked build identity survive. Change a lighting value, rebuild explicitly and inspect again. General Chupathingy in-place geometry/lighting writes are not claimed.
 
 Expected: standard native sky/lightmaps, correct selected materials, no change to original source files, and the actual game shows the intended authored lighting. Final radiosity costs more time; choose it only after the draft is reviewed. Separate results: controls/Save, native compilation/readback, game load, human visual quality, gameplay.
+
+## H22 — Chupathingy Windows dedicated native trial
+
+Prerequisites: current source-matched QA app; matching Chupathingy v0.9.0c; legally supplied NTSC Xbox UI/multiplayer maps; matching CE banks and a saved independently validated CE609 build for the custom-map case. Use copies/owned test storage. Do not accept or modify Windows Security/firewall settings during automation.
+
+1. Studio → Chupathingy → Online → Host game. Download verified server (21 MB), or locate the exact installed dedicated executable.
+2. Select a native Xbox multiplayer map and stock mode, or select Use current CE build. Start private dedicated server and wait for authenticated status. Record version, protocol, map/build/hash and process identity.
+3. For two independently configured local clients, use Local trial routing to name their loopback listening addresses (127.0.0.3,127.0.0.4 in the automated fixture; the server reserves127.0.0.2). This trial is loopback-only, not a LAN/public host. In two matching game clients use System Link to join the private session. Verify player movement, collision, visible authored geometry/materials, mutual damage and respawn. Record both clients and the server's count; two processes on one PC are not two physical computers.
+4. Restart map from Spark. Verify both clients see the correct map restart and remain compatible. Stop the server, reopen Spark and confirm the installation is retained while no game automatically starts.
+5. Record Pass/Fail/Blocked/Not run, tester/date, exact app/runtime/cache hashes, peer setup, screenshots, native logs and unchanged original inputs.
+
+This verifies ordinary private multiplayer hosting. AI Apocalypse, persistent extraction inventory/world state, native AI combat parity and the 30-second empty-game lifecycle require separate implementation and gameplay tests; they are not accepted by this checklist.

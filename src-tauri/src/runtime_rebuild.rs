@@ -104,7 +104,7 @@ fn registration(state: &AppState) -> Reply<runtime::RuntimeRegistration> {
     }
     Ok(registration)
 }
-fn checked_build(state: &AppState, project: &Project, build_id: Option<&str>) -> Reply<BuildRecord> {
+pub(crate) fn checked_build(state: &AppState, project: &Project, build_id: Option<&str>) -> Reply<BuildRecord> {
     let build = if let Some(id) = build_id { verified_build(state, project, id)? } else { current_build(state, project)? };
     if build.target != "gbx-custom" { return Err("Build the saved project as standard Custom Edition content for Chupathingy first".into()); }
     let output = build.output.as_ref().ok_or("Validated native output is missing")?;
@@ -122,11 +122,14 @@ fn checked_build(state: &AppState, project: &Project, build_id: Option<&str>) ->
     Ok(build)
 }
 fn copy_pin(source: &Path, target: &Path, expected: &str, total: &mut u64) -> Reply<()> {
+    copy_pin_bounded(source,target,expected,total,COPY_LIMIT)
+}
+pub(crate) fn copy_pin_bounded(source: &Path, target: &Path, expected: &str, total: &mut u64, limit:u64) -> Reply<()> {
     core::reject_links(source).map_err(error)?;
     core::reject_links(target).map_err(error)?;
     let size = fs::metadata(source).map_err(error)?.len();
     *total = total.checked_add(size).ok_or("Playtest copy size overflow")?;
-    if *total > COPY_LIMIT { return Err("Playtest inputs exceed 512 MiB; originals were not changed".into()); }
+    if *total > limit { return Err(format!("Playtest inputs exceed {} MiB; originals were not changed", limit/1024/1024)); }
     if maps::hash_file(source).map_err(error)? != expected { return Err("Playtest input changed before staging".into()); }
     fs::create_dir_all(target.parent().ok_or("Missing playtest parent")?).map_err(error)?;
     let mut input = fs::File::open(source).map_err(error)?;

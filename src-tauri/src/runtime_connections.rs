@@ -295,6 +295,7 @@ pub(super) async fn install_runtime_engine_download(app:tauri::AppHandle,id:Stri
   let current=engine_content_binding(&state,binding.content_registration_id.as_deref(),binding.dynamic_root.as_deref())?;
   if current!=(binding.data_root.clone(),binding.content_executable_sha256,binding.dynamic_root.clone()){return Err("Shared content selection changed; no engine was installed.".into());}
   let package=core::runtime_packages::package(&binding.package_id).map_err(error)?;
+  if package.id=="chupathingy-server"{return Err("Install this dedicated package from Online > Host; it is not an interactive runtime profile.".into());}
   let profile_id=format!("engine-{}-{}",package.id,package.version);
   {let lib=lock(&state.library)?;let profiles:Vec<runtime::RuntimeRegistration>=lib.setting("runtimeRegistrations").map_err(error)?;if profiles.len()>=24&&!profiles.iter().any(|p|p.id==profile_id){return Err("Keep at most 24 engine profiles; remove an unused profile before installation.".into());}}
   let status=state.map_downloads.status(&id).map_err(error)?;let download=status.receipt.ok_or("Engine download has not completed")?;

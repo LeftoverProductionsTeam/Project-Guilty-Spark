@@ -2,10 +2,13 @@
 use super::*;
 use spark_core as core;
 use spark_core::community_host as host;
+#[path = "community_host_process.rs"]
+pub(super) mod private_server;
 
 #[derive(Default)]
 pub(super) struct CommunityHostState {
     controls: HashMap<String, ControlSession>,
+    hosts: HashMap<String, Arc<private_server::Session>>,
 }
 struct ControlSession {
     owner: String,
@@ -332,6 +335,7 @@ pub(super) async fn community_control_disconnect(
 pub(super) fn release_window(state: &AppState, label: &str) {
     if let Ok(mut controls) = state.community_hosts.lock() {
         controls.controls.retain(|_, c| c.owner != label);
+        if let Some(host)=controls.hosts.remove(label){host.stop();}
     }
 }
 

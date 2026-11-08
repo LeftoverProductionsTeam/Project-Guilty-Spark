@@ -1,0 +1,255 @@
+# PROJECT GUILTY SPARK — AI APOCALYPSE, LIVE LINK, SPARKLINK & COMPLETE WORKFLOW PROOF
+
+## MANDATORY ADDENDUM — ALL THE TOOLS, AND THEN SOME
+
+This directive extends the complete Project Guilty Spark engineering mandate. It does not replace, reduce or defer any existing requirement.
+
+**Everything must be implemented through real creator workflows and proven using appropriate native tools, real engines, real game clients and evidence.**
+
+A feature does not count as complete because its UI exists, its source compiles, an integration class was created or a simulator passes.
+
+## 1. AI APOCALYPSE — DEPLOYABLE TO CHUPATHINGY DEDICATED SERVERS
+
+Create a genuine AI Apocalypse server/game-mode workflow using the existing Halo editor, gameplay authoring, AI, scenario, scripting and server systems.
+
+Include both persistent PvPvE extraction and the established Zombie Apocalypse restoration goals. Preserve their distinct rules and identities; do not replace the original Zombie Apocalypse mechanics with generic AI waves.
+
+### Actual gameplay
+
+Creators must be able to configure and play:
+
+- Covenant and Flood enemy populations.
+- AI squads, behaviors, patrols, ambushes and reinforcements.
+- Zombie/Flood infection and survival mechanics where supported.
+- Waves, continuous population and persistent encounter modes.
+- PvE, cooperative survival and PvPvE variants.
+- Player-versus-player combat alongside hostile AI.
+- Equipment, weapon and ammunition distribution.
+- Vehicles, defensive locations, interactive doors and triggers.
+- Server-controlled enemy difficulty and population limits.
+- Dynamic encounters across MegaWorld regions.
+- Server-side AI combat, damage, death and respawn.
+- Multiplayer synchronization of relevant AI and gameplay state.
+
+The system must handle real enemies, not scripted decorative models or visual-only NPCs.
+
+### Dedicated server support
+
+Use Chupathingy's actual dedicated server, supported Custom Edition map loading, gametype/playlist mechanisms, authenticated control API and native networking interfaces.
+
+Investigate the exact selected server version before implementing.
+
+A valid `.map` must load from its supported map directory. A valid gametype must actually appear in server configuration and execute its supported rules.
+
+Where advanced AI synchronization or persistence requires functionality beyond stock server interfaces, develop a narrow, versioned opt-in extension or collaborate with Milenko on an upstream solution.
+
+**Do not assume a standard Chupathingy gametype TOML file can implement arbitrary AI, inventory databases or custom network protocols.**
+
+Do not use unauthorized DLL injection, memory patching, security bypasses or unreviewed executable modifications.
+
+A configured server must remain compatible with ordinary Halo whenever the Apocalypse extension is disabled.
+
+### Real persistent-world behavior
+
+The ordinary Chupathingy server's documented game/playlist lifecycle is not the same as a persistent-world service.
+
+Implement an explicit, authoritative persistence contract covering:
+
+- Player identity and inventory.
+- Banked extraction items.
+- World and encounter state.
+- Loot regeneration and depletion.
+- Death and reconnection.
+- Server stop/start and crash recovery.
+- Controlled world reset and administrative recovery.
+- Configuration upgrades and rollback.
+- Zero-player behavior and the no-raid-timer requirement.
+
+Use durable, validated server-owned persistence separate from original maps and engine assets.
+
+Never claim persistence from a lobby that simply restarts the same map.
+
+## 2. COMPLETE EXTRACTION MAP CREATION WORKFLOW
+
+Spark must allow someone to create an actual extraction experience without hand-editing engine source.
+
+Prove the complete creator journey through its real desktop controls:
+
+**File → New or Open Map → Choose Extraction Mode → Configure World → Place Extraction Content → Configure AI → Configure Loot and Inventory → Save → Compile → Package → Configure Chupathingy Server → Launch → Join → Play → Extract → Reconnect.**
+
+The creator must be able to:
+
+- Select an existing map, author a new map or use MegaWorld.
+- Place and configure extraction zones.
+- Define plasma-pistol/no-shield starting rules.
+- Create loadout/inventory menus.
+- Place loot, weapons, ammo, health packs and overshields.
+- Set loot rarity, spawn rates and item availability.
+- Add Covenant and Flood spawn/encounter zones.
+- Configure PvPvE and server rules.
+- Specify player death, disconnection and extraction outcomes.
+- Save and reopen all settings.
+- Build real compatible native content.
+- Export a versioned deployment package with no proprietary bundled game assets.
+- Use Spark's existing Games & Tools/server workflow to deploy to a supported private Chupathingy server.
+- Join that server with two genuine game clients and prove all intended behaviors.
+
+**The UI must author and deploy working gameplay, not merely generate a configuration file whose rules the engine ignores.**
+
+## 3. LIVE LINK — CHUPATHINGY AND OPENH1
+
+Build and test each runtime adapter independently.
+
+For every supported Live Link operation:
+
+1. Detect the actual engine and exact version.
+2. Establish a supported, permissioned connection.
+3. Read the real game state.
+4. Make a supported change from Spark's UI.
+5. Verify the change is visible or effective in the running game.
+6. Verify actual game-side state/readback.
+7. Verify multiplayer host/client agreement when relevant.
+8. Disconnect safely.
+9. Reconnect and reconcile state.
+10. Validate appropriate Undo, rollback or rebuild behavior.
+
+Target actual supported operations such as object placement, supported tag changes, camera control, scenario interactions, live inspection and native reloads.
+
+Distinguish changes that work while a game is running from changes requiring a rebuilt map or engine restart.
+
+OpenH1's internal engine functions must not be presented as a public editor API.
+
+Where Chupathingy or OpenH1 lacks an appropriate interface, implement the Spark-side adapter and negotiate the smallest safe engine-side extension. Do not fabricate success.
+
+## 4. SPARKLINK — REAL MULTI-CREATOR ACCEPTANCE
+
+Use the established SparkLink implementation rather than starting a second collaboration system.
+
+Prove:
+
+- Two real Spark processes.
+- Two separate physical computers where available.
+- Shared source/project identity.
+- Concurrent placement and editing.
+- Geometry, tags, scenario and logic changes within supported schemas.
+- Revision ordering and conflict resolution.
+- Per-creator Undo/Redo.
+- Save and reopening.
+- Network interruption and reconnection.
+- One creator crashing while another continues.
+- Recovery without losing accepted work.
+- Actual native compilation of the reconciled result.
+
+Then run a combined demonstration:
+
+**Creator A edits → Creator B sees the change → SparkLink reconciles it → native content builds → Chupathingy launches it → both game clients observe the intended change.**
+
+Where a verified Live Link operation exists, additionally prove the live game receives that supported operation without requiring a rebuild.
+
+Do not confuse editor-to-editor synchronization with game-peer AI replication.
+
+## 5. USE PROVEN NATIVE TOOLS
+
+Prefer existing, tested tools and interfaces:
+
+- Halo's appropriate native editing kits and compilers for each supported target.
+- Invader for independent supported native inspection, extraction and verification.
+- Existing Spark BSP, tag, script, asset, build and recovery systems.
+- Verified Chupathingy dedicated-server packages, playlist/gametype formats and authenticated management API.
+- Version-pinned OpenCE/Faber capabilities where genuinely applicable.
+- Supported HaloScript and native gameplay mechanisms.
+- Existing regression, browser and desktop lifecycle test infrastructure.
+- Actual game clients, server logs, network captures and authoritative game-state observations for multiplayer acceptance.
+
+Do not build substitute game engines, duplicate the existing editor or create fake gameplay verification tools.
+
+External engines remain independently maintained. Follow their contribution rules, licenses and Code of Conduct.
+
+All optional engine installations and downloads must be verified, staged and reversible.
+
+## 6. PROVE EVERY USER WORKFLOW — WITHOUT EXCEPTIONS
+
+Audit every feature in the existing requirements ledger, including:
+
+- Map creation and editing.
+- BSP construction and MegaWorld seams.
+- Tag editing, importing, extraction and conversion.
+- Native asset and model workflows.
+- Textures, shaders, sound and animation.
+- Game modes, spawn points and objectives.
+- AI Apocalypse and Zombie Apocalypse.
+- Persistent extraction creation and server deployment.
+- Firefight and campaign authoring.
+- Runtime setup and managed downloads.
+- Server creation, hosting and game joining.
+- Machinima and Recording Director.
+- Live Link and SparkLink.
+- VR Forge and OpenH1 integration.
+- Interface Studio and user-customized layouts.
+- Walkthrough, help, navigation and accessibility.
+- Settings, error recovery, application restart and releases.
+
+For each requirement, track independently:
+
+**Actual UI workflow → persistent output → native validation → runtime behavior → multiplayer acceptance where applicable → human test readiness.**
+
+Use real mouse, keyboard, menus, buttons, dragging and dialogs.
+
+Automated tests must confirm the same paths rather than bypass them through internal APIs alone.
+
+Verify both success and failure cases.
+
+Capture exact source commit, test input, output hash, engine revision, test results, screenshots, logs and unresolved dependencies.
+
+Never mark unperformed headset, two-computer, real-game or gameplay tests as passed.
+
+## 7. SERVER-READY ACCEPTANCE TEST
+
+The AI Apocalypse/Extraction server milestone is complete only after the following actual demonstration:
+
+1. Create the scenario and game mode using Spark's interface.
+2. Compile and independently validate its native map.
+3. Package and deploy it through the approved Chupathingy workflow.
+4. Start a real headless Chupathingy dedicated server.
+5. Join with two independent game clients.
+6. Verify live Covenant and Flood AI across clients.
+7. Verify PvP combat, player damage and synchronized AI behavior.
+8. Verify starting equipment and shield settings.
+9. Collect loot and successfully extract.
+10. Verify authoritative saved inventory.
+11. Kill a player and verify the configured inventory consequences.
+12. Reconnect and verify persistent state.
+13. Restart the server and verify the intended persistent-world recovery.
+14. Verify no unintended raid timer.
+15. Exercise SparkLink collaboration and supported Live Link operations against the same authored content.
+16. Disable the mode and verify ordinary Halo gameplay remains functional.
+17. Record performance, memory, latency, recovery and failure behavior.
+
+Perform a bounded multi-client stability session before declaring the server deployment production-ready.
+
+If the current Chupathingy build cannot supply the needed AI/network functionality, preserve that explicit engine blocker, produce a testable versioned integration proposal and continue implementing the compatible Spark-side authoring pipeline.
+
+Never call the complete feature server-ready before this acceptance passes.
+
+## 8. FULL PRODUCT COMPLETION AUDIT
+
+Before the final handoff, reconcile **every approved requirement** against source, tests and evidence three separate times:
+
+**First:** implementation and user controls.
+
+**Second:** native output, game compatibility and failure recovery.
+
+**Third:** actual user workflows, gameplay, collaboration, multiplayer, headset and clean-machine release acceptance.
+
+Maintain a traceable requirement-by-requirement record of accepted, partial, blocked and missing functionality.
+
+Outstanding requirements must retain exact next engineering actions.
+
+Do not substitute a growing test count or a long status report for working features.
+
+Preserve all verified progress, existing user content and the current release work.
+
+**The mission is complete Halo creation, real AI Apocalypse gameplay on Chupathingy servers, native Live Link, real SparkLink collaboration, and proof that ordinary users can operate every feature from beginning to end.**
+
+# ALL THE TOOLS, AND THEN SOME.
+# ONE HALO. EVERY WORLD. EVERY TOOL. TOGETHER.
