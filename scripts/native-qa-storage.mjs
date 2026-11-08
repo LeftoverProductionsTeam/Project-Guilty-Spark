@@ -301,7 +301,21 @@ export async function admitCargoOutput(
 async function atomicJson(file, value) {
   const temporary = file + '.tmp-' + crypto.randomUUID();
   await fs.writeFile(temporary, JSON.stringify(value, null, 2), { flag: 'wx' });
-  await fs.rename(temporary, file);
+  try {
+    // Windows indexers/virus scanners can briefly hold the destination. Keep
+    // the last good manifest intact; never unlink it to force replacement.
+    for(let attempt=0;;attempt++){
+      try {await fs.rename(temporary,file);break;}
+      catch(error){
+        if(process.platform!=='win32'||!['EPERM','EACCES','EBUSY'].includes(error.code)||attempt>=6)throw error;
+        await new Promise(resolve=>setTimeout(resolve,25*2**attempt));
+      }
+    }
+  } catch(error){
+    // This exact nonce file belongs to this write, never to another writer.
+    await fs.unlink(temporary).catch(cleanup=>{if(cleanup.code!=='ENOENT')error.retainedTemporary=temporary;});
+    throw error;
+  }
 }
 let allocationMeterCache;
 async function prepareAllocationMeter(run, finish) {

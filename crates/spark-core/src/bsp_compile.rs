@@ -859,3 +859,202 @@ pub fn prepare_native(
   assert!(dependency_input(&source,&recovered,"../escape.bitmap").is_err());
  }
 }
+
+/// A bounded edit of an existing source placement, never a new native object.
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BaseTransform {
+    object_id: String,
+    block: String,
+    source_count: usize,
+    index: usize,
+    before_position: [f32; 3],
+    position: [f32; 3],
+    before_rotation: [f32; 3],
+    rotation: [f32; 3],
+    yaw_only: bool,
+    tag: Option<String>,
+}
+/// Resolve native fields from the trusted inspection, not renderer offsets.
+/// Structural additions/removals and editor-only metadata cannot be ignored.
+pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result<Vec<BaseTransform>> {
+    project.validate()?;
+    if project.scene.len() != base.objects.len() {
+        return invalid("Connected-world placement additions/removals need native scenario array authoring; no source object will be silently omitted");
+    }
+    let originals: BTreeMap<_,_> = base.objects.iter().map(|row|(row.id.as_str(),row)).collect();
+    let mut counts = BTreeMap::new();for row in &base.objects { *counts.entry(row.kind.as_str()).or_insert(0usize) += 1; }
+    let mut result = vec![];
+    for object in &project.scene {
+        let old = originals.get(object.id.as_str()).copied()
+            .ok_or_else(|| SparkError::Invalid("Connected-world placement identity differs from the original source".into()))?;
+        let mut expected = old.clone(); expected.position = object.position; expected.rotation = object.rotation;
+        if *object != expected {
+            return invalid(format!("{} changes native identity, scale or unsupported placement metadata; only original position/rotation edits are integrated", object.id));
+        }
+        if object == old { continue; }
+        let (block, prefix, yaw_only) = match old.kind.as_str() {
+            "Player spawn" => ("player_starting_locations", "spawn", true),
+            "Scenery" => ("scenery", "Scenery", false),
+            "Biped" => ("bipeds", "Biped", false),
+            "Vehicle" => ("vehicles", "Vehicle", false),
+            "Equipment" => ("equipment", "Equipment", false),
+            "Weapon" => ("weapons", "Weapon", false),
+            "Machine" => ("machines", "Machine", false),
+            "Sound scenery" => ("sound_scenery", "Sound scenery", false),
+            _ => return invalid(format!("{} has no reviewed connected-world native transform setter", old.kind)),
+        };
+        let index = old.id.strip_prefix(&format!("{prefix}-")).and_then(|v| v.parse::<usize>().ok())
+            .filter(|i| old.id == format!("{prefix}-{i}"))
+            .ok_or_else(|| SparkError::Invalid("Original native placement index is invalid".into()))?;
+        if old.source_offset.is_none() || old.rotation_offset.is_none()
+            || object.position.iter().any(|v| !v.is_finite() || v.abs() > 2048.)
+            || (yaw_only && (object.rotation[1] != 0. || object.rotation[2] != 0.)) {
+            return invalid(format!("{} exceeds the supported native position/rotation bounds", object.id));
+        }
+        let tag = old.tag_id.map(|id| {
+            let tag = base.tags.iter().find(|t| t.id == id)
+                .ok_or_else(|| SparkError::Invalid("Source placement tag is missing".into()))?;
+            let extension = match (old.kind.as_str(), tag.class.as_str()) {
+                ("Scenery", "scen") => "scenery", ("Biped", "bipd") => "biped",
+                ("Vehicle", "vehi") => "vehicle", ("Equipment", "eqip") => "equipment",
+                ("Weapon", "weap") => "weapon", ("Machine", "mach") => "device_machine",
+                ("Sound scenery", "ssce") => "sound_scenery",
+                _ => return invalid("Source placement class does not match its native scenario palette"),
+            };
+            let path = format!("{}.{}", tag.path, extension); safe_relative(&path)?; Ok(path)
+        }).transpose()?;
+        if tag.is_none() && !yaw_only { return invalid("Native placement has no verified palette tag"); }
+        result.push(BaseTransform { object_id: old.id.clone(), block: block.into(), source_count: counts[old.kind.as_str()], index,
+            before_position: old.position, position: object.position, before_rotation: old.rotation,
+            rotation: object.rotation, yaw_only, tag });
+    }
+    Ok(result)
+}
+fn transform_numbers(text: &str, expected: &[f32], degrees: bool) -> Result<()> {
+    let values = text.trim().split(',').map(|s| s.trim().parse::<f32>())
+        .collect::<std::result::Result<Vec<_>, _>>().map_err(|_| SparkError::Invalid("Native placement readback is not numeric".into()))?;
+    if values.len() != expected.len() || values.iter().zip(expected).any(|(a,b)| {
+        let a = if degrees { a.to_radians() } else { *a };
+        !a.is_finite() || if degrees { (a-b).sin().atan2((a-b).cos()).abs() > 0.0001 } else { (a-b).abs() > 0.0002 }
+    }) { return invalid("Native placement differs from its reviewed source transform"); }
+    Ok(())
+}
+/// Mutate only this build's private scenario. A divergent external tag is a
+/// conflict, not permission to overwrite the author's source edits.
+pub(crate) fn apply_base_transforms(project: &Project, base: &MapInspection, edit: &Path, runner: &Runner,
+    workspace: &Path, tags: &Path) -> Result<serde_json::Value> {
+    let rows = base_transforms(project, base)?;
+    let scenario = format!("{}.scenario", base.scenario_path);
+    let file = tags.join(safe_relative(&scenario)?); crate::reject_links(&file)?;
+    let before = maps::hash_file(&file)?;
+    let query = |flag: &str, field: String| runner.run(edit, &["-t".into(), tags.to_string_lossy().into_owned(), flag.into(), field, scenario.clone()], workspace, "bsp-gameplay-source", 30);
+    let read_transform = |row: &BaseTransform, position: &[f32; 3], rotation: &[f32; 3]| -> Result<()> {
+        let prefix = format!("{}[{}]", row.block, row.index);
+        transform_numbers(&query("-G", format!("{prefix}.position"))?, position, false)?;
+        transform_numbers(&query("-G", format!("{prefix}.{}", if row.yaw_only {"facing"} else {"rotation"}))?,
+            if row.yaw_only { &rotation[..1] } else { &rotation[..] }, true)
+    };
+    let mut counts = BTreeSet::new();
+    for row in &rows {
+        if counts.insert(row.block.clone()) {
+            let count = query("-C", row.block.clone())?.trim().parse::<usize>()
+                .map_err(|_| SparkError::Invalid("Native placement count is invalid".into()))?;
+            let expected = row.source_count;
+            if count != expected { return invalid(format!("{} native array differs from its original cache; reconcile external edits before rebuilding", row.block)); }
+        }
+        read_transform(row, &row.before_position, &row.before_rotation).map_err(|e| SparkError::Invalid(format!("{} source conflict: {e}", row.object_id)))?;
+        if let Some(expected) = &row.tag {
+            let slot = query("-G", format!("{}[{}].type",row.block,row.index))?.trim().parse::<usize>()
+                .map_err(|_|SparkError::Invalid("Native placement palette index is invalid".into()))?;
+            let palette = if row.block == "machines" { "machine_palette".to_string() } else if row.block == "sound_scenery" { "sound_scenery_palette".into() } else if row.block == "scenery" { "scenery_palette".into() } else { format!("{}_palette", row.block.trim_end_matches('s')) };
+            let actual = query("-G", format!("{palette}[{slot}].name"))?;
+            if !actual.trim().replace('/',"\\").eq_ignore_ascii_case(&expected.replace('/',"\\")) {
+                return invalid(format!("{} native palette tag differs from the source; reconcile it before rebuilding",row.object_id));
+            }
+        }
+    }
+    for batch in rows.chunks(24) {
+        let mut args = vec!["-t".into(),tags.to_string_lossy().into_owned()];
+        for row in batch {
+            let prefix = format!("{}[{}]",row.block,row.index);
+            if row.position != row.before_position { args.extend(["-S".into(),format!("{prefix}.position"),row.position.map(|v|v.to_string()).join(",")]); }
+            if row.rotation != row.before_rotation { args.extend(["-S".into(),format!("{prefix}.{}",if row.yaw_only {"facing"} else {"rotation"}),if row.yaw_only {row.rotation[0].to_string()} else {row.rotation.map(|v|v.to_string()).join(",")}]); }
+        }
+        args.push(scenario.clone()); runner.run(edit,&args,workspace,"bsp-gameplay-author",31)?;
+    }
+    for row in &rows { read_transform(row,&row.position,&row.rotation)?; }
+    Ok(serde_json::json!({"schemaVersion":1,"sourceSha256":base.sha256,"scenario":scenario,"beforeSha256":before,
+        "afterSha256":maps::hash_file(&file)?,"transforms":rows,"scope":"Original scenario position/rotation fields only; staged tag readback passed. Compiled readback and gameplay are independent gates."}))
+}
+/// Check every original placement, including untouched rows, against the
+/// compiled cache. Native datum IDs may change; class/path identities may not.
+pub(crate) fn verify_compiled_base(project: &Project, base: &MapInspection, compiled: &MapInspection) -> Result<()> {
+    base_transforms(project,base)?;
+    let tag = |inspection: &MapInspection,id: Option<u32>| id.and_then(|id|inspection.tags.iter().find(|t|t.id==id))
+        .map(|t|(t.class.clone(),t.path.replace('/',"\\").to_ascii_lowercase()));
+    let objects: BTreeMap<_,_> = compiled.objects.iter().map(|row|(row.id.as_str(),row)).collect();
+    for expected in &project.scene {
+        let actual = objects.get(expected.id.as_str()).copied()
+            .ok_or_else(||SparkError::Invalid(format!("Compiled base placement {} is missing",expected.id)))?;
+        if actual.kind != expected.kind || tag(base,expected.tag_id) != tag(compiled,actual.tag_id)
+            || actual.position.iter().zip(expected.position).any(|(a,b)|!a.is_finite() || (a-b).abs()>0.0002)
+            || actual.rotation.iter().zip(expected.rotation).any(|(a,b)|!a.is_finite() || (a-b).sin().atan2((a-b).cos()).abs()>0.0001) {
+            return invalid(format!("Compiled base placement {} differs from the authored source",expected.id));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod base_transform_tests {
+    use super::*;
+    fn source() -> (Project, MapInspection) {
+        let object = maps::SceneObject {id:"spawn-0".into(),name:"Player spawn 1".into(),kind:"Player spawn".into(),tag_id:None,
+            position:[1.,2.,3.],rotation:[0.,0.,0.],scale:[1.;3],visible:true,source_offset:Some(100),rotation_offset:Some(112),asset_id:None,source_model:None};
+        let base = MapInspection {header:maps::MapHeader {version:609,engine:"synthetic".into(),name:"fixture".into(),build:"fixture".into(),scenario_type:1,
+            file_size:2048,declared_size:2048,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false},
+            sha256:"0".repeat(64),tag_checksum:None,tags:vec![],objects:vec![object.clone()],decals:vec![],mesh:Default::default(),render_mesh:None,
+            model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"levels/fixture/fixture".into()};
+        let mut project=Project::new("Synthetic placement source");project.scene=vec![object];(project,base)
+    }
+    #[test]
+    fn existing_spawn_moves_in_native_axes_without_granting_structural_changes() {
+        let (mut project,base)=source();assert!(base_transforms(&project,&base).unwrap().is_empty());
+        project.scene[0].position[0]=1.25;project.scene[0].rotation[0]=std::f32::consts::FRAC_PI_2;
+        let plan=base_transforms(&project,&base).unwrap();assert_eq!(plan.len(),1);assert_eq!(plan[0].block,"player_starting_locations");
+        assert_eq!(plan[0].index,0);assert_eq!(plan[0].position,[1.25,2.,3.]);assert_eq!(plan[0].before_position,[1.,2.,3.]);assert!(plan[0].yaw_only);
+        let expected=project.scene.clone();
+        for change in 0..7 {project.scene=expected.clone();match change {
+            0=>project.scene[0].rotation[1]=0.2,1=>project.scene[0].scale=[2.;3],2=>project.scene[0].tag_id=Some(5),
+            3=>project.scene[0].source_offset=Some(200),4=>project.scene[0].visible=false,5=>project.scene[0].name="Unintegrated rename".into(),_=>project.scene[0].position[0]=2049.,
+        }assert!(base_transforms(&project,&base).is_err(),"unsafe change {change}");}
+        project.scene=expected;project.scene.clear();assert!(base_transforms(&project,&base).is_err());
+    }
+    #[test]
+    fn native_readback_handles_degree_output_and_rejects_stale_or_nonfinite_values() {
+        assert!(transform_numbers("90",&[std::f32::consts::FRAC_PI_2],true).is_ok());
+        assert!(transform_numbers("450",&[std::f32::consts::FRAC_PI_2],true).is_ok());
+        for value in ["NaN","inf","0","90,90"] {assert!(transform_numbers(value,&[std::f32::consts::FRAC_PI_2],true).is_err());}
+        assert!(transform_numbers("1,2,3",&[1.,2.,3.],false).is_ok());
+        assert!(transform_numbers("1,2,3.1",&[1.,2.,3.],false).is_err());
+    }
+    #[test]
+    fn compiled_readback_requires_authored_transform_and_all_untouched_placements() {
+        let (mut project,base)=source();project.scene[0].position[0]=1.25;
+        assert!(verify_compiled_base(&project,&base,&base).is_err());
+        let mut compiled=base.clone();compiled.objects=project.scene.clone();assert!(verify_compiled_base(&project,&base,&compiled).is_ok());
+        compiled.objects[0].position[0]=f32::NAN;assert!(verify_compiled_base(&project,&base,&compiled).is_err());
+        compiled.objects.clear();assert!(verify_compiled_base(&project,&base,&compiled).is_err());
+        project.scene=base.objects.clone();let mut compiled=base.clone();compiled.objects[0].rotation[0]=0.1;
+        assert!(verify_compiled_base(&project,&base,&compiled).is_err());
+    }
+    #[test]
+    fn missing_native_spans_and_unreviewed_source_kinds_cannot_be_transformed() {
+        let (mut project,mut base)=source();base.objects[0].source_offset=None;project.scene=base.objects.clone();project.scene[0].position[0]+=0.25;
+        assert!(base_transforms(&project,&base).is_err());
+        let (mut project,mut base)=source();base.objects[0].kind="Netgame item".into();project.scene=base.objects.clone();
+        assert!(base_transforms(&project,&base).unwrap().is_empty());project.scene[0].position[0]+=0.25;
+        assert!(base_transforms(&project,&base).is_err());
+    }
+}

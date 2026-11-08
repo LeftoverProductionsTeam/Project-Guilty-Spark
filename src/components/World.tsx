@@ -1749,7 +1749,7 @@ export default function World({
                             value={
                               property === 'rotation' ? Number(((value * 180) / Math.PI).toFixed(3)) : value
                             }
-                            label={`${property} ${i}`}
+                            label={property === 'rotation' ? `Rotation ${['Yaw', 'Pitch', 'Roll'][i]}` : `${property === 'position' ? 'Position' : 'Scale'} ${['X', 'Y', 'Z'][i]}`}
                             disabled={
                               property === 'rotation' &&
                               i > 0 &&

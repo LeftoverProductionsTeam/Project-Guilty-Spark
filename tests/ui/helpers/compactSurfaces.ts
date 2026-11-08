@@ -2,16 +2,37 @@ import {expect,type Locator,type Page} from '@playwright/test';
 const controls='button,a[href],input,select,textarea,summary';
 /** Read layout from the actual rendered surface and visit its visible page
  * controls. No scrollIntoView, forced clicks, style edits or mocked bounds. */
-export async function auditPagedSurface(surface:Locator){
+export async function auditPagedSurface(surface:Locator,options:{afterInitialLayout?:()=>Promise<void>}={}){
  await expect(surface).toBeVisible();
  await surface.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
  await expect.poll(async()=>Number(await surface.locator(':scope > .gs-page-viewport').evaluate(node=>node.getBoundingClientRect().height))).toBeGreaterThan(35);
- const count=Number(await surface.getAttribute('data-pages'));
- const seen=new Set<number>();
- let expected:number[]=[];const pages=[];
+
+ // Registration, fonts and native zoom can settle after the menu first opens.
+ // Require one coherent measured layout, then enumerate every page of it.
+ const settled=async()=>{
+  let previous='';
+  await expect.poll(async()=>{
+   const signature=await surface.evaluate(async(root,selector)=>{
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    const view=root.querySelector(':scope > .gs-page-viewport')!,body=view.firstElementChild!,bounds=body.getBoundingClientRect(),box=view.getBoundingClientRect();
+    const n=(value:number)=>Math.round(value*1000)/1000;
+    return JSON.stringify({pages:root.getAttribute('data-pages'),width:n(box.width),height:n(box.height),content:body.scrollHeight,
+     controls:[...body.querySelectorAll<HTMLElement>(selector)].map(node=>{const r=node.getBoundingClientRect();return [n(r.left-bounds.left),n(r.top-bounds.top),n(r.width),n(r.height)];})});
+   },controls);
+   const stable=signature===previous;previous=signature;return stable;
+  },{message:'Paged control layout must settle before auditing reachability',timeout:5000,intervals:[16,32,64]}).toBe(true);
+  return previous;
+ };
+ await settled();await options.afterInitialLayout?.();
+ for(let generation=0;generation<4;generation++){
+ const signature=await settled(),count=Number(await surface.getAttribute('data-pages'));
+ expect(Number.isInteger(count)&&count>0,'A paged surface must expose a positive measured page count').toBe(true);
+ const seen=new Set<number>();let expected:number[]=[];const pages=[];let changed=false;
  for(let page=1;page<=count;page++){
+  if(await settled()!==signature){changed=true;break;}
   const choice=surface.locator(':scope > .gs-surface-pages input[type=number]');
   if(count>1){await choice.fill(String(page));await expect(surface).toHaveAttribute('data-page',String(page));}
+  if(await settled()!==signature){changed=true;break;}
   const result=await surface.evaluate((root,selector)=>{
    const view=root.querySelector(':scope > .gs-page-viewport')!,box=view.getBoundingClientRect();
    const body=view.firstElementChild!;
@@ -33,7 +54,10 @@ export async function auditPagedSurface(surface:Locator){
   expect(result.visible.filter(item=>!item.clickable),'Another control must not cover a command target').toEqual([]);
   pages.push({page,controls:result.visible.length,viewport:result.viewport});
  }
+ if(changed||await settled()!==signature)continue;
  expect(expected.filter(index=>!seen.has(index)),'Every mounted control must be reachable on at least one page').toEqual([]);
  return {surface:await surface.getAttribute('data-surface'),controls:expected.length,pages};
+ }
+ throw Error('Paged controls kept changing during four complete reachability audits');
 }
 export async function auditVisiblePages(page:Page){const result=[];for(const surface of await page.locator('.gs-paged-surface:visible').all())result.push(await auditPagedSurface(surface));return result;}

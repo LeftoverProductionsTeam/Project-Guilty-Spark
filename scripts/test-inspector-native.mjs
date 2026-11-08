@@ -18,7 +18,7 @@ try{
   // Closing a details summary scrolls it into view. Measure the selected object
   // only after restoring the drawer to its top, rather than measuring that click.
   await panel.evaluate(e=>{for(const p of [e,...e.querySelectorAll('*')])if(p.scrollTop)p.scrollTop=0;});await page.waitForTimeout(100);
-  const position=panel.getByRole('spinbutton',{name:'position 0',exact:true});const positionBox=await position.boundingBox(),rendererBox=await renderer.boundingBox(),nameBox=await name.boundingBox(),panelBox=await panel.boundingBox();const selectionBeforeRenderer=positionBox.y<rendererBox.y;
+  const position=panel.getByRole('spinbutton',{name:'Position X',exact:true});const positionBox=await position.boundingBox(),rendererBox=await renderer.boundingBox(),nameBox=await name.boundingBox(),panelBox=await panel.boundingBox();const selectionBeforeRenderer=positionBox.y<rendererBox.y;
   const transformAboveFold=positionBox.y>=Math.max(0,panelBox.y)&&positionBox.y+positionBox.height<=Math.min(size.height,panelBox.y+panelBox.height);expect(nameBox.y).toBeGreaterThanOrEqual(Math.max(0,panelBox.y));
   const collapsed={size,selectionBeforeRenderer,transformAboveFold,positionY:positionBox.y,nameY:nameBox.y,panelHeight:panelBox.height,rendererY:rendererBox.y};
   if(!baseline){expect(selectionBeforeRenderer).toBe(true);expect(transformAboveFold).toBe(true);}

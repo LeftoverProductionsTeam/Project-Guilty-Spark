@@ -33,6 +33,7 @@ if(rebuildOnly&&!logicOnly)throw Error('Live Rebuild acceptance uses the existin
 // MegaWorld-only acceptance uses the source-creation path, not the door benchmark.
 const crossRuntime=process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'||process.env.SPARK_QA_MEGAWORLD_ONLY==='1';
 if(crossRuntime&&!logicOnly)throw Error('Cross-runtime asset acceptance uses the existing native logic workflow');
+if(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'&&![process.env.SPARK_QA_RUNTIME_ROOT,process.env.SPARK_QA_MEGAWORLD_BASE,process.env.SPARK_QA_MEGAWORLD_DONOR].every(Boolean))throw Error('MegaWorld native acceptance requires the explicit owned runtime root and both source map paths');
 if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('Native logic authoring requires its own bounded run');
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20','50'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 or50 edits');
@@ -403,6 +404,26 @@ try{
       report.megaWorldCreation={};const {nativeMegaWorldCreation}=await import('./native-logic-roundtrip.mjs');
       await nativeMegaWorldCreation({page:main,call:(command,args)=>invoke(main,command,args),receipt:report.megaWorldCreation,expect,root,run:runOwned,invader:path.resolve(invaderDirectory),baseFile:process.env.SPARK_QA_MEGAWORLD_BASE,donorFile:process.env.SPARK_QA_MEGAWORLD_DONOR});
       step('File/New creates an independent native two-source world, then Save and reopen retain its plan');
+      if(process.env.SPARK_QA_MEGAWORLD_AUTHORED==='1'){
+        if(process.env.SPARK_QA_MEGAWORLD_TARGET!=='chupathingyCe')throw Error('Authored connected native scenario acceptance requires the explicit CE/Chupathingy target');
+        const id=report.megaWorldCreation.projectId,initial=(await invoke(main,'open_project',{id})).project;
+        const source=initial.scene.find(object=>object.kind==='Player spawn');expect(source).toBeTruthy();
+        await chooseTool(main,'Level editor');await openDrawer(main,'Objects');
+        const objects=main.getByRole('region',{name:'Objects panel',exact:true});await objects.getByLabel('Search scene objects',{exact:true}).fill(source.name);
+        await objects.getByRole('button',{name:source.name,exact:true}).click();await openDrawer(main,'Inspector');
+        const field=main.getByRole('region',{name:'Inspector panel',exact:true}).getByRole('spinbutton',{name:'Position X',exact:true});await revealPagedControl(field);
+        const expected=source.position.map((value,index)=>index===0?value+.25:value);await field.fill(String(expected[0]));await field.press('Tab');
+        const current=async()=>{const value=await state(main,id);return value.project.scene.find(object=>object.id===source.id);};
+        await expect.poll(async()=>(await current()).position).toEqual(expected);
+        await main.keyboard.press('Control+z');await expect.poll(async()=>(await current()).position).toEqual(source.position);
+        await main.keyboard.press('Control+y');await expect.poll(async()=>(await current()).position).toEqual(expected);
+        await main.getByLabel('File menu',{exact:true}).click();await main.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();
+        await expect.poll(async()=>(await state(main,id)).history.head.dirty).toBe(false);
+        const saved=(await invoke(main,'open_project',{id})).project;expect(saved.scene.find(row=>row.id===source.id).position).toEqual(expected);
+        report.megaWorldCreation.authoredScenario={id:source.id,name:source.name,before:source.position,expected,rotation:source.rotation,actualInspector:true,undoRedoImmediateSave:true,compiledReadback:false,gameplayAccepted:false};
+        await main.screenshot({path:path.join(root,'megaworld-authored-spawn.png')});
+        step('Existing Player start moves through actual Objects/Inspector, Undo/Redo and Save controls in the connected world');
+      }
     }
 
     const pid=child.pid;
@@ -513,6 +534,8 @@ try{
     await expect(main.getByLabel('Donor BSP section',{exact:true})).toHaveValue(String(world.bspAssembly.donorBspIndex));
     await expect(main.locator('.bsp-assembly .bsp-error')).toHaveCount(0);
     report.megaWorldCreation.fullProcessRestart=true;report.megaWorldCreation.reopenedNativeDonorControls=true;
+    if(report.megaWorldCreation.authoredScenario){const change=report.megaWorldCreation.authoredScenario;expect(world.scene.find(object=>object.id===change.id).position).toEqual(change.expected);change.fullProcessRestart=true;await main.getByRole('button',{name:'Deselect object',exact:true}).click();change.selectionRetainedAndExplicitlyCleared=true;}
+
     const donorStatus=main.getByTestId('assembly-source-status');
     await expect(donorStatus).toHaveAttribute('data-source-sha',report.megaWorldCreation.donorHash,{timeout:120000});
     await expect(donorStatus).toHaveAttribute('data-ready','true',{timeout:180000});
@@ -570,6 +593,17 @@ try{
       for(const tag of [scenario,bsp]){const extraction=await runOwned(path.join(invaderDirectory,'invader-extract.exe'),['-s',tag,'-t',extracted,output.output],{windowsHide:true,timeout:180000,maxBuffer:8*1024**2});expect(extraction.stdout+'\n'+extraction.stderr).not.toMatch(/Failed to extract|ERROR:/i);}
       const crc=Number((await runOwned(path.join(invaderDirectory,'invader-info.exe'),['-T','crc32_mismatched',output.output],{windowsHide:true,timeout:30000})).stdout.trim());expect(crc).toBe(0);
       const read=async(tag,field)=>(await runOwned(path.join(invaderDirectory,'invader-edit.exe'),['-t',extracted,'-G',field,tag],{windowsHide:true,timeout:30000})).stdout.trim();
+
+      if(report.megaWorldCreation.authoredScenario){
+        const change=report.megaWorldCreation.authoredScenario,slot=Number(change.id.slice('spawn-'.length)),field='player_starting_locations['+slot+'].position';
+        const actual=inspected.inspection.objects.find(object=>object.id===change.id);expect(actual).toBeTruthy();
+        const native=(await read(scenario,field)).split(',').map(value=>Number(value.trim()));expect(native).toHaveLength(3);
+        native.forEach((value,index)=>expect(value).toBeCloseTo(change.expected[index],3));
+        actual.position.forEach((value,index)=>expect(value).toBeCloseTo(change.expected[index],3));
+        const receipt=JSON.parse(await fs.readFile(path.join(path.dirname(path.dirname(output.output)),'megaworld-receipt.json'),'utf8'));
+        expect(receipt.authoredScenario.transforms).toHaveLength(1);expect(receipt.originalPlacementsVerified).toBe(world.scene.length);
+        change.compiledReadback={independentInvader:true,field,values:native,cacheSha256:inspected.inspection.sha256,sourceReceipt:receipt.authoredScenario,originalPlacementsVerified:receipt.originalPlacementsVerified};
+      }
       const ref=await read(scenario,'structure_bsps[0].structure_bsp');expect(ref.replaceAll('\\','/').toLowerCase()).toBe(bsp.replaceAll('\\','/').toLowerCase());
       if(report.megaWorldCreation.terrainSeam){
         const materials=[];

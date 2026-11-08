@@ -8,7 +8,7 @@ Chupathingy remains the preferred standard engine. OpenH1 is the immersive integ
 
 After release: close the first natural Timberland–Sidewinder seam; complete the 19-source cluster through real native geometry; verify every connection and Warthog/mountain route; then engine stability, end-to-end creator workflows, and separate Chupathingy/OpenH1 Live Link and SparkLink acceptance. Atlas planning, native compilation, human traversal, two-computer collaboration and in-headset editing remain distinct. Preserve all later feature goals.
 
-Current seam milestone: three independently editable routes now pass desktop source authoring and biped collision checks. Finish native compilation and actual cave/Warthog/canyon-top/sniper acceptance before propagating the pattern through all 19 regions. [Evidence](docs/MEGAWORLD_SEAM_ROUTES_20261108.md).
+Current seam milestone: three independently editable routes now pass desktop source authoring and biped collision checks. Native CE compilation, independent readback and isolated Chupathingy loading now pass R226, including an Inspector-authored player start. Finish actual cave/Warthog/canyon-top/sniper acceptance before propagating the pattern through all19regions. [Current scoped closure](docs/CI_NATIVE_SOURCE_CLOSURE_20261108.md). [Evidence](docs/MEGAWORLD_SEAM_ROUTES_20261108.md).
 
 The older checkpoints below are historical evidence, not a claim that the same blockers or source revisions are current.
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Windows Tools audit and native scenario transforms, 8 November2026
+
+- Reproduce CI's late Tools-page registration failure and repair measured-layout enumeration without relaxing control reachability, hit testing or no-scroll assertions. Add a genuine clipping rejection.
+- Integrate reviewed original scenario transforms into connected CE builds through staged native fields and independent compiled placement verification; prove an Inspector-edited player start in the real compiled cache and isolated Chupathingy load. Structural additions and unintegrated tag operations remain explicit limitations.
+- Expose meaningful transform-axis labels, keep source-aware How To current, and preserve the last storage receipt across bounded Windows sharing retries.
+- [Exact evidence and remaining gates](docs/CI_NATIVE_SOURCE_CLOSURE_20261108.md). Full-product, human gameplay and public-release acceptance remain open.
+
 ## Unreleased — Native lighting bake and Chupathingy Live Rebuild, 8 November 2026
 
 - Add explicit Bake lighting & rebuild to the existing QuickForge, BSP Workshop and editable BSP-assembly environment controls. Author a separate standard sky, run real Halo Tool radiosity and verify the compiled sky plus actual BSP lightmap pages/UVs before adopting output.

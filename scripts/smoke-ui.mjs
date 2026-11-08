@@ -14,7 +14,7 @@ await page.locator('.map-card').filter({ hasText: 'a10' }).first().click();
 await expect(page.locator('.viewport-label')).toContainText('Imported BSP', { timeout: 30000 });
 await expect(page.locator('canvas')).toBeVisible();
 await page.locator('.object-name').first().click();
-const position = page.getByRole('spinbutton', { name: 'position 0', exact: true });
+const position = page.getByRole('spinbutton', { name: 'Position X', exact: true });
 const original = Number(await position.inputValue());
 await position.fill(String(original + 0.25));
 await position.press('Tab');

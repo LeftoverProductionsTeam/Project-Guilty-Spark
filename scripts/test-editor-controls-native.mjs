@@ -36,7 +36,7 @@ try{
   const object=owned.project.scene.find(o=>owned.inspection.tags.some(t=>t.id===o.tagId&&t.class==='scen'&&t.path.replaceAll('\\','/')==='scenery/rocks/boulder/boulder'));expect(object).toBeTruthy();
   const collider=await call('preview_owned_object_collision',{projectId:owned.project.id,sourceSha256:owned.project.source.sha256,tagId:object.tagId});expect(collider.indices.length).toBeGreaterThan(0);
   await page.getByRole('button',{name:'Toggle Objects',exact:true}).click();await page.locator('.object-list .object-row').nth(owned.project.scene.findIndex(o=>o.id===object.id)).locator('.object-name').click();
-  await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();const z=page.locator('input[aria-label="position 2"]'),originalZ=Number(await z.inputValue()),raised=originalZ+12;
+  await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();const z=page.locator('input[aria-label="Position Z"]'),originalZ=Number(await z.inputValue()),raised=originalZ+12;
   await z.fill(String(raised));await z.press('Tab');await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await page.keyboard.press('End');
   await expect.poll(async()=>Number(await z.inputValue())).toBeLessThan(raised-5);const snapped=Number(await z.inputValue());expect(Math.abs(snapped-originalZ)).toBeLessThan(5);
   await page.keyboard.press('Control+z');await expect.poll(async()=>Number(await z.inputValue())).toBeCloseTo(raised,5);

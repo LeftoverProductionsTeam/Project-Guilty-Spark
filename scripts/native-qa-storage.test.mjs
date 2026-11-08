@@ -758,3 +758,35 @@ test('concurrent compiler temp renames do not abort measurement-only QA admissio
  }finally{child.kill();await new Promise(resolve=>child.exitCode!==null?resolve():child.once('close',resolve));}
  assert.ok((await fs.stat(writer)).isDirectory(),'unowned writer directory is retained');
 }));
+
+
+test('Windows transient manifest locks preserve the previous receipt and retry bounded atomic replacement', {skip:process.platform!=='win32'},()=>fixture(async parent=>{
+ const storage=await mkdir(path.join(parent,'storage')),output=await mkdir(path.join(storage,'owned'));
+ const finish=await beginQaStorage(output,{workflow:'manifest-retry-test',appSha256:'a'.repeat(64),storageRoot:storage,reservationBytes:1024**2,totalBytes:64*1024**2,minimumFreeBytes:0});
+ await finish.createScratch('baseline');
+ const file=path.join(output,'scratch-ownership.json'),before=await fs.readFile(file),rename=fs.rename;let denied=0;
+ try {
+  fs.rename=async(from,to)=>{if(to===file&&denied++<2){assert.deepEqual(await fs.readFile(file),before);throw Object.assign(Error('simulated temporary Windows sharing lock'),{code:'EPERM'});}return rename(from,to);};
+  await finish.createScratch('content');assert.equal(denied,3);
+ }finally{fs.rename=rename;}
+ assert.notDeepEqual(await fs.readFile(file),before);
+ assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false);
+ await finish('passed');
+}));
+
+test('manifest replacement errors do not delete the previous receipt or leave this writes temporary copy',()=>fixture(async parent=>{
+ const storage=await mkdir(path.join(parent,'storage')),output=await mkdir(path.join(storage,'owned'));
+ const finish=await beginQaStorage(output,{workflow:'manifest-error-test',appSha256:'a'.repeat(64),storageRoot:storage,reservationBytes:1024**2,totalBytes:64*1024**2,minimumFreeBytes:0});
+ await finish.createScratch('baseline');
+ const file=path.join(output,'scratch-ownership.json'),before=await fs.readFile(file),rename=fs.rename;let attempts=0;
+ try {
+  fs.rename=async(from,to)=>{if(to===file){attempts++;throw Object.assign(Error('nontransient failure'),{code:'EIO'});}return rename(from,to);};
+  await assert.rejects(finish.createScratch('content'),{code:'EIO'});
+ }finally{fs.rename=rename;}
+ assert.equal(attempts,1);assert.deepEqual(await fs.readFile(file),before);
+ assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false);
+ // A subsequent owned registration persists the already-owned in-memory
+ // namespace too; nothing unowned is adopted or silently removed.
+ await finish.createScratch('recovered');
+ await finish('passed');
+}));

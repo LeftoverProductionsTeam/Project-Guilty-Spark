@@ -102,7 +102,7 @@ try {
   await expect(page.locator('.viewport-status')).toContainText('5,940');
   await expect(page.getByRole('button', { name: 'Wireframe', exact: true })).toHaveClass(/active/);
   await page.locator('.object-name').first().click();
-  const position = page.getByRole('spinbutton', { name: 'position 0', exact: true });
+  const position = page.getByRole('spinbutton', { name: 'Position X', exact: true });
   const original = Number(await position.inputValue());
   async function near(input, value) {
     await expect.poll(async () => Number(await input.inputValue())).toBeCloseTo(value, 4);

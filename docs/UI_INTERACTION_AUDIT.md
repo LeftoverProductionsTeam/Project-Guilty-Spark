@@ -115,3 +115,12 @@ R207 independently read the saved descriptors, not only the UI/journal: A0.75 SH
 Verified implementation commit: e879581cffd26b2a786c7791ff1a5ead4a0e5fb9. The retained R205 app matches that commit’s complete runtime-source fingerprint0482e26b85d3fefdf4d544b695ca1656396edf9ee76d63fd1c89c69dec748f32. Original build manifest honestly records its pre-commit dirty-tree origin; it was not relabeled. Final compact inventory: E/interaction-source-inventory-r209/interactions.json,1,016,713bytes. Superseded self-generated QA binaries/inventories were retired; current app/baseline/evidence and C49/user assets remain. No installer or remote publication occurred.
 
 Nine opt-in Rust skips remain explicit: HTTPS provider check; reviewed running-MCC camera disconnect; owned BSP audio/detail serialization; owned MCC powerup compilation; owned campaign tag duplicate/UI-cache compilation; owned native emitter rename compilation; selected owned installation inventory; historical project native recovery. No skip is counted as a pass. All broader unsupported engine, human gameplay, physical peer and platform gates remain in the master ledger.
+
+
+## Current Windows regression closure — 8 November2026
+
+UI-CI-01: CI42514856941 reported Tools controls9–12 unreachable. Deterministic R223 reproduces a harness page-count/layout registration race using real PagedSurface. The shared audit now settles coherent geometry and enumerates every measured page, retaining all original fits/hit-test/no-scroll/all-mounted-control assertions. R22415repeats and R228four positive/negative checks pass; deliberate real clipping is still rejected. Hosted rerun remains pending owner push.
+
+UI-AXIS-01: R218 could not identify the actual Inspector X control because World exposed position0. Fields now have semantic axis labels; C61 browser contract and native R226 actual edit/Undo/Save/full-restart/compiled readback pass. Shared bsp-connections How To documents the existing native transform route and unsupported structural changes.
+
+R229 verifies90 controls per requested native size and saved scale/cache/flavor settings. R230 verifies A/B/C independent project descriptors, writer/view ownership, immediate Save, histories and restart; all eight picker layouts retain the canvas with no measured scrolling/unreachable controls. Direct Sky File-menu review is partial; physical monitor/DPI and whole-application acceptance remain open. [Source contracts and receipts](CI_NATIVE_SOURCE_CLOSURE_20261108.md).

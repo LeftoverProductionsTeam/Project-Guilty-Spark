@@ -13,7 +13,8 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("Import an original CE map first".into()))?;
     if source.sha256!=inspection.sha256||source.scenario_path!=inspection.scenario_path{return invalid("The base inspection belongs to another source revision");}
     if source.cache_version!=609||plan.donor_source.cache_version!=609||inspection.header.version!=609||inspection.mesh.parts.len()!=1||inspection.header.scenario_type!=1{return invalid("Initial CE Megaworld acceptance needs a single-BSP CE multiplayer base and a CE donor; cross-runtime source conversion is a separate step");}
-    if !project.tag_edits.is_empty()||project.scene!=inspection.objects||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.native_asset_imports.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.conversion_profile.is_some(){return invalid("This first CE connected-world path preserves original scenario placements. Other authored tag/object/asset/audio edits require their existing native build path and will not be silently omitted");}
+    crate::bsp_compile::base_transforms(project,inspection)?;
+    if !project.tag_edits.is_empty()||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.native_asset_imports.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.conversion_profile.is_some(){return invalid("Connected CE builds support original scenario position/rotation edits. Tag edits, structural placement/asset/audio changes and conversion profiles still require their validated native authoring path; nothing is silently omitted");}
     let tools=Toolchain{h1a_directory:target.hek_directory.clone(),base_tags_directory:target.tags_directory.clone(),invader_directory:target.invader_directory.clone(),..Default::default()};
     if tools.base_tags_directory.as_ref().is_none_or(|p|!p.is_dir())||crate::conversion::native_tool(&tools).is_none(){return invalid("Select matching extracted CE source tags and the installed H1A authoring kit");}
     for name in ["invader-edit","invader-build","invader-info","invader-dependency","invader-refactor"]{if build::tool_path(&tools,name).is_none(){return invalid(format!("{name} is required for connected CE source"));}}
@@ -44,12 +45,14 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     }
     let tags=dir.join("tags");let hashes=crate::forge_build::stage_tags(base_tags,&tags,&cancel,|done,total,_,_|{if done==total{runner.emit("stage",format!("Verified {total} isolated CE source tags"),20,"info");}})?;
     fs::create_dir(dir.join("data"))?;
-    crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags)?;
+    let authored=crate::bsp_compile::apply_base_transforms(project,inspection,&build::tool_path(&tools,"invader-edit").unwrap(),&runner,&dir,&tags)?;
+        project::atomic_write(&dir.join("authored-scenario.json"),&serde_json::to_vec_pretty(&authored)?,false)?;
+        crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags)?;
     let output=dir.join("output");fs::create_dir(&output)?;
     let build=build::tool_path(&tools,"invader-build").unwrap();
     runner.run(&build,&["-g".into(),"gbx-custom".into(),"-t".into(),tags.to_string_lossy().into_owned(),"-m".into(),output.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),inspection.scenario_path.clone()],&dir,"compile-ce",80)?;
     let name=inspection.scenario_path.rsplit(['\\','/']).next().ok_or_else(||SparkError::Invalid("No native scenario filename".into()))?;
-    let file=output.join(format!("{name}.map"));let compiled=maps::inspect_map(&file,None)?;
+    let file=output.join(format!("{name}.map"));let compiled=maps::inspect_map(&file,None)?;crate::bsp_compile::verify_compiled_base(project,inspection,&compiled)?;
     if compiled.header.version!=609||compiled.header.scenario_type!=1||compiled.mesh.parts.len()!=1||compiled.scenario_path!=inspection.scenario_path{return invalid("Native output has the wrong CE identity or resident BSP count");}
     let info=build::tool_path(&tools,"invader-info").unwrap();for field in ["crc32_mismatched","is_protected","stub_count"]{let value=runner.run(&info,&["-T".into(),field.into(),file.to_string_lossy().into_owned()],&dir,"validate-ce",90)?;if !["0","false"].contains(&value.trim().to_lowercase().as_str()){return invalid(format!("Native CE cache {field} failed: {value}"));}}
     let routes=crate::bsp_assembly::verify_compiled_routes(&file,std::slice::from_ref(plan))?;
@@ -65,7 +68,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     crate::native_lighting::verify_cache(project,&file,&compiled)?;
     let sha=maps::hash_file(&file)?;if sha!=compiled.sha256{return invalid("Compiled connected cache changed during validation");}
     let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message:"Two source regions and their authored connection compiled into one CE BSP; native dependencies, CRC and collision route checked. Player traversal remains unverified.".into(),project_fingerprint:project.fingerprint()?};
-    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
+    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":project.scene.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
     storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated","CE source compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)

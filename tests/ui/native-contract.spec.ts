@@ -177,6 +177,8 @@ test('C61 Inspector puts selected transforms before global settings and keeps al
   await openDrawer(page,'Objects');await page.locator('.object-name').first().click();await openDrawer(page,'Inspector');
   const panel=page.getByRole('region',{name:'Inspector panel',exact:true}),selected=panel.locator('.world-inspector-selection');
   await expect(selected).toBeVisible();const selection=await selected.boundingBox(),global=await panel.locator('.gs-render-features').boundingBox();expect(selection!.y).toBeLessThan(global!.y);
+  for(const label of ['Position X','Position Y','Position Z','Rotation Yaw','Rotation Pitch','Rotation Roll','Scale X','Scale Y','Scale Z'])await expect(selected.getByRole('spinbutton',{name:label,exact:true})).toHaveCount(1);
+  await expect(selected.getByRole('spinbutton',{name:'position 0',exact:true})).toHaveCount(0);
   await revealPagedControl(panel.locator('.gs-render-features>summary'));await panel.locator('.gs-render-features>summary').click();await revealPagedControl(panel.getByLabel('Enable renderer enhancements',{exact:true}));await panel.getByLabel('Enable renderer enhancements',{exact:true}).check();
   const controls=panel.locator('.gs-render-feature-controls');await revealPagedControl(controls.getByLabel('Bloom strength',{exact:true}));await expect(controls.getByLabel('Bloom strength',{exact:true})).toBeVisible();
   const bloom=controls.getByLabel('Bloom strength',{exact:true}),before=await bloom.inputValue();await bloom.focus();await page.keyboard.press('End');await expect(bloom).toHaveValue('2');
@@ -3678,4 +3680,28 @@ test('immediate Save after a map tab click belongs to the selected project in th
  await page.evaluate(()=>{const original=window.requestAnimationFrame,queue:FrameRequestCallback[]=[];window.requestAnimationFrame=callback=>{queue.push(callback);return 0;};try{(document.querySelector('[role="tab"][aria-label="Synthetic baseline"]') as HTMLButtonElement).click();document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'s',code:'KeyS',ctrlKey:true,bubbles:true}));for(let turn=0;queue.length&&turn<12;turn++){const batch=queue.splice(0);for(const callback of batch)callback(performance.now());}}finally{window.requestAnimationFrame=original;}});
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('a');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(39);
  await expect(velocity).toHaveValue('39');await page.getByRole('tab',{name:'Synthetic candidate',exact:true}).click();await expect(velocity).toHaveValue('45');await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-description','Unsaved changes');
+});
+
+
+test('Tools reachability audit follows a later measured page when mounted commands grow',async({page})=>{
+ await page.setViewportSize({width:1280,height:600});await mockDesktop(page);
+ await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountLateTools();});
+ const surface=page.locator('[data-surface="late-tools-regression"]');await expect(surface).toHaveAttribute('data-pages','1');
+ const result=await auditPagedSurface(surface,{afterInitialLayout:async()=>{
+  await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).growLateTools();await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));});
+  await expect(surface).toHaveAttribute('data-pages','2');
+ }});
+ expect(result.controls).toBe(13);expect(result.pages).toHaveLength(2);
+ await surface.getByRole('button',{name:'Fixture command 13',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__pagingClicks)).toEqual([12]);
+});
+
+
+test('Tools reachability still rejects a genuinely clipped command after page growth',async({page})=>{
+ await page.setViewportSize({width:1280,height:600});await mockDesktop(page);
+ await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountLateTools();});
+ const surface=page.locator('[data-surface="late-tools-regression"]');await expect(surface).toHaveAttribute('data-pages','1');
+ await expect(auditPagedSurface(surface,{afterInitialLayout:async()=>{
+  await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).overflowLateTools();});
+ }})).rejects.toThrow('Every visible control must be fully reachable');
 });

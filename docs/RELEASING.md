@@ -17,7 +17,7 @@ The manually triggered workflow is [`.github/workflows/release.yml`](../.github/
 6. After publication, confirm an anonymous visitor can download the installer:
 
 ```powershell
-node scripts/release/verify-public.mjs v0.4.1-preview.1 FULL_SOURCE_COMMIT .local/public-download-receipt.json
+node scripts/release/verify-public.mjs v0.4.1-preview.2 FULL_SOURCE_COMMIT "$releaseRoot/public-download-receipt.json"
 ```
 
 This read-only check refuses a draft, missing Windows installer/portable package, wrong commit, mismatched hashes or unverified extra assets. Public distribution is complete only when this succeeds against an approved public release. Draft downloads require repository write access and are not yet public distribution.
@@ -57,9 +57,14 @@ Editor startup is not Halo gameplay acceptance. MCC/CE/OpenCE/Chupathingy proces
 Use Python 3.11+ and the existing locked Node/Rust toolchains. From a clean committed source checkout:
 
 ```powershell
-node scripts/release/gates.mjs FULL_COMMIT .local/release-gates
-node scripts/desktop.mjs build --bundles nsis -- --locked
-python -B scripts/release/package.py stage --commit FULL_COMMIT --preview 1 --platform windows-x64 --output releases/windows-x64
+$releaseRoot = Join-Path $env:TEMP 'GuiltySpark-Release-0.4.1-preview.2'
+if (Test-Path -LiteralPath $releaseRoot) { throw 'Choose a fresh release directory; preserve the previous candidate.' }
+New-Item -ItemType Directory -Path $releaseRoot | Out-Null
+node scripts/release/gates.mjs FULL_COMMIT "$releaseRoot/gates-windows"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+node scripts/desktop.mjs build --bundles nsis --export-to "$releaseRoot/build" -- --locked
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+python -B scripts/release/package.py stage --commit FULL_COMMIT --preview 2 --platform windows-x64 --build-root "$releaseRoot/build" --output "$releaseRoot/windows-x64"
 ```
 
 Then follow the workflow's extraction, native startup and NSIS installation steps. Only after their exact receipts pass does `package.py seal` create a verified manifest and checksums. `package.py verify` checks the complete final directory. `candidate.json` alone is explicitly unaccepted staging metadata.

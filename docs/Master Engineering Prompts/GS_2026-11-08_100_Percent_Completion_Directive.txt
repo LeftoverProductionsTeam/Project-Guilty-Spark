@@ -1,0 +1,1036 @@
+# PROJECT GUILTY SPARK
+# THE 100% COMPLETION DIRECTIVE
+## ALL THE TOOLS, AND THEN SOME.
+### One Halo. Every World. Every Tool. Together.
+
+**Date:** November 8, 2026  
+**Mission:** Complete Project Guilty Spark as a fully integrated, reliable, playable and distributable Halo 1 creation studio.
+
+---
+
+# EXECUTIVE MANDATE
+
+Project Guilty Spark has advanced from a basic Halo map editor into a substantial native modding environment. It can inspect Halo maps, work with original assets, author native geometry, compile supported modifications, connect to external tools, and operate against several Halo 1 runtimes.
+
+However, numerous features remain partial, disconnected, insufficiently tested or unavailable to ordinary creators.
+
+**Your assignment is to finish the product, not merely continue development.**
+
+The ultimate target is 100% completion of every technically feasible, user-approved feature and workflow, with genuine native and gameplay acceptance.
+
+Do not interpret this as a demand to fabricate completion. A feature counts as complete only when its promised functionality works, its output is verified, its limitations are documented, and its relevant acceptance tests pass.
+
+Do not stop after planning, auditing, creating another feature ledger, or delivering another list of unfinished work.
+
+**Investigate → reproduce → implement → test → verify → integrate → document → commit → continue.**
+
+Every continuation must make meaningful engineering progress against the remaining backlog.
+
+## 1. BEGIN WITH THE ACTUAL REPOSITORY
+
+Repository:
+
+`https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark`
+
+Known upstream checkpoint:
+
+`1a60fa15f1582a9fb1021fb46f4779ef25bf6e24`
+
+This checkpoint is a reference, not a permanent assumption. Recheck the actual local and upstream state before making changes.
+
+Read and reconcile:
+
+- `AGENTS.md`
+- `README.md`
+- `ROADMAP.md`
+- `CHANGELOG.md`
+- `docs/ACTIVE_TASK.md`
+- `docs/CURRENT_FEATURES.md`
+- `docs/MASTER_FEATURE_LEDGER.csv`
+- `docs/MASTER_FEATURE_LEDGER.md`
+- `docs/DIRECTIVE_LEDGER.md`
+- `docs/PENDING_REQUESTS.md`
+- `docs/HUMAN_TEST_PLAN.md`
+- `docs/UI_INTERACTION_AUDIT.md`
+- `docs/RELEASING.md`
+- All Master Engineering Prompts, numbered 04 through 28.
+- Every subsequent owner directive, preserved engineering checkpoint and accepted test receipt.
+
+Preserve all 475 historical ledger identities and the original 25 numbered directives.
+
+These historical rows represent different requirements and evidence states. Do not assume that 475 records means 475 independently completed features.
+
+Build a traceability matrix connecting each distinct requirement to its actual implementation, owning function, UI control, native operation, supported runtimes, tests and remaining acceptance gates.
+
+**Do not regenerate the ledger in a manner that destroys historical evidence.**
+
+Also inspect uncommitted work, current source, native fixtures and source-preservation rules before touching existing functionality.
+
+## 2. NON-NEGOTIABLE ENGINEERING RULES
+
+1. Preserve the single canonical Spark repository/worktree and established local `master` workflow. Do not create nested repositories, duplicate project trees or unnecessary branches.
+2. Preserve all user-owned Halo games, ISOs, SDKs, maps, original mods, source tags, sound banks, installed runtimes and assets, regardless of their location or size.
+3. Never delete or overwrite the user-provided Halo Combat Evolved ISO used with Chupathingy.
+4. Preserve original Zombie Apocalypse material, MegaWorld sources, the existing C49 release, Git history and known-good builds.
+5. Never disable Windows security, bypass OS permission prompts, weaken repository protection or alter original game installations to make tests pass.
+6. Keep experiments and generated outputs in owned, bounded, disposable workspaces. Use hash-verified backups and previous-good recovery.
+7. Prefer improving current code to implementing competing managers, caches, editors, asset databases, server systems or network stacks.
+8. Use standard native Halo formats and supported target-specific sidecars. Do not introduce proprietary Halo tag extensions.
+9. Preserve compatibility between supported Halo versions without pretending their memory layouts, networking protocols or asset capabilities are identical.
+10. Never mark an operation successful solely because a function returned, a compiler exited successfully, a preview rendered or a client joined.
+11. Validate claims against the exact executable, map, source revision, runtime and test evidence.
+12. Do not force-push, rewrite history, bypass branch protection, automatically publish a Release or submit upstream contributions without authorization.
+
+**No safety regression, data loss or dishonest acceptance status is permitted in pursuit of 100%.**
+
+---
+
+# PHASE 0 — GET THE GITHUB RELEASE WORKING
+
+This is the immediate priority.
+
+The latest inspected `master` CI run was:
+
+`42514856941`
+
+It failed in Windows UI testing.
+
+The known failing test is:
+
+`tests/ui/native-contract.spec.ts`
+
+Specifically:
+
+`Level editor Tools menu commands receive clicks at 1280`
+
+The test found four mounted controls that were not reachable.
+
+Investigate:
+
+- Tools menu pagination and geometry.
+- Actual available viewport height.
+- Window scaling and native WebView zoom.
+- Hidden controls versus mounted controls.
+- Hit-test interception.
+- Layout measurement timing.
+- 800×600 through 5120×1440 acceptance.
+- Keyboard and pointer navigation.
+- Any other errors introduced by the latest changes.
+
+Fix the underlying production defect if it exists. If the evidence instead demonstrates a test-harness defect, repair the harness without weakening its reachability assertions.
+
+Also investigate previous Web Audio browser timeouts under concurrent native compilation. Determine whether there is a real performance defect, a scheduling limitation or a test isolation problem.
+
+Do not simply increase timeouts indefinitely.
+
+### Release requirements
+
+Use the existing `.github/workflows/release.yml`.
+
+Do not build a competing release pipeline.
+
+Require:
+
+- Green Rust, frontend, TypeScript, offline and browser checks.
+- Source and dependency verification.
+- Real Windows x64 Tauri compilation.
+- Working NSIS installation.
+- Working extracted portable application.
+- Clean initial workspace loading.
+- Fresh library creation.
+- Open/edit/save/restart operations.
+- Source and binary SHA-256 identity verification.
+- Installation and removal validation.
+- Correct runtime prerequisites.
+- Verified absence of proprietary Halo assets from public packages.
+- Accurate release notes and known limitations.
+- No regressions to previous-good build recovery.
+
+The existing `0.4.1` configuration should first produce an independently verified candidate such as `v0.4.1-preview.2`, using an unused tag.
+
+Do not pretend that an Actions artifact is a public GitHub Release.
+
+Prepare the draft using the existing verified workflow. Leave final public publication to the owner unless explicit authorization is given.
+
+After stabilizing this release, advance toward `0.5.0-alpha.1` when substantive integrated capabilities justify it.
+
+Do not declare version `1.0.0` until the full stable-release criteria are satisfied.
+
+### Required output for Phase 0
+
+Report the exact source commit, passing tests, remaining failures, verified package identities, draft-release status and any owner-only actions.
+
+Then resume engineering the unfinished product. Do not turn release preparation into a permanent holding pattern.
+
+---
+
+# PHASE 1 — COMPLETE THE ENTIRE CREATOR EXPERIENCE
+
+Guilty Spark must become a genuinely integrated Halo 1 creation studio.
+
+A creator should be able to:
+
+**Open Halo → inspect everything → modify anything supported → build → test → play → share.**
+
+Without having to understand five separate editors and manually stitch together ten disconnected processes.
+
+## 1.1 Complete map and tag editing
+
+Finish the supported native workflow for:
+
+- Map opening, discovery and indexing.
+- Cache inspection and validation.
+- Scenario and BSP inspection.
+- Standard Halo tags and dependencies.
+- Object properties and placements.
+- Weapons, equipment and vehicles.
+- Characters, bipeds and animations.
+- Shaders, bitmaps, materials and reflections.
+- Sounds, music, dialogue and emitters.
+- Scripts, globals, triggers and objectives.
+- Multiplayer starts and gametype markers.
+- Native extraction and rebuilding.
+- Supported source recovery.
+- Asset import, export and conversion.
+- Resource-map dependencies.
+- Safe independent output generation.
+
+Identify every tag class and operation currently absent, partially handled or silently approximated.
+
+Implement useful missing operations through the existing native source/build architecture.
+
+If a format cannot safely support an operation, refuse it accurately rather than corrupting content.
+
+**Structural compiled-cache edits are a major outstanding requirement.**
+
+Develop safe, explicitly supported structural-edit operations where native format knowledge allows them. Otherwise use verified extraction-to-source and native rebuild workflows.
+
+Do not use header-only conversions as proof of compatibility.
+
+## 1.2 One complete asset studio
+
+Integrate:
+
+- Model preview, skeletons, animation and variations.
+- Native collision geometry.
+- Bitmap extraction and replacement.
+- Shader material editing.
+- Texture assignment and UV controls.
+- Lighting and radiosity.
+- Halo audio classes and looping sounds.
+- Native resource dependencies.
+- Supported OBJ/JMS/Blender exchanges.
+- External editing reconciliation.
+- Native tag validation and rebuilding.
+
+Keep provenance and original dependencies visible.
+
+A successful asset import must lead to an actual buildable, readable result—not merely an item appearing in the editor.
+
+Test models, materials, textures, animation and sounds against the original game output.
+
+## 1.3 Integrated external tools
+
+Use existing Invader, Halo Tool, Guerilla, Sapien, Baboon, Blender and relevant community utilities where they are the most accurate implementation.
+
+Improve the existing orchestration so the user sees one coherent workflow.
+
+Automatically handle validated dependencies, source staging, command arguments, compilation, readback, errors and previous-good recovery.
+
+Do not turn Spark into a collection of unrelated external-tool launch buttons.
+
+---
+
+# PHASE 2 — FINISH WORLD EDITING AND BSP MASTERY
+
+This is a flagship capability.
+
+Spark should eventually provide Hammer++-style authoring for Halo 1, with the simplicity of Forge and the native accuracy of Sapien.
+
+## 2.1 Complete BSP Workshop
+
+Finish:
+
+- Four-view and 3D editing.
+- Brush and primitive creation.
+- Vertex, face and edge manipulation.
+- Real selection and gizmos.
+- Terrain sculpting.
+- Source geometry import/export.
+- Geometry transformations.
+- Room, corridor, ramp and tunnel construction.
+- Cave interiors and natural entrances.
+- Boolean operations.
+- Material assignment and UV alignment.
+- Lightmap UVs and native radiosity.
+- Fog, skies and environmental lighting.
+- Collision and sealed-world requirements.
+- Portals and visibility.
+- PVS and occlusion correctness.
+- Native physics boundaries.
+- Automated geometry repair and diagnostics.
+- Undo/Redo and safe source publication.
+
+Investigate failures reported historically in SwordEdit, Sapien, other Halo editors and community tools. Apply relevant lessons without assuming an external report proves a current Spark defect.
+
+Preserve exact native material behavior, including the important difference between sphere/player-vehicle collision surfaces and complete invisible collision surfaces.
+
+All geometry compilation must use disposable sources and preserve the previous-good result.
+
+## 2.2 Finish Timberland–Sidewinder
+
+The existing three-route connection is the immediate MegaWorld engineering foundation.
+
+Complete three independently usable routes:
+
+**Infantry cave:** natural entrance, correct height, collision, visibility and two-way traversal.
+
+**Warthog road:** continuous drivable surface, manageable grades, adequate width, clearance, shoulders and stable vehicle physics.
+
+**High-ground route:** continuous exposed ridge, mountain path, useful sniper sightlines and valid projectile behavior.
+
+Finish:
+
+- Seam geometry.
+- Source edge matching.
+- Material blending.
+- UV continuity.
+- Collision repair.
+- Portals.
+- Lightmap continuity.
+- Source and compiled-map agreement.
+- Real runtime playback.
+- Two-way human traversal.
+- Actual vehicle traversal.
+- Weapon/projectile checks.
+
+A compile and an automatic biped collision sample are necessary but not sufficient.
+
+**The connection is not complete until a player can cross it in the real game, return, and use the intended routes.**
+
+## 2.3 Build the complete 19-map MegaWorld
+
+After the first seam passes, expand through the planned 3–4–5–4–3 region structure.
+
+Use all 13 original Xbox multiplayer maps and six Halo PC additions, preserving each map's identity and compatible owned source assets.
+
+Develop:
+
+- Natural region transitions.
+- Mountains, roads, tunnels and caves.
+- Distinctive biome transitions.
+- Sniper and vehicle routes.
+- AI navigation and encounter zones.
+- Appropriate portals and visibility.
+- Native collision and lighting.
+- A safe, authoritative randomized teleport network.
+- Host/player synchronization.
+- Performance-aware world partitioning.
+- Native map compilation and game acceptance.
+
+Measure the actual engine's limits before promising seamless 19-region streaming or 128 simultaneous players.
+
+If one native map cannot reasonably hold the intended world, investigate a supported region-streaming/transition design rather than concealing the limit.
+
+Do not label an Atlas, editor preview or two-map prototype a complete MegaWorld.
+
+---
+
+# PHASE 3 — COMPLETE CHUPATHINGY, OPENCE, MCC AND LIVE INTEGRATION
+
+**One Halo. Every World. Every Tool. Together.**
+
+This requires deliberate interoperability, not pretending every runtime is identical.
+
+## 3.1 Chupathingy as the primary community-engine target
+
+Advance the existing Windows Chupathingy integration.
+
+The private dedicated-server prerequisite already has native evidence for two clients spawning and a guarded map restart.
+
+Now connect that to actual creation.
+
+Prove this complete sequence:
+
+1. Open a supported original map in Spark.
+2. Make a meaningful native geometry or gameplay edit.
+3. Save an exact revision.
+4. Share that revision through SparkLink.
+5. Freeze a verified build while other creators continue working.
+6. Compile the frozen source into a valid native CE map.
+7. Independently validate the compiled result.
+8. Stage only authorized content in an isolated Chupathingy environment.
+9. Start the verified private dedicated server.
+10. Connect two real Chupathingy game clients.
+11. Observe the exact new gameplay behavior.
+12. Handle another source revision and guarded rebuild/restart.
+13. Recover correctly if the new build is invalid.
+14. Stop and restart without losing the original project or previous-good result.
+
+Reuse the existing `checked_build(Some(buildId))` and source-identity mechanisms where appropriate.
+
+Do not weaken the current-source guard or silently substitute older builds.
+
+## 3.2 Complete Live Link and Live Rebuild
+
+Investigate every supported engine's legitimate runtime-editing interfaces.
+
+Target:
+
+- Live object transforms.
+- Camera movement and machinima.
+- Supported physics values.
+- Supported character and vehicle manipulation.
+- Live property inspection.
+- Safe source-edit projection.
+- Native rebuild while a private game is running.
+- Bounded reload/restart where supported.
+- Conflict detection.
+- Reconnection.
+- Undo/rollback.
+- Exact loaded-map and source identity.
+- Multiple editing windows.
+- Multiple Spark processes.
+- Stable multiplayer observations.
+
+Distinguish:
+
+**Source revision → Compiled revision → Running game revision.**
+
+Make these identities visible in the UI.
+
+Do not treat live memory changes as persistent authoring changes without verified adoption into native source.
+
+Do not add arbitrary memory pokes, unknown addresses or unsafe thread manipulation.
+
+Engine-specific capabilities must be version-pinned and backed by real executable tests.
+
+## 3.3 SparkLink collaboration
+
+Finish:
+
+- Multiple-author editing.
+- Single-writer ownership and authorized transfers.
+- Conflict resolution.
+- Durable Undo/Redo.
+- Offline editing and reconnect.
+- Crash recovery.
+- Frozen revisions and builds.
+- Two physical computers on LAN/VPN.
+- Long-lived sessions.
+- Permission and invitation controls.
+- Secure session transport.
+- Consistent source and asset identity.
+- Correct UI in all detached windows.
+- Safe participant departure and session rollover.
+
+Extend the working three-process architecture rather than replacing it.
+
+## 3.4 Runtime interoperability
+
+Build an explicit capability matrix for:
+
+- Halo PC Retail.
+- Halo Custom Edition.
+- Halo MCC H1A.
+- Xbox Halo Combat Evolved.
+- Halo Mac Retail.
+- Halo Mac Demo/HaloMD.
+- OpenSauce.
+- OpenCE/Chupathingy.
+- Faber and supported community flavors.
+- OpenH1, where its native capabilities can be validated.
+
+Every target must accurately describe which source formats, builds, gameplay operations and multiplayer features it actually supports.
+
+Investigate sharing maps, native content, hosting and player experiences between compatible runtimes.
+
+Use maintained upstream APIs and protocols wherever possible.
+
+Do not advertise universal cross-engine multiplayer until actual mixed-engine network sessions work.
+
+---
+
+# PHASE 4 — MAKE THE ORIGINAL GAME MODES PLAYABLE
+
+This is critical.
+
+A mod that compiles but has no stable gameplay is unfinished.
+
+## 4.1 Original Zombie Apocalypse
+
+Restore the original mod's identity and behavior.
+
+Finish the original:
+
+- Carrier and zombie spawning.
+- Weapon-driven automatic release.
+- Correct animations and vehicle attachment behavior.
+- Hostile movement and targeting.
+- AI navigation.
+- Damage and death.
+- Cleanup and respawn.
+- Audio and visual effects.
+- Original sound cues.
+- Wave and survival behavior.
+- Multiplayer replication.
+- Client join/reconnect.
+- Reliable game completion or endless-survival loops.
+
+Preserve original content and intent.
+
+Do not silently substitute a different generic zombie implementation simply because its tests pass.
+
+Resolve native animation, actor physics, controller and dependency faults using original assets and target-specific evidence.
+
+Test real combat in Chupathingy and compatible Halo 1 runtimes.
+
+## 4.2 Native Firefight Creator
+
+Finish the existing Firefight tools and exports.
+
+Support:
+
+- Encounter placement.
+- Spawn zones and navigation.
+- Enemy wave composition.
+- Round progression.
+- Lives and shared lives.
+- Revives.
+- Scoring.
+- HUD/feedback.
+- Difficulty and skull-style modifiers where supported.
+- Supplies.
+- Restart and checkpoint behavior.
+- Solo and cooperative gameplay.
+- Native script generation.
+- Multiplayer AI synchronization.
+
+Test actual player combat, not merely scripted enemy kills or global counters.
+
+The creator should build the encounter through Spark and launch the resulting game mode without manually patching the generated source.
+
+## 4.3 Persistent Extraction
+
+Develop the requested MegaWorld extraction experience as a real supported Chupathingy game mode.
+
+Intended gameplay:
+
+- Spawn with a plasma pistol and no shields.
+- Choose carried equipment through a compatible interface.
+- Explore a persistent world without a mandatory raid timer.
+- Collect weapons, ammunition, equipment and resources.
+- Fight Covenant, Flood, bots and hostile players.
+- Reach valid extraction points.
+- Extract and bank items.
+- Retain banked inventory through appropriate server-side persistence.
+- Return with selected equipment.
+- Support reconnect and safe state recovery.
+- Offer sprint and dual wielding only where genuinely implemented.
+- Investigate optional proximity voice using maintained engine interfaces.
+
+Implement durability, atomic state publication and authoritative validation.
+
+An editor-side inventory JSON file is not proof of persistent in-game inventory.
+
+If engine modifications or plugins are required, research the exact supported interfaces and develop a maintained, permissioned integration.
+
+Respect Chupathingy upstream ownership and contribution standards.
+
+Do not inject arbitrary engine hooks, invent network messages or replace engine security mechanisms.
+
+## 4.4 Campaign and advanced gameplay
+
+Complete:
+
+- First Contact campaign workflow and actual mission completion.
+- Campaign tag/scenario editing.
+- AI encounters and navigation.
+- Objectives, triggers and cinematics.
+- Cutscene and camera authoring.
+- Checkpoints.
+- HaloScript generation.
+- Safe campaign compilation.
+- Game-mode setup.
+- King of the Hill markers.
+- CTF, Race, Slayer, Oddball and other supported multiplayer placements.
+- Powerups and teleporter placement.
+- Custom weapons and gameplay parameters.
+- Supported sprint, dual wield and movement features.
+- Cooperative campaign research and implementation.
+
+Use real game-mode acceptance for each supported target.
+
+Expanded six-player co-op, 128-player multiplayer, split-screen and cross-engine sessions remain explicit goals. Advance them through measured engine/network investigations and implementation where feasible.
+
+Do not invent a successful player-count or networking result.
+
+---
+
+# PHASE 5 — FINISH THE MULTIPLAYER AND COMMUNITY EXPERIENCE
+
+Spark should make creating, distributing and playing mods substantially easier.
+
+Complete:
+
+- Runtime-aware multiplayer hosting.
+- Compatible server/client discovery.
+- LAN/VPN/private hosting.
+- Community game browser.
+- Map and content compatibility checks.
+- Safe map downloading.
+- Automatic dependency verification.
+- Mod packaging.
+- Versioned map manifests.
+- Game-mode metadata.
+- Shared native content roots where supported.
+- Correct isolation of incompatible engines.
+- Multiplayer error reporting.
+- Join/rejoin and connection recovery.
+- Community attribution.
+- Clear licensing and content provenance.
+
+Research practical interoperability and PlayBridge opportunities without building a second incompatible Halo networking protocol.
+
+Where community engines are missing required functionality, isolate the smallest maintainable upstream contribution.
+
+For Chupathingy and other independent maintainers, respect their architecture and contribution guidelines. Prepare narrowly scoped patches and evidence, but do not submit PRs or contact maintainers without authorization.
+
+**The objective is to reduce the Halo community's fragmentation, not create another isolated ecosystem.**
+
+---
+
+# PHASE 6 — COMPLETE MAC, LINUX, VR AND PLATFORM INDEPENDENCE
+
+Preserve the full scope of directives #27 and #28.
+
+## 6.1 Mac Legacy Edition
+
+Implement useful native Apple Silicon macOS support for Spark.
+
+Priorities:
+
+- Native `.app` and `.dmg`.
+- Proper app resources and permissions.
+- First-run setup.
+- Halo Mac Retail format support.
+- Halo Mac Demo/HaloMD map inspection and editing.
+- Source-safe native conversions.
+- Legacy resource resolution.
+- Supported native asset editing.
+- Stable multiwindow UI.
+- Performance on Apple Silicon.
+- Correct packaging, signing/notarization when release requirements demand it.
+
+Do not claim modern native macOS support from source portability alone.
+
+Historical PowerPC-era Halo runtimes require explicit feasibility and compatibility boundaries.
+
+## 6.2 Linux
+
+Complete:
+
+- Native application compilation.
+- Tauri/WebKitGTK integration.
+- AppImage packaging.
+- DEB packaging.
+- Native startup.
+- GUI and editor workflows.
+- Runtime and tool discovery where supported.
+- Graphics compatibility.
+- Correct filesystem permissions and path handling.
+
+Do not publish Linux packages based only on successful compilation.
+
+## 6.3 OpenH1 and VR Forge
+
+Continue researched OpenH1 integration.
+
+Investigate:
+
+- Version-pinned engine interfaces.
+- Headset runtime support.
+- VR camera and input.
+- Object selection and manipulation.
+- In-headset source authoring.
+- Scene navigation.
+- Native collision interactions.
+- Saved changes and build output.
+- Desktop/VR handoff.
+
+Do not claim VR editing if only desktop source code or non-VR builds have been inspected.
+
+---
+
+# PHASE 7 — COMPLETE THE USER INTERFACE AND EVERY ADVERTISED WORKFLOW
+
+The interface must do exactly what it tells users it does.
+
+Continue the existing UI interaction audit, including its 1,736 source interaction templates. That inventory is not evidence of 1,736 successful native interactions.
+
+For every meaningful control, verify:
+
+**Label → Tooltip → Enabled state → Click/keyboard action → Actual operation → Result → Persistence → How To documentation.**
+
+Audit:
+
+- Home.
+- Library.
+- Maps and tags.
+- QuickForge.
+- BSP Workshop.
+- World editor.
+- Asset Studio.
+- Build and playtest.
+- Runtime setup.
+- Multiplayer hosting.
+- SparkLink.
+- Machinima.
+- Recording Director.
+- Interface Studio.
+- Storage and Cache.
+- Settings.
+- Learning Center.
+- Features.
+- Detached windows.
+- All context menus.
+
+Fix:
+
+- Misleading tooltips.
+- Dead buttons.
+- Hidden settings.
+- Unreachable controls.
+- Obscured UI.
+- Incorrect keyboard shortcuts.
+- Confusing project versus workspace navigation.
+- Incorrect Save ownership.
+- Stale asynchronous results.
+- Duplicate functionality.
+- Missing persistence.
+- Incomplete beginner workflows.
+- Incorrect feature documentation.
+- Controls that claim unsupported runtime capabilities.
+
+Ensure complete operation from 800×600 through ultra-wide displays.
+
+Validate actual window scaling, DPI, fullscreen, multiple physical monitors and detached editing windows.
+
+The UI should make advanced Halo creation approachable without sacrificing technical depth.
+
+Preserve the original Halo-inspired interface direction and local asset customization.
+
+Do not hide broken functionality as a substitute for repairing it.
+
+---
+
+# PHASE 8 — CODEBASE AUDIT, CONSOLIDATION AND PERFORMANCE
+
+This is a source-level engineering requirement, not merely a documentation exercise.
+
+## 8.1 Identify architectural bloat
+
+The latest audit found large areas needing inspection:
+
+- `src-tauri/src/app.rs`
+- `src/App.tsx`
+- `src/components/QuickForge.tsx`
+- `src/components/World.tsx`
+- `crates/spark-core/src/bsp_assembly.rs`
+- `crates/spark-core/src/storage.rs`
+- `tests/ui/native-contract.spec.ts`
+
+Inspect every substantial module and public function.
+
+Determine:
+
+- Its purpose.
+- Actual callers.
+- UI and IPC exposure.
+- Runtime dependencies.
+- Duplicate functionality.
+- Tests.
+- Dead/unreachable code.
+- Mutable state ownership.
+- Memory and allocation behavior.
+- Error handling.
+- Concurrency and lifecycle behavior.
+- Whether the operation belongs in the frontend, native adapter or shared core.
+
+Look specifically for duplicate loaders, redundant caches, oversized components, repeated decoding, stale asynchronous requests, expensive unnecessary scans and excess UI renders.
+
+Investigate localStorage thumbnail lifetime and cache growth rather than assuming the existing usage is harmless.
+
+Do not delete code merely because it lacks obvious direct callers; runtime registration, dynamic entrypoints, tests and historical compatibility must be checked.
+
+## 8.2 Controlled refactoring
+
+Refactor large modules into coherent, testable responsibilities when there is demonstrable benefit.
+
+Use existing architecture.
+
+Preserve public APIs, serialized formats, source identity, Undo/recovery and old-project compatibility.
+
+Make incremental changes with passing regression tests.
+
+Do not conduct a big-bang rewrite of the editor.
+
+## 8.3 Performance and memory
+
+Measure:
+
+- Cold startup.
+- First map loading.
+- Returning to a previously opened map.
+- Multi-map switching.
+- Bitmap and shader decoding.
+- Large BSP viewing.
+- Model and animation preview.
+- GPU memory.
+- CPU memory.
+- Multiple detached windows.
+- Native compilation.
+- Three-process SparkLink sessions.
+- Long editing sessions.
+- Build/rebuild cycles.
+- Storage growth and recovery.
+- Failed/repeated operations.
+
+Test representative original maps and large imported projects.
+
+Set measurable budgets based on stable baselines, not arbitrary invented targets.
+
+Prioritize eliminating unnecessary work and retaining useful source-bound caches.
+
+Preserve existing bounds and source ownership.
+
+Never trade correctness, collision, lighting or source integrity for a benchmark improvement.
+
+## 8.4 Documentation and repository hygiene
+
+The tracked GitHub tree contains approximately 50.8 MB of content, with most space in documentation, screenshots and fixtures.
+
+Audit documentation duplication and stale feature claims.
+
+Do not delete evidence, source manifests, screenshots or historical prompts without proving reference safety and preserving necessary history.
+
+Reduce unnecessary regeneration.
+
+Keep repository size and generated QA storage within established budgets.
+
+User-owned runtime content is exempt from generated-artifact cleanup regardless of size.
+
+Investigate all open dependency PRs independently. Merge nothing solely to obtain a newer version number.
+
+Run security and license checks without compromising original game data.
+
+---
+
+# PHASE 9 — PROVE COMPLETE END-TO-END ACCEPTANCE
+
+Do not measure completion through implementation counts alone.
+
+For each feature establish these evidence levels:
+
+| Level | Required proof |
+|---|---|
+| A — Source | Actual reviewed implementation exists |
+| B — Automated | Relevant unit/integration regression passes |
+| C — Native | Real desktop/native operation and authoritative readback pass |
+| D — Gameplay | Feature works as intended in a real supported Halo runtime |
+| E — Release | Feature survives clean installation, restart and applicable distribution/platform tests |
+
+Every requirement must declare the level needed to count as complete.
+
+Editor-only features may be complete without a gameplay requirement. Gameplay features cannot be complete without game acceptance. Platform-release requirements cannot be complete without the target platform.
+
+### Mandatory flagship journeys
+
+Prove all of the following where technically supported:
+
+1. Fresh install → first-run setup → original map import → edit → save → build → real playtest.
+2. Open two saved projects → retain independent unsaved changes → undo → switch → save → restart.
+3. Import a compatible model and texture → edit → compile → verify in Halo.
+4. Build a room/corridor/ramp → generate collision, materials and lighting → play it in Halo.
+5. Connect Timberland and Sidewinder → walk both ways → drive a Warthog → verify ridge and sniper routes.
+6. Collaborate through SparkLink → freeze source → compile → load that exact map on private Chupathingy → verify two game clients.
+7. Create Firefight → spawn enemies → engage in actual combat → finish waves → restart.
+8. Restore Zombie Apocalypse → automatic release → AI combat → death/cleanup → synchronized multiplayer.
+9. Create Extraction → enter raid → loot → extract → restart/reconnect → retrieve persistent inventory.
+10. Create a multiplayer gametype → place objectives/starts → compile → host → join and play.
+11. Create campaign content → compile → load → complete objective sequence and final mission state.
+12. Create a machinima scene → animate camera/takes → save → load in real target runtime → capture usable output.
+13. Perform compatible map/tag conversion → verify native resources, compiled behavior and actual gameplay.
+14. Run representative engine-specific Live Link operations with identity checks, source adoption and rollback.
+15. Run a clean Windows release, native Linux release and native macOS release on actual applicable platforms.
+
+Additional flagship requirements—including full MegaWorld, extended co-op, expanded multiplayer and VR—retain their own acceptance tests and feasibility assessments.
+
+Do not invent human input, hardware access, game results or operating-system tests.
+
+When a physical test or external permission is necessary, record the exact blocked step, prerequisites and owner action. Continue with other unblocked engineering work.
+
+---
+
+# PHASE 10 — MAKE COMPLETION MEASURABLE
+
+The earlier broad estimate was approximately 45% completion of the full envisioned product. Treat that as an initial planning estimate, not a verified baseline.
+
+Create and maintain an acceptance-weighted completion model using the canonical feature ledger.
+
+Account for:
+
+- Scope.
+- Implementation.
+- Native verification.
+- Gameplay verification.
+- Quality.
+- Platform coverage.
+- Release readiness.
+
+Distinguish complete, partial, blocked and unverified requirements.
+
+Do not count duplicate requirements multiple times.
+
+Do not mark a feature complete because it shares an IPC function or module with another accepted feature.
+
+Update completion estimates only when evidence warrants them.
+
+**100% means every in-scope, feasible, user-approved requirement has met its required acceptance level, with no unresolved release-blocking or critical defects.**
+
+Externally constrained or technically infeasible goals remain explicitly reported. They cannot be silently dropped, renamed or counted as complete.
+
+A truthful 80% with verified working software is more valuable than an invented 100%.
+
+---
+
+# EXECUTION STRATEGY — NO MORE ENDLESS PLANNING
+
+You have the entire existing codebase, test infrastructure, engineering history and feature ledger.
+
+Use them.
+
+## First engineering cycle
+
+1. Inspect current source/worktree/CI evidence.
+2. Reproduce the Windows Tools menu failure.
+3. Fix the real issue.
+4. Run focused and full regressions.
+5. Advance the verified Windows release candidate.
+6. Commit the tested changes locally.
+7. Report the exact release gate remaining, if any.
+
+Then immediately continue the highest-value unfinished integration.
+
+## Second engineering cycle
+
+Finish the source-bound SparkLink frozen-build → native compile → Chupathingy dedicated server → two actual game clients workflow.
+
+Do not stop at a successful native build.
+
+## Third engineering cycle
+
+Close actual Zombie Apocalypse and Firefight gameplay requirements, beginning with the unresolved original AI lifecycle and synchronization behaviors.
+
+## Fourth engineering cycle
+
+Finish the playable Timberland–Sidewinder seam and use it as the verified basis for MegaWorld expansion.
+
+## Subsequent cycles
+
+Continue through the remaining 475 historical ledger records, additional owner requests, creator workflows, interoperability improvements, platform targets, code consolidation and release acceptance.
+
+Always choose the highest-value unblocked task according to dependencies and user impact.
+
+Do not repeatedly audit an already understood subsystem without implementing or testing a concrete improvement.
+
+Do not create additional tracking architecture when the existing ledger can record the result.
+
+When a test fails, diagnose the cause, preserve evidence, repair the product or genuinely defective test, and run verification again.
+
+When a hardware, credential, engine or owner dependency blocks a task, document the precise requirement and move to the next useful engineering task.
+
+Never invent success to clear the backlog.
+
+---
+
+# REQUIRED REPORT AT THE END OF EACH CHECKPOINT
+
+Produce a concise engineering report containing:
+
+**1. Source status**
+- Starting and ending commit.
+- Files changed.
+- Dirty/clean worktree state.
+
+**2. Actual engineering work**
+- Bugs fixed.
+- Features completed.
+- Existing systems integrated.
+- Workflows improved.
+- Code duplication or performance problems removed.
+
+**3. Evidence**
+- Tests executed and results.
+- Native compiler/readback results.
+- Actual game-process/playability results.
+- Source preservation.
+- Runtime/version identities.
+- Performance measurements where relevant.
+
+**4. Failures**
+- Exact failed operation.
+- Root cause or current hypothesis.
+- Evidence collected.
+- Next actionable fix.
+- Any owner-only prerequisite.
+
+**5. Completion**
+- Previous verified completion estimate.
+- New justified estimate.
+- Exact features newly accepted.
+- Critical outstanding requirements.
+
+**6. Immediate continuation**
+- The next dependency-respecting engineering task.
+- Why it has priority.
+- The specific acceptance test required.
+
+Do not end with generic phrases such as “everything is ready,” “remaining items need testing,” or “the next agent should continue” without a concrete implemented result and a specific next action.
+
+Keep reports focused on proof and useful progress.
+
+---
+
+# FINAL PRODUCT DEFINITION
+
+Project Guilty Spark is successful when a Halo creator can do what previously required a fragmented ecosystem of disconnected tools.
+
+They can open original Halo content, inspect it, modify it, build valid native output, launch and test the result, collaborate, create new worlds and game modes, preserve their work, and share compatible mods.
+
+MegaWorld is physically explorable.
+
+Zombie Apocalypse and Firefight are genuinely playable.
+
+Extraction is a functioning persistent game mode.
+
+Chupathingy integration supports real creator-to-game workflows.
+
+Live Link and SparkLink are reliable within their verified runtime capabilities.
+
+Native editing produces correct Halo content.
+
+The UI is understandable and every advertised action functions.
+
+Windows, macOS and Linux have their independently validated releases.
+
+The repository is organized, safe, maintainable and reasonably efficient.
+
+The community can extend Spark without depending on undocumented hacks or one person's private workspace.
+
+This is what the original vision demands:
+
+## ALL THE TOOLS, AND THEN SOME.
+### ONE HALO. EVERY WORLD. EVERY TOOL. TOGETHER.
+
+**Final instruction: Stop optimizing the appearance of progress. Deliver working, independently verified functionality. Start with the release-blocking CI defect and the next complete creator-to-game workflow, then continue systematically toward the full product vision. Do not declare 100% until the evidence actually supports it.**
