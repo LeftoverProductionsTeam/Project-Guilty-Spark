@@ -8,6 +8,10 @@ const regionFocus = new WeakMap<HTMLElement,HTMLElement>();
 function visible(element:HTMLElement) {
   return !element.closest('[hidden],[inert],[aria-hidden="true"]') && element.getClientRects().length > 0;
 }
+export function focusCompositeItem(element:HTMLElement){
+  element.dispatchEvent(new CustomEvent('guilty-spark-focus-control',{bubbles:true}));
+  if(!element.closest('[inert]'))element.focus();
+}
 export function hasKeyboardDialog() {
   return [...document.querySelectorAll<HTMLElement>('[role="dialog"],[role="alertdialog"]')].some(visible);
 }
@@ -22,7 +26,7 @@ export function navigateComposite(event:ReactKeyboardEvent<HTMLElement>) {
   const group=tablist??menu;
   if(!group)return;
   const items=[...group.querySelectorAll<HTMLElement>(tablist?'[role="tab"]':menu?.id==='gs-workspace-navigation'?'button:not(:disabled),a[href]':'button:not(:disabled),a[href],[role^="menuitem"]')]
-    .filter(item=>visible(item)&&!item.matches(':disabled,[aria-disabled="true"]')&&(!tablist||item.closest('[role="tablist"]')===tablist)&&(!menu||menu.id==='gs-workspace-navigation'||item.closest('[role="menu"]')===menu));
+    .filter(item=>(visible(item)||!!item.closest('[data-gs-offpage]')&&item.getClientRects().length>0)&&!item.closest('.gs-surface-pages')&&!item.matches(':disabled,[aria-disabled="true"]')&&(!tablist||item.closest('[role="tablist"]')===tablist)&&(!menu||menu.id==='gs-workspace-navigation'||item.closest('[role="menu"]')===menu));
   if(!items.length)return;
   const at=items.indexOf(document.activeElement as HTMLElement);
   const vertical=!tablist||tablist.getAttribute('aria-orientation')==='vertical';
@@ -45,7 +49,7 @@ export function navigateComposite(event:ReactKeyboardEvent<HTMLElement>) {
     search.set(group,{value,at:now});
   }
   if(next<0)return;
-  event.preventDefault();event.stopPropagation();items[next].focus();
+  event.preventDefault();event.stopPropagation();focusCompositeItem(items[next]);
   if(tablist)items[next].click();
 }
 

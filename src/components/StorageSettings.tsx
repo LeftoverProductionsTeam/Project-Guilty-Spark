@@ -4,7 +4,8 @@ import { call, native } from '../api';
 import type { Project, Settings } from '../types';
 import { NumberField } from './ui';
 import { nativePreviewResourceStats, trimNativePreviewResources } from '../nativePreviewResources';
-import { previewBudgets, savePreviewBudgets, type PreviewBudgets } from '../resourceBudgets';
+import {decodedBitmapStats,trimDecodedBitmapPreviews} from '../ownedBitmapPreview';
+import { previewBudgets, savePreviewBudgets, validatePreviewBudgets, type PreviewBudgets } from '../resourceBudgets';
 import './storageSettings.css';
 interface Limits {
   previewBytes: number;
@@ -309,7 +310,7 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
       setApproved(false);
     }
   };
-  const memory = nativePreviewResourceStats();
+  const memory = nativePreviewResourceStats(),pixels=decodedBitmapStats();
   const retention = project ? automaticBackupLimit(project, settings) : 0;
   const unsavedBackupLimit = backup !== null && backup.automaticRetention !== retention;
   const eligible = report?.cleanup.eligible ?? [];
@@ -383,9 +384,9 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
         </span>
         <span>
           <b>
-            {size(memory.bytes)} / {size(memory.maxBytes)}
+            {size(memory.bytes+pixels.estimatedBytes)} / {size(previewBudgets().decodedMiB*1024**2)}
           </b>
-          Decoded preview memory
+          Reusable preview memory (estimate)
         </span>
       </div>
       {locations && <section className="gs-storage-project gs-storage-locations" aria-label="Mods and export locations">
@@ -573,7 +574,8 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
         <div className="gs-storage-limit-grid">
           {(
             [
-              ['decodedMiB', 'Decoded preview cache', 16, 512],
+              ['decodedMiB', 'Reusable preview cache', 16, 512],
+              ['inspectionMiB','Native map data cache',16,1024],
               ['textureMiB', 'Textures per viewport', 64, 1024],
               ['warmEditors', 'Warm map renderers', 1, 4],
             ] as const
@@ -582,10 +584,11 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
               {label}
               <input
                 type="number"
+                aria-label={label}
                 min={min}
                 max={max}
                 step={1}
-                value={previews[key]}
+                value={previews[key]??256}
                 onChange={(e) => setPreviews({ ...previews, [key]: e.target.valueAsNumber })}
               />
               {key === 'warmEditors' ? 'maps' : 'MiB'}
@@ -593,10 +596,13 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
           ))}
         </div>
         <button
-          onClick={() => {
+          onClick={async () => {
             try {
-              savePreviewBudgets(previews);
-              trimNativePreviewResources();
+              const valid=validatePreviewBudgets(previews);
+              if(native)await call('set_inspection_cache_budget',{bytes:valid.inspectionMiB!*1024**2});
+              savePreviewBudgets(valid);
+              trimNativePreviewResources();trimDecodedBitmapPreviews();
+              setPreviews({...previewBudgets()});
               setError('');
             } catch (e) {
               setError(String(e));
@@ -607,7 +613,7 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
         </button>
         <small>
           Texture limits estimate owned texture payloads; geometry, shaders and driver overhead are separate.
-          Existing scenes are preserved. Warm-renderer changes take effect on navigation; texture changes
+          Changed sources invalidate the affected entries. Inactive reusable data is evicted first; open project/history data stays intact. These are cache estimates, not a total RAM/GPU driver quota. Existing scenes are preserved. Warm-renderer changes take effect on navigation; texture changes
           apply to new image loads.
         </small>
       </details>

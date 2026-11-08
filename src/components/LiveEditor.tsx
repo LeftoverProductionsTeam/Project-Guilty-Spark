@@ -4,6 +4,7 @@ import { useThree } from '@react-three/fiber';
 import { Matrix3, Raycaster, Vector2, Vector3 } from 'three';
 import type { Project, MapInspection, MeshData, Vec3, SceneObject } from '../types';
 import LiveObjectInspector from './LiveObjectInspector';
+import RuntimeLiveRebuild from './RuntimeLiveRebuild';
 import type { LiveViewportControls, LiveStatus } from './LiveObjectInspector';
 import { matchesLiveMap, runtimeScene } from '../liveScene';
 import { Notice } from './ui';
@@ -266,6 +267,7 @@ export default function LiveEditor(props: Props) {
   const [runtime]=useMapState<RuntimeId>(props.project?.id??'global','hosting.runtime',props.project?.quickForge?.runtimeId??props.defaultRuntime ?? PREFERRED_RUNTIME);
   return <LiveObjectInspector presentation={props.sourceViewport!==undefined?'drawer':'sidebar'} controlsOpen={props.mode==='live'}
     runtimeId={runtime}
+    rebuildControls={runtime==='chupathingyCe'?<RuntimeLiveRebuild project={props.project} onSave={props.onBeforeResources}/>:undefined}
     keyboardEnabled={status=>!!status&&(props.mode==='live'||(props.mode!=='source'&&matchesLiveMap(props.project,props.inspection,status)))}
     viewport={(controls) => <LiveViewport {...props} controls={controls} />} />;
 }

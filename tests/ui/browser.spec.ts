@@ -1,10 +1,10 @@
-import {chooseTool,openDrawer,openStudioMenu} from './helpers/navigation';
+import {chooseTool,openDrawer,openStudioMenu,revealPagedControl} from './helpers/navigation';
 import { test, expect } from '@playwright/test';
 test('Storage keeps source cleanup separate from saved preview memory limits',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await page.goto('/');await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
  const panel=page.getByRole('region',{name:'Storage and cache settings'});await expect(panel).toBeVisible();await expect(panel.getByText('Open the desktop app to inspect local files and configure disk budgets.')).toBeVisible();await expect(panel.getByRole('button',{name:'Inspect storage',exact:true})).toBeDisabled();
- await panel.locator('summary').filter({hasText:'Preview memory & graphics'}).click();await panel.getByLabel('Decoded preview cache').fill('32');await panel.getByLabel('Textures per viewport').fill('128');await panel.getByLabel('Warm map renderers').fill('1');await panel.getByRole('button',{name:'Save preview limits',exact:true}).click();
- expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('spark.previewBudgets.v1')!))).toEqual({decodedMiB:32,textureMiB:128,warmEditors:1});await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();await panel.locator('summary').filter({hasText:'Preview memory & graphics'}).click();await expect(panel.getByLabel('Decoded preview cache')).toHaveValue('32');expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(0);
+ await panel.locator('summary').filter({hasText:'Preview memory & graphics'}).click();await panel.getByLabel('Reusable preview cache').fill('32');await panel.getByLabel('Textures per viewport').fill('128');await panel.getByLabel('Warm map renderers').fill('1');await revealPagedControl(panel.getByRole('button',{name:'Save preview limits',exact:true,includeHidden:true}));await panel.getByRole('button',{name:'Save preview limits',exact:true}).click();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('spark.previewBudgets.v1')!))).toEqual({decodedMiB:32,textureMiB:128,warmEditors:1,inspectionMiB:256});await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();await panel.locator('summary').filter({hasText:'Preview memory & graphics'}).click();await expect(panel.getByLabel('Reusable preview cache')).toHaveValue('32');expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(0);
 });
 
 test('Interface Studio keeps compact categories, keyboard navigation and saved place',async({page})=>{
@@ -127,7 +127,7 @@ test('workspace search keeps focus bounded and navigates with the keyboard', asy
   await search.fill('QuickForge');await search.press('Enter');
   await page.getByRole('button',{name:'Create a new Halo level',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Make a place to play.'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Create editable map',exact:true})).toBeDisabled();
+  await revealPagedControl(page.getByRole('button',{name:'Create editable map',exact:true,includeHidden:true}));await expect(page.getByRole('button',{name:'Create editable map',exact:true})).toBeDisabled();
   await expect(page.locator('#gs-window-header')).toBeVisible();await openStudioMenu(page);await launcher.click();await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByLabel('Studio options',{exact:true})).toBeFocused();
@@ -206,21 +206,21 @@ test('Dark Glow saves custom colors and keeps text white on dark surfaces',async
   await page.goto('/');
   await chooseTool(page,"Settings & tools");
   await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
-  await page.locator('.interface-theme-dark-glow').click();
+  await revealPagedControl(page.locator('.interface-theme-dark-glow'));await page.locator('.interface-theme-dark-glow').click();
   await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
-  const choose=async(label:string,color:string)=>page.getByLabel(label,{exact:true}).evaluate((element,value)=>{
+  const choose=async(label:string,color:string)=>{const control=page.getByLabel(label,{exact:true});await revealPagedControl(control);return control.evaluate((element,value)=>{
     const input=element as HTMLInputElement;
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,value);
     input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
-  },color);
+  },color);};
   await choose('Primary glow color','#ff5d9c');await choose('Secondary glow color','#83ffcd');
-  const strength=page.getByRole('slider',{name:'Glow strength',exact:true});await strength.focus();await strength.press('End');
+  const strength=page.getByRole('slider',{name:'Glow strength',exact:true,includeHidden:true});await revealPagedControl(strength);await strength.focus();await strength.press('End');
   await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--gs-glow-primary').trim())).toBe('#ff5d9c');
   await expect(page.locator('.analysis-card').first()).toHaveCSS('background-color','rgb(16, 23, 37)');
-  await expect(page.getByRole('heading',{name:'Make the workbench yours.'})).toHaveCSS('color','rgb(255, 255, 255)');
-  await expect(page.getByRole('button',{name:'Restore defaults',exact:true})).toHaveCSS('color','rgb(255, 255, 255)');
+  await expect(page.getByRole('heading',{name:'Make the workbench yours.',includeHidden:true})).toHaveCSS('color','rgb(255, 255, 255)');
+  await expect(page.getByRole('button',{name:'Restore defaults',exact:true,includeHidden:true})).toHaveCSS('color','rgb(255, 255, 255)');
   await choose('Primary glow color','#ffffff');
-  await expect(page.getByRole('button',{name:'Restore defaults',exact:true})).toHaveCSS('color','rgb(255, 255, 255)');
+  await expect(page.getByRole('button',{name:'Restore defaults',exact:true,includeHidden:true})).toHaveCSS('color','rgb(255, 255, 255)');
   await expect(page.locator('.analysis-card').first()).toHaveCSS('background-color','rgb(16, 23, 37)');
   await choose('Primary glow color','#ff5d9c');await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
@@ -228,8 +228,8 @@ test('Dark Glow saves custom colors and keeps text white on dark surfaces',async
   await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await expect(page.getByLabel('Primary glow color',{exact:true})).toHaveValue('#ff5d9c');
   await expect(page.getByLabel('Secondary glow color',{exact:true})).toHaveValue('#83ffcd');
-  await expect(page.getByRole('slider',{name:'Glow strength',exact:true})).toHaveValue('100');
-  await strength.focus();await strength.press('Home');
+  await expect(page.getByRole('slider',{name:'Glow strength',exact:true,includeHidden:true})).toHaveValue('100');
+  await revealPagedControl(strength);await strength.focus();await strength.press('Home');
   await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--gs-glow-percent').trim())).toBe('0%');
 });
 

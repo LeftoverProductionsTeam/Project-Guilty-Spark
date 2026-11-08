@@ -66,7 +66,7 @@ fn context(
         .find(|t| t.id == target_id)
         .ok_or("CE target no longer exists")?;
     if project.active_build_target.as_deref() != Some(target_id)
-        || target.runtime_id != core::runtime::RuntimeId::HaloCustomEdition
+        || !matches!(target.runtime_id,core::runtime::RuntimeId::HaloCustomEdition|core::runtime::RuntimeId::ChupathingyCe)
         || target.builder != "invader-ce"
     {
         return Err("Select this Custom Edition build target before reviewing its source".into());

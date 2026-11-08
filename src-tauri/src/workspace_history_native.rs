@@ -50,3 +50,8 @@ pub(super) fn take_project_document(state:State<AppState>,window:tauri::WebviewW
     lock(&state.document_owners)?.insert(id.clone(),window.label().into());
     let _=window.app_handle().emit("spark:window-history",serde_json::json!({"projectId":id,"owner":window.label()}));Ok(())
 }
+
+#[tauri::command]
+pub(super) fn set_inspection_cache_budget(state:tauri::State<'_,AppState>,bytes:usize)->Reply<serde_json::Value>{
+    let mut cache=lock(&state.inspections)?;cache.set_budget(bytes)?;Ok(cache.stats())
+}

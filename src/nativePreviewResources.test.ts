@@ -34,3 +34,29 @@ describe('one shared native preview resource broker',()=>{
   await nativePreviewResource('preview_owned_object_model',args,hash);expect(call).toHaveBeenCalledTimes(2);
  });
 });
+
+it('reuses an unchanged model after minutes away and releases only a closed map',async()=>{
+ const {releaseNativePreviewResources}=await import('./nativePreviewResources');
+ vi.mocked(call).mockResolvedValue({sourceSha256:hash,objectTagId:42,mesh:{positions:[1,2,3]}});
+ await nativePreviewResource('preview_owned_object_model',args,hash);
+ const clock=vi.spyOn(Date,'now').mockReturnValue(Date.now()+600000);
+ try{await nativePreviewResource('preview_owned_object_model',args,hash);expect(call).toHaveBeenCalledTimes(1);
+ releaseNativePreviewResources('another-map');expect(nativePreviewResourceStats().entries).toBe(1);
+ releaseNativePreviewResources(args.projectId);expect(nativePreviewResourceStats().entries).toBe(0);}finally{clock.mockRestore();}
+});
+
+it('never retains native responses beyond the saved CPU share and trims on a lower limit',async()=>{
+ const {savePreviewBudgets,nativePreviewBudget}=await import('./resourceBudgets');
+ const {trimNativePreviewResources}=await import('./nativePreviewResources');
+ const values=new Map<string,string>();vi.stubGlobal('localStorage',{getItem:(k:string)=>values.get(k)??null,setItem:(k:string,v:string)=>values.set(k,v)});
+ vi.stubGlobal('window',{dispatchEvent:vi.fn()});
+ try{
+  savePreviewBudgets({decodedMiB:32,textureMiB:64,warmEditors:1});
+  vi.mocked(call).mockImplementation(async(_command,params:any)=>({sourceSha256:hash,objectTagId:params.tagId,payload:'p'.repeat(300000)}));
+  for(let tagId=1;tagId<=25;tagId++)await nativePreviewResource('preview_owned_object_model',{...args,tagId},hash);
+  expect(nativePreviewResourceStats().bytes).toBeGreaterThan(8*1024**2);
+  savePreviewBudgets({decodedMiB:16,textureMiB:64,warmEditors:1});trimNativePreviewResources();
+  expect(nativePreviewResourceStats().bytes).toBeLessThanOrEqual(nativePreviewBudget());
+  expect(nativePreviewResourceStats().entries).toBeLessThan(25);
+ }finally{vi.unstubAllGlobals();}
+});

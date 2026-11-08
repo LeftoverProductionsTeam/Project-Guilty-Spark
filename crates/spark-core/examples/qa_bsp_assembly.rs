@@ -2,7 +2,8 @@
 use spark_core::{bsp_assembly, library::Library, maps, Result};
 use std::{fs, path::Path, sync::atomic::AtomicBool};
 fn main() -> Result<()> {
-    let a: Vec<_> = std::env::args().collect();
+    let mut a: Vec<_> = std::env::args().collect();
+    let terrain=a.get(1).is_some_and(|v|v=="--terrain");if terrain{a.remove(1);}
     if a.len() == 4 && a[1] == "--verify-walkthrough" {
         let p = spark_core::project::load_project(Path::new(&a[3]))?;
         let route = p.bsp_assembly.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("Project has no connection route".into()))?;
@@ -85,7 +86,7 @@ fn main() -> Result<()> {
     let index = a[3]
         .parse()
         .map_err(|_| spark_core::SparkError::Invalid("Invalid BSP index".into()))?;
-    let plan = bsp_assembly::plan(&p, &i, &d, &j, index, fs::canonicalize(&a[4])?)?;
+    let plan = if terrain{bsp_assembly::plan_terrain(&p,&i,&d,&j,index,fs::canonicalize(&a[4])?)?}else{bsp_assembly::plan(&p, &i, &d, &j, index, fs::canonicalize(&a[4])?)?};
     eprintln!("plan {}", serde_json::to_string(&plan)?);
     p.bsp_assembly = Some(plan);
     spark_core::project::save_project(&out.join("project.gsproject"), &p)?;

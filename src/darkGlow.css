@@ -51,7 +51,7 @@
     inset 0 1px 0 var(--gs-glow-alt),
     0 0 var(--gs-glow-blur, 14px) var(--gs-glow);
 }
-:root[data-gs-theme='dark-glow'] :is(button, input, textarea, select, option) {
+:root[data-gs-theme='dark-glow'] :is(button, input, textarea, select, option, optgroup) {
   background: #111b2b !important;
   border-color: #44536a;
 }

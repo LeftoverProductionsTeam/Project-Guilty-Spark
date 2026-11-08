@@ -70,6 +70,42 @@ fn broken_dependencies_report_the_actual_tag_before_filesystem_staging() {
     assert!(error.contains("scenery/rock.model"));
     assert!(error.contains("matching editable tags"));
 }
+// Prefer authored tags; recover only missing, explicitly selected donor roots
+// into this build's private staging. Never write into an editing kit or game.
+fn dependency_input(source:&Path,recovered:&Path,relative:&str)->Result<PathBuf>{
+    let relative_path=safe_relative(relative)?;
+    for root in [source,recovered] {let input=root.join(&relative_path);crate::reject_links(&input)?;if input.is_file(){return Ok(input);}}
+    invalid(format!("Missing native BSP/scenery dependency {relative}. Select matching editable donor tags or recover this tag from the original source map; no original was changed"))
+}
+fn recover_missing_roots(source:&Path,recovered:&Path,bsp:&str,scenery:&[crate::bsp_scenery::Placement],recovery:Option<(&project::Source,&MapInspection)>,tools:&Toolchain,runner:&Runner,workspace:&Path)->Result<()>{
+    let mut roots=vec![format!("{bsp}.scenario_structure_bsp")];roots.extend(scenery.iter().map(|p|format!("{}.scenery",p.tag_path)));roots.sort();roots.dedup();
+    for root in &roots {safe_relative(root)?;}
+    let missing:Vec<_>=roots.into_iter().filter(|p|!source.join(p.replace('\\',"/")).is_file()).collect();
+    fs::create_dir(recovered)?;
+    if missing.is_empty(){return Ok(());}
+    let (cache,inspection)=recovery.ok_or_else(||SparkError::Invalid(format!("Missing native source tag {} in {}. Choose matching editable tags; no build was accepted",missing[0],source.display())))?;
+    if ![6,7,609].contains(&cache.cache_version)||inspection.sha256!=cache.sha256{return invalid("Missing donor dependencies require matching editable tags; automatic source recovery is not verified for this cache format");}
+    let resources=cache.resource_directory.as_deref().ok_or_else(||SparkError::Invalid("Connect the donor's original resource maps before recovering missing scenery".into()))?;
+    crate::tag_exchange::verify_source_snapshot(cache,Some(resources))?;
+    crate::native_resources::review(cache,inspection,resources)?;
+    let extract=find_tool(tools,"invader-extract")?;
+    for root in missing {
+        let normalized=root.replace('\\',"/");
+        let known=inspection.tags.iter().filter(|tag|{
+            let ext=match tag.class.as_str(){"sbsp"=>"scenario_structure_bsp","scen"=>"scenery",_=>return false};
+            format!("{}.{}",tag.path.replace('\\',"/"),ext).eq_ignore_ascii_case(&normalized)
+        }).count();
+        if known!=1{return invalid(format!("Requested missing donor tag is not indexed by the exact source map: {root}"));}
+        if recovered.join(safe_relative(&normalized)?).is_file(){continue;}
+        runner.run(&extract,&["-m".into(),resources.to_string_lossy().into_owned(),"-s".into(),root,"-r".into(),"-t".into(),recovered.to_string_lossy().into_owned(),cache.preserved_path.to_string_lossy().into_owned()],workspace,"extract",38)?;
+        crate::tag_exchange::inventory(recovered)?;
+    }
+    crate::tag_exchange::verify_source_snapshot(cache,Some(resources))?;
+    let(files,bytes)=crate::tag_exchange::inventory(recovered)?;
+    project::atomic_write(&workspace.join("bsp-donor-recovery.json"),&serde_json::to_vec_pretty(&serde_json::json!({"sourceSha256":cache.sha256,"files":files,"bytes":bytes,"authoredTagsPreferred":true,"originalsChanged":false}))?,false)?;
+    runner.emit("bsp-recovery",format!("Recovered only missing donor dependencies: {} files, {bytes} bytes; existing editable tags take precedence",files.len()),38,"info");
+    Ok(())
+}
 fn namespace_materials(
     source: &Path,
     bsp: &str,
@@ -80,6 +116,7 @@ fn namespace_materials(
     runner: &Runner,
     workspace: &Path,
     destination: &Path,
+    recovery: Option<(&project::Source,&MapInspection)>,
 ) -> Result<NamespacedDependencies> {
     crate::reject_links(source)?;
     if !source.is_dir() {
@@ -87,6 +124,11 @@ fn namespace_materials(
             "Select the matching editable donor tags directory before compiling a BSP assembly",
         );
     }
+    // Native read-only dependency lookup also has legacy filename buffers.
+    // Keep the exact input root alive under its own short alias for this scope.
+    #[cfg(windows)] let source_alias=crate::native_workspace::Alias::new(source)?;
+    #[cfg(windows)] let source_arg=source_alias.path().to_string_lossy().into_owned();
+    #[cfg(not(windows))] let source_arg=source.to_string_lossy().into_owned();
     let dependency = find_tool(tools, "invader-dependency")?;
     let refactor = find_tool(tools, "invader-refactor")?;
     let working = workspace.join(format!("bsp-dependencies-{source_index}"));
@@ -94,6 +136,8 @@ fn namespace_materials(
     // consistently. Its cwd is the owned job, so keep these paths relative.
     let working_arg = format!("bsp-dependencies-{source_index}");
     fs::create_dir(&working)?;
+    let recovered=workspace.join(format!("bsp-recovered-{source_index}"));
+    recover_missing_roots(source,&recovered,bsp,scenery,recovery,tools,runner,workspace)?;
     let mut prepared = BTreeMap::new();
     let mut model_reference_changes = vec![];
     let mut prepared_bytes = 0u64;
@@ -102,7 +146,7 @@ fn namespace_materials(
         if prepared.contains_key(&relative) {
             continue;
         }
-        let input = source.join(safe_relative(&relative)?);
+        let input = dependency_input(source,&recovered,&relative)?;
         crate::reject_links(&input)?;
         let size = fs::metadata(&input)?.len();
         prepared_bytes = prepared_bytes
@@ -113,7 +157,7 @@ fn namespace_materials(
         }
         let source_hash = maps::hash_file(&input)?;
         let output = working.join(safe_relative(&relative)?);
-        fs::create_dir_all(output.parent().unwrap())?;
+        fs::create_dir_all(output.parent().unwrap()).map_err(|e| SparkError::Invalid(format!("Cannot prepare BSP destination directory {}: {e}",output.parent().unwrap().display())))?;
         fs::copy(&input, &output)?;
         let mut permissions = fs::metadata(&output)?.permissions();
         permissions.set_readonly(false);
@@ -133,7 +177,7 @@ fn namespace_materials(
             39,
         )?;
         let reference = crate::bsp_scenery::model_reference(&row.model_path, &observed)?;
-        let model = source.join(safe_relative(&reference)?);
+        let model = dependency_input(source,&recovered,&reference)?;
         crate::reject_links(&model)?;
         if !model.is_file() {
             return invalid(format!("Donor source GBX model is missing: {reference}"));
@@ -199,7 +243,8 @@ fn namespace_materials(
             "-t".into(),
             working_arg.clone(),
             "-t".into(),
-            source.to_string_lossy().into_owned(),
+            source_arg.clone(),
+            "-t".into(),recovered.to_string_lossy().into_owned(),
             "-r".into(),
             bsp_root,
         ],
@@ -217,7 +262,8 @@ fn namespace_materials(
                     "-t".into(),
                     working_arg.clone(),
                     "-t".into(),
-                    source.to_string_lossy().into_owned(),
+                    source_arg.clone(),
+                    "-t".into(),recovered.to_string_lossy().into_owned(),
                     "-r".into(),
                     root.clone(),
                 ],
@@ -235,7 +281,7 @@ fn namespace_materials(
     let mut hashes = BTreeMap::new();
     let mut bytes = 0u64;
     for relative in required {
-        let input = source.join(safe_relative(&relative)?);
+        let input = dependency_input(source,&recovered,&relative)?;
         crate::reject_links(&input)?;
         let size = fs::metadata(&input)?.len();
         bytes = bytes
@@ -246,7 +292,7 @@ fn namespace_materials(
         }
         let hash = maps::hash_file(&input)?;
         let output = working.join(safe_relative(&relative)?);
-        fs::create_dir_all(output.parent().unwrap())?;
+        fs::create_dir_all(output.parent().unwrap()).map_err(|e| SparkError::Invalid(format!("Cannot prepare BSP destination directory {}: {e}",output.parent().unwrap().display())))?;
         let expected = if let Some((source_hash, prepared_hash)) = prepared.get(&relative) {
             if *source_hash != hash {
                 return invalid("Scenery source changed during dependency staging");
@@ -268,7 +314,7 @@ fn namespace_materials(
     if working.join(&namespace).exists() {
         return invalid("BSP dependency namespace collides with an input path");
     }
-    let entries = fs::read_dir(&working)?.collect::<std::io::Result<Vec<_>>>()?;
+    let entries = fs::read_dir(&working).map_err(|e| SparkError::Invalid(format!("Cannot inspect BSP staging directory {}: {e}",working.display())))?.collect::<std::io::Result<Vec<_>>>()?;
     for entry in entries {
         let name = entry.file_name().to_string_lossy().into_owned();
         let mut args = vec!["-t".into(), working_arg.clone(), "-M".into(), "move".into()];
@@ -307,7 +353,9 @@ fn namespace_materials(
                 let previous_file =
                     working.join(format!("{namespace}/materials/{}.{}", previous.name, ext));
                 let alias_file = working.join(safe_relative(&alias)?);
-                fs::copy(previous_file, alias_file)?;
+                fs::copy(&previous_file, &alias_file).map_err(|e| SparkError::Invalid(format!(
+                    "Cannot prepare repeated BSP shader alias {} from {}: {e}", alias_file.display(), previous_file.display()
+                )))?;
             } else {
                 runner.run(
                     &refactor,
@@ -361,7 +409,7 @@ fn namespace_materials(
     let root = working.join(&namespace);
     let mut stack = vec![root.clone()];
     while let Some(folder) = stack.pop() {
-        for e in fs::read_dir(folder)? {
+        for e in fs::read_dir(&folder).map_err(|e| SparkError::Invalid(format!("Cannot read namespaced BSP directory {}: {e}",folder.display())))? {
             let e = e?;
             let path = e.path();
             crate::reject_links(&path)?;
@@ -377,9 +425,9 @@ fn namespace_materials(
             if output.exists() {
                 return invalid("BSP dependency would overwrite a destination tag");
             }
-            fs::create_dir_all(output.parent().unwrap())?;
-            let hash = maps::hash_file(&path)?;
-            fs::copy(&path, &output)?;
+            fs::create_dir_all(output.parent().unwrap()).map_err(|e| SparkError::Invalid(format!("Cannot prepare BSP destination directory {}: {e}",output.parent().unwrap().display())))?;
+            let hash = maps::hash_file(&path).map_err(|e| SparkError::Invalid(format!("Cannot verify namespaced BSP dependency {}: {e}",path.display())))?;
+            fs::copy(&path, &output).map_err(|e| SparkError::Invalid(format!("Cannot stage namespaced BSP dependency {} to {}: {e}",path.display(),output.display())))?;
             if maps::hash_file(&path)? != hash || maps::hash_file(&output)? != hash {
                 return invalid("Namespaced dependency changed while copying into the native job");
             }
@@ -687,6 +735,7 @@ pub fn prepare_native(
         runner,
         workspace,
         tags,
+        None,
     )?;
     let donor_hashes = namespace_materials(
         &assembly.donor_tags_directory,
@@ -698,6 +747,7 @@ pub fn prepare_native(
         runner,
         workspace,
         tags,
+        Some((&assembly.donor_source,&donor)),
     )?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let name = "connected";
@@ -772,6 +822,8 @@ pub fn prepare_native(
         return invalid("Scenario did not bind exactly one rebuilt BSP");
     }
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
+    crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
+    let bake_quality=crate::native_lighting::request(project).map(|r|r.lightmap_quality()).unwrap_or(["0","0.1"]);
     native_step(
         &tool,
         runner,
@@ -780,8 +832,8 @@ pub fn prepare_native(
             "lightmaps".into(),
             inspection.scenario_path.clone(),
             name.into(),
-            "0".into(),
-            "0.1".into(),
+            bake_quality[0].into(),
+            bake_quality[1].into(),
         ],
         "bsp-lightmaps",
     )?;
@@ -794,4 +846,16 @@ pub fn prepare_native(
         false,
     )?;
     Ok(())
+}
+
+#[cfg(test)] mod source_precedence_tests {
+ use super::*;
+ #[test] fn recovery_uses_authored_tags_first_and_reports_the_exact_missing_dependency(){
+  let root=tempfile::tempdir().unwrap();let source=root.path().join("authored");let recovered=root.path().join("recovered");fs::create_dir(&source).unwrap();fs::create_dir(&recovered).unwrap();
+  fs::write(source.join("boulder.scenery"),b"authored edit").unwrap();fs::write(recovered.join("boulder.scenery"),b"original").unwrap();
+  assert_eq!(fs::read(dependency_input(&source,&recovered,"boulder.scenery").unwrap()).unwrap(),b"authored edit");
+  fs::write(recovered.join("model.gbxmodel"),b"native model").unwrap();assert_eq!(dependency_input(&source,&recovered,"model.gbxmodel").unwrap(),recovered.join("model.gbxmodel"));
+  let error=dependency_input(&source,&recovered,"missing.bitmap").unwrap_err().to_string();assert!(error.contains("missing.bitmap")&&error.contains("no original was changed"));
+  assert!(dependency_input(&source,&recovered,"../escape.bitmap").is_err());
+ }
 }

@@ -76,3 +76,9 @@ it('decodes changed pixels under the same metadata, rejects corrupt DDS and can 
   expect(() => decodeOwnedBitmapPreview(broken, target)).toThrow();
   expect([...decodeOwnedBitmapPreview(preview(0x8123), target).pixels]).toEqual([17, 34, 51, 136]);
 });
+
+it('immediately trims existing decoded pixels when the user lowers the budget',()=>{
+ const cache=new DecodedBitmapCache(128);const image={width:1,height:1,format:'BGRA8' as const,pixels:new Uint8Array(4)};
+ cache.put('one','dds',image);cache.put('two','dds',image);cache.setBudget(16);expect(cache.stats().estimatedBytes).toBeLessThanOrEqual(16);expect(cache.stats().evictions).toBeGreaterThan(0);
+ expect(()=>cache.setBudget(Infinity)).toThrow();
+});

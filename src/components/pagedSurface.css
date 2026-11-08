@@ -1,0 +1,13 @@
+.gs-paged-surface{min-width:0;min-height:0;display:flex;flex-direction:column;max-width:100%;}
+.gs-paged-surface[data-fill]{height:100%;flex:1;}
+.gs-page-viewport{flex:none;min-height:0;overflow:clip;position:relative;}
+.gs-page-body{display:flow-root;min-width:0;transform-origin:top left;}
+.gs-page-body [data-gs-offpage]{visibility:hidden!important;}
+.gs-surface-pages{display:flex;align-items:center;justify-content:flex-end;gap:5px;height:28px;flex:none;border-top:1px solid var(--line);font-size:10px;}
+.gs-surface-pages>label{display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.application .gs-surface-pages button{display:grid;place-items:center;min-height:23px;width:24px;padding:2px;border-radius:4px;}
+.application .gs-surface-pages input{width:42px;min-height:22px;padding:1px 3px;font-size:10px;}
+.gs-page-body>.panel{width:auto!important;border:0!important;min-width:0;max-height:none;}
+
+.application .gs-surface-pages>input[type=search]{margin-right:auto;flex:1;max-width:210px;min-width:60px;width:0;font-size:11px;min-height:23px;}
+.gs-settings-workspace>[role=tabpanel]>.gs-paged-surface{width:100%;}

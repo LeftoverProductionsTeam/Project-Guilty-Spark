@@ -2,6 +2,7 @@
  * No game assets are bundled, cached on disk, or saved into project JSON.
  */
 import { decodeHaloDds } from './haloDds.ts';
+import {pixelPreviewBudget} from './resourceBudgets.ts';
 import { DecodedBitmapCache } from './decodedBitmapCache.ts';
 import { decodeBoundedBase64 } from './boundedBase64.ts';
 import { profileGauge } from './profiling.ts';
@@ -40,7 +41,10 @@ const SUPPORTED_FORMATS = new Set([
   'Y8',
   'A8Y8',
 ]);
-const decodedPixels = new DecodedBitmapCache();
+const decodedPixels = new DecodedBitmapCache(pixelPreviewBudget());
+export const decodedBitmapStats=()=>decodedPixels.stats();
+export const trimDecodedBitmapPreviews=()=>decodedPixels.setBudget(pixelPreviewBudget());
+if(typeof window!=='undefined'){window.addEventListener?.('spark-preview-budgets',trimDecodedBitmapPreviews);window.addEventListener?.('storage',event=>{if(event.key==='spark.previewBudgets.v1')trimDecodedBitmapPreviews();});}
 
 /** Validate *both* tag and source identity before revealing any returned pixel buffer. */
 export function decodeOwnedBitmapPreview(
@@ -134,6 +138,7 @@ export function decodeOwnedBitmapPreview(
     preview.format,
     cubeFaceIndex ?? '2d',
   ]);
+  trimDecodedBitmapPreviews();
   const cached = decodedPixels.get(key, preview.ddsBase64);
   profileGauge('bitmap-decode', () => decodedPixels.stats());
   if (cached) return cached;

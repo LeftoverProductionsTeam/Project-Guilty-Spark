@@ -1,3 +1,4 @@
+import PagedSurface from './PagedSurface';
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {AppWindow,ChevronDown,ExternalLink,Search,X} from 'lucide-react';
 import {workspaceCatalog,workspaceLabel} from '../workspaceCatalog';
@@ -34,7 +35,7 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
     const key=(event:KeyboardEvent)=>{
       if(event.key==='Escape'&&open){event.preventDefault();event.stopImmediatePropagation();close();}
       if(event.key==='Tab'&&open){
-        const controls=[...root.current?.querySelectorAll<HTMLElement>('.gs-open-work-popup button:not(:disabled),.gs-open-work-popup input,.gs-open-work-popup select')??[]].filter(e=>e.getClientRects().length);
+        const controls=[...root.current?.querySelectorAll<HTMLElement>('.gs-open-work-popup button:not(:disabled),.gs-open-work-popup input,.gs-open-work-popup select')??[]].filter(e=>e.getClientRects().length&&!e.closest('[inert]'));
         const target=event.shiftKey&&document.activeElement===controls[0]?controls.at(-1):!event.shiftKey&&document.activeElement===controls.at(-1)?controls[0]:null;
         if(target){event.preventDefault();target.focus();}
       }
@@ -81,7 +82,7 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
       <header><strong>Open work</strong><button aria-label="Close open work" onClick={close}><X size={14}/></button></header>
       <label className="gs-open-work-search"><Search size={14}/><input ref={search} type="search" placeholder="Map, workspace or window…" aria-label="Search open work" value={query} maxLength={160} onChange={e=>setQuery(e.target.value)}/></label>
       <div className="gs-role-choice"><label>Workspace in this window<select aria-label="Workspace in this window" value={workspace} onChange={e=>choose(()=>onNavigate(e.target.value as Workspace))}>{workspaceCatalog.filter(item=>item.id!=='interface').map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label><button aria-label="Open workspace in another window" title="Focus this workspace's existing window, or open a new view" onClick={()=>choose(()=>onWindow(workspace))}><ExternalLink size={14}/></button></div>
-      <div className="gs-open-work-groups">
+      <PagedSurface name="open-work" label="Open work" maxHeight={420} reserveBottom={55}><div className="gs-open-work-groups">
         {(handoff||processes.length>0)&&<section aria-label="External tool handoffs"><h3>External tools</h3>{handoff&&<button className="gs-work-row" onClick={()=>choose(()=>onRecent({workspace:'tags',projectId:handoff.projectId,settingsTab:'tools'}))}><span><strong>{title(handoff.projectId)??'Source handoff'} · {handoff.tag}</strong><small>{handoff.status}</small></span><small>Review</small></button>}{processes.map(p=><button className="gs-work-row" key={p.id} onClick={()=>choose(()=>onRecent({workspace:'build',projectId:p.projectId,settingsTab:'tools'}))}><span><strong>{title(p.projectId)??'Native tool'} · {p.actionId}</strong><small>{p.status==='running'?'Running':`Exited · ${p.exitCode}`} · {p.detail}</small></span></button>)}</section>}
         {!!running.length&&<section aria-label="Running tasks"><h3>Running tasks</h3>{running.map(job=><button className="gs-work-row" key={job.jobId} onClick={()=>choose(()=>onRecent({workspace:'build',projectId:job.projectId,settingsTab:'tools'}))}><span><strong>{documents.documents.find(d=>d.id===job.projectId)?.history.current?.title??'Build snapshot'}</strong><small>{job.phase} · {job.message}</small></span><small>{job.progress>0?`${Math.round(job.progress)}%`:'Running'}</small></button>)}</section>}
         {!!failed.length&&<section aria-label="Tasks needing attention"><h3>Needs attention</h3>{failed.map(job=><button className="gs-work-row" key={job.jobId} onClick={()=>choose(()=>onRecent({workspace:'build',projectId:job.projectId,settingsTab:'tools'}))}><span><strong>{job.phase}</strong><small>{job.message}</small></span></button>)}</section>}
@@ -89,7 +90,7 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
         {!!documents.documents.length&&<section aria-label="Open maps in this window"><h3>Maps here · {documents.documents.length}</h3>{documents.documents.filter(d=>match(`${d.history.current?.title} ${d.history.current?.source?.engine??''}`)).map(d=><button key={d.id} className="gs-work-row" onClick={()=>choose(()=>onSelect(d.id))}><span><strong>{d.history.current?.title}{d.history.dirty?' ●':''}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}{d.history.current?.builds?.length?' · build history available':''}</small></span><small>{d.id===documents.activeId?'Active':'Return'}</small></button>)}</section>}
         {!!recent.length&&<section aria-label="Recent places"><h3>Recent places</h3>{recent.filter(r=>match(`${workspaceLabel(r.workspace)} ${title(r.projectId)??''}`)).slice(0,12).map((r,i)=><button className="gs-work-row" disabled={!!r.projectId&&!title(r.projectId)} key={`${r.projectId}:${r.workspace}:${i}`} onClick={()=>choose(()=>onRecent(r))}><span><strong>{workspaceLabel(r.workspace)}</strong><small>{r.projectId?title(r.projectId)??'Map unavailable':r.workspace==='settings'?r.settingsTab:r.workspace==='learning'?r.learningSection:'Studio'}</small></span><small>{r.projectId&&!documents.documents.some(d=>d.id===r.projectId)?title(r.projectId)?'Reopen':'Unavailable':'Return'}</small></button>)}</section>}
         {error&&<p role="alert">{error}</p>}
-      </div>
+      </div></PagedSurface>
       <footer><button onClick={()=>choose(()=>onWindow(workspace,true))}>Open another view</button><small>Navigation keeps source Undo separate.</small></footer>
     </section>}
   </div>;

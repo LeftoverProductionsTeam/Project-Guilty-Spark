@@ -1,11 +1,16 @@
+import {useId,Suspense} from 'react';
+import {navigateComposite} from '../keyboardNavigation';
+import PagedSurface from './PagedSurface';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {useState,type ReactNode} from 'react';
 import RuntimeRegistration from './RuntimeRegistration';
+import RuntimeModPacks from './RuntimeModPacks';
+import ManagedRuntimes from './ManagedRuntimes';
 import ExternalBrowserLink from './ExternalBrowserLink';
 import { Check, FolderOpen, Gamepad2, RefreshCw, Settings2 } from 'lucide-react';
-import { native } from '../api';
-import { useMapState } from '../mapSession';
-import { runtimeNames } from '../runtimeWorkbench';
+import { call,native } from '../api';
+import { useMapState,writeMapSession } from '../mapSession';
+import { runtimeNames,runtimeProfileName,runtimeProfileLabel } from '../runtimeWorkbench';
 import type { Bootstrap, Project, RuntimeId } from '../types';
 import { primaryRuntimes, useRuntimeConnections } from '../useRuntimeConnections';
 import { Notice } from './ui';
@@ -40,8 +45,16 @@ export default function GamesTools({
   );
   const [search, setSearch] = useMapState(project?.id ?? 'global', `tools.search.${runtime}`, '');
   const [advanced, setAdvanced] = useMapState('global', 'tools.advanced', false);
-  const { reports, detected, checking, connecting, error, refresh, connect } = useRuntimeConnections(data);
+  const { reports, detected, profiles, checking, connecting, error, refresh, connect } = useRuntimeConnections(data);
+  const [flavorError,setFlavorError]=useState('');
   const [foldersFor,setFoldersFor]=useState<RuntimeId|null>(null);
+  type Dashboard='tools'|'setup'|'packs'|'preferences';
+  const [section,setSection]=useMapState<Dashboard>('global','tools.dashboard','tools');
+  const [visited,setVisited]=useState<Set<Dashboard>>(()=>new Set(['tools',section]));
+  const dashboard=useId();
+  function chooseSection(next:Dashboard){setSection(next);setVisited(old=>new Set([...old,next]));if(next==='preferences')setAdvanced(true);}
+  function openFolders(){chooseSection('setup');if(runtime==='mccSteam')onSetup(runtime);else setFoldersFor(runtime);}
+
   const selectedReport=reports.find(report=>report.id===runtime);
   const reveal = useRevealWorkspacePanel();
   const installation = reports.find((report) => report.id === runtime)?.installation;
@@ -94,6 +107,14 @@ export default function GamesTools({
           );
         })}
       </div>
+      {['openCe','chupathingyCe'].includes(runtime)&&<label className="games-tools-flavors">OpenCE flavors · community engines
+        <select aria-label="Community engine flavor" value={profiles.find(item=>item.id===installation?.registrationId)?.id??''} onChange={event=>{const id=event.target.value;if(id.startsWith('setup:')){writeMapSession('global','tools.enginePackage',id.slice(6));writeMapSession('global','tools.downloadOpen',true);chooseSection('setup');return;}const candidate=detected.find(item=>item.executableSha256===id);if(candidate){void connect(candidate);return;}const profile=profiles.find(item=>item.id===id);if(profile)void call('activate_runtime_registration',{registrationId:id}).then(()=>{setRuntime(profile.runtimeId);window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));}).catch(error=>setFlavorError(String(error)));}}>
+          <option value="" disabled>Choose an engine or connect one…</option>
+          {profiles.filter(item=>['openCe','chupathingyCe'].includes(item.runtimeId)).map(item=><option value={item.id} key={item.id}>{runtimeProfileLabel(item)}</option>)}
+          {detected.filter(item=>['openCe','chupathingyCe'].includes(item.runtimeId)&&!profiles.some(profile=>profile.executable.replaceAll('\\','/').toLowerCase()===item.executable.replaceAll('\\','/').toLowerCase())).map(item=><option value={item.executableSha256} key={item.executableSha256}>Connect {runtimeProfileName({...item,id:'detected',networkVersion:null})} · {item.version??'detected'}</option>)}
+          <option value="setup:openh1">OpenH1 · setup / download</option><option value="setup:faber">Faber · setup / download</option>
+        </select><small>Engine files and profiles stay independent. OpenH1 Windows VR remains unverified.</small>{flavorError&&<span role="alert">{flavorError}</span>}
+      </label>}
       {runtime==='arenaEvolved'&&<Notice tone="info">Arena Evolved 0.7.7-beta can read owned MCC, Xbox and CE content. Connect its folders below; executable launch is awaiting release verification. <ExternalBrowserLink href="https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta">Official release &amp; setup</ExternalBrowserLink></Notice>}
       <div className="games-tools-context">
         <label>
@@ -132,13 +153,19 @@ export default function GamesTools({
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <button disabled={!native||busy||checking} onClick={()=>runtime==='mccSteam'?onSetup(runtime):setFoldersFor(runtime)}><FolderOpen size={14}/>Runtime folders…</button>
+        <button disabled={!native||busy||checking} onClick={openFolders}><FolderOpen size={14}/>Runtime folders…</button>
         <button disabled={connecting !== null} onClick={() => candidate?.contentReady && !installation ? void connect(candidate) : onSetup(runtime)} title={candidate?.detail}>
           <Settings2 size={14} />
           {connecting === runtime ? 'Connecting…' : installation?.validation === 'pass' ? 'Connect tools' : candidate?.contentReady ? 'Connect detected Halo' : 'Connect this Halo'}
         </button>
       </div>
-      {foldersFor===runtime&&runtime!=='mccSteam'&&selectedReport&&<RuntimeRegistration key={runtime} report={selectedReport} initialOpen onRegistered={()=>void refresh()}/>}
+      <div className="games-tools-sections" role="tablist" aria-label="Runtime dashboard" onKeyDown={navigateComposite}>
+        <button role="tab" id={dashboard+'-tools'} aria-controls={dashboard+'-pane-tools'} aria-selected={section==='tools'} tabIndex={section==='tools'?0:-1} onClick={()=>chooseSection('tools')}>Tools</button>
+        <button role="tab" id={dashboard+'-setup'} aria-controls={dashboard+'-pane-setup'} aria-selected={section==='setup'} tabIndex={section==='setup'?0:-1} onClick={()=>chooseSection('setup')}>Runtime setup</button>
+        <button role="tab" id={dashboard+'-packs'} aria-controls={dashboard+'-pane-packs'} aria-selected={section==='packs'} tabIndex={section==='packs'?0:-1} onClick={()=>chooseSection('packs')}>Packs</button>
+        <button role="tab" id={dashboard+'-preferences'} aria-controls={dashboard+'-pane-preferences'} aria-selected={section==='preferences'} tabIndex={section==='preferences'?0:-1} onClick={()=>chooseSection('preferences')}>Preferences</button>
+      </div>
+      <div className="games-tools-pane" role="tabpanel" id={dashboard+'-pane-tools'} aria-labelledby={dashboard+'-tools'} hidden={section!=='tools'}>{visited.has('tools')&&<PagedSurface name="runtime-tools" label="Tools" scope={project?.id??'global'} fill>
       <div className="games-tools-save-flow">
         <span>
           <strong>Edit → save in the tool → review in Spark.</strong> Working map saves are checked every 2
@@ -167,14 +194,23 @@ export default function GamesTools({
         onSettings={() => onSetup(runtime)}
         onOpenWorkspace={onOpenWorkspace}
       />
+      </PagedSurface>}</div>
+      <div className="games-tools-pane" role="tabpanel" id={dashboard+'-pane-setup'} aria-labelledby={dashboard+'-setup'} hidden={section!=='setup'}>{visited.has('setup')&&<PagedSurface name="runtime-setup" label="Runtime setup" scope={project?.id??'global'} fill>
+      {foldersFor===runtime&&runtime!=='mccSteam'&&selectedReport&&<RuntimeRegistration key={`registration:${runtime}`} report={selectedReport} initialOpen onRegistered={()=>void refresh()}/>}
+      <ManagedRuntimes onUseFolders={openFolders} onInstalled={id=>{setRuntime(id);void refresh();}}/>
+      </PagedSurface>}</div>
+      <div className="games-tools-pane" role="tabpanel" id={dashboard+'-pane-packs'} aria-labelledby={dashboard+'-packs'} hidden={section!=='packs'}>{visited.has('packs')&&<PagedSurface name="runtime-packs" label="Packs" scope={project?.id??'global'} fill>
+      <RuntimeModPacks key={`packs:${installation?.registrationId??runtime}`} registrationId={installation?.registrationId} runtime={runtime}/>      </PagedSurface>}</div>
+      <div className="games-tools-pane" role="tabpanel" id={dashboard+'-pane-preferences'} aria-labelledby={dashboard+'-preferences'} hidden={section!=='preferences'}>{visited.has('preferences')&&<PagedSurface name="runtime-preferences" label="Preferences" scope={project?.id??'global'} fill>
       <details
         className="games-tools-advanced"
         open={advanced}
         onToggle={(event) => setAdvanced(event.currentTarget.open)}
       >
         <summary>Advanced folders, backups &amp; preferences</summary>
-        {children}
+        <Suspense fallback={<p role="status">Opening preferences…</p>}>{children}</Suspense>
       </details>
+      </PagedSurface>}</div>
     </div>
   );
 }

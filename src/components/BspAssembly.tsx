@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
+import {selectedSeamEdge} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, Vec3 } from '../types';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
-import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
+import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
@@ -29,7 +30,9 @@ export default function BspAssembly({
   const {active}=useWorkspaceActivity();
   const sourceShaders=inspection&&project.source&&inspection.sha256===project.source.sha256?inspection.tags.filter(tag=>tag.class==='senv'):[];
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
-  const [pickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
+  const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
+  const [edgeTarget,setEdgeTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
+  const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
   const candidates = entries.filter(
     (e) => e.id !== project.id && e.sha256 && [6, 7, 13, 609].includes(e.version ?? 0),
@@ -49,11 +52,12 @@ export default function BspAssembly({
       'bsp.applied',
       assemblySignature(project.bspAssembly ?? null),
     ),
-    [routeView,setRouteView]=useMapState<'primary'|'infantry'>(project.id,'bsp.route','primary'),
+    [routeView,setRouteView]=useMapState<'primary'|'infantry'|'highGround'|`section:${string}`>(project.id,'bsp.route','primary'),
     [entrancePivot, setEntrancePivot] = useMapState(project.id, 'bsp.entrancePivot', false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
+  const draftNow=useRef(draft);draftNow.current=draft;
   const operation = useRef(0),
     mounted = useRef(false);
   const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index });
@@ -128,23 +132,52 @@ export default function BspAssembly({
       if (current()) setBusy(false);
     }
   }
+  async function proposeConnection(terrainSeam:boolean){
+    await perform(async(current)=>{
+      const request={...latest.current};
+      const matches=()=>current()&&latest.current.signature===request.signature&&latest.current.donor===request.donor&&latest.current.index===request.index;
+      await onSave();if(!matches())return;
+      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,terrainSeam});
+      if(matches()){setDraft(plan);setRouteView('primary');setReport(null);}
+    });
+  }
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
   function update(change: Partial<Plan>) {
     if (draft) {
       const next = { ...draft, ...change };
       latest.current = { ...latest.current, signature: assemblySignature(next) };
-      setDraft(next);
+      draftNow.current=next;setDraft(next);
       setReport(null);
       setError('');
     }
   }
   const infantry=routeView==='infantry'&&!!draft?.infantryTunnel;
-  const routeDraft=draft&&infantry?{...draft,tunnelPoints:draft.infantryTunnel!.points,tunnelWidth:draft.infantryTunnel!.width,tunnelHeight:draft.infantryTunnel!.height,tunnelShaderPath:draft.infantryTunnel!.shaderPath}:draft;
+  const ridge=routeView==='highGround'&&!!draft?.highGround;
+  const routeKey=infantry?'infantryTunnel':ridge?'highGround':null;
+  const selectedSection=draft?.sections?.find(section=>routeView===`section:${section.id}`);
+  const secondary=selectedSection??(routeKey&&draft?.[routeKey]);
+  const routeDraft=draft&&secondary?{...draft,tunnelPoints:secondary.points,tunnelWidth:secondary.width,tunnelHeight:secondary.height,tunnelShaderPath:secondary.shaderPath,archSegments:selectedSection?.archSegments,openRoad:selectedSection?.openRoad??false}:draft;
   function updateRoute(change:Partial<Plan>){
-    if(infantry&&draft?.infantryTunnel){const route=draft.infantryTunnel;update({infantryTunnel:{...route,
+    if(selectedSection){update({sections:draft!.sections!.map(section=>section.id===selectedSection.id?{...section,points:change.tunnelPoints??section.points,width:change.tunnelWidth??section.width,height:change.tunnelHeight??section.height,shaderPath:change.tunnelShaderPath??section.shaderPath,...('archSegments' in change?{archSegments:change.archSegments}:{}),...('openRoad' in change?{openRoad:change.openRoad}:{})}:section)});}
+    else if(routeKey&&secondary){const route=secondary;update({[routeKey]:{...route,
       points:change.tunnelPoints??route.points,width:change.tunnelWidth??route.width,height:change.tunnelHeight??route.height,shaderPath:change.tunnelShaderPath??route.shaderPath}});}
     else update(change);
   }
+  useEffect(()=>{
+    if(!edgeTarget||!draft||!pickedSurface)return;
+    const hash=edgeTarget==='base'?project.source?.sha256:draft.donorSource.sha256,bsp=edgeTarget==='base'?0:draft.donorBspIndex;
+    const edge=hash?selectedSeamEdge(pickedSurface,hash,bsp):null;if(!edge)return;
+    setEdgePicks(previous=>({...previous,[edgeTarget]:edge}));setEdgeTarget(edgeTarget==='base'?'donor':null);setPickedSurface(null);
+  },[pickedSurface,edgeTarget,project.source?.sha256,draft?.donorSource.sha256,draft?.donorBspIndex]);
+  async function previewDraft(value:Plan|null=draftNow.current){
+    if(!value||!project.bspAssembly||busy)return;
+    await perform(async current=>{
+      const signature=assemblySignature(value);
+      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value});
+      if(current()&&latest.current.signature===signature){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
+    });
+  }
+  function armEdge(target:'base'|'donor'){setPickedSurface(null);setEdgeTarget(target);}
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
     return (
       <div className="bsp-vector">
@@ -172,6 +205,7 @@ export default function BspAssembly({
       </summary>
       {open && (
         <div className="bsp-assembly-body">
+          {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · full source: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           <p>
@@ -225,29 +259,12 @@ export default function BspAssembly({
             <button
               disabled={!native || busy || !donor || !options.some((option) => option.index === index)}
               onClick={() =>
-                void perform(async (current) => {
-                  const request = { ...latest.current };
-                  const matches = () =>
-                    current() &&
-                    latest.current.signature === request.signature &&
-                    latest.current.donor === request.donor &&
-                    latest.current.index === request.index;
-                  await onSave();
-                  if (!matches()) return;
-                  const plan = await call<Plan>('plan_bsp_assembly', {
-                    projectId: project.id,
-                    donorProjectId: donor,
-                    donorBspIndex: index,
-                  });
-                  if (matches()) {
-                    setDraft(plan);
-                    setReport(null);
-                  }
-                })
+                void proposeConnection(false)
               }
             >
               {busy ? 'Working…' : 'Plan connected tunnel'}
             </button>
+            <button disabled={!native||busy||!donor||!options.some(option=>option.index===index)} onClick={()=>void proposeConnection(true)}>Plan adjacent terrain</button>
           </div>
           {optionsError && (
             <p role="alert" className="bsp-error">
@@ -270,16 +287,36 @@ export default function BspAssembly({
                   world units · {routeDraft!.tunnelPoints.length - 2} bends
                 </span>
               </div>
+              <fieldset className="bsp-edge-controls"><legend>Edge-to-edge seam sections</legend>
+                <div className="bsp-actions">
+                  <button disabled={busy||!applied} aria-pressed={edgeTarget==='base'} onClick={()=>armEdge('base')}>Pick edge in this BSP</button>
+                  <button disabled={busy||!applied} aria-pressed={edgeTarget==='donor'} onClick={()=>armEdge('donor')}>Pick edge in donor BSP</button>
+                  <button disabled={busy||!native||!applied||!edgePicks.base||!edgePicks.donor||(draft.sections?.length??0)>=8} onClick={()=>void perform(async current=>{
+                    const signature=assemblySignature(draft);await onSave();if(!current()||latest.current.signature!==signature)return;
+                    const next=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,edges:[edgePicks.base,edgePicks.donor]});
+                    if(current()&&latest.current.signature===signature){update(next);setRouteView(`section:${next.sections!.at(-1)!.id}`);setEdgePicks({});}
+                  })}>Add seam section from edges</button>
+                  {edgeTarget&&<button onClick={()=>setEdgeTarget(null)}>Cancel edge selection</button>}
+                </div>
+                <p role="status">{edgeTarget?`Click an edge on ${edgeTarget==='base'?'this region, then an edge on the donor':'the donor region'}.`:`Edges: ${edgePicks.base?'this BSP selected':'pick this BSP'} · ${edgePicks.donor?'donor selected':'pick donor'}.`} Apply the donor first. Each section keeps its own width, path and roof; original architecture stays intact outside the cut.</p>
+              </fieldset>
               <div className="bsp-actions" aria-label="Connection routes">
-                <label>Route <select aria-label="Connection route" value={infantry?'infantry':'primary'} onChange={e=>setRouteView(e.target.value as 'primary'|'infantry')} disabled={busy}>
+                <label>Route <select aria-label="Connection route" value={selectedSection?`section:${selectedSection.id}`:infantry?'infantry':ridge?'highGround':'primary'} onChange={e=>setRouteView(e.target.value as typeof routeView)} disabled={busy}>
                   <option value="primary">{draft.openRoad?'Primary road':'Primary tunnel'}</option>
                   {draft.infantryTunnel&&<option value="infantry">Infantry tunnel</option>}
+                  {draft.highGround&&<option value="highGround">High-ground route</option>}
+                {(draft.sections??[]).map(section=><option key={section.id} value={`section:${section.id}`}>{section.name}</option>)}
                 </select></label>
                 <button disabled={busy||!!draft.infantryTunnel} onClick={()=>{try{update(addInfantryTunnel(draft));setRouteView('infantry');}catch(error){setError(String(error));}}}>Add infantry tunnel</button>
-                {infantry&&<button disabled={busy} onClick={()=>{update({infantryTunnel:undefined});setRouteView('primary');}}>Remove infantry tunnel</button>}
-                {!infantry&&<label><input type="checkbox" aria-label="Open-sky road" checked={draft.openRoad??false} disabled={busy} onChange={e=>update({openRoad:e.target.checked,...(e.target.checked?{tunnelWidth:Math.max(4,draft.tunnelWidth),tunnelHeight:Math.max(4,draft.tunnelHeight)}:{})})}/> Open sky above road</label>}
+                <button disabled={busy||!!draft.highGround} onClick={()=>{try{update(addHighGroundRoute(draft));setRouteView('highGround');}catch(error){setError(String(error));}}}>Add high-ground route</button>
+                <button disabled={busy||!!draft.infantryTunnel&&!!draft.highGround&&draft.tunnelWidth>=6&&draft.tunnelHeight>=4} onClick={()=>{try{update(makeThreeRouteSeam(draft));setRouteView('primary');}catch(error){setError(String(error));}}}>Make three-route seam</button>
+                {routeKey&&<button disabled={busy} onClick={()=>{update({[routeKey]:undefined});setRouteView('primary');}}>Remove {infantry?'infantry tunnel':'high-ground route'}</button>}
+                {selectedSection&&<button disabled={busy} onClick={()=>{update({sections:draft.sections!.filter(section=>section.id!==selectedSection.id)});setRouteView('primary');}}>Remove seam section</button>}
+                {!routeKey&&<label><input type="checkbox" aria-label="Open-sky road" checked={routeDraft!.openRoad??false} disabled={busy} onChange={e=>updateRoute({openRoad:e.target.checked,archSegments:undefined,...(e.target.checked?{tunnelWidth:Math.max(4,routeDraft!.tunnelWidth),tunnelHeight:Math.max(4,routeDraft!.tunnelHeight)}:{})})}/> Open sky above road</label>}
               </div>
-              <p className="subtle">{infantry?'Adjust the separate infantry route below. Its entrances must stay on the original ground.':'The primary route can be widened for vehicles. Open sky uses the native sky boundary.'} Both routes are checked and rebuilt together; walking and driving require a Halo playtest.</p>
+              <p className="subtle" aria-label="Seam route requirements">Player cave: {draft.infantryTunnel?'drafted':'missing'} · Warthog route: {draft.tunnelWidth>=6&&draft.tunnelHeight>=4?'design width set':'widen the primary passage'} · Canyon tops: {draft.highGround?'drafted':'missing'}. Drafts are not gameplay acceptance.</p>
+              <p className="subtle">{ridge?'Open ridge with access ramps. Adjust its floor points onto walkable canyon tops on both maps; use bends for overlooks. Source checks must pass before compiling.':infantry?'Separate player cave. Keep both entrances on the original ground.':'Widen the primary passage for a Warthog cave or choose open sky for a canyon road.'} All routes rebuild together. Vehicle handling, continuous mountain access and sniper sightlines require a Halo playtest.</p>
+              {pickedSurface&&project.source?.sha256===pickedSurface.sourceHash&&pickedSurface.bspIndex===0&&<button disabled={busy} onClick={()=>updateRoute({tunnelPoints:routeDraft!.tunnelPoints.map((p,i)=>i===0?[...pickedSurface.point]:p)})}>Use selected landscape for entrance</button>}
               {!selectionMatches && (
                 <div className="bsp-selection-warning" role="status">
                   <p>
@@ -307,6 +344,15 @@ export default function BspAssembly({
                 Position <strong>{draft.donorTitle}</strong> relative to this map. Coordinates use Halo world
                 units; Z is up. Moving the section also moves its tunnel mouth.
               </p>
+              {selectedSection&&<label className="bsp-section-name">Section name<input aria-label="Seam section name" maxLength={60} value={selectedSection.name} onChange={e=>update({sections:draft.sections!.map(section=>section.id===selectedSection.id?{...section,name:e.target.value}:section)})}/></label>}
+              {(!draft.terrainSeam||!!selectedSection)&&!routeKey&&<label>Opening <select aria-label="Seam opening shape" value={routeDraft!.archSegments?'arch':routeDraft!.openRoad?'road':'tunnel'} disabled={busy} onChange={e=>updateRoute({archSegments:e.target.value==='arch'?6:undefined,openRoad:e.target.value==='road',...(e.target.value==='road'?{tunnelWidth:Math.max(4,routeDraft!.tunnelWidth),tunnelHeight:Math.max(4,routeDraft!.tunnelHeight)}:{})})}><option value="tunnel">Rectangular tunnel</option><option value="arch">Arch through both sides</option><option value="road">Open canyon road</option></select></label>}
+              <div className="bsp-seam-sliders">
+                <label>Width <output>{routeDraft!.tunnelWidth.toFixed(1)}</output><input type="range" aria-label="Seam preview width" min={routeDraft!.openRoad?3:.8} max={16} step={.1} value={routeDraft!.tunnelWidth} onChange={e=>updateRoute({tunnelWidth:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key))void previewDraft();}}/></label>
+                <label>Head clearance <output>{routeDraft!.tunnelHeight.toFixed(1)}</output><input type="range" aria-label="Seam preview height" min={routeDraft!.openRoad?3:1} max={16} step={.1} value={routeDraft!.tunnelHeight} onChange={e=>updateRoute({tunnelHeight:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key))void previewDraft();}}/></label>
+                {routeDraft!.archSegments&&<label>Arch facets <output>{routeDraft!.archSegments}</output><input type="range" aria-label="Seam arch facets" min={2} max={12} step={1} value={routeDraft!.archSegments} onChange={e=>updateRoute({archSegments:Number(e.target.value)})} onPointerUp={()=>void previewDraft()}/></label>}
+                <button disabled={busy||!native||!project.bspAssembly||!selectionMatches} onClick={()=>void previewDraft()}>{busy?'Rebuilding preview…':'Preview draft & triangles'}</button>
+                <span>Release a slider to rebuild the exact preview and triangle count. Apply keeps it as one undoable source edit; native compilation is still required.</span>
+              </div>
               <div className="bsp-settings">
                 {vector(
                   draft.translation,
@@ -353,6 +399,12 @@ export default function BspAssembly({
                   />
                 </label>
               </div>
+              {draft.terrainSeam&&<div className="bsp-settings">
+                <label>Shoulders<NumberField value={draft.terrainSeam.shoulderWidth} min={2} max={24} step={0.5} label="Terrain shoulder width" onCommit={value=>update({terrainSeam:{...draft.terrainSeam!,shoulderWidth:value}})}/></label>
+                <label>Bank height<NumberField value={draft.terrainSeam.bankHeight} min={0} max={12} step={0.25} label="Terrain bank height" onCommit={value=>update({terrainSeam:{...draft.terrainSeam!,bankHeight:value}})}/></label>
+                <button disabled={busy||draft.terrainSeam.bankHeight===0} onClick={()=>{setDraft(flattenTerrainConnector(draft));setReport(null);}}>Start with flat connector</button>
+                <span>Low-poly strip between the original edges; source texture scale stays intact. Start flat, then shape the shoulders and banks. Apply, check source and compile before playtesting.</span>
+              </div>}
               <div className="bsp-toggles">
                 <label>
                   <input
@@ -443,7 +495,7 @@ export default function BspAssembly({
               </div>
               <div className="bsp-actions">
                 <button
-                  disabled={busy || routeDraft!.tunnelPoints.length >= 16}
+                  disabled={busy || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
                   onClick={() => {
                     const a = routeDraft!.tunnelPoints.at(-2)!,
                       b = routeDraft!.tunnelPoints.at(-1)!;
@@ -461,7 +513,7 @@ export default function BspAssembly({
                 <button
                   disabled={busy || applied || !selectionMatches}
                   onClick={() =>
-                    onEdit({ ...project, bspAssembly: draft }, 'Connect imported BSP with a tunnel')
+                    onEdit({ ...project, bspAssembly: draft }, draft.terrainSeam?'Join adjacent native terrain':'Connect imported BSP with a tunnel')
                   }
                 >
                   Apply connection
@@ -478,13 +530,13 @@ export default function BspAssembly({
                         latest.current.signature === request.signature;
                       if (!matches()) return;
                       const checked = await call<AssemblyReport>('preview_bsp_assembly', {
-                        projectId: project.id,
+                        projectId: project.id, includeGeometry:true,
                       });
-                      if (matches()) setReport(checked);
+                      if (matches()) {setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
                     })
                   }
                 >
-                  Check tunnel clearance
+                  Preview joined seam & clearance
                 </button>
                 <button
                   disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
@@ -534,7 +586,8 @@ export default function BspAssembly({
                   {(report.donorScenery ?? 0) > 0 && (
                     <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
                   )}
-                  <p>{draft.infantryTunnel?'Both primary and infantry routes passed the source checks. ':''}Build next to check compiled collision, then walk and drive in Halo.</p>
+                  {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
+                  <p>Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.</p>
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>
                   ))}

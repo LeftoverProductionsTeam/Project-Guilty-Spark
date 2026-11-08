@@ -7,13 +7,14 @@ use std::path::Path;
 pub struct SourceAppearance {
     pub source_sha256:String,pub sky_tag_id:Option<u32>,pub sky_path:Option<String>,
     pub environment:Option<EditorEnvironment>,pub fog_maximum_density:f32,
+    pub fog_start_distance:f32,pub fog_opaque_distance:f32,
     pub sky_mesh:Option<MeshData>,pub warnings:Vec<String>,
 }
 pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceAppearance>{
     let (header,bytes,actual)=maps::read_cache_snapshot_shared(path)?;
     if actual!=hash||actual!=inspection.sha256{return invalid("Source changed during appearance inspection");}
     let mut result=SourceAppearance{source_sha256:actual,sky_tag_id:None,sky_path:None,environment:None,
-        fog_maximum_density:0.,sky_mesh:None,warnings:vec![]};
+        fog_maximum_density:0.,fog_start_distance:0.,fog_opaque_distance:0.,sky_mesh:None,warnings:vec![]};
     if !matches!(header.version,5|6|7|13|609){result.warnings.push("This engine's authored sky/appearance reader is not implemented".into());return Ok(result);}
     let start=header.tag_offset as usize;let end=start.checked_add(header.tag_size as usize).ok_or_else(||SparkError::Invalid("Sky tag region overflow".into()))?;
     let r=Reader(&bytes);r.bytes(start,header.tag_size as usize)?;
@@ -48,7 +49,7 @@ pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceApp
         env.sun_azimuth=r.f32(light+0x68)?.to_degrees().rem_euclid(360.);if env.sun_azimuth>180.{env.sun_azimuth-=360.;}
         env.sun_elevation=r.f32(light+0x6c)?.to_degrees().clamp(-90.,90.);
     }else{env.sun_intensity=0.;}
-    result.sky_tag_id=Some(id);result.sky_path=Some(sky.path.clone());result.environment=Some(env);result.fog_maximum_density=density;
+    result.sky_tag_id=Some(id);result.sky_path=Some(sky.path.clone());result.environment=Some(env);result.fog_maximum_density=density;result.fog_start_distance=near;result.fog_opaque_distance=far;
     if density>0.&&far==near{result.warnings.push("Atmospheric fog has no positive native distance range; the preview does not invent one".into());}
     if count>1{result.warnings.push("Multiple skies require BSP cluster/portal sky selection; this view currently uses scenario sky 0".into());}
     if matches!(r.fourcc(at)?.as_str(),"mod2"|"mode") {

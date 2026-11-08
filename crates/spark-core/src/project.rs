@@ -158,6 +158,8 @@ pub struct Project {
     pub active_build_target:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub world_environment:Option<crate::quickforge::EditorEnvironment>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub native_lighting:Option<crate::native_lighting::NativeLighting>,
     #[serde(default)]
     pub source_scene_version:u32,
 }
@@ -200,6 +202,7 @@ impl Project {
             studio: None,
             build_targets:vec![],active_build_target:None,
             world_environment:None,
+            native_lighting:None,
             source_scene_version:1,
         }
     }
@@ -236,6 +239,7 @@ impl Project {
         for binding in &self.animation_assignments{uuid::Uuid::parse_str(&binding.id).map_err(|_|crate::SparkError::Invalid("Invalid animation assignment".into()))?;if !animation_ids.contains(&binding.asset_id)||!matches!(binding.mode.as_str(),"custom"|"replace-graph")||binding.source_sha256.len()!=64||binding.target_tag_path.len()>256||crate::safe_relative(&binding.target_tag_path).is_err(){return invalid("Invalid animation assignment or missing source asset");}}
         if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery"|"mcc-multiplayer-ui")){return invalid("Unknown map conversion profile");}
         if let Some(environment)=&self.world_environment {environment.validate()?;}
+        if let Some(lighting)=&self.native_lighting {lighting.validate()?;if self.quick_forge.is_some()||self.bsp_assembly.is_none(){return invalid("Imported-map lighting currently requires an editable BSP assembly and its native rebuild");}}
         if self.build_targets.len()>16 {return invalid("At most 16 engine build targets per project");}
         let mut target_ids=std::collections::HashSet::new();
         for target in &self.build_targets {
@@ -363,9 +367,9 @@ impl Project {
         let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
         let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
         let native_audio=crate::native_audio::fingerprint_inputs(self);
-        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.tag_renames.is_empty()&&self.native_asset_imports.is_empty()&&native_audio.is_empty(){return Ok(base);}
+        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.tag_renames.is_empty()&&self.native_asset_imports.is_empty()&&native_audio.is_empty()&&self.native_lighting.is_none(){return Ok(base);}
         let used:Vec<_>=self.animations.iter().filter(|asset|self.animation_assignments.iter().any(|a|a.asset_id==asset.id)).collect();
-        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.tag_renames.is_empty(){hash.update(b"tag-renames-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_renames)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}if !native_audio.is_empty(){hash.update(b"native-audio-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&native_audio)?));}Ok(crate::hex_bytes(hash.finalize()))
+        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.tag_renames.is_empty(){hash.update(b"tag-renames-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_renames)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}if !native_audio.is_empty(){hash.update(b"native-audio-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&native_audio)?));}if let Some(lighting)=&self.native_lighting{hash.update(b"native-lighting-v1\0");hash.update(fingerprint_json(serde_json::to_vec(lighting)?));}Ok(crate::hex_bytes(hash.finalize()))
     }
 }
 
@@ -740,5 +744,31 @@ mod backup_policy_tests {
         save_project(&file,&incoming).unwrap();assert_eq!(load_project(&file).unwrap().id,incoming.id);
         let backups=fs::read_dir(root.path()).unwrap().map(|entry|entry.unwrap().path()).filter(|p|p.file_name().unwrap().to_string_lossy().starts_with("incoming.gsproject.bak-")).collect::<Vec<_>>();assert_eq!(backups.len(),1);assert_eq!(load_project(&backups[0]).unwrap().id,first.id);
         let library=crate::library::Library::open(&root.path().join("library")).unwrap();assert!(library.import_project(&file).unwrap_err().to_string().contains("No referenced input was opened"));assert!(library.list().unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod native_lighting_revision_tests {
+    use super::*;
+    #[test]
+    fn imported_bsp_bakes_have_distinct_revisions_and_preview_does_not_replace_them() {
+        let mut p=Project::new("Lighting revision fixture");
+        let source=serde_json::json!({"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":"a".repeat(64),"cacheVersion":609,"engine":"Halo Custom Edition","scenarioPath":"levels/test/fixture"});
+        p.source=Some(serde_json::from_value(source.clone()).unwrap());
+        p.bsp_assembly=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"donorProjectId":Uuid::new_v4().to_string(),"donorTitle":"Fixture donor","donorSource":source,"donorTagsDirectory":"fixture-tags","donorBspIndex":0,"translation":[10.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[1.,0.,0.],[9.,0.,0.]],"tunnelWidth":2.,"tunnelHeight":1.6,"tunnelShaderPath":"fixture/metal"})).unwrap());
+        p.validate().unwrap();
+        let original=p.fingerprint().unwrap();
+        let mut preview=crate::quickforge::EditorEnvironment::default();preview.ambient_intensity=0.6;
+        p.world_environment=Some(preview.clone());assert_eq!(p.fingerprint().unwrap(),original);
+        p.native_lighting=Some(crate::native_lighting::NativeLighting{sky_path:"sky/example".into(),environment:preview,quality:"draft".into()});
+        p.validate().unwrap();let draft=p.fingerprint().unwrap();assert_ne!(draft,original);
+        let reloaded:Project=serde_json::from_slice(&serde_json::to_vec(&p).unwrap()).unwrap();
+        assert_eq!(reloaded.fingerprint().unwrap(),draft);
+        p.native_lighting.as_mut().unwrap().environment.ambient_intensity=0.75;
+        assert_ne!(p.fingerprint().unwrap(),draft);
+        p=reloaded;p.native_lighting.as_mut().unwrap().quality="final".into();
+        assert_ne!(p.fingerprint().unwrap(),draft);
+        p.native_lighting=None;p.validate().unwrap();
+        assert_eq!(p.fingerprint().unwrap(),original);
     }
 }

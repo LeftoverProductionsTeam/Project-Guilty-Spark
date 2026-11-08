@@ -215,3 +215,20 @@ fn downloaded_map_installation_checks_native_identity_and_never_overwrites() {
     );
     assert_eq!(spark_core::maps::hash_file(&path).unwrap(), hash);
 }
+
+#[cfg(windows)]
+#[test]
+fn native_runtime_paths_keep_source_identity_and_allow_engine_slash_joins() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("shared Halo content");
+    fs::create_dir_all(source.join("maps")).unwrap();
+    let bytes=common::fixture(5);
+    fs::write(source.join("maps/ui.map"), &bytes).unwrap();
+    let canonical=fs::canonicalize(&source).unwrap();
+    assert!(canonical.to_string_lossy().starts_with(r"\\?\"));
+    let native=process_path(&canonical).unwrap();
+    assert!(!native.to_string_lossy().starts_with(r"\\?\"));
+    assert_eq!(fs::canonicalize(&native).unwrap(), canonical);
+    assert_eq!(fs::read(format!("{}/maps/ui.map", native.display())).unwrap(), bytes);
+    assert_eq!(fs::read(source.join("maps/ui.map")).unwrap(), bytes);
+}

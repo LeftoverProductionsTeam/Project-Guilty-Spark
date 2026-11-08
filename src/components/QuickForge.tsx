@@ -181,7 +181,7 @@ interface Props {
   onDefaultMaterials: (materials: ForgeMaterial[]) => void;
   onSharedDocument: (document: QuickForgeDocument) => void;
   onCreate: (title: string, template: string, target: RuntimeId) => Promise<void>;
-  onSave: () => Promise<void>;
+  onSave: (persist?:boolean) => Promise<void>;
   onBuild: () => Promise<void>;
   onRuntimes: () => void;
   onSettings: () => void;
@@ -845,6 +845,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     edit({ ...latestProject.current, quickForge: next }, description);
   }
+  async function bakeLighting(quality:'draft'|'final') {
+    if(studioRole==='viewer')throw Error('Only the editing participant can bake native lighting.');
+    if(!doc.skyPath)throw Error('Select an existing native sky tag before baking.');
+    commit({...doc,nativeLighting:{skyPath:doc.skyPath,environment:environmentValue(doc.environment),quality},buildQuality:quality},'Apply native sky lighting and bake');
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    await props.onSave(true);await props.onBuild();
+  }
   function selectMeshDiagnosticTriangle(triangles: number[]) {
     const triangle = triangles[0];
     if (!snapshot || !preflight.sameDocument || !Number.isSafeInteger(triangle)) return;
@@ -1379,6 +1386,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             onBack={() => setBspMode(false)}
             onAssets={() => {setBspMode(false); revealPanel('asset-library');}}
             onBuildSettings={() => setExpandedBuild(true)}
+            onBakeLighting={bakeLighting}
             readOnly={studioRole === 'viewer'}
             materialSource={materialOpen}
             materialBindings={project.nativeAssetImports}
@@ -2649,6 +2657,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   {tab === 'properties' && (
                     <ForgeProperties
                       document={doc}
+                      onBakeNative={bakeLighting}
                       chosen={chosen}
                       changeNode={changeNode}
                       commit={commit}
@@ -3287,6 +3296,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
 
 function ForgeProperties({
   document: doc,
+  onBakeNative,
   chosen,
   changeNode,
   commit,
@@ -3295,6 +3305,7 @@ function ForgeProperties({
   onSelectLogic,
 }: {
   document: QuickForgeDocument;
+  onBakeNative:(quality:"draft"|"final")=>Promise<void>;
   chosen: ForgeNode[];
   changeNode: (update: (node: ForgeNode) => ForgeNode, description: string) => void;
   commit: (doc: QuickForgeDocument, description: string) => void;
@@ -3819,13 +3830,16 @@ function ForgeProperties({
           />
         </label>
         <details className="forge-details gs-environment-panel">
-          <summary title="Adjust editor lighting, ambient color, sun direction and fog in real time. Saves with this source map, but does not patch Halo sky or fog tags.">
-            Environment lighting &amp; fog · live preview
+          <summary title="Adjust the preview, then choose Bake lighting & rebuild to write separate native sky settings and lightmaps.">
+            Environment lighting &amp; fog
           </summary>
           <EnvironmentControls
             value={environmentValue(doc.environment)}
             persisted
             skyPath={doc.skyPath}
+            onBake={onBakeNative}
+            bakedQuality={doc.nativeLighting?.quality}
+            bakeDisabled={!native?"Native baking requires the desktop application.":!doc.skyPath?"Select an existing Halo sky tag before baking.":undefined}
             onChange={(next) => {
               try {
                 validateEnvironment(next);
@@ -3837,8 +3851,7 @@ function ForgeProperties({
           />
         </details>
         <p className="forge-hint">
-          These colors are live editor intent, not compiled shader/sky/fog tags. A real Halo lighting change
-          requires selecting an authorized sky tag and compiling new lightmaps.
+          These colors are live editor intent, not compiled shader/sky/fog tags. Choose Bake lighting &amp; rebuild above to apply sun, ambient light and fog to a separate native sky and compile real lightmaps.
         </p>
       </details>
     </>

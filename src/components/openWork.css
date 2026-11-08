@@ -11,7 +11,7 @@
 .gs-role-choice{display:flex;gap:5px;align-items:end;}
 .gs-role-choice label{display:grid;gap:3px;flex:1;font-size:10px;color:var(--muted);}
 .gs-role-choice select{width:100%;}
-.gs-open-work-groups{max-height:min(62vh,540px);overflow:auto;overscroll-behavior:contain;}
+.gs-open-work-groups{max-height:none;overflow:visible;}
 .gs-open-work-groups h3{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:9px 4px 4px;}
 .application .gs-open-work-groups .gs-work-row{width:100%;display:flex;gap:8px;align-items:center;text-align:left;padding:5px 7px;min-height:34px;border:0;border-radius:5px;background:transparent;}
 .gs-work-row>span{display:grid;gap:2px;flex:1;min-width:0;}

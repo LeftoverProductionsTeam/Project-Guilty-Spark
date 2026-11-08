@@ -609,6 +609,26 @@ pub fn report(
     Ok(reports)
 }
 
+/// Paths sent to native engines must permit their documented C-style slash
+/// joins. Rust's verbatim Windows roots disable slash translation. Keep the
+/// canonical identity for authorization and verify the ordinary spelling still
+/// resolves to that exact directory/file before giving it to a process.
+pub fn process_path(path: &Path) -> Result<PathBuf> {
+    #[cfg(windows)] {
+        let canonical = fs::canonicalize(path)?;
+        let text = canonical.to_str().ok_or_else(|| crate::SparkError::Invalid("Runtime path is not valid Unicode".into()))?;
+        let ordinary = if let Some(tail) = text.strip_prefix(r"\\?\") {
+            if tail.get(..4).is_some_and(|prefix| prefix.eq_ignore_ascii_case(r"UNC\")) {
+                PathBuf::from(format!(r"\\{}", &tail[4..]))
+            } else if tail.as_bytes().get(1) == Some(&b':') && tail.as_bytes().get(2) == Some(&b'\\') && tail.as_bytes()[0].is_ascii_alphabetic() {
+                PathBuf::from(tail)
+            } else { return invalid("This native engine cannot use a Windows device-namespace path"); }
+        } else { canonical.clone() };
+        if fs::canonicalize(&ordinary)? != canonical { return invalid("Runtime path spelling changed its source identity"); }
+        Ok(ordinary)
+    }
+    #[cfg(not(windows))] { Ok(path.to_path_buf()) }
+}
 fn checked_directory(path: &Path) -> Result<PathBuf> {
     crate::reject_links(path)?;
     if !path.is_dir() {
@@ -907,7 +927,8 @@ pub fn shared_content_interface(id: RuntimeId, executable_sha256: &str) -> Optio
     match (id, executable_sha256) {
         (RuntimeId::OpenCe, "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0" |
             "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9" |
-            "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3") => Some("openCe"),
+            "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3" |
+            "b9b69d43a6757961152cec070bfa3d59d96209d16f8018befd74c9896209b1ea" | "7aab23553625099ed156faa627d31c7bbc342e4b5d252a348f0d0ddf464ddb46") => Some("openCe"),
         (RuntimeId::ChupathingyCe, "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4" |
             "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b") => Some("chupathingy"),
         _ => None,
@@ -951,14 +972,14 @@ pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> 
         if maps::inspect_header(&ui)?.version != 5 {
             return invalid("A community shared folder needs original Xbox maps/ui.map in maps; keep Custom Edition maps and banks in maps_ce");
         }
-        environment.insert("HALO_DATA_ROOT".into(), installed.data_root.clone());
+        environment.insert("HALO_DATA_ROOT".into(), process_path(&installed.data_root)?);
     }
     if interface.is_some() {
-        if registration.data_root.is_some(){environment.insert("HALO_DATA_ROOT".into(),installed.data_root.clone());}
+        if registration.data_root.is_some(){environment.insert("HALO_DATA_ROOT".into(),process_path(&installed.data_root)?);}
         let ce = installed.data_root.join("maps_ce");
         crate::reject_links(&ce)?;
         if interface == Some("openCe") {
-            let custom=if ce.is_dir(){fs::canonicalize(&ce)?}else{installed.data_root.join("custom_maps")};
+            let custom=if ce.is_dir(){process_path(&fs::canonicalize(&ce)?)?}else{process_path(&installed.data_root)?.join("custom_maps")};
             crate::reject_links(&custom)?;
             environment.insert("HALO_CUSTOM_MAPS_ROOT".into(),custom);
         }

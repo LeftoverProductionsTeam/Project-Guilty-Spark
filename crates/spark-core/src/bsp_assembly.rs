@@ -21,6 +21,12 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
+#[path="bsp_terrain_seam.rs"]
+mod terrain;
+pub use terrain::TerrainSeam;
+#[path="bsp_seam_sections.rs"]
+mod seam_sections;
+pub use seam_sections::{SeamEdge,SeamSection,append_edge_section};
 type V = [f64; 3];
 const MAX_INPUT_TRIANGLES: usize = 100_000;
 const MAX_OUTPUT_TRIANGLES: usize = 150_000;
@@ -56,6 +62,15 @@ pub struct BspAssembly {
     pub open_road: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub infantry_tunnel: Option<InfantryTunnel>,
+    /// Open ridge route in optional authoring metadata; native source is rebuilt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub high_ground: Option<InfantryTunnel>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub terrain_seam: Option<TerrainSeam>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub sections:Vec<SeamSection>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub arch_segments:Option<u8>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visibility_zones: Vec<crate::bsp_visibility::VisibilityZone>,
 }
@@ -93,6 +108,15 @@ impl BspAssembly {
                 "Tunnel needs 2-16 floor points, width 0.8-16 and height 1-16 world units",
             );
         }
+        if self.sections.len()>8||self.arch_segments.is_some_and(|n|!(2..=12).contains(&n))||self.arch_segments.is_some()&&(self.open_road||self.terrain_seam.is_some()) {
+            return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
+        }
+        let mut section_ids=BTreeSet::new();
+        for section in &self.sections {
+            uuid::Uuid::parse_str(&section.id).map_err(|_|SparkError::Invalid("Invalid seam section identity".into()))?;
+            if !section_ids.insert(&section.id)||section.name.trim().is_empty()||section.name.len()>60||section.name.chars().any(char::is_control) {return invalid("Seam sections need unique IDs and a short readable name");}
+            let mut route=self.section_plan(section);route.sections.clear();route.validate()?;
+        }
         let mut total = 0.;
         for p in &self.tunnel_points {
             if p.iter().any(|x| !x.is_finite() || x.abs() > 2048.) {
@@ -118,6 +142,7 @@ impl BspAssembly {
         if self.open_road && (self.tunnel_width < 3. || self.tunnel_height < 3.) {
             return invalid("An open road needs at least 3 world units of width and clear height; vehicle handling still requires a game test");
         }
+        if let Some(seam) = &self.terrain_seam { seam.validate(self)?; }
         if let Some(infantry) = &self.infantry_tunnel {
             let route = self.infantry_plan(infantry);
             route.validate().map_err(|e| SparkError::Invalid(format!("Infantry tunnel: {e}")))?;
@@ -125,20 +150,42 @@ impl BspAssembly {
                 return invalid("The infantry tunnel needs a distinct route; move its bends or entrances away from the road");
             }
         }
+        if let Some(ridge) = &self.high_ground {
+            let route = self.high_ground_plan(ridge);
+            route.validate().map_err(|e| SparkError::Invalid(format!("High-ground route: {e}")))?;
+            if route.tunnel_points == self.tunnel_points || self.infantry_tunnel.as_ref().is_some_and(|t|t.points == ridge.points) {
+                return invalid("The high-ground route needs its own canyon-top floor points, separate from the lower passages");
+            }
+        }
         Ok(())
     }
     fn infantry_plan(&self, tunnel: &InfantryTunnel) -> Self {
         let mut route = self.clone();
-        route.infantry_tunnel = None; route.open_road = false;
+        route.infantry_tunnel = None; route.high_ground = None; route.open_road = false; route.terrain_seam=None;route.sections.clear();route.arch_segments=None;
         route.tunnel_points = tunnel.points.clone(); route.tunnel_width = tunnel.width;
         route.tunnel_height = tunnel.height; route.tunnel_shader_path = tunnel.shader_path.clone();
         route.visibility_zones.clear(); route
     }
+    fn high_ground_plan(&self, ridge: &InfantryTunnel) -> Self {
+        let mut route = self.infantry_plan(ridge); route.open_road = true; route
+    }
+    fn section_plan(&self,section:&SeamSection)->Self {
+        let mut route=self.infantry_plan(&InfantryTunnel{points:section.points.clone(),width:section.width,height:section.height,shader_path:section.shader_path.clone()});
+        route.open_road=section.open_road;route.arch_segments=section.arch_segments;route
+    }
+    pub fn route_label(&self,index:usize)->&str {
+        if index==0{return "Primary connection";}let mut at=1;
+        if self.infantry_tunnel.is_some(){if index==at{return "Infantry tunnel";}at+=1;}
+        if self.high_ground.is_some(){if index==at{return "High-ground route";}at+=1;}
+        self.sections.get(index-at).map(|section|section.name.as_str()).unwrap_or("Seam section")
+    }
     /// Keep the first route's old representation/fingerprint when extras are absent.
     pub fn connection_routes(&self) -> Vec<Self> {
-        let mut primary = self.clone(); primary.infantry_tunnel = None;
+        let mut primary = self.clone(); primary.infantry_tunnel = None; primary.high_ground = None;primary.sections.clear();
         let mut routes = vec![primary];
         if let Some(tunnel) = &self.infantry_tunnel { routes.push(self.infantry_plan(tunnel)); }
+        if let Some(ridge) = &self.high_ground { routes.push(self.high_ground_plan(ridge)); }
+        routes.extend(self.sections.iter().map(|section|self.section_plan(section)));
         routes
     }
 }
@@ -154,12 +201,24 @@ pub struct AssemblyMaterial {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RouteClearance {
+    pub label: String,
+    pub width: f32,
+    pub clear_height: f32,
+    pub walk_samples: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AssemblyReport {
     pub input_triangles: usize,
     pub output_triangles: usize,
+    #[serde(default)]
+    pub connector_triangles: usize,
     pub generated_uv_faces: usize,
     pub walk_samples: usize,
     pub portal_count: usize,
+    #[serde(default)]
+    pub route_clearance: Vec<RouteClearance>,
     #[serde(default)]
     pub donor_scenery: usize,
     pub warnings: Vec<String>,
@@ -169,6 +228,37 @@ pub struct AssemblyGeometry {
     pub materials: Vec<AssemblyMaterial>,
     pub triangle_materials: Vec<usize>,
     pub report: AssemblyReport,
+}
+/// The editor displays this same validated source mesh, using each original
+/// map's shader IDs. It is not a compiled lightmap or gameplay receipt.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct AssemblyViewportSurface { pub source: usize, pub mesh: MeshData }
+pub fn viewport_surfaces(geometry:&AssemblyGeometry,base:&MapInspection,donor:&MapInspection)->Result<Vec<AssemblyViewportSurface>> {
+    if geometry.mesh.normals.len()!=geometry.mesh.positions.len()||geometry.mesh.uvs.len()*3!=geometry.mesh.positions.len()*2||geometry.triangle_materials.len()*3!=geometry.mesh.indices.len()||geometry.mesh.indices.iter().any(|i|*i as usize>=geometry.mesh.positions.len()/3){return invalid("Joined source preview has inconsistent native geometry attributes");}
+    let mut result=vec![];
+    for source in 0..2 {
+        let inspection=if source==0 {base}else{donor};
+        let mut mesh=MeshData{label:"Joined BSP source preview".into(),source:inspection.sha256.clone(),..Default::default()};
+        let mut remap=BTreeMap::new();
+        for (slot,material) in geometry.materials.iter().enumerate().filter(|(_,m)|m.source==source&&!m.collision_only&&m.shader_path.is_some()) {
+            let tag=inspection.tags.iter().find(|t|Some(&t.class)==material.shader_class.as_ref()&&material.shader_path.as_ref().is_some_and(|p|t.path.replace('\\',"/").eq_ignore_ascii_case(&p.replace('\\',"/"))))
+                .ok_or_else(||SparkError::Invalid(format!("Joined preview material has no verified native tag: {}",material.name)))?;
+            let start=mesh.indices.len();
+            for (triangle,ids) in geometry.mesh.indices.chunks_exact(3).enumerate().filter(|(i,_)|geometry.triangle_materials[*i]==slot) {
+                let _=triangle;
+                for id in ids {let mapped=*remap.entry(*id).or_insert_with(||{
+                    let old=*id as usize;let next=(mesh.positions.len()/3) as u32;
+                    mesh.positions.extend_from_slice(&geometry.mesh.positions[old*3..old*3+3]);
+                    mesh.normals.extend_from_slice(&geometry.mesh.normals[old*3..old*3+3]);
+                    mesh.uvs.extend_from_slice(&geometry.mesh.uvs[old*2..old*2+2]);next
+                });mesh.indices.push(mapped);}
+            }
+            if mesh.indices.len()>start {mesh.material_ranges.push(maps::MeshMaterialRange{shader_tag_id:tag.id,bsp_index:0,lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,lightmap_bitmap_tag_id:None,index_start:start,index_count:mesh.indices.len()-start});}
+        }
+        if !mesh.indices.is_empty(){result.push(AssemblyViewportSurface{source,mesh});}
+    }
+    Ok(result)
 }
 fn sub(a: V, b: V) -> V {
     std::array::from_fn(|i| a[i] - b[i])
@@ -258,8 +348,9 @@ fn render_shader_aliases(tags: &[maps::Tag], used: &BTreeSet<u32>) -> BTreeMap<u
         let path=tag.path.replace('\\',"/");
         let Some((parent,name))=path.rsplit_once('/') else {continue};
         let Some(material)=name.strip_prefix("pgs") else {continue};
-        let generated=material.split_once('m').is_some_and(|(hash,index)|hash.len()==8&&hash.bytes().all(|c|c.is_ascii_hexdigit())&&index.strip_suffix('x').is_some_and(|v|!v.is_empty()&&v.bytes().all(|c|c.is_ascii_digit())))
-            || material.strip_prefix("tunnel").and_then(|v|v.strip_suffix('x')).is_some_and(|v|v.len()==8&&v.bytes().all(|c|c.is_ascii_hexdigit()));
+        let terrain_alias=["ter0","ter1"].iter().any(|prefix|material.strip_prefix(prefix).and_then(|s|s.strip_suffix('x')).is_some_and(|s|s.len()==8&&s.bytes().all(|c|c.is_ascii_hexdigit())));
+        let generated=terrain_alias || material.split_once('m').is_some_and(|(hash,index)|hash.len()==8&&hash.bytes().all(|c|c.is_ascii_hexdigit())&&index.strip_suffix('x').is_some_and(|v|!v.is_empty()&&v.bytes().all(|c|c.is_ascii_digit())))
+            || ["tunnel","infantry","ridge"].iter().any(|prefix|material.strip_prefix(prefix).and_then(|v|v.strip_suffix('x')).is_some_and(|v|v.len()==8&&v.bytes().all(|c|c.is_ascii_hexdigit())));
         if !generated || !parent.ends_with("/materials") || !parent.rsplit('/').nth(1).is_some_and(|p|p.starts_with("gsbsp_")) || tag.shader_preview.is_none() {continue;}
         let target=format!("{parent}/{}",&name[1..]);
         if let Some(render)=tags.iter().find(|t|used.contains(&t.id)&&t.class==tag.class&&t.path.replace('\\',"/").eq_ignore_ascii_case(&target)) {
@@ -411,7 +502,7 @@ fn tunnel_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize) 
 }
 fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize, sky: Option<usize>) -> Result<Manifold> {
     let up = [0., 0., height];
-    let p = [
+    let mut p = vec![
         sub(a, side_a),
         add(a, side_a),
         add(b, side_b),
@@ -425,10 +516,19 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
         num_prop: 5,
         ..Default::default()
     };
-    let triangles = [
-        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6,
-        3, 0, 4, 3, 4, 7,
-    ];
+    // A graded miter is generally not a plane. Preserve the authored center
+    // line as an edge instead of letting an arbitrary diagonal lift/drop it.
+    // Split the end caps too: inserting only floor points creates T-junctions.
+    let split=dot(sub(p[3],p[0]),normal(p[0],p[1],p[2])).abs()>1e-7;
+    let triangles=if split {
+        p.extend([a,b,add(a,up),add(b,up)]);
+        vec![8,0,3,8,3,9,8,9,2,8,2,1,
+             10,7,4,10,11,7,10,6,11,10,5,6,
+             0,8,10,0,10,4,8,1,5,8,5,10,
+             1,2,6,1,6,5,
+             2,9,11,2,11,6,9,3,7,9,7,11,
+             3,0,4,3,4,7]
+    }else{vec![0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7]};
     for t in triangles.chunks_exact(3) {
         let points = [p[t[0]], p[t[2]], p[t[1]]];
         let n = normal(points[0], points[1], points[2]);
@@ -439,10 +539,24 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
         }
         gl.tri_verts.extend([first, first + 1, first + 2]);
     }
-    gl.face_id = vec![material as u64; 12];
-    if let Some(sky) = sky { gl.face_id[2..4].fill(sky as u64); }
+    gl.face_id = vec![material as u64; triangles.len()/3];
+    if let Some(sky) = sky { let floor=if split{4}else{2};gl.face_id[floor..floor*2].fill(sky as u64); }
     gl.merge();
     checked(Manifold::from_mesh_gl64(&gl), "Tunnel")
+}
+// A route volume joined into existing outdoor sky cannot raise its floor:
+// it is already inside free space. Remove only the explicitly authored strip
+// beneath the ridge, leaving a real supported surface and the lower routes.
+fn support_high_ground(mut space:Manifold,route:&BspAssembly,material:usize,minimum:f64,token:Option<&CancelToken>)->Result<Manifold>{
+    let sides=tunnel_sides(&route.tunnel_points,route.tunnel_width as f64)?;
+    for (index,pair) in route.tunnel_points.windows(2).enumerate(){
+        let depth=pair[0][2].max(pair[1][2])-minimum;
+        if !depth.is_finite()||depth<=0. {return invalid("High-ground support requires a verified lower source boundary");}
+        let down=[0.,0.,-depth];
+        let support=passage_solid(add(pair[0],down),add(pair[1],down),sides[index],sides[index+1],depth,material,None)?;
+        space=checked(space.boolean_with_engine_and_token(&support,OpType::Subtract,BooleanEngine::Auto,token),"Canyon-top terrain support")?;
+    }
+    Ok(space)
 }
 pub fn generate(
     base_path: &Path,
@@ -478,9 +592,14 @@ pub fn generate(
         )
         .ok();
     }
+    for section in &assembly.sections {
+        seam_sections::validate_edges(section,&base.sha256,assembly)?;
+        seam_sections::verify_rendered_edge(base_path,base,&section.edges[0])?;
+        seam_sections::verify_rendered_edge(&assembly.donor_source.preserved_path,&donor,&section.edges[1])?;
+    }
     let routes = assembly.connection_routes();
     for (index, route) in routes.iter().enumerate() {
-        let label = if index == 0 { "Primary connection" } else { "Infantry tunnel" };
+        let label = assembly.route_label(index);
         verify_entrance(&base_mesh, &base_faces, 0, [0.;3], 0., route.tunnel_points[0])
             .map_err(|e| SparkError::Invalid(format!("{label} entrance: {e}")))?;
         verify_entrance(&donor_mesh, &donor_faces, route.donor_bsp_index, route.translation,
@@ -511,22 +630,31 @@ pub fn generate(
         &mut materials,
         &mut generated_uv_faces,
     )?;
+    let first_connector_material=materials.len();
     let mut passage_materials = vec![];
     for (index, route) in routes.iter().enumerate() {
         let material = materials.len();
         materials.push(AssemblyMaterial {
-            name: if index == 0 { format!("gstunnel{}x", &base.sha256[..8]) } else { format!("gsinfantry{}x", &base.sha256[..8]) },
+            name: format!("gs{}{}x",if index==0 {"tunnel".into()}else if assembly.route_label(index)=="Infantry tunnel" {"infantry".into()}else if assembly.route_label(index)=="High-ground route" {"ridge".into()}else{format!("section{index}")}, &base.sha256[..8]),
             source: 0, shader_path: Some(route.tunnel_shader_path.clone()), shader_class: Some("senv".into()),
             flags: 0, collision_only: false,
         });
         passage_materials.push(material);
     }
-    let sky_material = if assembly.open_road {
+    let sky_material = if routes.iter().any(|route|route.open_road) {
         Some(materials.iter().position(|m| m.name == "+sky" && m.source == 0).unwrap_or_else(|| {
             let index = materials.len(); materials.push(AssemblyMaterial {name:"+sky".into(),source:0,
                 shader_path:None,shader_class:None,flags:0,collision_only:false}); index
         }))
     } else { None };
+    let terrain_ribbon=assembly.terrain_seam.as_ref().map(|_|terrain::Ribbon::new(base,&base_mesh,&base_faces,&donor,&donor_mesh,&donor_faces,assembly)).transpose()?;
+    let terrain_materials=if let Some(seam)=&assembly.terrain_seam {
+        let indices=[materials.len(),materials.len()+1];
+        for (source,path) in [&seam.base_shader_path,&seam.donor_shader_path].into_iter().enumerate(){materials.push(AssemblyMaterial{name:format!("gster{}{}x",source,&base.sha256[..8]),source,shader_path:Some(path.clone()),shader_class:Some("senv".into()),flags:0,collision_only:false});}
+        Some(indices)
+    }else{None};
+    let lowest_source=base_mesh.positions.chunks_exact(3).map(|p|p[2] as f64)
+        .chain(donor_mesh.positions.chunks_exact(3).map(|p|p[2] as f64+assembly.translation[2])).fold(f64::INFINITY,f64::min);
     let started = Instant::now();
     let token = CancelToken::new();
     let complete = AtomicBool::new(false);
@@ -543,11 +671,18 @@ pub fn generate(
             }
         });
         let result = (|| {
+            let right=if assembly.terrain_seam.is_some(){terrain::trim_donor(right,&donor,&donor_mesh,&donor_faces,assembly,sky_material.unwrap(),&token)?}else{right};
             let mut combined = left;
-            for (route, material) in routes.iter().zip(&passage_materials) {
+            if let (Some(ribbon),Some(slots))=(&terrain_ribbon,terrain_materials){
+                combined=checked(combined.boolean_with_engine_and_token(&ribbon.solid(assembly,slots,sky_material.unwrap())?,OpType::Add,BooleanEngine::Auto,Some(&token)),"Terrain seam join")?;
+            }
+            for (route_index,(route, material)) in routes.iter().zip(&passage_materials).enumerate() {
+            if route_index==0 && terrain_ribbon.is_some(){continue;}
             let sides=tunnel_sides(&route.tunnel_points,route.tunnel_width as f64)?;
             for (index,pair) in route.tunnel_points.windows(2).enumerate() {
-                let passage = passage_solid(
+                let passage = if let Some(segments)=route.arch_segments {
+                    seam_sections::arch_solid(pair[0],pair[1],sides[index],sides[index+1],route.tunnel_width as f64,route.tunnel_height as f64,segments,*material)?
+                }else{passage_solid(
                     pair[0].map(f64::from),
                     pair[1].map(f64::from),
                     sides[index],
@@ -555,7 +690,7 @@ pub fn generate(
                     route.tunnel_height as f64,
                     *material,
                     if route.open_road { sky_material } else { None },
-                )?;
+                )?};
                 combined = checked(
                     combined.boolean_with_engine_and_token(
                         &passage,
@@ -567,7 +702,7 @@ pub fn generate(
                 )?;
             }
             }
-            let united = checked(
+            let mut united = checked(
                 combined.boolean_with_engine_and_token(
                     &right,
                     OpType::Add,
@@ -576,6 +711,9 @@ pub fn generate(
                 ),
                 "Donor join",
             )?;
+            if let Some(ridge)=&assembly.high_ground {
+                united=support_high_ground(united,&assembly.high_ground_plan(ridge),passage_materials[1+usize::from(assembly.infantry_tunnel.is_some())],lowest_source-0.25,Some(&token))?;
+            }
             checked(
                 united.rebuild_solid_with_token(
                     manifold_rust::types::WindingRule::Positive,
@@ -598,9 +736,10 @@ pub fn generate(
         return invalid("Boolean lost source material or vertex-property provenance");
     }
     crate::bsp_triangulate::improve(&mut gl);
-    for material in passage_materials { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
+    for material in passage_materials.into_iter().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
-    let walk_samples = verify_route(&mesh, assembly)?;
+    let route_clearance = crate::bsp_clearance::RouteChecker::new(&mesh)?.verify_details(assembly)?;
+    let walk_samples = route_clearance.iter().map(|route|route.walk_samples).sum();
     for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
         let slot = gl.face_id[face] as usize;
         if slot >= materials.len() {
@@ -639,8 +778,35 @@ pub fn generate(
         assembly,
         &base_mesh,
         &donor_mesh,
+        assembly.terrain_seam.as_ref().map(|_|terrain::render_edge(&donor,assembly.donor_bsp_index,false).map(|edge|edge-0.25+assembly.translation[0])).transpose()?,
     )?;
-    Ok(AssemblyGeometry{report:AssemblyReport{input_triangles:base_mesh.indices.len()/3+donor_mesh.parts[assembly.donor_bsp_index].index_count/3,output_triangles:mesh.indices.len()/3,generated_uv_faces,walk_samples,portal_count,donor_scenery,warnings:vec!["This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.".into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials})
+    let connector_triangles=triangle_materials.iter().filter(|&&slot|slot>=first_connector_material&&materials[slot].shader_path.is_some()&&!materials[slot].collision_only).count();
+    Ok(AssemblyGeometry{report:AssemblyReport{input_triangles:base_mesh.indices.len()/3+donor_mesh.parts[assembly.donor_bsp_index].index_count/3,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),"This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.".into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials})
+}
+// Automatic cuts may span a change of grade along the same horizontal run.
+// Keep authored segment identities intact, and never join around an XY bend.
+fn portal_spans(route:&BspAssembly)->Vec<(usize,usize)>{
+    let mut spans=vec![(0,1)];
+    for index in 1..route.tunnel_points.len()-1 {
+        let a=sub(route.tunnel_points[index],route.tunnel_points[index-1]);
+        let b=sub(route.tunnel_points[index+1],route.tunnel_points[index]);
+        let lengths=a[0].hypot(a[1])*b[0].hypot(b[1]);
+        if route.visibility_zones.is_empty()&&lengths>1e-8&&(a[0]*b[0]+a[1]*b[1])/lengths>1.-1e-8 {
+            spans.last_mut().unwrap().1=index+1;
+        }else{spans.push((index,index+1));}
+    }
+    spans
+}
+fn visibility_solid(mesh:&MeshData,slots:&[usize],materials:&[AssemblyMaterial])->Result<Manifold>{
+    let mut gl=MeshGL64{num_prop:3,..Default::default()};
+    for (face,t) in mesh.indices.chunks_exact(3).enumerate(){
+        let material=materials.get(slots[face]).ok_or_else(||SparkError::Invalid("Visibility source material is missing".into()))?;
+        if !material.collision_only&&material.shader_path.is_some(){continue;}
+        let start=gl.num_vert() as u64;
+        for id in [t[0],t[2],t[1]]{gl.vert_properties.extend(mesh.positions[id as usize*3..id as usize*3+3].iter().map(|&v|f64::from(v)));}
+        gl.tri_verts.extend([start,start+1,start+2]);gl.face_id.push(0);
+    }
+    gl.merge();checked(Manifold::from_mesh_gl64_robust(&gl),"Native visibility source import")
 }
 fn add_portals(
     mesh: &mut MeshData,
@@ -649,6 +815,7 @@ fn add_portals(
     assembly: &BspAssembly,
     base: &MeshData,
     donor: &MeshData,
+    trimmed_donor_min: Option<f64>,
 ) -> Result<usize> {
     fn bounds(mesh: &MeshData, part: usize, translation: V, yaw: f64) -> (V, V) {
         let mut lo = [f64::INFINITY; 3];
@@ -664,32 +831,33 @@ fn add_portals(
         (lo, hi)
     }
     let base_bounds = bounds(base, 0, [0.; 3], 0.);
-    let donor_bounds = bounds(
+    let mut donor_bounds = bounds(
         donor,
         assembly.donor_bsp_index,
         assembly.translation.map(f64::from),
         assembly.yaw_degrees as f64,
     );
+    if let Some(boundary)=trimmed_donor_min{donor_bounds.0[0]=boundary;}
     let inside = |p: V, b: (V, V)| (0..3).all(|k| p[k] >= b.0[k] - 0.1 && p[k] <= b.1[k] + 0.1);
+    let source_space=if assembly.terrain_seam.is_some(){Some(visibility_solid(mesh,slots,materials)?)}else{None};
     let slot = materials.len();
     let mut count = 0;
+    let mut native_cuts:Vec<Vec<[u32;3]>>=vec![];
     let mut generated_cuts:Vec<([[f64;3];4],bool)>=vec![];
     for (route_index, route) in assembly.connection_routes().into_iter().enumerate() {
-    let before = count;
-    for (segment, pair) in route.tunnel_points.windows(2).enumerate() {
-        let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
+    let before = count;let mut covered_by_shared_cut=false;
+    for (segment,end) in portal_spans(&route) {
+        let (a,b)=(route.tunnel_points[segment],route.tunnel_points[end]);
         let d = sub(b, a);
-        let length = d[0].hypot(d[1]);
-        let steps = (length / 0.4).ceil() as usize;
-        let candidates: Vec<_> = (1..steps)
-            .map(|n| add(a, mul(d, n as f64 / steps as f64)))
-            .filter(|p| !inside(*p, base_bounds) && !inside(*p, donor_bounds))
-            .collect();
+        let candidates: Vec<_> = route.tunnel_points[segment..=end].windows(2).flat_map(|pair|{
+            let delta=sub(pair[1],pair[0]);let steps=(delta[0].hypot(delta[1])/0.4).ceil() as usize;
+            (1..steps).map(move|n|add(pair[0],mul(delta,n as f64/steps as f64)))
+        }).filter(|p| !inside(*p, base_bounds) && !inside(*p, donor_bounds)).collect();
         let authored = crate::bsp_visibility::authored_centers(&route.visibility_zones, &route.tunnel_points, segment)?;
         if authored.is_none() && candidates.len() < 4 {
             continue;
         }
-        let [first, last] = authored.unwrap_or_else(||[candidates[candidates.len() / 3],candidates[candidates.len() * 2 / 3]]);
+        let [first, last] = authored.unwrap_or_else(||if route.terrain_seam.is_some(){[candidates[0],*candidates.last().unwrap()]}else{[candidates[candidates.len() / 3],candidates[candidates.len() * 2 / 3]]});
         if [first,last].iter().any(|p|inside(*p,base_bounds)||inside(*p,donor_bounds)) {
             return invalid("Authored visibility cuts must lie in an isolated tunnel segment outside both source BSP bounds; move the portal handles or choose a longer segment");
         }
@@ -700,32 +868,38 @@ fn add_portals(
             continue;
         }
         for center in [first, last] {
-            let points = if authored.is_some(){crate::bsp_visibility::authored_portal_quad(center,d,route.tunnel_width as f64,route.tunnel_height as f64)?}else{crate::bsp_visibility::portal_quad(center,d,route.tunnel_width as f64,route.tunnel_height as f64)?};
+            let portal_height=route.tunnel_height as f64+if route.arch_segments.is_some(){route.tunnel_width as f64/2.}else{0.};
+            let points = if let Some(seam)=&route.terrain_seam {
+                // A road-width rectangle cannot split the full outdoor seam.
+                // Let Halo Tool clip this source-bounded plane against its banks.
+                let bottom=base_bounds.0[2].min(donor_bounds.0[2])-0.1;
+                let roof=base_bounds.1[2].max(donor_bounds.1[2])+0.25;
+                terrain::portal([center[0],center[1],bottom],d,route.tunnel_width as f64+2.*seam.shoulder_width,roof)?
+            }else if authored.is_some(){crate::bsp_visibility::authored_portal_quad(center,d,route.tunnel_width as f64,portal_height)?}else{crate::bsp_visibility::portal_quad(center,d,route.tunnel_width as f64,portal_height)?};
             if generated_cuts.iter().any(|(previous,was_authored)|(*was_authored||authored.is_some())&&crate::bsp_visibility::portals_intersect(previous,&points)) {
                 return invalid("Authored visibility planes cross or overlap another portal. Move the handles away from the tunnel bend or other cuts");
             }
-            generated_cuts.push((points,authored.is_some()));
-            let n = normal(points[0], points[1], points[2]);
-            let begin = mesh.positions.len() / 3;
-            for p in points {
-                mesh.positions.extend(p.map(|v| v as f32));
-                mesh.normals.extend(n.map(|v| v as f32));
-                mesh.uvs.extend([0., 0.]);
+            let surface=if let Some(space)=&source_space {
+                crate::bsp_visibility::clipped_portal(space,center,d,(route.tunnel_height as f64*0.5).min(0.8))?
+            }else{
+                let points=if let Some(segments)=route.arch_segments{seam_sections::arch_portal(center,d,route.tunnel_width as f64,route.tunnel_height as f64,segments)?}else{points.to_vec()};
+                let triangles=(1..points.len()-1).map(|i|[0,i,i+1]).collect();crate::bsp_visibility::SourcePortal{points,triangles}
+            };
+            if source_space.is_some(){
+                let mut signature:Vec<[u32;3]>=surface.points.iter().map(|point|point.map(|v|(v as f32).to_bits())).collect();signature.sort();signature.dedup();
+                if native_cuts.contains(&signature){if authored.is_some(){return invalid("Authored visibility cut duplicates a shared native portal; move the handles");}covered_by_shared_cut=true;continue;}
+                native_cuts.push(signature);
             }
-            mesh.indices.extend([
-                begin as u32,
-                begin as u32 + 1,
-                begin as u32 + 2,
-                begin as u32,
-                begin as u32 + 2,
-                begin as u32 + 3,
-            ]);
-            slots.extend([slot, slot]);
+            generated_cuts.push((points,authored.is_some()));
+            let first=surface.triangles[0];let n=normal(surface.points[first[0]],surface.points[first[1]],surface.points[first[2]]);
+            let begin=mesh.positions.len()/3;
+            for point in &surface.points{mesh.positions.extend(point.map(|v|v as f32));mesh.normals.extend(n.map(|v|v as f32));mesh.uvs.extend([0.,0.]);}
+            for ids in surface.triangles{mesh.indices.extend(ids.map(|i|(begin+i) as u32));slots.push(slot);}
             count += 1;
         }
     }
-    if count == before {
-        let label = if route_index == 0 { "Primary connection" } else { "Infantry tunnel" };
+    if count == before && !covered_by_shared_cut {
+        let label = assembly.route_label(route_index);
         return invalid(&format!("{label}: no isolated section is available for visibility portals. Separate the BSP bounds or add a route bend before compiling"));
     }
     }
@@ -968,10 +1142,17 @@ pub fn plan(
         tunnel_shader_path: shader.path.clone(),
         open_road: false,
         infantry_tunnel: None,
+        high_ground: None,
+        terrain_seam: None,
+        sections:vec![],arch_segments:None,
         visibility_zones: vec![],
     };
     plan.validate()?;
     Ok(plan)
+}
+/// A new adjacent terrain proposal; saved corridor plans are not rewritten.
+pub fn plan_terrain(base_project:&Project,base:&MapInspection,donor_project:&Project,donor:&MapInspection,index:usize,tags:PathBuf)->Result<BspAssembly>{
+    terrain::plan(&base_project.source.as_ref().ok_or_else(||SparkError::Invalid("Destination source is missing".into()))?.preserved_path,base,donor,plan(base_project,base,donor_project,donor,index,tags)?)
 }
 pub fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<usize> {
     crate::bsp_clearance::verify_route(mesh, assembly)
@@ -1013,6 +1194,7 @@ pub fn verify_compiled_walkthrough(path: &Path, route: &BspAssembly) -> Result<C
     let mut reverse = route.clone();
     reverse.tunnel_points.reverse();
     if let Some(tunnel) = &mut reverse.infantry_tunnel { tunnel.points.reverse(); }
+    if let Some(ridge) = &mut reverse.high_ground { ridge.points.reverse(); }
     let return_samples = checker.verify(&reverse)?;
     let points = inspection.objects.iter().filter(|o| o.kind == "Player spawn").collect::<Vec<_>>();
     if points.is_empty() || points.len() > 4096 {
@@ -1144,7 +1326,11 @@ fn collision_layer(
         for id in ids {
             input
                 .vert_properties
-                .extend_from_slice(&render.vert_properties[*id as usize * 5..*id as usize * 5 + 3]);
+                // Match MeshData/JMS precision before topology cleanup. Casting
+                // after Manifold silently collapses distinct boundary vertices,
+                // leaving zero-area sky faces and opposing collision surfaces.
+                .extend(render.vert_properties[*id as usize * 5..*id as usize * 5 + 3]
+                    .iter().map(|&coordinate| f64::from(coordinate as f32)));
         }
         input.tri_verts.extend([first, first + 1, first + 2]);
         input.face_id.push(slot as u64);
@@ -1261,13 +1447,13 @@ mod tests {
         let(base,donor)=(bounds(0.,2.),bounds(8.,10.));
         plan.visibility_zones=vec![crate::bsp_visibility::VisibilityZone::Tunnel{id:uuid::Uuid::new_v4().to_string(),name:"Portal span".into(),segment:0,start:0.25,end:0.75}];
         let(mut mesh,mut materials,mut slots)=(MeshData::default(),vec![],vec![]);
-        assert_eq!(add_portals(&mut mesh,&mut materials,&mut slots,&plan,&base,&donor).unwrap(),2);
+        assert_eq!(add_portals(&mut mesh,&mut materials,&mut slots,&plan,&base,&donor,None).unwrap(),2);
         assert_eq!(mesh.positions[0],3.);
         assert_eq!(mesh.positions[12],7.);
-        let geometry=AssemblyGeometry{mesh,materials,triangle_materials:slots,report:AssemblyReport{input_triangles:0,output_triangles:4,generated_uv_faces:0,walk_samples:0,portal_count:2,donor_scenery:0,warnings:vec![]}};
+        let geometry=AssemblyGeometry{mesh,materials,triangle_materials:slots,report:AssemblyReport{input_triangles:0,output_triangles:4,connector_triangles:0,generated_uv_faces:0,walk_samples:0,portal_count:2,route_clearance:vec![],donor_scenery:0,warnings:vec![]}};
         assert!(export_jms(&geometry).unwrap().contains("+portal\r\n<none>\r\n"));
         if let crate::bsp_visibility::VisibilityZone::Tunnel{start,..}=&mut plan.visibility_zones[0]{*start=0.05;}
-        assert!(add_portals(&mut MeshData::default(),&mut vec![],&mut vec![],&plan,&base,&donor).is_err());
+        assert!(add_portals(&mut MeshData::default(),&mut vec![],&mut vec![],&plan,&base,&donor,None).is_err());
     }
 
     fn material() -> AssemblyMaterial {
@@ -1279,6 +1465,47 @@ mod tests {
             flags: 0,
             collision_only: false,
         }
+    }
+
+    #[test]
+    fn collision_precision_repairs_collapsed_boundary_edges_without_losing_the_solid() {
+        let a=[62.4620166,21.42190674,-12.11817017];
+        let b=[76.,a[1],a[2]];
+        let sides=tunnel_sides(&[a,b],2.).unwrap();
+        let body=tunnel_solid(a,b,sides[0],sides[1],4.,0).unwrap();
+        let mut gl=body.get_mesh_gl64(-1);
+        let edge=[gl.tri_verts[0],gl.tri_verts[1]];
+        let point=|m:&MeshGL64,id:u64|std::array::from_fn::<_,3,_>(|k|m.vert_properties[id as usize*5+k]);
+        let ends=edge.map(|id|point(&gl,id));
+        let faces=std::mem::take(&mut gl.tri_verts);
+        let slots=std::mem::take(&mut gl.face_id);
+        let mut split=0;
+        for (face,ids) in faces.chunks_exact(3).enumerate() {
+            if let Some(k)=(0..3).find(|&k|{
+                let x=point(&gl,ids[k]);let y=point(&gl,ids[(k+1)%3]);
+                x==ends[0]&&y==ends[1]||x==ends[1]&&y==ends[0]
+            }) {
+                let [x,y,z]=[ids[k],ids[(k+1)%3],ids[(k+2)%3]];
+                let weight=if point(&gl,x)==ends[0]{1e-9}else{1.-1e-9};
+                let new=gl.num_vert() as u64;
+                for property in 0..5 {
+                    let v=gl.vert_properties[x as usize*5+property]*(1.-weight)+gl.vert_properties[y as usize*5+property]*weight;
+                    gl.vert_properties.push(v);
+                }
+                assert_eq!(point(&gl,new).map(|v|v as f32),ends[0].map(|v|v as f32));
+                gl.tri_verts.extend([x,new,z,new,y,z]);gl.face_id.extend([slots[face];2]);split+=1;
+            } else {gl.tri_verts.extend(ids);gl.face_id.push(slots[face]);}
+        }
+        assert!(split>=2,"The same closed-solid edge must be split on both sides");
+        let mut materials=vec![material()];let (mesh,slots)=collision_layer(&gl,&mut materials).unwrap();
+        let mut volume=0.;let mut unique=std::collections::BTreeSet::new();
+        for (ids,slot) in mesh.indices.chunks_exact(3).zip(slots) {
+            let p=[vertex(&mesh,ids[0]),vertex(&mesh,ids[1]),vertex(&mesh,ids[2])];
+            assert!(dot(cross(sub(p[1],p[0]),sub(p[2],p[0])),cross(sub(p[1],p[0]),sub(p[2],p[0])))>0.,"Native float output must contain no collapsed face");
+            let mut key=p.map(|v|v.map(f64::to_bits));key.sort();assert!(unique.insert(key),"Native collision must contain no coincident opposing faces");
+            assert!(materials[slot].collision_only);volume+=dot(p[0],cross(p[1],p[2]))/6.;
+        }
+        assert!((volume.abs()-body.volume()).abs()<1e-4,"Cleanup must preserve the complete solid volume");
     }
 
     #[test]
@@ -1477,18 +1704,122 @@ mod tests {
         plan.infantry_tunnel=Some(InfantryTunnel{points:vec![[0.,0.,0.],[25.,8.,0.],[75.,8.,0.],[100.,0.,0.]],width:2.,height:1.6,shader_path:"fixture/stone".into()});
         let overlap=MeshData{positions:vec![0.,-1.,0.,100.,1.,6.,0.,1.,0.],indices:vec![0,1,2],parts:vec![maps::MeshPart{name:"fixture".into(),index_start:0,index_count:3}],..Default::default()};
         let(mut mesh,mut materials,mut slots)=(MeshData::default(),vec![],vec![]);
-        let error=add_portals(&mut mesh,&mut materials,&mut slots,&plan,&overlap,&overlap).unwrap_err();
+        let error=add_portals(&mut mesh,&mut materials,&mut slots,&plan,&overlap,&overlap,None).unwrap_err();
         assert!(error.to_string().contains("Primary connection"));
         assert!(materials.is_empty());
+    }
+    #[test]
+    fn visibility_run_crosses_a_grade_change_without_losing_the_isolated_cut(){
+        let mut plan=dual_route_plan();plan.tunnel_points=vec![[0.,0.,0.],[32.,0.,0.]];
+        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,-4.,1.],[11.5,-4.,3.],[32.,-4.,1.]],width:4.,height:8.,shader_path:"fixture/stone".into()});
+        let bounds=|lo:f32,hi:f32|MeshData{positions:vec![lo,-10.,0.,hi,10.,20.,lo,10.,0.],indices:vec![0,1,2],parts:vec![maps::MeshPart{name:"fixture".into(),index_start:0,index_count:3}],..Default::default()};
+        let(mut mesh,mut materials,mut slots)=(MeshData::default(),vec![],vec![]);
+        assert_eq!(add_portals(&mut mesh,&mut materials,&mut slots,&plan,&bounds(0.,10.),&bounds(13.,32.),None).unwrap(),4);
+        assert_eq!(materials.len(),1);assert_eq!(slots.len(),8);
+        let ridge=plan.high_ground_plan(plan.high_ground.as_ref().unwrap());assert_eq!(portal_spans(&ridge),vec![(0,2)]);
+        let mut bend=ridge.clone();bend.tunnel_points[1][1]-=2.;assert_eq!(portal_spans(&bend),vec![(0,1),(1,2)]);
     }
     #[test]
     fn both_connections_export_distinct_native_portal_cuts_with_one_portal_material() {
         let mut plan=dual_route_plan();plan.open_road=true;plan.infantry_tunnel=Some(InfantryTunnel{points:vec![[0.,0.,0.],[25.,8.,0.],[75.,8.,0.],[100.,0.,0.]],width:2.,height:1.6,shader_path:"fixture/stone".into()});
         let bounds=|lo:f32,hi:f32|MeshData{positions:vec![lo,-1.,0.,hi,1.,6.,lo,1.,0.],indices:vec![0,1,2],parts:vec![maps::MeshPart{name:"fixture".into(),index_start:0,index_count:3}],..Default::default()};
         let(mut mesh,mut materials,mut slots)=(MeshData::default(),vec![],vec![]);
-        let cuts=add_portals(&mut mesh,&mut materials,&mut slots,&plan,&bounds(0.,10.),&bounds(90.,100.)).unwrap();
+        let cuts=add_portals(&mut mesh,&mut materials,&mut slots,&plan,&bounds(0.,10.),&bounds(90.,100.),None).unwrap();
         assert_eq!(cuts,8);assert_eq!(materials.len(),1);assert_eq!(materials[0].name,"+portal");assert_eq!(slots.len(),16);
         assert!(mesh.positions.chunks_exact(3).any(|p|p[1]>6.));
     }
 
+
+    #[test]
+    fn high_ground_is_optional_source_metadata_with_independent_validation_and_no_recursive_routes() {
+        let mut plan=dual_route_plan();
+        assert!(serde_json::to_value(&plan).unwrap().get("highGround").is_none());
+        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,-12.,6.],[100.,-12.,6.]],width:4.,height:8.,shader_path:"fixture/stone".into()});
+        plan.validate().unwrap();
+        let routes=plan.connection_routes();assert_eq!(routes.len(),2);assert_eq!(plan.route_label(1),"High-ground route");
+        assert!(!routes[0].open_road);assert!(routes[1].open_road);
+        assert!(routes.iter().all(|route|route.infantry_tunnel.is_none()&&route.high_ground.is_none()));
+        let encoded=serde_json::to_vec(&plan).unwrap();let decoded:BspAssembly=serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(serde_json::to_vec(&decoded).unwrap(),encoded);
+        plan.high_ground.as_mut().unwrap().points=plan.tunnel_points.clone();
+        assert!(plan.validate().unwrap_err().to_string().contains("separate"));
+        plan.high_ground.as_mut().unwrap().points=vec![[0.,-12.,6.],[10.,-12.,16.]];
+        assert!(plan.validate().unwrap_err().to_string().contains("High-ground route"));
+        plan.high_ground.as_mut().unwrap().points=vec![[0.,-12.,6.],[100.,-12.,6.]];
+        plan.high_ground.as_mut().unwrap().width=2.;assert!(plan.validate().is_err());
+    }
+    #[test]
+    fn canyon_route_inside_existing_open_sky_gets_a_real_floor_without_covering_the_lower_road(){
+        let mut plan=dual_route_plan();plan.open_road=true;
+        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,-12.,6.],[100.,-12.,6.]],width:4.,height:8.,shader_path:"fixture/stone".into()});
+        let a=[-2.,0.,0.];let b=[102.,0.,0.];let sides=tunnel_sides(&[a,b],40.).unwrap();
+        let space=passage_solid(a,b,sides[0],sides[1],20.,0,Some(2)).unwrap();
+        let mut slots=vec![material(),material(),AssemblyMaterial{name:"+sky".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}];
+        let original=space.get_mesh_gl64(-1);let (mesh,_)=collision_layer(&original,&mut slots).unwrap();
+        assert!(crate::bsp_clearance::RouteChecker::new(&mesh).unwrap().verify(&plan).is_err(),"Open sky alone has no raised floor");
+        let supported=support_high_ground(space,&plan.high_ground_plan(plan.high_ground.as_ref().unwrap()),1,-1.,None).unwrap().get_mesh_gl64(-1);
+        assert!(supported.num_tri()<100,"A flat ridge must stay coarse");
+        let (mesh,_)=collision_layer(&supported,&mut slots).unwrap();
+        let report=crate::bsp_clearance::RouteChecker::new(&mesh).unwrap().verify_details(&plan).unwrap();
+        assert_eq!(report.len(),2);assert!(report.iter().all(|route|route.walk_samples>=400));
+    }
+    #[test]
+    fn ramped_canyon_support_remains_continuous_at_every_miter(){
+        let mut plan=dual_route_plan();plan.tunnel_points=vec![[0.,0.,0.],[32.788,0.,0.]];
+        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,0.,0.],[6.5576,-12.,0.],[13.1152,-12.,1.96728],[19.6728,-12.,1.96728],[26.2304,-12.,0.],[32.788,0.,0.]],width:4.,height:8.,shader_path:"fixture/stone".into()});
+        let a=[-3.,0.,0.];let b=[36.,0.,0.];let sides=tunnel_sides(&[a,b],40.).unwrap();
+        let space=passage_solid(a,b,sides[0],sides[1],20.,0,Some(2)).unwrap();
+        let ridge=plan.high_ground_plan(plan.high_ground.as_ref().unwrap());
+        let supported=support_high_ground(space,&ridge,1,-1.,None).unwrap().get_mesh_gl64(-1);
+        let mut slots=vec![material(),material(),AssemblyMaterial{name:"+sky".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}];
+        let (mesh,_)=collision_layer(&supported,&mut slots).unwrap();
+        let report=crate::bsp_clearance::RouteChecker::new(&mesh).unwrap().verify_details(&plan).unwrap();
+        assert_eq!(report.len(),2);assert!(supported.num_tri()<200);
+    }
+    #[test]
+    fn all_three_authored_routes_are_sampled_and_missing_ridge_collision_cannot_pass_on_lower_routes() {
+        let mut plan=dual_route_plan();plan.open_road=true;
+        plan.infantry_tunnel=Some(InfantryTunnel{points:vec![[0.,8.,0.],[100.,8.,0.]],width:2.,height:1.6,shader_path:"fixture/cave".into()});
+        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,-12.,6.],[100.,-12.,6.]],width:4.,height:8.,shader_path:"fixture/stone".into()});
+        let routes=plan.connection_routes();assert_eq!(routes.len(),3);assert_eq!(plan.route_label(2),"High-ground route");
+        let mut combined:Option<Manifold>=None;
+        for (index,route) in routes.iter().enumerate(){
+            let a=add(route.tunnel_points[0],[-2.,0.,0.]);let b=add(*route.tunnel_points.last().unwrap(),[2.,0.,0.]);
+            let sides=tunnel_sides(&[a,b],route.tunnel_width as f64).unwrap();
+            let body=passage_solid(a,b,sides[0],sides[1],route.tunnel_height as f64,index,route.open_road.then_some(3)).unwrap();
+            combined=Some(match combined {None=>body,Some(previous)=>checked(previous.boolean_with_engine_and_token(&body,OpType::Add,BooleanEngine::Auto,None),"Fixture routes").unwrap()});
+        }
+        let gl=combined.unwrap().get_mesh_gl64(-1);
+        assert!(gl.face_id.contains(&2));assert!(gl.face_id.contains(&3));
+        let mut materials=vec![material(),material(),material(),AssemblyMaterial{name:"+sky".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}];
+        let (mesh,_)=collision_layer(&gl,&mut materials).unwrap();
+        let checker=crate::bsp_clearance::RouteChecker::new(&mesh).unwrap();let report=checker.verify_details(&plan).unwrap();
+        assert_eq!(report.iter().map(|route|route.label.as_str()).collect::<Vec<_>>(),["Primary connection","Infantry tunnel","High-ground route"]);
+        assert!(report.iter().all(|route|route.walk_samples>=400));
+        let total=checker.verify(&plan).unwrap();assert_eq!(total,report.iter().map(|route|route.walk_samples).sum::<usize>());
+        let mut reverse=plan.clone();reverse.tunnel_points.reverse();reverse.infantry_tunnel.as_mut().unwrap().points.reverse();reverse.high_ground.as_mut().unwrap().points.reverse();
+        assert_eq!(checker.verify(&reverse).unwrap(),total);
+        // Lower collision within the legacy floor-search tolerance must not
+        // falsely certify an elevated sniper route.
+        plan.high_ground.as_mut().unwrap().points=vec![[0.,-12.,7.],[100.,-12.,7.]];
+        assert!(checker.verify(&plan).unwrap_err().to_string().contains("canyon-top floor"));
+        plan.high_ground.as_mut().unwrap().points=vec![[0.,-24.,6.],[100.,-24.,6.]];
+        assert!(checker.verify(&plan).unwrap_err().to_string().contains("High-ground route"));
+    }
+
+}
+
+#[cfg(test)] mod viewport_source_tests {
+ use super::*;
+ fn inspected(id:u32)->MapInspection{
+  MapInspection{header:maps::MapHeader{version:609,engine:"fixture".into(),name:"fixture".into(),build:"fixture".into(),scenario_type:1,file_size:2048,declared_size:2048,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false},sha256:format!("{id:064x}"),tag_checksum:None,tags:vec![maps::Tag{id,index:0,class:"senv".into(),path:"native/floor".into(),data_offset:None,external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],decals:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()}
+ }
+ #[test] fn joined_preview_keeps_each_native_shader_owner_world_positions_uvs_and_unbaked_status(){
+  let mesh=MeshData{positions:vec![0.,0.,0.,1.,0.,0.,0.,1.,0.],normals:vec![0.,0.,1.,0.,0.,1.,0.,0.,1.],uvs:vec![0.,0.,1.,0.,0.,1.],indices:vec![0,1,2,0,1,2,0,1,2],..Default::default()};
+  let mut geometry=AssemblyGeometry{mesh,materials:vec![AssemblyMaterial{name:"base".into(),source:0,shader_path:Some("native/floor".into()),shader_class:Some("senv".into()),flags:0,collision_only:false},AssemblyMaterial{name:"donor".into(),source:1,shader_path:Some("native/floor".into()),shader_class:Some("senv".into()),flags:0,collision_only:false},AssemblyMaterial{name:"+portal".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}],triangle_materials:vec![0,1,2],report:AssemblyReport{input_triangles:2,output_triangles:3,connector_triangles:0,generated_uv_faces:0,walk_samples:1,portal_count:1,route_clearance:vec![],donor_scenery:0,warnings:vec![]}};
+  let base=inspected(10);let donor=inspected(20);let views=viewport_surfaces(&geometry,&base,&donor).unwrap();assert_eq!(views.len(),2);
+  for (view,id) in views.iter().zip([10,20]) {assert_eq!(view.mesh.positions,geometry.mesh.positions);assert_eq!(view.mesh.uvs,geometry.mesh.uvs);assert_eq!(view.mesh.indices,vec![0,1,2]);assert_eq!(view.mesh.material_ranges[0].shader_tag_id,id);assert!(!view.mesh.material_ranges[0].has_lightmap_uvs);assert_eq!(view.mesh.material_ranges[0].lightmap_page,-1);}
+  let mut missing=donor.clone();missing.tags.clear();assert!(viewport_surfaces(&geometry,&base,&missing).unwrap_err().to_string().contains("native tag"));
+  geometry.mesh.normals.clear();assert!(viewport_surfaces(&geometry,&base,&donor).is_err());
+ }
 }

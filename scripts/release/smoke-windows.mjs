@@ -1,4 +1,4 @@
-import { assertQaOutputPath } from '../native-qa-storage.mjs';
+import { assertQaOutputPath, withDevelopmentWorkspace, runDevelopmentCommand } from '../native-qa-storage.mjs';
 // Real packaged WebView2 + native IPC. A fresh isolated library, no Halo required.
 import { chromium, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -94,14 +94,23 @@ try {
   cdp.on('Debugger.scriptParsed', (e) => parsed.push(e));
   await cdp.send('Debugger.enable');
   if (!scripts.length) throw Error('No packaged frontend scripts');
-  for (const url of scripts) {
-    const entry = parsed.find((e) => e.url === url);
-    if (!entry) throw Error('Packaged frontend source unavailable');
-    const { scriptSource } = await cdp.send('Debugger.getScriptSource', { scriptId: entry.scriptId });
-    const file = path.join('dist', new URL(url).pathname.replace(/^\//, ''));
-    if (hash(scriptSource) !== hash(await fs.readFile(file)))
-      throw Error('Portable frontend differs from this build');
-  }
+  // The source-only builder intentionally disposes its frontend. Rebuild from
+  // this exact clean commit into the existing bounded scratch owner, then compare
+  // the actual packaged JS bytes; never restore a permanent repository dist tree.
+  await withDevelopmentWorkspace('release-frontend-acceptance', async (context) => {
+    await runDevelopmentCommand(process.execPath, ['scripts/build-web.mjs'], context);
+    for (const url of scripts) {
+      const entry = parsed.find((e) => e.url === url);
+      if (!entry) throw Error('Packaged frontend source unavailable');
+      const { scriptSource } = await cdp.send('Debugger.getScriptSource', { scriptId: entry.scriptId });
+      const relative = new URL(url).pathname.replace(/^\//, '');
+      const file = path.resolve(context.env.SPARK_FRONTEND_DIST, relative);
+      if (!file.startsWith(path.resolve(context.env.SPARK_FRONTEND_DIST) + path.sep))
+        throw Error('Packaged frontend path escaped its verified build');
+      if (hash(scriptSource) !== hash(await fs.readFile(file)))
+        throw Error('Portable frontend differs from this build');
+    }
+  });
   await cdp.detach();
   receipt.checks.push('embedded frontend bytes match build');
   await page.screenshot({ path: path.join(root, 'startup.png') });

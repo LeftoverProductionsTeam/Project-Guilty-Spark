@@ -139,22 +139,30 @@ impl Index {
         }
         best
     }
-    fn clear_segment(&self, a: V, b: V, radius: f64, scratch: &mut Vec<usize>) -> bool {
+    fn floor_diagnostic(&self,at:V)->String {
+        let mut ids=vec![];self.root.query([at[0]-0.3,at[1]-0.3,at[2]-4.],[at[0]+0.3,at[1]+0.3,at[2]+4.],&mut ids);
+        let mut near=ids.into_iter().map(|id|{let p=self.triangles[id];let d=sub(closest(at,p),at);(dot(d,d),id)}).collect::<Vec<_>>();
+        near.sort_by(|a,b|a.0.total_cmp(&b.0));
+        let rows=near.into_iter().take(3).map(|(distance,id)|{let p=self.triangles[id];let (n,square)=self.planes[id];serde_json::json!({"distance":distance.sqrt(),"up":n[2]/square.sqrt().max(1e-30),"points":p})}).collect::<Vec<_>>();
+        format!("{} nearby triangles; closest {}",rows.len(),serde_json::to_string(&rows).unwrap_or_default())
+    }
+    fn clear_segment(&self,a:V,b:V,radius:f64,scratch:&mut Vec<usize>)->bool {self.blocking_triangle(a,b,radius,scratch).is_none()}
+    fn blocking_triangle(&self, a: V, b: V, radius: f64, scratch: &mut Vec<usize>) -> Option<Tri> {
         scratch.clear();
         self.root.query(
             std::array::from_fn(|k| a[k].min(b[k]) - radius),
             std::array::from_fn(|k| a[k].max(b[k]) + radius),
             scratch,
         );
-        scratch.iter().all(|id| {
+        scratch.iter().find_map(|id| {
             let (n, length_squared) = self.planes[*id];
             let da = dot(n, sub(a, self.triangles[*id][0]));
             let db = dot(n, sub(b, self.triangles[*id][0]));
             // Plane distance is a conservative lower bound. Most floor/wall
             // candidates can avoid the exact segment/triangle region tests.
             if length_squared > 1e-20 && da * db > 0.
-                && (da * da).min(db * db) >= (radius - 0.002).powi(2) * length_squared { return true; }
-            segment_triangle_distance(a, b, self.triangles[*id]) >= (radius - 0.002).powi(2)
+                && (da * da).min(db * db) >= (radius - 0.002).powi(2) * length_squared { return None; }
+            (segment_triangle_distance(a, b, self.triangles[*id]) < (radius - 0.002).powi(2)).then_some(self.triangles[*id])
         })
     }
 }
@@ -258,12 +266,18 @@ impl RouteChecker {
         Ok(floor)
     }
     pub(crate) fn verify(&self, assembly: &BspAssembly) -> Result<usize> {
-        assembly.validate()?;
-        assembly.connection_routes().iter().enumerate().try_fold(0, |total, (index, route)| {
-            self.verify_one(route).map(|count| total + count).map_err(|e| SparkError::Invalid(format!("{}: {e}", if index == 0 { "Primary connection" } else { "Infantry tunnel" })))
-        })
+        Ok(self.verify_details(assembly)?.iter().map(|route|route.walk_samples).sum())
     }
-    fn verify_one(&self, assembly: &BspAssembly) -> Result<usize> {
+    pub(crate) fn verify_details(&self, assembly: &BspAssembly) -> Result<Vec<crate::bsp_assembly::RouteClearance>> {
+        assembly.validate()?;
+        assembly.connection_routes().iter().enumerate().map(|(index, route)| {
+            let label = assembly.route_label(index);
+            self.verify_one(route, label == "High-ground route").map(|walk_samples|crate::bsp_assembly::RouteClearance {
+                label:label.into(),width:route.tunnel_width,clear_height:route.tunnel_height,walk_samples,
+            }).map_err(|e| SparkError::Invalid(format!("{label}: {e}")))
+        }).collect()
+    }
+    fn verify_one(&self, assembly: &BspAssembly, strict_floor: bool) -> Result<usize> {
     let index = &self.index;
     let mut scratch = vec![];
     let mut samples = 0;
@@ -274,7 +288,11 @@ impl RouteChecker {
         let steps = (dot(d, d).sqrt() / 0.25).ceil() as usize;
         for step in 0..=steps {
             let p = add(a, mul(d, step as f64 / steps as f64));
-            let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous in segment {} near {:.2}, {:.2}, {:.2}; adjust its floor points",segment + 1,p[0],p[1],p[2])))?;
+            let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous in segment {} near {:.2}, {:.2}, {:.2}; adjust its floor points ({})",segment + 1,p[0],p[1],p[2],index.floor_diagnostic(p))))?;
+            // A nearby lower road cannot stand in for a canyon-top route.
+            if strict_floor && (z-p[2]).abs() > 0.12 {
+                return invalid(format!("The canyon-top floor is {:.2} units below its authored route near {:.2}, {:.2}; align the ridge with real supported terrain, not the lower passage",p[2]-z,p[0],p[1]));
+            }
             if previous.is_some_and(|(_, old)| (z - old).abs() > 0.12) {
                 return invalid(format!(
                     "Tunnel floor has a step higher than 0.12 world units in segment {} near {:.2}, {:.2}, {:.2}; add a ramp waypoint",
@@ -294,7 +312,8 @@ impl RouteChecker {
                 if (old_floor + height < raised - 1e-10 && !index.clear_segment(from, high_from, 0.18, &mut scratch))
                     || !index.clear_segment(high_from, high_to, 0.18, &mut scratch)
                     || (z + height < raised - 1e-10 && !index.clear_segment(high_to, to, 0.18, &mut scratch)) {
-                    return invalid(format!("The connection contains a wall, narrow edge or insufficient biped head clearance in segment {} near {:.2}, {:.2}, {:.2}; adjust the tunnel path", segment + 1, p[0], p[1], z));
+                    let blocker=index.blocking_triangle(high_from,high_to,0.18,&mut scratch).or_else(||index.blocking_triangle(from,high_from,0.18,&mut scratch)).or_else(||index.blocking_triangle(high_to,to,0.18,&mut scratch));
+                    return invalid(format!("The connection contains a wall, narrow edge or insufficient biped head clearance in segment {} near {:.2}, {:.2}, {:.2}; adjust the tunnel path. Blocking source triangle: {:?}", segment + 1, p[0], p[1], z,blocker));
                 }
             }
             previous = Some((p, z));
@@ -340,6 +359,9 @@ mod tests {
             tunnel_shader_path: "fixture/stone".into(),
             open_road: false,
             infantry_tunnel: None,
+            high_ground: None,
+            terrain_seam: None,
+            sections:vec![],arch_segments:None,
             visibility_zones: vec![],
         }
     }

@@ -25,6 +25,18 @@ pub fn merge(
     let workshop =
         crate::studio_workshop::merge(&base.workshop, &next.workshop, &current.workshop)?;
     let logic = crate::native_logic::merge(&base.logic, &next.logic, &current.logic)?;
+    // A reviewed bake is one atomic source recipe. Removing an optional recipe
+    // (including author Undo) must propagate even though serde omits its key.
+    let native_lighting = if base.native_lighting == next.native_lighting {
+        current.native_lighting.clone()
+    } else {
+        if current.native_lighting != base.native_lighting
+            && current.native_lighting != next.native_lighting
+        {
+            return invalid("Concurrent edit conflict: nativeLighting. Your local draft was retained.");
+        }
+        next.native_lighting.clone()
+    };
     let b = serde_json::to_value(base)?;
     let n = serde_json::to_value(next)?;
     let mut c = serde_json::to_value(current)?;
@@ -32,7 +44,7 @@ pub fn merge(
         if b.get(key) == Some(value) {
             continue;
         }
-        if key == "native" || key == "workshop" || key == "logic" {
+        if key == "native" || key == "workshop" || key == "logic" || key == "nativeLighting" {
             continue;
         }
         if [
@@ -103,6 +115,7 @@ pub fn merge(
     doc.native = native;
     doc.workshop = workshop;
     doc.logic = logic;
+    doc.native_lighting = native_lighting;
     quickforge::validate_portable_document(&doc)?;
     Ok(doc)
 }

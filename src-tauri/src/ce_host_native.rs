@@ -518,8 +518,8 @@ impl Drop for ProcessJob {
         }
     }
 }
-struct OwnedProcess {
-    child: Child,
+pub(super) struct OwnedProcess {
+    pub(super) child: Child,
     #[cfg(windows)]
     _job: ProcessJob,
 }
@@ -547,6 +547,10 @@ fn launch(game: &Path, directory: &Path, port: u16) -> Reply<OwnedProcess> {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000);
     }
+    OwnedProcess::spawn(&mut command)
+}
+impl OwnedProcess {
+    pub(super) fn spawn(command: &mut Command) -> Reply<Self> {
     let mut child = command.spawn().map_err(error)?;
     #[cfg(windows)]
     let process_job = match ProcessJob::attach(&child) {
@@ -562,7 +566,9 @@ fn launch(game: &Path, directory: &Path, port: u16) -> Reply<OwnedProcess> {
         #[cfg(windows)]
         _job: process_job,
     })
+    }
 }
+
 fn persist(job: &Job, began: Instant) -> Reply<()> {
     lock(&job.view)?.elapsed_ms = began.elapsed().as_millis().min(u64::MAX as u128) as u64;
     let view = session_view(job)?;

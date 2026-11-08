@@ -1,6 +1,7 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
 
 export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';
+export type OpenCeFlavor = 'opence' | 'faber' | 'openh1';
 
 export type ActionAvailability = 'ready' | 'running' | 'setupRequired' | 'updateNeeded' | 'unavailable';
 export type EvidenceLevel =
@@ -33,6 +34,14 @@ export const runtimeNames: Record<RuntimeId, string> = {
   haloMd: 'HaloMD',
   haloXbox: 'Halo Xbox',
 };
+/** Display names do not grant capabilities; native executable validation remains authoritative. */
+export function runtimeProfileName(profile:RuntimeRegistration):string {
+ const identity=[profile.id,profile.version??'',profile.root.replaceAll('\\','/').split('/').filter(Boolean).at(-1)??''].join(' ');
+ return profile.runtimeId==='chupathingyCe'?'ChupathingyCE':/openh1/i.test(identity)?'OpenH1':/faber/i.test(identity)?'Faber':runtimeNames[profile.runtimeId];
+}
+export function runtimeProfileLabel(profile:RuntimeRegistration):string {
+ return runtimeProfileName(profile)+' · '+profile.root.replaceAll('\\','/').split('/').filter(Boolean).at(-1);
+}
 export interface RuntimeDockAction {
   id: string;
   operation: string;

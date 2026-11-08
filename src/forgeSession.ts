@@ -41,7 +41,7 @@ export function mergeForge(
     n = next as unknown as Record<string, unknown>,
     result = structuredClone(current) as unknown as Record<string, unknown>;
   for (const key of Object.keys(n)) {
-    if (key === 'logic') continue; // Optional graph, including deletion, is merged atomically below.
+    if (key === 'logic' || key === 'nativeLighting') continue; // Optional source recipes merge atomically below, including deletion.
     if (same(b[key], n[key])) continue;
     if (key === 'workshop') {
       result.workshop = mergeWorkshop(base.workshop, next.workshop, current.workshop, forceRemote);
@@ -142,6 +142,14 @@ export function mergeForge(
   if(!same(base.logic,next.logic)) {
     if(!forceRemote&&!same(current.logic,base.logic)&&!same(current.logic,next.logic))throw Error('Concurrent Logic / Events conflict; retain both drafts');
     if(next.logic)result.logic=structuredClone(next.logic);else delete result.logic;
+  }
+  // The native bake recipe stays atomic; a peer must explicitly resolve a
+  // competing bake or removal instead of silently combining different skies.
+  if (!same(base.nativeLighting, next.nativeLighting)) {
+    if (!forceRemote && !same(current.nativeLighting, base.nativeLighting) && !same(current.nativeLighting, next.nativeLighting))
+      throw Error('Concurrent native lighting conflict; retain both drafts');
+    if (next.nativeLighting) result.nativeLighting = structuredClone(next.nativeLighting);
+    else delete result.nativeLighting;
   }
   return result as unknown as QuickForgeDocument;
 }

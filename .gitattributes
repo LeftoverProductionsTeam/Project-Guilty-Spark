@@ -9,3 +9,11 @@ docs/licenses/*.txt -text -whitespace
 "docs/Master Engineering Prompts/GS_2026-11-07_Native_Runtime_19_Map_Megaworld_VR.md" -text -whitespace
 "docs/Master Engineering Prompts/GS_2026-11-07_19_Map_Chupathingy_OpenH1_VR_Forge.md" -text -whitespace
 "docs/Master Engineering Prompts/GS_2026-11-07_Megaworld_Geometry_Random_Teleporter_Web.md" -text -whitespace
+
+"docs/Master Engineering Prompts/GS_2026-11-07_OpenH1_VR_Editor_Integration.md" -text -whitespace
+
+"docs/Master Engineering Prompts/GS_2026-11-07_Runtime_Ownership_Workflows_Gameplay_Acceptance.md" -text -whitespace
+
+"docs/Master Engineering Prompts/GS_2026-11-07_GitHub_Sync_Verified_Release.md" -text -whitespace
+
+"docs/Master Engineering Prompts/GS_2026-11-08_Make_Megaworld_Seam_Work.md" -text -whitespace

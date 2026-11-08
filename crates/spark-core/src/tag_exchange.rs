@@ -118,7 +118,7 @@ pub(crate) fn inventory(root:&Path)->Result<(Vec<ExtractedFile>,u64)> {
     files.sort_by(|a,b|a.path.cmp(&b.path));
     Ok((files,total))
 }
-fn verify_source_snapshot(source:&project::Source,resources:Option<&Path>)->Result<()> {
+pub(crate) fn verify_source_snapshot(source:&project::Source,resources:Option<&Path>)->Result<()> {
     reject_links(&source.preserved_path)?;
     if maps::hash_file(&source.preserved_path)?!=source.sha256{return invalid("Preserved source cache changed during tag exchange");}
     if let Some(resources)=resources {

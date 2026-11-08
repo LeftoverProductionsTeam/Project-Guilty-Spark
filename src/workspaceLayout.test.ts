@@ -16,3 +16,11 @@ test('changing one map layout cannot mutate another stored map snapshot',()=>{
  const mapA=changePanel(cleanLayout(null),'inspector',{open:true,dock:'float',width:520}),mapB=cleanLayout(null);
  const changed=changePanel(mapA,'inspector',{width:300});expect(mapA.panels.inspector.width).toBe(520);expect(changed.panels.inspector.width).toBe(300);expect(mapB.panels).toEqual({});
 });
+
+test('docked drawers reserve their true bounded size while floating windows do not obscure reserved content',async()=>{
+ const {drawerInsets}=await import('./workspaceLayout');const right={...defaultPanel(),open:true,width:720};
+ expect(drawerInsets({right},1000,700)).toEqual({left:0,right:720,top:0,bottom:0});
+ const both=drawerInsets({right,left:{...right,dock:'left'}},800,600);expect(both.left+both.right).toBeLessThanOrEqual(560);
+ expect(drawerInsets({floating:{...right,dock:'float'}},800,600).right).toBe(0);
+ expect(drawerInsets({closed:{...right,open:false}},800,600).right).toBe(0);
+});

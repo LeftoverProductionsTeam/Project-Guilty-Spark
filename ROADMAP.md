@@ -1,5 +1,17 @@
 # Roadmap
 
+## Current release and native acceptance — 7 November 2026
+
+Preserve the upstream README and all native authoring history. Finish the latest-source Windows NSIS/portable candidate through the existing release gates, with source/binary identities, startup and installation checks. The owner will push the verified local commit and run the draft-release workflow; public publication remains separate. [Release handoff](docs/RELEASE_CANDIDATE_20261107.md).
+
+Chupathingy remains the preferred standard engine. OpenH1 is the immersive integration target; its Windows package is desktop-only in current acceptance. OpenCE/Faber profiles share compatible content through documented data roots while keeping engine support files, saves and logs independent. Named presentation packs still need verified author sources; local imports use native-loader validation.
+
+After release: close the first natural Timberland–Sidewinder seam; complete the 19-source cluster through real native geometry; verify every connection and Warthog/mountain route; then engine stability, end-to-end creator workflows, and separate Chupathingy/OpenH1 Live Link and SparkLink acceptance. Atlas planning, native compilation, human traversal, two-computer collaboration and in-headset editing remain distinct. Preserve all later feature goals.
+
+Current seam milestone: three independently editable routes now pass desktop source authoring and biped collision checks. Finish native compilation and actual cave/Warthog/canyon-top/sniper acceptance before propagating the pattern through all 19 regions. [Evidence](docs/MEGAWORLD_SEAM_ROUTES_20261108.md).
+
+The older checkpoints below are historical evidence, not a claim that the same blockers or source revisions are current.
+
 ## C60 maintenance checkpoint — November 3, 2026
 
 The stale library-refresh race is repaired and native event bursts use bounded reads. Existing window/source-resource owners are consolidated; validators, public APIs, research and all 472 requirement rows remain. Full regression, native window/history/session tests and a frozen shared BSP native build pass. Load-time/memory measurements are mixed; no overall RAM-budget completion is claimed. C49 installer/portable integrity and startup pass again, but authenticated GitHub attachment and approved public publication remain blocked. [Evidence and remaining gates](docs/CONTINUATION_60_RELEASE_MAINTENANCE.md).

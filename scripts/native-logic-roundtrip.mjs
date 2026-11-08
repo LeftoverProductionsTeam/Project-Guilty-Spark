@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {originalMultiplayerMaps,overlappingRegions} from '../src/megaworldLayout.ts';
 import {PerspectiveCamera,Vector3} from 'three';
-import {openDrawer,chooseTool,createMultiplayerMap} from '../tests/ui/helpers/navigation.ts';
+import {openDrawer,chooseTool,createMultiplayerMap,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,call,receipt,expect,resume=false,run,verifyEditedAsset=false,reviewControl}){
  const hash=async p=>crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,preferredHalo:'mccSteam',hekDirectory:kit,hekTagsDirectory:tags,invaderDirectory:invader,hekFlavor:'h1aEk'}});
@@ -438,6 +438,11 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
 }
 
 
+export async function nativeConnectionControl(page,role,name){
+ const panel=page.getByRole('region',{name:'Construction panel',exact:true});
+ const node=panel.getByRole(role,{name,exact:true,includeHidden:true});await revealPagedControl(node);return node;
+}
+
 export async function nativeMegaWorldCreation({page,call,receipt,expect,baseFile,donorFile,root,run,invader}){
  if(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'){
   const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,hekDirectory:process.env.SPARK_LOGIC_KIT,hekTagsDirectory:process.env.SPARK_LOGIC_TAGS,hekFlavor:'h1aEk'}});
@@ -475,9 +480,49 @@ export async function nativeMegaWorldCreation({page,call,receipt,expect,baseFile
  const entry=(await call('bootstrap')).entries.find(row=>row.title==='Timberland–Sidewinder authored connection');if(!entry)throw Error('New world was not admitted');
  let world=(await call('open_project',{id:entry.id})).project;
  if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,hekTagsDirectory:process.env.SPARK_LOGIC_TAGS,invaderDirectory:invader}});}
+ if(process.env.SPARK_QA_MEGAWORLD_TARGET==='chupathingyCe'){
+  const scenario=sources[0].inspection.tags.find(tag=>tag.class==='scnr');if(!scenario)throw Error('The CE base has no native scenario');
+  // Reuse Source Guardian's complete, source-pinned scenario recovery and its
+  // native short-path lease; no second extraction or ignored per-tag failures.
+  const recovered=await call('extract_selected_tag_tree',{projectId:sources[0].project.id,tagId:scenario.id}),folder=recovered.tagRoot;
+  expect(recovered.sourceSha256).toBe(originals[0].sha256);expect(recovered.sourceVersion).toBe(609);
+  let files=0,bytes=0;const inventory=async dir=>{for(const item of await fs.readdir(dir,{withFileTypes:true})){const file=path.join(dir,item.name),info=await fs.lstat(file);if(info.isSymbolicLink())throw Error('CE source contains a link');if(info.isDirectory())await inventory(file);else if(info.isFile()){files++;bytes+=info.size;if(files>4096||bytes>512*1024**2)throw Error('CE source exceeds the reviewed selected-map budget');}}};await inventory(folder);
+  await openDrawer(page,'Project setup');const panel=page.getByRole('region',{name:'Project setup panel',exact:true}),mapTools=panel.locator('.gs-map-tools'),targets=panel.locator('.gs-build-targets');
+  if(await mapTools.getAttribute('open')===null){const summary=mapTools.locator(':scope > summary');await revealPagedControl(summary);await summary.click();}
+  const summaries=targets.locator(':scope > summary');await revealPagedControl(summaries);if(await targets.getAttribute('open')===null)await summaries.click();
+  const use=async(role,name)=>{const field=targets.getByRole(role,{name,exact:typeof name==='string',includeHidden:true});await revealPagedControl(field);return field;};
+  await (await use('combobox','New engine target runtime')).selectOption('chupathingyCe');await (await use('button','Add runtime target')).click();
+  await (await use('combobox','Authoring kit generation')).selectOption('h1aEk');
+  for(const [name,value]of [[/Map Builder folder/,process.env.SPARK_LOGIC_KIT],[/Editable Halo Tags folder/,folder],[/Invader folder/,invader]]){const field=await use('textbox',name);await field.fill(value);await field.press('Tab');}
+  await (await use('checkbox',/I selected a CE base tagset/)).check();await (await use('button','Use this target')).click();
+  await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();
+  await expect.poll(async()=>{const p=(await call('open_project',{id:world.id})).project;return p.buildTargets.find(t=>t.id===p.activeBuildTarget)?.runtimeId;}).toBe('chupathingyCe');
+  const saveCe=async()=>{await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await call('read_workspace_history',{projectId:world.id})).history.head.dirty).toBe(false);};
+  const {reviewNativeCeSource}=await import('./native-live-rebuild.mjs');
+  receipt.reviewedCeRecovery=await reviewNativeCeSource({page,targets,use:async(_scope,role,name)=>use(role,name),current:async()=>(await call('open_project',{id:world.id})).project,save:saveCe,hash,expect,sourceRoot:folder});
+  receipt.nativeBuildTarget={runtime:'chupathingyCe',format:'gbx-custom',cacheVersion:609,sourceTagFiles:files,sourceTagBytes:bytes,originalMapHash:originals[0].sha256,configuredThroughUi:true,gameLoaded:false};
+  await page.screenshot({path:path.join(root,'megaworld-chupathingy-target.png')});await page.getByRole('button',{name:'Close Project setup',exact:true}).click();
+  world=(await call('open_project',{id:world.id})).project;
+ }
+
 
  expect(world.id).not.toBe(sources[0].project.id);expect(world.id).not.toBe(sources[1].project.id);expect(world.source.sha256).toBe(originals[0].sha256);expect(world.bspAssembly.donorSource.sha256).toBe(originals[1].sha256);
  for(const row of before)expect(JSON.stringify((await call('open_project',{id:row.id})).project)).toBe(row.project);
+ if(process.env.SPARK_QA_MEGAWORLD_TERRAIN==='1'){
+  await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
+  const panel=page.getByRole('region',{name:'Construction panel',exact:true}).locator('.bsp-assembly');if(await panel.getAttribute('open')===null){const summary=panel.locator(':scope>summary');await revealPagedControl(summary);await summary.click();}
+  await (await nativeConnectionControl(page,'button','Plan adjacent terrain')).click();
+  await expect((await nativeConnectionControl(page,'spinbutton','Terrain shoulder width'))).toHaveValue('8',{timeout:180000});
+  await (await nativeConnectionControl(page,'checkbox','Include donor scenery')).check();
+  if(process.env.SPARK_QA_MEGAWORLD_THREE_ROUTES==='1'){await (await nativeConnectionControl(page,'button','Make three-route seam')).click();}
+  if(process.env.SPARK_QA_MEGAWORLD_FLAT==='1'){await (await nativeConnectionControl(page,'button','Start with flat connector')).click();await expect(await nativeConnectionControl(page,'spinbutton','Terrain bank height')).toHaveValue('0');}
+  await (await nativeConnectionControl(page,'button','Apply connection')).click();
+  await page.keyboard.press('Control+s');await expect.poll(async()=>(await call('read_workspace_history',{projectId:world.id})).history.head.dirty).toBe(false);
+  world=(await call('open_project',{id:world.id})).project;
+  expect(world.bspAssembly.terrainSeam).toBeTruthy();if(process.env.SPARK_QA_MEGAWORLD_FLAT==='1')expect(world.bspAssembly.terrainSeam.bankHeight).toBe(0);expect(world.bspAssembly.tunnelPoints).toHaveLength(2);expect(world.bspAssembly.tunnelWidth).toBe(6);
+  expect(Math.hypot(...world.bspAssembly.tunnelPoints[1].map((v,i)=>v-world.bspAssembly.tunnelPoints[0][i]))).toBeLessThan(40);
+  receipt.terrainSeam={actualControls:true,proposal:world.bspAssembly,sourceProfiles:true,nativeCompilation:false,gameplayAccepted:false};
+ }
  if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
   await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
   const assembly=page.locator('.bsp-assembly');if(await assembly.getAttribute('open')===null)await assembly.locator(':scope>summary').click();

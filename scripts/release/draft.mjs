@@ -168,6 +168,7 @@ export async function createDraft(set, api, { runId, linuxStatus = 'not requeste
       ? `Linux: AppImage and Debian package both compiled and launched under Xvfb/WebKitGTK. ${linux.compatibility}`
       : `Linux packages are not attached or advertised as verified. Linux job: ${linuxStatus}. This does not block the verified Windows preview.`,
     '',
+    'This source adds reviewed shared-library runtime packages and per-profile presentation-pack controls. Chupathingy is the preferred standard target; OpenH1 is the immersive target, with Windows VR still unverified. Faber keeps its own support files. The 19-source Atlas is planning, not a compiled 19-map gameplay world.',
     'C48 shared BSP editing, author undo, durable recovery, the Megaworld Atlas and native source/tool workflows are preserved. Source synchronization is separate from Halo multiplayer/AI replication. All-map physical traversal, complete Zombie gameplay/conversion and in-game sound listening remain acceptance gates; see the source documentation.',
     '',
     '**Draft awaiting owner review. Public publication is a separate, explicit owner action.**',

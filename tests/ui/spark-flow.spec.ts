@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {chooseTool} from './helpers/navigation';
+import {chooseTool,revealPagedControl} from './helpers/navigation';
 
 test('Open Work is keyboard accessible and stays separate from visibility recovery and source Undo',async({page})=>{
   await page.goto('/');await expect(page.getByRole('button',{name:'Open work and workspace windows',exact:true})).toBeVisible();
@@ -21,8 +21,8 @@ test('Workspace fades affect content only and honor saved reduced-motion and ani
   expect(fades.length).toBeGreaterThan(0);for(const fade of fades){expect(fade.options.duration).toBeLessThanOrEqual(200);expect(fade.frames.every((f:any)=>f.opacity>=.8)).toBe(true);}
   expect(await page.evaluate(()=>(window as any).flowAnimations.some((a:any)=>String(a.className).includes('app-header')))).toBe(false);
   await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
-  await page.getByRole('checkbox',{name:'Subtle workspace fades',exact:true}).uncheck();await page.getByRole('checkbox',{name:'Shield loading animation',exact:true}).uncheck();await page.getByRole('checkbox',{name:'Reduced motion and interface transitions',exact:true}).check();
+  for(const [name,checked]of [['Subtle workspace fades',false],['Shield loading animation',false],['Reduced motion and interface transitions',true]] as const){const input=page.getByRole('checkbox',{name,exact:true,includeHidden:true});await revealPagedControl(input);await input.setChecked(checked);}
   await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
-  await expect(page.getByRole('checkbox',{name:'Subtle workspace fades',exact:true})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Shield loading animation',exact:true})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Reduced motion and interface transitions',exact:true})).toBeChecked();
+  await expect(page.getByRole('checkbox',{name:'Subtle workspace fades',exact:true,includeHidden:true})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Shield loading animation',exact:true,includeHidden:true})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Reduced motion and interface transitions',exact:true,includeHidden:true})).toBeChecked();
   await page.evaluate(()=>(window as any).flowAnimations=[]);await chooseTool(page,'Features & workflows');await chooseTool(page,'Community maps');expect(await page.evaluate(()=>(window as any).flowAnimations)).toEqual([]);
 });

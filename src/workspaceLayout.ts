@@ -56,3 +56,19 @@ export function changePanel(
       if (other !== id && value.dock === panel.dock) value.open = false;
   return next;
 }
+
+/** Every docked drawer reserves space. Old pinned metadata stays compatible,
+ * but no longer permits a docked panel to obscure the editor. */
+export function drawerInsets(panels:Record<string,PanelPlacement>,width:number,height:number){
+ const out={left:0,right:0,top:0,bottom:0};
+ for(const panel of Object.values(panels))if(panel.open&&panel.dock!=='float')out[panel.dock]=Math.max(out[panel.dock],panel.dock==='left'||panel.dock==='right'?panel.width:panel.height);
+ const fit=(a:number,b:number,available:number,minimum:number)=>{
+  if(a+b<=available)return[a,b];
+  const count=Number(a>0)+Number(b>0),base=Math.min(minimum,available/(count||1));
+  const extra=Math.max(0,available-base*count),wanted=Math.max(0,a-base)+Math.max(0,b-base);
+  return [a?Math.floor(base+extra*Math.max(0,a-base)/(wanted||1)):0,b?Math.floor(base+extra*Math.max(0,b-base)/(wanted||1)):0];
+ };
+ const [left,right]=fit(out.left,out.right,Math.max(0,width-240),240);
+ const [top,bottom]=fit(out.top,out.bottom,Math.max(0,height-160),160);
+ return {left,right,top,bottom};
+}

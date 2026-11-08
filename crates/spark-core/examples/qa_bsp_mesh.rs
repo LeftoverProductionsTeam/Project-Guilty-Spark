@@ -2,7 +2,19 @@
 use spark_core::{maps,Result};
 use std::{collections::BTreeMap,path::Path};
 fn main()->Result<()>{
- for file in std::env::args().skip(1){
+ let args:Vec<_>=std::env::args().skip(1).collect();
+ if args.first().is_some_and(|arg|arg=="--export-collision") {
+  if args.len()<3||args.len()%2!=1 {return spark_core::invalid("qa_bsp_mesh --export-collision <owned.map> <fresh.json> [...]");}
+  for pair in args[1..].chunks_exact(2){
+  let file=Path::new(&pair[0]);let out=Path::new(&pair[1]);
+  let before=maps::hash_file(file)?;let i=maps::inspect_map(file,file.parent())?;
+  let mesh=&i.mesh;
+  if before!=i.sha256||maps::hash_file(file)?!=before {return spark_core::invalid("Source changed during collision survey");}
+  let report=serde_json::json!({"sourceSha256":before,"scenario":i.scenario_path,"mesh":mesh,"renderMesh":i.render_mesh,"tags":i.tags.iter().filter(|t|t.class=="senv").map(|t|serde_json::json!({"id":t.id,"path":t.path,"references":t.references})).collect::<Vec<_>>()});
+  spark_core::project::atomic_write(out,&serde_json::to_vec(&report)?,false)?;
+  println!("{}",serde_json::json!({"sourceSha256":before,"collision":stats(&mesh),"sourceUnchanged":true}));}return Ok(());
+ }
+ for file in args{
   let i=maps::inspect_map(Path::new(&file),Path::new(&file).parent())?;
   println!("{}",serde_json::json!({"scenario":i.scenario_path,"sha256":i.sha256,"collision":stats(&i.mesh),"render":i.render_mesh.as_ref().map(stats)}));
  }

@@ -1,6 +1,6 @@
-import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
+import {PREFERRED_RUNTIME,runtimeProfileLabel,runtimeProfileName,type OpenCeFlavor} from '../runtimeWorkbench';
 import { useEffect,useRef,useState } from 'react';
-import { Check, FolderOpen, Gamepad2, Globe2, Hammer, Users, type LucideIcon } from 'lucide-react';
+import { Check, FolderOpen, Gamepad2, Layers3, Hammer, Users, type LucideIcon } from 'lucide-react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
 import { call, native } from '../api';
 import ConnectGames from './ConnectGames';
@@ -39,10 +39,10 @@ const halos: { id: RuntimeId; name: string; icon: LucideIcon; description: strin
   },
   {
     id: 'openCe',
-    name: 'OpenCE',
-    icon: Globe2,
-    description: 'A community Halo port with online co-op, custom maps and browser play.',
-    bestFor: 'Community multiplayer across devices.',
+    name: 'OpenCE Flavors',
+    icon: Layers3,
+    description: 'Choose OpenCE, Faber or OpenH1 for your Halo projects.',
+    bestFor: 'Community engines, co-op and custom maps.',
     offers: ['Online campaign co-op', 'Custom Edition maps', 'Map downloads'],
   },
 ];
@@ -51,10 +51,12 @@ export default function StartupSetup({
   data,
   onApply,
   navigate,
+  onSetupFlavor,
 }: {
   data: Bootstrap;
   onApply: (settings: Settings) => Promise<void>;
   navigate: (w: Workspace) => void;
+  onSetupFlavor: (flavor: OpenCeFlavor) => void;
 }) {
   const connections = useRuntimeConnections(data);
   const [choice, setChoice] = useState<RuntimeId>(data.settings.preferredHalo ?? PREFERRED_RUNTIME),
@@ -67,6 +69,22 @@ export default function StartupSetup({
   const [modDirectory, setModDirectory] = useState(data.settings.modDirectory ?? '');
   const [choosingMods, setChoosingMods] = useState(false);
   const [modError, setModError] = useState('');
+  const flavorIntent=useRef(0);
+  const flavorProfiles=connections.profiles.filter(profile=>profile.runtimeId==='openCe');
+  const flavorProfile=flavorProfiles.find(profile=>profile.id===connections.reports.find(report=>report.id==='openCe')?.installation?.registrationId)??flavorProfiles[0];
+  const selectedHaloName=choice==='openCe'&&flavorProfile?runtimeProfileName(flavorProfile):halos.find(halo=>halo.id===choice)?.name;
+  async function selectFlavor(key:string) {
+    const intent=++flavorIntent.current;
+    if(key.startsWith('setup:')){setChoice('openCe');onSetupFlavor(key.slice(6) as OpenCeFlavor);return;}
+    const profile=flavorProfiles.find(profile=>'profile:'+profile.id===key);if(!profile)return;
+    setBusy(true);setError('');
+    try{
+      await call('activate_runtime_registration',{registrationId:profile.id});
+      window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
+      if(mounted.current&&intent===flavorIntent.current)setChoice('openCe');
+    }catch(problem){if(mounted.current&&intent===flavorIntent.current)setError(String(problem));}
+    finally{if(mounted.current)setBusy(false);}
+  }
   const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useEffect(() => {
     if (step !== 1 || !native) return;
@@ -143,14 +161,14 @@ export default function StartupSetup({
               const connected = installed?.validation === 'pass';
               const status = connected ? 'Connected' : candidate ? (candidate.contentReady ? 'Detected' : 'Needs content') : connections.checking ? 'Checking…' : 'Not connected';
               const RuntimeIcon = h.icon;
-              return (
+              const card = (
               <button
                 key={h.id}
                 className={choice === h.id ? 'selected' : ''}
                 aria-pressed={choice === h.id}
                 data-connected={connected}
                 title={installed?.root ?? candidate?.root ?? h.description}
-                onClick={() => setChoice(h.id)}
+                onClick={() => {flavorIntent.current++;setChoice(h.id);}}
               >
                 <span className="gs-halo-card-heading">
                   <span className="gs-halo-emblem" aria-hidden="true"><RuntimeIcon size={25} strokeWidth={1.6} /></span>
@@ -163,6 +181,16 @@ export default function StartupSetup({
                 <span className="gs-halo-status" data-ready={connected || !!candidate?.contentReady}><i aria-hidden="true" />{status}</span>
               </button>
               );
+              return h.id==='openCe'?<div key={h.id} className={'gs-halo-flavors-card'+(choice===h.id?' selected':'')} data-connected={connected}>
+                {card}
+                <label className="gs-setup-flavor"><span>OpenCE flavor</span>
+                  <select aria-label="Setup OpenCE flavor" disabled={busy} value={flavorProfile?'profile:'+flavorProfile.id:''} onChange={event=>void selectFlavor(event.target.value)}>
+                    <option value="" disabled>Choose a flavor…</option>
+                    {flavorProfiles.length>0&&<optgroup label="Connected engines">{flavorProfiles.map(profile=><option key={profile.id} value={'profile:'+profile.id}>{runtimeProfileLabel(profile)}</option>)}</optgroup>}
+                    <optgroup label="Connect or install">{([['opence','OpenCE'],['faber','Faber'],['openh1','OpenH1']] as const).filter(([,name])=>!flavorProfiles.some(profile=>runtimeProfileName(profile)===name)).map(([id,name])=><option key={id} value={'setup:'+id}>{name} · setup</option>)}</optgroup>
+                  </select>
+                </label>
+              </div>:card;
             })}
           </div>
           <details className="gs-legacy-targets"><summary>Legacy import and export targets</summary>
@@ -181,7 +209,7 @@ export default function StartupSetup({
       ) : (
         <>
           <p>
-            Your Halo: <strong>{halos.find((h) => h.id === choice)?.name}</strong>. Existing tool folders are
+            Your Halo: <strong>{selectedHaloName}</strong>. Existing tool folders are
             prefilled. Connect them now or keep the editor available and configure them later.
           </p>
           <div className="analysis-actions gs-setup-connection" aria-label="Selected runtime connection">

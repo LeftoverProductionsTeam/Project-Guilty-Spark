@@ -8,7 +8,7 @@ import net from 'node:net';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {chromium,expect as assertion} from '@playwright/test';
-import {chooseTool,openDrawer} from '../tests/ui/helpers/navigation.ts';
+import {chooseTool,openDrawer,openStudioMenu,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 const [source,destination,nativeMap,invaderDirectory]=process.argv.slice(2);
 if(!source||!destination)throw Error('Use: test-workspace-lifecycle-native <embedded exe> <fresh evidence directory>');
 const root=path.resolve(destination),expect=assertion.configure({timeout:45000});
@@ -28,6 +28,8 @@ const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const logicOnly=process.env.SPARK_LIFECYCLE_LOGIC==='1';
+const rebuildOnly=process.env.SPARK_LIFECYCLE_LIVE_REBUILD==='1';
+if(rebuildOnly&&!logicOnly)throw Error('Live Rebuild acceptance uses the existing native logic lifecycle');
 // MegaWorld-only acceptance uses the source-creation path, not the door benchmark.
 const crossRuntime=process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'||process.env.SPARK_QA_MEGAWORLD_ONLY==='1';
 if(crossRuntime&&!logicOnly)throw Error('Cross-runtime asset acceptance uses the existing native logic workflow');
@@ -41,10 +43,10 @@ if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned 
 const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
 if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
 if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small native preview/context test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
-const reservationBytes=previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*1024**3;
+const reservationBytes=rebuildOnly?4*1024**3:previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:launchOnly?'native-layout-only':geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
 const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?`native-${editCount}-edits`:nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 await finishStorage.createScratch('application');
 await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
@@ -55,6 +57,8 @@ if(logicOnly)await finishStorage.createScratch('independent-native-tags');
 if(logicOnly&&crossRuntime){await finishStorage.createScratch('donor-inputs');await finishStorage.createScratch('native-output');}
 if(geometryOnly)await finishStorage.createScratch('independent-model-tags');
 if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1')await finishStorage.createScratch('assembly-donor-tags');
+if(process.env.SPARK_QA_MEGAWORLD_TARGET==='chupathingyCe')await finishStorage.createScratch('assembly-base-tags');
+if(process.env.SPARK_LIFECYCLE_SEAM_ROUTES==='1')await finishStorage.createScratch('seam-donor-tags');
 const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
 const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
 process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt);
@@ -354,6 +358,28 @@ try{
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(launchOnly){expect(path.resolve(boot.dataDirectory)).toBe(path.join(root,'library'));await expect(main.locator('#root')).not.toBeEmpty();step('Actual embedded app starts with its isolated library and no mocked IPC',{url:main.url()});}
+  if(process.env.SPARK_LIFECYCLE_RESPONSIVE==='1'){if(!launchOnly)throw Error('Responsive layout acceptance uses the existing launch-only fixture');const {nativeResponsiveLayout}=await import('./native-responsive-layout.mjs');await nativeResponsiveLayout({page:main,root,invoke,report,step,baseline:process.env.SPARK_LIFECYCLE_LAYOUT_BASELINE==='1'});}
+  if(process.env.SPARK_LIFECYCLE_SETUP_FLAVORS==='1'){
+    if(!launchOnly)throw Error('Setup flavor acceptance uses the existing launch-only fixture');
+    const {nativeOpenCeFlavorSetup}=await import('./native-responsive-layout.mjs');await nativeOpenCeFlavorSetup({page:main,root,invoke,report,step});
+    await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();const {openNativeHaloChoice}=await import('./native-responsive-layout.mjs');
+    const flavor=await openNativeHaloChoice(main);await revealPagedControl(flavor);await expect(flavor).toHaveValue('profile:'+report.setupFlavors.selectedRegistrationId);
+    expect((await invoke(main,'bootstrap')).settings.preferredHalo).toBe('openCe');report.setupFlavors.fullApplicationRestartPreservedSelection=true;
+    step('Native OpenCE flavor and chosen runtime survive actual application close and restart');
+  }
+  if(process.env.SPARK_LIFECYCLE_STUDIO_POPUP_REVIEW==='1'){
+    if(!launchOnly)throw Error('Studio popup review uses the existing isolated launch-only fixture');
+    const {nativeStudioPopupReview}=await import('./native-responsive-layout.mjs');await nativeStudioPopupReview({page:main,root,report,step});
+  }
+  if(process.env.SPARK_LIFECYCLE_SEAM_ROUTES==='1'){
+    if(!launchOnly||!process.env.SPARK_LIFECYCLE_SEAM_BASE||!process.env.SPARK_LIFECYCLE_SEAM_DONOR||!invaderDirectory)throw Error('Seam control acceptance requires launch-only mode and two explicit owned sources');
+    const {nativeSeamRouteControls}=await import('./native-responsive-layout.mjs');
+    const saved=await nativeSeamRouteControls({page:main,root,invoke,report,step,run:runOwned,invader:path.resolve(invaderDirectory),baseFile:path.resolve(process.env.SPARK_LIFECYCLE_SEAM_BASE),donorFile:path.resolve(process.env.SPARK_LIFECYCLE_SEAM_DONOR)});
+    for(const view of [...pages()].reverse())if(!view.isClosed())await close(view,'save');
+    await waitForQaExit(child);await browser.close();await launchNative();
+    const reopened=await invoke(main,'open_project',{id:saved.id});expect(reopened.project.bspAssembly).toEqual(saved.bspAssembly);expect(reopened.project.source).toEqual(saved.source);
+    report.seamRoutes.fullProcessRestart=true;step('Three-route source metadata and exact source identity survive a full native process restart');
+  }
   if(memoryAcceptance){expect(boot.memoryFirst).toBe(true);expect(boot.settings.watchSharedMccInbox).toBe(false);await nativeMemoryLifecycle();}
   if(geometryOnly){
     const {nativeGeometryRoundTrip}=await import('./native-geometry-roundtrip.mjs');
@@ -415,7 +441,31 @@ try{
     }
 
   }
-  if(logicOnly&&!crossRuntime){
+  if(logicOnly&&rebuildOnly){
+    const {nativeLiveRebuild}=await import('./native-live-rebuild.mjs');report.liveRebuild={mockedIpc:false,humanGameplayAccepted:false};
+    await nativeLiveRebuild({page:main,root,kit:process.env.SPARK_LOGIC_KIT,invader:invaderDirectory,cache:nativeMap,call:(command,args)=>invoke(main,command,args),receipt:report.liveRebuild,expect,run:runOwned});
+    step('Actual Chupathingy compiled playtest, source edit, Live Rebuild, failed-build preservation and stop',report.liveRebuild);
+    const id=report.liveRebuild.projectId,before=(await invoke(main,'open_project',{id})).project;
+    await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();
+    const reopened=(await invoke(main,'open_project',{id})).project;
+    expect(reopened.quickForge).toEqual(before.quickForge);expect(reopened.builds).toEqual(before.builds);
+    expect(await invoke(main,'runtime_rebuild_status')).toBeNull();
+    await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${id}"]`).click();await chooseTool(main,'Level editor');await openDrawer(main,'Game connection');
+    const controls=main.getByRole('region',{name:'Chupathingy Live Rebuild',exact:true});
+    await revealPagedControl(controls.getByRole('button',{name:'Start compiled playtest',exact:true,includeHidden:true}));
+    await expect(controls.getByRole('button',{name:'Start compiled playtest',exact:true})).toBeEnabled();
+    report.liveRebuild.savedSourceAndBuildHistorySurviveRestart=true;report.liveRebuild.sessionDoesNotRelaunchWithoutUserAction=true;
+    step('Live Rebuild source and independent build history persist across actual application restart without restarting the game');
+    // Keep only the exact accepted native cache until the parent exports it.
+    // The rest of this test library remains disposable, including old builds.
+    const accepted=before.builds.find(build=>build.id===report.liveRebuild.rebuiltSession.gameBuildId);
+    expect(accepted.sha256).toBe(report.liveRebuild.rebuiltSession.gameSha256);
+    expect(crypto.createHash('sha256').update(await fs.readFile(accepted.output)).digest('hex')).toBe(accepted.sha256);
+    await finishStorage.retain(accepted.output,'One accepted Live Rebuild native cache for the bounded parent evidence export');
+
+
+  }
+  if(logicOnly&&!crossRuntime&&!rebuildOnly){
     const {nativeLogicRoundTrip}=await import('./native-logic-roundtrip.mjs');
     report.logicRoundTrip={appSha256:report.appSha256,sourceCacheSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex'),mockedIpc:false,gameplayVerified:false,externalGuiEdited:false};
     await nativeLogicRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT??''),tags:path.resolve(process.env.SPARK_LOGIC_TAGS??''),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),call:(command,args)=>invoke(main,command,args),receipt:report.logicRoundTrip,expect,run:runOwned,verifyEditedAsset:true,reviewControl:process.env.SPARK_LOGIC_GAME_REVIEW==='1'?id=>reviewNativeScene(id,'control'):undefined});
@@ -444,6 +494,7 @@ try{
   }
 
   if(report.megaWorldCreation){
+    const {nativeConnectionControl}=await import('./native-logic-roundtrip.mjs');
     const sharedViewportStarted=performance.now();
     const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount);
     await chooseTool(main,'Map library');await main.locator('.map-card').filter({has:main.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(main,'Level editor');await openDrawer(main,'Construction');
@@ -459,19 +510,20 @@ try{
     const previewId=await donorStatus.getAttribute('data-preview-id');expect(previewId).toBeTruthy();expect(previewId).not.toBe(world.id);expect(previewId).not.toBe(world.bspAssembly.donorProjectId);
     const counts={shaders:Number(await donorStatus.getAttribute('data-shaders')),lightmaps:Number(await donorStatus.getAttribute('data-lightmaps'))};expect(counts.shaders).toBeGreaterThan(0);expect(counts.lightmaps).toBeGreaterThan(0);
     const donorTextureId=await donorStatus.getAttribute('data-texture-id');expect(donorTextureId).toBeTruthy();const sharedViewportReadyMs=Math.round(performance.now()-sharedViewportStarted);
-    await main.getByLabel('Connection route',{exact:true}).selectOption('primary');
+    await (await nativeConnectionControl(main,'combobox','Connection route')).selectOption('primary');
     if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
-      expect(world.bspAssembly.infantryTunnel.points).toHaveLength(4);await expect(main.getByRole('checkbox',{name:'Open-sky road',exact:true})).toBeChecked();
+      expect(world.bspAssembly.infantryTunnel.points).toHaveLength(4);await expect((await nativeConnectionControl(main,'checkbox','Open-sky road'))).toBeChecked();
       report.megaWorldCreation.dualRoutes.fullProcessRestart=true;
     }
     const oldWidth=world.bspAssembly.tunnelWidth,newWidth=oldWidth+.5;
-    const field=main.getByRole('spinbutton',{name:'Tunnel width',exact:true});await field.fill(String(newWidth));await field.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();
+    const field=(await nativeConnectionControl(main,'spinbutton','Tunnel width'));await field.fill(String(newWidth));await field.press('Enter');await (await nativeConnectionControl(main,'button','Apply connection')).click();
     const saved=async()=>{await main.getByLabel('File menu',{exact:true}).click();await main.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await state(main,world.id)).history?.head.dirty).toBe(false);return (await invoke(main,'open_project',{id:world.id})).project;};
     expect((await saved()).bspAssembly.tunnelWidth).toBe(newWidth);await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.tunnelWidth).toBe(oldWidth);await main.keyboard.press('Control+y');expect((await saved()).bspAssembly.tunnelWidth).toBe(newWidth);
     report.megaWorldCreation.editedAfterRestart=true;report.megaWorldCreation.undoRedoImmediateSave=true;
-    const yaw=main.getByRole('spinbutton',{name:'BSP section yaw',exact:true});await yaw.fill('2');await yaw.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();expect((await saved()).bspAssembly.yawDegrees).toBe(2);
+    const terrain=!!world.bspAssembly.terrainSeam;
+    const changed=await nativeConnectionControl(main,'spinbutton',terrain?'Terrain bank height':'BSP section yaw');await changed.fill(terrain?'5':'2');await changed.press('Enter');await (await nativeConnectionControl(main,'button','Apply connection')).click();const changedPlan=(await saved()).bspAssembly;expect(terrain?changedPlan.terrainSeam.bankHeight:changedPlan.yawDegrees).toBe(terrain?5:2);
     await expect(donorStatus).toHaveAttribute('data-preview-id',previewId);await expect(donorStatus).toHaveAttribute('data-ready','true');
-    await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.yawDegrees).toBe(world.bspAssembly.yawDegrees);
+    await main.keyboard.press('Control+z');const restoredPlan=(await saved()).bspAssembly;expect(terrain?restoredPlan.terrainSeam.bankHeight:restoredPlan.yawDegrees).toBe(terrain?world.bspAssembly.terrainSeam.bankHeight:world.bspAssembly.yawDegrees);
     await expect(donorStatus).toHaveAttribute('data-preview-id',previewId);await expect(donorStatus).toHaveAttribute('data-ready','true');
     await expect(donorStatus).toHaveAttribute('data-texture-id',donorTextureId);
     report.megaWorldCreation.sharedViewport={sourceSha256:report.megaWorldCreation.sourceHash,donorSha256:report.megaWorldCreation.donorHash,donorPreviewId:previewId,...counts,initialReadyMs:sharedViewportReadyMs,sourceRetainedDuringTransformAndUndo:true,textureAllocationRetained:true,gameplayAccepted:false};
@@ -481,29 +533,44 @@ try{
     await main.screenshot({path:path.join(root,'megaworld-shared-viewport.png')});
     await openDrawer(main,'Construction');
     step('Original base and donor render together with source-specific native materials and lightmaps; moving and undoing retain the donor preview',report.megaWorldCreation.sharedViewport);
-    await main.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();
+    await (await nativeConnectionControl(main,'button','Preview joined seam & clearance')).click();
     await expect.poll(async()=>await main.locator('.bsp-assembly .bsp-error').count()?'blocked':(await main.locator('.bsp-assembly').innerText()).includes('Source clearance checked at')?'checked':'working',{timeout:180000}).not.toBe('working');
     const failure=main.locator('.bsp-assembly .bsp-error');if(await failure.count()){report.megaWorldCreation.sourceClearance={accepted:false,error:await failure.innerText()};throw Error('Native source clearance failed: '+report.megaWorldCreation.sourceClearance.error);}
     report.megaWorldCreation.sourceClearance={accepted:true,scope:'Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance',summary:(await main.locator('.bsp-assembly').innerText()).match(/Source clearance checked at[^\n]*/)?.[0]};
     if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
       await expect(main.locator('.bsp-assembly')).toContainText('Both primary and infantry routes passed');
-      const beforeRemove=(await saved()).bspAssembly;await main.getByLabel('Connection route',{exact:true}).selectOption('infantry');
-      await main.getByRole('button',{name:'Remove infantry tunnel',exact:true}).click();await main.getByRole('button',{name:'Apply connection',exact:true}).click();expect((await saved()).bspAssembly.infantryTunnel).toBeUndefined();
+      const beforeRemove=(await saved()).bspAssembly;await (await nativeConnectionControl(main,'combobox','Connection route')).selectOption('infantry');
+      await (await nativeConnectionControl(main,'button','Remove infantry tunnel')).click();await (await nativeConnectionControl(main,'button','Apply connection')).click();expect((await saved()).bspAssembly.infantryTunnel).toBeUndefined();
       await main.keyboard.press('Control+z');expect((await saved()).bspAssembly).toEqual(beforeRemove);
-      await main.getByLabel('Connection route',{exact:true}).selectOption('primary');
+      await (await nativeConnectionControl(main,'combobox','Connection route')).selectOption('primary');
       report.megaWorldCreation.dualRoutes.removalUndoImmediateSave=true;report.megaWorldCreation.dualRoutes.bothSourceRoutesChecked=true;
     }
-    await main.screenshot({path:path.join(root,'megaworld-source-check.png')});step('Saved source-bound donor controls support edited width, Undo/Redo, immediate Save and actual native source clearance');
+    const joined=main.getByTestId('assembly-source-status');await expect.poll(async()=>Number(await joined.getAttribute('data-joined-triangles')),{timeout:45000}).toBeGreaterThan(100);
+    report.megaWorldCreation.sourceClearance.connectorBudget=(await main.getByLabel('Connector triangle budget',{exact:true}).innerText());
+    report.megaWorldCreation.sourceClearance.viewport={actualRenderer:true,triangles:Number(await joined.getAttribute('data-joined-triangles')),nativeCompiled:false};
+    await main.keyboard.press('Escape');await main.getByRole('button',{name:'Frame both regions (F)',exact:true}).click();await main.screenshot({path:path.join(root,'megaworld-source-check.png')});const viewCanvas=main.locator('.world-layout:visible canvas'),box=await viewCanvas.boundingBox();await main.mouse.move(box.x+box.width/2,box.y+box.height/2);await main.mouse.wheel(0,-500);await main.waitForTimeout(350);await main.screenshot({path:path.join(root,'megaworld-seam-closeup.png')});
+    await openDrawer(main,'Construction');step('Saved source-bound donor controls support edited width, Undo/Redo, immediate Save and actual joined-source rendering/clearance');
     if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){
-      await main.getByRole('button',{name:'Build & playtest connection',exact:true}).click();await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','build');
-      const build=main.getByRole('button',{name:'Convert map to MCC',exact:true});await expect(build).toBeEnabled({timeout:90000});await build.click();
+      report.megaWorldCreation.compiledPlan=structuredClone((await invoke(main,'open_project',{id:world.id})).project.bspAssembly);
+      await (await nativeConnectionControl(main,'button','Build & playtest connection')).click();await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','build');
+      const build=main.getByRole('button',{name:process.env.SPARK_QA_MEGAWORLD_TARGET==='chupathingyCe'?'Build for Chupathingy':'Convert map to MCC',exact:true,includeHidden:true});await revealPagedControl(build);await expect(build).toBeEnabled({timeout:90000});await build.click();
       let output;const began=performance.now();await expect.poll(async()=>{const project=(await invoke(main,'open_project',{id:world.id})).project;output=project.builds.findLast(row=>row.status==='validated'&&row.output);const log=(await invoke(main,'bootstrap')).logs.findLast(row=>row.projectId===world.id);if(log?.phase==='failed')throw Error(log.message);return output?.status;},{timeout:900000,intervals:[1500,3000]}).toBe('validated');
-      const inspected=await invoke(main,'open_built_map',{projectId:world.id,buildId:output.id});expect(inspected.inspection.header.version).toBe(13);expect(inspected.inspection.mesh.parts.length).toBe(1);expect(inspected.inspection.mesh.indices.length).toBeGreaterThan(30000);
+      const inspected=await invoke(main,'open_built_map',{projectId:world.id,buildId:output.id});expect(inspected.inspection.header.version).toBe(process.env.SPARK_QA_MEGAWORLD_TARGET==='chupathingyCe'?609:13);expect(inspected.inspection.mesh.parts.length).toBe(1);expect(inspected.inspection.mesh.indices.length).toBeGreaterThan(30000);
       const extracted=path.join(root,'independent-native-tags','megaworld');await fs.mkdir(extracted);const scenario=inspected.inspection.tags.find(row=>row.class==='scnr').path+'.scenario',bsp=inspected.inspection.tags.find(row=>row.class==='sbsp').path+'.scenario_structure_bsp';
       for(const tag of [scenario,bsp]){const extraction=await runOwned(path.join(invaderDirectory,'invader-extract.exe'),['-s',tag,'-t',extracted,output.output],{windowsHide:true,timeout:180000,maxBuffer:8*1024**2});expect(extraction.stdout+'\n'+extraction.stderr).not.toMatch(/Failed to extract|ERROR:/i);}
       const crc=Number((await runOwned(path.join(invaderDirectory,'invader-info.exe'),['-T','crc32_mismatched',output.output],{windowsHide:true,timeout:30000})).stdout.trim());expect(crc).toBe(0);
       const read=async(tag,field)=>(await runOwned(path.join(invaderDirectory,'invader-edit.exe'),['-t',extracted,'-G',field,tag],{windowsHide:true,timeout:30000})).stdout.trim();
       const ref=await read(scenario,'structure_bsps[0].structure_bsp');expect(ref.replaceAll('\\','/').toLowerCase()).toBe(bsp.replaceAll('\\','/').toLowerCase());
+      if(report.megaWorldCreation.terrainSeam){
+        const materials=[];
+        for(const source of [0,1]){
+          const alias=`gsbsp_${output.id.slice(0,8)}_${source}/materials/gster${source}${world.source.sha256.slice(0,8)}x`;
+          const tag=inspected.inspection.tags.find(tag=>tag.class==='senv'&&tag.path.replaceAll('\\','/').toLowerCase()===alias);expect(tag,'Both native terrain materials must survive the source rebuild').toBeTruthy();
+          const material=tag.path+'.shader_environment';const extraction=await runOwned(path.join(invaderDirectory,'invader-extract.exe'),['-s',material,'-t',extracted,output.output],{windowsHide:true,timeout:30000});expect(extraction.stdout+'\n'+extraction.stderr).not.toMatch(/Failed to extract|ERROR:/i);
+          materials.push({source,shader:material,baseMap:await read(material,'base_map')});
+        }
+        report.megaWorldCreation.terrainSeam.independentMaterials=materials;
+      }
       if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
         const namespace=`gsbsp_${output.id.slice(0,8)}_0`,materials=[];
         for(const name of ['gstunnel','gsinfantry']){
@@ -516,20 +583,37 @@ try{
         }
         report.megaWorldCreation.dualRoutes.independentMaterialReadback={materials,sourceOverviewBitmapUsed:false};
       }
-      report.megaWorldCreation.nativeCompilation={accepted:true,target:'mcc-cea',mapSha256:crypto.createHash('sha256').update(await fs.readFile(output.output)).digest('hex'),bytes:(await fs.stat(output.output)).size,milliseconds:Math.round(performance.now()-began),collisionTriangles:inspected.inspection.mesh.indices.length/3,independentBspReference:ref,crcMismatch:crc};
-      const retained=path.join(root,'native-output','megaworld.map');await fs.copyFile(output.output,retained,fs.constants.COPYFILE_EXCL);await finishStorage.retain(retained,'Owner-requested independently verified Timberland–Sidewinder native cache for gameplay acceptance');report.megaWorldCreation.nativeCompilation.retainedOutput=retained;
+      const connectionFile=path.join(extracted,'connection-source.gsproject');await fs.writeFile(connectionFile,JSON.stringify((await invoke(main,'open_project',{id:world.id})).project),{flag:'wx'});
+      const routeReadback=await runOwned(process.execPath,['scripts/cargo.mjs','run','--release','--locked','-p','spark-core','--example','qa_bsp_assembly','--','--verify-cache',output.output,connectionFile],{cwd:process.cwd(),windowsHide:true,timeout:240000,maxBuffer:4*1024**2});
+      const routes=JSON.parse(routeReadback.stdout.trim().split(/\r?\n/).at(-1));expect(routes.status).toBe('PASS');expect(routes.routes[0].walkSamples).toBeGreaterThan(0);
+      report.megaWorldCreation.compiledRouteReadback={...routes,gameplayAccepted:false,independentProcess:true};
+      report.megaWorldCreation.nativeCompilation={accepted:true,target:process.env.SPARK_QA_MEGAWORLD_TARGET==='chupathingyCe'?'gbx-custom':'mcc-cea',gameRuntime:process.env.SPARK_QA_MEGAWORLD_TARGET??'mccSteam',gameLoaded:false,mapSha256:crypto.createHash('sha256').update(await fs.readFile(output.output)).digest('hex'),bytes:(await fs.stat(output.output)).size,milliseconds:Math.round(performance.now()-began),collisionTriangles:inspected.inspection.mesh.indices.length/3,independentBspReference:ref,crcMismatch:crc};
+      const retained=path.join(root,'native-output',path.basename(output.output));await fs.copyFile(output.output,retained,fs.constants.COPYFILE_EXCL);await finishStorage.retain(retained,'Owner-requested independently verified Timberland–Sidewinder native cache for gameplay acceptance');report.megaWorldCreation.nativeCompilation.retainedOutput=retained;
       for(const input of report.megaWorldCreation.originals)expect(crypto.createHash('sha256').update(await fs.readFile(input.file)).digest('hex')).toBe(input.sha256);
       report.megaWorldCreation.originalMapsUnchangedAfterCompilation=true;
+      if(report.megaWorldCreation.terrainSeam)report.megaWorldCreation.terrainSeam.nativeCompilation=true;
       step('Native combined Timberland–Sidewinder cache compiled and independently reopened; player traversal remains unverified');
-      if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+      if(process.env.SPARK_QA_MEGAWORLD_TARGET==='chupathingyCe'){
+        const runtime=process.env.SPARK_TEST_CHUPATHINGY_ROOT;if(!runtime)throw Error('Select the owned Chupathingy package for the actual private map-loading gate');
+        await invoke(main,'register_runtime',{registration:{id:'native-seam-chupathingy',runtimeId:'chupathingyCe',root:runtime,executable:path.join(runtime,'chupathingy.exe'),dataRoot:runtime,version:'v0.9.0c'}});
+        await chooseTool(main,'Level editor');await openStudioMenu(main);const choice=main.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(choice);await choice.selectOption('chupathingyCe');await main.keyboard.press('Escape');
+        await openDrawer(main,'Game connection');const controls=main.getByRole('region',{name:'Chupathingy Live Rebuild',exact:true});const start=controls.getByRole('button',{name:'Start compiled playtest',exact:true,includeHidden:true});await revealPagedControl(start);await start.click();
+        await expect.poll(async()=>{const session=await invoke(main,'runtime_rebuild_status');if(session?.error||session?.phase==='failed')throw Error(session.error||session.detail);return session;},{timeout:180000,intervals:[1000,2000]}).toMatchObject({phase:'running',gameSha256:report.megaWorldCreation.nativeCompilation.mapSha256});
+        report.megaWorldCreation.nativeGameLoad={session:await invoke(main,'runtime_rebuild_status'),actualControls:true,privateOwnedProcess:true,humanTraversalAccepted:false};report.megaWorldCreation.nativeCompilation.gameLoaded=true;
+        await main.screenshot({path:path.join(root,'megaworld-chupathingy-loaded.png')});const stop=controls.getByRole('button',{name:'Stop playtest',exact:true,includeHidden:true});await revealPagedControl(stop);await stop.click();await expect.poll(()=>invoke(main,'runtime_rebuild_status'),{timeout:15000}).toMatchObject({phase:'stopped',processId:null});
+        await main.getByRole('button',{name:'Close Game connection',exact:true}).click();await chooseTool(main,'Build & playtest');
+        step('Chupathingy loads the independently verified new seam cache in its private native playtest; traversal remains pending');
+      }
+
+      if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'||process.env.SPARK_QA_MEGAWORLD_TERRAIN==='1'){
         await main.getByRole('button',{name:'Open compiled map',exact:true}).click();await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','level');
         const viewport=main.locator('.world-layout:visible');await expect(viewport.locator('canvas')).toBeVisible();
         await expect.poll(async()=>Number(await viewport.getAttribute('data-source-shaders')),{timeout:120000}).toBeGreaterThan(0);
         await expect.poll(()=>viewport.evaluate(element=>({loading:element.dataset.materialLoading,pending:element.dataset.pendingMaterials,reflections:element.dataset.reflectionLoading})),{timeout:120000}).toEqual({loading:'false',pending:'0',reflections:'false'});
         const rendering=await viewport.evaluate(element=>({...element.dataset}));expect(Number(rendering.sourceLightmaps)).toBeGreaterThan(0);
         await main.getByRole('button',{name:'Frame scene (F)',exact:true}).click();await main.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await main.screenshot({path:path.join(root,'megaworld-compiled-routes.png')});
-        report.megaWorldCreation.dualRoutes.compiledViewport={actualUiOpen:true,rendering,gameplayAccepted:false};
-        step('Build workspace opens the compiled road and infantry routes with native textures and lightmaps in the existing Level Editor',report.megaWorldCreation.dualRoutes.compiledViewport);
+        (report.megaWorldCreation.terrainSeam??report.megaWorldCreation.dualRoutes).compiledViewport={actualUiOpen:true,rendering,gameplayAccepted:false};
+        step('Build workspace opens the compiled connection with native textures and lightmaps in the existing Level Editor',(report.megaWorldCreation.terrainSeam??report.megaWorldCreation.dualRoutes).compiledViewport);
       }
       if(process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
         await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${world.id}"]`).click();await chooseTool(main,'Level editor');
@@ -692,7 +776,7 @@ try{
   await chooseTool(main,'Level editor');await inspector(main);await acknowledged(main,a.project.id,1.5);
   await independentNativeWindows(a.project.id);
   }
-  if(nativeMap&&!geometryOnly&&!logicOnly){
+  if(nativeMap&&nativeMap!=='-'&&!launchOnly&&!geometryOnly&&!logicOnly){
     if(!readOnly&&!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
     const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
     const importStarted=performance.now();
@@ -1000,20 +1084,24 @@ try{
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser){
   report.failureWindows=await Promise.all(pages().map(async(page,i)=>{await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});return{url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label).catch(()=>null),workspace:await page.locator('.gs-workspace-shell').getAttribute('data-workspace').catch(()=>null),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,2500),tail:(await page.locator('body').innerText().catch(()=>'')).slice(-4000)};}));
 }
-  report.nativeFailureLogs=await Promise.race([invoke(main,'bootstrap').then(value=>value.logs.slice(-10)).catch(()=>[]),new Promise(resolve=>setTimeout(()=>resolve([]),3000))]);
+  report.nativeFailureLogs=await Promise.race([invoke(main,'bootstrap').then(value=>value.logs.filter(row=>!report.megaWorldCreation?.projectId||row.projectId===report.megaWorldCreation.projectId).slice(-500)).catch(()=>[]),new Promise(resolve=>setTimeout(()=>resolve([]),3000))]);
   if(report.megaWorldCreation){
     // Preserve bounded native error geometry before the owned failed job is
     // disposed. A compiler diagnostic must survive cleanup, not its SDK tree.
-    report.megaWorldCreation.nativeErrorGeometry=[];
+    report.megaWorldCreation.nativeErrorGeometry=[];report.megaWorldCreation.failedSourceFiles=[];
+    if(report.megaWorldCreation.projectId)report.megaWorldCreation.failedPlan=await invoke(main,'open_project',{id:report.megaWorldCreation.projectId}).then(value=>value.project.bspAssembly).catch(()=>null);
     let visited=0,total=0;const sourceFiles=[];
     const inspectErrors=async(directory,depth=0)=>{if(depth>8||++visited>256)return;for(const row of await fs.readdir(directory,{withFileTypes:true}).catch(()=>[])){
       const file=path.join(directory,row.name),info=await fs.lstat(file);if(info.isSymbolicLink())continue;
       if(info.isDirectory()&&!/^(?:tags|sdk-tags|bsp-dependencies-\d+)$/.test(row.name))await inspectErrors(file,depth+1);
       else if(info.isFile()&&row.name==='connected.jms'&&info.size<=16*1024**2)sourceFiles.push(file);
-      else if(info.isFile()&&/lightmaps_errors\.wrl$/i.test(row.name)&&info.size<=256*1024&&total+info.size<=512*1024){const bytes=await fs.readFile(file);total+=bytes.length;report.megaWorldCreation.nativeErrorGeometry.push({file:path.relative(root,file),sha256:crypto.createHash('sha256').update(bytes).digest('hex'),text:bytes.toString('utf8')});}
+      else if(info.isFile()&&/\.wrl$/i.test(row.name)&&info.size<=256*1024&&total+info.size<=512*1024){const bytes=await fs.readFile(file);total+=bytes.length;report.megaWorldCreation.nativeErrorGeometry.push({file:path.relative(root,file),sha256:crypto.createHash('sha256').update(bytes).digest('hex'),text:bytes.toString('utf8')});}
     }};
     await inspectErrors(path.join(root,'library','jobs'));
     for(const file of sourceFiles)try{
+      if(report.megaWorldCreation.failedSourceFiles.length>=1)break;
+      await finishStorage.retain(file,'One exact failed native JMS source for collision-error diagnosis before parent disposal');
+      report.megaWorldCreation.failedSourceFiles.push({file,bytes:(await fs.stat(file)).size,sha256:crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex')});
       const lines=(await fs.readFile(file,'utf8')).trim().split(/\r?\n/);let at=8;const count=Number(lines[at++]),materials=[];
       for(let i=0;i<count;i++){materials.push(lines[at++]);at++;}at+=3;
       const vertexCount=Number(lines[at++]),vertices=[];

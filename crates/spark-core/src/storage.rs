@@ -1322,7 +1322,7 @@ fn file_ownership(path: &Path) -> Option<((u64, u64), u64)> {
 pub(crate) fn file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path).map(|(identity,_)|identity)}
 /// A rollback may clear a generated file's Windows read-only bit. Require one
 /// link so this cannot change the attributes of a user file through an alias.
-pub(crate) fn unique_file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path).filter(|(_,links)|*links==1).map(|(identity,_)|identity)}
+pub fn unique_file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path).filter(|(_,links)|*links==1).map(|(identity,_)|identity)}
 
 #[cfg(test)]
 mod tests {

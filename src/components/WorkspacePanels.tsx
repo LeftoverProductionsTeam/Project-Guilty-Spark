@@ -1,4 +1,5 @@
-import {navigateComposite} from '../keyboardNavigation';
+import PagedSurface from './PagedSurface';
+import {navigateComposite,focusCompositeItem} from '../keyboardNavigation';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from 'react';
@@ -10,7 +11,7 @@ import {getCurrentWindow} from '@tauri-apps/api/window';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { WindowControls } from './WindowFrame';
 import { requestedPanel } from '../detachedPanels';
-import { changePanel, cleanLayout, defaultPanel } from '../workspaceLayout';
+import { changePanel, cleanLayout, defaultPanel, drawerInsets } from '../workspaceLayout';
 import type { PanelPlacement, WorkspaceLayout } from '../workspaceLayout';
 import '../workspacePanels.css';
 import './mapTabsMenu.css';
@@ -23,6 +24,7 @@ export interface WorkspaceFileAction {
   id: string; label: string; run: () => void; disabled?: boolean; hint?: string; shortcut?: string; group?: 'new';
 }
 interface ContextValue {
+  scope:string;
   registerFileActions: (scope: string, actions: WorkspaceFileAction[]) => () => void;
   contentHosts: Record<string, HTMLDivElement | null>;
   attachContent: (id: string, element: HTMLDivElement | null) => void;
@@ -36,6 +38,7 @@ interface ContextValue {
   detach?: (id:string)=>Promise<boolean>;
   canDetach?: (id:string)=>boolean;
   detached: string|null;
+  insets:{left:number;right:number;top:number;bottom:number};
 }
 const Context = createContext<ContextValue | null>(null);
 export function closeOtherHeaderMenus(current:HTMLDetailsElement){
@@ -44,9 +47,9 @@ export function closeOtherHeaderMenus(current:HTMLDetailsElement){
 export function headerMenuKeyDown(event:ReactKeyboardEvent<HTMLDetailsElement>){
   if(event.defaultPrevented || event.target instanceof Element&&event.target.closest('input,select,textarea,[role="menu"]')||!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
   event.preventDefault();event.stopPropagation();const menu=event.currentTarget;menu.open=true;
-  const buttons=[...menu.querySelectorAll<HTMLElement>('[role="menuitem"],button:not(:disabled)')].filter(item=>!item.matches(':disabled')&&item.getClientRects().length>0),at=buttons.indexOf(document.activeElement as HTMLElement);
+  const buttons=[...menu.querySelectorAll<HTMLElement>('[role="menuitem"],button:not(:disabled)')].filter(item=>!item.matches(':disabled')&&item.getClientRects().length>0&&!item.closest('[hidden],.gs-surface-pages')&&(!item.closest('[inert]')||!!item.closest('[data-gs-offpage]'))),at=buttons.indexOf(document.activeElement as HTMLElement);
   const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
-  buttons[next]?.focus();
+  if(buttons[next])focusCompositeItem(buttons[next]);
 }
 function HeaderTools({children,target="gs-header-workspace-tools"}:{children:ReactNode;target?:string}){
   const [host,setHost]=useState<HTMLElement|null>(null);
@@ -94,6 +97,8 @@ export default function WorkspacePanels({
 }) {
   const detached=native?requestedPanel(location.search,workspace):null;
   const contentRoot=useRef<HTMLDivElement>(null);
+  const [contentSize,setContentSize]=useState({width:innerWidth,height:innerHeight});
+  useLayoutEffect(()=>{const node=contentRoot.current;if(!node)return;const observer=new ResizeObserver(()=>{const r=node.getBoundingClientRect();setContentSize(old=>old.width===r.width&&old.height===r.height?old:{width:r.width,height:r.height});});observer.observe(node);return()=>observer.disconnect();},[]);
   useLayoutEffect(()=>{
     const root=contentRoot.current;
     if(!root||document.documentElement.dataset.gsWorkspaceTransitions==='false'||document.documentElement.dataset.gsReducedMotion==='true'||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -144,8 +149,10 @@ export default function WorkspacePanels({
     }
     return [...groups];
   },[descriptors]);
+  const padding=useMemo(()=>drawerInsets(detached?{}:layout.panels,contentSize.width,contentSize.height),[detached,layout.panels,contentSize]);
   const context = useMemo<ContextValue>(
     () => ({
+      scope:windowLayoutId,
       registerFileActions,
       contentHosts,
       attachContent,
@@ -154,7 +161,7 @@ export default function WorkspacePanels({
       peek,
       detach:onDetachPanel,
       canDetach:canDetachPanel,
-      detached,
+      detached,insets:padding,
       register: (d) => {
         setDescriptors((previous) => (previous.some((p) => p.id === d.id) ? previous : [...previous, d]));
         if (d.defaultDock)
@@ -177,7 +184,7 @@ export default function WorkspacePanels({
         setRaw((old) => changePanel(cleanLayout(old), panel, { open: true }));
       },
     }),
-    [host, layout, peek, setRaw, contentHosts, attachContent,onDetachPanel,canDetachPanel,detached,registerFileActions],
+    [windowLayoutId, host, layout, peek, setRaw, contentHosts, attachContent,onDetachPanel,canDetachPanel,detached,registerFileActions,padding],
   );
   useEffect(()=>{const open=(e:Event)=>{const id=(e as CustomEvent).detail?.id;if(typeof id==='string'&&descriptors.some(d=>d.id===id))context.reveal(id);};window.addEventListener('guilty-spark-reveal-drawer',open);return()=>window.removeEventListener('guilty-spark-reveal-drawer',open);},[context,descriptors]);
   useEffect(() => {
@@ -189,8 +196,13 @@ export default function WorkspacePanels({
       delete document.documentElement.dataset.gsFullscreen;
     };
   }, [fullscreen]);
-  useEffect(() => {
+  // Keep one listener: another shortcut can synchronously render the editor
+  // during this same event. Removing/readding a listener then loses Escape.
+  const keyState=useRef({fullscreen,peek,detached,panels:layout.panels,changeFullscreen,setRaw});
+  keyState.current={fullscreen,peek,detached,panels:layout.panels,changeFullscreen,setRaw};
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => {
+      const {fullscreen,peek,detached,panels,changeFullscreen,setRaw}=keyState.current;
       if (e.defaultPrevented) return;
       if (e.key === 'F11') {
         e.preventDefault();
@@ -206,7 +218,7 @@ export default function WorkspacePanels({
       if (e.key === 'Escape' && !detached && !document.querySelector('[role="dialog"]')) {
         const panel =
           peek ??
-          (Object.entries(layout.panels)
+          (Object.entries(panels)
                 .filter(([, value]) => value.open)
                 .at(-1)?.[0]);
         if (panel) {
@@ -222,19 +234,14 @@ export default function WorkspacePanels({
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [fullscreen, peek, changeFullscreen, setRaw, layout.panels, descriptors]);
-  const padding = { left: 0, right: 0, top:0, bottom: 0 };
-    for (const placement of Object.values(layout.panels))
-      if (placement.open && placement.pinned && placement.dock !== 'float')
-        padding[placement.dock] =
-          placement.dock === 'bottom'||placement.dock==='top' ? Math.min(placement.height, 360) : Math.min(placement.width, 440);
+  }, []);
   return (
     <Context.Provider value={context}>
       <div className="gs-workspace-shell" data-fullscreen={fullscreen} data-workspace={workspace} data-detached-panel={detached??undefined}>
         <HeaderTools target="gs-header-file-tools"><nav className="gs-workspace-menus" aria-label="File and tools">
           <details className="gs-file-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={headerMenuKeyDown}>
             <summary aria-label="File menu">File <span aria-hidden="true">▾</span></summary>
-            <div role="menu" aria-label="File commands" onKeyDown={navigateComposite}>
+            <div role="menu" aria-label="File commands" onKeyDown={navigateComposite}><PagedSurface name="file-menu" label="File menu" scope={windowLayoutId} maxHeight={400}>
               {[fileActions,...Object.values(fileGroups).map(group=>group.actions)].filter(group=>group.length).map((group,index)=><section key={index} role="group" aria-label={index===0?'Project files':'Workspace files'}>
                 {group.some(command=>command.group==='new')&&<details className="gs-file-new" onKeyDown={event=>{
                   const details=event.currentTarget,summary=details.querySelector('summary')!;
@@ -245,18 +252,12 @@ export default function WorkspacePanels({
                   <div role="menu" aria-label="New project commands" onKeyDown={navigateComposite}>{group.filter(command=>command.group==='new').map(command=><button key={command.id} role="menuitem" aria-label={command.label} disabled={command.disabled} title={command.hint} onClick={event=>{const file=event.currentTarget.closest('.gs-file-menu');file?.querySelector('details')?.removeAttribute('open');file?.removeAttribute('open');command.run();}}>{command.label}</button>)}</div>
                 </details>}
                 {group.filter(command=>command.group!=='new').map(command=><button key={command.id} role="menuitem" aria-label={command.label} disabled={command.disabled} title={command.hint} aria-keyshortcuts={command.shortcut} onClick={event=>{event.currentTarget.closest('.gs-file-menu')?.removeAttribute('open');command.run();}}><span>{command.label}</span>{command.shortcut&&<kbd>{command.shortcut.replace('Control+','Ctrl+')}</kbd>}</button>)}
-              </section>)}
+              </section>)}</PagedSurface>
             </div>
           </details>
-          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open){closeOtherHeaderMenus(event.currentTarget);const popup=event.currentTarget.querySelector<HTMLElement>('[role="menu"]');if(popup){popup.style.setProperty('--gs-tools-nudge','0px');requestAnimationFrame(()=>{const rect=popup.getBoundingClientRect();popup.style.setProperty('--gs-tools-nudge',`${Math.max(0,8-rect.left)-Math.max(0,rect.right-innerWidth+8)}px`);});}}}} onKeyDown={event=>{
-            if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
-            event.preventDefault();event.stopPropagation();event.currentTarget.open=true;
-            const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"],[role="menuitem"]')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
-            const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
-            buttons[next]?.focus();
-          }}>
+          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open){closeOtherHeaderMenus(event.currentTarget);const popup=event.currentTarget.querySelector<HTMLElement>('[role="menu"]');if(popup){popup.style.setProperty('--gs-tools-nudge','0px');requestAnimationFrame(()=>{const rect=popup.getBoundingClientRect();popup.style.setProperty('--gs-tools-nudge',`${Math.max(0,8-rect.left)-Math.max(0,rect.right-innerWidth+8)}px`);});}}}} onKeyDown={headerMenuKeyDown}>
             <summary aria-label="More workspace drawers" title="Workspace tools and panels">Tools <span aria-hidden="true">▾</span>{Object.values(counts).some(count=>count>0)&&<span className="gs-panel-count" aria-label="Tools need review">•</span>}</summary>
-            <div role="menu" aria-label="Workspace drawers" onKeyDown={navigateComposite}>{onNewWindow&&<section className="gs-tools-window-command" role="group" aria-label="Windows"><button role="menuitem" onClick={event=>{event.currentTarget.closest('details')!.open=false;onNewWindow();}}><SquareArrowOutUpRight size={13}/><span>New workspace window</span></button></section>}{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</div>
+            <div role="menu" aria-label="Workspace drawers" onKeyDown={navigateComposite}><PagedSurface name="tools-menu" label="Tools menu" scope={windowLayoutId} maxHeight={360}>{onNewWindow&&<section className="gs-tools-window-command" role="group" aria-label="Windows"><button role="menuitem" onClick={event=>{event.currentTarget.closest('details')!.open=false;onNewWindow();}}><SquareArrowOutUpRight size={13}/><span>New workspace window</span></button></section>}{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</PagedSurface></div>
           </details>}
         </nav></HeaderTools>
         <HeaderTools><nav className="gs-workspace-tools" aria-label="Workspace panels">
@@ -276,7 +277,7 @@ export default function WorkspacePanels({
             {actions}
             <details className="gs-layout-menu gs-view-menu" onToggle={event=>{if(event.currentTarget.open){if(!detached)onListLayouts?.();closeOtherHeaderMenus(event.currentTarget);}}} onKeyDown={headerMenuKeyDown}>
               <summary aria-label="View and window options">View <span aria-hidden="true">▾</span></summary>
-              <div>
+              <div><PagedSurface name="view-menu" label="View menu" scope={windowLayoutId} maxHeight={420}>
                 <section className="gs-view-commands" aria-label="Window view">
                   <button aria-label={fullscreen?'Exit fullscreen editing':'Fullscreen editing'} aria-pressed={fullscreen} onClick={event=>{event.currentTarget.closest('details')!.open=false;void changeFullscreen();}}>{fullscreen?<Shrink size={15}/>:<Expand size={15}/>}<span>{fullscreen?'Exit fullscreen':'Fullscreen'}</span><kbd>F11</kbd></button>
                   {onPopout&&!detached&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={event=>{event.currentTarget.closest('details')!.open=false;onPopout();}}><SquareArrowOutUpRight size={15}/><span>Move workspace to a new window</span></button>}
@@ -308,7 +309,7 @@ export default function WorkspacePanels({
                   Reset layout
                 </button>
                 </>}
-              </div>
+              </PagedSurface></div>
             </details>
           </div>
           {windowHost&&createPortal(<WindowControls
@@ -415,8 +416,8 @@ export function WorkspacePanel({
           top: `min(${placement.y}px, max(0px, 100% - ${placement.height}px - 8px))`,
         }
       : placement.dock === 'bottom'||placement.dock==='top'
-        ? { height: placement.height }
-        : { width: placement.width };
+        ? { height: detached?placement.height:context.insets[placement.dock] }
+        : { width: detached?placement.width:context.insets[placement.dock],top:context.insets.top,bottom:context.insets.bottom };
   return createPortal(
     <section
       ref={section}
@@ -481,7 +482,7 @@ export function WorkspacePanel({
         </span>
         {native&&detachAction&&!context.detached&&<button aria-label={`Detach ${label}`} title={`Move ${label} to a separate native editing window`} disabled={detaching} onClick={detach}><SquareArrowOutUpRight size={14}/></button>}
         {!detached&&<details className="gs-panel-options">
-          <summary aria-label={`${label} drawer options`} title="Drawer position, size and pinning"><SlidersHorizontal size={14}/></summary>
+          <summary aria-label={`${label} drawer options`} title="Drawer position and size"><SlidersHorizontal size={14}/></summary>
       <div className="gs-panel-placement">
         <select
           aria-label={`${label} position`}
@@ -494,14 +495,7 @@ export function WorkspacePanel({
           <option value="bottom">Bottom edge</option>
           <option value="float">Floating</option>
         </select>
-        <label>
-          <input
-            type="checkbox"
-            checked={placement.pinned}
-            onChange={(e) => context.update(id, { pinned: e.target.checked })}
-          />
-          Pin space
-        </label>
+        <small>Docked drawers make space for the editor. Choose Floating or detach for a separate view.</small>
         <label>
           {placement.dock === 'bottom'||placement.dock==='top' ? 'Height' : 'Width'}
           <input
@@ -523,7 +517,7 @@ export function WorkspacePanel({
           <X size={15} />
         </button>}
       </header>
-      <div className="gs-panel-content">{detachError&&<p role="alert">{detachError}</p>}{children}<div ref={appendHost} className="gs-panel-addons"/></div>
+      <div className="gs-panel-content"><PagedSurface name={id} label={label+' drawer'} scope={context.scope} fill>{detachError&&<p role="alert">{detachError}</p>}{children}<div ref={appendHost} className="gs-panel-addons"/></PagedSurface></div>
       <div className="gs-panel-resize" role="separator" tabIndex={0} aria-label={`Resize ${label} drawer`}
         aria-orientation={placement.dock==='top'||placement.dock==='bottom'?'horizontal':'vertical'}
         onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);resize.current={pointer:event.pointerId,x:event.clientX,y:event.clientY,width:placement.width,height:placement.height};}}

@@ -1,0 +1,59 @@
+# UI interaction acceptance audit
+
+Current base: master `5095e9b9ea0979448cd571d56659b4076e5930a2`, dirty continuation. This audit tracks observable interactions; a catalog entry or tooltip is not evidence of operation.
+
+## Repairs and evidence
+
+- Tools menu: removed the obsolete outer two-column grid. The columns now belong only to its existing command body, so the pager cannot cover Inspector. All visible command centres are hit-tested, in addition to geometry/clip checks. Focused six regression cases and ten layout/click cases pass.
+- Maps: keyboard Home/End/arrows reveal the requested page before focus. Search/Enter waits for the visible command. Help now distinguishes choosing a map in this window from moving that map and its history into another window. Independent native handoff acceptance remains separate.
+- Help: manual Start walkthrough now exists even with automatic guidance off; all 17 existing steps, Finish and persisted opt-out pass the browser journey. Settings uses its existing saved Interface Studio preference. The runtime step now names the actual Runtime setup and Tools controls.
+- Retained editors: paging sits inside stable retained workspace owners. Level/home editor trees are not wrapped/reparented. The prior shrink/remount regression was repaired; focused canvas, drawer-return, donor-tag Undo/Save and fullscreen checks pass.
+- Paging: closed-details controls do not create phantom pages; complete labeled controls reveal together; inactive pages are inert without destroying document state. Search and keyboard focus use the same existing owners.
+
+Private evidence root: `C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf`.
+`compact-ui-regressions-r10.log`: 6 pass. `compact-hit-layout-r11.log`: 10 pass, including eight requested browser sizes plus Tools click targets at 800 and 1280. `compact-flavors-r17.log`: 13 focused passes, including eight sizes and the complete manual walkthrough. The later `scale-drawers-cache-browser-r22.log` has four passes: same-canvas dock/float/navigation behavior, saved UI scale, saved cache limits and drawer Escape/restore. The broad browser R7 run finished with 207 passes and 23 failures; six BSP cases are now corrected and pass together in R46. The remaining 17 UI/paging cases still require a fresh combined run. Native R45 completed on the R36 release-mode QA app.
+
+## Audit method and remaining controls
+
+| Surface | Required proof | Current state |
+|---|---|---|
+| File / Tools / Maps / View / Work / orb | Mouse and keyboard, full command hit target, paging/search, Escape focus return, no hidden unreachable command | Shared checks implemented. R45 native menu/dashboard hit targets pass; 17 broad UI/paging cases remain open. |
+| Games & tools | Runtime cards, real folder selection, installed version, reviewed download/install, launch, prerequisite/unsupported messages | Four official packages install in native app; engine content/restart gates remain open. |
+| Drawers / detached panels | Complete labels/inputs, no pager interception, saved page, close/reveal, independent windows and owner history | R26 release-mode native lifecycle passes 12 cases. R45 verifies current scale/docking; physical other-DPI/disconnect remain open. |
+| Features / Learning / How To | Every catalog entry has prerequisites/steps/route/limits; action opens actual supported context; searchable guides retain place | Existing catalog coverage tests retained; feature-search paging regression has a focused pass; full current suite remains required. Extraction/server/VR creation must remain explicitly unfinished until implemented. |
+| Editor previews | Full canvas after navigation, paused inactive owner, source-aware invalidation, Retry and source preservation | R25: same retained canvas, zero repeated preview IPC, 116/116 primary shaders and unchanged owned-source hash. Budget eviction/source changes still require reload; no universal load-once claim. |
+| Tooltips | Text matches click, destination, ownership and prerequisite; keyboard focus and Escape | Map-switcher wording/keyboard path repaired; exhaustive per-command/native audit not yet complete. |
+| Release application | Actual embedded build, all eight native sizes, scaling/fullscreen/monitor moves, restart, no mocked IPC | R45 on the optimized R36 app passes all eight native sizes and 90 dashboard controls each with zero overflow/scrolling controls, saved 125%/Auto scale and cache settings, fullscreen and three monitor placements at 100% Windows DPI. Other physical DPI/disconnect/5120 hardware remain untested. No installer sealed. |
+
+Use [HUMAN_TEST_PLAN](HUMAN_TEST_PLAN.md) to record physical outcomes. Native screenshots and before/after metrics must identify their executable hash. Browser viewport emulation is not native/DPI/headset acceptance. No automated pass promotes a feature into human or real-peer acceptance.
+
+## Cache, scaling and docked-space follow-through
+
+- Reusable native preview responses no longer expire after two minutes. Source hash, exact tag identity, pinned resource scope, bounded single-flight/LRU and failed-response retry remain enforced.
+- Decoded pixels now obey the saved preview limit. Pixels and native response reuse share one CPU quota rather than each using the whole allowance. The existing native inspection cache also accepts a reviewed user limit. Lower limits trim reuse entries; live callers retain full geometry. Original assets, document state and history are not cache cleanup targets.
+- Interface Studio exposes Auto and75–150% UI scale through documented native WebView zoom. Auto responds to native window/fullscreen dimensions. Windows display scaling is untouched; saved preferences fit down in a small window to keep controls accessible.
+- All docked workspace drawers and the workspace switcher reserve main content space. Floating and detached panels retain independent placement. Focused tests retain the same canvas identity and restore its bounds after closing/floating.
+- Cache estimates are not process RAM or GPU-driver quotas. Texture working sets, active models and bounded warm renderers are reported separately. Reuse may be evicted when the chosen budget is exhausted; changed source/resources deliberately invalidate it.
+
+Earlier baseline regressions: 851 locked Rust passes/9 ignored, 459 frontend unit passes and 59 offline passes. Native R48 proves actual three-route Construction controls, immediate Save/Undo/Redo, source preservation and restart. R47 intentionally failed an overbroad source equality assertion; R48 additionally verifies the legitimate discovered sound-bank scope against its hash. [Exact seam scope](MEGAWORLD_SEAM_ROUTES_20261108.md). Full browser acceptance is still incomplete; no release or gameplay pass follows from these scoped results.
+
+## 8 November native follow-through
+
+- Studio native runtime dropdown: explicit opaque theme fills for select/options/groups; Dark Glow now includes option groups in its existing native-control fill. R137 passes all five actual palette-selection checks, including option/group text and background consistency. R138 full browser suite passes242cases. Actual Windows popup inspection passed on R140; E/studio-theme-r140-windows.jpg and E/studio-theme-r140-popup.jpg show the opaque dark popup. Native Windows selection-row styling remains.
+- R133 native acceptance exposed a menu-readiness race in the harness after CE recovery; the existing real Tools helper now waits for its menu before paging, with detailed closed/off-page diagnostics. R135 reaches native compilation and independent four-start readback. This does not establish a production mouse-target fix.
+- R135 private Chupathingy game never reached confirmed ticks: it lacked CE banks and read the installed engine's configuration. The bank/setup screen is a failure, not a loaded gameplay receipt. The adapter now reuses verified CE preparation in owned staging and an exact publisher engine copy. R142 passed two actual-app/native-game cases, including changed starting positions, rejection without restart, Stop and full Spark restart. The outer R142 evidence export failed after child cleanup. R148 verifies the bounded export repair and retains the exact accepted map.
+
+## Native lighting and CE setup follow-through
+
+- R144 passed six real Windows setup cases. Games & tools → ChupathingyCE → Runtime folders → Set up Custom Edition maps copied three validated owned banks (165,658,385 bytes); a second Faber profile reused all three without copying. Differing existing content and a stale profile were refused. Thirteen original hashes were unchanged. This is setup evidence, not game-mod-loader acceptance.
+- R145 passed871locked Rust tests (9ignored),469frontend tests, TypeScript,59offline and36storage checks; R146 passed all242browser tests. These results precede the native fog-off correction.
+- R147 reached real Tool radiosity and a valid CE cache, then correctly rejected compiled fog enablement that differed from the requested disabled state. The native toolchain defaults zero density to one. The corrected authoring uses zero native start/opaque distances when fog is disabled, with exact raw cache readback. R148 passes the actual Bake button, native radiosity/cache validation, real Chupathingy load, changed start readback, failed-build preservation and full Spark restart. R153 independently extracts the standard sky/BSP and verifies all15lighting fields, native metal and lightmaps. Human appearance remains pending.
+- Native lighting uses the existing Environment controls and compiler. It applies sun, indoor/outdoor ambient and atmospheric fog to a separate standard sky tag; original sky model/dependencies remain. Backdrop color remains preview-only. The first path supports QuickForge/BSP Workshop and editable BSP assemblies with one sky, not arbitrary compiled-map light patching or multiple-sky authoring.
+
+- R155 passes875locked Rust tests (9ignored),471frontend tests/103files, TypeScript,59offline and36storage checks. A real TCP host/guest test proves native bake recipe removal through author Undo while retaining the peer brush; competing recipes are rejected. The expanded three-native-process test remains separate until it runs. Native portal source sections now follow the actual joined air volume; real seam compiler acceptance is still pending.
+
+
+R166 current-source Final radiosity follow-through completes actual Bake controls, explicit acknowledged Save, independent standard sky/BSP/material readback, isolated Chupathingy load, changed-start Live Rebuild, bad-source compiler rejection retaining the prior game, Stop and full application restart. R163 exposed the stage-only Save defect; it is repaired through existing callbacks and R165 proves failed Save prevents compile. R167 full browser245passes, R166 frontend472/TypeScript/offline59/storage36. See NATIVE_LIGHTING_20261108.md for exact hashes and scope. The OS capture contains an untouched Windows network-permission prompt; native appearance/human movement and unobscured first-run acceptance remain open. R168 three-process/current-layout continuation is separate, still running at this entry.
+
+
+R169 completes the current three-process shared-source acceptance and12native layout/setup cases on the R166 app: all8requested dimensions,90dashboard controls each, zero measured page overflow/scrolling controls, saved scale/cache/flavor choices and actual app restart. Includes valid lighting Undo snapshots,240commits, frozen native compile, real owner-process crash/offline-edit recovery, rollover/new invitations and revoked permissions. Same-computer LAN/Radmin only; no two-computer or gameplay-network acceptance. R168's already-open-panel helper was corrected without changing product code. Physical other-DPI/monitor-disconnect/ultrawide-hardware and human appearance remain open.

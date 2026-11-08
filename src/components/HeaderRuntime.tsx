@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { call, native } from '../api';
 import { primaryRuntimes } from '../useRuntimeConnections';
-import { runtimeNames } from '../runtimeWorkbench';
+import { runtimeNames,runtimeProfileName,runtimeProfileLabel } from '../runtimeWorkbench';
 import type { RuntimeId, RuntimeRegistration } from '../types';
 export default function HeaderRuntime({
   value,
-  onChange,
+  onChange,onSetupFlavor,
 }: {
   value: RuntimeId;
   onChange: (id: RuntimeId) => void;
+  onSetupFlavor?:(flavor:'openh1'|'faber')=>void;
 }) {
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]),
     [busy, setBusy] = useState(false),
@@ -33,8 +34,9 @@ export default function HeaderRuntime({
     };
   }, []);
   const selected = profiles.find((item) => item.runtimeId === value);
-  const multiple = profiles.filter((item) => item.runtimeId === value).length > 1;
+  const multiple = profiles.filter((item) => item.runtimeId === value).length > 1||!!selected&&runtimeProfileName(selected)!==runtimeNames[value];
   const change = async (key: string) => {
+    if(key==='setup:openh1'||key==='setup:faber'){onSetupFlavor?.(key.slice(6) as 'openh1'|'faber');return;}
     if (!key.startsWith('profile:')) {
       onChange(key as RuntimeId);
       return;
@@ -69,20 +71,15 @@ export default function HeaderRuntime({
         value={multiple && selected ? 'profile:' + selected.id : value}
         onChange={(event) => void change(event.target.value)}
       >
-        {primaryRuntimes.flatMap((id) => {
-          const options = profiles.filter((item) => item.runtimeId === id);
-          return options.length > 1
-            ? options.map((item) => (
-                <option value={'profile:' + item.id} key={item.id}>
-                  {runtimeNames[id]} · {item.root.replaceAll('\\', '/').split('/').filter(Boolean).at(-1)}
-                </option>
-              ))
-            : [
-                <option value={id} key={id}>
-                  {runtimeNames[id]}
-                </option>,
-              ];
+        {primaryRuntimes.filter(id=>!['openCe','chupathingyCe'].includes(id)).map(id=><option value={id} key={id}>{runtimeNames[id]}</option>)}
+        <optgroup label="OpenCE flavors · community engines">
+        {(['chupathingyCe','openCe'] as const).flatMap(id=>{
+          const options=profiles.filter(item=>item.runtimeId===id);
+          return options.length>1||options.some(item=>runtimeProfileName(item)!==runtimeNames[id])?options.map(item=><option value={'profile:'+item.id} key={item.id}>{runtimeProfileLabel(item)}</option>):[<option value={id} key={id}>{runtimeNames[id]}</option>];
         })}
+        {!profiles.some(item=>runtimeProfileName(item)==='OpenH1')&&<option value="setup:openh1">OpenH1 · connect or download…</option>}
+        {!profiles.some(item=>runtimeProfileName(item)==='Faber')&&<option value="setup:faber">Faber · connect or download…</option>}
+        </optgroup>
         {!primaryRuntimes.some((id) => id === value) && <option value={value}>{runtimeNames[value]}</option>}
       </select>
       <span className="sr-only" role="status">

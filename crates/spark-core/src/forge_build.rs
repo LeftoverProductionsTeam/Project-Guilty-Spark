@@ -19,13 +19,13 @@ pub fn tools_for_target(project:&Project,fallback:ForgeToolchain)->Result<ForgeT
     let profile=project.build_targets.iter().find(|p|&p.id==id)
         .ok_or_else(||SparkError::Invalid("Active build target missing".into()))?;
     if profile.open_sauce {return invalid("OpenSauce .yelo compilation is not integrated. Use a separate CE/OpenSauce toolchain; MCC cannot load it");}
-    let expected=match profile.runtime_id {RuntimeId::MccSteam=>"h1a-tool",RuntimeId::HaloCustomEdition=>"invader-ce",
+    let expected=match profile.runtime_id {RuntimeId::MccSteam=>"h1a-tool",RuntimeId::HaloCustomEdition|RuntimeId::ChupathingyCe=>"invader-ce",
         _=>return invalid("This runtime has no verified integrated builder; retain its configuration and export source for research")};
     if profile.builder!=expected {return invalid("Selected builder produces the wrong engine output");}
     if profile.runtime_id==RuntimeId::MccSteam && profile.hek_flavor.as_deref()!=Some("h1aEk") {
         return invalid("MCC source compilation requires the H1A editing kit");
     }
-    if profile.runtime_id==RuntimeId::HaloCustomEdition && !profile.ce_compatible_tagset {
+    if matches!(profile.runtime_id,RuntimeId::HaloCustomEdition|RuntimeId::ChupathingyCe) && !profile.ce_compatible_tagset {
         return invalid("Confirm a Custom Edition base tagset and review incompatible MCC fields/scripts before building CE. No fields are silently stripped");
     }
     Ok(ForgeToolchain{hek_directory:profile.hek_directory.clone(),hek_tags_directory:profile.tags_directory.clone(),
@@ -151,6 +151,19 @@ fn tool_file(tools: &ForgeToolchain) -> Option<PathBuf> {
 }
 fn invader(tools:&ForgeToolchain,name:&str)->Option<PathBuf> {
     build::tool_path(&build::Toolchain{invader_directory:tools.invader_directory.clone(),..Default::default()},name)
+}
+// A Chupathingy authoring document emits standard CE tags, never an Xbox/MCC
+// cache relabel. Require the same explicit reviewed CE profile as its build route.
+fn authoring_preflight(project:&Project,tools:&ForgeToolchain,document:&quickforge::QuickForgeDocument)->Result<()> {
+    let selected=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|p|&p.id==id));
+    let reviewed=selected.is_some_and(|p|p.ce_compatible_tagset&&p.builder=="invader-ce"&&!p.open_sauce&&matches!(p.runtime_id,RuntimeId::HaloCustomEdition|RuntimeId::ChupathingyCe));
+    match document.runtime_id {
+        RuntimeId::MccSteam if tools.hek_flavor.as_deref()!=Some("h1aEk")=>invalid("MCC/H1A builds require an explicitly selected H1A Editing Kit, not classic HEK. Configure the kit generation in Settings."),
+        RuntimeId::HaloCustomEdition if tools.hek_flavor.as_deref()!=Some("legacyHek")&&!(tools.hek_flavor.as_deref()==Some("h1aEk")&&reviewed)=>invalid("CE requires classic HEK or an explicitly reviewed H1A authoring profile with a CE base tagset. Invader must build gbx-custom output."),
+        RuntimeId::ChupathingyCe if !reviewed||!selected.is_some_and(|p|p.runtime_id==RuntimeId::ChupathingyCe)||!matches!(tools.hek_flavor.as_deref(),Some("legacyHek"|"h1aEk"))=>invalid("Chupathingy needs its selected, reviewed CE base tagset and a compatible authoring kit. Invader must build standard gbx-custom output; Xbox/MCC caches are not substituted."),
+        RuntimeId::OpenCe=>invalid("OpenCE target-specific structure and runtime output have not been verified. Export sources and validate with the actual runtime before enabling compilation."),
+        _=>Ok(()),
+    }
 }
 fn target(runtime: RuntimeId)->Result<(&'static str,u32)> {
     match runtime {
@@ -397,17 +410,7 @@ pub fn run_prepared_job(
         let engine=match target(document.runtime_id){Ok(v)=>Some(v),Err(e)=>{receipt.blockers.push(e.to_string());None}};
         if project.firefight.is_some(){receipt.blockers.push("Firefight rules are authored and locally simulated, but no supported game-side wave bridge has been implemented or verified. A Firefight game build is blocked.".into());}
         let tool=tool_file(tools);
-        match document.runtime_id {
-            RuntimeId::MccSteam if tools.hek_flavor.as_deref()!=Some("h1aEk") =>
-                receipt.blockers.push("MCC/H1A builds require an explicitly selected H1A Editing Kit, not classic HEK. Configure the kit generation in Settings.".into()),
-            RuntimeId::HaloCustomEdition if tools.hek_flavor.as_deref()!=Some("legacyHek") &&
-                !(tools.hek_flavor.as_deref()==Some("h1aEk") && project.active_build_target.as_ref().is_some_and(|id|
-                    project.build_targets.iter().any(|p|&p.id==id&&p.ce_compatible_tagset))) =>
-                receipt.blockers.push("CE requires classic HEK or an explicitly reviewed H1A authoring profile with a CE base tagset. Invader must build gbx-custom output.".into()),
-            RuntimeId::OpenCe|RuntimeId::ChupathingyCe =>
-                receipt.blockers.push("OpenCE / ChupathingyCE target-specific structure and runtime output have not been verified. Export sources and validate with the actual runtime before enabling compilation.".into()),
-            _ => (),
-        }
+        if let Err(problem)=authoring_preflight(project,tools,document) {receipt.blockers.push(problem.to_string());}
         if tool.is_none(){receipt.blockers.push("Halo 1 Editing Kit Tool is missing. Select the separately installed matching HEK or H1A kit folder in Settings.".into());}
         let tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
@@ -480,7 +483,12 @@ pub fn run_prepared_job(
                 "invaderEdit"=>(invader(tools,"invader-edit").unwrap(),vec!["-t".into(),stage.to_string_lossy().into_owned()]),
                 other=>return invalid(format!("Unsupported compiler command {other}")),
             };
-            args.extend(command.args.clone());
+            let mut native_args=command.args.clone();
+            if command.phase=="lightmaps" {
+                crate::native_lighting::apply(project,&stage,&sources.scenario_path,&invader(tools,"invader-edit").unwrap(),&runner,workspace)?;
+                if let Some(lighting)=crate::native_lighting::request(project){let quality=lighting.lightmap_quality();if native_args.len()!=5||native_args[0]!="lightmaps"{return invalid("Unexpected native lightmap command");}native_args[3]=quality[0].into();native_args[4]=quality[1].into();}
+            }
+            args.extend(native_args);
             if command.phase=="logic-names"&&!reviewed_new_logic_names {
                 // Only a new Tool-generated scenario may receive this bounded
                 // Sapien-style name table. Never disable editing safeguards on
@@ -541,7 +549,8 @@ pub fn run_prepared_job(
         }
         if maps::hash_file(&output)?!=inspected.sha256 {return invalid("Compiled output changed during verification; the modified artifact is rejected and the previous build is retained");}
         crate::forge_reuse::record(&directory,source_tags,&stage,&hashes,&import_hashes,tools)?;
-        let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:engine.into(),output:Some(output.clone()),sha256:Some(inspected.sha256.clone()),message:"QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.".into(),project_fingerprint:project.fingerprint()?};
+        crate::native_lighting::verify_cache(project,&output,&inspected)?;
+        let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:engine.into(),output:Some(output.clone()),sha256:Some(inspected.sha256.clone()),message:if document.native_lighting.is_some(){format!("Native sky settings, BSP lightmap references and cache structure independently verified after {} radiosity. Target-game appearance and gameplay require separate acceptance.",document.native_lighting.as_ref().unwrap().quality)}else{"QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.".into()},project_fingerprint:project.fingerprint()?};
         project::atomic_write(&directory.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
         receipt.build=Some(record);receipt.status="validated".into();Ok(())
     })();
@@ -556,6 +565,23 @@ pub fn run_prepared_job(
 #[cfg(test)]
 mod tool_generation_tests {
     use super::*;
+    #[test]
+    fn chupathingy_authoring_requires_a_reviewed_ce_profile_and_keeps_other_engines_separate() {
+        use crate::project::EngineBuildTarget;
+        let mut p=Project::new("Chupathingy authoring");
+        let mut doc=quickforge::create_arena("Owned source","smallIndoorArena").unwrap();doc.runtime_id=RuntimeId::ChupathingyCe;
+        let mut tools=ForgeToolchain{hek_flavor:Some("h1aEk".into()),..Default::default()};
+        assert!(authoring_preflight(&p,&tools,&doc).is_err());
+        let id=uuid::Uuid::new_v4().to_string();p.active_build_target=Some(id.clone());
+        p.build_targets.push(EngineBuildTarget{id,name:"CE for Chupathingy".into(),runtime_id:RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:None,hek_flavor:tools.hek_flavor.clone(),tags_directory:None,invader_directory:None,ce_compatible_tagset:true,open_sauce:false});
+        authoring_preflight(&p,&tools,&doc).unwrap();
+        tools.hek_flavor=Some("legacyHek".into());authoring_preflight(&p,&tools,&doc).unwrap();
+        p.build_targets[0].ce_compatible_tagset=false;assert!(authoring_preflight(&p,&tools,&doc).is_err());p.build_targets[0].ce_compatible_tagset=true;
+        p.build_targets[0].builder="h1a-tool".into();assert!(authoring_preflight(&p,&tools,&doc).is_err());p.build_targets[0].builder="invader-ce".into();
+        p.build_targets[0].open_sauce=true;assert!(authoring_preflight(&p,&tools,&doc).is_err());p.build_targets[0].open_sauce=false;
+        doc.runtime_id=RuntimeId::OpenCe;assert!(authoring_preflight(&p,&tools,&doc).is_err());
+        doc.runtime_id=RuntimeId::MccSteam;assert!(authoring_preflight(&p,&tools,&doc).is_err());
+    }
     #[test]
     fn native_peak_uses_the_validated_subset_not_unrelated_sdk_bytes() {
         use std::io::{Read, Write};

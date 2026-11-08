@@ -30,3 +30,11 @@ describe('bounded preview resources', () => {
     expect(previewBudgets()).toEqual(defaultPreviewBudgets);
   });
 });
+
+it('splits the saved reusable CPU limit across native responses and decoded pixels',async()=>{
+ const {nativePreviewBudget,pixelPreviewBudget}=await import('./resourceBudgets');
+ savePreviewBudgets({decodedMiB:16,textureMiB:64,warmEditors:1,inspectionMiB:16});
+ expect(nativePreviewBudget()+pixelPreviewBudget()).toBe(decodedPreviewBudget());
+ expect(previewBudgets().inspectionMiB).toBe(16);
+ expect(()=>savePreviewBudgets({...previewBudgets(),inspectionMiB:Infinity})).toThrow();
+});

@@ -1,4 +1,5 @@
-import { assertQaOutputPath } from './native-qa-storage.mjs';
+import { assertQaOutputPath, beginQaStorage } from './native-qa-storage.mjs';
+import {unzipSync} from 'three/addons/libs/fflate.module.js';
 // Opt-in private native game QA using exact publisher-verified release files.
 // Supply lawfully owned Xbox data already extracted by the runtime or another
 // reviewed source. This script never imports an ISO, downloads content or installs.
@@ -31,6 +32,7 @@ for (let at = 2; at < process.argv.length; at += 2) {
       '--native-ai',
       '--player-input',
       '--rejoin',
+      '--chupathingy-archive',
     ].includes(process.argv[at]) ||
     !process.argv[at + 1] ||
     args.has(process.argv[at])
@@ -44,12 +46,12 @@ if (
   )
 )
   throw Error(
-    'Required: --host-id pinned-id --host-dir official-release-folder --client-id pinned-id --client-dir official-release-folder --maps owned-Xbox-maps-folder --output fresh-directory [--mode bloodgulch:slayer|a30:coop|b30:coop|ce:slayer|ce:coop] [--ce-map native-cache] [--native-ai true] [--player-input bot|none] [--late-join-seconds 2..30] [--rejoin true] [--ai-symbols verified-PDB-directory --ai-details true] [--diagnostic-no-audio true]',
+    'Required: --host-id pinned-id --host-dir official-release-folder --client-id pinned-id --client-dir official-release-folder --maps owned-Xbox-maps-folder --output fresh-directory [--mode bloodgulch:slayer|a30:coop|b30:coop|ce:slayer|ce:coop] [--ce-map native-cache] [--native-ai true] [--player-input bot|none] [--late-join-seconds 2..30] [--rejoin true] [--ai-symbols verified-PDB-directory --ai-details true] [--diagnostic-no-audio true] [--chupathingy-archive pinned-v0.9.0c-ZIP]',
   );
 const hostId = args.get('--host-id'),
   clientId = args.get('--client-id'),
   mode = args.get('--mode') ?? 'bloodgulch:slayer';
-const allowed = ['opence-build-329', 'chupathingy-v0.8.1c', 'opence-build-335', 'chupathingy-v0.8.1d'];
+const allowed = ['opence-build-329', 'chupathingy-v0.8.1c', 'opence-build-335', 'chupathingy-v0.8.1d', 'chupathingy-v0.9.0c'];
 const isOpenCe = (id) => id.startsWith('opence-build-');
 if (
   ![hostId, clientId].every((id) => allowed.includes(id)) ||
@@ -101,6 +103,24 @@ publisher.clients.push(
   ),
 );
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const currentChupaId = 'chupathingy-v0.9.0c';
+if ([hostId,clientId].includes(currentChupaId) !== args.has('--chupathingy-archive'))
+  throw Error('The current Chupathingy test requires its exact publisher-pinned portable ZIP');
+if(args.has('--chupathingy-archive')) {
+  const catalog=JSON.parse(await fs.readFile(new URL('../docs/fixtures/managed-runtime-packages-20261107.json',import.meta.url),'utf8'));
+  const pin=catalog.packages.find(p=>p.id==='chupathingy'&&p.version==='v0.9.0c');
+  if(!pin?.accepted.publisherArchiveHash||!pin.accepted.archiveInspected)throw Error('Missing verified current publisher identity');
+  const file=path.resolve(args.get('--chupathingy-archive')),info=await fs.lstat(file);
+  if(!info.isFile()||info.isSymbolicLink()||info.size!==pin.bytes||info.size>64*1024**2)throw Error('Publisher archive size/type differs');
+  const bytes=await fs.readFile(file);if(hash(bytes)!==pin.sha256)throw Error('Publisher archive SHA-256 differs');
+  let total=0,count=0;
+  const entries=unzipSync(bytes,{filter:entry=>{total+=entry.originalSize;if(++count>128||total>128*1024**2)throw Error('Publisher inventory exceeds bounds');return true;}});
+  const files=Object.entries(entries).map(([name,content])=>({name,bytes:content.length,sha256:hash(content)}));
+  if(files.some(p=>!p.name||p.name.split('/').some(s=>!s||s==='.'||s==='..'||! /^[A-Za-z0-9_. -]+$/.test(s))))throw Error('Publisher archive contains an unsafe member');
+  if(files.find(p=>p.name===pin.executable)?.sha256!==pin.executableSha256)throw Error('Publisher executable identity differs');
+  publisher.clients.push({id:currentChupaId,release:pin.version,releaseUrl:pin.releasePage,archiveSha256:pin.sha256,publisherDigestVerified:true,executable:pin.executable,files});
+}
+
 const aiDetails = args.get('--ai-details') === 'true';
 if (
   args.has('--ai-details') &&
@@ -177,6 +197,7 @@ const plan = {
       HALO_DISCORD_APPLICATION: '',
       HALO_UPDATE_AUTO: 'false',
       HALO_CRASH_REPORTS: 'no',
+      HALO_MOVE_OLD_MAP_FOLDERS: 'no',
     },
     chupathingyAdditionalEnvironment: {
       HALO_NET_COPY_TO_CLIPBOARD: 'false',
@@ -202,6 +223,7 @@ const expected = {
   'chupathingy-v0.8.1c': 'bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a',
   'opence-build-335': '788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0',
   'chupathingy-v0.8.1d': 'b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4',
+  [currentChupaId]: publisher.clients.find(p=>p.id===currentChupaId)?.files.find(p=>p.name==='chupathingy.exe')?.sha256,
 };
 const report = {
   schemaVersion: 1,
@@ -223,13 +245,14 @@ const report = {
     ? { customEditionMap: ceMap, compatibilityDeployment: true, nativeCompilationPerformedByRunner: false }
     : {}),
 };
+const finishStorage=await beginQaStorage(output,{workflow:'community-runtime-native',appSha256:expected[hostId],reservationBytes:3*1024**3});
 const children = [];
 const completions = [];
 const abortedChildren = new Set();
 async function launch(role, id, instance = role) {
   const root = path.join(output, instance),
     client = path.resolve(args.get(role === 'host' ? '--host-dir' : '--client-dir'));
-  await fs.mkdir(await assertQaOutputPath(root));
+  await finishStorage.createScratch(instance);
   await fs.mkdir(path.join(root, 'data'));
   await fs.mkdir(path.join(root, 'data', 'maps'));
   const reusedProfile = [];
@@ -291,7 +314,7 @@ async function launch(role, id, instance = role) {
     await fs.copyFile(original, target, fs.constants.COPYFILE_EXCL);
     if (hash(await fs.readFile(target)) !== known.sha256) throw Error('Copied publisher member differs');
   }
-  const executable = path.join(root, 'halo.exe');
+  const executable = path.join(root, release.executable??'halo.exe');
   if (hash(await fs.readFile(executable)) !== expected[id]) throw Error('Release EXE identity differs');
   const inputs = [];
   for (const file of extraction.files.filter(
@@ -367,6 +390,7 @@ async function launch(role, id, instance = role) {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   children.push(child);
+  await finishStorage.trackProcess(child);
   const record = {
     instance,
     ...(reusedProfile.length ? { reusedProfile } : {}),
@@ -561,12 +585,30 @@ for (const file of extraction.files) {
 }
 if (aiObserver && hash(await fs.readFile(aiObserver.executable)) !== aiObserver.sha256)
   report.errors.push('Native observer changed during execution');
+report.originalRuntimeFiles=[];
+for(const [id,folder]of [[hostId,args.get('--host-dir')],[clientId,args.get('--client-dir')]]){
+  for(const known of publisher.clients.find(entry=>entry.id===id).files){
+    const file=path.join(path.resolve(folder),...known.name.split('/'));
+    if(report.originalRuntimeFiles.some(row=>row.path===file))continue;
+    const unchanged=hash(await fs.readFile(file))===known.sha256;
+    report.originalRuntimeFiles.push({path:file,sha256:known.sha256,unchanged});
+    if(!unchanged)report.errors.push('Original runtime member changed: '+known.name);
+  }
+}
+report.originalRuntimeFilesUnchanged=report.originalRuntimeFiles.every(row=>row.unchanged);
 report.originalInputMapsUnchanged = !report.errors.some((error) =>
   error.startsWith('Original input map changed:'),
 );
 await fs.writeFile(path.join(output, 'execution.json'), JSON.stringify(report, null, 2) + '\n', {
   flag: 'wx',
 });
+for(const record of report.executed){
+  for(const relative of ['stdio.log','logs/debug.txt','ai-observer.ndjson','ai-observer.stderr.log']){
+    const file=path.join(output,record.instance,relative),info=await fs.lstat(file).catch(()=>null);
+    if(info?.isFile()&&!info.isSymbolicLink()&&info.size<=8*1024**2)await finishStorage.retain(file,'Bounded native engine diagnostics; map/binary/profile scratch is disposable');
+  }
+}
+await finishStorage(report.errors.length?'failed':'passed');
 if (report.errors.length) throw Error(report.errors.join('; '));
 console.log(
   JSON.stringify({

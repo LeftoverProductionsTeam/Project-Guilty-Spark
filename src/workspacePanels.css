@@ -28,13 +28,13 @@
   display: flex;
   gap: 2px;
   min-width: 0;
-  overflow-x: auto;
+  flex-wrap: wrap;
   scrollbar-width: none;
 }
 .gs-panel-buttons::-webkit-scrollbar { display: none; }
 .gs-panel-overflow { flex: none; }
 .gs-panel-overflow > summary { cursor: pointer; font-size: 11px; padding: 5px 6px; border-radius: 6px; }
-.gs-panel-overflow > div { position: absolute; right: 8px; top: var(--gs-tools-height); z-index: 105; display: grid; gap: 2px; min-width: 190px; max-height: min(70vh,520px); overflow: auto; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px #0006; }
+.gs-panel-overflow > div { position: absolute; right: 8px; top: var(--gs-tools-height); z-index: 105; display: grid; gap: 2px; min-width: 190px; max-height: none; overflow: visible; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px #0006; }
 .gs-panel-overflow [role='menuitemcheckbox'] { padding: 7px 12px; text-align: left; background: transparent; border: 0; }
 .gs-panel-overflow [aria-checked='true'] { box-shadow: inset 2px 0 var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .gs-panel-buttons button,
@@ -132,7 +132,7 @@
 .gs-view-menu{position:relative;}
 .gs-view-menu>summary{white-space:nowrap;list-style:none;}
 .gs-view-menu>summary::-webkit-details-marker{display:none;}
-.gs-view-menu>div{top:calc(100% + 7px);right:0;width:min(320px,calc(100vw - 28px));max-height:calc(100vh - 70px);overflow:auto;padding:8px;}
+.gs-view-menu>div{top:calc(100% + 7px);right:0;width:min(320px,calc(100vw - 28px));max-height:none;overflow:visible;padding:8px;}
 .gs-view-commands{display:grid;gap:3px;padding-bottom:6px;border-bottom:1px solid var(--line);}
 .application .gs-view-commands>button{display:flex;align-items:center;gap:7px;width:100%;padding:6px 8px;text-align:left;border:0;background:transparent;box-shadow:none;}
 .gs-view-commands>button>span{flex:1;}
@@ -276,8 +276,9 @@
 .gs-panel-content {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-  padding: 10px;
+  overflow: clip;
+  display:flex;flex-direction:column;
+  padding: 8px;
 }
 .gs-panel-content > .panel {
   width: auto !important;
@@ -823,3 +824,27 @@ html[data-gs-fullscreen='true'] .gs-window-actions .gs-window-button { height:26
 .gs-full-catalogs a {padding:6px 9px;border-radius:7px;background:var(--panel);}
 .gs-map-file-advisor p.subtle {display:block;}
 .gs-map-file-advisor p.subtle code {display:inline;}
+
+/* Control pages keep existing components mounted and every command reachable. */
+.application .gs-navigation-drawer{width:min(620px,calc(100vw - 24px));max-width:none;display:flex;flex-direction:column;}
+.application .gs-navigation-drawer>nav{display:flex;flex:1;min-height:0;overflow:visible;}
+.gs-nav-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;}
+.gs-navigation-drawer :is(.sidebar-project,.sidebar-label,.sidebar-footer){flex:none;}
+.gs-navigation-drawer .nav-item{min-height:27px;padding-block:4px;}
+.gs-panel-content>.gs-paged-surface{width:100%;}
+.gs-page-body>.analysis-page{width:100%;max-width:1920px;margin-inline:auto;}
+.gs-page-body>.settings-page{max-height:none;overflow:visible;}
+.application .gs-file-menu .gs-page-body>[role=group]{display:grid;gap:2px;border-bottom:1px solid var(--line);padding-bottom:4px;}
+.gs-tools-menu .gs-page-body>section{display:grid;gap:2px;}
+@media(max-width:900px){.application .gs-navigation-drawer{width:min(540px,calc(100vw - 24px));}.gs-nav-groups{gap:4px 8px;}}
+
+
+.gs-tools-menu .gs-page-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px;}
+.gs-tools-menu .gs-tools-window-command{grid-column:1/-1;}
+
+.gs-workspace-content{transition:padding 160ms ease-out;box-sizing:border-box;}
+html[data-gs-reduced-motion='true'] .gs-workspace-content{transition:none;}
+@media(prefers-reduced-motion:reduce){.gs-workspace-content{transition:none;}}
+
+/* Docked surfaces share the actual available rectangle, including short windows. */
+.gs-workspace-panel:not([data-dock='float']){min-width:0;min-height:0;}

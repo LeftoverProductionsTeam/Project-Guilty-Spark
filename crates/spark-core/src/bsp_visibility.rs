@@ -183,6 +183,35 @@ pub fn portals_intersect(a: &[Point; 4], b: &[Point; 4]) -> bool {
     x.max(y).min(1.)-x.min(y).max(0.)>1e-6
 }
 
+/// A portal follows the actual closed air volume, not a rectangle guessed from
+/// world bounds. Parallel road/ridge spaces can overlap and need one full cut.
+#[derive(Debug)]
+pub(crate) struct SourcePortal {
+    pub points: Vec<Point>,
+    pub triangles: Vec<[usize; 3]>,
+}
+pub(crate) fn clipped_portal(space:&manifold_rust::manifold::Manifold, center:Point, direction:Point, probe_height:f64)->Result<SourcePortal>{
+    use manifold_rust::linalg::{Vec2,Vec3};
+    let length=direction[0].hypot(direction[1]);
+    if !length.is_finite()||length<0.5||center.iter().any(|v|!v.is_finite())||!probe_height.is_finite()||probe_height<=0. {return invalid("Invalid native visibility section");}
+    let normal=[direction[0]/length,direction[1]/length,0.];let side=[-normal[1],normal[0],0.];
+    let local=space.translate(Vec3::new(-center[0],-center[1],-center[2])).rotate(0.,0.,-direction[1].atan2(direction[0]).to_degrees()).rotate(0.,90.,0.);
+    let polygons=local.slice(0.).to_polygons();
+    if polygons.len()>256||polygons.iter().map(Vec::len).sum::<usize>()>4096 {return invalid("Native visibility section exceeds its bounded source complexity");}
+    let area=|p:&Vec<Vec2>|p.iter().zip(p.iter().cycle().skip(1)).map(|(a,b)|a.x*b.y-b.x*a.y).sum::<f64>()*0.5;
+    let contains=|p:&Vec<Vec2>,point:Vec2|{let mut inside=false;for(a,b)in p.iter().zip(p.iter().cycle().skip(1)){if (a.y>point.y)!=(b.y>point.y)&&point.x<(b.x-a.x)*(point.y-a.y)/(b.y-a.y)+a.x{inside=!inside;}}inside};
+    let probe=Vec2::new(probe_height,0.);
+    let outer=polygons.iter().filter(|p|area(p)>0.&&contains(p,probe)).min_by(|a,b|area(a).total_cmp(&area(b))).ok_or_else(||crate::SparkError::Invalid("Visibility cut has no closed air section at the route; move the handle away from walls or junctions".into()))?;
+    let mut selected=vec![outer.clone()];
+    for hole in polygons.iter().filter(|p|area(p)<0.&&p.first().is_some_and(|point|contains(outer,*point))){if contains(hole,probe){return invalid("Visibility cut lies inside a structural obstruction");}selected.push(hole.clone());}
+    let flat:Vec<_>=selected.iter().flatten().copied().collect();
+    let points:Vec<Point>=flat.iter().map(|p|[center[0]+side[0]*p.y,center[1]+side[1]*p.y,center[2]+p.x]).collect();
+    if points.iter().flatten().any(|v|!v.is_finite()||v.abs()>2048.){return invalid("Native portal leaves the supported world bounds");}
+    let triangles=manifold_rust::polygon::triangulate(&selected,1e-8,false).into_iter().map(|t|[t.x as usize,t.y as usize,t.z as usize]).collect::<Vec<_>>();
+    if triangles.is_empty()||triangles.iter().flatten().any(|&i|i>=points.len()){return invalid("Closed native visibility section could not be triangulated");}
+    Ok(SourcePortal{points,triangles})
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +280,24 @@ mod tests {
             &points
         )
         .is_err());
+    }
+}
+
+#[cfg(test)] mod native_section_tests {
+    use super::*;use manifold_rust::{manifold::Manifold,linalg::Vec3};
+    fn area(surface:&SourcePortal)->f64 {surface.triangles.iter().map(|ids|{let [a,b,c]=ids.map(|i|surface.points[i]);((b[1]-a[1])*(c[2]-a[2])-(b[2]-a[2])*(c[1]-a[1])).abs()*0.5}).sum()}
+    #[test] fn shared_road_ridge_portal_reaches_the_complete_closed_boundary(){
+        let road=Manifold::cube(Vec3::new(12.,6.,10.),false).translate(Vec3::new(0.,-3.,0.));
+        let ridge=Manifold::cube(Vec3::new(12.,4.,8.),false).translate(Vec3::new(0.,-5.,0.));
+        let joined=road.union(&ridge);let cut=clipped_portal(&joined,[6.,0.,0.],[1.,0.,0.],0.8).unwrap();
+        assert!(cut.points.iter().all(|p|(p[0]-6.).abs()<1e-8));assert!((area(&cut)-76.).abs()<1e-7);
+        assert!(cut.points.iter().any(|p|(p[1]+5.).abs()<1e-8));assert!(cut.points.iter().any(|p|(p[2]-8.).abs()<1e-8));
+    }
+    #[test] fn independent_cave_cut_does_not_include_an_unrelated_outdoor_region(){
+        let road=Manifold::cube(Vec3::new(12.,6.,10.),false).translate(Vec3::new(0.,-3.,0.));
+        let cave=Manifold::cube(Vec3::new(12.,2.,2.),false).translate(Vec3::new(0.,10.,0.));
+        let joined=road.union(&cave);let cut=clipped_portal(&joined,[6.,11.,0.],[1.,0.,0.],0.8).unwrap();
+        assert!((area(&cut)-4.).abs()<1e-7);assert!(cut.points.iter().all(|p|p[1]>=10.-1e-8&&p[1]<=12.+1e-8));
+        assert!(clipped_portal(&joined,[6.,7.,0.],[1.,0.,0.],0.8).is_err());
     }
 }

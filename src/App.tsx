@@ -1,3 +1,5 @@
+import {releaseNativePreviewResources} from './nativePreviewResources';
+import PagedSurface from './components/PagedSurface';
 import {PREFERRED_RUNTIME} from './runtimeWorkbench';
 import {cycleWorkArea,hasKeyboardDialog,navigateComposite} from './keyboardNavigation';
 import { retainAssetSource } from './assetSources';
@@ -80,6 +82,7 @@ import {createEmitter,emptySoundScene} from './spatialAudio';
 import { browserBootstrap, call, native } from './api';
 import { applyInterfacePreferences, readInterfacePreferences, saveInterfacePreferences, INTERFACE_STORAGE_KEY } from './interfacePreferences';
 import type { CueName, LocalCueReference } from './interfacePreferences';
+import {useInterfaceScale} from './useInterfaceScale';
 import { UiCuePlayer } from './uiCuePlayer';
 import { pinOwnedInterfaceBitmap, matchesOwnedInterfaceBitmap, decodeBoundedInterfaceBitmap } from './ownedInterfaceBitmap';
 import type { OwnedBitmapPreview } from './ownedBitmapPreview';
@@ -167,6 +170,8 @@ export default function App() {
     setClosePrompt(projects.map(project=>project.title));return new Promise(resolve=>{closeChoice.current=resolve;});
   },[]);
   const windowWritersRef=useRef(windowWriters);windowWritersRef.current=windowWriters;
+  const previewProjects=useRef(new Set<string>());
+  useEffect(()=>{const next=new Set(documents.documents.map(doc=>doc.id));for(const id of previewProjects.current)if(!next.has(id))releaseNativePreviewResources(id);previewProjects.current=next;},[documents.documents]);
   const resourceIdentities=JSON.stringify(documents.documents.map(d=>[d.id,textureResourceScope(d.history.current?.source)]));
   useEffect(()=>{for(const doc of documents.documents){if(doc.history.current)publishTextureResources(doc.history.current);}},[resourceIdentities]);
   const activeMap=activeDocument(documents),history=activeMap?.history??{...initialHistory,limit:documents.limit};
@@ -197,6 +202,8 @@ export default function App() {
   const [focusTagId, setFocusTagId] = useMapState<number | null>(activeMap?.id??'no-map','tags.focus',null);
   useEffect(()=>{if(activeMap&&mapWorkspaces.includes(workspace))writeMapSession(activeMap.id,'workspace',workspace);},[activeMap?.id,workspace]);
   const [interfacePreferences, setInterfacePreferences] = useState(readInterfacePreferences);
+  const uiScaleStatus=useInterfaceScale(interfacePreferences.uiScale);
+  useEffect(()=>{if(!native)return;const update=()=>{void call('set_inspection_cache_budget',{bytes:(previewBudgets().inspectionMiB??256)*1024**2}).catch(()=>{});};update();window.addEventListener('spark-preview-budgets',update);const changed=(event:StorageEvent)=>{if(event.key==='spark.previewBudgets.v1')update();};window.addEventListener('storage',changed);return()=>{window.removeEventListener('spark-preview-budgets',update);window.removeEventListener('storage',changed);};},[]);
   const interfacePreferencesRef = useRef(interfacePreferences);
   interfacePreferencesRef.current = interfacePreferences;
   const audioPlayer = useRef<UiCuePlayer | null>(null);
@@ -257,6 +264,7 @@ export default function App() {
   const [runtimeChoice,setDependencyRuntime]=useMapState<RuntimeId|null>(current?.id??'global','hosting.runtime',ready?(current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??PREFERRED_RUNTIME):null);
   const dependencyRuntime=runtimeChoice??data.settings.preferredHalo??PREFERRED_RUNTIME;
   function openDependencySetup(){setSettingsTab('dependencies');setWorkspace('settings');}
+  function openCommunityFlavorSetup(flavor:import('./runtimeWorkbench').OpenCeFlavor){writeMapSession(current?.id??'global','hosting.runtime','openCe');writeMapSession('global','tools.dashboard','setup');writeMapSession('global','tools.enginePackage',flavor);writeMapSession('global','tools.downloadOpen',true);setDependencyRuntime('openCe');setSettingsTab('tools');setWorkspace('settings');}
   function selectSettingsTab(tab:WorkflowRoute['settingsTab']){setSettingsTab(tab);setWorkspace('settings');}
   const [ownedHeaderArt,setOwnedHeaderArt] = useState<{url:string;tagId:number}|null>(null);
   const [ownedHeaderLoading,setOwnedHeaderLoading] = useState(false);
@@ -1234,8 +1242,8 @@ export default function App() {
       </div>
     </Empty>
   );
-  function forgeView(project:Project|null,map?:MapDocument){return <QuickForge library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project?.id??'new'} project={project} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(project!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={()=>save(false,project?.id)} onBuild={buildQuickForge} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(map?.savedRevision??0)} dirty={map?.history.dirty??false}/>;}
-  function sourceView(map?:MapDocument){const project=map?.history.current;return project?.quickForge?forgeView(project,map):project?<Suspense fallback={<div className="loading">Loading map viewer…</div>}><World library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project.id} project={project} inspection={map.inspection} assetMeshes={map.meshes} edit={edit} notify={notice} onSelectMap={id=>{void openProject(id,'quickforge');}} onBeforeResources={()=>save(false,project.id)} onResourcesConnected={applyResourceMetadata} onDetachTags={detachTagPanel} onOpenTag={(tagId,sourceId)=>{const owner=sourceId??project.id;writeMapSession(owner,'tags.focus',tagId);dispatchDocument({type:'select',id:owner});setFocusTagId(tagId);setWorkspace('tags');}}/></Suspense>:forgeView(null);}
+  function forgeView(project:Project|null,map?:MapDocument){return <QuickForge library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project?.id??'new'} project={project} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(project!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={persist=>save(persist===true,project?.id)} onBuild={buildQuickForge} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(map?.savedRevision??0)} dirty={map?.history.dirty??false}/>;}
+  function sourceView(map?:MapDocument){const project=map?.history.current;return project?.quickForge?forgeView(project,map):project?<Suspense fallback={<div className="loading">Loading map viewer…</div>}><World library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project.id} project={project} inspection={map.inspection} assetMeshes={map.meshes} edit={edit} notify={notice} onSelectMap={id=>{void openProject(id,'quickforge');}} onBeforeResources={persist=>save(persist===true,project.id)} onBakeBuild={startBuild} onResourcesConnected={applyResourceMetadata} onDetachTags={detachTagPanel} onOpenTag={(tagId,sourceId)=>{const owner=sourceId??project.id;writeMapSession(owner,'tags.focus',tagId);dispatchDocument({type:'select',id:owner});setFocusTagId(tagId);setWorkspace('tags');}}/></Suspense>:forgeView(null);}
   async function openRecordingDirector(){const project=historyRef.current.current;if(!project)return;try{await save();window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:project.id}));let session=await call<import('./directorSession').DirectorSession>('director_session',{projectId:project.id});if(session.revision===0){const pose=readMapSession<{position:number[];target?:number[];quaternion:number[]}|null>(project.id,'camera.world.PerspectiveCamera',null);if(pose?.position.length===3&&pose.quaternion?.length===4){const[x,y,z,w]=pose.quaternion,p=pose.position,target=pose.target??[p[0]-2*(x*z+w*y),p[1]-2*(y*z-w*x),p[2]-(1-2*(x*x+y*y))];session=await call('director_update',{projectId:project.id,revision:session.revision,composition:{...session.composition,pose:{position:p,lookAt:target,fov:55,roll:0}},save:true});}}await call('director_popout',{projectId:project.id});setDockedDirector(false);if(workspace==='machinima')setWorkspace('world');notice('Recording Director opened. Use its display selector or drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   function libraryView(){return (<Library
           data={data}
@@ -1266,7 +1274,7 @@ export default function App() {
     return [...visitedWorkspaces.current].map(([key,view])=>{
       const map=view.projectId?documents.documents.find(d=>d.id===view.projectId):activeMap;
       return <RetainedLevelView key={key} id={`workspace:${key}`} active={!inLevelEditor&&otherKey===key} graphicsResident={warm.has(key)}>
-        <Suspense fallback={<div className="loading">Opening workspace…</div>}><WorkspaceSession id={view.projectId??'global'} workspace={view.workspace}>{workspaceContent(view.workspace,map)}</WorkspaceSession></Suspense>
+        <Suspense fallback={<div className="loading">Opening workspace…</div>}><WorkspaceSession id={view.projectId??'global'} workspace={view.workspace}>{['machinima','assets','tags','settings','interface','compare'].includes(view.workspace)?workspaceContent(view.workspace,map):<PagedSurface name={view.workspace} label={view.workspace+' workspace'} scope={view.projectId??'global'} fill>{workspaceContent(view.workspace,map)}</PagedSurface>}</WorkspaceSession></Suspense>
       </RetainedLevelView>;
     });
   }
@@ -1293,11 +1301,11 @@ export default function App() {
     // a hidden editor to whichever map happens to be active in this window.
     const workspace=target,current=map?.history.current??null,inspection=map?.inspection??null,meshes=map?.meshes??{},history=map?.history??{...initialHistory,limit:documents.limit},activeMap=map;
     if (workspace === 'learning') return <LearningCenter project={current} inspection={inspection} settings={data.settings} section={learningSection} onSection={setLearningSection} navigate={setWorkspace}/>;
-    if (workspace === 'get-started') return <GettingStarted data={data} project={current} onApply={applySettings} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
+    if (workspace === 'get-started') return <GettingStarted onSetupFlavor={openCommunityFlavorSetup} onWalkthrough={()=>setInterfacePreferences(previous=>({...previous,walkthroughEnabled:true}))} data={data} project={current} onApply={applySettings} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
     if (workspace === 'features') return <Features project={current} openMaps={documents.documents.length} navigate={setWorkspace}/>;
     if (workspace === 'community') return <CommunityThanks/>;
     if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onImportConvert={()=>void importFiles(undefined,'build')} currentMapTitle={current?.source?current.title:null} onConvertCurrent={()=>setWorkspace('build')} onLibrary={()=>setWorkspace('library')} busy={busy} onDownloaded={openDownloadedMaps} targetLabel={data.settings.preferredHalo==='mccSteam'||!data.settings.preferredHalo?'MCC Halo 1':data.settings.preferredHalo}/>;
-    if (workspace === 'interface' || workspace === 'settings' && settingsTab === 'interface') return <SettingsPanel tab="interface" onTab={selectSettingsTab}><InterfaceStudio
+    if (workspace === 'interface' || workspace === 'settings' && settingsTab === 'interface') return <SettingsPanel tab="interface" onTab={selectSettingsTab}><InterfaceStudio scaleStatus={uiScaleStatus}
       preferences={interfacePreferences} onChange={setInterfacePreferences} onPreview={playInterfaceCue}
       homeModelSettings={<ShowcaseChoice data={data}/>}
       bitmapTags={matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection) || (!bitmapPreference && !!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase())
@@ -1374,7 +1382,7 @@ export default function App() {
       case 'preservation':
         return <Preservation project={current} inspection={inspection} edit={edit} onBeforeSave={save} onRestore={load} />;
       case 'build':
-        return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(current!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(activeMap?.savedRevision??0)} dirty={history.dirty} /> : current.source ? (
+        return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(current!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={persist=>save(persist===true,current.id)} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(activeMap?.savedRevision??0)} dirty={history.dirty} /> : current.source ? (
           <Build
             key={current.id}
             edit={edit}
@@ -1418,7 +1426,7 @@ export default function App() {
   return (
     <>
       <div className="gs-window-content" onKeyDown={navigateComposite}>
-        <div className="application gs-drawers" data-panel-window={requestedPanel(location.search,workspace)??undefined} inert={closing || undefined} onWheelCapture={event=>{const field=event.target;if(field instanceof HTMLInputElement&&field.type==='number'&&document.activeElement===field)field.blur();}}>
+        <div className="application gs-drawers" data-navigation-open={sidebarOpen} data-panel-window={requestedPanel(location.search,workspace)??undefined} inert={closing || undefined} onWheelCapture={event=>{const field=event.target;if(field instanceof HTMLInputElement&&field.type==='number'&&document.activeElement===field)field.blur();}}>
           <header
             id="gs-window-header"
             className="app-header gs-compact-header"
@@ -1480,7 +1488,7 @@ export default function App() {
                 onSetup={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}}
                 onOpen={id=>{void openStudioProject(id);}}
               />
-              <HeaderRuntime value={dependencyRuntime} onChange={id=>{setDependencyRuntime(id);void applySettings({...data.settings,preferredHalo:id}).catch(()=>{});}}/>
+              <HeaderRuntime onSetupFlavor={openCommunityFlavorSetup} value={dependencyRuntime} onChange={id=>{setDependencyRuntime(id);void applySettings({...data.settings,preferredHalo:id}).catch(()=>{});}}/>
               <button
                 className="gs-header-find"
                 title="Search all Spark tools and workspaces (Ctrl+K)"
@@ -1508,7 +1516,7 @@ export default function App() {
             }}
           >
             <div className="sidebar-label gs-nav-heading"><strong className="gs-current-workspace" aria-label="Current workspace" aria-live="polite" title={`Current workspace: ${orbWorkspaceTitle}`}>{orbWorkspaceTitle}</strong><button aria-label="Open work & recent places" onClick={()=>{setSidebarOpen(false);window.dispatchEvent(new Event('gs:open-work'));}}>Open work</button></div>
-            <nav aria-label="Workspaces">
+            <nav aria-label="Workspaces"><PagedSurface name="navigation" label="Workspaces" maxHeight={620} reserveBottom={145}><div className="gs-nav-groups">
               {navGroups.map(([group, ids]) => (
                 <div className={`gs-nav-group${group==='Home & first setup'?' gs-nav-home':''}`} key={group}>
                   <div className="sidebar-label">{group}</div>
@@ -1537,7 +1545,7 @@ export default function App() {
                     ))}
                 </div>
               ))}
-            </nav>
+            </div></PagedSurface></nav>
             <div className="sidebar-project">
               <div className="sidebar-label">CURRENT PROJECT</div>
               {current ? (
@@ -1782,6 +1790,8 @@ export default function App() {
                   <WorkspacePanel id="help" label="Help">
                     <WorkbenchGuide
                       key={workspace}
+                      walkthroughEnabled={interfacePreferences.walkthroughEnabled}
+                      onWalkthroughChange={enabled=>setInterfacePreferences(previous=>({...previous,walkthroughEnabled:enabled}))}
                       workspace={workspace}
                       evidence={{
                         desktop: native,

@@ -5,6 +5,7 @@ export interface NativeSurfacePick {
   shaderTagId: number;
   triangle: number;
   point: Vec3;
+  edge?:{vertices:[Vec3,Vec3];point:Vec3};
 }
 /** Select only an attributed triangle of the displayed native BSP. Rebased
  * material spans retain their original BSP identity; selection grants no

@@ -49,6 +49,8 @@ pub struct QuickForgeDocument {
     pub sky_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<EditorEnvironment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_lighting:Option<crate::native_lighting::NativeLighting>,
     #[serde(default = "draft")]
     pub build_quality: String,
 }
@@ -489,6 +491,7 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
         safe_relative(sky)?;
     }
     if let Some(environment) = &doc.environment { environment.validate()?; }
+    if let Some(lighting)=&doc.native_lighting {lighting.validate()?;if doc.sky_path.as_deref()!=Some(lighting.sky_path.as_str()){return invalid("Native lighting sky differs from the document sky; apply lighting again after changing sky");}}
     for b in &doc.geometry {
         if !finite(&b.position)
             || !finite(&b.rotation)
@@ -605,6 +608,7 @@ pub fn create_arena(name: &str, template: &str) -> Result<QuickForgeDocument> {
         objectives: vec![],
         sky_path: None,
         environment: None,
+        native_lighting:None,
         build_quality: draft(),
     };
     if ["customBlank", "blank"].contains(&template) {
@@ -1967,7 +1971,7 @@ pub fn source_requirements(doc: &QuickForgeDocument) -> Result<(Vec<ForgeDepende
             ));
         }
     }
-    if doc.environment.as_ref().is_some_and(|env| env != &EditorEnvironment::default()) {
+    if doc.native_lighting.is_none()&&doc.environment.as_ref().is_some_and(|env| env != &EditorEnvironment::default()) {
         blockers.push("The custom environment preview has NOT been applied to Halo sky/fog tags or radiosity; compile and verify authored lighting before claiming gameplay parity".into());
     }
     if let Some(path) = &doc.sky_path {

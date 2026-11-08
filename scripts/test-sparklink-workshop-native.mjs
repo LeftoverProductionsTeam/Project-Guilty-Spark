@@ -67,6 +67,7 @@ async function start(a, restart = false) {
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     },
   });
+  await finishStorage.trackProcess(a.child);
   await fs.writeFile(
     path.join(a.dir, restart ? 'restarted-process.json' : 'process.json'),
     JSON.stringify({ pid: a.child.pid, port }),
@@ -138,7 +139,7 @@ async function start(a, restart = false) {
     const { scriptSource: code } = await debuggerSession.send('Debugger.getScriptSource', {
       scriptId: script.scriptId,
     });
-    const file = path.join('dist', new URL(url).pathname.replace(/^\//, ''));
+    const file = path.join(process.env.SPARK_FRONTEND_DIST??'dist', new URL(url).pathname.replace(/^\//, ''));
     served.push({ file, sha256: hash(code), localSha256: await fileHash(file) });
     expect(hash(code)).toBe(await fileHash(file));
   }
@@ -152,17 +153,18 @@ async function start(a, restart = false) {
 async function actor(slug) {
   const dir = path.join(root, slug),
     data = path.join(dir, 'library');
+  await finishStorage.createScratch(slug);
   await fs.mkdir(data, { recursive: true });
   const a = { slug, dir, data, exe: path.join(dir, 'GuiltySpark-C48-qa.exe') };
   actors.push(a);
   await fs.copyFile(app, a.exe, fs.constants.COPYFILE_EXCL);
-  await finishStorage.registerDisposable(a.exe);
   await start(a);
   return a;
 }
 async function panel(a) {
-  if (!(await a.page.getByRole('button', { name: 'Close SparkLink', exact: true }).isVisible()))
+  if (!(await a.page.getByRole('button', { name: 'Close SparkLink', exact: true }).isVisible())) {
     await openStudioMenu(a.page);await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  }
   a.panel = a.page.locator('.studio-panel');
   await expect(a.panel).toBeVisible();
   if (!(await a.panel.evaluate((el) => el.open))) await a.panel.locator(':scope > summary').click();
@@ -280,7 +282,7 @@ async function uiName(a, index, name) {
   const close = a.page.getByRole('button', { name: 'Close SparkLink', exact: true });
   if (await close.isVisible()) await close.click();
   await select(a, index);
-  const input = a.page.locator('.bsp-source-fields').getByRole('textbox', { name: 'Name', exact: true });
+  const input = a.page.locator('.bsp-source-fields').getByRole('textbox', { name: 'Volume name', exact: true });
   await input.fill(name);
   // Background native WebViews share one physical keyboard focus on this PC.
   // Trigger the real blur handler explicitly; no IPC/document mock is used.
@@ -346,7 +348,7 @@ try {
   const details = a.page
     .locator('.bsp-source-fields details')
     .filter({ has: a.page.locator('summary', { hasText: 'Halo material paths & player starts' }) });
-  await details.locator('summary').click();
+  await details.locator(':scope > summary').click();
   const shader = a.page.getByRole('textbox', { name: 'Shader path surface', exact: true });
   await shader.fill('levels/test/tutorial/shaders/example_tutorial_metal_floor');
   await shader.press('Tab');
@@ -364,7 +366,7 @@ try {
   await sky.fill('levels/test/bloodgulch/bloodgulch');
   await sky.press('Tab');
   await expect(a.page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
-  await details.locator('summary').click();
+  await details.locator(':scope > summary').click();
   const portals = a.page
     .locator('.bsp-source-fields details')
     .filter({ has: a.page.locator('summary', { hasText: 'Doorway portal' }) });
@@ -436,13 +438,45 @@ try {
   current = await view(a);
   await converge(current);
   await mark('participantSpecificBspUndoRedo');
+  // Real source recipes cross three independent native processes. This phase
+  // checks collaboration, not radiosity or gameplay (accepted separately).
+  const lightingBase=await view(a),recipe={skyPath:lightingBase.document.skyPath,quality:'draft',environment:{previewEnabled:true,skyColor:[0.05,0.1,0.13],ambientColor:[0.7,0.8,0.9],ambientIntensity:0.5,sunColor:[1,0.9,0.8],sunIntensity:2,sunAzimuth:-35,sunElevation:50,fogEnabled:false,fogColor:[0.3,0.4,0.5],fogNear:25,fogFar:180}};
+  expect(recipe.skyPath).toBe('levels/test/bloodgulch/bloodgulch');
+  current=(await update(a,lightingBase,d=>{d.nativeLighting=recipe;})).next;
+  const acceptedLighting=clone(current.document.nativeLighting);
+  await converge(current);
+  current=(await update(b,current,d=>{d.workshop.brushes[1].name='Room B after lighting';})).next;
+  const peerBrush=clone(current.document.workshop.brushes[1]);
+  current=await a.call('forge_session_reverse',{projectId:a.id,sessionId:a.session,operationId:crypto.randomUUID(),redo:false});
+  expect(current.document.nativeLighting).toBeUndefined();
+  expect(current.document.workshop.brushes[1]).toEqual(peerBrush);await converge(current);
+  current=await a.call('forge_session_reverse',{projectId:a.id,sessionId:a.session,operationId:crypto.randomUUID(),redo:true});
+  expect(current.document.nativeLighting).toEqual(acceptedLighting);
+  expect(current.document.workshop.brushes[1]).toEqual(peerBrush);await converge(current);
+  const beforeCompeting=current;
+  current=(await update(c,current,d=>{d.nativeLighting.environment.ambientIntensity=0.75;})).next;
+  await expect(update(a,beforeCompeting,d=>{delete d.nativeLighting;})).rejects.toThrow(/nativeLighting|conflict/i);
+  expect((await view(a)).document).toEqual(current.document);await converge(current);
+  current=(await update(a,current,d=>{delete d.nativeLighting;})).next;
+  expect(current.document.nativeLighting).toBeUndefined();await converge(current);
+  await Promise.all(actors.map(x=>save(x,current.document)));
+  for(const x of actors){
+    await expect.poll(async()=>(await x.call('read_workspace_history',{projectId:x.id})).history?.head.dirty).toBe(false);
+    const savedHistory=(await x.call('read_workspace_history',{projectId:x.id})).history;
+    for(const snapshot of savedHistory.snapshots){const doc=snapshot.project.quickForge;if(doc?.nativeLighting)expect(doc.nativeLighting.skyPath).toBe(doc.skyPath);}
+    expect((await x.page.locator('[role="alert"]').allTextContents()).join(' ')).not.toMatch(/History snapshot.*refused/i);
+  }
+  await mark('nativeLightingRecipeAuthorUndoAndConflict',{independentProcesses:3,optionalRemoval:true,peerBrushPreserved:true,competingRecipeRefused:true,validSavedUndoSnapshots:true,nativeBakeTestedInThisStage:false});
+
   // A real held orthographic mouse drag emits wire ghosts without journal commits.
   await panel(b); // Close SparkLink overlay again if it covered the view.
   await openStudioMenu(b.page);await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
   await b.page.getByRole('button', { name: 'Move', exact: true }).click();
   const top = b.page.getByLabel('top orthographic editing view'),
     bounds = await top.boundingBox();
-  const target = top.locator('[data-brush="ramp"][data-face]').first();
+  // The corridor ceiling is exposed. The ramp is behind Room A's source
+  // ceiling in top view and must not be selected through that nearer face.
+  const target = top.locator('[data-brush="corridor"][data-face="face-1"]');
   const pt = await target.evaluate((el) => {
     const r = el.getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
@@ -457,22 +491,27 @@ try {
   expect(preview.revision).toBe(beforePreview.revision);
   expect(preview.acknowledgedOperations).toBe(beforePreview.acknowledgedOperations);
   expect(preview.workshopPreviews).toHaveLength(1);
-  expect(preview.workshopPreviews[0].brush.brushId).toBe('ramp');
-  await expect(a.page.locator('svg [data-workshop-preview="ramp"]')).toHaveCount(3);
+  expect(preview.workshopPreviews[0].brush.brushId).toBe('corridor');
+  await expect(a.page.locator('svg [data-workshop-preview="corridor"]')).toHaveCount(3);
   await a.page.screenshot({ path: path.join(root, 'peer-drag-preview.png') });
   await b.page.mouse.up();
   await expect(a.page.getByLabel('Native BSP Workshop')).toHaveAttribute('data-workshop-preview-count', '0');
   await expect(c.page.getByLabel('Native BSP Workshop')).toHaveAttribute('data-workshop-preview-count', '0');
   await expect
     .poll(
-      async () => (await view(a)).document.workshop.brushes.find((brush) => brush.id === 'ramp').position[0],
+      async () => (await view(a)).document.workshop.brushes.find((brush) => brush.id === 'corridor').position[0],
       { intervals: [500] },
     )
-    .toBe(beforePreview.document.workshop.brushes.find((brush) => brush.id === 'ramp').position[0] + 0.5);
+    .toBe(beforePreview.document.workshop.brushes.find((brush) => brush.id === 'corridor').position[0] + 0.5);
   current = await view(a);
   expect(current.revision).toBe(beforePreview.revision + 1);
   await converge(current);
+  // Restore the source with its actual author Undo before frozen compilation.
+  await b.page.keyboard.press('Control+z');
+  await expect.poll(async()=>(await view(a)).document.workshop.brushes.find(brush=>brush.id==='corridor').position[0]).toBe(beforePreview.document.workshop.brushes.find(brush=>brush.id==='corridor').position[0]);
+  current=await view(a);await converge(current);
   await mark('actualMouseDragGhosts', {
+    originalGeometryRestoredByAuthorUndo:true,
     perspectiveAndOrthographic: true,
     uncommittedRevisionUnchanged: true,
     clearedAfterGesture: true,
@@ -511,7 +550,7 @@ try {
   await expect.poll(async () => (await view(c)).role).toBe('viewer');
   await expect(c.page.locator('.bsp-source-fields > fieldset')).toHaveAttribute('disabled', '');
   await expect(
-    c.page.locator('.bsp-source-fields').getByRole('textbox', { name: 'Name', exact: true }),
+    c.page.locator('.bsp-source-fields').getByRole('textbox', { name: 'Volume name', exact: true }),
   ).toBeDisabled();
   await expect(
     c.call('forge_session_preview', {
@@ -840,6 +879,7 @@ try {
   throw e;
 } finally {
   for (const a of actors) {
+    for(const name of ['final.png','failure.png']){const source=path.join(a.dir,name),info=await fs.stat(source).catch(()=>null);if(info?.isFile()&&info.size<=4*1024**2){await fs.copyFile(source,path.join(root,`native-sparklink-${a.slug}.png`));break;}}
     await a.browser?.close().catch(() => {});
     a.child?.kill();
     if (a.child) await waitForQaExit(a.child);

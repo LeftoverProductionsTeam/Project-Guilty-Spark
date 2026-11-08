@@ -1247,6 +1247,39 @@ mod studio_tests {
         owner.leave();
     }
     #[test]
+    fn native_lighting_author_undo_is_shared_without_erasing_peer_geometry() {
+        let mut doc = quickforge::create_arena("lighting", "emptyArena").unwrap();
+        doc.sky_path = Some("sky/example".into());
+        let host = Host::start(doc.clone(), false).unwrap();
+        let (guest, _) = Guest::join(&host.endpoint.to_string(), &host.key()).unwrap();
+        let owner = Peer::Host(host.clone());
+        let artist = Peer::Guest(guest);
+        let mut bake = doc.clone();
+        bake.native_lighting = Some(crate::native_lighting::NativeLighting {
+            sky_path: "sky/example".into(), quality: "draft".into(), environment: Default::default(),
+        });
+        owner.propose(0, bake.clone()).unwrap();
+        let mut moved = doc.clone();
+        moved.geometry[0].position[0] += 1.;
+        let shared = artist.propose(0, moved).unwrap();
+        assert_eq!(shared.document.native_lighting, bake.native_lighting);
+        let moved_brush = shared.document.geometry[0].clone();
+        let undone = owner.reverse(&uuid::Uuid::new_v4().to_string(), false).unwrap();
+        assert!(undone.document.native_lighting.is_none());
+        assert_eq!(undone.document.geometry[0], moved_brush);
+        let restored = owner.reverse(&uuid::Uuid::new_v4().to_string(), true).unwrap();
+        assert_eq!(restored.document.native_lighting, bake.native_lighting);
+        assert_eq!(restored.document.geometry[0], moved_brush);
+        let mut competing = restored.document.clone();
+        competing.native_lighting.as_mut().unwrap().environment.ambient_intensity = 0.5;
+        artist.propose(restored.revision, competing.clone()).unwrap();
+        let mut removal = restored.document.clone();
+        removal.native_lighting = None;
+        assert!(owner.propose(restored.revision, removal).unwrap_err().to_string().contains("nativeLighting"));
+        assert_eq!(owner.poll().unwrap().document, competing);
+        artist.leave(); owner.leave();
+    }
+    #[test]
     fn independent_environment_fields_preserve_both_authors() {
         let mut doc = quickforge::create_arena("environment", "emptyArena").unwrap();
         doc.environment = Some(Default::default());

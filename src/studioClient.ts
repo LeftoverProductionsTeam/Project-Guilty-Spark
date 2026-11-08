@@ -105,6 +105,23 @@ export function studioDifferences(
       rows.push({ target: key, mine: brief(local[key]), shared: brief(shared[key]) });
     if (rows.length >= 12) return rows;
   }
+  const mineLighting = local.nativeLighting, sharedLighting = shared.nativeLighting;
+  if (!mineLighting || !sharedLighting) {
+    if (mineLighting !== sharedLighting)
+      rows.push({target:'nativeLighting',mine:mineLighting?'Present':'Absent',shared:sharedLighting?'Present':'Absent'});
+  } else {
+    for (const field of ['skyPath', 'quality'] as const) {
+      if (mineLighting[field] !== sharedLighting[field])
+        rows.push({target:`nativeLighting/${field}`,mine:brief(mineLighting[field]),shared:brief(sharedLighting[field])});
+      if (rows.length >= 12) return rows;
+    }
+    for (const field of Object.keys(mineLighting.environment) as (keyof typeof mineLighting.environment)[]) {
+      if (JSON.stringify(mineLighting.environment[field]) !== JSON.stringify(sharedLighting.environment[field]))
+        rows.push({target:`nativeLighting/environment/${field}`,mine:brief(mineLighting.environment[field]),shared:brief(sharedLighting.environment[field])});
+      if (rows.length >= 12) return rows;
+    }
+  }
+  if (rows.length >= 12) return rows;
   for (const key of ['brushes', 'portals'] as const) {
     for (const id of new Set(
       [...(local.workshop?.[key] ?? []), ...(shared.workshop?.[key] ?? [])].map((v) => v.id),

@@ -1,6 +1,7 @@
 import {describe,it,expect} from 'vitest';
-import {assemblyViewportSource,assemblyBounds} from './assemblyViewport';
+import {assemblyViewportSource,assemblyBounds,currentAssemblyPreview,currentAssemblyDraftPreview} from './assemblyViewport';
 import type {OpenProject,MapInspection,MeshData,SceneObject} from './types';
+import {assemblySignature} from './bspAssembly';
 import type {BspAssembly} from './bspAssembly';
 const sha='a'.repeat(64);
 function fixture(){
@@ -24,4 +25,27 @@ describe('shared native assembly viewport',()=>{
 describe('native render labels versus scenario references',()=>{
  it('uses scenario-ordered identities when the real render parts are generically numbered',()=>{const {open,plan,mesh}=fixture();open.inspection!.renderMesh={...mesh,parts:mesh.parts!.map((part,i)=>({...part,name:'BSP '+(i+1)}))};const view=assemblyViewportSource(open,plan);expect(view.surfaces[0].tagId).toBe(2);expect(view.terrain.indices).toEqual([1,2,3]);expect(view.terrain.materialRanges![0].shaderTagId).toBe(12);});
  it('prefers exact native paths over duplicate basenames and refuses a missing scenario reference',()=>{const {open,plan,mesh}=fixture();open.inspection!.mesh={...mesh,parts:mesh.parts!.map((part,i)=>({...part,name:i===1?'levels\\test\\second':part.name}))};open.inspection!.tags.push({id:3,class:'sbsp',path:'different/second'} as never);expect(assemblyViewportSource(open,plan).surfaces[0].tagId).toBe(2);open.inspection!.mesh.parts![1].name='levels/missing/second';expect(()=>assemblyViewportSource(open,plan)).toThrow(/unavailable/);});
+});
+
+it('accepts joined source geometry only for the exact project, source, donor and current assembly',()=>{
+ const {open,plan,mesh}=fixture();const project={...open.project,bspAssembly:plan},preview={projectId:project.id,sourceSha256:sha,donorSha256:sha,assembly:plan,surfaces:[{source:0,mesh}]};
+ expect(currentAssemblyPreview(project,preview)).toBe(preview);
+ expect(currentAssemblyPreview({...project,id:'another-map'},preview)).toBeUndefined();
+ expect(currentAssemblyPreview(project,{...preview,donorSha256:'b'.repeat(64)})).toBeUndefined();
+ expect(currentAssemblyPreview({...project,bspAssembly:{...plan,translation:[99,0,0]}},preview)).toBeUndefined();
+ expect(currentAssemblyPreview(project,undefined)).toBeUndefined();
+});
+
+it('retains native f32 route dimensions across a real JSON response',()=>{
+ const {open,plan,mesh}=fixture();const local={...plan,tunnelWidth:2,tunnelHeight:1.6,infantryTunnel:{points:[[0,0,0],[10,3,0]] as [number,number,number][],width:2,height:1.6,shaderPath:'fixture/stone'}};
+ const project={...open.project,bspAssembly:local},preview={projectId:project.id,sourceSha256:sha,donorSha256:sha,assembly:JSON.parse(JSON.stringify({...local,tunnelHeight:Math.fround(1.6),infantryTunnel:{...local.infantryTunnel,height:Math.fround(1.6)}})),surfaces:[{source:0,mesh}]};
+ expect(currentAssemblyPreview(project,preview)).toBe(preview);
+ expect(currentAssemblyPreview({...project,bspAssembly:{...local,tunnelHeight:1.61}},preview)).toBeUndefined();
+});
+
+it('unsaved seam previews remain fenced by the current saved revision and donor owner',()=>{
+ const {open,plan,mesh}=fixture(),project={...open.project,bspAssembly:plan},draft={...plan,tunnelWidth:4},preview={projectId:project.id,sourceSha256:sha,donorSha256:sha,assembly:draft,surfaces:[{source:0,mesh}]};
+ expect(currentAssemblyPreview(project,preview)).toBeUndefined();expect(currentAssemblyDraftPreview(project,draft,assemblySignature(plan),preview)).toBe(preview);
+ expect(currentAssemblyDraftPreview({...project,bspAssembly:{...plan,yawDegrees:2}},draft,assemblySignature(plan),preview)).toBeUndefined();
+ expect(currentAssemblyDraftPreview(project,{...draft,donorProjectId:'different'},assemblySignature(plan),preview)).toBeUndefined();
 });

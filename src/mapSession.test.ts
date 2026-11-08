@@ -162,3 +162,11 @@ test('window browsing and category choices do not follow another live window',as
  session.configureMapViewWindow('main');expect(session.readMapSession('global','library.query','')).toBe('main-map');expect(session.readMapSession('global','interface.section','')).toBe('appearance');expect(session.readMapSession('a','hosting.runtime','')).toBe('mccSteam');
  session.writeMapSession('global','home.model','johnson');session.configureMapViewWindow('editor-two');expect(session.readMapSession('global','home.model','')).toBe('johnson');
 });
+
+test('runtime dashboard pages and engine setup stay independent across live windows',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('runtime-one');
+ session.writeMapSession('global','tools.dashboard','setup');session.writeMapSession('global','tools.enginePackage','openh1');
+ session.configureMapViewWindow('runtime-two');session.writeMapSession('global','tools.dashboard','packs');session.writeMapSession('global','tools.enginePackage','faber');
+ session.configureMapViewWindow('runtime-one');expect(session.readMapSession('global','tools.dashboard','')).toBe('setup');expect(session.readMapSession('global','tools.enginePackage','')).toBe('openh1');
+ session.configureMapViewWindow('runtime-two');expect(session.readMapSession('global','tools.dashboard','')).toBe('packs');expect(session.readMapSession('global','tools.enginePackage','')).toBe('faber');
+});

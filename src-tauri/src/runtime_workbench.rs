@@ -8,6 +8,8 @@ use spark_core::{
 use std::process::{Child, Command};
 use sha2::Digest;
 const WORKING_TAG_SNAPSHOT_REASON:&str="before-build";
+#[path = "runtime_rebuild.rs"]
+pub(super) mod rebuild;
 
 #[derive(Default)]
 pub(super) struct WorkbenchState {
@@ -18,6 +20,7 @@ pub(super) struct WorkbenchState {
     plans: HashMap<String, PendingTool>,
     joins: HashMap<String, PendingJoin>,
     processes: Vec<ToolProcess>,
+    rebuilds: HashMap<String, Arc<rebuild::Session>>,
 }
 
 struct PendingJoin {
@@ -193,6 +196,7 @@ pub(super) fn community_data_environment(
 
 pub(super) fn release_window(state: &AppState, label: &str) {
     if let Ok(mut workbench) = state.runtime_workbench.lock() {
+        if let Some(session) = workbench.rebuilds.remove(label) { session.stop(); }
         workbench.plans.retain(|_, p| p.owner != label);
         workbench.joins.retain(|_, p| p.owner != label);
         workbench.processes.retain(|p|p.owner!=label||p.view.action_id!="testScene");

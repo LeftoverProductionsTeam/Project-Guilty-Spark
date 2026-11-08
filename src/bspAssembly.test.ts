@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addInfantryTunnel, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
 import type { BspAssembly } from './bspAssembly';
 const plan: BspAssembly = {
   schemaVersion: 1,
@@ -85,4 +85,72 @@ describe('separate road and infantry route authoring',()=>{
   it('refuses unsupported offsets and too-short connections before creating an unusable route',()=>{
     expect(()=>addInfantryTunnel(plan,Infinity)).toThrow(/offset/);expect(()=>addInfantryTunnel(plan,2)).toThrow(/offset/);expect(()=>addInfantryTunnel({...plan,tunnelPoints:[[0,0,0],[1,0,0]]})).toThrow(/8 world units/);
   });
+});
+
+it('preserves terrain-sidecar identity through transforms without altering the original plan',()=>{
+ const terrain={...plan,terrainSeam:{shoulderWidth:8,bankHeight:4,baseShaderPath:'owned/grass',donorShaderPath:'owned/snow'}};
+ expect(assemblySignature({...plan,terrainSeam:undefined})).toBe(assemblySignature(plan));
+ const moved=transformAssembly(terrain,[22,1,0],0);expect(moved.terrainSeam).toEqual(terrain.terrainSeam);
+ expect(assemblySignature(terrain)).not.toBe(assemblySignature({...terrain,terrainSeam:{...terrain.terrainSeam,bankHeight:5}}));
+ expect(plan).not.toHaveProperty('terrainSeam');
+});
+
+describe('three-route canyon seam authoring',()=>{
+  it('keeps source identities and the primary points intact while drafting three independent routes',()=>{
+    const before=JSON.stringify(plan),next=makeThreeRouteSeam(plan);
+    expect(JSON.stringify(plan)).toBe(before);expect(next.donorSource).toBe(plan.donorSource);expect(next.tunnelPoints).toBe(plan.tunnelPoints);
+    expect([next.tunnelWidth,next.tunnelHeight]).toEqual([6,4]);
+    expect(assemblyRoutes(next).map(route=>route.id)).toEqual(['primary','infantry','highGround']);
+    expect(next.highGround!.points).toHaveLength(6);expect(next.highGround!.points[2][2]).toBeGreaterThan(plan.tunnelPoints[0][2]);
+    expect(next.highGround!.points[2][1]).toBeLessThan(0);expect(next.infantryTunnel!.points[1][1]).toBeGreaterThan(0);
+    expect(assemblySignature(makeThreeRouteSeam(next))).toBe(assemblySignature(next));
+    expect(assemblySignature({...plan,highGround:undefined})).toBe(assemblySignature(plan));
+  });
+  it('retains custom ridge floors through donor transforms and entrance-pivot round trips',()=>{
+    const next=makeThreeRouteSeam(plan),source=JSON.stringify(next);next.highGround!.points[next.highGround!.points.length-1]=[25,-3,2];
+    const before=JSON.stringify(next),moved=transformAssembly(next,[30,10,2],90);
+    expect(JSON.stringify(next)).toBe(before);expect(moved.highGround!.points[1]).toBe(next.highGround!.points[1]);
+    const pivot=rotateAssemblyAtEntrance(next,90),restored=rotateAssemblyAtEntrance(pivot,0);
+    restored.highGround!.points.at(-1)!.forEach((v,i)=>expect(v).toBeCloseTo(next.highGround!.points.at(-1)![i],10));
+    expect(assemblySignature(next)).not.toBe(assemblySignature(plan));expect(source).not.toBe(before);
+  });
+  it('refuses unsupported length, grade, offset and world bounds before altering a draft',()=>{
+    expect(()=>addHighGroundRoute({...plan,tunnelPoints:[[0,0,0],[8,0,0]]})).toThrow(/16 world units/);
+    expect(()=>addHighGroundRoute({...plan,tunnelPoints:[[0,0,0],[25,0,10]]})).toThrow(/steep/);
+    expect(()=>addHighGroundRoute(plan,Infinity)).toThrow(/offset/);
+    expect(()=>addHighGroundRoute({...plan,tunnelPoints:[[2040,0,0],[2065,0,0]]})).toThrow(/world bounds/);
+    const next=addHighGroundRoute(plan);expect(addHighGroundRoute(next)).toBe(next);
+    expect(assemblyRoutes(next).map(route=>route.label)).toEqual(['Primary connection','High-ground route']);
+  });
+});
+
+it('starts a flat native connector without losing source edges, materials or other routes',()=>{
+ const source={...plan,terrainSeam:{shoulderWidth:8,bankHeight:4,baseShaderPath:'fixture/grass',donorShaderPath:'fixture/snow'}};
+ const before=structuredClone(source),flat=flattenTerrainConnector(source);
+ expect(flat.terrainSeam).toEqual({...source.terrainSeam,bankHeight:0});
+ expect(flat.tunnelPoints).toEqual(source.tunnelPoints);expect(flat.donorSource).toEqual(source.donorSource);
+ expect(source).toEqual(before);expect(()=>flattenTerrainConnector(plan)).toThrow(/Plan adjacent terrain/);
+});
+
+it('places a natural seam cave outside the vehicle shoulders and uses native ground on its ridge',()=>{
+ const source={...plan,tunnelPoints:[[0,0,0],[100,0,0]] as [number,number,number][],tunnelWidth:6,terrainSeam:{shoulderWidth:8,bankHeight:0,baseShaderPath:'fixture/grass',donorShaderPath:'fixture/snow'}};
+ const next=makeThreeRouteSeam(source);expect(next.infantryTunnel!.points[1][1]).toBe(13);
+ expect(next.highGround!.shaderPath).toBe('fixture/grass');expect(source).not.toHaveProperty('infantryTunnel');
+});
+
+
+it('matches native f32 passage-size readback while retaining f64 coordinate edits',()=>{
+ const next=makeThreeRouteSeam(plan),native={...next,tunnelHeight:Math.fround(next.tunnelHeight),infantryTunnel:{...next.infantryTunnel!,height:Math.fround(next.infantryTunnel!.height)}};
+ expect(assemblySignature(native)).toBe(assemblySignature(next));
+ expect(assemblySignature({...next,translation:[20+1e-10,0,0]})).not.toBe(assemblySignature(next));
+ expect(assemblySignature({...next,tunnelWidth:2.01})).not.toBe(assemblySignature(next));
+});
+
+it('sectioned seams retain edge identities, native dimensions and independent donor mouths through transforms',()=>{
+ const edge={sourceSha256:'a'.repeat(64),bspIndex:0,vertices:[[0,0,0],[0,4,0]] as [[number,number,number],[number,number,number]],point:[0,2,0] as [number,number,number]};
+ const section={id:'first',name:'Existing doorway',points:[[0,0,0],[25,3,0]] as [number,number,number][],width:4,height:1.6,shaderPath:'fixture/stone',archSegments:6,edges:[edge,edge] as [typeof edge,typeof edge]};
+ const p={...plan,sections:[section]},moved=transformAssembly(p,[30,10,2],90);
+ expect(moved.sections![0].points[0]).toEqual(section.points[0]);expect(moved.sections![0].points.at(-1)).toEqual([27,15,2]);expect(moved.sections![0].edges).toBe(section.edges);
+ expect(assemblyRoutes(p).at(-1)!.label).toBe('Existing doorway');expect(assemblySignature({...plan,sections:[]})).toBe(assemblySignature(plan));
+ expect(assemblySignature({...p,sections:[{...section,height:Math.fround(1.6)}]})).toBe(assemblySignature(p));
 });

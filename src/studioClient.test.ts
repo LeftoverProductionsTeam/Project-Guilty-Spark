@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { studioDifferences } from './studioClient';
+import { DEFAULT_ENVIRONMENT } from './environment';
 import type { QuickForgeDocument } from './forge';
 const base: QuickForgeDocument = {
   schemaVersion: 1,
@@ -77,4 +78,16 @@ describe('shared conflict review', () => {
     expect(studioDifferences(base, shared)).toHaveLength(12);
     expect(shared.spawns).toHaveLength(100);
   });
+});
+
+it('shows exact native bake differences rather than truncating matching recipe prefixes',()=>{
+  const mine=structuredClone(base),shared=structuredClone(base);
+  mine.nativeLighting={skyPath:'sky/example',quality:'draft',environment:structuredClone(DEFAULT_ENVIRONMENT)};
+  shared.nativeLighting=structuredClone(mine.nativeLighting);
+  shared.nativeLighting.environment.fogEnabled=true;shared.nativeLighting.environment.fogFar=200;
+  expect(studioDifferences(mine,shared)).toEqual([
+    {target:'nativeLighting/environment/fogEnabled',mine:'false',shared:'true'},
+    {target:'nativeLighting/environment/fogFar',mine:'180',shared:'200'},
+  ]);
+  expect(studioDifferences(base,mine)).toEqual([{target:'nativeLighting',mine:'Absent',shared:'Present'}]);
 });

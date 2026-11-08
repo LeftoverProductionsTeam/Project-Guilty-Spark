@@ -20,7 +20,7 @@ const eventLabels: Record<CueName, string> = { select: 'Menu navigation', confir
 export default function InterfaceStudio({
   preferences, onChange, onPreview, onOpenTags, canBrowseSounds,
   bitmapTags, bitmapStatus, bitmapLoading, bitmapActive, onChooseBitmap, onClearBitmap,
-  homeModelSettings,
+  homeModelSettings,scaleStatus,
 }: {
   preferences: InterfacePreferences;
   onChange: (next: InterfacePreferences) => void;
@@ -34,6 +34,7 @@ export default function InterfaceStudio({
   onChooseBitmap: (id:number)=>void;
   onClearBitmap: ()=>void;
   homeModelSettings?:ReactNode;
+  scaleStatus?:{scale:number;error:string};
 }) {
   const [savedSection,setSection]=useMapState('global','interface.section','appearance');
   const [desktopOrb,setDesktopOrb]=useMapState('global','workspace.desktopOrb',false);
@@ -59,6 +60,11 @@ export default function InterfaceStudio({
     {section==='appearance'&&<>
     <section className="analysis-card">
       <div className="interface-visual-heading"><h2><Palette size={19}/> Visual identity</h2><label className="interface-monitor-eye" title="Color of the Monitor menu button's eye and glow">Monitor eye <input type="color" aria-label="Monitor eye color" value={preferences.monitorEyeColor} onChange={event=>onChange({...preferences,monitorEyeColor:event.target.value})}/></label></div>
+      <label className="interface-control">UI scale <select aria-label="UI scale" value={preferences.uiScale===null?'auto':String(preferences.uiScale)} disabled={!native} onChange={event=>onChange({...preferences,uiScale:event.target.value==='auto'?null:Number(event.target.value)})}>
+        <option value="auto">Auto · fit window / fullscreen</option>{[.75,.85,1,1.1,1.25,1.5].map(scale=><option key={scale} value={scale}>{Math.round(scale*100)}%</option>)}
+      </select><button type="button" onClick={()=>onChange({...preferences,uiScale:null})}>Reset UI scale</button><output aria-label="Applied UI scale">{Math.round((scaleStatus?.scale??1)*100)}% in this window</output></label>
+      <small>Auto adapts to window size and fullscreen. Larger choices fit down if needed to keep controls reachable. Windows display scaling is unchanged.</small>
+      {scaleStatus?.error&&<p role="alert">UI scaling could not be applied: {scaleStatus.error}</p>}
       {homeModelSettings}
       <div className="interface-theme-grid">
         {themes.map((theme) => <button
@@ -75,6 +81,7 @@ export default function InterfaceStudio({
         onChange={(event) => onChange({ ...preferences, reducedMotion: event.target.checked })}/>
         Reduced motion and interface transitions</label>
       <label className="interface-control"><input type="checkbox" checked={preferences.workspaceTransitions} onChange={e=>onChange({...preferences,workspaceTransitions:e.target.checked})}/>Subtle workspace fades</label>
+      <label className="interface-control"><input type="checkbox" checked={preferences.walkthroughEnabled} onChange={e=>onChange({...preferences,walkthroughEnabled:e.target.checked})}/>Guided workspace walkthrough</label>
       <label className="interface-control"><input type="checkbox" checked={preferences.shieldLoading} onChange={e=>onChange({...preferences,shieldLoading:e.target.checked})}/>Shield loading animation</label>
       <label className="interface-control"><input type="checkbox" checked={preferences.restoreWorkspaceLayout} onChange={e=>onChange({...preferences,restoreWorkspaceLayout:e.target.checked})}/>Restore my saved workspace layout on launch</label>
       </div>

@@ -58,3 +58,11 @@ describe('runtime folder relocation',()=>{
   expect(relocateRuntimeRegistration({...installed,runtimeId:'haloCustomEdition',root:'',executable:'',dataRoot:null},'D:/Runtimes/Halo Custom Edition')).toEqual({...installed,runtimeId:'haloCustomEdition',root:'D:/Runtimes/Halo Custom Edition',executable:'D:/Runtimes/Halo Custom Edition/haloce.exe',dataRoot:'D:/Runtimes/Halo Custom Edition'});
  });
 });
+
+it('labels installed OpenH1 and Faber separately without changing their validated adapter identity',async()=>{
+ const {runtimeProfileName,runtimeProfileLabel}=await import('./runtimeWorkbench');
+ const profile={id:'engine-openh1-build-1845',runtimeId:'openCe' as const,root:'C:/Owned/engines/openh1',executable:'C:/Owned/engines/openh1/halo.exe',dataRoot:'C:/Owned/Maps',version:'build-1845',networkVersion:null};
+ expect(runtimeProfileName(profile)).toBe('OpenH1');expect(runtimeProfileLabel(profile)).toBe('OpenH1 · openh1');
+ expect(runtimeProfileName({...profile,id:'engine-faber-v2.3.4',root:'C:/Owned/Faber',version:'v2.3.4'})).toBe('Faber');
+ expect(profile.runtimeId).toBe('openCe');
+});

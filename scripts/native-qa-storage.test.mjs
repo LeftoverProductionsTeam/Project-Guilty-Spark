@@ -742,3 +742,19 @@ test('copy admission rejects self copy, generated descendants, links and quota b
     }
     await assert.rejects(fs.stat(path.join(parent, 'copied')), { code: 'ENOENT' });
   }));
+
+test('concurrent compiler temp renames do not abort measurement-only QA admission',()=>fixture(async parent=>{
+ const storage=await mkdir(path.join(parent,'admission')),writer=await mkdir(path.join(storage,'other-active-compiler'));
+ const script=`const fs=require('fs'),p=require('path'),root=process.argv[1];console.log('ready');const end=Date.now()+20000;let n=0;while(Date.now()<end){const a=p.join(root,'rmeta'+n++),b=a+'.gone';fs.writeFileSync(a,Buffer.alloc(256,7));fs.renameSync(a,b);fs.unlinkSync(b);}`;
+ const child=spawn(process.execPath,['-e',script,writer],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+ try {
+  await new Promise((resolve,reject)=>{child.stdout.once('data',resolve);child.once('error',reject);});
+  for(let i=0;i<8;i++){
+   const output=await mkdir(path.join(storage,'owned-'+i));
+   const finish=await beginQaStorage(output,{workflow:'measurement-race-test',appSha256:'a'.repeat(64),storageRoot:storage,reservationBytes:1024**2,totalBytes:64*1024**2,minimumFreeBytes:0});
+   await finish('passed');
+   assert.equal(child.exitCode,null,'admission must not stop another active compiler');
+  }
+ }finally{child.kill();await new Promise(resolve=>child.exitCode!==null?resolve():child.once('close',resolve));}
+ assert.ok((await fs.stat(writer)).isDirectory(),'unowned writer directory is retained');
+}));

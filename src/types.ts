@@ -244,6 +244,7 @@ export interface Project {
   conversionProfile?: 'faithful' | 'zombie-recovery' | 'mcc-multiplayer-ui' | null;
   sourceSceneVersion?: number;
   worldEnvironment?: import('./environment').EditorEnvironment | null;
+  nativeLighting?: import("./environment").NativeLighting | null;
   buildTargets?: EngineBuildTarget[];
   activeBuildTarget?: string | null;
   quickForge?: QuickForgeDocument | null;

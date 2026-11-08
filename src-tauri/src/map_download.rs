@@ -1,4 +1,5 @@
-//! User-requested map data downloads. No executable, installer or game writes.
+//! Explicit map/presentation downloads and publisher-pinned engine packages.
+//! Engine ZIPs have a separate immutable binding; ordinary archives never authorize code.
 use reqwest::{header, Client, Response, Url};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -65,16 +66,24 @@ pub(super) struct DownloadStatus {
 enum Kind {
     Map,
     Zip,
+    PackZip,
+    EngineZip,
 }
 impl Kind {
     fn extension(self) -> &'static str {
         match self {
             Self::Map => "map",
-            Self::Zip => "zip",
+            Self::Zip | Self::PackZip | Self::EngineZip => "zip",
         }
     }
 }
+#[derive(Clone,Debug)]
+pub(super) struct PackBinding {pub registration_id:String,pub executable_sha256:String,pub data_root:PathBuf,pub inventory_sha256:String,pub kind:String}
+#[derive(Clone,Debug)]
+pub(super) struct EngineBinding {pub dynamic_root:Option<PathBuf>,pub package_id:String,pub content_registration_id:Option<String>,pub data_root:PathBuf,pub content_executable_sha256:Option<String>}
 struct Job {
+    engine_binding:Option<EngineBinding>,
+    pack_binding:Option<PackBinding>,
     url: Url,
     kind: Kind,
     created: Instant,
@@ -457,7 +466,7 @@ async fn save_response(
         {
             return invalid("The response is not supported map/archive data");
         }
-        if matches!(job.kind, Kind::Zip) && prefix.len() >= 4 && !prefix.starts_with(b"PK\x03\x04")
+        if matches!(job.kind, Kind::Zip | Kind::PackZip | Kind::EngineZip) && prefix.len() >= 4 && !prefix.starts_with(b"PK\x03\x04")
         {
             return invalid("The response has no supported ZIP signature");
         }
@@ -481,6 +490,14 @@ async fn save_response(
                     "Downloaded map is not a supported, bounded Halo scenario cache".into(),
                 )
             })?;
+        }
+        Kind::EngineZip => {
+            let binding=job.engine_binding.as_ref().ok_or_else(||SparkError::Invalid("Engine package has no publisher binding".into()))?;
+            spark_core::runtime_packages::inspect(&path,&binding.package_id)?;
+        }
+        Kind::PackZip => {
+            let binding=job.pack_binding.as_ref().ok_or_else(||SparkError::Invalid("Pack download has no runtime binding".into()))?;
+            spark_core::runtime_mods::inspect_archive(&path,&binding.kind)?;
         }
         Kind::Zip => {
             let inventory = archive::inventory(&path).map_err(|_| {
@@ -564,8 +581,14 @@ impl DownloadRegistry {
             .cloned()
             .ok_or_else(|| SparkError::Invalid("Download job is unknown or expired".into()))
     }
-    pub(super) fn prepare(&self, url: &str) -> Result<DownloadStatus> {
+    pub(super) fn prepare(&self,url:&str)->Result<DownloadStatus>{self.prepare_kind(url,None,None)}
+    pub(super) fn prepare_pack(&self,url:&str,binding:PackBinding)->Result<DownloadStatus>{self.prepare_kind(url,Some(binding),None)}
+    pub(super) fn pack_binding(&self,id:&str)->Result<PackBinding>{self.job(id)?.pack_binding.clone().ok_or_else(||SparkError::Invalid("This download is not a presentation pack".into()))}
+    pub(super) fn prepare_engine(&self,binding:EngineBinding)->Result<DownloadStatus>{let p=spark_core::runtime_packages::package(&binding.package_id)?;self.prepare_kind(p.url,None,Some(binding))}
+    pub(super) fn engine_binding(&self,id:&str)->Result<EngineBinding>{self.job(id)?.engine_binding.clone().ok_or_else(||SparkError::Invalid("This download is not a reviewed engine package".into()))}
+    fn prepare_kind(&self, url: &str, pack_binding:Option<PackBinding>,engine_binding:Option<EngineBinding>) -> Result<DownloadStatus> {
         let (url, kind) = checked_url(url, true)?;
+        let kind=if engine_binding.is_some(){Some(Kind::EngineZip)}else if pack_binding.is_some(){if !matches!(kind,Some(Kind::Zip)){return invalid("Native presentation packs need a direct ZIP link");}Some(Kind::PackZip)}else{kind};
         let mut jobs = lock(&self.jobs)?;
         if jobs.len() >= MAX_JOBS {
             let old = jobs
@@ -597,6 +620,8 @@ impl DownloadRegistry {
         jobs.insert(
             id,
             Arc::new(Job {
+                pack_binding,
+                engine_binding,
                 url,
                 kind: kind.unwrap(),
                 created: Instant::now(),
@@ -715,6 +740,24 @@ impl DownloadRegistry {
         self.execute(id, root, |job| {
             tauri::async_runtime::block_on(fetch_response(&job))
         })
+    }
+    pub(super) fn discard_pack(&self,id:&str,root:&Path)->Result<bool>{
+        let job=self.job(id)?;if job.pack_binding.is_none()&&job.engine_binding.is_none(){return invalid("Only owned package downloads may be discarded");}
+        let phase=lock(&self.job(id)?.status)?.phase.clone();
+        if !matches!(phase,Phase::Downloaded|Phase::Failed){return Ok(false);}
+        self.finish_pack_install(id,root)?;
+        let job=self.job(id)?;let mut status=lock(&job.status)?;status.phase=Phase::Cancelled;status.detail="Uninstalled temporary pack download discarded".into();Ok(true)
+    }
+    pub(super) fn finish_pack_install(&self,id:&str,root:&Path)->Result<()> {
+        let job=self.job(id)?;let receipt=lock(&job.status)?.receipt.clone().ok_or_else(||SparkError::Invalid("Pack download receipt missing".into()))?;
+        uuid::Uuid::parse_str(id).map_err(|_|SparkError::Invalid("Invalid download identity".into()))?;
+        let directory=root.join(id);reject_links(&directory)?;reject_links(&receipt.path)?;
+        if fs::canonicalize(receipt.path.parent().ok_or_else(||SparkError::Invalid("Missing download parent".into()))?)?!=fs::canonicalize(&directory)?||maps::hash_file(&receipt.path)?!=receipt.sha256||spark_core::storage::unique_file_identity(&receipt.path).is_none(){return invalid("Downloaded pack ownership changed; original bytes retained");}
+        let owner:serde_json::Value=serde_json::from_slice(&fs::read(directory.join(".download-owner.json"))?)?;
+        if owner["owner"]!="ProjectGuiltySpark/download-v1"||owner["id"]!=id{return invalid("Pack download owner changed; retained");}
+        let mut permissions=fs::metadata(&receipt.path)?.permissions();permissions.set_readonly(false);fs::set_permissions(&receipt.path,permissions)?;
+        fs::remove_file(&receipt.path)?;
+        let mut status=lock(&job.status)?;status.phase=Phase::Imported;status.detail="Package installed; temporary ZIP removed after verified extraction".into();Ok(())
     }
     pub(super) fn mark_importing(&self, id: &str) -> Result<()> {
         let job = self.job(id)?;
@@ -1087,4 +1130,24 @@ mod tests {
             .is_err());
         assert_eq!(registry.status(&status.id).unwrap().phase, Phase::Cancelled);
     }
+    #[test]
+    fn pack_download_uses_archive_validation_and_discards_only_its_owned_readonly_zip(){
+        use zip::{ZipWriter,write::SimpleFileOptions};
+        let mut zip=ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name,data) in [("native/mod.toml",b"name='Authored QA pack'\nformat=1\n".as_slice()),("native/tags/fixture.bitmap",&[0u8;64][..])]{
+            zip.start_file(name,SimpleFileOptions::default()).unwrap();zip.write_all(data).unwrap();
+        }
+        let body=zip.finish().unwrap().into_inner();
+        let t=tempfile::tempdir().unwrap();let registry=DownloadRegistry::default();
+        let status=registry.prepare_pack("https://example.com/pack.zip",PackBinding{registration_id:"test".into(),executable_sha256:"a".repeat(64),data_root:t.path().into(),inventory_sha256:"b".repeat(64),kind:"custom".into()}).unwrap();
+        let receipt=registry.execute(&status.id,t.path(),|_|Ok(response(body,"Content-Type: application/zip\r\n"))).unwrap();
+        assert!(receipt.path.is_file());assert!(fs::metadata(&receipt.path).unwrap().permissions().readonly());
+        assert!(registry.engine_binding(&status.id).is_err());
+        let owner=receipt.path.parent().unwrap().join(".download-owner.json");let original=fs::read(&owner).unwrap();
+        fs::write(&owner,b"{}").unwrap();assert!(registry.discard_pack(&status.id,t.path()).is_err());assert!(receipt.path.is_file());
+        fs::write(&owner,original).unwrap();assert!(registry.discard_pack(&status.id,t.path()).unwrap());assert!(!receipt.path.exists());
+        let unknown=registry.prepare_engine(EngineBinding{dynamic_root:None,package_id:"arbitrary-code".into(),content_registration_id:None,data_root:t.path().into(),content_executable_sha256:None});
+        assert!(unknown.is_err());
+    }
+
 }

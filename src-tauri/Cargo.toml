@@ -29,3 +29,4 @@ path = "src/main.rs"
 
 [dev-dependencies]
 tempfile = "3"
+zip = { version = "=9.1.0", default-features = false, features = ["deflate-flate2"] }

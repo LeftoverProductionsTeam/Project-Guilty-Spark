@@ -40,7 +40,7 @@ export default function BuildTargets({
           builder:
             runtimeId === 'mccSteam'
               ? 'h1a-tool'
-              : runtimeId === 'haloCustomEdition'
+              : ['haloCustomEdition','chupathingyCe'].includes(runtimeId)
                 ? 'invader-ce'
                 : 'unsupported',
           hekDirectory:
@@ -48,7 +48,7 @@ export default function BuildTargets({
               ? (defaults.hekDirectory ?? null)
               : null,
           hekFlavor:
-            runtimeId === 'mccSteam' ? 'h1aEk' : runtimeId === 'haloCustomEdition' ? 'legacyHek' : null,
+            runtimeId === 'mccSteam' ? 'h1aEk' : ['haloCustomEdition','chupathingyCe'].includes(runtimeId) ? 'legacyHek' : null,
           tagsDirectory:
             defaults?.hekFlavor === (runtimeId === 'mccSteam' ? 'h1aEk' : 'legacyHek')
               ? (defaults.hekTagsDirectory ?? null)
@@ -144,7 +144,7 @@ export default function BuildTargets({
               </button>
             </label>
           ))}
-          {t.runtimeId === 'haloCustomEdition' && (
+          {['haloCustomEdition','chupathingyCe'].includes(t.runtimeId) && (
             <label>
               <input
                 type="checkbox"
@@ -155,7 +155,7 @@ export default function BuildTargets({
               Compilation and game testing are still required.
             </label>
           )}
-          {t.runtimeId === 'haloCustomEdition' && (
+          {['haloCustomEdition','chupathingyCe'].includes(t.runtimeId) && (
             <CeSourceRecovery
               project={project}
               target={t}

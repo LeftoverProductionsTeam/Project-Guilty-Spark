@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-08T12:58:34.819Z",
+  "sourceBaseCommit": "5095e9b9ea0979448cd571d56659b4076e5930a2",
+  "sourceWorkingTreeWasDirty": true,
+  "qaApp": {
+    "sourceCommit": "5095e9b9ea0979448cd571d56659b4076e5930a2",
+    "workingTreeDirty": true,
+    "files": [
+      {
+        "file": "GuiltySpark.exe",
+        "bytes": 49984512,
+        "sha256": "f4e54a6a1f3a8a343d0352b742ef3ab9e2b9aae185a67f3cda0a2edf06f3b7ba"
+      }
+    ],
+    "runtimeSourceFingerprint": "a0c9c57a69e981cc72dcff6fed3c0d3643e1a537685306e6f69873c6efbf3635",
+    "purpose": "One temporary source-pinned QA executable; not a release"
+  },
+  "receipt": "E/chupa-portal-native-r157.json",
+  "receiptSha256": "931704c82e532b898d9fa41533a738d21c3e39d591390138d630ae4048d99c08",
+  "cache": {
+    "file": "chupa-portal-native-r157-timberland.map",
+    "bytes": 77674656,
+    "sha256": "4959ad0f7ce739a68241fb8cd918cd781b730f672f51196a7507ce76c3f79d0b",
+    "target": "gbx-custom",
+    "privateOnly": true,
+    "redistributionAuthorized": false
+  },
+  "originalSources": [
+    {
+      "name": "timberland.map",
+      "sha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea"
+    },
+    {
+      "name": "sidewinder.map",
+      "sha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+    }
+  ],
+  "actualNativeUi": {
+    "fileNew": true,
+    "fullRestart": true,
+    "undoRedoImmediateSave": true,
+    "originalMapsUnchanged": true
+  },
+  "geometry": {
+    "regions": 2,
+    "connectorTriangles": 193,
+    "totalSourceTriangles": 32084,
+    "renderTriangles": 15768,
+    "compiledCollisionTriangles": 16124,
+    "compiledWalkSamples": 524,
+    "portalStrategy": "Actual closed collision/sky air-volume sections, using existing Manifold; legacy tunnel authoring retained"
+  },
+  "donorPreparation": {
+    "tag": "levels\\test\\sidewinder\\sidewinder",
+    "files": 69,
+    "bytes": 18034422,
+    "toolSha256": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138",
+    "recursiveNativeExtraction": true,
+    "entireSdkCopied": false
+  },
+  "nativeCompilation": {
+    "accepted": true,
+    "milliseconds": 325054,
+    "crcMismatch": 0,
+    "bsp": "levels\\spark\\assembly_0d085555\\connected.scenario_structure_bsp"
+  },
+  "compiledViewport": {
+    "sourceShaders": 137,
+    "sourceLightmaps": 7,
+    "sourceCubes": 17
+  },
+  "nativeGameLoad": {
+    "runtime": "ChupathingyCE 0.9.0c",
+    "exeSha256": "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b",
+    "actualControls": true,
+    "privateOwnedProcess": true,
+    "gameSha256": "4959ad0f7ce739a68241fb8cd918cd781b730f672f51196a7507ce76c3f79d0b",
+    "gameTicksObserved": true
+  },
+  "recipe": {
+    "exactGsprojectRetained": false,
+    "basis": "Initial saved plan plus the verified UI width +0.5, Undo, Redo and bank-height Undo sequence; native compiled map and receipt retained. Paths below are documented setup placeholders, not an importable project.",
+    "plan": {
+      "schemaVersion": 1,
+      "donorProjectId": "bf124c5a-ec17-4155-a1df-f092823b9a50",
+      "donorTitle": "sidewinder",
+      "donorSource": {
+        "originalPath": "<connected Custom Edition maps>/sidewinder.map",
+        "preservedPath": "<connected Custom Edition maps>/sidewinder.map",
+        "sha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+        "cacheVersion": 609,
+        "engine": "Halo Custom Edition",
+        "scenarioPath": "levels\\test\\sidewinder\\sidewinder",
+        "archive": null,
+        "resourceDirectory": "<connected Custom Edition maps>",
+        "resourceSha256": {
+          "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+          "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+          "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+        }
+      },
+      "donorTagsDirectory": "<select matching recovered donor tags in Project setup>",
+      "donorBspIndex": 0,
+      "includeDonorScenery": true,
+      "translation": [
+        114.02209091186523,
+        9.3280029296875,
+        -17.233085022040342
+      ],
+      "yawDegrees": 0,
+      "tunnelPoints": [
+        [
+          38.811767578125,
+          34.44912338256836,
+          -21.075042829581236
+        ],
+        [
+          71.59999084472656,
+          34.44912338256836,
+          -21.075042829581236
+        ]
+      ],
+      "tunnelWidth": 6.5,
+      "tunnelHeight": 4,
+      "tunnelShaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor",
+      "openRoad": true,
+      "infantryTunnel": {
+        "points": [
+          [
+            38.811767578125,
+            34.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            47.00882339477539,
+            47.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            63.40293502807617,
+            47.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            71.59999084472656,
+            34.44912338256836,
+            -21.075042829581236
+          ]
+        ],
+        "width": 2,
+        "height": 1.6,
+        "shaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor"
+      },
+      "highGround": {
+        "points": [
+          [
+            38.811767578125,
+            34.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            45.36941223144531,
+            22.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            51.927056884765626,
+            22.44912338256836,
+            -19.10774943358514
+          ],
+          [
+            58.484701538085936,
+            22.44912338256836,
+            -19.10774943358514
+          ],
+          [
+            65.04234619140625,
+            22.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            71.59999084472656,
+            34.44912338256836,
+            -21.075042829581236
+          ]
+        ],
+        "width": 4,
+        "height": 8,
+        "shaderPath": "levels\\test\\timberland\\shaders\\timberland_ground"
+      },
+      "terrainSeam": {
+        "shoulderWidth": 8,
+        "bankHeight": 0,
+        "baseShaderPath": "levels\\test\\timberland\\shaders\\timberland_ground",
+        "donorShaderPath": "levels\\test\\sidewinder\\shaders\\sidewinder ground"
+      }
+    }
+  },
+  "humanAcceptance": {
+    "walkingBothWays": false,
+    "warthogBothWays": false,
+    "ridge": false,
+    "cavesAndDoors": false,
+    "sniperProjectiles": false,
+    "verifiedPhysicallyTraversableConnections": 0
+  },
+  "nineteenMapNativeWorldAccepted": false,
+  "screenshots": [
+    "E/chupa-portal-native-r157-megaworld-seam-closeup.png",
+    "E/chupa-portal-native-r157-megaworld-compiled-routes.png"
+  ]
+}

@@ -93,3 +93,6 @@ export function environmentHandoff(value?:EditorEnvironment|null, skyTagPath?:st
       'Set real sky/fog tags using a compatible editing kit; rerun radiosity/lightmaps and validate in Halo.',
     ]},null,2)+'\n';
 }
+
+/** Explicit native build request; saved separately from viewport lighting. */
+export interface NativeLighting { skyPath:string; environment:EditorEnvironment; quality:"draft"|"final"; }

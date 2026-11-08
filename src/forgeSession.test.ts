@@ -5,6 +5,7 @@ import type {Project} from './types';
 import type {QuickForgeDocument} from './forge';
 import {workshopExample} from './bspWorkshop';
 import {semanticJson} from './semanticJson';
+import {DEFAULT_ENVIRONMENT} from './environment';
 const base:QuickForgeDocument={schemaVersion:1,name:'shared',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[{id:'room',name:'Room',kind:'room',position:[0,0,0],rotation:[0,0,0],dimensions:[10,10,10],steps:4,visible:true,locked:false,materialId:'m'}],materials:[{id:'m',name:'Material',shaderPath:null,color:[1,1,1]}],placements:[],spawns:[],objectives:[]};
 it('does not retrofit unchanged native portal fields into pre-portal history just because object keys were reordered',()=>{
   const early=workshopExample(base),later=structuredClone(early);
@@ -52,4 +53,50 @@ it('merges native field edits with complete asset publication and preserves inve
 it('does not round native admission or semantic values through float32 geometry normalization',()=>{
   const d=structuredClone(base);d.native={source:{inventorySha256:'a'.repeat(64),fieldTag:'weapons/pistol/pistol.weapon',fieldTagSha256:'b'.repeat(64),boundingRadius:0.1,templateTag:'scenery/rock.scenery',templateSha256:'c'.repeat(64),dependencies:{'scenery/rock.gbxmodel':'d'.repeat(64)},previewSha256:'e'.repeat(64),previewTagId:1,previewTagPath:'scenery/rock'},fields:[{id:'pistolBoundingRadius',boundingRadius:0.225}],assets:[]};
   expect(portableForge(d).native).toEqual(d.native);expect(portableForge(portableForge(d))).toEqual(portableForge(d));
+});
+
+it('native lighting author Undo and Redo preserve an unrelated peer edit and reject a competing recipe',()=>{
+  const bake=structuredClone(base);
+  bake.nativeLighting={skyPath:'sky/example',quality:'draft',environment:structuredClone(DEFAULT_ENVIRONMENT)};
+  const peer=structuredClone(bake);peer.geometry[0].name='Partner room';
+  const removed=mergeForge(bake,base,peer);
+  expect(removed.nativeLighting).toBeUndefined();expect(removed.geometry[0].name).toBe('Partner room');
+  const restored=mergeForge(base,bake,removed);
+  expect(restored.nativeLighting).toEqual(bake.nativeLighting);expect(restored.geometry[0].name).toBe('Partner room');
+  const competing=structuredClone(peer);competing.nativeLighting!.environment.ambientIntensity=0.5;
+  expect(()=>mergeForge(bake,base,competing)).toThrow(/native lighting conflict/);
+  expect(competing.nativeLighting!.environment.ambientIntensity).toBe(0.5);
+  expect(mergeForge(bake,base,competing,true).nativeLighting).toBeUndefined();
+  let state=historyReducer(initialHistory,{type:'load',project:project(base)});
+  state=historyReducer(state,{type:'edit',project:project(bake),description:'Bake lighting'});
+  state=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:peer});
+  state=historyReducer(state,{type:'undo'});
+  expect(state.current?.quickForge?.nativeLighting).toBeUndefined();
+  expect(state.current?.quickForge?.geometry[0].name).toBe('Partner room');
+  state=historyReducer(state,{type:'redo'});
+  expect(state.current?.quickForge?.nativeLighting).toEqual(bake.nativeLighting);
+  expect(state.current?.quickForge?.geometry[0].name).toBe('Partner room');
+});
+
+it('rebases shared lighting into compatible history without attaching it to an older sky',()=>{
+  const initial=workshopExample(base);
+  let state=historyReducer(initialHistory,{type:'load',project:project(initial)});
+  const selectedSky=structuredClone(initial);selectedSky.skyPath='sky/example';
+  state=historyReducer(state,{type:'edit',project:project(selectedSky),description:'Choose sky'});
+  const peer=structuredClone(selectedSky);peer.nativeLighting={skyPath:'sky/example',quality:'draft',environment:structuredClone(DEFAULT_ENVIRONMENT)};peer.workshop!.brushes[1].name='Peer room';
+  state=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:peer});
+  expect(state.current?.quickForge?.nativeLighting).toEqual(peer.nativeLighting);
+  expect(state.past[0].quickForge?.skyPath).toBeNull();
+  expect(state.past[0].quickForge?.nativeLighting).toBeUndefined();
+  expect(state.past[0].quickForge?.workshop?.brushes[1].name).toBe('Peer room');
+  for(const p of [...state.past,state.current!]){
+    if(p.quickForge?.nativeLighting)expect(p.quickForge.nativeLighting.skyPath).toBe(p.quickForge.skyPath);
+  }
+  const earlier=structuredClone(initial);earlier.skyPath='sky/earlier';earlier.nativeLighting={...peer.nativeLighting,skyPath:'sky/earlier'};
+  let previous=historyReducer(initialHistory,{type:'load',project:project(earlier)});
+  previous=historyReducer(previous,{type:'edit',project:project(selectedSky),description:'Choose another sky'});
+  previous=historyReducer(previous,{type:'forge-remote',projectId:'shared-project',document:peer});
+  expect(previous.past[0].quickForge?.nativeLighting).toEqual(earlier.nativeLighting);
+  expect(previous.past[0].quickForge?.skyPath).toBe('sky/earlier');
+  expect(previous.past[0].quickForge?.workshop?.brushes[1].name).toBe('Peer room');
 });

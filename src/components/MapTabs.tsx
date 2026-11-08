@@ -1,4 +1,5 @@
-import {hasKeyboardDialog,navigateComposite} from '../keyboardNavigation';
+import PagedSurface from './PagedSurface';
+import {hasKeyboardDialog,navigateComposite,focusCompositeItem} from '../keyboardNavigation';
 import { ChevronDown, CornerUpLeft, ExternalLink, Pin, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {createPortal} from 'react-dom';
@@ -93,28 +94,29 @@ export default function MapTabs({
       {state.documents.length>0&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
         if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-file-menu[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
       }} onKeyDown={event=>{
-        if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector<HTMLElement>('summary')?.focus();return;}
+        if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector<HTMLElement>('summary')?.focus();return;}
+        if((event.target as HTMLElement).closest('.gs-surface-pages'))return;
         const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)')];
         if(!buttons.length)return;
         const input=event.target instanceof HTMLInputElement;
-        if(event.key==='Enter'&&input){event.preventDefault();buttons[0].click();return;}
+        if(event.key==='Enter'&&input){event.preventDefault();focusCompositeItem(buttons[0]);requestAnimationFrame(()=>{if(!buttons[0].closest('[inert]'))buttons[0].click();});return;}
         if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key)||(input&&['Home','End'].includes(event.key)))return;
         event.preventDefault();event.stopPropagation();const at=buttons.indexOf(document.activeElement as HTMLButtonElement);
         const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
-        buttons[next]?.focus();
+        if(buttons[next])focusCompositeItem(buttons[next]);
       }}>
-        <summary aria-label="Choose open map" title="Switch maps by full name; search or open a map in another window" onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
+        <summary aria-label="Choose open map" title="Choose an open map in this window. Search by name; the arrow moves a map to its own window." onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
         <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
           <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
-          <div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
-            <button role="menuitemradio" aria-label={d.history.current?.title} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
+          <PagedSurface name="map-switcher" label="Open maps" maxHeight={360}><div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
+            <button role="menuitemradio" aria-label={d.history.current?.title} title={'Switch to '+d.history.current?.title+' in this window; keep unsaved edits and history.'} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
               if(menu.current)menu.current.open=false;
               if(state.activeId===d.id)requestAnimationFrame(()=>tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
               else pendingFocus.current=d.id;
               onSelect(d.id);
             }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
-            <button aria-label={'Open '+d.history.current?.title+' in another window'} title="Open in another window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
-          </div>)}</div>
+            <button aria-label={'Open '+d.history.current?.title+' in another window'} title="Move this map and its history to a separate window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
+          </div>)}</div></PagedSurface>
           {!matches.length&&<p role="status">No open maps match.</p>}
         </div>
       </details>}

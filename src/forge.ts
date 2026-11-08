@@ -69,6 +69,7 @@ export interface QuickForgeDocument {
   skyPath: string | null;
   /** Visual authoring intent only; never treated as compiled Halo sky/fog tags. */
   environment?: EditorEnvironment | null;
+  nativeLighting?: import("./environment").NativeLighting | null;
   buildQuality: 'draft' | 'final';
   geometry: ForgeBrush[];
   materials: ForgeMaterial[];

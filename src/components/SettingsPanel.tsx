@@ -1,3 +1,4 @@
+import PagedSurface from './PagedSurface';
 import { Suspense, type ReactNode } from 'react';
 export default function SettingsPanel({
   tab,
@@ -79,7 +80,7 @@ export default function SettingsPanel({
             </div>
           }
         >
-          {children}
+          {tab==='tools'?children:<PagedSurface name={'settings-'+tab} label={'Settings '+tab} fill>{children}</PagedSurface>}
         </Suspense>
       </div>
     </div>

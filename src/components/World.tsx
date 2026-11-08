@@ -19,7 +19,7 @@ import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react
 import type { ReactNode,MutableRefObject } from 'react';
 import { Canvas, useThree,useFrame } from '@react-three/fiber';
 import {
-  OrbitControls,
+  OrbitControls,Line,
 
   OrthographicCamera,
   PerspectiveCamera,
@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview,RuntimeId } from '../types';
 import { extraTextureKey } from '../haloMaterial';
-import {nativeSurfacePick} from '../nativeSurfacePick';
+import {nativeEdgePick,donorPoint} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import {configureSourceTexture} from '../sourceTexture';
 import {playerStartCamera} from '../sourceCamera';
@@ -292,7 +292,7 @@ function Scene({
   onSceneDragStart,onSceneDragEnd,
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
-  ownedModels,assembly,additionalBounds,
+  ownedModels,assembly,joinedPreview,additionalBounds,pickTarget,surfacePick,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -320,7 +320,9 @@ function Scene({
   cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;greenScreen?:boolean;
   ownedModels:Record<string,OwnedModelView>;
   assembly:AssemblyViewportSource|null;
+  joinedPreview?:import('../bspAssembly').AssemblyReport['viewport'];
   additionalBounds:{min:Vec3;max:Vec3}|null;
+  pickTarget?:'base'|'donor'|null;surfacePick?:NativeSurfacePick|null;
 }) {
   const group = useRef<THREE.Group>(null);
   const altDrag=useRef(false),{gl}=useThree();
@@ -373,7 +375,7 @@ function Scene({
           position={[0, 0, -0.02]}
         />
       )}
-      {previewMesh?.positions.length ? (
+      {!joinedPreview&&previewMesh?.positions.length ? (
         <group userData={{assetSurface:true}}>
         <Mesh
           data={previewMesh}
@@ -386,19 +388,21 @@ function Scene({
           shaderTextures={viewMode === 'render' || viewMode === 'materials' ? shaderTextures : EMPTY_SHADER_TEXTURES}
           lightmapTextures={viewMode === 'render' || viewMode === 'materials' ? lightmapTextures : EMPTY_LIGHTMAP_TEXTURES}
           onShaderClick={onOpenTag}
-          onSurfaceClick={!cinematic&&inspection&&previewMesh&&onPickSurface?(triangle,point)=>{const pick=nativeSurfacePick(previewMesh,inspection.sha256,triangle,point);if(pick)onPickSurface(pick);}:undefined}
+          onSurfaceClick={!cinematic&&inspection&&previewMesh&&onPickSurface&&pickTarget!=='donor'?(triangle,point)=>{const pick=nativeEdgePick(previewMesh,inspection.sha256,triangle,point);if(pick)onPickSurface(pick);}:undefined}
         />
         </group>
       ) : null}
-      {!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
+      {!joinedPreview&&!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
       {assembly&&project.bspAssembly&&(()=>{
-        const plan=project.bspAssembly,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
+        const plan=joinedPreview?.assembly??project.bspAssembly,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
         return <group name="gs-assembly-donor" userData={{assetSurface:true}} position={plan.translation} rotation={[0,0,plan.yawDegrees*Math.PI/180]}>
-          <Mesh greenScreen={greenScreen} data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>
-          {!greenScreen&&viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
+          {!joinedPreview&&<Mesh greenScreen={greenScreen} data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures} onSurfaceClick={!cinematic&&onPickSurface&&pickTarget==='donor'?(triangle,point)=>{const pick=nativeEdgePick(assembly.terrain,source.inspection!.sha256,triangle,donorPoint(point,plan,true));if(pick)onPickSurface(pick);}:undefined}/>}
+          {!joinedPreview&&!greenScreen&&viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
           {assembly.scenery.map(object=>{const model=ownedModels[forgeModelKey({...identity,tagId:object.tagId!})];return <group key={object.id} position={object.position} rotation={[object.rotation[2],object.rotation[1],object.rotation[0],'ZYX']} scale={object.scale}><ObjectVisual greenScreen={greenScreen} object={object} asset={model?.mesh??source.inspection?.modelMeshes?.[object.tagId!]} selected={false} size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?model?.shaderTextures:EMPTY_SHADER_TEXTURES} shaderMetadata={model?.shaderMetadata} extraTextures={model?.extraTextures}/></group>;})}
         </group>;
       })()}
+      {joinedPreview&&assembly&&joinedPreview.surfaces.map(surface=>{const donor=surface.source===1,view=ownedModels[forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId})];return <group key={surface.source} name="gs-joined-source" userData={{assetSurface:true}}><Mesh data={surface.mesh} greenScreen={greenScreen} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?(donor?view?.shaderTextures:shaderTextures):EMPTY_SHADER_TEXTURES} shaderMetadata={donor?view?.shaderMetadata:shaderMetadata} extraTextures={donor?view?.extraTextures:extraTextures}/></group>;})}
+      {surfacePick?.edge&&(()=>{const donor=surfacePick.sourceHash===project.bspAssembly?.donorSource.sha256;const points=surfacePick.edge.vertices.map(p=>donor&&project.bspAssembly?donorPoint(p,project.bspAssembly):p);return <Line points={points} color="#ffe280" lineWidth={4} depthTest={false} renderOrder={1000}/>;})()}
       {all
         .filter((o) => o.id !== selected&&!(playerView&&o.id===cameraStartId&&o.kind==='Player spawn'))
         .map((o) => (
@@ -488,6 +492,7 @@ export default function World({
   onSelectMap,
   onResourcesConnected,
   onBeforeResources,
+  onBakeBuild,
   selectedId,
   onSelectObject,
   viewportChildren,
@@ -508,7 +513,8 @@ export default function World({
   onDetachTags?: (sourceProjectId:string,tagId:number)=>Promise<boolean>;
   onSelectMap?: (id:string)=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
-  onBeforeResources?: () => Promise<void>;
+  onBeforeResources?: (persist?:boolean) => Promise<void>;
+  onBakeBuild?:()=>Promise<void>;
   selectedId?: string | null;
   onSelectObject?: (id: string | null) => void;
   viewportChildren?: React.ReactNode;
@@ -522,6 +528,7 @@ export default function World({
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
   const [surfacePick,setSurfacePick]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
+  const [pickTarget,setPickTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
   const activity=useWorkspaceActivity();
   const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
@@ -550,8 +557,8 @@ export default function World({
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
-  const assemblyDonor=useAssemblyDonor(project),assembly=assemblyDonor.source;
-  const donorBounds=useMemo(()=>assembly&&project.bspAssembly?assemblyBounds(assembly.terrain,project.bspAssembly.translation,project.bspAssembly.yawDegrees):null,[assembly?.terrain,project.bspAssembly?.translation,project.bspAssembly?.yawDegrees]);
+  const assemblyDonor=useAssemblyDonor(project),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.preview?.assembly??project.bspAssembly;
+  const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
   const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes,assembly?.surfaces);
   const assemblyTerrainKey=assembly?forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId}):'';
   async function dropAsset(key: string, position: Vec3, replaceId?: string | null) {
@@ -1452,7 +1459,7 @@ export default function World({
                     cinematic,greenScreen,
                     cameraLocked,
                     externalCameraAuthority,
-                    ownedModels,assembly,additionalBounds:donorBounds,
+                    ownedModels,assembly,joinedPreview:pickTarget?undefined:assemblyDonor.preview,additionalBounds:donorBounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
                   onSnapError={notify}
@@ -1518,7 +1525,8 @@ export default function World({
               <button onClick={() => setSelected(null)}>Deselect object</button>
             </div>
           )}
-          {!cinematic&&!chosen&&surfacePick&&inspection&&surfacePick.sourceHash===inspection.sha256&&<div className="viewport-object-actions" data-native-surface={surfacePick.bspIndex} data-source-hash={surfacePick.sourceHash}>
+          {pickTarget&&<div className="viewport-object-actions" role="status">Click an edge on {pickTarget==='base'?'this region':'the donor region'}. <button onClick={()=>setPickTarget(null)}>Cancel edge selection</button></div>}
+          {!pickTarget&&!cinematic&&!chosen&&surfacePick&&inspection&&surfacePick.sourceHash===inspection.sha256&&<div className="viewport-object-actions" data-native-surface={surfacePick.bspIndex} data-source-hash={surfacePick.sourceHash}>
             <strong>BSP {surfacePick.bspIndex+1} · landscape</strong>
             <button onClick={()=>openObjectTag(surfacePick.shaderTagId)}>Surface shader</button>
             <button onClick={()=>{writeMapSession(project.id,'bsp.open',true);revealPanel('construction');}}>Connect / tunnel</button>
@@ -1591,7 +1599,7 @@ export default function World({
           </div>
         </div>
         <div className="viewport-status">
-          {project.bspAssembly&&<span data-testid="assembly-source-status" data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original source regions in one viewport. The connection, collision and new lighting require the native rebuild; source preview is not gameplay acceptance.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading saved donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':'2 source regions · '+project.bspAssembly.donorTitle+' · native rebuild required')}</span>}
+          {project.bspAssembly&&<span data-testid="assembly-source-status" data-joined-triangles={assemblyDonor.preview?.surfaces.reduce((n,s)=>n+s.mesh.indices.length/3,0)??0} data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original regions and validated joined source share one renderer. Preview joined seam in Construction displays the rebuilt connection. New native lightmaps and gameplay still require compilation and a Halo test.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading saved donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':assemblyDonor.preview?'Joined source geometry · native rebuild required':'2 source regions · Preview joined seam in Construction to display the connection')}</span>}
           <span>{formatNumber((previewMesh?.indices.length ?? 0) / 3)} visible triangles</span>
           <span>{Object.keys(inspection?.modelMeshes ?? {}).length} object model types resolved</span>
           <span>{project.scene.length} objects</span>
@@ -1821,6 +1829,15 @@ export default function World({
             <EnvironmentControls
               value={environment}
               persisted
+              skyPath={sourceAppearance?.skyPath}
+              bakedQuality={project.nativeLighting?.quality}
+              bakeDisabled={!native?'Native baking requires the desktop application.':!project.bspAssembly?'Native baking here requires editable BSP source and a configured build target. Use BSP Workshop or connect a BSP assembly first.':!sourceAppearance?.skyPath?'This source has no supported single sky tag.':undefined}
+              onBake={onBakeBuild?async quality=>{
+                if(!project.bspAssembly||!sourceAppearance?.skyPath)throw Error('Connect editable native BSP source and its sky before baking.');
+                edit({...project,nativeLighting:{skyPath:sourceAppearance.skyPath,environment:structuredClone(environment),quality}},'Apply native sky lighting and bake');
+                await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+                await onBeforeResources?.(true);await onBakeBuild();
+              }:undefined}
               onChange={(next) => {
                 setEnvironment(next);
                 edit({ ...project, worldEnvironment: next }, 'Change world lighting and fog');

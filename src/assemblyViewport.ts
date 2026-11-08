@@ -1,5 +1,7 @@
 import type {OpenProject,MeshData,SceneObject,Vec3} from './types';
-import type {BspAssembly} from './bspAssembly';
+import {assemblySignature} from './bspAssembly';
+import type {BspAssembly,AssemblyReport} from './bspAssembly';
+import type {Project} from './types';
 import type {OwnedSourceMesh} from './useOwnedForgeModels';
 import {resolveBspMesh} from './renderView';
 
@@ -31,4 +33,15 @@ export function assemblyBounds(mesh:MeshData,translation:Vec3,yawDegrees:number)
  const min:Vec3=[Infinity,Infinity,Infinity],max:Vec3=[-Infinity,-Infinity,-Infinity],angle=yawDegrees*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
  for(const index of mesh.indices){const i=index*3;if(!Number.isSafeInteger(index)||index<0||i+2>=mesh.positions.length)throw Error('Invalid donor geometry index');const [x,y,z]=mesh.positions.slice(i,i+3),point=[c*x-s*y+translation[0],s*x+c*y+translation[1],z+translation[2]];if(!point.every(Number.isFinite))throw Error('Invalid donor geometry');for(let axis=0;axis<3;axis++){min[axis]=Math.min(min[axis],point[axis]);max[axis]=Math.max(max[axis],point[axis]);}}
  return {min,max};
+}
+
+/** A late check cannot replace another map, a newer edit or another donor. */
+export function currentAssemblyPreview(project:Project,preview:AssemblyReport['viewport']){
+ return preview&&preview.projectId===project.id&&preview.sourceSha256===project.source?.sha256&&preview.donorSha256===project.bspAssembly?.donorSource.sha256&&assemblySignature(preview.assembly)===assemblySignature(project.bspAssembly??null)?preview:undefined;
+}
+
+/** Only this window's draft based on the present saved revision may own a preview. */
+export function currentAssemblyDraftPreview(project:Project,draft:BspAssembly|null,baseline:string,preview:AssemblyReport['viewport']){
+ if(!draft||baseline!==assemblySignature(project.bspAssembly??null)||draft.donorProjectId!==project.bspAssembly?.donorProjectId||draft.donorSource.sha256!==project.bspAssembly?.donorSource.sha256)return undefined;
+ return currentAssemblyPreview({...project,bspAssembly:draft},preview);
 }

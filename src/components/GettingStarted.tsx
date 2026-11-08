@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { ArrowRight, BookOpen, Boxes, CircleHelp, Compass, Globe2, ShieldCheck, Users } from 'lucide-react';
 import type { Bootstrap, Project, Settings, Workspace } from '../types';
 import StartupSetup from './StartupSetup';
+import type {OpenCeFlavor} from '../runtimeWorkbench';
 import { STARTER_PATHS, starterEvidence } from '../firstRun';
 import type { StarterId } from '../firstRun';
 import { Notice, PageTitle, Pill } from './ui';
 import '../onboarding.css';
-export default function GettingStarted({data,project,navigate,onApply}:{data:Bootstrap;project:Project|null;navigate:(target:Workspace)=>void;onApply:(s:Settings)=>Promise<void>}){
+export default function GettingStarted({data,project,navigate,onApply,onWalkthrough,onSetupFlavor}:{onSetupFlavor:(flavor:OpenCeFlavor)=>void;onWalkthrough:()=>void;data:Bootstrap;project:Project|null;navigate:(target:Workspace)=>void;onApply:(s:Settings)=>Promise<void>}){
   const [selected,setSelected]=useState<StarterId>('inspect');
   const path=STARTER_PATHS.find(p=>p.id===selected)!;
   return <div className="analysis-page gs-get-started">
     <PageTitle eyebrow="WELCOME / GUILTY SPARK" title="Make a Halo world. Know what the engine needs."
       description="A single workbench for preserved maps, editable source geometry, tag references, scripted scenarios and runtime-specific tooling. Pick a goal and follow real, explained steps." />
-    <StartupSetup data={data} onApply={onApply} navigate={navigate}/>
+    <StartupSetup data={data} onApply={onApply} navigate={navigate} onSetupFlavor={onSetupFlavor}/>
+    <button onClick={onWalkthrough}>Start guided walkthrough</button>
     <button onClick={()=>navigate('features')}>Explore Spark features &amp; workflows</button>
     <details className="gs-project-paths" open={!!data.settings.onboardingCompleted}><summary>Project ideas &amp; guided paths</summary>
     <div className="gs-starter-picker" role="group" aria-label="Choose your first project goal">{STARTER_PATHS.map(p=><button key={p.id} className={selected===p.id?'gs-starter-selected':''} onClick={()=>setSelected(p.id)} title={p.description} aria-pressed={selected===p.id}>

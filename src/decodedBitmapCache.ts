@@ -9,11 +9,16 @@ export class DecodedBitmapCache {
   private misses = 0;
   private changes = 0;
   private evictions = 0;
-  private readonly budget: number;
+  private budget: number;
   private readonly limit: number;
   constructor(budget = 64 * 1024 * 1024, limit = 128) {
     this.budget = budget;
     this.limit = limit;
+  }
+  setBudget(bytes:number){
+    if(!Number.isSafeInteger(bytes)||bytes<0)throw Error('A finite decoded-cache budget is required.');
+    this.budget=bytes;
+    while(this.bytes>bytes&&this.entries.size){const oldest=this.entries.keys().next().value!;this.bytes-=this.entries.get(oldest)!.bytes;this.entries.delete(oldest);this.evictions++;}
   }
   get(key: string, dds: string): DdsImage | null {
     const entry = this.entries.get(key);

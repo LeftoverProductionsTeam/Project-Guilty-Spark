@@ -123,3 +123,16 @@
   gap: 7px;
   font-size: 12px;
 }
+
+/* Paging owns control navigation; a nested scroll box made lower route controls unreachable. */
+.gs-page-body .bsp-assembly {max-height:none;overflow:visible;}
+
+.bsp-edge-controls{margin:8px 0;padding:6px 8px;border:1px solid var(--line);border-radius:4px;min-width:0;}
+.bsp-edge-controls legend{font-size:11px;font-weight:700;}
+.bsp-edge-controls p{margin:2px 0;font-size:11px;line-height:1.4;}
+.bsp-edge-controls .bsp-actions{gap:4px;margin:2px 0;}
+.bsp-seam-sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin:8px 0;}
+.bsp-seam-sliders label{display:grid;grid-template-columns:1fr auto;gap:3px;font-size:11px;}
+.bsp-seam-sliders input{grid-column:1/-1;min-width:0;width:100%;padding:0;}
+.bsp-seam-sliders span{grid-column:1/-1;font-size:11px;line-height:1.4;color:var(--muted);}
+.bsp-section-name{display:flex;gap:6px;align-items:center;font-size:11px;}

@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "scope": "Publisher-pinned Windows runtime packages; no Halo game content",
+  "packages": [
+    {
+      "id": "opence",
+      "name": "OpenCE",
+      "version": "build-343",
+      "url": "https://github.com/OpenCommunityEdition/OpenCE/releases/download/build-343/halo-windows-release.zip",
+      "releasePage": "https://github.com/OpenCommunityEdition/OpenCE/releases/tag/build-343",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "sha256": "4804cceef72a0b18f97813902625bf32c6f7677d0f023f3bc49eb31cceb2be81",
+      "bytes": 15186349,
+      "executable": "halo.exe",
+      "executableSha256": "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9",
+      "sourceCommit": "fc9deb0b10eaae1d62caedb0710968b4e77e6e16",
+      "license": "AGPL v3 (bundled license); all notices retained",
+      "accepted": {
+        "publisherArchiveHash": true,
+        "archiveInspected": true,
+        "nativeInstall": false,
+        "launch": false,
+        "gameplay": false,
+        "vr": false
+      }
+    },
+    {
+      "id": "chupathingy",
+      "name": "Chupathingy",
+      "version": "v0.9.0c",
+      "url": "https://github.com/ChupathingyCE/chupathingyce/releases/download/v0.9.0c/chupathingyce-windows64-release.zip",
+      "releasePage": "https://github.com/ChupathingyCE/chupathingyce/releases/tag/v0.9.0c",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "sha256": "be85c65f3bd9abf3c1dfb8d912f900fb15d6940be3080412a866e8734fc2f72c",
+      "bytes": 31227575,
+      "executable": "chupathingy.exe",
+      "executableSha256": "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b",
+      "sourceCommit": null,
+      "license": "GPL v3 (bundled license); all notices retained",
+      "accepted": {
+        "publisherArchiveHash": true,
+        "archiveInspected": true,
+        "nativeInstall": false,
+        "launch": false,
+        "gameplay": false,
+        "vr": false
+      }
+    },
+    {
+      "id": "faber",
+      "name": "OpenCE Faber",
+      "version": "v2.3.4",
+      "url": "https://github.com/SutlabSol/OpenCE-Faber/releases/download/v2.3.4/OpenCE-Faber-Windows-Full.zip",
+      "releasePage": "https://github.com/SutlabSol/OpenCE-Faber/releases/tag/v2.3.4",
+      "repository": "https://github.com/SutlabSol/OpenCE-Faber",
+      "sha256": "b6ed7f1df72dfa4dbc935e3747bda347f6ea4bbd11ca613938a2d823c401d3ec",
+      "bytes": 43294895,
+      "executable": "halo.exe",
+      "executableSha256": "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3",
+      "sourceCommit": null,
+      "license": "AGPL v3 (bundled license); all notices retained",
+      "accepted": {
+        "publisherArchiveHash": true,
+        "archiveInspected": true,
+        "nativeInstall": false,
+        "launch": false,
+        "gameplay": false,
+        "vr": false
+      }
+    },
+    {
+      "id": "openh1",
+      "name": "OpenH1",
+      "version": "build-1845",
+      "url": "https://github.com/OpenH1/OpenH1/releases/download/build-1845/OpenH1-Windows.zip",
+      "releasePage": "https://github.com/OpenH1/OpenH1/releases/tag/build-1845",
+      "repository": "https://github.com/OpenH1/OpenH1",
+      "sha256": "557cb59541631515da49d8a2c96c385cc05e4ac0e9730ab8a41f4f478c16a9d7",
+      "bytes": 20893816,
+      "executable": "halo.exe",
+      "executableSha256": "7aab23553625099ed156faa627d31c7bbc342e4b5d252a348f0d0ddf464ddb46",
+      "sourceCommit": "17615bc81b20df5094955566e4216b1d7125d2b9",
+      "license": "AGPL v3 (bundled license); all notices retained",
+      "accepted": {
+        "publisherArchiveHash": true,
+        "archiveInspected": true,
+        "nativeInstall": false,
+        "launch": false,
+        "gameplay": false,
+        "vr": false
+      }
+    }
+  ],
+  "notes": [
+    "User-installed runtimes remain untouched.",
+    "Separate engine files reference one shared content set through existing exact-build profiles.",
+    "The three named presentation packs have no verified publisher URL and have not been downloaded.",
+    "Headset and game acceptance remain independent."
+  ]
+}

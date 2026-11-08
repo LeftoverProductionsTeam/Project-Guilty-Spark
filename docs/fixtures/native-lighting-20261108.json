@@ -1,0 +1,495 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "5095e9b9ea0979448cd571d56659b4076e5930a2",
+  "workingTreeDirty": true,
+  "runtimeSourceFingerprint": "d1446a4b396cfdbfe4bc8d3e41add5225bbddeb49b169b849dcff67094c04df6",
+  "application": {
+    "file": "GuiltySpark.exe",
+    "bytes": 49782784,
+    "sha256": "431fbbbeb5c0d4ad21f7f42c26098d2573b7c664bfe38270fd9b59cbcace390d"
+  },
+  "runtime": "Chupathingy v0.9.0c Windows x64",
+  "uiControls": [
+    "BSP Workshop",
+    "Halo material paths & player starts",
+    "Lighting & fog",
+    "Bake lighting & rebuild"
+  ],
+  "bake": {
+    "skyPath": "sky\\sky_timberland\\sky_timberland",
+    "environment": {
+      "previewEnabled": true,
+      "skyColor": [
+        0.051,
+        0.098,
+        0.133
+      ],
+      "ambientColor": [
+        0.69,
+        0.83,
+        0.91
+      ],
+      "ambientIntensity": 0.6,
+      "sunColor": [
+        1,
+        0.92,
+        0.77
+      ],
+      "sunIntensity": 2.2,
+      "sunAzimuth": -35,
+      "sunElevation": 50,
+      "fogEnabled": false,
+      "fogColor": [
+        0.3,
+        0.43,
+        0.51
+      ],
+      "fogNear": 25,
+      "fogFar": 180
+    },
+    "quality": "draft"
+  },
+  "geometry": {
+    "vertices": 174,
+    "triangles": 58
+  },
+  "nativeBuildSha256": "a8f3ee12247150f7c7fcf4f241c53ff9b59e0ffd18b9186b4013853f4ff75019",
+  "rebuiltSha256": "75b0a4ca4c7788e6a5bbfe083e93c78ddf5f11e9fb4f3b6d63bbe3f9cdbf1e36",
+  "externalReadback": {
+    "complete": true,
+    "cacheSha256": "75b0a4ca4c7788e6a5bbfe083e93c78ddf5f11e9fb4f3b6d63bbe3f9cdbf1e36",
+    "humanGameplayAccepted": false,
+    "sky": "levels\\guilty_spark_lighting\\943d19f45e8e4b03ae455de953c99190\\sky.sky",
+    "values": {
+      "indoor_ambient_radiosity_power": [
+        0.6
+      ],
+      "indoor_ambient_radiosity_color": [
+        0.69,
+        0.83,
+        0.91
+      ],
+      "indoor_fog_maximum_density": [
+        1
+      ],
+      "indoor_fog_start_distance": [
+        0
+      ],
+      "indoor_fog_opaque_distance": [
+        0
+      ],
+      "indoor_fog_color": [
+        0.3,
+        0.43,
+        0.51
+      ],
+      "outdoor_ambient_radiosity_power": [
+        0.6
+      ],
+      "outdoor_ambient_radiosity_color": [
+        0.69,
+        0.83,
+        0.91
+      ],
+      "outdoor_fog_maximum_density": [
+        1
+      ],
+      "outdoor_fog_start_distance": [
+        0
+      ],
+      "outdoor_fog_opaque_distance": [
+        0
+      ],
+      "outdoor_fog_color": [
+        0.3,
+        0.43,
+        0.51
+      ],
+      "lights[0].power": [
+        2.2
+      ],
+      "lights[0].color": [
+        1,
+        0.92,
+        0.77
+      ],
+      "lights[0].direction": [
+        -35,
+        50
+      ]
+    },
+    "skyTagSha256": "4363c83c61a33375639ab3e667f768ca23256c2c42472cb3ddefe94958694f81",
+    "bsp": "levels\\quickforge\\native_live_rebuild\\native_live_rebuild.scenario_structure_bsp",
+    "lightmap": "levels\\quickforge\\native_live_rebuild\\native_live_rebuild.bitmap",
+    "lightmapGroups": 2,
+    "materials": [
+      "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor.shader_environment"
+    ],
+    "crcMismatch": 0,
+    "acceptedCacheUnchanged": true
+  },
+  "firstBuildMs": 64943,
+  "rebuildAndLoadMs": 86979,
+  "gameStartPositions": {
+    "first": [
+      32,
+      -4,
+      0
+    ],
+    "rebuilt": [
+      32.25,
+      -4,
+      0
+    ]
+  },
+  "failedBuildPreservedPreviousProcessAndCache": true,
+  "saveAndBuildHistorySurviveRestart": true,
+  "originalInputCount": 8,
+  "originalsUnchanged": true,
+  "automated": {
+    "rustPassed": 872,
+    "rustIgnored": 9,
+    "frontendPassed": 469,
+    "browserPassed": 243,
+    "offlinePassed": 59,
+    "storagePassed": 36
+  },
+  "gameLoadAccepted": true,
+  "humanGameplayAccepted": false,
+  "finalRadiosityAccepted": true,
+  "mccLightingBakeAccepted": false,
+  "evidence": [
+    "native-lighting-r148.json",
+    "native-lighting-readback-r153.json",
+    "native-lighting-r148-chupathingy.jpg",
+    "native-lighting-r148-logic-inspector.png"
+  ],
+  "sharedRecipeFollowThrough": {
+    "receipt": "E/portal-lighting-regressions-r155.json",
+    "rustPassed": 875,
+    "rustIgnored": 9,
+    "frontendPassed": 471,
+    "realTcpAuthorUndoPeerPreservation": true,
+    "competingRecipeRefused": true,
+    "threeProcessLightingAccepted": true,
+    "twoPhysicalComputersAccepted": false,
+    "latestReceipt": "E/lighting-shared-native-r169.json",
+    "latestReceiptSha256": "27cdce717f37ebb647f3a5186dc265efc89d3081d8a74496f59385b6a8a1ed61",
+    "threeProcessFullContinuationAccepted": true,
+    "physicalMachines": 1,
+    "separateLibraries": 3,
+    "mockedIpc": false,
+    "validSavedUndoSnapshots": true,
+    "realOwnerProcessDeathRecovery": true,
+    "journalRolloverAndReinvitation": true,
+    "revokedParticipantRefused": true,
+    "nativeBakeTestedInThisStage": false,
+    "frozenMccCacheSha256": "826f56799c7614cd8d915709916b2a7dce1c099378626ba993fa91819718ec32",
+    "frozenBuildRevision": 254,
+    "newerLiveRevision": 255,
+    "sustainedCommits": 240,
+    "journalBytes": 1153342,
+    "historyLimit": 100,
+    "medianEarlySampleMs": 904.0,
+    "medianLateSampleMs": 915.1,
+    "measurementScope": "One-machine sustained-edit measurements; not a before/after optimization, whole-process memory or cross-computer latency result.",
+    "gameplayReplicationTested": false,
+    "steamTransportTested": false
+  },
+  "latestFinalAcceptance": {
+    "receipt": "E/native-lighting-saved-r166.json",
+    "receiptSha256": "4c91925f5f36e858056fadd5541b300656b6494553b3a742f2422ce9721a4214",
+    "application": {
+      "directory": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Engineering-d49eb02588bf\\lighting-saved-app-r166",
+      "sourceCommit": "5095e9b9ea0979448cd571d56659b4076e5930a2",
+      "workingTreeDirty": true,
+      "files": [
+        {
+          "file": "GuiltySpark.exe",
+          "bytes": 49985024,
+          "sha256": "38cdda4efb86c4321bf6aec7c787913401c6917cc4c152390a016d14f6b99a7a"
+        }
+      ],
+      "runtimeSourceFingerprint": "b0c36e0c40d21e89d10fbdf64238cc589e22711f12d2e7e4e7142a42ed225beb",
+      "purpose": "One temporary source-pinned QA executable; not a release"
+    },
+    "quality": "final",
+    "request": {
+      "skyPath": "sky\\sky_timberland\\sky_timberland",
+      "environment": {
+        "previewEnabled": true,
+        "skyColor": [
+          0.051,
+          0.098,
+          0.133
+        ],
+        "ambientColor": [
+          0.69,
+          0.83,
+          0.91
+        ],
+        "ambientIntensity": 0.6,
+        "sunColor": [
+          1,
+          0.92,
+          0.77
+        ],
+        "sunIntensity": 2.2,
+        "sunAzimuth": -35,
+        "sunElevation": 50,
+        "fogEnabled": false,
+        "fogColor": [
+          0.3,
+          0.43,
+          0.51
+        ],
+        "fogNear": 25,
+        "fogFar": 180
+      },
+      "quality": "final"
+    },
+    "actualWindowsControls": true,
+    "savedHistoryDirty": false,
+    "stagedAndSavedDocumentDifferences": [],
+    "firstCacheSha256": "af90a68fea7b88bf28187d8a79dd1392614265704398ebb733e9379601283782",
+    "rebuiltCache": {
+      "file": "native-lighting-saved-r166-validated.map",
+      "bytes": 57566348,
+      "sha256": "76b72f02f459e323a586eedce73f5c1693023d6677e1e65fb45a8d65e53281a8",
+      "purpose": "One accepted native cache for independent review and pending human playtest"
+    },
+    "independentSky": {
+      "tag": "levels\\guilty_spark_lighting\\da510fad82324bd6b6f82028aabf098c\\sky.sky",
+      "values": {
+        "indoor_ambient_radiosity_power": [
+          0.6
+        ],
+        "indoor_ambient_radiosity_color": [
+          0.69,
+          0.83,
+          0.91
+        ],
+        "indoor_fog_maximum_density": [
+          1
+        ],
+        "indoor_fog_start_distance": [
+          0
+        ],
+        "indoor_fog_opaque_distance": [
+          0
+        ],
+        "indoor_fog_color": [
+          0.3,
+          0.43,
+          0.51
+        ],
+        "outdoor_ambient_radiosity_power": [
+          0.6
+        ],
+        "outdoor_ambient_radiosity_color": [
+          0.69,
+          0.83,
+          0.91
+        ],
+        "outdoor_fog_maximum_density": [
+          1
+        ],
+        "outdoor_fog_start_distance": [
+          0
+        ],
+        "outdoor_fog_opaque_distance": [
+          0
+        ],
+        "outdoor_fog_color": [
+          0.3,
+          0.43,
+          0.51
+        ],
+        "lights[0].power": [
+          2.2
+        ],
+        "lights[0].color": [
+          1,
+          0.92,
+          0.77
+        ],
+        "lights[0].direction": [
+          -35,
+          50
+        ]
+      }
+    },
+    "independentBsp": {
+      "tag": "levels\\quickforge\\native_live_rebuild\\native_live_rebuild.scenario_structure_bsp",
+      "lightmapGroups": 2,
+      "materials": [
+        "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor.shader_environment"
+      ]
+    },
+    "crcMismatch": 0,
+    "initialCompiledStarts": [
+      [
+        -5,
+        -4,
+        0.1
+      ],
+      [
+        -5,
+        4,
+        0.1
+      ],
+      [
+        32,
+        -4,
+        0.1
+      ],
+      [
+        32,
+        4,
+        0.1
+      ]
+    ],
+    "rebuiltCompiledStarts": [
+      [
+        -4.75,
+        -4,
+        0.1
+      ],
+      [
+        -4.75,
+        4,
+        0.1
+      ],
+      [
+        32.25,
+        -4,
+        0.1
+      ],
+      [
+        32.25,
+        4,
+        0.1
+      ]
+    ],
+    "firstGamePosition": [
+      32,
+      -4,
+      0
+    ],
+    "rebuiltGamePosition": [
+      -4.75,
+      -4,
+      0
+    ],
+    "gameSpawnEvidence": "Every native start shifted X+0.25. The runtime selected different valid starts on the two launches; both observed positions match their exact compiled start sets. This is not player movement or collision acceptance.",
+    "firstBuildMilliseconds": 76630,
+    "rebuildAndLoadMilliseconds": 92102,
+    "failedBuildRetainedPreviousProcessAndCache": true,
+    "realCompilerRejected": true,
+    "sourceAndBuildHistorySurviveActualRestart": true,
+    "originalInputs": 8,
+    "originalsUnchanged": true,
+    "nativeGameLoad": true,
+    "humanAppearanceAccepted": false,
+    "humanGameplayAccepted": false,
+    "osScreenshot": "E/native-lighting-saved-r166-chupathingy-os-prompt.jpg",
+    "osScreenshotObscuredByUnhandledWindowsNetworkPermission": true,
+    "windowsSecuritySettingsChanged": false,
+    "reviewedSourceRecovery": {
+      "tags": 3,
+      "lossless": false,
+      "sourceTagsUnchanged": true,
+      "reviewRequired": true
+    }
+  },
+  "currentRegression": {
+    "rustReceipt": "E/native-lighting-integration-r158.json",
+    "rustPassed": 876,
+    "rustIgnored": 9,
+    "rustScope": "Rust stage passed; that earlier overall run stopped at a stale native UI selector. Rust source unchanged by the subsequent frontend Save fix.",
+    "frontendReceipt": "E/native-lighting-saved-r166.json",
+    "frontendPassed": 472,
+    "browserReceipt": "E/lighting-saved-browser-r167.json",
+    "browserPassed": 245,
+    "offlinePassed": 59,
+    "storagePassed": 36,
+    "focusedSaveBrowserPassed": 2
+  },
+  "currentNativeLayouts": {
+    "receipt": "E/lighting-shared-native-r169.json",
+    "appSha256": "38cdda4efb86c4321bf6aec7c787913401c6917cc4c152390a016d14f6b99a7a",
+    "cases": 12,
+    "devicePixelRatio": 1,
+    "results": [
+      {
+        "width": 800,
+        "height": 600,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 1366,
+        "height": 768,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 1500,
+        "height": 950,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 2560,
+        "height": 1080,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 3440,
+        "height": 1440,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      },
+      {
+        "width": 5120,
+        "height": 1440,
+        "horizontalOverflow": 0,
+        "verticalOverflow": 0,
+        "scrollingControls": 0,
+        "dashboardControls": 90
+      }
+    ],
+    "nativeViewportAcceptance": true,
+    "physicalDpiChangesTested": false,
+    "physicalUltrawideHardwareTested": false,
+    "physicalMonitorDisconnectTested": false,
+    "savedScaleCacheAndFlavorRestartAccepted": true
+  }
+}

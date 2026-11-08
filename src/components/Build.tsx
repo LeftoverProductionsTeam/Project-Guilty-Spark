@@ -65,6 +65,8 @@ export default function Build({
     [resourcesOpen,setResourcesOpen]=useMapState(project.id,'build.resourcesOpen',false),
     [reportOpen,setReportOpen]=useMapState(project.id,'build.reportOpen',false),
     [historyOpen,setHistoryOpen]=useMapState(project.id,'build.historyOpen',false);
+  const target=project.buildTargets?.find(t=>t.id===project.activeBuildTarget);
+  const ceTarget=target?.builder==='invader-ce'&&['haloCustomEdition','chupathingyCe'].includes(target.runtimeId);
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
@@ -75,7 +77,7 @@ export default function Build({
       const results = await Promise.allSettled([
         call<CompatibilityReport>('compatibility', { id: project.id }),
         call<Readiness>('launch_readiness', { id: project.id }),
-        call<TemplateReport>('inspect_template', { id: project.id }),
+        ceTarget?Promise.resolve(null):call<TemplateReport>('inspect_template', { id: project.id }),
       ]);
       if (cancelled) return;
       setReport(results[0].status === 'fulfilled' ? results[0].value : null);
@@ -94,15 +96,16 @@ export default function Build({
       cancelled = true;
     };
   }, [project.id, project.modifiedAt, project.builds.length,project.conversionProfile,project.activeBuildTarget,project.buildTargets,dirty, data.settings, epoch]);
+  const targetName=ceTarget?(target!.runtimeId==='chupathingyCe'?'Chupathingy':'Custom Edition'):'MCC';
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
   const validated = dirty || checking
     ? undefined
-    : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
+    : ceTarget ? project.builds.find(b=>b.status==='validated'&&b.target==='gbx-custom'&&b.id===readiness?.currentValidatedBuildId) : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
   const steps = [
     ['validate', 'Inspect source'],
     ['extract', 'Extract tags'],
-    ['compile', 'Build MCC cache'],
+    ['compile', `Build ${targetName} cache`],
     ['verify', 'Validate output'],
   ];
   return (
@@ -120,7 +123,7 @@ export default function Build({
             </button>
             {view==='build'&&<button className="primary" onClick={onStart} disabled={checking || !report?.ready || !!activeJob}>
               <Hammer size={15} />
-              {dirty ? 'Save & convert to MCC' : 'Convert map to MCC'}
+              {ceTarget?(dirty?`Save & build for ${targetName}`:`Build for ${targetName}`):(dirty ? 'Save & convert to MCC' : 'Convert map to MCC')}
             </button>}
           </>
         }
@@ -131,14 +134,16 @@ export default function Build({
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
       <div className="build-columns" hidden={view!=='build'}>
         <div className="build-main">
-          <details className="surface build-conversion" open={inputsOpen} onToggle={event=>setInputsOpen(event.currentTarget.open)}><summary>Build inputs &amp; conversion <small>Source resources and MCC toolchain</small></summary>
-            <p>Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check.</p>
+          <details className="surface build-conversion" open={inputsOpen} onToggle={event=>setInputsOpen(event.currentTarget.open)}><summary>Build inputs &amp; conversion <small>Source resources and {targetName} toolchain</small></summary>
+            <p>{ceTarget?`Rebuild the original CE regions with their matching editable tags, then compile a standard CE cache for ${targetName}. Native compilation and actual engine loading are checked separately.`:"Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check."}</p>
             <BuildTargets project={project} defaults={data.settings} onSave={onSave} onChange={next=>edit(next,'Configure map conversion target')}/>
+            {!ceTarget&&<>
             <button disabled={!native||preparing||!!activeJob} onClick={()=>{setPreparing(true);void onAction(async()=>{await call('prepare_mcc_conversion_tools',{projectId:project.id});onRefresh();},'MCC tools and editable tags are prepared. Your choices are saved.').finally(()=>setPreparing(false));}}>{preparing?'Preparing installed MCC tools…':'Prepare installed MCC tools'}</button>
             <p className="subtle">If the SDK is not installed: Steam → Library → include Tools → Halo: CE Mod Tools - MCC. Preparation extracts its bundled tags into Spark’s local cache and remembers the folders.</p>
+            </>}
             {project.source?.sha256==='b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d'&&<label>Zombie Apocalypse conversion profile<select aria-label="Zombie Apocalypse conversion profile" value={project.conversionProfile??'faithful'} onChange={e=>edit({...project,conversionProfile:e.target.value as Project['conversionProfile']},'Choose Zombie Apocalypse conversion profile')}><option value="faithful">Faithful · require the two original missing custom audio cues</option><option value="zombie-recovery">Recovery edition · omit two unavailable cues and disable one corrupt placement</option></select></label>}
             {project.conversionProfile==='zombie-recovery'&&<Notice>The recovery edition retains the actual vehicle-based zombie spawners and valid mixed-class placements. Two missing custom sounds and the corrupt first placement are recorded as omissions. Runtime behavior still needs testing.</Notice>}
-            {project.source?.cacheVersion===609&&data.entries.find(entry=>entry.id===project.id)?.scenarioType===1&&<label className="toggle-setting"><input aria-label="Use MCC multiplayer UI dependencies" type="checkbox" checked={project.conversionProfile==='mcc-multiplayer-ui'} onChange={e=>edit({...project,conversionProfile:e.target.checked?'mcc-multiplayer-ui':'faithful'},'Choose MCC multiplayer UI compatibility')}/><span>Use MCC multiplayer UI dependencies<small>Replaces the CE startup multiplayer UI collection with your installed MCC SDK version. Custom entries under that collection are not retained. The change is recorded; custom UI/HUD and game loading still need testing.</small></span></label>}
+            {!ceTarget&&project.source?.cacheVersion===609&&data.entries.find(entry=>entry.id===project.id)?.scenarioType===1&&<label className="toggle-setting"><input aria-label="Use MCC multiplayer UI dependencies" type="checkbox" checked={project.conversionProfile==='mcc-multiplayer-ui'} onChange={e=>edit({...project,conversionProfile:e.target.checked?'mcc-multiplayer-ui':'faithful'},'Choose MCC multiplayer UI compatibility')}/><span>Use MCC multiplayer UI dependencies<small>Replaces the CE startup multiplayer UI collection with your installed MCC SDK version. Custom entries under that collection are not retained. The change is recorded; custom UI/HUD and game loading still need testing.</small></span></label>}
           </details>
           {issues.map((issue) => (
             <Notice key={issue}>{issue}</Notice>
@@ -166,8 +171,8 @@ export default function Build({
                 <Hammer size={24} />
               </div>
               <div>
-                <h2>Halo 1 · The Master Chief Collection</h2>
-                <p>Cache version 13 · {report?.pipeline??'Verified extraction and target compilation'}</p>
+                <h2>{ceTarget?`Halo 1 · ${targetName}`:"Halo 1 · The Master Chief Collection"}</h2>
+                <p>Cache version {ceTarget?609:13} · {report?.pipeline??'Verified extraction and target compilation'}</p>
               </div>
               <Pill tone={report?.ready ? 'green' : 'amber'}>
                 {report?.ready ? 'Ready to build' : 'Dependencies required'}
@@ -310,6 +315,7 @@ export default function Build({
           </details>
         </div>
         <aside className="build-sidebar">
+          {ceTarget?<section className="surface"><h3>{targetName} playtest</h3><p>Build a standard Custom Edition cache with the selected source tags. Choose {targetName} in the runtime menu and use Online to host or join the compiled map.</p><p>{readiness?.currentBuildMessage??'Save and build before starting a playtest.'}</p><small>Map loading, player movement and vehicle travel need their own game tests.</small></section>:<>
           <section className="surface">
             <div className="section-heading">
               <h3>
@@ -402,6 +408,7 @@ export default function Build({
             Open project folder
           </button>
           <small className="build-acceptance-note">Compilation, package validation and an in-game playtest are separate checks.</small>
+        </>}
         </aside>
       </div>
     </div>

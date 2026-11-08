@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-08T01:53:15.960Z",
+  "file": "closure-native-r6-megaworld.map",
+  "bytes": 82753578,
+  "sha256": "2611cac26411cea6197d72bfe691bc894c8d1920e8b6f209ccddd9ec39d067ae",
+  "distribution": "private-proprietary-Halo-content-no-redistribution-license",
+  "originalSourceHashes": [
+    {
+      "map": "timberland.map",
+      "sha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea"
+    },
+    {
+      "map": "sidewinder.map",
+      "sha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+    }
+  ],
+  "target": "mcc-cea",
+  "sourceBaseCommit": "9078cd8543767e9104c058741fd472316aba5896",
+  "sourceWorkingTreeWasDirty": true,
+  "runtimeSourceFingerprint": "a626c159dfa7367a727f254098d1135c6af577fcf84aa4d920607bb65ca31df8",
+  "laterPrototypeIntegration": "6c0c62fd65b4ec1d88ed2c191007376dd412bae3",
+  "exactReleaseSourceBuild": false,
+  "nativeReceiptSha256": "7861e2d2f59b2c7f5bde20d4a17c4aa8413d9cee22f499c52805d1d23033ae17",
+  "projectId": "e9830125-8f4b-4147-82db-cff8835d4671",
+  "sourceProject": {
+    "exactGsprojectRetained": false,
+    "retained": "bounded acceptance receipt and route metadata; original disposable native build workspace retired",
+    "plan": {
+      "schemaVersion": 1,
+      "donorTitle": "sidewinder",
+      "donorBspIndex": 0,
+      "translation": [
+        196.80172729492188,
+        9.3280029296875,
+        -21.232985482283567
+      ],
+      "yawDegrees": 0,
+      "tunnelPoints": [
+        [
+          38.811767578125,
+          34.44912338256836,
+          -21.075042829581236
+        ],
+        [
+          144.11968994140625,
+          34.44912338256836,
+          -21.075042829581236
+        ]
+      ],
+      "tunnelWidth": 4,
+      "tunnelHeight": 4,
+      "tunnelShaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor",
+      "openRoad": true,
+      "infantryTunnel": {
+        "points": [
+          [
+            38.811767578125,
+            34.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            65.13874816894531,
+            42.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            117.79270935058594,
+            42.44912338256836,
+            -21.075042829581236
+          ],
+          [
+            144.11968994140625,
+            34.44912338256836,
+            -21.075042829581236
+          ]
+        ],
+        "width": 2,
+        "height": 1.6,
+        "shaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor"
+      }
+    }
+  },
+  "nativeCompile": {
+    "accepted": true,
+    "crcMismatch": 0,
+    "collisionTriangles": 16252,
+    "independentBspReference": "levels\\spark\\assembly_e9830125\\connected.scenario_structure_bsp"
+  },
+  "freshReadback": {
+    "engine": "Halo: Combat Evolved Anniversary (MCC)",
+    "crcMismatch": 0,
+    "scenario": "levels\\test\\timberland\\timberland"
+  },
+  "geometryRegions": 2,
+  "compiledNineteenMapWorld": false,
+  "humanTraversalAccepted": false,
+  "verifiedPhysicalConnections": 0,
+  "warthogTraversalAccepted": false,
+  "publicContent": "Spark-owned recipes and hash/geometry diagnostics only",
+  "newerIndependentCeSeamEvidence": "native-terrain-seam-20261108.json",
+  "historicalScope": "This record remains the earlier MCC prototype; the newer three-route CE609 native build and Chupathingy load are recorded separately."
+}

@@ -187,20 +187,20 @@ async function snapshot(root, maxBytes = policy.qaRunBytes) {
   rows.sort((a, b) => a.path.localeCompare(b.path));
   return { rows, bytes, files: rows.filter((row) => !row.directory).length };
 }
-async function measure(root, maxBytes, excludeNames = new Set()) {
+async function measure(root, maxBytes, excludeNames = new Set(), liveMeasurement = false) {
   // WebView can atomically rename its last temp file after the app exits.
   // Restart the entire bounded measurement; never skip an unknown file or
   // weaken the hash/identity checks used for disposable deletion.
   for (let attempt = 0; ; attempt++) {
     try {
-      return await measureOnce(root, maxBytes, excludeNames);
+      return await measureOnce(root, maxBytes, excludeNames, liveMeasurement);
     } catch (error) {
       if (error.code !== 'ENOENT' || attempt >= 4) throw error;
       await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
     }
   }
 }
-async function measureOnce(root, maxBytes, excludeNames) {
+async function measureOnce(root, maxBytes, excludeNames, liveMeasurement) {
   await noLinks(root);
   let bytes = 0,
     files = 0,
@@ -211,10 +211,18 @@ async function measureOnce(root, maxBytes, excludeNames) {
   const pending = [root];
   while (pending.length) {
     const directory = pending.pop();
-    for (const item of await fs.readdir(directory, { withFileTypes: true })) {
+    const entries = await fs.readdir(directory, { withFileTypes: true }).catch(error=>{
+      if(liveMeasurement && error.code==='ENOENT')return [];
+      throw error;
+    });
+    for (const item of entries) {
       if (directory === root && excludeNames.has(key(item.name))) continue;
       const file = path.join(directory, item.name);
-      const info = await fs.lstat(file, { bigint: true });
+      const info = await fs.lstat(file, { bigint: true }).catch(error=>{
+        if(liveMeasurement && error.code==='ENOENT')return null;
+        throw error;
+      });
+      if(!info)continue;
       if (info.isSymbolicLink()) throw Error('QA output contains a link; no cleanup or traversal attempted');
       if (info.isDirectory()) {
         if (path.relative(root, file).split(path.sep).length > 32)
@@ -964,7 +972,11 @@ export async function beginQaStorage(
           ? Math.max(row.reservedBytes, row.logicalBytes ?? 0)
           : row.logicalBytes;
     }
-    const existing = await measure(storageRoot, totalBytes),
+    // Aggregate admission is a measurement while other owners can compile.
+    // A vanished temp file contributes no resident bytes. Reservations below
+    // still charge active owners; strict deletion inventories/hashes never use
+    // this mode, and links, access failures and quota breaches still refuse.
+    const existing = await measure(storageRoot, totalBytes, new Set(), true),
       own = await measure(absolute, reservationBytes);
     const free = await fs.statfs(storageRoot),
       freeBytes = Number(free.bavail) * Number(free.bsize);

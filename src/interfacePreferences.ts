@@ -20,6 +20,7 @@ export interface LocalCueReference {
 export interface InterfacePreferences {
   schemaVersion: 1;
   theme: ThemeName;
+  uiScale:number|null; // null follows the current window size, including fullscreen.
   uiAudioEnabled: boolean;
   launchVoiceEnabled:boolean;
   launchVoiceVolume:number;
@@ -27,6 +28,7 @@ export interface InterfacePreferences {
   reducedMotion: boolean;
   workspaceTransitions:boolean;
   shieldLoading:boolean;
+  walkthroughEnabled:boolean;
   restoreWorkspaceLayout:boolean;
   windowOpacity:number;
   windowTint:string;
@@ -42,6 +44,7 @@ export interface InterfacePreferences {
 export const DEFAULT_INTERFACE: InterfacePreferences = {
   schemaVersion: 1,
   theme: 'covenant',
+  uiScale:null,
   uiAudioEnabled: false, // Never autoplay or assume user consent for local game sounds.
   launchVoiceEnabled:true, // Explicit character greeting preference, independent of menu cues.
   launchVoiceVolume:0.35,
@@ -49,6 +52,7 @@ export const DEFAULT_INTERFACE: InterfacePreferences = {
   reducedMotion: false,
   workspaceTransitions:true,
   shieldLoading:true,
+  walkthroughEnabled:false,
   restoreWorkspaceLayout:false,
   windowOpacity:1,
   windowTint:'#65c5ff',
@@ -85,6 +89,7 @@ export function sanitizeInterfacePreferences(v: unknown): InterfacePreferences {
     schemaVersion: 1,
     theme: typeof v.theme === 'string' && (themeNames as readonly string[]).includes(v.theme)
       ? v.theme as ThemeName : DEFAULT_INTERFACE.theme,
+    uiScale:typeof v.uiScale==='number'&&Number.isFinite(v.uiScale)?Math.max(.75,Math.min(1.5,v.uiScale)):null,
     uiAudioEnabled: v.uiAudioEnabled === true,
     launchVoiceEnabled:typeof v.launchVoiceEnabled==='boolean'?v.launchVoiceEnabled:DEFAULT_INTERFACE.launchVoiceEnabled,
     launchVoiceVolume:typeof v.launchVoiceVolume==='number'&&Number.isFinite(v.launchVoiceVolume)?Math.max(0,Math.min(1,v.launchVoiceVolume)):DEFAULT_INTERFACE.launchVoiceVolume,
@@ -93,6 +98,7 @@ export function sanitizeInterfacePreferences(v: unknown): InterfacePreferences {
     reducedMotion: v.reducedMotion === true,
     workspaceTransitions:v.workspaceTransitions!==false,
     shieldLoading:v.shieldLoading!==false,
+    walkthroughEnabled:v.walkthroughEnabled===true,
     restoreWorkspaceLayout:v.restoreWorkspaceLayout===true,
     windowOpacity:typeof v.windowOpacity==='number'&&Number.isFinite(v.windowOpacity)?Math.max(.1,Math.min(1,v.windowOpacity)):1,
     windowTint:typeof v.windowTint==='string'&&/^#[0-9a-f]{6}$/i.test(v.windowTint)?v.windowTint.toLowerCase():DEFAULT_INTERFACE.windowTint,

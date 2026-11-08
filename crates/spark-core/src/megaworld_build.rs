@@ -3,12 +3,12 @@
 //! It never treats scenario BSP references as streaming.
 use crate::{build::{self,JobEvent,Runner,Toolchain},maps::{self,MapInspection},project::{self,Project,BuildRecord},invalid,Result,SparkError};
 use std::{fs,path::Path,sync::{Arc,atomic::{AtomicBool,Ordering}},time::Instant};
-pub fn selected(project:&Project)->bool{project.bsp_assembly.is_some()&&project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).is_some_and(|t|t.runtime_id==crate::runtime::RuntimeId::HaloCustomEdition)}
+pub fn selected(project:&Project)->bool{project.bsp_assembly.is_some()&&project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).is_some_and(|t|matches!(t.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe))}
 pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     project.validate()?;
     let target=project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).ok_or_else(||SparkError::Invalid("Choose an explicit CE build target".into()))?;
     crate::forge_build::tools_for_target(project,Default::default())?;
-    if target.runtime_id!=crate::runtime::RuntimeId::HaloCustomEdition||target.hek_flavor.as_deref()!=Some("h1aEk"){return invalid("Connected CE regions require the reviewed H1A authoring / Invader CE profile");}
+    if !matches!(target.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe)||target.hek_flavor.as_deref()!=Some("h1aEk"){return invalid("Connected CE regions require the reviewed H1A authoring / Invader CE profile");}
     let plan=project.bsp_assembly.as_ref().ok_or_else(||SparkError::Invalid("Author a connected BSP plan first".into()))?;plan.validate()?;
     let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("Import an original CE map first".into()))?;
     if source.sha256!=inspection.sha256||source.scenario_path!=inspection.scenario_path{return invalid("The base inspection belongs to another source revision");}
@@ -62,6 +62,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     if plan.include_donor_scenery{crate::bsp_scenery::verify_compiled(inspection,&compiled,&file,&scenery,&format!("gsbsp_{}_1",&id[..8]))?;}
     for (relative,sha) in &hashes{if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}if maps::hash_file(&base_tags.join(crate::safe_relative(relative)?))?!=*sha{return invalid("CE source changed while the world was compiling");}}
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("Original region identity changed during build");}}
+    crate::native_lighting::verify_cache(project,&file,&compiled)?;
     let sha=maps::hash_file(&file)?;if sha!=compiled.sha256{return invalid("Compiled connected cache changed during validation");}
     let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message:"Two source regions and their authored connection compiled into one CE BSP; native dependencies, CRC and collision route checked. Player traversal remains unverified.".into(),project_fingerprint:project.fingerprint()?};
     project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"gameplayVerified":false,"streaming":false}))?,false)?;

@@ -10,7 +10,7 @@ import { withDevelopmentWorkspace, runDevelopmentCommand, exportDevelopmentBuild
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
-if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime', 'baseline'].includes(s)))
+if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime', 'baseline', 'sparklink'].includes(s)))
   throw Error('Unknown source-only verification stage');
 if (stages.includes('native') && ![sourceMap, kit, tags, invader].every(Boolean))
   throw Error('Native verification requires the selected owned map, kit, small tag source and Invader paths');
@@ -18,6 +18,7 @@ if (stages.some(s=>s==='compiler'||s==='geometry'||s==='logic') && ![acceptedPro
   throw Error(
     'Compiler verification requires the accepted Workshop project, small tag source, kit and Invader',
   );
+if(stages.includes('sparklink')&&![kit,tags,invader].every(Boolean))throw Error('Shared-source acceptance requires the selected owned kit, bounded tags and Invader');
 if(stages.includes('geometry')&&!(await fs.stat(process.env.SPARK_GEOMETRY_BLENDER??'').catch(()=>null))?.isFile())
   throw Error('Geometry round-trip verification requires the selected installed Blender executable');
 // Explicitly selected QA executables may be reused only against the same full
@@ -62,7 +63,7 @@ try {
       if (stages.includes('browser'))
         await run('Browser regressions', ['node_modules/@playwright/test/cli.js', 'test', '--reporter=line']);
       let tagSource=tags;
-      if (stages.includes('compiler')||stages.includes('geometry')||stages.includes('logic')) {
+      if (stages.includes('compiler')||stages.includes('geometry')||stages.includes('logic')||stages.includes('sparklink')) {
         if(tags.toLowerCase().endsWith('.7z')){
           const spec=JSON.parse(await fs.readFile(new URL('../docs/fixtures/source-only-h1a-inputs.json',import.meta.url),'utf8'));
           if(stages.includes('logic')&&process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
@@ -138,7 +139,7 @@ try {
       }
       if(stages.includes('logic'))for(const file of ['scripts/native-logic-roundtrip.mjs','scripts/test-workspace-lifecycle-native.mjs'])
         await run('Native acceptance syntax '+file,['--check',file]);
-      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')||stages.includes('runtime')){
+      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')||stages.includes('runtime')||stages.includes('sparklink')){
         if(!selectedApp){
           const beforeBuild=await runtimeFingerprint();
           await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
@@ -151,6 +152,23 @@ try {
           manifest.runtimeSourceFingerprint=await runtimeFingerprint();manifest.purpose='One temporary source-pinned QA executable; not a release';
           await fs.writeFile(path.join(target,'manifest.json'),JSON.stringify(manifest,null,2),{flag:'wx'});report.exportedQaApplication={directory:target,...manifest};
         }
+      }
+      if(stages.includes('sparklink')){
+        // Rebuild only the small frontend in this owned workspace so native
+        // WebView served-source hashes can be compared with the exact source.
+        if(selectedApp)await run('Shared-source frontend identity', ['scripts/build-web.mjs']);
+        const output=path.join(context.directory,'qa','sparklink');await fs.mkdir(path.dirname(output),{recursive:true});
+        try{await run('Three independent Spark processes: shared BSP, conflict, Undo, recovery and frozen native compile',[
+          'scripts/test-sparklink-workshop-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release/GuiltySpark.exe'),output,path.resolve(kit),path.resolve(tagSource),path.resolve(invader),
+        ]);}finally{
+          const file=['acceptance.json','failure.json'].map(name=>path.join(output,name));
+          for(const candidate of file){const text=await fs.readFile(candidate,'utf8').catch(()=>null);if(text){report.sparklink=JSON.parse(text);break;}}
+          if(receiptFile)for(const actor of ['owner','editor-b','editor-c']){
+            const image=path.join(output,`native-sparklink-${actor}.png`),info=await fs.stat(image).catch(()=>null);
+            if(info?.isFile()&&info.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(image));await fs.copyFile(image,target,fs.constants.COPYFILE_EXCL);(report.sparklinkScreenshots??=[]).push({file:target,bytes:info.size});}
+          }
+        }
+        if(!report.sparklink?.complete)throw Error('Real shared-source native acceptance did not pass');
       }
       if(stages.includes('runtime')){
         if(!process.env.SPARK_TEST_RUNTIME_ROOT)throw Error('Runtime acceptance needs the explicitly selected owned runtime folder');
@@ -209,12 +227,12 @@ try {
       if(stages.includes('workspace')){
         const output=path.join(context.directory,'qa','native-workspaces');await fs.mkdir(path.dirname(output),{recursive:true});
         try{
-          await run('Actual retained multiwindow workspace lifecycle and route regressions',[
+          await run(process.env.SPARK_LIFECYCLE_RESPONSIVE==='1'?'Actual native responsive layouts and saved OpenCE setup':'Actual retained multiwindow workspace lifecycle and route regressions',[
             'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,
-          ],{SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_CROSS_RUNTIME:'0',SPARK_QA_MEGAWORLD_ONLY:'0',SPARK_QA_MEGAWORLD_COMPILE:'0'});
+          ],{SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_LIVE_REBUILD:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:process.env.SPARK_LIFECYCLE_RESPONSIVE==='1'?'1':'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_CROSS_RUNTIME:'0',SPARK_QA_MEGAWORLD_ONLY:'0',SPARK_QA_MEGAWORLD_COMPILE:'0'});
         }finally{const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.workspace=JSON.parse(receipt);
         if(receiptFile){
-          for(const name of ['application-icon.png','compact-header.png','tab-lift.png','monitor-pink.png','monitor-glow.png','monitor-source.png','monitor-source.json','failure-window-0.png','failure-window-1.png','failure-window-2.png']){
+          for(const name of ['application-icon.png','native-studio-theme.png','native-setup-flavors-800x600.png','native-setup-flavors-1500x950.png','native-setup-flavors-2560x1080.png','native-setup-flavors-5120x1440.png','native-games-tools-800x600.png','native-games-tools-1500x950.png','native-games-tools-2560x1080.png','native-games-tools-5120x1440.png','native-layout-failure.png','compact-header.png','tab-lift.png','monitor-pink.png','monitor-glow.png','monitor-source.png','monitor-source.json','failure-window-0.png','failure-window-1.png','failure-window-2.png']){
             const image=path.join(output,name),stat=await fs.stat(image).catch(()=>null);
             if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));await fs.copyFile(image,target);(report.workspaceScreenshots??=[]).push({file:target,bytes:stat.size});if(name==='compact-header.png')report.workspaceScreenshot={file:target,bytes:stat.size};}
           }
@@ -240,12 +258,22 @@ try {
         try{
           await run(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'?'Actual MegaWorld File/New, source-bound donor controls, restart, Undo/Save and source clearance':process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'?'Actual CE-to-MCC native asset catalog, drag, edit, Undo/Save/restart, compile and independent readback':'Actual native tag edit, asset drop, door/trigger logic, Undo/Save/reopen, compile and independent readback',[
             'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,path.resolve(cache),path.resolve(invader),
-          ],{SPARK_LIFECYCLE_LOGIC:'1',SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_MEMORY:'0',
+          ],{SPARK_LIFECYCLE_LOGIC:'1',SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_RESPONSIVE:'0',SPARK_LIFECYCLE_SETUP_FLAVORS:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:'0',
              SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_TAGS:path.resolve(tagSource),SPARK_LOGIC_KIT:path.resolve(kit)});
         }finally{
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
+          if(receiptFile&&report.logic?.complete&&report.logic?.liveRebuild?.nativeChangedSpawnObserved){
+            const trial=report.logic.liveRebuild,build=trial.builds.find(build=>build.id===trial.rebuiltSession.gameBuildId);
+            if(!build?.output||build.sha256!==trial.rebuiltSession.gameSha256)throw Error('Accepted Live Rebuild output identity is missing');
+            const info=await fs.stat(build.output);if(!info.isFile()||info.size>256*1024**2)throw Error('Accepted native cache exceeds bounded evidence export');
+            const sha=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
+            if(await sha(build.output)!==build.sha256)throw Error('Accepted Live Rebuild cache changed before export');
+            const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-validated.map');
+            await fs.copyFile(build.output,target,fs.constants.COPYFILE_EXCL);if(await sha(target)!==build.sha256)throw Error('Accepted Live Rebuild cache export differs');
+            report.liveRebuildNativeCache={file:target,bytes:info.size,sha256:build.sha256,purpose:'One accepted native cache for independent review and pending human playtest'};
+          }
           if(receiptFile&&(report.logic?.crossRuntime||report.logic?.megaWorldCreation)){
-            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-shared-viewport.png','megaworld-compiled-routes.png','megaworld-atlas-layout.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
+            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-seam-closeup.png','megaworld-chupathingy-target.png','megaworld-shared-viewport.png','megaworld-compiled-routes.png','megaworld-chupathingy-loaded.png','megaworld-atlas-layout.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/timberland.map']){
               const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(!info)continue;
               if(!info.isFile()||info.size>(name.endsWith('.map')?256:4)*1024**2)throw Error('Selected native acceptance evidence exceeds its bounded export');
               const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));
@@ -253,7 +281,12 @@ try {
               const sha256=await hash(source);if(await hash(target)!==sha256)throw Error('Native evidence export readback differs');(report.crossRuntimeEvidence??=[]).push({file:target,bytes:info.size,sha256});
             }
           }
-          if(receiptFile)for(const name of ['logic-inspector.png','failure-window-0.png']){
+          if(receiptFile)for(const [index,source]of (report.logic?.megaWorldCreation?.failedSourceFiles??[]).entries()){
+            if(index>=1||source.bytes>16*1024**2)throw Error('Failed native source diagnostic exceeded its one-file bound');
+            const bytes=await fs.readFile(source.file);if(bytes.length!==source.bytes||crypto.createHash('sha256').update(bytes).digest('hex')!==source.sha256)throw Error('Failed native source changed before diagnostic export');
+            const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-native-source.jms');await fs.writeFile(target,bytes,{flag:'wx'});(report.nativeSourceDiagnostics??=[]).push({file:target,bytes:bytes.length,sha256:source.sha256});
+          }
+          if(receiptFile)for(const name of ['logic-inspector.png','native-lighting-baked.png','live-rebuild-first.png','live-rebuild-updated.png','failure-window-0.png']){
             const source=path.join(output,name),stat=await fs.stat(source).catch(()=>null);
             if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));await fs.copyFile(source,target);(report.logicScreenshots??=[]).push({file:target,bytes:stat.size});}
           }
@@ -262,7 +295,7 @@ try {
       }
     },
     {
-      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry' || s === 'logic' || s === 'workspace' || s === 'runtime')
+      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry' || s === 'logic' || s === 'workspace' || s === 'runtime' || s === 'sparklink')
         ? 12 * 1024 ** 3
         : 1024 ** 3,
     },

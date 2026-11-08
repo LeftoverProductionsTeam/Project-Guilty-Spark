@@ -189,6 +189,10 @@ mod windows {
         }
         Ok(found)
     }
+    // Process-name inspection only; pack selection never attaches to a game.
+    pub fn presentation_game_running() -> Result<bool> {
+        Ok(processes()?.iter().any(|(_,name)| ["halo.exe","chupathingy.exe","haloce.exe"].iter().any(|n|name.eq_ignore_ascii_case(n))))
+    }
     fn check_anticheat() -> Result<()> {
         if processes()?.iter().any(|(_, name)| {
             let name = name.to_ascii_lowercase();
@@ -770,7 +774,9 @@ mod windows {
     }
 }
 #[cfg(windows)]
-pub use windows::{connect, disconnect, moves, sample, scale, scale_info,gameplay_inventory,sprint_configure,sprint_status,camera_configure,camera_status,camera_shortcut,camera_toggle};
+pub use windows::{presentation_game_running,connect, disconnect, moves, sample, scale, scale_info,gameplay_inventory,sprint_configure,sprint_status,camera_configure,camera_status,camera_shortcut,camera_toggle};
+#[cfg(not(windows))]
+pub fn presentation_game_running()->Result<bool>{invalid("This native presentation-pack launch adapter has only been validated on Windows")}
 #[cfg(not(windows))]
 pub fn camera_status(_: &Session)->Result<NativeCameraStatus>{invalid("Native MCC third-person camera requires Windows")}
 #[cfg(not(windows))]

@@ -19,3 +19,9 @@ fn target(runtime_id:RuntimeId)->EngineBuildTarget {EngineBuildTarget{id:uuid::U
     p.build_targets[0].hek_flavor=Some("h1aEk".into());assert!(forge_build::tools_for_target(&p,ForgeToolchain::default()).is_ok());
 }
 #[test] fn opensauce_cannot_be_configured_as_an_mcc_extension(){let mut p=Project::new("No cross-engine plugins");let mut t=target(RuntimeId::MccSteam);t.open_sauce=true;p.build_targets.push(t);assert!(p.validate().is_err());}
+
+#[test] fn chupathingy_builds_standard_ce_source_with_explicit_review_not_mcc_headers(){
+ let mut p=Project::new("Chupathingy native target");let t=target(RuntimeId::ChupathingyCe);p.active_build_target=Some(t.id.clone());p.build_targets.push(t);
+ assert!(forge_build::tools_for_target(&p,ForgeToolchain::default()).is_err());p.build_targets[0].ce_compatible_tagset=true;
+ assert!(forge_build::tools_for_target(&p,ForgeToolchain::default()).is_ok());p.build_targets[0].builder="h1a-tool".into();assert!(forge_build::tools_for_target(&p,ForgeToolchain::default()).is_err());
+}

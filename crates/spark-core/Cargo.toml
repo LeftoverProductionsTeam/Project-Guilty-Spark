@@ -18,5 +18,7 @@ manifold-rust = "=0.19.1"
 rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
 rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring"] }
 
+toml_edit = "=0.25.17"
+
 [dev-dependencies]
 tempfile = "3"

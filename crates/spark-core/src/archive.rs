@@ -362,7 +362,7 @@ pub fn inventory(path: &Path) -> Result<ArchiveInventory> {
     Ok(open_checked(path)?.1)
 }
 
-struct StageGuard {
+pub(crate) struct StageGuard {
     stage:PathBuf,parent:PathBuf,id:String,active:bool,
     parent_identity:(u64,u64),directories:BTreeMap<PathBuf,(u64,u64)>,files:BTreeMap<PathBuf,((u64,u64),String)>,
 }
@@ -375,7 +375,7 @@ impl Write for RecordedWriter<'_>{
     fn flush(&mut self)->std::io::Result<()>{self.file.flush()}
 }
 impl StageGuard {
-    fn new(parent:&Path,id:String)->Result<Self>{
+    pub(crate) fn new(parent:&Path,id:String)->Result<Self>{
         crate::reject_links(parent)?;
         let parent_identity=crate::storage::file_identity(parent).ok_or_else(||SparkError::Invalid("Archive parent ownership unavailable".into()))?;
         let stage=parent.join(format!(".stage-{id}"));fs::create_dir(&stage)?;
@@ -391,7 +391,7 @@ impl StageGuard {
         fs::create_dir(path)?;
         self.directories.insert(path.into(),crate::storage::file_identity(path).ok_or_else(||SparkError::Invalid("Archive directory ownership unavailable; retained".into()))?);Ok(())
     }
-    fn copy(&mut self,input:&mut impl Read,path:&Path)->Result<u64>{
+    pub(crate) fn copy(&mut self,input:&mut impl Read,path:&Path)->Result<u64>{
         use sha2::Digest;
         self.directory(path.parent().ok_or_else(||SparkError::Invalid("Archive output has no parent".into()))?)?;crate::reject_links(path)?;
         let mut file=OpenOptions::new().write(true).create_new(true).open(path)?;
@@ -417,6 +417,24 @@ impl StageGuard {
         }
         if actual_files.len()!=self.files.len()||actual_dirs.len()!=self.directories.len(){return invalid("Archive stage inventory changed; retained");}
         Ok((actual_files.into_iter().collect(),actual_dirs.into_iter().collect()))
+    }
+    pub(crate) fn path(&self)->&Path{&self.stage}
+    pub(crate) fn publish_payload_new(mut self,destination:&Path)->Result<()> {
+        crate::reject_links(destination)?;
+        if destination.parent()!=Some(self.parent.as_path())||destination.exists(){return invalid("Archive destination is occupied or outside its owned parent");}
+        self.owned_inventory()?;
+        // Windows rename does not replace an existing directory. Other native
+        // install publishers require independent platform acceptance.
+        #[cfg(not(windows))] return invalid("Native pack publication has only been verified on Windows");
+        #[cfg(windows)] {
+            fs::rename(self.stage.join("payload"),destination)?;self.active=false;
+            // Until this atomic rename, a native loader sees no root mod.toml
+            // in the owned staging folder, even after an interrupted install.
+            let owner=self.stage.join(".owner");
+            if self.files.get(&owner).is_some_and(|(id,hash)|crate::storage::unique_file_identity(&owner)==Some(*id)&&maps::hash_file(&owner).ok().as_ref()==Some(hash)){
+                let _=fs::remove_file(owner);let _=fs::remove_dir(&self.stage);
+            }Ok(())
+        }
     }
     fn rollback(&self)->Result<()> {
         let (mut files,mut dirs)=self.owned_inventory()?;files.sort_by_key(|p|p.file_name().is_some_and(|n|n==".owner"));

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Native lighting bake and Chupathingy Live Rebuild, 8 November 2026
+
+- Add explicit Bake lighting & rebuild to the existing QuickForge, BSP Workshop and editable BSP-assembly environment controls. Author a separate standard sky, run real Halo Tool radiosity and verify the compiled sky plus actual BSP lightmap pages/UVs before adopting output.
+- Keep preview backdrop/colors separate from the native bake request. Fix the native fog-off convention without hiding it through renderer clamps; original sky/model dependencies stay intact.
+- Verify Draft and Final CE609 rooms through actual Windows controls, independent Invader sky/BSP readback and Chupathingy0.9.0c loading. Changed native starts, failed-build preservation and full Save/restart pass. Bake now acknowledges explicit Save before compilation; failed Save stops the build. Human lighting/gameplay, MCC and multiple-sky cases remain separate gates. See [native lighting evidence](docs/NATIVE_LIGHTING_20261108.md).
+- Share the optional native bake recipe atomically through the existing SparkLink merge. Preserve author-owned removal/Undo, reject competing recipes and show the exact differing lighting fields.
+
+## Unreleased — Three-route seam authoring, 8 November 2026
+
+- Extend the existing BSP connection with an optional player tunnel and open canyon-top route. Preserve legacy plans and source identities; allow independent points, width, height and material.
+- Check every route against generated collision, reject missing or floating ridge floors, retain world-space UVs and support one-action Undo/Redo, Save and restart.
+- Remove nested Construction clipping inside the existing paged drawer. Actual desktop authoring/Save/restart, native CE structural compilation,524compiled collision route samples and isolated Chupathingy loading pass for Timberland–Sidewinder.193connector-only triangles/32,084total source triangles. Human driving, two-way traversal and sniper visibility remain separate gates. See `docs/MEGAWORLD_SEAM_ROUTES_20261108.md`.
+
+## Unreleased — Shared runtime packages and release synchronization, 7 November 2026
+
+- Preserve GitHub README commit `5095e9b` by fast-forwarding canonical master without discarding unfinished geometry, runtime or UI source.
+- Reuse the existing secure downloader and native ZIP staging for publisher-pinned OpenCE, Chupathingy, Faber and OpenH1 Windows x64 packages. Keep engines isolated and compatible maps/resource banks shared; retain Faber support data. Refuse foreign archives, changed receipts and unsupported host installs.
+- Offer existing owned runtime folders or an explicit empty/owned Spark dynamic folder with maps, custom maps, CE banks, player mods and independent engine packages. Never adopt or overwrite an original installation.
+- Preserve per-profile native presentation-pack choices, native load order and unknown TOML fields. Local ZIP import and manual verified-source downloads remain separate from the three suggested packs whose author links are missing.
+- Add the optional saved workspace walkthrough through existing Help controls and fix the runtime-profile form key collision and Interface Studio overflow.
+- Keep the new natural terrain seam source and diagnostic path context as unfinished engineering. Do not label it a playable 19-map world.
+- Reuse the exact-commit release pipeline; current acceptance and platform limits are recorded in `docs/RELEASE_CANDIDATE_20261107.md`. No public release is inferred from a local build.
+
 ## Unreleased — Native workflow reliability and ledger integration, 6 November 2026
 
 - Keep source and Undo accessible when optional native build metadata is malformed or oversized; retain damaged metadata for review.

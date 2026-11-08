@@ -54,7 +54,15 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
       // schema. Retrofitting only a changed brush/field would invent missing
       // portal materials or native dependencies in that undo snapshot.
       if(!!p.quickForge.workshop!==!!before.workshop||!sameJson(p.quickForge.native?.source,before.native?.source))return p;
-      return {...p,quickForge:mergeForge(before,incoming,p.quickForge,true)};
+      // A bake recipe belongs to its admitted sky. Rebase unrelated peer
+      // changes into older snapshots without inventing that recipe beside a
+      // different sky (or erasing the older snapshot's coherent recipe).
+      const recipeSkyChanged=p.quickForge.skyPath!==before.skyPath &&
+        (p.quickForge.nativeLighting||before.nativeLighting||incoming.nativeLighting);
+      const snapshotIncoming=recipeSkyChanged
+        ? {...incoming,skyPath:before.skyPath,nativeLighting:before.nativeLighting}
+        : incoming;
+      return {...p,quickForge:mergeForge(before,snapshotIncoming,p.quickForge,true)};
     };
     const current={...state.current,quickForge:action.document,modifiedAt:new Date().toISOString()};
     const comparable=(p:Project)=>JSON.stringify({...p,modifiedAt:'',history:[],builds:[]});

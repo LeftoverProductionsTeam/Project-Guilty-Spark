@@ -446,14 +446,15 @@ impl Runner<'_> {
             (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
                 || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"|"tag-renaming"))
                 || (name.eq_ignore_ascii_case("invader-extract.exe") && phase=="extract")
-                || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"|"tag-renaming"))
-                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"dependencies"|"asset-dependencies"|"tag-renaming"))
+                || (name.eq_ignore_ascii_case("invader-build.exe") && phase=="compile-ce")
+                || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"|"tag-renaming"|"bsp-scenery-model"|"bsp-scenery-model-check"))
+                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"dependencies"|"asset-dependencies"|"tag-renaming"|"bsp-dependencies"))
                 || (matches!(phase,"recovery-readback"|"recovery-dependencies"|"recovery-data") && ["invader-edit.exe","invader-dependency.exe","invader-recover.exe"].contains(&name.as_ref()))
         }) {
             Some(crate::native_workspace::Alias::new(cwd)?)
         } else {None};
         #[cfg(windows)]
-        let extraction_args = if matches!(phase,"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data") {
+        let extraction_args = if matches!(phase,"compile-ce"|"bsp-dependencies"|"bsp-scenery-model"|"bsp-scenery-model-check"|"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data") {
             native_alias.as_ref().map(|alias|crate::native_workspace::extraction_arguments(args,cwd,alias.path())).transpose()?
         } else {None};
         #[cfg(windows)]
@@ -974,6 +975,7 @@ pub fn run_build(
         if !project.native_asset_imports.is_empty(){let _=crate::native_asset_imports::available_files(jobs_root.parent().unwrap(),project)?;}
         crate::tag_duplicates::verify_compiled(project,inspection,&validated)?;
         crate::tag_renames::verify_compiled(project,inspection,&validated)?;
+        crate::native_lighting::verify_cache(project,&output,&validated)?;
         crate::powerups::verify_compiled(project,&validated,&dir)?;
         if let Some(assembly)=&project.bsp_assembly{
             let (compiled_collision,compiled_faces)=maps::collision_source(&output,&validated)?;

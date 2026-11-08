@@ -1,3 +1,5 @@
+import EnvironmentControls from './EnvironmentControls';
+import {environmentValue} from '../environment';
 import SceneEnvironment from './SceneEnvironment';
 import MegaworldAtlas from './MegaworldAtlas';
 import { sourceSurfaceEnvironment } from '../environment';
@@ -61,6 +63,7 @@ interface Props {
   onBack: () => void;
   onAssets: () => void;
   onBuildSettings: () => void;
+  onBakeLighting?:(quality:"draft"|"final")=>Promise<void>;
   readOnly?: boolean;
   materialSource?: OpenProject | null;
   materialBindings?: import('../types').NativeAssetImport[];
@@ -1335,6 +1338,12 @@ export default function BspWorkshop(props: Props) {
               )}
               <details>
                 <summary>Halo material paths & player starts</summary>
+                <details className="gs-native-bsp-lighting"><summary>Lighting &amp; fog</summary>
+                  <EnvironmentControls value={environmentValue(doc.environment)} persisted skyPath={doc.skyPath}
+                    onChange={environment=>{void apply({...doc,environment},'Change BSP lighting preview');}}
+                    onBake={props.onBakeLighting} bakedQuality={doc.nativeLighting?.quality}
+                    bakeDisabled={disabled?'Wait for source editing to finish.':!doc.skyPath?'Select an existing Halo sky tag below before baking.':undefined}/>
+                </details>
                 {props.textureSources && (
                   <label>
                     Texture source map

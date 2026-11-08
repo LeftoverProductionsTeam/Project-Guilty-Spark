@@ -70,6 +70,7 @@ pub enum RuntimeOperation {
     EditLevel,
     EditTags,
     Publish,
+    LiveRebuild,
     ObserveLive,
     MoveLiveObject,
     ScaleLiveObject,
@@ -88,7 +89,7 @@ pub enum RuntimeOperation {
 }
 
 impl RuntimeOperation {
-    pub const ALL: [Self; 26] = [
+    pub const ALL: [Self; 27] = [
         Self::Detect,
         Self::Inspect,
         Self::Edit,
@@ -100,6 +101,7 @@ impl RuntimeOperation {
         Self::EditLevel,
         Self::EditTags,
         Self::Publish,
+        Self::LiveRebuild,
         Self::ObserveLive,
         Self::MoveLiveObject,
         Self::ScaleLiveObject,
@@ -883,6 +885,15 @@ pub fn capability_report(observation: &RuntimeObservation) -> RuntimeCapabilityR
         convert.availability = Unavailable;
     }
     capabilities.push(convert);
+    let rebuild_supported = observation.runtime_id == RuntimeId::ChupathingyCe
+        && observation.target.platform == "windows" && ["x86_64", "unknown"].contains(&observation.target.architecture.as_str())
+        && observation.fingerprint.executable_sha256.as_deref()
+            == crate::runtime_packages::package("chupathingy").ok().map(|p|p.executable_sha256);
+    capabilities.push(capability(LiveRebuild, if rebuild_supported { Implemented } else { Unknown },
+        if !rebuild_supported { Unavailable } else if observation.project.built_output_verified { Ready } else { SetupRequired },
+        "Rebuild saved native source while a Spark-owned private Chupathingy playtest runs. Validate a self-contained CE cache, then restart that owned round; failed builds keep the running map. This is not in-place BSP replacement or remote server control.",
+        "Select the Chupathingy native target, build the map, then use Level editor > Game connection > Start compiled playtest and Live Rebuild. Exact executable, output, ownership and storage checks run again natively."));
+
     let mut launch = capability(LaunchGame, if !preservation && native_host_supported && target_matches { Implemented } else { Unknown }, if preservation || !native_host_supported || !target_matches { Unavailable } else if observation.game_running { Running } else { installed(observation) }, "Explicit existing game/launcher integration is independent from content conversion and live editing. Discovery never executes a program.", "Validate the installed executable/official launcher and choose Play. Use the official MCC mod route where needed.");
     if !observation.installation_validated {
         launch.gates.push(gate("installationRequired", "A validated installation/launcher is required; executable-name matching alone is insufficient."));
@@ -1431,4 +1442,23 @@ mod tests {
             ActionAvailability::Ready
         );
     }
+    #[test]
+    fn live_rebuild_is_a_pinned_private_restart_not_a_live_bsp_write_permit() {
+        let mut observation=RuntimeObservation {
+            runtime_id:RuntimeId::ChupathingyCe,target:target_for(RuntimeId::ChupathingyCe,"windows"),detected:true,
+            installation_validated:true,game_running:false,fingerprint:BuildFingerprint::default(),resources:vec![],toolchains:vec![],
+            protocol:ProtocolEvidence::default(),session:SessionEvidence::default(),project:ProjectEvidence::default(),
+        };
+        assert_eq!(capability_report(&observation).capability(RuntimeOperation::LiveRebuild).unwrap().availability,ActionAvailability::Unavailable);
+        observation.fingerprint.executable_sha256=Some(crate::runtime_packages::package("chupathingy").unwrap().executable_sha256.into());
+        assert_eq!(capability_report(&observation).capability(RuntimeOperation::LiveRebuild).unwrap().availability,ActionAvailability::SetupRequired);
+        observation.project.built_output_verified=true;
+        let report=capability_report(&observation);
+        assert_eq!(report.capability(RuntimeOperation::LiveRebuild).unwrap().availability,ActionAvailability::Ready);
+        assert_eq!(report.capability(RuntimeOperation::ReplaceLiveBsp).unwrap().availability,ActionAvailability::Unavailable);
+        assert_eq!(report.capability(RuntimeOperation::MoveLiveObject).unwrap().availability,ActionAvailability::Unavailable);
+        observation.runtime_id=RuntimeId::OpenCe;
+        assert_eq!(capability_report(&observation).capability(RuntimeOperation::LiveRebuild).unwrap().availability,ActionAvailability::Unavailable);
+    }
+
 }

@@ -55,6 +55,7 @@ use tauri::{Emitter, Manager, State};
 #[path="dependency_install.rs"] mod dependency_install;
 #[path="ce_setup.rs"] mod ce_setup;
 #[path="runtime_connections.rs"] mod runtime_connections;
+#[path="runtime_mods_native.rs"] mod runtime_mods_native;
 #[path="ce_host_native.rs"] mod ce_host_native;
 #[path="baboon_native.rs"] mod baboon_native;
 #[path="native_tag_parser.rs"] mod native_tag_parser;
@@ -489,8 +490,11 @@ async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String,assembly_pr
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<core::bsp_assembly::BspAssembly>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=if let Some(donor)=core::bsp_assembly::referenced_donor(&base,&donor_project_id).map_err(error)?{donor}else{lock(&state.library)?.get(&donor_project_id).map_err(error)?};let tags=base.bsp_assembly.as_ref().filter(|plan|plan.donor_project_id==donor_project_id).map(|plan|plan.donor_tags_directory.clone()).or(editing_tools(&state,&donor)?.base_tags_directory).ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;core::bsp_assembly::plan(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}).await.map_err(error)?
+async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>)->Reply<core::bsp_assembly::BspAssembly>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=if let Some(donor)=core::bsp_assembly::referenced_donor(&base,&donor_project_id).map_err(error)?{donor}else{lock(&state.library)?.get(&donor_project_id).map_err(error)?};let tags=base.bsp_assembly.as_ref().filter(|plan|plan.donor_project_id==donor_project_id).map(|plan|plan.donor_tags_directory.clone()).or(editing_tools(&state,&donor)?.base_tags_directory).ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;if let Some(edges)=edges {
+            let plan=base.bsp_assembly.as_ref().filter(|p|p.donor_project_id==donor_project_id&&p.donor_bsp_index==donor_bsp_index).ok_or("Apply the current donor connection before adding edge-selected sections")?;
+            return core::bsp_assembly::append_edge_section(&base.source.as_ref().ok_or("Original destination source unavailable")?.preserved_path,&i,plan,edges).map_err(error);
+        }if terrain_seam.unwrap_or(false){core::bsp_assembly::plan_terrain(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}else{core::bsp_assembly::plan(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}}).await.map_err(error)?
 }
 #[tauri::command]
 async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<OpenProject>{
@@ -529,8 +533,22 @@ async fn open_bsp_assembly_donor(app:tauri::AppHandle,project_id:String)->Reply<
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_assembly::AssemblyReport>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;core::bsp_assembly::generate_project(&p,&i,&AtomicBool::new(false)).map(|g|g.report).map_err(error)}).await.map_err(error)?
+async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>)->Reply<serde_json::Value>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        if let Some(draft)=draft {
+            let saved=p.bsp_assembly.as_ref().ok_or("Apply the donor identity before previewing seam drafts")?;
+            if draft.donor_project_id!=saved.donor_project_id||draft.donor_bsp_index!=saved.donor_bsp_index||serde_json::to_value(&draft.donor_source).map_err(error)?!=serde_json::to_value(&saved.donor_source).map_err(error)?||draft.donor_tags_directory!=saved.donor_tags_directory {return Err("Draft preview cannot replace its saved donor/source identity".into());}
+            draft.validate().map_err(error)?;p.bsp_assembly=Some(draft);
+        }
+        let i=inspect(&state,&p)?;
+        let geometry=core::bsp_assembly::generate_project(&p,&i,&AtomicBool::new(false)).map_err(error)?;
+        let mut result=serde_json::to_value(&geometry.report).map_err(error)?;
+        if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No saved BSP connection")?;
+            let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref()).map_err(error)?;
+            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+        }
+        Ok(result)
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn preview_owned_cache_bitmap(
@@ -2408,9 +2426,10 @@ async fn choose_runtime_path(kind: String) -> Reply<Option<PathBuf>> {
     }
 }
 fn registered_runtime_command(state:&AppState,registration:&runtime::RuntimeRegistration,plan:&runtime::LaunchPlan)->Reply<std::process::Command>{
-    let mut command=steam::command(plan.executable.to_string_lossy().as_ref());
-        command.current_dir(&plan.cwd).args(&plan.args).envs(&plan.environment);
-        if plan.environment.get("HALO_DATA_ROOT").is_some_and(|data|fs::canonicalize(&registration.root).ok().as_ref()!=Some(data)) {
+    let executable=runtime::process_path(&plan.executable).map_err(error)?;
+    let mut command=steam::command(executable.to_string_lossy().as_ref());
+        command.current_dir(runtime::process_path(&plan.cwd).map_err(error)?).args(&plan.args).envs(&plan.environment);
+        if plan.environment.get("HALO_DATA_ROOT").is_some_and(|data|fs::canonicalize(&registration.root).ok()!=fs::canonicalize(data).ok()) {
             // Data is common; writable saves and logs are specific to this profile.
             core::safe_relative(&registration.id).map_err(error)?;
             if std::path::Path::new(&registration.id).components().count()!=1 { return Err("Invalid runtime profile identifier".into()); }
@@ -2418,7 +2437,7 @@ fn registered_runtime_command(state:&AppState,registration:&runtime::RuntimeRegi
             core::reject_links(&private).map_err(error)?;
             for (key,folder) in [("HALO_SAVE_ROOT","saves"),("HALO_LOG_ROOT","logs"),("HALO_CACHE_ROOT","cache")] {
                 let directory=private.join(folder); core::reject_links(&directory).map_err(error)?;
-                fs::create_dir_all(&directory).map_err(error)?; command.env(key,directory);
+                fs::create_dir_all(&directory).map_err(error)?; command.env(key,runtime::process_path(&directory).map_err(error)?);
             }
         }
 
@@ -2443,7 +2462,9 @@ async fn launch_registered_runtime(
         if plan.executable.starts_with(canonical_data.join("archives")) || plan.executable.starts_with(canonical_data.join("Inbox")) {
             return Err("Archived or Inbox executables cannot be launched. Use a separately installed runtime.".into());
         }
+        let pack_root=runtime_mods_native::apply_for_launch(&state,&registration)?;
         let mut command=registered_runtime_command(&state,&registration,&plan)?;
+        if let Some(root)=pack_root{command.env("HALO_DATA_ROOT",runtime::process_path(&root).map_err(error)?);}
         command.spawn().map_err(error)?;
         Ok(plan.warnings.join(" "))
     }).await.map_err(error)?
@@ -3107,6 +3128,10 @@ pub fn run() {
             runtime_workbench::runtime_workbench_report,
             runtime_workbench::prepare_runtime_tool,
             runtime_workbench::launch_runtime_tool,
+            runtime_workbench::rebuild::runtime_rebuild_start,
+            runtime_workbench::rebuild::runtime_rebuild_begin,
+            runtime_workbench::rebuild::runtime_rebuild_status,
+            runtime_workbench::rebuild::runtime_rebuild_stop,
             runtime_workbench::build_working_tags,
             baboon_native::baboon_report,
             baboon_native::baboon_register,
@@ -3154,6 +3179,7 @@ pub fn run() {
             workspace_history_native::take_project_document,
             workspace_history_native::retain_workspace_draft,
             workspace_history_native::inspection_cache_status,
+            workspace_history_native::set_inspection_cache_budget,
             megaworld_native::megaworld_atlas,
             megaworld_native::import_megaworld_region,
             workspace_windows::release_project_document,
@@ -3314,6 +3340,12 @@ pub fn run() {
             initialize_mcc_inbox,
             runtime_report,
             runtime_connections::discover_halo_connections,
+            runtime_connections::managed_runtime_packages,
+            runtime_connections::runtime_dynamic_layout,
+            runtime_connections::choose_dynamic_runtime_root,
+            runtime_connections::prepare_runtime_engine_download,
+            runtime_connections::fetch_runtime_engine_download,
+            runtime_connections::install_runtime_engine_download,
             runtime_connections::connect_detected_halo,
             legacy_companion_dashboard,
             choose_legacy_companion_path,
@@ -3333,6 +3365,15 @@ pub fn run() {
             runtime_inventory,
             choose_runtime_path,
             launch_registered_runtime,
+            runtime_mods_native::runtime_mod_packs,
+            runtime_mods_native::save_runtime_mod_packs,
+            runtime_mods_native::choose_runtime_pack_zip,
+            runtime_mods_native::inspect_runtime_pack_archive,
+            runtime_mods_native::install_runtime_pack_archive,
+            runtime_mods_native::prepare_runtime_pack_download,
+            runtime_mods_native::fetch_runtime_pack_download,
+            runtime_mods_native::discard_runtime_pack_download,
+            runtime_mods_native::install_runtime_pack_download,
             inspect_sound,
             inspect_looping_sound,
             preview_owned_object_model,

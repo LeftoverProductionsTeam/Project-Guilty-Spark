@@ -62,9 +62,11 @@ fn main() -> Result<()> {
         report: AssemblyReport {
             input_triangles: 12,
             output_triangles: 12,
+            connector_triangles: 0,
             generated_uv_faces: 0,
             walk_samples: 0,
             portal_count: 0,
+            route_clearance: vec![],
             donor_scenery: 0,
             warnings: vec![],
         },

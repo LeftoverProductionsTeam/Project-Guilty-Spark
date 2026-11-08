@@ -83,6 +83,7 @@ pub mod tag_duplicates;
 pub mod protocol;
 pub mod runtime;
 pub mod runtime_content;
+pub mod runtime_mods;
 pub mod runtime_adapters;
 pub mod steam;
 pub mod snapshots;
@@ -201,3 +202,7 @@ mod digest_identity_tests {
         assert_eq!(super::hex_bytes(Sha256::digest(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 }
+
+pub mod runtime_packages;
+
+pub mod native_lighting;

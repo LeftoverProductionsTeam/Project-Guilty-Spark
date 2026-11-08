@@ -5,11 +5,14 @@ export interface PreviewBudgets {
   decodedMiB: number;
   textureMiB: number;
   warmEditors: number;
+  inspectionMiB?:number;
 }
 const key = 'spark.previewBudgets.v1';
-export const defaultPreviewBudgets: PreviewBudgets = { decodedMiB: 64, textureMiB: 256, warmEditors: 2 };
+export const defaultPreviewBudgets: PreviewBudgets = { decodedMiB: 64, textureMiB: 256, warmEditors: 2, inspectionMiB:256 };
 export function validatePreviewBudgets(value: PreviewBudgets) {
+  const inspection=value?.inspectionMiB??256;
   if (
+    !value||!Number.isInteger(inspection)||inspection<16||inspection>1024||
     !Number.isInteger(value.decodedMiB) ||
     value.decodedMiB < 16 ||
     value.decodedMiB > 512 ||
@@ -21,9 +24,9 @@ export function validatePreviewBudgets(value: PreviewBudgets) {
     value.warmEditors > 4
   )
     throw Error(
-      'Choose 16–512 MiB decoded previews, 64–1024 MiB textures per viewport, and 1–4 warm editors.',
+      'Choose 16–512 MiB reusable previews, 16–1024 MiB native map data, 64–1024 MiB textures per viewport, and 1–4 warm editors.',
     );
-  return value;
+  return {...value,inspectionMiB:inspection};
 }
 export function previewBudgets(): PreviewBudgets {
   try {
@@ -34,8 +37,12 @@ export function previewBudgets(): PreviewBudgets {
 }
 export function savePreviewBudgets(value: PreviewBudgets) {
   validatePreviewBudgets(value);
-  localStorage.setItem(key, JSON.stringify(value));
+  localStorage.setItem(key, JSON.stringify(validatePreviewBudgets(value)));
   window.dispatchEvent(new CustomEvent('spark-preview-budgets'));
 }
 export const decodedPreviewBudget = () => previewBudgets().decodedMiB * 1024 ** 2;
 export const texturePreviewBudget = () => previewBudgets().textureMiB * 1024 ** 2;
+
+// Split one user-reviewed CPU reuse quota; these pools cannot each spend it twice.
+export const nativePreviewBudget=()=>Math.floor(decodedPreviewBudget()/2);
+export const pixelPreviewBudget=()=>decodedPreviewBudget()-nativePreviewBudget();

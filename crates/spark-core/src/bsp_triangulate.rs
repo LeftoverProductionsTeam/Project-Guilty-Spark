@@ -48,7 +48,8 @@ fn affine(m: &MeshGL64, t: [u64; 3], d: u64) -> bool {
         (projected - value(d)).abs() < 1e-6 * (1. + value(d).abs())
     })
 }
-pub(crate) fn improve(m: &mut MeshGL64) -> usize {
+pub(crate) fn improve(m: &mut MeshGL64) -> usize { improve_material(m,None) }
+fn improve_material(m: &mut MeshGL64, selected:Option<u64>) -> usize {
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
         return 0;
     }
@@ -56,6 +57,7 @@ pub(crate) fn improve(m: &mut MeshGL64) -> usize {
     for _ in 0..16 {
         let mut edges: BTreeMap<(u64, u64), Vec<(usize, u64, u64, u64)>> = BTreeMap::new();
         for (f, t) in m.tri_verts.chunks_exact(3).enumerate() {
+            if selected.is_some_and(|id|m.face_id[f]!=id){continue;}
             for k in 0..3 {
                 let (a, b, c) = (t[k], t[(k + 1) % 3], t[(k + 2) % 3]);
                 edges
@@ -127,7 +129,7 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
         });
         let Some((index,t)) = selected else { return Ok(splits); };
         if m.num_tri().saturating_add(2) > maximum || splits >= 256 {
-            return crate::invalid("Native triangle conditioning exceeds the existing BSP budget; simplify the source connection");
+            return crate::invalid(format!("Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material {generated_material}, {} triangles, {splits} refinements, quality {:.8}, points {:?})",m.num_tri(),face(m,t).1,t.map(|id|at(m,id))));
         }
         let k = (0..3).min_by(|&a,&b| {
             let length = |k:usize| { let d=sub(at(m,t[k]),at(m,t[(k+1)%3]));dot(d,d) };
@@ -146,7 +148,7 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
         }
         m.tri_verts[index*3..index*3+3].copy_from_slice(&[a,b,midpoint]);
         m.tri_verts.extend([b,c,midpoint,c,a,midpoint]);m.face_id.extend([generated_material;2]);
-        splits += 1; improve(m);
+        splits += 1; improve_material(m,Some(generated_material));
     }
 }
 #[cfg(test)]
@@ -182,6 +184,20 @@ mod tests {
             let (n, quality) = face(&m, [t[0], t[1], t[2]]);
             n[2] < -0.99 && quality > q * 10.
         }));
+    }
+    #[test]
+    fn generated_material_improvement_does_not_touch_another_repairable_surface() {
+        let mut m = needle();
+        let second = needle();
+        m.vert_properties.extend(second.vert_properties);
+        m.tri_verts.extend(second.tri_verts.iter().map(|id| id + 4));
+        m.face_id = vec![17,17,29,29];
+        let positions=m.vert_properties.clone();let other=m.tri_verts[6..].to_vec();
+        assert!(improve_material(&mut m,Some(17))>0);
+        assert_eq!(m.vert_properties,positions);
+        assert_eq!(&m.tri_verts[6..],&other);
+        assert!(improve_material(&mut m,Some(29))>0);
+        assert_eq!(m.face_id,vec![17,17,29,29]);
     }
     #[test]
     fn source_material_and_nonplanar_boundaries_are_preserved() {
