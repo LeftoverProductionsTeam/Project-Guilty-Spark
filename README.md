@@ -37,26 +37,40 @@ Capabilities vary by Halo edition, source availability, and installed tools. **N
 We're building toward a place where the Halo 1 community can do far more:
 
 - **Cross-Halo 1 play and interoperability** across compatible classic, MCC, legacy Mac, Xbox, and community-engine experiences.
-- **MegaWorlds:** connected Halo environments designed with the long-term goal of **128-player battles**.
+- **19-map MegaWorld:** author all 13 original Xbox multiplayer maps plus the six Halo PC additions in one planned world, with natural BSP seams, mountain roads, caves, sniper routes and a randomized teleporter web. All-region gameplay, vehicle traversal and 128-player battles remain unverified research/engineering goals.
 - **Synchronized AI and custom Firefight:** shared encounters, survival modes, and the original **Zombie Apocalypse** revival.
 - **Full creation in one place:** maps, BSPs, tags, assets, scripts, gametypes, campaigns, machinima, and multiplayer hosting.
+- **Chupathingy + OpenH1 VR:** prefer Chupathingy for standard gameplay integration; research a native Spark VR Forge editor and playtesting through OpenH1. No in-headset editing or Windows OpenH1 VR acceptance is claimed.
 - **Windows, macOS, and Linux:** a genuinely useful native editor with fewer mandatory external tools.
 
 **These are development and research goals—not promises of working cross-engine multiplayer, 128-player gameplay, complete AI synchronization, or finished cross-platform releases.** Each needs its own native and in-game acceptance.
 
 ## Where things stand
 
-| Area | Current state |
-| --- | --- |
-| Map inspection, supported edits, native builds, and tool handoffs | Working in validated, target-specific workflows |
-| [Arena Evolved](docs/fixtures/arena-evolved-0.7.7.json) | Separate version-pinned setup/profile; installed executable, launch, game and peer acceptance remain pending |
-| [Runtime profiles and compatible shared content](docs/RUNTIME_INTEGRATION_20261107.md) | Native Windows setup verified for installed OpenCE/Faber/Chupathingy and owned CE banks; game/peer acceptance remains separate |
-| Visual worldbuilding, native doors/triggers, and detachable workspaces | Working in scoped workflows; broader editing remains in progress |
-| [File → New: Multiplayer Map / MegaWorld](docs/DOUBLE_ACTION_20261107.md) | Shared creators, source-bound two-region viewport, restart recovery and native combined-BSP build/readback verified; game acceptance remains open |
-| MegaWorld traversal, full Firefight/Zombie gameplay, shared AI, and cross-engine play | In development or research; game and peer acceptance remain open |
-| Public downloads | No verified GitHub Release assets yet; the preserved C49 Windows preview is an earlier local candidate |
+The latest pushed development checkpoint is [`205b4e7`](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/commit/205b4e72aa175afd36a8f7cd3a7e1e10a7fa9c8c) (7 November 2026). This is **active development**, not a finished game or published release.
 
-For the technical truth behind every claim, see the [current engineering checkpoint](docs/ACTIVE_TASK.md), [feature ledger](docs/MASTER_FEATURE_LEDGER.md), and [latest native acceptance report](docs/P0_C71_CONTINUATION_20261106.md).
+| Area | Verified status on pushed source |
+| --- | --- |
+| Map/tag inspection, supported source edits, native builds and external-tool handoffs | Working in validated, target-specific workflows; not universally available across engines |
+| [19-map MegaWorld Atlas](docs/ACTIVE_TASK.md) | All 19 CE multiplayer source identities checked; hex-cluster planning, transform/yaw, overlap warnings and native UI Undo/Save/restart verified. **Planning only:** no complete 19-map BSP/gameplay build |
+| [Timberland–Sidewinder prototype](docs/DOUBLE_ACTION_20261107.md) | Two-source native compilation, materials, collision and independent readback verified. Natural edge-to-edge seam, Warthog driving, player crossings, sniper combat and randomized teleporting **not yet accepted** |
+| [Chupathingy integration and Machinima](docs/CURRENT_FEATURES.md) | Preferred fresh-setup runtime; verified editor source rendering, reversible greenscreen and camera Save/restart. In-game live writes, co-op and gameplay acceptance remain pending |
+| [OpenH1 VR](docs/ENGINE_SOURCE_ATLAS.md) | Source/interface research only. In-headset Spark VR editing and Windows OpenH1 VR playback have **not** been verified |
+| [Arena Evolved](docs/fixtures/arena-evolved-0.7.7.json) | Separate version-pinned setup/profile; installed game, launch and peer acceptance remain open |
+| Firefight, Zombie Apocalypse, AI sync, dual wield, sprint and cross-engine multiplayer | Target-specific implementation/research; **not** claimed as fully playable or interoperable |
+| Downloads and release builds | No published GitHub Release assets. Earlier C49 Windows 0.4.1 candidate is preserved; newer source needs its own verified build and release checks |
+
+![Native shared-region prototype with original Halo material previews](docs/screenshots/20261107/shared-native-regions.png)
+
+*Development screenshot: two regions rendered in the editor. It is not evidence of a playable 19-map world.*
+
+### Development maps and downloads
+
+Source-bound authoring projects and evidence are tracked in this repository; **original Halo game maps, textures, editing-kit files, and proprietary content are not distributed here**. A compiled experimental MegaWorld test map has been retained privately for validation, not published as a downloadable, gameplay-accepted demo.
+
+For eventual desktop packages, the existing [Release candidate workflow](.github/workflows/release.yml) can create **Windows NSIS installer and portable ZIP candidates** and optionally attempt **Linux AppImage and DEB candidates** from a pinned, pushed commit. Candidates require automated gates, native startup checks and artifact verification. A GitHub Actions artifact is **not** automatically a public GitHub Release; publishing remains a separate approval step. A macOS release package is still a future validation target.
+
+Read the [current engineering checkpoint](docs/ACTIVE_TASK.md), [verified feature status](docs/CURRENT_FEATURES.md), [full feature ledger](docs/MASTER_FEATURE_LEDGER.md), and [native evidence](docs/DOUBLE_ACTION_20261107.md) for precise scope and open acceptance gates.
 
 ## Join the project
 
