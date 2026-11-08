@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Exact-source release preparation, 8 November2026
+
+- Generate the existing two source checksum lists from staged Git blobs without an archive or source copy; preserve normalized text, binary bytes and unstaged author work.
+- Reject stale source checksum metadata in the existing first release gate before compilation. Keep all committed-byte, checksum, archive and native-startup requirements.
+
 ## Unreleased — Windows Tools audit and native scenario transforms, 8 November2026
 
 - Reproduce CI's late Tools-page registration failure and repair measured-layout enumeration without relaxing control reachability, hit testing or no-scroll assertions. Add a genuine clipping rejection.

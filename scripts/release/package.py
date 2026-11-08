@@ -94,6 +94,70 @@ def source_info(repo, commit, preview):
             "repository": REPOSITORY, "releaseTag": f"v{version}-preview.{preview}"}
 
 
+def source_manifests(repo, check=False):
+    """Hash reviewed staged Git blobs, never CRLF worktree bytes or ignored data.
+
+    This writes only the two existing generated manifests. It does not stage,
+    commit, archive, copy source trees, or change any original content.
+    """
+    repo = Path(repo).resolve()
+    manifests = {"SOURCE_SHA256SUMS.txt", "SOURCE_MANIFEST_SHA256.txt"}
+    rows, seen = [], set()
+    for record in git(repo, "ls-files", "--stage", "-z").split(b"\0"):
+        if not record:
+            continue
+        metadata, encoded = record.split(b"\t", 1)
+        mode, oid, stage = metadata.decode("ascii").split()
+        name = encoded.decode("utf-8")
+        need(stage == "0" and mode in {"100644", "100755"}, "Unmerged or linked source index")
+        public_source_path(name)
+        need(not any(ord(c) < 32 for c in name), "Source checksum path contains control characters")
+        need(name.casefold() not in seen, "Source path collision")
+        seen.add(name.casefold())
+        if name not in manifests:
+            rows.append((name, oid))
+    rows.sort()
+    need(0 < len(rows) <= 4094, "Source inventory exceeds bound")
+    request = "".join(oid + "\n" for _, oid in rows).encode("ascii")
+    metadata = subprocess.check_output(["git", "-C", str(repo), "cat-file",
+                                        "--batch-check=%(objectname) %(objecttype) %(objectsize)"], input=request)
+    sizes = metadata.decode("ascii").splitlines()
+    need(len(sizes) == len(rows), "Git source size inventory differs")
+    total, lengths = 0, []
+    for (_, oid), record in zip(rows, sizes):
+        actual, kind, size = record.split()
+        need(actual == oid and kind == "blob" and size.isdecimal(), "Invalid source object")
+        size = int(size)
+        need(size <= 32 * 1024**2, "Source member exceeds 32 MiB")
+        total += size
+        need(total <= 128 * 1024**2, "Source archive exceeds bound")
+        lengths.append(size)
+    payload = subprocess.check_output(["git", "-C", str(repo), "cat-file", "--batch"], input=request)
+    offset, records = 0, []
+    for (name, oid), size in zip(rows, lengths):
+        header = f"{oid} blob {size}\n".encode("ascii")
+        need(payload[offset:offset + len(header)] == header, "Git source payload header differs")
+        offset += len(header)
+        body = payload[offset:offset + size]
+        need(len(body) == size and payload[offset + size:offset + size + 1] == b"\n",
+             "Git source payload is truncated")
+        offset += size + 1
+        records.append(f"{sha(body)}  {name}\n")
+    need(offset == len(payload), "Unexpected source payload bytes")
+    text = ("# SHA256  relative paths - all staged source blobs except these two manifests\n" + "".join(records)).encode("utf-8")
+    need(total + 2 * len(text) <= 128 * 1024**2, "Source archive exceeds bound")
+    for name in sorted(manifests):
+        destination = repo / name
+        need(not destination.is_symlink(), "Linked checksum manifest refused")
+        if check:
+            need(git(repo, "show", ":" + name) == text,
+                 "Stale staged source checksums. Stage reviewed source, run node scripts/package-source.mjs --manifests-only, then stage both checksum manifests and commit.")
+        else:
+            destination.write_bytes(text)
+    return {"mode": "check" if check else "written", "sourceFiles": len(rows),
+            "sourceBytes": total, "manifestSha256": sha(text), "archiveCreated": False}
+
+
 def pe_machine(data):
     need(len(data) >= 128 and data[:2] == b"MZ", "Not a Windows executable")
     offset = struct.unpack_from("<I", data, 60)[0]
@@ -414,6 +478,9 @@ def verify(directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    manifests_parser = sub.add_parser("manifests")
+    manifests_parser.add_argument("--repo", default=".")
+    manifests_parser.add_argument("--check", action="store_true")
     info = sub.add_parser("identity")
     stage_parser = sub.add_parser("stage")
     for target in (info, stage_parser):
@@ -434,7 +501,9 @@ def main():
     payload_parser.add_argument("expected")
     payload_parser.add_argument("installed")
     args = parser.parse_args()
-    if args.command == "identity":
+    if args.command == "manifests":
+        result = source_manifests(args.repo, args.check)
+    elif args.command == "identity":
         result = source_info(args.repo, args.commit, args.preview)
     elif args.command == "stage":
         result = stage(args.repo, args.commit, args.preview, args.platform, args.output, args.build_root)

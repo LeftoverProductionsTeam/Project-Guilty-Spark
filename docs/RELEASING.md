@@ -9,7 +9,7 @@ The manually triggered workflow is [`.github/workflows/release.yml`](../.github/
 
 ## Owner procedure
 
-1. Commit and push the reviewed local master normally. Select an **exact full pushed commit** containing the release scripts; it must be an ancestor of remote master. Packaging refuses an uncommitted source tree or inconsistent frontend/Cargo/Tauri/lock versions.
+1. Stage the reviewed source, refresh and stage both source checksum manifests as described below, then commit and push local master normally. Select an **exact full pushed commit** containing the release scripts; it must be an ancestor of remote master. Packaging refuses an uncommitted source tree or inconsistent frontend/Cargo/Tauri/lock versions.
 2. Open Actions → Release candidate (build or draft) → Run workflow. Supply the full source commit and a **new** preview number. Leave **Prepare draft** off for a build-only trial. Linux is optional and defaults off.
 3. After the build-only run passes, rerun with **Prepare draft** on and an unused preview number. The Windows job always runs its gates again. If Linux was requested and fails, its job remains visibly failed; the verified Windows draft can still proceed without Linux assets.
 4. Inspect the private draft linked from the workflow summary. The publication job uploads actual Release assets, downloads every attached asset again through the authenticated GitHub API and checks its size/SHA-256. The manifest identifies the exact version, source commit/tree, workflow run and acceptance receipts. A successful upload alone is insufficient.
@@ -51,6 +51,19 @@ Linux uses Ubuntu 22.04 x64, WebKitGTK 4.1, GTK/AppIndicator, OpenSSL and the st
 The packager requires genuine x64 ELF/type-2 AppImage headers and a valid Debian archive with an amd64 control record and the exact application payload, accounting only for Tauri's `APP` and `DEB` bundle markers. The extracted AppImage and Debian executables have separate checked identities. It launches the actual AppImage using its extraction/run mode where FUSE is unavailable, and independently launches the Debian executable extracted by `dpkg-deb`. Both use a real Tauri driver, native IPC and visible frontend under Xvfb. No sandbox disabling or renamed Windows binaries are used. Native Linux compilation/startup is **pending until this runner actually passes**; local Windows validation cannot establish it.
 
 Editor startup is not Halo gameplay acceptance. MCC/CE/OpenCE/Chupathingy process hooks, Windows PE tool discovery/browser handoffs, Steam bridge, hosting and proprietary editing-kit execution remain Windows-specific or independently unverified on Linux. No Wine/Proton offsets are guessed. Existing explicit unsupported routes remain visible. Linux failure does not block a verified Windows preview.
+
+## Prepare committed source checksums
+
+The source ZIP must match the selected commit byte for byte. Refresh the two existing checksum lists after staging all reviewed source changes, before the release commit:
+
+```powershell
+node scripts/package-source.mjs --manifests-only
+git add SOURCE_SHA256SUMS.txt SOURCE_MANIFEST_SHA256.txt
+```
+
+This mode hashes staged Git blobs in bounded batches, preserving binary bytes and Git-normalized text. It writes only the two lists and creates no archive or source copy. It does not stage or commit source automatically. Commit the reviewed source and lists together. Set SPARK_RELEASE_PYTHON to an installed Python3.11+ executable if Python is not on PATH.
+
+The first existing release gate also runs `node scripts/package-source.mjs --check-manifests`'s equivalent check. Stale metadata, unmerged/linked source, forbidden game data, collisions and oversized inputs fail before compilation. The final archive still verifies both complete checksum lists, committed blob equality and CRC; none of those checks is relaxed. The older source-review ZIP mode is separate from exact-commit release packaging.
 
 ## Local packaging
 

@@ -1,12 +1,15 @@
 # Active engineering checkpoint
 
-Task: 100 Percent Directive Phase 0 — reproduce and repair Windows Tools-menu CI failure; preserve in-flight native authoring
+Task: Unified Halo Creator first — finish native creator verification and shared exact-source release checks
 Status: automated acceptance incomplete
 Starting revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24; clean canonical local master at intake. Read-only GitHub master confirms the same protected revision.
-Latest verified revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24 plus reviewed current source. R220885Rust/9ignored,472frontend/59offline/38storage; R226native authored CE scenario/build/Chupathingy load; R228strict Tools positive/negative; R229all8native sizes; R230project/history/restart pass. QA SHA2029878ac8a7c64d83e2fcbd690ee73e4a7e9509a2632f03f175a5483c50e1e6.
-Next action: Commit the reviewed CI/native-source closure locally, run scripts/release/gates.mjs against its exact clean SHA with the existing Blender Python3.13, then build/export a new Windows NSIS/portable preview2 through the existing release scripts. Preserve R226 map/evidence and C49. Owner performs remote push/workflow/publication. Then resume frozen SparkLink→native→private dedicated→two-client workflow.
+Latest verified revision: 2841f2ac38f17db3a61dd2ba4856f9ef17cb5260, all9clean release gates pass:885Rust/9ignored,472frontend,251browser/TypeScript/offline/storage/diagnostics/release. R226native authored CE build/load and R229/R230eight-size/project/history/restart pass. New resource-prompt repairR233 passes3focused browser cases; native final-source follow-through remains.
+Next action: Commit the reproduced self-contained CE prompt repair and current checkpoint. Rerun exact-source release gates; build one external NSIS/portable candidate, test its native source-aware preview, portable/installed startup and isolated installation/removal. Then resume the Unified Halo Creator native integration before the later100Percent directive, per owner ordering. No push/publication.
 
 ## Acceptance
+
+Latest owner steering: finish first directive, then second. Interpreted in posted order: Unified Halo Creator37c65d5f, then100Percent Completion237b00a4. A concise optional ordering clarification was asked; no response received yet. Shared current regression/release verification continues without claiming either directive complete. Do not begin a separate initiative or erase human-only first-directive gates.
+
 
 Superseding owner237b00a4, full1036-line instruction retained in docs/Master Engineering Prompts/GS_2026-11-08_100_Percent_Completion_Directive.txt (SHAa86de9fb7d34f23c9ecfd25dded3d760eff34449eaba5e46d495a8b32bd27f2a). Immediate Phase0 is the actual Windows CI Tools-menu failure; later full-product goals retain all475historical identities/25prompts and evidence levels. Remote master independently remains protected1a60fa1. Do not interrupt or discard current native authoring progress, publish, create competing pipelines or infer100percent completion.
 
@@ -24,6 +27,9 @@ Native lighting uses standard single-sky tags, existing Tool radiosity/cache bui
 Seam routes remain distinct: infantry cave, Warthog road/canyon and continuous exposed ridge/sniper path. Source preview, f32 collision, portal cuts and native compile share authoritative geometry. Human two-way foot/Warthog/ridge/projectile/door results remain separate. A19-map Atlas is not a compiled19-map world or streaming.
 
 ## Verified milestones
+
+2841f2a all9release gate groups pass in E/release-2841f2a-preview2/gates-windows/gates.json; source remained clean. R232 exposes a concrete false self-contained CE bitmap-bank prompt (1failed/2passed); R233 fixes it using native required resources (3passed). Required external banks still show a working action; pinned sources do not repeat setup. Current-source native/package checks remain pending. Preview2 is unused in the read-only GitHub tag collection; no remote write.
+
 
 Current closure details: docs/CI_NATIVE_SOURCE_CLOSURE_20261108.md. R223 deterministically reproduces exact CI9–12 late-registration failure; R22415repeats/R228fourfinal checks pass while deliberate clipping still fails. R227nine WebAudio cases pass during native compilation26.9s without timeout inflation; historical timeout not reproduced. R22910nativecases/all8sizes90controls per size; R230two full project/history/ownership/restart cases and all8picker sizes19controls, no reachability/scroll defects. Direct Sky review only opened File menu; not full manual acceptance.
 

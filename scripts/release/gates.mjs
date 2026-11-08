@@ -72,10 +72,16 @@ for (const [id, executable, args] of commands) {
       chunks.push(b);
       process.stdout.write(b);
     });
-  const exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('exit', (c) => resolve(c ?? -1));
   });
+  if (id === 'source-interfaces' && exitCode === 0) {
+    console.log('Checking committed source checksum manifests before compilation');
+    const checked = spawn(python, ['-B', 'scripts/release/package.py', 'manifests', '--check'], { env, windowsHide: true, stdio: ['ignore','pipe','pipe'] });
+    for (const stream of [checked.stdout, checked.stderr]) stream.on('data', b => { chunks.push(b); process.stdout.write(b); });
+    exitCode = await new Promise((resolve,reject) => { checked.on('error',reject); checked.on('exit',c => resolve(c??-1)); });
+  }
   const bytes = Buffer.concat(chunks);
   await fs.writeFile(path.join(output, id + '.log'), bytes, { flag: 'wx' });
   receipt.gates.push({

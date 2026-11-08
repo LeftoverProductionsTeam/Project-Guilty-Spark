@@ -4,7 +4,7 @@ Task: Unified Halo Creator first — finish native creator verification and shar
 Status: automated acceptance incomplete
 Starting revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24; clean canonical local master at intake. Read-only GitHub master confirms the same protected revision.
 Latest verified revision: 2841f2ac38f17db3a61dd2ba4856f9ef17cb5260, all9clean release gates pass:885Rust/9ignored,472frontend,251browser/TypeScript/offline/storage/diagnostics/release. R226native authored CE build/load and R229/R230eight-size/project/history/restart pass. New resource-prompt repairR233 passes3focused browser cases; native final-source follow-through remains.
-Next action: Commit the reproduced self-contained CE prompt repair and current checkpoint. Rerun exact-source release gates; build one external NSIS/portable candidate, test its native source-aware preview, portable/installed startup and isolated installation/removal. Then resume the Unified Halo Creator native integration before the later100Percent directive, per owner ordering. No push/publication.
+Next action: Finish source checksum repair by staging all reviewed source/docs, running package-source --manifests-only, staging the two lists and committing. Run current clean release gates and a real NSIS build in one disposable owner, then native packaged preview/project recovery, portable/installed startup, installation/removal and sealing. Do not relabel earlier de23acf binaries as the new commit. Resume Unified Halo Creator before the later100Percent directive.
 
 ## Acceptance
 
@@ -27,6 +27,9 @@ Native lighting uses standard single-sky tags, existing Tool radiosity/cache bui
 Seam routes remain distinct: infantry cave, Warthog road/canyon and continuous exposed ridge/sniper path. Source preview, f32 collision, portal cuts and native compile share authoritative geometry. Human two-way foot/Warthog/ridge/projectile/door results remain separate. A19-map Atlas is not a compiled19-map world or streaming.
 
 ## Verified milestones
+
+Release correction: de23acf all9groups pass (885Rust/9ignored,472frontend,254browser); actual x64app50,291,200B SHA293f10a75e422a0a9d2750473f3c4d1ad7ae1026d4f8277353ff7fecc0d5f940 and NSIS11,918,521B SHAa291c96ffbc133a3e52765d2cf589f129582259380382c66767bbd0cf88adcbf build. Public staging correctly fails at stale SOURCE_SHA256SUMS dating67545f5. Native follow-through did not run. No accepted new candidate. Existing helper now hashes staged Git blobs without an archive; R235new normalization/binary/unstaged/stale/forbidden-payload fixtures pass; R236canonical check fails before compilation as expected. Refresh lists with reviewed staged source, commit, then rerun existing full pipeline. Earlier scratch5.13GB disposed; C49/originals protected.
+
 
 2841f2a all9release gate groups pass in E/release-2841f2a-preview2/gates-windows/gates.json; source remained clean. R232 exposes a concrete false self-contained CE bitmap-bank prompt (1failed/2passed); R233 fixes it using native required resources (3passed). Required external banks still show a working action; pinned sources do not repeat setup. Current-source native/package checks remain pending. Preview2 is unused in the read-only GitHub tag collection; no remote write.
 

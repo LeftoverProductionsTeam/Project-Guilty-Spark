@@ -38,3 +38,12 @@ R220 passes885 Rust tests (nine explicit opt-in skips),472 frontend, TypeScript,
 R212 stopped at a transient Windows receipt rename; R218 exposed unfriendly transform labels; R220 then stopped because its harness tried to frame while selection was correctly retained. The test now explicitly deselects before Frame both. R225 refused concurrent storage reservation during cleanup; no budget was raised. R226 closes the native build path. Failed attempts stay recorded and are not passes.
 
 No source history, originals, runtime installation, ISO, C49 release, remote tag or GitHub settings changed. Release preparation will use a fresh external owned directory and exact committed source. Owner still performs push/workflow/publication. Actual public Release downloads, two-computer collaboration, multiplayer AI/Extraction/Zombie gameplay,19-region traversal, headset VR and Linux/macOS release acceptance remain separate unfinished requirements. No numeric global completion estimate is justified by these test counts.
+
+
+## Real packaging blocker and repair
+
+Both2841f2a andde23acf pass all nine clean-commit release groups; the latter passes254browser tests. The real de23acf x64 executable and NSIS package build, with5.13GB temporary compiler output disposed. Packaging correctly rejects stale source checksum lists: their last update was67545f5, and even .gitattributes no longer matches. No source ZIP, sealed candidate, draft or public release is accepted from that attempt.
+
+The existing package-source helper now offers --manifests-only/--check-manifests through the existing release packager. It hashes only reviewed staged Git blobs, batches reads after checking modes/counts/sizes, preserves binary and normalized text, writes only the two existing generated lists, and never creates a source tree/archive or stages/commits automatically. The existing source-interfaces release gate checks this metadata before expensive compilation; the nine gate identities and all source archive integrity assertions remain unchanged.
+
+R235 passes the release-pipeline tests, including three new synthetic fixtures: staged LF/binary fidelity with unrelated unstaged work unchanged; stale lists refused and corrected committed output independently archived; forbidden tracked game data rejected without altering old metadata. R236 reproduces the canonical stale-list preflight failure. The repair must now be committed with refreshed lists, then the exact-source release and native packaged-app checks rerun. C49 and both original Halo sources remain unchanged.

@@ -1,7 +1,14 @@
 // Package audited source roots only. Never enumerate caches or game directories.
 // Usage: node scripts/package-source.mjs <fresh-output.zip>
+// Release preparation: --manifests-only hashes staged Git blobs without an archive.
 import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import crypto from 'node:crypto';import {spawnSync} from 'node:child_process';
 import {sealQaScratch,disposeQaScratch} from './native-qa-storage.mjs';
+import {fileURLToPath} from 'node:url';
+if(['--manifests-only','--check-manifests'].includes(process.argv[2])){
+ const python=process.env.SPARK_RELEASE_PYTHON??(process.platform==='win32'?'python':'python3');
+ const run=spawnSync(python,['-B',fileURLToPath(new URL('./release/package.py',import.meta.url)),'manifests',...(process.argv[2]==='--check-manifests'?['--check']:[])],{stdio:'inherit',windowsHide:true});
+ if(run.error)throw run.error;process.exit(run.status??1);
+}
 if(process.platform!=='win32')throw new Error('This release helper currently uses Windows .NET ZIP; use the recorded manifest on other hosts.');
 const output=path.resolve(process.argv[2]??'releases/Project_Guilty_Spark_Continuation_35_SOURCE.zip');
 if(await fs.stat(output).then(()=>true,()=>false))throw new Error('Refusing to overwrite an existing source release');

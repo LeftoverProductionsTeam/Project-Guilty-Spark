@@ -209,5 +209,50 @@ class PackageAcceptance(unittest.TestCase):
             package.verify(self.output)
 
 
+    def test_staged_manifest_generation_preserves_binary_and_normalized_text_without_archiving(self):
+        text = self.repo / 'src/app.txt'
+        text.write_bytes(b'Updated staged source\r\nsecond line\r\n')
+        binary = self.repo / 'public/icon.png'
+        binary.parent.mkdir()
+        binary.write_bytes(b'\x89PNG\r\n\x1a\n\0\xff')
+        self.run_git('add', 'src/app.txt', 'public/icon.png')
+        text.write_bytes(b'Unstaged author work must stay unchanged')
+        before = text.read_bytes()
+        result = package.source_manifests(self.repo)
+        self.assertFalse(result['archiveCreated'])
+        self.assertEqual(text.read_bytes(), before)
+        self.assertEqual(binary.read_bytes(), b'\x89PNG\r\n\x1a\n\0\xff')
+        # The manifest must describe the staged LF blob, not the changed worktree.
+        sums = (self.repo / 'SOURCE_SHA256SUMS.txt').read_text()
+        self.assertIn(package.sha(b'Updated staged source\nsecond line\n') + '  src/app.txt', sums)
+        self.assertIn(package.sha(binary.read_bytes()) + '  public/icon.png', sums)
+        self.assertEqual((self.repo / 'SOURCE_SHA256SUMS.txt').read_bytes(),
+                         (self.repo / 'SOURCE_MANIFEST_SHA256.txt').read_bytes())
+        self.run_git('add', 'SOURCE_SHA256SUMS.txt', 'SOURCE_MANIFEST_SHA256.txt')
+        hashes = [(self.repo / name).read_bytes() for name in ['SOURCE_SHA256SUMS.txt', 'SOURCE_MANIFEST_SHA256.txt']]
+        self.assertEqual(package.source_manifests(self.repo, check=True)['mode'], 'check')
+        self.assertEqual(hashes, [(self.repo / name).read_bytes() for name in ['SOURCE_SHA256SUMS.txt', 'SOURCE_MANIFEST_SHA256.txt']])
+
+    def test_stale_staged_manifests_fail_before_source_packaging_and_repaired_index_can_archive(self):
+        (self.repo / 'src/app.txt').write_text('Reviewed new source', newline='\n')
+        self.run_git('add', 'src/app.txt')
+        with self.assertRaisesRegex(ValueError, 'Stale staged source checksums'):
+            package.source_manifests(self.repo, check=True)
+        package.source_manifests(self.repo)
+        self.run_git('add', 'SOURCE_SHA256SUMS.txt', 'SOURCE_MANIFEST_SHA256.txt')
+        self.run_git('-c', 'user.name=Release Test', '-c', 'user.email=release-test@example.invalid', 'commit', '-qm', 'Reviewed manifest update')
+        self.commit = self.run_git('rev-parse', 'HEAD').strip()
+        self.assertGreater(package.source_archive(self.repo, self.commit, self.root / 'source.zip'), 5)
+        package.source_manifests(self.repo, check=True)
+
+    def test_manifest_generation_refuses_tracked_game_data_without_touching_old_metadata(self):
+        before = (self.repo / 'SOURCE_SHA256SUMS.txt').read_bytes()
+        (self.repo / 'src/original.map').write_bytes(b'Synthetic forbidden native payload')
+        self.run_git('add', 'src/original.map')
+        with self.assertRaisesRegex(ValueError, 'Private/binary source payload'):
+            package.source_manifests(self.repo)
+        self.assertEqual((self.repo / 'SOURCE_SHA256SUMS.txt').read_bytes(), before)
+
+
 if __name__ == '__main__':
     unittest.main()
