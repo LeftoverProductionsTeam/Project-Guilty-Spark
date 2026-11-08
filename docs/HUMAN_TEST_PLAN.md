@@ -79,3 +79,23 @@ Prerequisites: current source-matched QA app; matching Chupathingy v0.9.0c; lega
 5. Record Pass/Fail/Blocked/Not run, tester/date, exact app/runtime/cache hashes, peer setup, screenshots, native logs and unchanged original inputs.
 
 This verifies ordinary private multiplayer hosting. AI Apocalypse, persistent extraction inventory/world state, native AI combat parity and the 30-second empty-game lifecycle require separate implementation and gameplay tests; they are not accepted by this checklist.
+
+
+## UI-PS — saved projects, workspaces and windows (release gate)
+
+Prerequisites: current verified Windows QA executable; two owned saved projects A/B; B closed; editable A; record executable SHA and source revision. Use isolated copies/source projects, never stock installs.
+
+1. Open A; change a supported property. Confirm the unsaved dot. Record original and edited value.
+2. Click Maps → Open saved project… (also repeat through File). Search B and click its row. Confirm B is active in this window.
+3. Return to A's tab. Confirm edited value/unsaved dot; Undo returns original, Redo restores edit. B's history remains separate.
+4. Work → Open work → Workspace in this window: choose Features & workflows. Confirm A remains the project. Reopen A from Saved projects; its remembered editor returns.
+5. Saved projects → B's window icon: another view opens. Main A remains active. Independent workspace navigation must not change the other window. Only one window can own editing for each project.
+6. Maps → A's Move arrow: current draft/history move to its window after acknowledgment. Undo/Redo there; Return map to workspace. Confirm no lost edits.
+7. Save A/B with Ctrl+S. Quit Spark normally and restart. Confirm active project/workspace, both open maps, selections and Undo/Redo. Repeat with another detached panel and monitor if available.
+8. Rename/remove only an isolated test project's file while closed, then attempt its saved/recent entry. Expect visible failure, unchanged active project/draft, no blank/wrong editor. Restore fixture afterward.
+
+Record pass/fail, actual values, native screenshots, window ownership, restart result and any blocked step. Native automated WebView events and mocked browser IPC are separate evidence from physical mouse/keyboard and multi-monitor outcomes. Settings → Interface Studio retains UI scale, menu sounds and automatic walkthrough preference independently; guides can always be opened manually from Learning center.
+
+UI-PS step7 prerequisite: if resuming all windows is wanted, enable Settings & tools → Interface Studio → Restore my saved workspace layout on launch, then View → Save workspace windows with A active and B open. Verify the saved-layout confirmation before quitting. With this option off, starting at Map Library is expected; both explicitly saved projects remain available through File/Maps → Open saved project….
+
+UI-PS current automated readiness: R207 passes the full sequence, including an unopened project C edited in its own window, direct descriptor values, single writer, return, configured full restart and19controls at all8native sizes. Ready for physical repetition after the owner handles the Windows Security network-permission prompt. Leave that decision to the owner; no security settings or original installs were changed. New game/compiler acceptance is not inferred.

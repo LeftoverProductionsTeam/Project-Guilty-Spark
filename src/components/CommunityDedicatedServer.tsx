@@ -234,7 +234,7 @@ export default function CommunityDedicatedServer({
           <p>{view.detail}</p>
           {view.status && (
             <p>
-              {view.status.players}/{view.status.maximumPlayers} players · native {view.status.state} · OpenCE
+              {!active && 'Last server observation · '}{view.status.players}/{view.status.maximumPlayers} players · native {view.status.state} · OpenCE
               compatibility {view.status.networkVersion} ·{' '}
               {view.status.public ? 'Public (unexpected)' : 'Private'}
             </p>

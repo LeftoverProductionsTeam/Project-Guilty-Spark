@@ -15,7 +15,7 @@ const root=path.resolve(destination),expect=assertion.configure({timeout:45000})
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
-const launchOnly=process.env.SPARK_LIFECYCLE_LAUNCH_ONLY==='1';
+const launchOnly=process.env.SPARK_LIFECYCLE_LAUNCH_ONLY==='1'||process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1';
 const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
 const contextOnly=process.env.SPARK_LIFECYCLE_TAG_CONTEXTS==='1';
 if(contextOnly&&(!nativeOnly||previewOnly))throw Error('Native asset-context acceptance requires native-only mode and its own small bounded run');
@@ -46,7 +46,7 @@ if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw 
 const reservationBytes=rebuildOnly?4*1024**3:previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:launchOnly?'native-layout-only':geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1'?'native-project-switching':launchOnly?'native-layout-only':geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
 const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?`native-${editCount}-edits`:nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 await finishStorage.createScratch('application');
 await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
@@ -358,6 +358,11 @@ try{
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(launchOnly){expect(path.resolve(boot.dataDirectory)).toBe(path.join(root,'library'));await expect(main.locator('#root')).not.toBeEmpty();step('Actual embedded app starts with its isolated library and no mocked IPC',{url:main.url()});}
+  if(process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1'){
+    if(!launchOnly)throw Error('Project-switch acceptance uses the existing bounded launch-only fixture');
+    const {nativeProjectSwitching}=await import('./native-project-switching.mjs');
+    await nativeProjectSwitching({page:main,root,invoke,report,step,openProject,inspector,x,setX,state,acknowledged,pages,nextPage,baseline:process.env.SPARK_PROJECT_SWITCH_BASELINE==='1',restart:async()=>{for(const page of pages().reverse())if(!page.isClosed())await close(page,'save');await waitForQaExit(child);await browser.close();await launchNative();return main;}});
+  }
   if(process.env.SPARK_LIFECYCLE_RESPONSIVE==='1'){if(!launchOnly)throw Error('Responsive layout acceptance uses the existing launch-only fixture');const {nativeResponsiveLayout}=await import('./native-responsive-layout.mjs');await nativeResponsiveLayout({page:main,root,invoke,report,step,baseline:process.env.SPARK_LIFECYCLE_LAYOUT_BASELINE==='1'});}
   if(process.env.SPARK_LIFECYCLE_SETUP_FLAVORS==='1'){
     if(!launchOnly)throw Error('Setup flavor acceptance uses the existing launch-only fixture');

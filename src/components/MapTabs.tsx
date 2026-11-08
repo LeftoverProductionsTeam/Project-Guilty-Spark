@@ -17,6 +17,7 @@ export default function MapTabs({
   onWindow,
   onReturn,
   onReorder,
+  onOpenSaved,
 }: {
   state: MapDocuments;
   disabled: boolean;
@@ -25,6 +26,7 @@ export default function MapTabs({
   onWindow: (id: string) => Promise<boolean>;
   onReturn?: (id:string)=>void;
   onReorder?:(ids:string[])=>void;
+  onOpenSaved:()=>void;
 }) {
   const tabs = useRef<HTMLDivElement>(null);
   const menu=useRef<HTMLDetailsElement>(null),pendingFocus=useRef<string|null>(null);
@@ -105,7 +107,7 @@ export default function MapTabs({
         const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
         if(buttons[next])focusCompositeItem(buttons[next]);
       }}>
-        <summary aria-label="Choose open map" title="Choose an open map in this window. Search by name; the arrow moves a map to its own window." onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
+        <summary aria-label="Choose open map" title="Switch between open maps, or choose Open saved project to browse your library. The arrow moves an open map and its draft to another window." onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
         <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
           <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
           <PagedSurface name="map-switcher" label="Open maps" maxHeight={360}><div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
@@ -115,9 +117,10 @@ export default function MapTabs({
               else pendingFocus.current=d.id;
               onSelect(d.id);
             }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
-            <button aria-label={'Open '+d.history.current?.title+' in another window'} title="Move this map and its history to a separate window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
+            <button aria-label={'Move '+d.history.current?.title+' to another window'} title="Move this map and its history to a separate window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
           </div>)}</div></PagedSurface>
           {!matches.length&&<p role="status">No open maps match.</p>}
+          <button className="gs-map-open-saved" role="menuitem" disabled={disabled} title="Browse all saved projects without closing the maps already open" onClick={()=>{if(menu.current)menu.current.open=false;onOpenSaved();}}>Open saved project…</button>
         </div>
       </details>}
       <div ref={tabs} className="map-tabs" role="tablist" aria-label="Open maps">

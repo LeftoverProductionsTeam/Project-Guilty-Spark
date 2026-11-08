@@ -218,7 +218,7 @@ pub fn hosting_plan_for(runtime_id: RuntimeId, action: HostingAction, scenario_t
         ];
         plan.limitations = vec![
             "Windows and loopback-only private CE dedicated hosting. No public listing, LAN/VPN exposure, MCC cross-play, expanded population or arbitrary console commands are enabled by this control.".into(),
-            "Real server map/status/lifecycle acceptance is separate from a joined client, movement, collision traversal or gameplay; those remain open.".into(),
+            "Server map/status/lifecycle checks do not establish client joining, movement or gameplay for the selected map. Confirm those independently through the matching private client trial.".into(),
         ];
     } else {
         if !runtime_id.allows_registration() {

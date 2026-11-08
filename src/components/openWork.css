@@ -20,3 +20,8 @@
 .application .gs-work-row:hover,.application .gs-work-row:focus-visible{background:color-mix(in srgb,var(--accent) 12%,var(--surface));}
 .gs-open-work-popup footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:7px;}
 .gs-open-work-popup footer small{font-size:9px;color:var(--muted);}
+
+.gs-work-sections{display:flex;gap:4px;}
+.gs-work-sections>button{flex:1;}
+.gs-saved-project-row{display:grid;grid-template-columns:minmax(0,1fr)30px;gap:3px;align-items:center;}
+.gs-saved-project-row>button:last-child{padding:4px;min-height:28px;}

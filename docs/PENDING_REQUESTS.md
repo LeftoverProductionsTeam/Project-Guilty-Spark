@@ -1,5 +1,7 @@
 # Pending engineering requests
 
+Current priority: 0512f096 release-blocking interaction audit: saved-project switching, native retained draft/history/window/restart proof, truthful controls and How To. Full original directive retained under Master Engineering Prompts. Prior dedicated/AI/seam/VR/Extraction objectives remain queued; intake is not acceptance.
+
 Current8Nov continuation:16cf955d/3383e186 are preserved exactly as GS_2026-11-08_Complete_Product_End_To_End.txt and GS_2026-11-08_AI_Apocalypse_Combined_Workflow_Proof.txt under Master Engineering Prompts. First input is physically truncated mid-section9; complete addendum retained. Priority is actual dedicated AI Apocalypse/persistent Extraction plus the combined SparkLink→native build→Chupathingy→two-game-client path. Existing Windows host adapter is being extended for official v0.9.0c; ordinary hosting is a prerequisite, not AI/persistence acceptance. All prior human-only seam,19-region,VR and platform gates remain open. No new scheduler, request completion or wholesale requeue is implied.
 
 ## Overnight continuation — 5 November 2026

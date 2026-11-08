@@ -937,8 +937,13 @@ pub fn capability_report(observation: &RuntimeObservation) -> RuntimeCapabilityR
         && observation.target.platform == "windows" && target_matches;
     capabilities.push(if ce_private_host {
         capability(HostGame, Implemented, SetupRequired,
-            "Online can start, observe and stop an owned loopback CE dedicated server from a checked private copy. Native map status, workspace persistence and process cleanup are tested; client join and gameplay are separate open gates.",
+            "Online can start, observe and stop an owned loopback CE dedicated server from a checked private copy. Server status, map identity and process cleanup are checked independently; verify client joining and gameplay for the selected map.",
             "Open Online → Host game, select a native CE map and run the dedicated-file/content checks. Registration alone does not authorize a particular map or server executable.")
+    } else if observation.runtime_id == RuntimeId::ChupathingyCe
+        && observation.target.platform == "windows" && target_matches {
+        capability(HostGame, Implemented, SetupRequired,
+            "Online prepares a Spark-owned private Chupathingy dedicated server using a separately verified Windows x64 package, compatible owned Xbox or self-contained CE609 maps, and authenticated native status. Setup and game-play acceptance remain distinct.",
+            "Open Online → Host game → Private Chupathingy dedicated server. Download verified server or locate the matching package, choose a compatible owned map, then Start private dedicated server.")
     } else {
         capability(HostGame, if community { UpstreamDeclared } else { Unknown }, Unavailable,
             "Upstream private/dedicated hosting instructions exist. Spark has not accepted an owner-controlled running game-server launch, host/client agreement or rollback path for this target.",
@@ -1459,6 +1464,23 @@ mod tests {
         assert_eq!(report.capability(RuntimeOperation::MoveLiveObject).unwrap().availability,ActionAvailability::Unavailable);
         observation.runtime_id=RuntimeId::OpenCe;
         assert_eq!(capability_report(&observation).capability(RuntimeOperation::LiveRebuild).unwrap().availability,ActionAvailability::Unavailable);
+    }
+
+    #[test]
+    fn private_host_guidance_matches_the_existing_windows_chupathingy_controls() {
+        let mut o = observation(RuntimeId::ChupathingyCe);
+        let report = capability_report(&o);
+        let host = report.capability(RuntimeOperation::HostGame).unwrap();
+        assert_eq!(host.evidence_level, EvidenceLevel::Implemented);
+        assert_eq!(host.availability, ActionAvailability::SetupRequired);
+        assert!(host.next_action.contains("Private Chupathingy dedicated server"));
+        assert!(host.detail.contains("CE609"));
+        o.target.platform = "linux".into();
+        assert_eq!(capability_report(&o).capability(RuntimeOperation::HostGame).unwrap().availability, ActionAvailability::Unavailable);
+        o.target.platform = "windows".into();
+        o.target.edition = "wrong-source-contract".into();
+        assert_eq!(capability_report(&o).capability(RuntimeOperation::HostGame).unwrap().availability, ActionAvailability::Unavailable);
+        assert_eq!(capability_report(&observation(RuntimeId::OpenCe)).capability(RuntimeOperation::HostGame).unwrap().availability, ActionAvailability::Unavailable);
     }
 
 }

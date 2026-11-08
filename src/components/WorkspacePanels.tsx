@@ -280,7 +280,7 @@ export default function WorkspacePanels({
               <div><PagedSurface name="view-menu" label="View menu" scope={windowLayoutId} maxHeight={420}>
                 <section className="gs-view-commands" aria-label="Window view">
                   <button aria-label={fullscreen?'Exit fullscreen editing':'Fullscreen editing'} aria-pressed={fullscreen} onClick={event=>{event.currentTarget.closest('details')!.open=false;void changeFullscreen();}}>{fullscreen?<Shrink size={15}/>:<Expand size={15}/>}<span>{fullscreen?'Exit fullscreen':'Fullscreen'}</span><kbd>F11</kbd></button>
-                  {onPopout&&!detached&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={event=>{event.currentTarget.closest('details')!.open=false;onPopout();}}><SquareArrowOutUpRight size={15}/><span>Move workspace to a new window</span></button>}
+                  {onPopout&&!detached&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors move their current draft and Undo history to that window." onClick={event=>{event.currentTarget.closest('details')!.open=false;onPopout();}}><SquareArrowOutUpRight size={15}/><span>Move workspace to a new window</span></button>}
                 </section>
                 {viewActions&&<section className="gs-view-audio" aria-label="Map preview sound"><strong>Map preview sound</strong>{viewActions}</section>}
                 {!detached&&<>

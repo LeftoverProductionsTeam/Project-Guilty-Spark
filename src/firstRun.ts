@@ -13,7 +13,7 @@ export const STARTER_PATHS:readonly StarterPath[]=[
     {id:'plan',label:'Export a local legacy workflow handoff',why:'The Academy handoff records project evidence and unverified engine gates with no private paths or original asset bytes.',target:'academy',needsDesktop:false},
   ]},
   {id:'inspect',title:'Open an old Halo map',level:'Start here',description:'Preserve a local cache, inspect its actual tags and see its geometry.',steps:[
-    {id:'import',label:'Import an owned .map in Map Library',why:'The original cache is copied and hashed before inspection.',target:'library',needsDesktop:true},
+    {id:'import',label:'Import an owned .map in Map Library',why:'Spark verifies the original cache and keeps source edits separate. Browsing does not create another map copy.',target:'library',needsDesktop:true},
     {id:'view',label:'Explore the World Editor',why:'Real BSP surfaces are visible when supported by the cache; missing textures remain explicit.',target:'world',needsDesktop:false},
     {id:'tag',label:'Browse relationships in Tag Editor',why:'A tag identity is a reference, not an extracted writable tag file.',target:'tags',needsDesktop:false},
     {id:'academy',label:'Follow the preservation lesson',why:'Learn why project overlays are safer than editing installed maps directly.',target:'academy',needsDesktop:false},

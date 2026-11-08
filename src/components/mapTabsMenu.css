@@ -59,3 +59,5 @@ html[data-gs-reduced-motion=true] :is(.gs-tab-tear-preview,.map-tab[data-draggin
 .new-megaworld h2,.new-megaworld p{margin:0;}
 
 .gs-page-body>.gs-map-switcher-list{max-height:none;overflow:visible;}
+
+.gs-map-open-saved{width:100%;text-align:left;margin-top:4px;}

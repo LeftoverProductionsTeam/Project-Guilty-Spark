@@ -838,9 +838,21 @@ export default function App() {
       if(imported.length&&current){dispatchDocument({type:'history',id:project.id,action:{type:'edit',project:{...current,animations:[...(current.animations??[]),...imported]},description:'Drop animation sources into the project'}});dispatchDocument({type:'select',id:project.id});setWorkspace('machinima');notice(`Imported ${imported.length} animation source${imported.length===1?'':'s'}. Choose a biped in Machinima.`,'success');}
     }catch(error){notice(String(error),'error');}finally{setBusy(false);}
   }
+  function chooseSavedProject(){window.dispatchEvent(new CustomEvent('gs:open-work',{detail:{open:true,section:'projects'}}));}
+  async function openSavedProjectWindow(id:string){
+    if(!native||busy||closing)return;
+    setBusy(true);try{
+      const existing=documentsRef.current.documents.find(d=>d.id===id);
+      if(existing)await flushWindowHandoff(id);
+      const open=existing?null:await call<OpenProject>('open_project',{id});
+      const project=existing?.history.current??open!.project;
+      await call('open_project_window',{id,workspace:rememberedWorkspace(project!,existing?.inspection??open?.inspection),another:true,observe:!!existing});
+      await workspaceWindows.refresh();
+    }catch(error){notice(String(error),'error');}finally{setBusy(false);}
+  }
   async function openProject(id: string, stayInWorkspace?: Workspace) {
     const requestedNavigation=workspaceNavigation.current;
-    const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){dispatchDocument({type:'select',id});setWorkspace(stayInWorkspace??rememberedWorkspace(existing.history.current!,existing.inspection));return;}
+    const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){selectMap(id,stayInWorkspace);return true;}
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
@@ -848,8 +860,9 @@ export default function App() {
       await load(open);
       // Compare navigation intent, including leaving and returning to the same route.
       if(workspaceNavigation.current===requestedNavigation)setWorkspace(stayInWorkspace ?? rememberedWorkspace(open.project,open.inspection));
+      return true;
     } catch (e) {
-      notice(String(e), 'error');
+      notice(String(e), 'error');return false;
     } finally {
       setBusy(false);
     }
@@ -861,7 +874,16 @@ export default function App() {
     // will not run again. Use the same reveal event as the header indicator.
     requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}})));
   }
-  function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{window.dispatchEvent(new Event('gs:save-viewport-context'));const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
+  function selectMap(id:string,targetWorkspace?:Workspace){
+    const map=documentsRef.current.documents.find(d=>d.id===id);
+    if(!map?.history.current){notice('This map is no longer open. Choose File → Open saved project… to reopen it.');return;}
+    if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+    window.dispatchEvent(new Event('gs:save-viewport-context'));
+    // A Save shortcut can arrive before the next animation frame. Publish the
+    // selected document now so its identity cannot be captured from the old tab.
+    // Blurring first commits the old field through its original project owner.
+    flushSync(()=>{dispatchDocument({type:'select',id});setWorkspace(targetWorkspace??rememberedWorkspace(map.history.current!,map.inspection));});
+  }
   async function flushWindowHandoff(id:string){
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id,true);
@@ -933,7 +955,7 @@ export default function App() {
   }
   async function returnToPlace(route:WorkflowRoute){
     if(mapWorkspaces.includes(route.workspace)&&route.projectId&&!documentsRef.current.documents.some(d=>d.id===route.projectId)){
-      await openProject(route.projectId,route.workspace);await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      if(!await openProject(route.projectId,route.workspace))return;await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
     }
     workflow.restore(route);
   }
@@ -1450,6 +1472,7 @@ export default function App() {
                 state={documents}
                 disabled={busy || closing}
                 onSelect={selectMap}
+                onOpenSaved={chooseSavedProject}
                 onReorder={ids=>dispatchDocument({type:'reorder',ids})}
                 onClose={(id) => void closeMap(id)}
                 onWindow={(id) => closeMap(id, true, true)}
@@ -1474,7 +1497,7 @@ export default function App() {
             <div className="gs-titlebar-drag-space" data-tauri-drag-region="deep" aria-hidden="true" />
             <div id="gs-header-workspace-tools"/>
             <OpenWork workspace={workspace} documents={documents} entries={data.entries} windows={workspaceWindows.windows} recent={workflow.recent} error={workspaceWindows.error} jobs={logs}
-              onNavigate={setWorkspace} onSelect={selectMap} onRecent={route=>void returnToPlace(route)}
+              disabled={busy||closing} onNavigate={setWorkspace} onSelect={selectMap} onOpenProject={id=>void openProject(id)} onProjectWindow={id=>void openSavedProjectWindow(id)} onRecent={route=>void returnToPlace(route)}
               onFocus={label=>void workspaceWindows.focus(label).catch(e=>notice(String(e),'error'))} onRefresh={()=>void workspaceWindows.refresh()} onWindow={(target,another)=>void openWorkspaceView(target,another)}/>
             <details className="gs-studio-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={headerMenuKeyDown}>
               <summary aria-label="Studio options" title="Halo runtime, collaboration, tools and help">Studio <span aria-hidden="true">▾</span></summary>
@@ -1652,6 +1675,7 @@ export default function App() {
                 onPopout={() => void popoutWorkspace()}
                 onNewWindow={() => void openWorkspaceView(workspaceRef.current, true)}
                 fileActions={[
+                  {id:'open-saved-project',label:'Open saved project…',hint:'Browse saved projects; other open maps keep their drafts and Undo history.',run:chooseSavedProject,disabled:busy},
                   {id:'open-map',label:'Open map or archive…',run:()=>void importFiles(),disabled:busy},
                   {id:'new-multiplayer',group:'new',label:'Multiplayer Map',run:()=>setCreateModal('multiplayer'),disabled:busy},
                   {id:'new-megaworld',group:'new',label:'MegaWorld',run:()=>setCreateModal('megaworld'),disabled:busy},

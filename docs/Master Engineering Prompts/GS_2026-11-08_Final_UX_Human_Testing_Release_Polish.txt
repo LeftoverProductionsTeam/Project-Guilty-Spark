@@ -1,0 +1,210 @@
+# PROJECT GUILTY SPARK — FINAL USER EXPERIENCE, HUMAN TESTING & RELEASE POLISH
+
+**MANDATORY ADDENDUM — ALL THE TOOLS, AND THEN SOME**
+
+This extends every previously approved engineering and release requirement. Nothing is removed, postponed or silently marked complete.
+
+## 1. REMOVE DEVELOPER LANGUAGE FROM THE USER EXPERIENCE
+
+Perform a complete user-facing language and content audit across every workspace, menu, tooltip, status message, notification, error, setup wizard, walkthrough, settings page and release screen.
+
+Guilty Spark must speak to Halo players, modders, creators and level designers—not only programmers.
+
+Replace internal development language with natural, informative instructions.
+
+Examples:
+
+| Developer-facing wording | Creator-facing wording |
+|---|---|
+| Native readback succeeded | Your map was built and verified successfully |
+| Runtime fingerprint mismatch | This game installation has changed. Check its setup before launching |
+| Sidecar persistence completed | Your project changes have been saved |
+| Dependency resolution failure | A required map resource is missing. Open the repair guide |
+| Experimental authoring surface | Map editor — available tools depend on your selected Halo version |
+| No accepted native traversal evidence | This connection hasn't been tested in-game yet |
+| Feature contract unavailable | This Halo version doesn't support that operation yet |
+
+Do not blindly replace established Halo terminology such as BSP, tags, shaders, portals or HaloScript. These are real concepts creators need to learn. Explain them through tooltips, contextual guidance and the glossary.
+
+**Preserve complete engineering diagnostics internally.** Move raw trace output, source paths, test identities, internal codes and diagnostic information into an appropriate Advanced/Diagnostics view.
+
+Never hide a failure, unsupported feature or limitation behind misleading friendly wording.
+
+Remove development-only UI clutter, internal fixture references, benchmark text, placeholder buttons, dead controls and confusing test terminology from the normal creator experience.
+
+Preserve all required developer tools and support diagnostics without exposing them unnecessarily to ordinary users.
+
+## 2. COMPLETE THE HOW TO SYSTEM — EVERY FEATURE
+
+Extend the existing `HowTo.tsx`, `featureCatalog.ts`, Learning Center and Settings components.
+
+**Every user-facing Guilty Spark feature must have an accurate, searchable, actionable How To guide.**
+
+Include every editor, panel, menu, setting, tool, runtime, game mode and creator workflow, including:
+
+- Opening and importing maps.
+- Tag editing and asset extraction.
+- BSP creation, modification and rebuilding.
+- Shader, texture, lighting and audio workflows.
+- Creating and joining MegaWorld regions.
+- Building roads, caves, tunnels and mountains.
+- Setting up AI Apocalypse.
+- Creating extraction maps, inventories, loot, encounters and extraction zones.
+- Compiling and deploying maps to Chupathingy servers.
+- Firefight and Zombie Apocalypse authoring.
+- Dual wielding and sprint setup on compatible engines.
+- SparkLink collaboration.
+- Live Link editing in supported running games.
+- OpenH1 VR authoring and playtesting.
+- Machinima, camera recording and greenscreen.
+- Runtime installation and switching.
+- Mod pack management.
+- Interface Studio customization.
+- Hosting, multiplayer joining and map distribution.
+- Importing, exporting, saving, recovery and backups.
+- Every remaining approved feature in the requirements ledger.
+
+### Interactive guidance
+
+Implement a context-aware walkthrough that can identify the actual workspace, controls and current user workflow.
+
+It should:
+
+1. Explain what the selected feature does.
+2. Identify its actual controls.
+3. Walk the user through the process in the correct order.
+4. Highlight the appropriate button, menu or editor control.
+5. Explain required Halo files, runtimes and tools.
+6. Show expected results and common errors.
+7. Explain how to save, Undo/Redo and recover.
+8. Explain compatibility and limitations.
+9. Offer the next relevant action.
+10. Allow the user to exit or resume without losing work.
+
+Guides must reflect the current real implementation, not planned buttons or nonexistent interactions.
+
+Include beginner-friendly descriptions and optional advanced explanations.
+
+Use actual verified application screenshots where helpful.
+
+### Toggleable in Settings
+
+Add or finish a clearly labeled setting:
+
+**Show guided walkthroughs**
+
+- On: Allow contextual guidance and walkthrough prompts.
+- Off: Suppress automatic walkthroughs, highlights and prompts.
+- Persist the selection across application restarts.
+- Do not reset it during updates.
+- Allow walkthroughs to be restarted manually at any time.
+- Keep the searchable How To library and Learning Center accessible even when automatic guidance is disabled.
+
+Include **Restart Tutorial** and **Open How To** commands in appropriate application navigation.
+
+A user who disables guidance must still be able to discover every supported feature.
+
+## 3. GENERATE THE COMPLETE HUMAN TESTING REQUIREMENTS
+
+Before final release approval, generate and maintain:
+
+**`docs/HUMAN_TEST_PLAN.md`**
+
+This must inventory every feature requiring human acceptance.
+
+For each requirement include:
+
+- Requirement ID and feature name.
+- Location in the actual Spark interface.
+- Prerequisites and required hardware.
+- Required Halo runtime and exact version.
+- Required map, assets and tools.
+- User actions in the correct order.
+- Expected visible or audible result.
+- Expected saved/native output.
+- Multiplayer or hardware requirements where applicable.
+- Negative and recovery tests.
+- Evidence required.
+- Known blockers and limitations.
+- Acceptance status and tester sign-off.
+
+Group tests into:
+
+**Desktop creator workflows:** All mouse, keyboard, menu, button, drag/drop, selection, editor, Save, Undo/Redo and restart operations.
+
+**Native Halo workflows:** Real native compilation, independent output validation, game launching, map loading, traversal, collision, weapons, vehicles, gametypes, AI and scripts.
+
+**Multiplayer:** Chupathingy/OpenCE hosting, two or more genuine clients, AI replication, player synchronization, Live Link, SparkLink, persistent extraction and reconnect/restart behavior.
+
+**MegaWorld:** All 19 regions, natural seams, Warthog routes, mountain traversal, tunnels, teleporter behavior and cross-region combat.
+
+**VR:** Supported OpenH1 headset/controller tests, in-headset creation, Save, launch and return-to-editor behavior.
+
+**Platform and releases:** Clean Windows installation, portable usage, Linux/macOS packages, updates, uninstall, file preservation and crash recovery.
+
+**Usability:** New-user onboarding, learning material, first-time extraction-map creation, How To accessibility, UI customization, widescreen and multi-monitor layouts.
+
+Provide a separate **Human Testing Readiness Summary** listing:
+- Tests ready for a person to perform now.
+- Tests that still need engineering.
+- Tests blocked by missing runtimes, hardware or upstream engine features.
+- Tests that passed with exact reproducible evidence.
+- Tests that failed with actionable defects.
+
+Do not report unperformed tests as passed.
+
+## 4. PROVE THE HOW TO GUIDES THEMSELVES
+
+For every guide, test the actual steps it gives.
+
+A human tester must be able to follow the instructions without needing developer knowledge or external explanations that are missing from Spark.
+
+For instance, the extraction guide must genuinely take the user from creating a new project to placing gameplay objects, configuring rules, building the supported output, deploying it and joining the server.
+
+The SparkLink guide must establish real collaboration.
+
+The Live Link guide must perform an actual supported operation against the connected game, not merely open a connection panel.
+
+If a guide cannot be completed because the feature is unfinished, mark the feature and guide accordingly. Do not fabricate completion instructions.
+
+**The How To system and requirement ledger must stay synchronized automatically or through enforced test checks so newly added features cannot ship without documentation.**
+
+## 5. FINAL POLISH AND GITHUB RELEASE
+
+After implementation and the required acceptance gates:
+
+- Resolve remaining functional, visual, usability and packaging defects.
+- Complete consistent UI styling, terminology, accessibility and first-run experience.
+- Verify supported editor workflows and actual native outputs.
+- Run complete regression, performance, recovery and platform-specific checks.
+- Produce real Windows installer and portable ZIP packages.
+- Produce verified Linux and macOS packages on supported build environments.
+- Preserve previous-good releases and original Halo assets.
+- Update GitHub README, feature lists, roadmap, changelog, screenshots and contribution documentation.
+- Remove outdated development claims and broken links.
+- Include clear installation, requirements and getting-started instructions.
+- Include accurate capabilities, compatibility and known limitations.
+- Attach actual verified binaries, checksums and release notes to a GitHub Release.
+- Respect the owner's authorization for the final push and publication.
+- Download published packages independently and verify their hashes and startup.
+
+Do not mistake GitHub Actions artifacts or draft attachments for a public release.
+
+The final presentation should demonstrate real application capability, not merely screenshots of unfinished systems.
+
+## 6. FINAL ACCEPTANCE RULE
+
+**Every feature must have three things:**
+
+1. **A working implementation.**
+2. **A verified user workflow.**
+3. **A complete, accurate How To guide.**
+
+Features that require native games, multiplayer, VR or physical hardware must additionally pass those acceptance requirements.
+
+Provide the complete human-testing checklist and exact unresolved needs before claiming release readiness.
+
+Do not replace the full original project scope with a smaller milestone. Continue engineering toward the whole product and preserve honest status for every remaining dependency.
+
+# ALL THE TOOLS, AND THEN SOME.
+# MAKE HALO YOURS.

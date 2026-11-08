@@ -3634,4 +3634,48 @@ test('private dedicated controls install a server separately and retain typed se
  await host.getByRole('button',{name:'Start private dedicated server',exact:true}).click();await expect(host.getByRole('button',{name:'Stop server',exact:true})).toBeVisible();await host.getByRole('button',{name:'Restart map',exact:true}).click();await host.getByRole('button',{name:'Stop server',exact:true}).click();await expect(host.getByRole('button',{name:'Start private dedicated server',exact:true})).toBeEnabled({timeout:10000});
  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls),start=calls.find((c:any)=>c.command==='community_server_start');expect(start.args.request).toMatchObject({runtimeId:'chupathingyCe',mode:'multiplayer',network:'lan',public:false,listGames:false});expect(start.args.projectId).toBeNull();expect(start.args.clientAddresses).toEqual(['127.0.0.3']);expect(calls.filter((c:any)=>c.command==='community_server_action').map((c:any)=>c.args)).toEqual([{id:'synthetic-private-session',action:'restart'},{id:'synthetic-private-session',action:'stop'}]);expect(calls.some((c:any)=>c.command==='install_runtime_engine_download'||c.command==='launch_registered_runtime')).toBe(false);
  await expect(host).toContainText('persistent Extraction are not supplied by a playlist');
+ await expect(host).toContainText('Last server observation');
+});
+
+
+test('advertised project picker opens an unopened saved project and retains the first draft and Undo',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true}),original=await velocity.inputValue();await velocity.fill('39');await velocity.press('Tab');
+ await page.getByLabel('Choose open map',{exact:true}).click();
+ const maps=page.getByRole('menu',{name:'Open map switcher',exact:true});
+ await maps.getByRole('menuitem',{name:'Open saved project…',exact:true}).click();
+ const work=page.getByRole('dialog',{name:'Open work',exact:true});
+ await expect(work.getByRole('tab',{name:'Saved projects',exact:true})).toHaveAttribute('aria-selected','true');
+ await work.getByLabel('Search open work',{exact:true}).fill('candidate');
+ await work.getByRole('button',{name:'Open saved project Synthetic candidate',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(velocity).toHaveValue('25');
+ await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(velocity).toHaveValue('39');
+ await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-description','Unsaved changes');
+ await velocity.focus();await page.keyboard.press('Tab');await page.keyboard.press('Control+z');await expect(velocity).toHaveValue(original);
+ await page.keyboard.press('Control+Shift+z');await expect(velocity).toHaveValue('39');
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(39);
+ await page.keyboard.press('Control+Shift+p');await work.getByRole('tab',{name:'Saved projects',exact:true}).click();
+ await work.getByLabel('Search open work',{exact:true}).fill('candidate');
+ await work.getByRole('button',{name:'Open saved project Synthetic candidate in another window',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_project_window').at(-1)?.args)).toMatchObject({id:'b',another:true,observe:true});
+ await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+});
+
+
+test('saved-project open errors keep the active draft and show the failure',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('39');await velocity.press('Tab');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{if(command==='open_project'&&args.id==='b')throw Error('Selected project is unavailable');return invoke(command,args);};});
+ await page.getByLabel('File menu',{exact:true}).click();await (await pagedControl(page,'menuitem','Open saved project…',page.getByRole('menu',{name:'File commands',exact:true}))).click();
+ const work=page.getByRole('dialog',{name:'Open work',exact:true});await work.getByLabel('Search open work',{exact:true}).fill('candidate');await work.getByRole('button',{name:'Open saved project Synthetic candidate',exact:true}).click();
+ await expect(page.getByText('Selected project is unavailable',{exact:false})).toBeVisible();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');await expect(velocity).toHaveValue('39');await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveCount(0);
+});
+
+
+test('immediate Save after a map tab click belongs to the selected project in the same frame',async({page})=>{
+ await mockDesktop(page);await openFixture(page);let velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('39');await velocity.press('Tab');
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();await chooseTool(page,'Tag editor');await velocity.fill('45');await velocity.press('Tab');
+ await page.evaluate(()=>{const original=window.requestAnimationFrame,queue:FrameRequestCallback[]=[];window.requestAnimationFrame=callback=>{queue.push(callback);return 0;};try{(document.querySelector('[role="tab"][aria-label="Synthetic baseline"]') as HTMLButtonElement).click();document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'s',code:'KeyS',ctrlKey:true,bubbles:true}));for(let turn=0;queue.length&&turn<12;turn++){const batch=queue.splice(0);for(const callback of batch)callback(performance.now());}}finally{window.requestAnimationFrame=original;}});
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('a');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(39);
+ await expect(velocity).toHaveValue('39');await page.getByRole('tab',{name:'Synthetic candidate',exact:true}).click();await expect(velocity).toHaveValue('45');await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-description','Unsaved changes');
 });
