@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
 Task: 100 Percent Directive Phase 0 — reproduce and repair Windows Tools-menu CI failure; preserve in-flight native authoring
-Status: implementation incomplete
+Status: automated acceptance incomplete
 Starting revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24; clean canonical local master at intake. Read-only GitHub master confirms the same protected revision.
-Latest verified revision: e879581cffd26b2a786c7791ff1a5ead4a0e5fb9, verified runtime fingerprint0482e26b85d3fefdf4d544b695ca1656396edf9ee76d63fd1c89c69dec748f32. R205881Rust/9ignored,472frontend/59offline/36storage; R202249browser; R2064focused; R207complete current native project/ownership/Save/restart/eight-size/Host route. QA SHA7b6f760f9d280be996c9d18e55b1e2701ae9a9c610476b6f34beaa948a9b279b.
-Next action: R220 current native authored-spawn test is in flight; preserve its outcome. R221 repeats the exact GitHub Tools-menu failure under build load. Diagnose CI42514856941/job128835531811 reachability indices9–12, repair production or harness without lowering assertions, then full regression/native sizes and exact-source release candidate through existing workflow.
+Latest verified revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24 plus reviewed current source. R220885Rust/9ignored,472frontend/59offline/38storage; R226native authored CE scenario/build/Chupathingy load; R228strict Tools positive/negative; R229all8native sizes; R230project/history/restart pass. QA SHA2029878ac8a7c64d83e2fcbd690ee73e4a7e9509a2632f03f175a5483c50e1e6.
+Next action: Commit the reviewed CI/native-source closure locally, run scripts/release/gates.mjs against its exact clean SHA with the existing Blender Python3.13, then build/export a new Windows NSIS/portable preview2 through the existing release scripts. Preserve R226 map/evidence and C49. Owner performs remote push/workflow/publication. Then resume frozen SparkLink→native→private dedicated→two-client workflow.
 
 ## Acceptance
 
@@ -24,6 +24,11 @@ Native lighting uses standard single-sky tags, existing Tool radiosity/cache bui
 Seam routes remain distinct: infantry cave, Warthog road/canyon and continuous exposed ridge/sniper path. Source preview, f32 collision, portal cuts and native compile share authoritative geometry. Human two-way foot/Warthog/ridge/projectile/door results remain separate. A19-map Atlas is not a compiled19-map world or streaming.
 
 ## Verified milestones
+
+Current closure details: docs/CI_NATIVE_SOURCE_CLOSURE_20261108.md. R223 deterministically reproduces exact CI9–12 late-registration failure; R22415repeats/R228fourfinal checks pass while deliberate clipping still fails. R227nine WebAudio cases pass during native compilation26.9s without timeout inflation; historical timeout not reproduced. R22910nativecases/all8sizes90controls per size; R230two full project/history/ownership/restart cases and all8picker sizes19controls, no reachability/scroll defects. Direct Sky review only opened File menu; not full manual acceptance.
+
+R226complete7nativecases: source Player start X-16.3068→-16.0568 through Inspector/Undo/Save/fullrestart; staged Invader scenario fields verified, actual HaloTool structural/lightmap+CEcompile, independent standard scenario extraction and358original placements/42donor scenery/524route samples/CRC0. Cache E/unified-native-r226-timberland.map77,701,528B SHAa90e52e1526778c6df9f031a8ed583ab6e9dcac155004ffe83839864c0554d2f;287connector/32,252source/15,862render/16,230collision triangles.69donorfiles18,034,422B. Native compile/readback348,763ms; geometry differs from R157, not optimization evidence. Private Chupa0.9.0c loads exactcache; human foot/Warthog/ridge/projectile/peer gates remain open. Original maps/source/SDK unchanged. Screenshots are overviews; generic compiled resource warning remains unresolved.
+
 
 Unified continuation: R212 current initial transform slice885Rust/9ignored and472frontend plus offline59/storage36; native app built but test stopped at a transient Windows manifest rename before launch. Existing atomic storage helper now retries bounded Windows sharing failures without deleting the previous receipt; R21634storage tests pass, including injected transient and permanent failures. R214nine browser workflows pass. R217 omitted required runtime-root test input (now guarded); R218 reached real player-start Inspector but its position field was labeled position0. World labels now expose Position X/Y/Z, Rotation Yaw/Pitch/Roll and Scale X/Y/Z; R219four current browser workflows pass. No new native compilation or gameplay accepted yet.
 

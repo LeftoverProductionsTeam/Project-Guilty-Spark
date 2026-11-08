@@ -87,7 +87,8 @@ for (const [id, executable, args] of commands) {
   await fs.writeFile(path.join(output, 'gates.json'), JSON.stringify(receipt, null, 2) + '\n');
   if (exitCode !== 0) throw Error(`Release gate failed: ${id} (${exitCode}). Evidence retained.`);
 }
-if (git('status', '--porcelain')) throw Error('Tests changed tracked source; receipt is not accepted');
+if (git('rev-parse', 'HEAD') !== commit || git('status', '--porcelain'))
+  throw Error('Source revision or tracked source changed while testing; receipt is not accepted');
 receipt.complete = true;
 receipt.finishedAt = new Date().toISOString();
 await fs.writeFile(path.join(output, 'gates.json'), JSON.stringify(receipt, null, 2) + '\n');

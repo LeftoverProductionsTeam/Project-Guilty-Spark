@@ -1538,6 +1538,7 @@ export default function World({
           {!cinematic &&
             inspection &&
             [6, 7, 609].includes(inspection.header.version) &&
+            inspection.resources.some(resource => resource.name === 'bitmaps.map' && resource.required) &&
             !project.source?.resourceSha256?.['bitmaps.map'] && (
               <div className="gs-texture-setup" role="status">
                 <strong>{Object.values(shaderTextures).some(t=>t.userData.runtimePreview)

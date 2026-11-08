@@ -902,6 +902,13 @@ try{
       expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
     }
     expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);
+    if([6,7,609].includes(opened.inspection.header.version)){
+      const required=opened.inspection.resources.some(resource=>resource.name==='bitmaps.map'&&resource.required);
+      const source=(await invoke(main,'open_project',{id:opened.project.id})).project.source;
+      const pinned=!!source.resourceSha256?.['bitmaps.map'];
+      await expect(main.locator('.gs-texture-setup')).toHaveCount(required&&!pinned?1:0);
+      report.sourceResourceGuidance={required,pinned,promptVisible:required&&!pinned,sourceHash:originalHash,hostingRuntimeIgnored:true};
+    }
     await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
     step(`Owned native cache ${expectedCacheVersion} opens in actual BSP viewport with source materials`,{nativeViewport,nativeGeometry,engineParityClaimed:false});
     if(previewOnly||contextOnly){

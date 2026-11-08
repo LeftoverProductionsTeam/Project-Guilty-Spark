@@ -3705,3 +3705,18 @@ test('Tools reachability still rejects a genuinely clipped command after page gr
   await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).overflowLateTools();});
  }})).rejects.toThrow('Every visible control must be fully reachable');
 });
+
+// Source dependency truth, independent of the selected hosting engine.
+for(const [title,required,pinned] of [
+ ['self-contained CE output does not request an unnecessary bitmap bank',false,false],
+ ['CE output with an actual external bitmap dependency keeps its setup action',true,false],
+ ['CE output with a pinned original bitmap bank does not repeat setup',true,true],
+] as const)test(title,async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(({required,pinned})=>{const open=(window as any).__sparkMock.projects.a;open.project.source.cacheVersion=609;open.inspection.header.version=609;open.inspection.resources=[{name:'bitmaps.map',required,found:pinned,reason:'Synthetic native dependency contract'}];open.project.source.resourceSha256=pinned?{'bitmaps.map':'b'.repeat(64)}:{};},{required,pinned});
+ await openFixture(page);await chooseTool(page,'Level editor');
+ await expect(page.locator('.world-layout')).toBeVisible();
+ const setup=page.locator('.gs-texture-setup');
+ if(required&&!pinned){await expect(setup).toContainText('Map textures need their original bitmaps.map.');await expect(setup.getByRole('button',{name:'Locate Halo Textures',exact:true})).toBeEnabled();}
+ else await expect(setup).toHaveCount(0);
+});
