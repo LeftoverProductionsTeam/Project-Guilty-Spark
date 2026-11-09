@@ -43,11 +43,13 @@ export default function CommunityHostAdapter({
   project,
   onRuntime,
   onSetup,
+  onSave,
 }: {
   runtime: RuntimeId;
   project: Project | null;
   onRuntime: (id: RuntimeId) => void;
   onSetup: () => void;
+  onSave?: () => Promise<void>;
 }) {
   const scope = project?.id ?? 'global',
     key = `hosting.community.${runtime}`;
@@ -254,7 +256,7 @@ export default function CommunityHostAdapter({
           Check host adapter
         </button>
       </div>
-      {runtime==='chupathingyCe'&&mode==='multiplayer'&&<CommunityDedicatedServer project={project} request={request}/>}
+      {runtime==='chupathingyCe'&&mode==='multiplayer'&&<CommunityDedicatedServer project={project} request={request} onSave={onSave}/>}
       <p className="subtle community-host-capacity">
         Player limits are requested settings; 128-player multiplayer and eight-player campaign / Firefight
         remain unverified.

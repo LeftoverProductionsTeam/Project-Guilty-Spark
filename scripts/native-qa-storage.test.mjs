@@ -12,6 +12,7 @@ import {
   admitCargoOutput,
   recoverQaScratch,
   stopQaProcess,
+  waitForQaExit,
   watchOutputBudget,
   embeddedFrontendConfig,
   exportDevelopmentBuild,
@@ -681,6 +682,9 @@ test('runtime budget stops a real owned writer and failed cleanup reclaims its g
         await finish.sample();
       }
       assert.ok(child.exitCode !== null || child.signalCode !== null, 'Over-budget child must be stopped');
+      const liveFailure=JSON.parse(await fs.readFile(path.join(root,'storage-run.json'),'utf8'));
+      assert.equal(liveFailure.active,true);
+      assert.match(liveFailure.monitoring.error,/storage budget/);
       await assert.rejects(finish('failed'), /storage budget/);
       const result = JSON.parse(await fs.readFile(path.join(root, 'storage-run.json'), 'utf8'));
       assert.equal(result.status, 'failed');
@@ -811,3 +815,14 @@ test('manifest replacement errors do not delete the previous receipt or leave th
  }
  assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false,'No orphan remains after all owned writers finish');
 }));
+
+
+test('an owned signal-exited child can be awaited again without a lost exit-event hang',{timeout:10000},async()=>{
+ const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',windowsHide:true});
+ try{
+  await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+  child.kill('SIGTERM');await waitForQaExit(child);
+  assert.ok(child.exitCode!==null||child.signalCode!==null);
+  await waitForQaExit(child);
+ }finally{await stopQaProcess(child);await waitForQaExit(child);}
+});

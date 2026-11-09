@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, FolderOpen, Play, RotateCcw, Square } from 'lucide-react';
+import { Download, FolderOpen, Play, RotateCcw, RefreshCw, Square } from 'lucide-react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import type { Project } from '../types';
@@ -23,6 +23,14 @@ interface DedicatedView {
   sourceBuildId: string | null;
   restarts: number;
   originalInputsUnchanged: boolean | null;
+  projectId?: string | null;
+  sourceFingerprint?: string | null;
+  compiledBuildId?: string | null;
+  compiledSha256?: string | null;
+  gameBuildId?: string | null;
+  gameSha256?: string | null;
+  pendingJobId?: string | null;
+  error?: string | null;
   status: null | {
     version: string;
     state: string;
@@ -50,22 +58,26 @@ interface Request {
 export default function CommunityDedicatedServer({
   project,
   request,
+  onSave,
 }: {
   project: Project | null;
   request: () => Request;
+  onSave?: () => Promise<void>;
 }) {
   const [installation, setInstallation] = useState<Installation | null>(null),
     [view, setView] = useState<DedicatedView | null>(null),
     [busy, setBusy] = useState(false),
-    [problem, setProblem] = useState(''),
-    [useBuild, setUseBuild] = useState(false);
+    [problem, setProblem] = useState('');
+  const [useBuild,setUseBuild]=useMapState(project?.id??'global','hosting.chupathingy.useCurrentCeBuild',false);
   const [clientAddresses, setClientAddresses] = useMapState(
     project?.id ?? 'global',
     'hosting.chupathingy.privateClientAddresses',
     '127.0.0.3',
   );
   const alive = useRef(true),
-    polling = useRef(false);
+    polling = useRef(false),
+    acting = useRef(false),
+    version = useRef(0);
   useEffect(() => {
     alive.current = true;
     void call<Installation>('community_server_installation')
@@ -76,11 +88,12 @@ export default function CommunityDedicatedServer({
         if (alive.current) setProblem(String(e));
       });
     const poll = async () => {
-      if (polling.current) return;
+      if (polling.current || acting.current) return;
+      const current=version.current;
       polling.current = true;
       try {
         const v = await call<DedicatedView | null>('community_server_status');
-        if (alive.current) setView(v);
+        if (alive.current && current===version.current) setView(v);
       } catch (e) {
         if (alive.current) setProblem(String(e));
       } finally {
@@ -104,6 +117,8 @@ export default function CommunityDedicatedServer({
     .at(-1)
     ?.replace(/\.map$/i, '');
   async function action(task: () => Promise<void>) {
+    if(acting.current)return;
+    acting.current=true;version.current++;
     setBusy(true);
     setProblem('');
     try {
@@ -111,6 +126,7 @@ export default function CommunityDedicatedServer({
     } catch (e) {
       if (alive.current) setProblem(String(e));
     } finally {
+      acting.current=false;
       if (alive.current) setBusy(false);
     }
   }
@@ -153,7 +169,7 @@ export default function CommunityDedicatedServer({
           <label title="The saved project's current independently validated Custom Edition build is checked again before staging.">
             <input
               type="checkbox"
-              checked={useBuild}
+              checked={active ? view.projectId===project?.id : useBuild}
               disabled={busy || active || !build}
               onChange={(e) => setUseBuild(e.target.checked)}
             />
@@ -182,7 +198,7 @@ export default function CommunityDedicatedServer({
         {active && (
           <>
             <button
-              disabled={busy || !['ready', 'inGame'].includes(view.phase)}
+              disabled={busy || !!view.pendingJobId || !['ready', 'inGame'].includes(view.phase)}
               onClick={() =>
                 void action(() => call('community_server_action', { id: view.id, action: 'restart' }))
               }
@@ -190,6 +206,22 @@ export default function CommunityDedicatedServer({
               <RotateCcw size={13} />
               Restart map
             </button>
+            {view.projectId && (
+              <button
+                disabled={busy || !onSave || view.projectId!==project?.id || !!view.pendingJobId || !['ready','inGame'].includes(view.phase)}
+                title="Save and compile this project's changes. Only validated output restarts this private server; the round resets and matching clients must rejoin."
+                onClick={()=>void action(async()=>{
+                  if(!project || !onSave || view.projectId!==project.id)throw Error('Return to the project owning this server and save it first.');
+                  await onSave();
+                  if(!alive.current)throw Error('This workspace closed while saving. The server was left alone.');
+                  await call('community_server_action',{id:view.id,action:'rebuild',projectId:project.id,confirmedRestart:true});
+                  const next=await call<DedicatedView>('community_server_status');
+                  if(alive.current)setView(next);
+                })}
+              >
+                <RefreshCw size={13}/>{view.pendingJobId?'Building…':'Live Rebuild · restart round'}
+              </button>
+            )}
             <button
               disabled={busy}
               onClick={() =>
@@ -226,12 +258,18 @@ export default function CommunityDedicatedServer({
         multiplayer session; AI Apocalypse and persistent Extraction are not supplied by a playlist.
       </p>
       {problem && <Notice>{problem}</Notice>}
+      {view?.error && <Notice tone="error">{view.error}</Notice>}
       {view && (
         <div aria-live="polite">
           <strong>
             {view.map} · {view.phase}
           </strong>
           <p>{view.detail}</p>
+          {view.projectId && <>
+            <small>Saved {view.sourceFingerprint?.slice(0,8)??'unavailable'} · Compiled {view.compiledSha256?.slice(0,8)??'not confirmed'} · Game {view.gameSha256?.slice(0,8)??'not confirmed'}</small>
+            {active && view.projectId!==project?.id && <p>Return to this server's project to rebuild it, or stop the server here.</p>}
+            <p className="subtle">Live Rebuild resets only this private round after native validation. Failed builds keep the running map. BSP changes require reload; players need the matching new map and must rejoin.</p>
+          </>}
           {view.status && (
             <p>
               {!active && 'Last server observation · '}{view.status.players}/{view.status.maximumPlayers} players · native {view.status.state} · OpenCE
@@ -246,7 +284,7 @@ export default function CommunityDedicatedServer({
                 SHA-256 <code>{view.mapSha256}</code>
               </p>
               <p>
-                Compiled build: {view.sourceBuildId ?? 'Owned Xbox source'} · restart acknowledgements:{' '}
+                Staged build: {view.sourceBuildId ?? 'Owned Xbox source'} · restart acknowledgements:{' '}
                 {view.restarts} · staged {(view.copiedBytes / 1024 ** 2).toFixed(1)} MiB.
               </p>
               <p>

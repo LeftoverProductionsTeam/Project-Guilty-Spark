@@ -625,6 +625,10 @@ export function watchOutputBudget(
           clearTimeout(eventTimer);
           for (const watcher of watchers.values()) watcher.close();
           watchers.clear();
+          // Publish the exact guard failure before stopping owned writers.
+          // A signal/closed native connection must not erase the interruption cause.
+          try { await onSample({ ...state }); }
+          catch (recordError) { state.recordError=String(recordError); }
           try {
             await onExceeded(error);
           } catch (stopError) {

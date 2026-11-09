@@ -64,7 +64,11 @@ try {
         await run('Browser regressions', ['node_modules/@playwright/test/cli.js', 'test', '--reporter=line']);
       let tagSource=tags;
       if (stages.includes('compiler')||stages.includes('geometry')||stages.includes('logic')||stages.includes('sparklink')) {
-        if(tags.toLowerCase().endsWith('.7z')){
+        // The CE collaboration path recovers its own native source closure;
+        // it never consumes the MCC SDK tag argument. Other native stages do.
+        const ceOnlyShared=stages.includes('sparklink')&&process.env.SPARK_QA_SHARED_CHUPATHINGY==='1'&&!stages.some(stage=>['compiler','geometry','logic'].includes(stage));
+        if(ceOnlyShared)report.disposableSdk={staged:false,reason:'CE shared-source fixture uses its independently recovered native source, not MCC SDK tags'};
+        if(tags.toLowerCase().endsWith('.7z')&&!ceOnlyShared){
           const spec=JSON.parse(await fs.readFile(new URL('../docs/fixtures/source-only-h1a-inputs.json',import.meta.url),'utf8'));
           if(stages.includes('logic')&&process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
             const shell=JSON.parse(await fs.readFile(new URL('../docs/fixtures/h1a-standalone-shell-inputs.json',import.meta.url),'utf8'));
@@ -161,10 +165,12 @@ try {
         try{await run('Three independent Spark processes: shared BSP, conflict, Undo, recovery and frozen native compile',[
           'scripts/test-sparklink-workshop-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release/GuiltySpark.exe'),output,path.resolve(kit),path.resolve(tagSource),path.resolve(invader),
         ]);}finally{
-          const file=['acceptance.json','failure.json'].map(name=>path.join(output,name));
+          const file=['acceptance.json','failure.json','progress.json'].map(name=>path.join(output,name));
           for(const candidate of file){const text=await fs.readFile(candidate,'utf8').catch(()=>null);if(text){report.sparklink=JSON.parse(text);break;}}
-          if(receiptFile)for(const actor of ['owner','editor-b','editor-c']){
-            const image=path.join(output,`native-sparklink-${actor}.png`),info=await fs.stat(image).catch(()=>null);
+          const guard=await fs.readFile(path.join(output,'storage-run.json'),'utf8').then(JSON.parse).catch(()=>null);
+          if(guard)report.sparklinkStorage={active:guard.active,status:guard.status,reservedBytes:guard.reservedBytes,peakLogicalBytes:guard.monitoring?.peakLogicalBytes,error:guard.monitoring?.error??null};
+          if(receiptFile)for(const imageName of [...['owner','editor-b','editor-c'].map(actor=>`native-sparklink-${actor}.png`),'native-dedicated-ready.png','native-dedicated-two-clients.png','native-dedicated-live-rebuild.png','native-dedicated-live-rebuild-rejected.png',...[[800,600],[1500,950],[3440,1440],[5120,1440]].map(([w,h])=>`native-dedicated-active-${w}x${h}.png`)]){
+            const image=path.join(output,imageName),info=await fs.stat(image).catch(()=>null);
             if(info?.isFile()&&info.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(image));await fs.copyFile(image,target,fs.constants.COPYFILE_EXCL);(report.sparklinkScreenshots??=[]).push({file:target,bytes:info.size});}
           }
         }

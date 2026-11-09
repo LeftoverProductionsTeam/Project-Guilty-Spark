@@ -206,7 +206,7 @@ export default function Runtimes({
         ) : tab === 'hosting' ? (
           selected === 'haloCustomEdition' ? <CustomEditionHost onSetup={onSettings} projectId={project?.id} dirty={dirty} savedRevision={dirty ? null : project?.modifiedAt} onBuild={()=>onOpenWorkspace(project?.quickForge ? 'quickforge' : 'build')}/> :
           selected === 'openCe' || selected === 'chupathingyCe' ? <>
-            <CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/>
+            <CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')} onSave={onSave}/>
             <details className="hosting-runtime-guide"><summary>Map preparation &amp; other hosting options</summary>
               <HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/>
             </details>

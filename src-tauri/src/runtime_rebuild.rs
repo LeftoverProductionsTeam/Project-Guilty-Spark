@@ -39,7 +39,7 @@ pub(crate) struct View {
     console_tail: String,
     ce_resource_sha256: std::collections::BTreeMap<String,String>,
 }
-struct Pending { job_id: String, fingerprint: String }
+pub(crate) struct Pending { pub(crate) job_id: String, pub(crate) fingerprint: String }
 pub(super) struct Session {
     view: Mutex<View>,
     pending: Mutex<Option<Pending>>,
@@ -319,20 +319,37 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         }
     }).await.map_err(error)?
 }
+/// One native build entrypoint for both owned client and dedicated playtests.
+/// Callers reserve their own pending slot before entering; source ownership and
+/// the selected edition are always checked here, never supplied by a peer.
+pub(crate) fn begin_saved_build(app: &tauri::AppHandle, owner: &str, project_id: &str) -> Reply<Pending> {
+    let state=app.state::<AppState>();
+    check_document_owner(&state,project_id,owner)?;
+    let project=lock(&state.library)?.get(project_id).map_err(error)?;
+    let selected=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|t|&t.id==id));
+    if !selected.is_some_and(|target|target.runtime_id==runtime::RuntimeId::ChupathingyCe&&target.builder=="invader-ce") {
+        return Err("Select the Chupathingy native CE build target in Project setup before Live Rebuild".into());
+    }
+    let fingerprint=project.fingerprint().map_err(error)?;
+    let job_id=if project.quick_forge.is_some(){quickforge_build(app.clone(),project_id.into())}else{begin_build(app.clone(),project_id.into())}?;
+    Ok(Pending{job_id,fingerprint})
+}
 #[tauri::command]
 pub(crate) async fn runtime_rebuild_begin(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Reply<View> {
     let owner=window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let session=owned(&state,&owner,&session_id)?;
-        let project_id=lock(&session.view)?.project_id.clone();check_document_owner(&state,&project_id,&owner)?;
-        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
-        let selected=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|t|&t.id==id));
-        if !selected.is_some_and(|target|target.runtime_id==runtime::RuntimeId::ChupathingyCe&&target.builder=="invader-ce") { return Err("Select the Chupathingy native CE build target in Project setup before Live Rebuild".into()); }
-        let fingerprint=project.fingerprint().map_err(error)?;
-        {let mut pending=lock(&session.pending)?;let view=lock(&session.view)?;if pending.is_some()||session.stopping.load(Ordering::Relaxed)||matches!(view.phase.as_str(),"failed"|"stopped"){return Err("The playtest is stopped or already rebuilding".into());}*pending=Some(Pending{job_id:String::new(),fingerprint:fingerprint.clone()});}
-        let job=if project.quick_forge.is_some(){quickforge_build(app.clone(),project_id)}else{begin_build(app.clone(),project_id)};
+        let project_id=lock(&session.view)?.project_id.clone();
         let mut pending=lock(&session.pending)?;
-        match job {Ok(job_id)=>{if let Some(pending)=pending.as_mut(){pending.job_id=job_id.clone();}let mut view=lock(&session.view)?;view.source_fingerprint=fingerprint;view.pending_job_id=Some(job_id);view.phase="rebuilding".into();view.error=None;view.detail="Compiling saved source while the previous-good playtest remains active. Only validated matching output will restart it.".into();Ok(view.clone())},Err(problem)=>{*pending=None;Err(problem)}}
+        if pending.is_some()||session.stopping.load(Ordering::Relaxed)||matches!(lock(&session.view)?.phase.as_str(),"failed"|"stopped") {
+            return Err("The playtest is stopped or already rebuilding".into());
+        }
+        let next=begin_saved_build(&app,&owner,&project_id)?;
+        let mut view=lock(&session.view)?;
+        view.source_fingerprint=next.fingerprint.clone();view.pending_job_id=Some(next.job_id.clone());
+        *pending=Some(next);view.phase="rebuilding".into();view.error=None;
+        view.detail="Compiling saved source while the previous-good playtest remains active. Only validated matching output will restart it.".into();
+        Ok(view.clone())
     }).await.map_err(error)?
 }
 #[tauri::command]

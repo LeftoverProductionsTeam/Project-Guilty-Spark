@@ -1375,7 +1375,7 @@ export default function App() {
         <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
       );
     if (workspace === 'runtimes')
-      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} onCollaborate={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}} edit={edit} />;
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save(true)} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} onCollaborate={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}} edit={edit} />;
     if (!current) return commonEmpty;
     switch (workspace) {
       case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} />;

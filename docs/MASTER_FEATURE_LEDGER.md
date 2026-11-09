@@ -1,6 +1,8 @@
 # Canonical cumulative feature and evidence ledger
 
-## Current reconciliation - 8 November 2026
+## Current reconciliation - 9 November 2026
+
+**9 November scoped M2 native milestone:** R302 completes three native Spark editors → authoritative CE revision → independent native build/readback → dedicated Live Rebuild → two real Chupathingy clients on one computer. A bad native compiler input keeps both peers, server PID and previous-good cache; explicit Save acknowledgement and eight active/stopped native layout sizes pass. Owner-crash/offline-draft recovery, rollover and revocation also pass. All475 IDs/wordings and wider requirements remain unchanged. Native telemetry is not human gameplay, remote-computer delivery, AI synchronization or persistent Extraction. Final full browser R303 passes262tests; remaining lifecycle faults and human/hardware gates are open. [Exact source/build hashes and evidence](CHUPATHINGY_DEDICATED_20261108.md#r302-accepted-combined-native-milestone--9-november).
 
 **8 November imported-source completion:** R277 verifies the real scenery source-tag handoff, acknowledged Save/Undo/two restarts, stale-import refusal, bounded CE609 radius copy with retained source bank identities, replacement of both placed assets, connected native build, independent0.75 readback and exact private Chupathingy load. All475 requirement identities and existing wider acceptance gates remain unchanged. This is a scoped creator/native milestone; human traversal, game interaction, full peer/platform/release acceptance and general CE field conversion remain open. [Exact evidence and failed iterations](NATIVE_SOURCE_TAG_EDIT_20261108.md).
 

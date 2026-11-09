@@ -770,6 +770,27 @@ pub struct Lease {
     finished: bool,
 }
 impl Lease {
+    /// Verify the caller still owns this active disposable staging root.
+    /// This grants no cleanup authority for sources, accepted output or children
+    /// that still have consumers; the operation must stop/join those first.
+    pub fn owned_staging_root(&self) -> Result<PathBuf> {
+        if self.finished || self.held.is_none() {
+            return invalid("The staging lease has already ended");
+        }
+        reject_links(&self.path)?;
+        reject_links(&marker(&self.path))?;
+        let owner: Owner = read_json(&marker(&self.path))?;
+        let _guard = lock(&self.store.root.join("catalog.lock"))?;
+        let rows = self.store.entries()?;
+        let row = rows.iter().find(|row| row.id == self.id)
+            .ok_or_else(|| fail("The staging reservation disappeared"))?;
+        if row.category != Category::Staging || row.state != "active" || row.protected
+            || row.path != self.path || owner.id != self.id
+            || owner.path != self.path || owner.store != self.store.root {
+            return invalid("The active staging ownership record changed");
+        }
+        Ok(fs::canonicalize(&self.path)?)
+    }
     pub fn mark_owned(&self) -> Result<()> {
         write(
             &marker(&self.path),
@@ -1955,4 +1976,19 @@ mod catalog_contention_tests {
         lease.finish_disposable().unwrap();release.join().unwrap();
         assert!(!output.exists());assert!(store.overview().unwrap().entries.is_empty());
     }
+    #[test]
+    fn active_staging_root_requires_unchanged_marker_and_category() {
+        let temp=tempfile::tempdir().unwrap();let store=Store::open(&temp.path().join("ledger")).unwrap();
+        let output=temp.path().join("owned");let lease=store.reserve(&output,None,65536,Category::Staging,"stopped consumer cache fixture").unwrap();
+        fs::create_dir(&output).unwrap();fs::write(output.join("source"),b"keep").unwrap();
+        assert!(lease.owned_staging_root().is_err());lease.mark_owned().unwrap();
+        assert_eq!(lease.owned_staging_root().unwrap(),fs::canonicalize(&output).unwrap());
+        let original=fs::read(marker(&output)).unwrap();
+        let mut owner:Owner=read_json(&marker(&output)).unwrap();owner.id="other owner".into();write(&marker(&output),&owner).unwrap();
+        assert!(lease.owned_staging_root().is_err());assert_eq!(fs::read(output.join("source")).unwrap(),b"keep");
+        fs::write(marker(&output),original).unwrap();store.update(&lease.id,"active",true,None).unwrap();
+        assert!(lease.owned_staging_root().is_err());store.update(&lease.id,"active",false,None).unwrap();
+        lease.finish_disposable().unwrap();
+    }
+
 }

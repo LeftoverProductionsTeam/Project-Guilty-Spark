@@ -1,4 +1,4 @@
-import {auditPagedSurface} from './helpers/compactSurfaces';
+import {auditPagedSurface,samePagedLayout} from './helpers/compactSurfaces';
 import {chooseTool,openDrawer,openViewMenu,openStudioMenu,revealPagedControl} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page, type Locator } from '@playwright/test';
@@ -3640,6 +3640,55 @@ test('private dedicated controls install a server separately and retain typed se
 });
 
 
+for(const failSave of [false,true])test(`dedicated Live Rebuild ${failSave?'retains the session when Save fails':'saves first and keeps game identity while compiling'}`,async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(fail=>{
+  const w=window as any,base=w.__TAURI_INTERNALS__.invoke;
+  w.__sparkMock.failSave=fail;
+  w.__dedicated={id:'owned-dedicated',projectId:'a',phase:'inGame',detail:'Synthetic running revision',map:'synthetic@ce',gameType:'slayer',processId:42,mapSha256:'a'.repeat(64),compiledSha256:'a'.repeat(64),gameSha256:'a'.repeat(64),sourceFingerprint:'b'.repeat(64),pendingJobId:null,error:null,serverSha256:'c'.repeat(64),copiedBytes:100,sourceBuildId:'good',restarts:0,originalInputsUnchanged:null,status:null};
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='runtime_report'){const rows=await base(command,args);return [...rows,{...rows[0],id:'chupathingyCe',name:'Synthetic Chupathingy'}];}
+   if(command==='community_server_installation')return {installed:true,version:'v0.9.0c'};
+   if(command==='community_server_status')return structuredClone(w.__dedicated);
+   if(command==='community_server_action'){
+    w.__sparkMock.calls.push({command,args:structuredClone(args)});
+    if(args.action==='rebuild'){w.__dedicated.pendingJobId='next';w.__dedicated.detail='Synthetic native compile pending';}
+    else if(args.action==='stop')w.__dedicated.phase='stopped';
+    return null;
+   }
+   return base(command,args);
+  };
+ },failSave);
+ await openFixture(page);const value=page.getByRole('spinbutton',{name:'Velocity',exact:true});await value.fill('38');await value.press('Tab');const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('chupathingyCe');await studio.getByLabel('Studio options',{exact:true}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Host game',exact:true}).click();
+ const host=page.getByRole('region',{name:'Private Chupathingy dedicated server',exact:true}),rebuild=host.getByRole('button',{name:'Live Rebuild · restart round',exact:true});
+ await expect(rebuild).toBeEnabled();await expect(host.getByRole('checkbox',{name:/Use current CE build/})).toBeChecked();await page.evaluate(()=>(window as any).__sparkMock.calls.length=0);await rebuild.click();
+ const calls=await page.evaluate(()=>(window as any).__sparkMock.calls),build=calls.findIndex((row:any)=>row.command==='community_server_action'&&row.args.action==='rebuild'),saved=calls.findIndex((row:any)=>row.command==='save_project');
+ if(failSave){await expect(host).toContainText('Synthetic save failure');expect(build).toBe(-1);await expect(rebuild).toBeEnabled();}
+ else{expect(saved).toBeGreaterThanOrEqual(0);expect(build).toBeGreaterThan(saved);await expect(page.getByRole('button',{name:'Save changes',exact:true})).toHaveCount(0);expect(calls[build].args).toEqual({id:'owned-dedicated',action:'rebuild',projectId:'a',confirmedRestart:true});await expect(host.getByRole('button',{name:'Building…',exact:true})).toBeDisabled();await expect(host.getByRole('button',{name:'Restart map',exact:true})).toBeDisabled();}
+ await expect(host).toContainText('Game aaaaaaaa');
+ await page.evaluate(()=>(window as any).__sparkMock.failSave=false);
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Host game',exact:true}).click();
+ await expect(host.getByRole('checkbox',{name:/Use current CE build/})).not.toBeChecked();await expect(host).toContainText("Return to this server's project");await expect(host.getByRole('button',{name:failSave?'Live Rebuild · restart round':'Building…',exact:true})).toBeDisabled();await expect(host.getByRole('button',{name:'Stop server',exact:true})).toBeEnabled();
+});
+
+test('stopped dedicated session retains reachable controls after failed rebuild at fractional layout widths',async({page})=>{
+ test.setTimeout(90000);await mockDesktop(page);
+ await page.evaluate(()=>{
+  const w=window as any,base=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='runtime_report'){const rows=await base(command,args);return [...rows,{...rows[0],id:'chupathingyCe',name:'Synthetic Chupathingy'}];}
+   if(command==='community_server_installation')return {installed:true,version:'v0.9.0c'};
+   if(command==='community_server_status')return {id:'stopped-owned',projectId:'a',phase:'stopped',detail:'Owned dedicated session stopped; disposable copies removed. Ordinary hosting is not persistent Extraction or AI Apocalypse acceptance.',map:'c48_workshop_owner@ce',gameType:'slayer',processId:null,mapSha256:'b'.repeat(64),compiledSha256:'b'.repeat(64),gameSha256:null,sourceFingerprint:'c'.repeat(64),pendingJobId:null,error:"Build does not belong to this project's validated history",serverSha256:'d'.repeat(64),copiedBytes:541644381,sourceBuildId:'0c4d2580-11fa-406e-9fee-358f7460a2d3',restarts:2,originalInputsUnchanged:true,status:{version:'0.9.0c',state:'in_game',map:'c48_workshop_owner@ce',gameType:'slayer',players:2,maximumPlayers:128,networkVersion:32,public:false}};
+   return base(command,args);
+  };
+ });
+ await openFixture(page);const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('chupathingyCe');await studio.getByLabel('Studio options',{exact:true}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Host game',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Private Chupathingy dedicated server',exact:true})).toContainText('Last server observation');
+ for(const [width,height] of [[1000,750],[1600,900],[1686,948],[1500,950],[1684,947],[2246,947],[2293,960],[3413,960]]){
+  await page.setViewportSize({width,height});await auditPagedSurface(page.locator('[data-surface="runtimes"]'));
+ }
+});
+
 test('advertised project picker opens an unopened saved project and retains the first draft and Undo',async({page})=>{
  await mockDesktop(page);await openFixture(page);
  const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true}),original=await velocity.inputValue();await velocity.fill('39');await velocity.press('Tab');
@@ -3721,6 +3770,15 @@ for(const [title,required,pinned] of [
  else await expect(setup).toHaveCount(0);
 });
 
+
+test('paged stability handles recorded native fractional-zoom roundoff without accepting a changed layout',()=>{
+ const before={pages:'2',width:1667.94,height:740.992,content:828,controls:[[1515.278,26.562,134.664,33.989]]};
+ const after=structuredClone(before);after.controls[0][1]=26.563;
+ expect(samePagedLayout(JSON.stringify(before),JSON.stringify(after))).toBe(true);
+ after.controls[0][1]=26.572;expect(samePagedLayout(JSON.stringify(before),JSON.stringify(after))).toBe(false);
+ after.controls[0][1]=26.563;after.pages='3';expect(samePagedLayout(JSON.stringify(before),JSON.stringify(after))).toBe(false);
+ after.pages='2';after.controls.push([0,50,20,20]);expect(samePagedLayout(JSON.stringify(before),JSON.stringify(after))).toBe(false);
+});
 
 test('paged audit rechecks a layout changed between settling and the actual reachability read',async({page})=>{
  await mockDesktop(page);await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountLateTools();});

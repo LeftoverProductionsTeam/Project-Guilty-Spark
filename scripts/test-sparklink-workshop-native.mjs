@@ -1,5 +1,5 @@
-import { assertQaOutputPath } from './native-qa-storage.mjs';
-import {openStudioMenu,chooseTool} from '../tests/ui/helpers/navigation.ts';
+import { assertQaOutputPath,sealQaScratch,disposeQaScratch } from './native-qa-storage.mjs';
+import {openStudioMenu,chooseTool,openDrawer,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 import {configureNativeCeTarget} from './native-live-rebuild.mjs';
 import {nativeDedicatedServer} from './native-dedicated-server.mjs';
 import {execFile} from 'node:child_process';
@@ -57,6 +57,29 @@ async function mark(key, value = true) {
   await fs.writeFile(path.join(root, 'progress.json'), JSON.stringify(receipt, null, 2));
   console.log(key, typeof value === 'object' ? JSON.stringify(value) : value);
 }
+// Bounded diagnostics for this owned disposable tree only; never read file
+// contents or traverse a linked directory. Retain the cause before cleanup.
+async function qaFootprint(label){
+  let files=0,bytes=0;const groups=new Map(),largest=[];let partial=false;
+  async function walk(directory,relative=''){
+    let entries;try{entries=await fs.readdir(directory,{withFileTypes:true});}catch(error){if(error.code==='ENOENT'){partial=true;return;}throw error;}
+    for(const entry of entries){
+      if(++files>25000)throw Error('QA footprint exceeds its diagnostic entry bound');
+      const next=path.join(relative,entry.name),file=path.join(directory,entry.name);
+      if(entry.isSymbolicLink())throw Error('Linked QA diagnostic entry refused');
+      if(entry.isDirectory())await walk(file,next);
+      else if(entry.isFile()){
+        let info;try{info=await fs.lstat(file);}catch(error){if(error.code==='ENOENT'){partial=true;continue;}throw error;}
+        if(info.isSymbolicLink()||!info.isFile())throw Error('QA diagnostic file changed type');
+        bytes+=info.size;const group=next.split(path.sep).slice(0,4).join('/');groups.set(group,(groups.get(group)??0)+info.size);
+        if(info.size>=32*1024**2){largest.push({file:next.replaceAll(path.sep,'/'),bytes:info.size});largest.sort((a,b)=>b.bytes-a.bytes);if(largest.length>32)largest.pop();}
+      }
+    }
+  }
+  await walk(root);const sample={label,logicalBytes:bytes,entries:files,partial,groups:[...groups].sort((a,b)=>b[1]-a[1]).slice(0,24),largest};
+  receipt.qaFootprints??=[];if(receipt.qaFootprints.length>=20)receipt.qaFootprints.shift();receipt.qaFootprints.push(sample);
+  console.log('QA_FOOTPRINT',JSON.stringify(sample));return sample;
+}
 async function freePort() {
   const s = net.createServer();
   await new Promise((r) => s.listen(0, '127.0.0.1', r));
@@ -65,6 +88,9 @@ async function freePort() {
   return p;
 }
 async function start(a, restart = false) {
+  // Independent processes/libraries can read one immutable, hash-pinned app.
+  // Do not retain three identical 50 MiB binaries merely to isolate settings.
+  expect(await fileHash(a.exe)).toBe(receipt.appSha256);
   const port = await freePort();
   a.child = spawn(a.exe, [], {
     windowsHide: true,
@@ -79,7 +105,7 @@ async function start(a, restart = false) {
   await finishStorage.trackProcess(a.child);
   await fs.writeFile(
     path.join(a.dir, restart ? 'restarted-process.json' : 'process.json'),
-    JSON.stringify({ pid: a.child.pid, port }),
+    JSON.stringify({ pid: a.child.pid, port, executable: a.exe, appSha256: receipt.appSha256 }),
   );
   await expect
     .poll(() =>
@@ -166,9 +192,9 @@ async function actor(slug) {
     data = path.join(dir, 'library');
   await finishStorage.createScratch(slug);
   await fs.mkdir(data, { recursive: true });
-  const a = { slug, dir, data, exe: path.join(dir, 'GuiltySpark-C48-qa.exe') };
+  const a = { slug, dir, data, exe: app };
   actors.push(a);
-  await fs.copyFile(app, a.exe, fs.constants.COPYFILE_EXCL);
+  receipt.sharedExecutable = { path: app, sha256: receipt.appSha256, independentLibraries: true, redundantCopiesAvoided: actors.length, avoidedLogicalBytes: actors.length * (await fs.stat(app)).size };
   await start(a);
   return a;
 }
@@ -279,6 +305,56 @@ async function converge(expected) {
     }),
   );
   return report;
+}
+// Only completed generated tag staging inside this test's declared scratch.
+// Keep frozen project source, receipts/logs, current input tags and every map.
+async function retireQaTagIntermediates(a,build){
+  expect(build.status).toBe('validated');expect(build.id).toMatch(/^[0-9a-f-]{36}$/);
+  const job=path.join(a.data,'jobs',build.id),target=path.join(job,'workspace','tags');
+  expect(path.relative(root,target).startsWith('..')).toBe(false);
+  const real=await fs.realpath(target),inside=(parent,child)=>{const r=path.relative(parent.toLowerCase(),child.toLowerCase());return r===''||(!path.isAbsolute(r)&&r!=='..'&&!r.startsWith('..'+path.sep));};
+  const project=(await a.call('open_project',{id:a.id})).project;
+  for(const profile of project.buildTargets??[])if(profile.tagsDirectory){const source=await fs.realpath(profile.tagsDirectory);expect(inside(source,real)||inside(real,source)).toBe(false);}
+  const output=await fileHash(build.output),snapshot=await fileHash(path.join(job,'workspace','project.gsproject'));
+  expect(output).toBe(build.sha256);
+  const seal=await sealQaScratch(root,target),removed=await disposeQaScratch(root,seal,{ownerFinished:true});
+  expect(await fs.stat(target).catch(()=>null)).toBeNull();expect(await fileHash(build.output)).toBe(output);expect(await fileHash(path.join(job,'workspace','project.gsproject'))).toBe(snapshot);
+  (receipt.retiredQaTagIntermediates??=[]).push({buildId:build.id,bytes:removed.bytes,files:removed.files,outputSha256:output,projectSnapshotSha256:snapshot,inputsAndMapsPreserved:true,qaOnly:true});
+  await mark('completedQaIntermediatesRetired',receipt.retiredQaTagIntermediates);
+}
+// The frozen QA output has completed its independent readback and preservation
+// comparison before retirement. Keep the frozen project/source receipt and the
+// actual current/previous-good game maps; this never evicts a user build.
+async function retireFrozenQaMap(a,frozen,current){
+  expect(frozen.id).not.toBe(current.id);expect(frozen.status).toBe('validated');expect(current.status).toBe('validated');
+  expect(await fileHash(frozen.output)).toBe(receipt.frozenCeReadback.sha256);
+  const currentSha=await fileHash(current.output),snapshot=path.join(a.data,'jobs',frozen.id,'workspace','project.gsproject'),sourceSha=await fileHash(snapshot);
+  const seal=await sealQaScratch(root,frozen.output),removed=await disposeQaScratch(root,seal,{ownerFinished:true});
+  expect(await fileHash(current.output)).toBe(currentSha);expect(await fileHash(snapshot)).toBe(sourceSha);
+  receipt.retiredFrozenQaOutput={buildId:frozen.id,sha256:receipt.frozenCeReadback.sha256,logicalBytes:removed.bytes,sourceSnapshotSha256:sourceSha,retiredOnlyAfterNativeReadbackAndConcurrentBuildCheck:true,currentGameOutputPreserved:true,qaOnly:true};
+  await mark('finishedFrozenQaOutputRetired',receipt.retiredFrozenQaOutput);
+}
+async function uiBuild(a){
+  const seen=new Set((await a.call('bootstrap')).logs.map(row=>row.jobId).filter(Boolean));
+  const button=a.page.getByRole('button',{name:'Build & check playtest',exact:true,includeHidden:true});
+  await revealPagedControl(button);await expect(button).toBeEnabled();await button.click();
+  let job;
+  await expect.poll(async()=>{job=(await a.call('bootstrap')).logs.find(row=>row.projectId===a.id&&row.jobId&&!seen.has(row.jobId))?.jobId;return job;},{timeout:15000}).toBeTruthy();
+  return job;
+}
+async function uiMoveStarts(a,delta){
+  await chooseTool(a.page,'Level editor');
+  if(await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'Objects & gameplay',exact:true}).click();
+  for(let i=0;i<4;i++){
+    const before=(await view(a)).document.spawns[i].position[0];
+    await openDrawer(a.page,'Build tools');await a.page.locator('.forge-tree-select').filter({hasText:new RegExp('^Player '+(i+1)+'$')}).click();
+    await openDrawer(a.page,'Inspector');await a.page.getByRole('button',{name:'Properties',exact:true}).click();
+    const x=a.page.getByRole('spinbutton',{name:'Position X',exact:true});await x.fill(String(before+delta));await x.evaluate(node=>node.blur());
+    await expect.poll(async()=>(await view(a)).document.spawns[i].position[0]).toBeCloseTo(before+delta,5);
+  }
+  const close=a.page.getByRole('button',{name:'Close Inspector',exact:true});if(await close.isVisible())await close.click();
+  await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();
+  return view(a);
 }
 async function save(a, expected) {
   await a.page.keyboard.press('Control+s');
@@ -663,15 +739,15 @@ try {
   await converge(current);
   await save(a, current.document);
   const buildStart = performance.now(),
-    jobId = await a.call('quickforge_build', { projectId: a.id });
+    jobId = await uiBuild(a);
   const frozen = current;
   await sleep(200);
   current = (
     await update(c, current, (d) => {
       d.workshop.brushes[3].name = 'Changed during frozen native BSP build';
-      if(chupathingyTrial){expect(d.spawns).toHaveLength(4);for(const start of d.spawns)start.position[0]+=.25;}
     })
   ).next;
+  if(chupathingyTrial)current=await uiMoveStarts(c,.25);
   await converge(current);
   await save(a, current.document);
   let built;
@@ -725,16 +801,56 @@ try {
       return {sha256:await fileHash(build.output),positions,crcMismatch:0,independentNativeReadback:true};
     }
     receipt.frozenCeReadback=await independentReadback(built,'frozen');
+    if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireQaTagIntermediates(a,built);
     const stale=await a.call('quickforge_build_report',{projectId:a.id});expect(stale.current).toBe(false);
     const gameRevision=current;await Promise.all(actors.map(x=>save(x,current.document)));
-    const nextJob=await a.call('quickforge_build',{projectId:a.id});let gameBuild;
+    const nextJob=await uiBuild(a);let gameBuild;
     await expect.poll(async()=>{const boot=await a.call('bootstrap'),failed=boot.logs.find(row=>row.jobId===nextJob&&['failed','blocked'].includes(row.phase));if(failed)throw Error(failed.message);gameBuild=(await a.call('open_project',{id:a.id})).project.builds.find(row=>row.id===nextJob);return gameBuild?.status;},{timeout:300000,intervals:[1500,3000]}).toBe('validated');
     const gameBinding=JSON.parse(await fs.readFile(path.join(a.data,'jobs',nextJob,'studio-binding.json'),'utf8'));expect(gameBinding.sessionRevision).toBe(gameRevision.revision);
     receipt.currentCeReadback=await independentReadback(gameBuild,'game');
+    if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireQaTagIntermediates(a,gameBuild);
     for(let i=0;i<4;i++)expect(receipt.currentCeReadback.positions[i][0]).toBeCloseTo(receipt.frozenCeReadback.positions[i][0]+.25,5);
     const ready=await a.call('quickforge_build_report',{projectId:a.id});expect(ready.current).toBe(true);expect(ready.build.id).toBe(nextJob);
     receipt.sharedGameRevision={sessionId:a.session,sessionRevision:gameRevision.revision,buildId:nextJob,sha256:gameBuild.sha256,frozenOlderBuildRetained:await fileHash(built.output)===receipt.frozenCeReadback.sha256};
-    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,trackProcess:child=>finishStorage.trackProcess(child),createScratch:name=>finishStorage.createScratch(name)});
+    if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireFrozenQaMap(a,built,gameBuild);
+    const hostPage=async()=>{await chooseTool(a.page,'Online');await a.page.getByRole('button',{name:'Host game',exact:true}).click();};
+    const liveRebuild=process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1'?{
+      async edit(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await hostPage();receipt.sharedRebuildRevision={sessionId:a.session,sessionRevision:current.revision,documentSha256:(await a.call('quickforge_validate',{document:current.document})).sourceSha256,realPeerInspectorEdits:true};},
+      async readback(adopted){
+        const project=(await a.call('open_project',{id:a.id})).project,build=project.builds.find(row=>row.id===adopted.sourceBuildId);expect(build?.status).toBe('validated');
+        const readback=await independentReadback(build,'dedicated-rebuilt');
+        for(let i=0;i<4;i++)expect(readback.positions[i][0]).toBeCloseTo(receipt.currentCeReadback.positions[i][0]+.25,5);
+        const binding=JSON.parse(await fs.readFile(path.join(a.data,'jobs',build.id,'studio-binding.json'),'utf8'));expect(binding.sessionRevision).toBe(current.revision);expect(binding.sessionId).toBe(a.session);
+        receipt.sharedRebuildRevision.buildId=build.id;receipt.sharedRebuildRevision.sha256=readback.sha256;
+        await retireQaTagIntermediates(a,build);
+        return readback;
+      },
+      async breakBuild(){
+        await chooseTool(a.page,'Level editor');await openDrawer(a.page,'Project setup');
+        const panel=a.page.getByRole('region',{name:'Project setup panel',exact:true}),mapTools=panel.locator('.gs-map-tools'),targets=panel.locator('.gs-build-targets');
+        for(const details of [mapTools,targets])if(await details.getAttribute('open')===null){const summary=details.locator(':scope>summary');await revealPagedControl(summary);await summary.click();}
+        const tags=targets.getByRole('textbox',{name:/Editable Halo Tags folder/,includeHidden:true});await revealPagedControl(tags);await tags.fill(nativeRecovery.tagRoot);await tags.evaluate(node=>node.blur());
+        await a.page.getByRole('button',{name:'Close Project setup',exact:true}).click();await hostPage();
+      },
+      async restoreBuild(){
+        const diagnostics=(await a.call('bootstrap')).logs.filter(row=>row.projectId===a.id&&row.phase==='compile').slice(-300);
+        expect(diagnostics.some(row=>row.message.includes('ActorVariant::grenade_type is out of range'))).toBe(true);
+        await chooseTool(a.page,'Level editor');await a.page.locator('.runtime-dock-heading').click();await a.page.keyboard.press('Control+z');await save(a,current.document);
+        const project=(await a.call('open_project',{id:a.id})).project;expect(project.buildTargets.find(target=>target.id===project.activeBuildTarget).tagsDirectory).toBe(receipt.ceSource.reviewedRecovery.tagsDirectory);
+        await hostPage();return diagnostics;
+      },
+    }:undefined;
+    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,checkpoint:async phase=>{
+      await qaFootprint(phase);
+      const history=await a.call('read_workspace_history',{projectId:a.id});
+      const saveState={phase,historyDirty:history?.history?.head?.dirty,historyHead:history?.history?.head?.current,visibleSaveChanges:await a.page.getByRole('button',{name:'Save changes',exact:true}).count()};
+      (receipt.nativeSaveIndicators??=[]).push(saveState);
+      if(['live-rebuild-compiling-with-two-peers','new-revision-adopted-and-independent-readback','new-revision-readback-and-two-rejoined-clients','native-compiler-failure-kept-two-peers'].includes(phase)){
+        expect(saveState.historyDirty,'Live Rebuild must acknowledge the actual saved history before compiling').toBe(false);
+        expect(saveState.visibleSaveChanges,'Saved source must not remain marked as an unsaved draft').toBe(0);
+      }
+      await mark('dedicatedProgress',{phase});
+    },trackProcess:child=>finishStorage.trackProcess(child),createScratch:name=>finishStorage.createScratch(name)});
     receipt.gameLaunched=true;expect(receipt.nativeDedicated.twoClients).toBe(true);expect(receipt.nativeDedicated.start.mapSha256).toBe(gameBuild.sha256);
     receipt.ceSource.originalsUnchanged=(await Promise.all(receipt.ceSource.originals.map(async row=>await fileHash(row.file)===row.sha256))).every(Boolean);expect(receipt.ceSource.originalsUnchanged).toBe(true);
     await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);
@@ -919,6 +1035,7 @@ try {
 } catch (e) {
   receipt.error = String(e);
   receipt.stack = e.stack;
+  await qaFootprint('failure-before-owned-cleanup').catch(problem=>{receipt.footprintError=String(problem);});
   receipt.pageErrors = errors;
   for (const a of actors) {
     receipt.uiAlerts??={};

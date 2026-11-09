@@ -1,5 +1,15 @@
 import {expect,type Locator,type Page} from '@playwright/test';
 const controls='button,a[href],input,select,textarea,summary';
+// Native WebView fractional zoom produced 26.562/26.563 for the same
+// page-relative coordinate. This tolerance ONLY compares measurement stability;
+// the actual clipping, overlap and complete control coverage checks stay below.
+export function samePagedLayout(before:string,after:string){
+ if(before===after)return true;if(!before||!after)return false;
+ const a=JSON.parse(before),b=JSON.parse(after),same=(x:number,y:number)=>Math.abs(x-y)<=.002;
+ return a.pages===b.pages&&a.content===b.content&&same(a.width,b.width)&&same(a.height,b.height)
+  &&a.controls.length===b.controls.length&&a.controls.every((row:number[],i:number)=>row.length===b.controls[i].length&&row.every((value:number,j:number)=>same(value,b.controls[i][j])));
+}
+
 /** Read layout from the actual rendered surface and visit its visible page
  * controls. No scrollIntoView, forced clicks, style edits or mocked bounds. */
 export async function auditPagedSurface(surface:Locator,options:{afterInitialLayout?:()=>Promise<void>;beforePageRead?:()=>Promise<void>}={}){
@@ -19,20 +29,27 @@ export async function auditPagedSurface(surface:Locator,options:{afterInitialLay
     return JSON.stringify({pages:root.getAttribute('data-pages'),width:n(box.width),height:n(box.height),content:body.scrollHeight,
      controls:[...body.querySelectorAll<HTMLElement>(selector)].map(node=>{const r=node.getBoundingClientRect();return [n(r.left-bounds.left),n(r.top-bounds.top),n(r.width),n(r.height)];})});
    },controls);
-   const stable=signature===previous;previous=signature;return stable;
+   const stable=samePagedLayout(signature,previous);previous=signature;return stable;
   },{message:'Paged control layout must settle before auditing reachability',timeout:5000,intervals:[16,32,64]}).toBe(true);
   return previous;
  };
  await settled();await options.afterInitialLayout?.();
+ const changes:unknown[]=[];
+ const changedLayout=(before:string,after:string)=>{
+  if(samePagedLayout(before,after))return false;
+  const a=JSON.parse(before),b=JSON.parse(after);
+  changes.push({before:{...a,controls:undefined},after:{...b,controls:undefined},controls:a.controls.flatMap((r:number[],index:number)=>JSON.stringify(r)===JSON.stringify(b.controls[index])?[]:[{index,before:r,after:b.controls[index]}]).slice(0,5)});
+  return true;
+ };
  for(let generation=0;generation<4;generation++){
  const signature=await settled(),count=Number(await surface.getAttribute('data-pages'));
  expect(Number.isInteger(count)&&count>0,'A paged surface must expose a positive measured page count').toBe(true);
  const seen=new Set<number>();let expected:number[]=[];const pages=[];let changed=false;
  for(let page=1;page<=count;page++){
-  if(await settled()!==signature){changed=true;break;}
+  if(changedLayout(signature,await settled())){changed=true;break;}
   const choice=surface.locator(':scope > .gs-surface-pages input[type=number]');
   if(count>1){await choice.fill(String(page));await expect(surface).toHaveAttribute('data-page',String(page));}
-  if(await settled()!==signature){changed=true;break;}
+  if(changedLayout(signature,await settled())){changed=true;break;}
   await options.beforePageRead?.();
   const result=await surface.evaluate((root,selector)=>{
    const view=root.querySelector(':scope > .gs-page-viewport')!,box=view.getBoundingClientRect();
@@ -55,17 +72,17 @@ export async function auditPagedSurface(surface:Locator,options:{afterInitialLay
     controls:all.map(node=>{const r=node.getBoundingClientRect();return [n(r.left-bounds.left),n(r.top-bounds.top),n(r.width),n(r.height)];})});
    return {eligible,visible,scrolls,layoutSignature,viewport:{x:box.x,y:box.y,width:box.width,height:box.height}};
   },controls);
-  if(result.layoutSignature!==signature){changed=true;break;}
+  if(changedLayout(signature,result.layoutSignature)){changed=true;break;}
   expected=result.eligible;for(const item of result.visible)if(item.fits)seen.add(item.index);
   expect(result.scrolls,'Nested control surfaces must use pages, not scrolling').toEqual([]);
   expect(result.visible.filter(item=>!item.fits),'Every visible control must be fully reachable').toEqual([]);
   expect(result.visible.filter(item=>!item.clickable),'Another control must not cover a command target').toEqual([]);
   pages.push({page,controls:result.visible.length,viewport:result.viewport});
  }
- if(changed||await settled()!==signature)continue;
+ if(changed||changedLayout(signature,await settled()))continue;
  expect(expected.filter(index=>!seen.has(index)),'Every mounted control must be reachable on at least one page').toEqual([]);
  return {surface:await surface.getAttribute('data-surface'),controls:expected.length,pages};
  }
- throw Error('Paged controls kept changing during four complete reachability audits');
+ throw Error('Paged controls kept changing during four complete reachability audits: '+JSON.stringify(changes.slice(-4)));
 }
 export async function auditVisiblePages(page:Page){const result=[];for(const surface of await page.locator('.gs-paged-surface:visible').all())result.push(await auditPagedSurface(surface));return result;}
