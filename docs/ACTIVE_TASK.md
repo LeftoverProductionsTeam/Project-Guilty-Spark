@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
 Task: Operation110 M2 combined SparkLink frozen-source to Chupathingy game workflow
-Status: implementation incomplete
+Status: automated acceptance incomplete
 Starting revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: dc4456ed58d3bdc26889e210fdaf7d51dced1f92; all nine local release gates, actual native packaged preview/projects, host install/startup/uninstall and sealed preview4 pass. Later report/checkpoint commit does not change the binary source.
-Next action: Extend the existing three-process SparkLink/native Workshop acceptance to a reviewed CE source profile and reuse the existing private Chupathingy dedicated/two-client adapter. First reproduce actual frozen-revision versus current-draft launch/build ownership behavior, then implement only demonstrated gaps, prove rebuilt revision adoption and failed-build preservation. Do not replace collaboration/Live Rebuild/hosting controllers.
+Latest verified revision: 6cf22153ff1b3f25eaebf43424ed0327e3d10ff7 plus reviewed native-harness changes; R290 complete:true,15stages, three real Spark processes→two CE609 builds→private Chupathingy/two actual clients agreeing on changed starts, restart/rejection and authority recovery/rollover. Exact sealed release remains dc4456e.
+Next action: Commit the reviewed scoped R290 test/evidence changes locally, then extend the existing combined native test to actual compile-button/peer Inspector actions and new-build adoption/failed-compiler preservation while the dedicated session runs. Reuse existing runtime_rebuild and dedicated adapter; do not label same-cache Restart map as Live Rebuild.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Full Operation110f3bd3ec0 is docs/Master Engineering Prompts/GS_2026-11-08_Opera
 Preserve475IDs/25prompt identities, first-four-columnSHAa47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a and sortedIDsetSHAb990f65f7c1ccb092b776feab2065a1207926a0aca5aeee05cf5d63547736077. MASTER_FEATURE_LEDGER.csv/md, PENDING_REQUESTS/DIRECTIVE_LEDGER and full Master Engineering Prompts remain authoritative. No branch/worktree/clone/new queue. No push, workflow invocation or publication: owner will do those. No original Halo/ISO/map/tag/runtime/mod/SDK/C49/history/stash changes. Stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85 protected.
 
 ## Verified milestones
+
+M2 scoped R290 complete:true/exit0. Three editors,254frozen while255advances; native CRC/scenario readback, actual dedicated255 cache SHA2f7905e5fa42d271d24d944858e3da2f9ac152695396a95661b78679f513eb52 and both native clients agree on player0(-4.75,4,0)/player1(32.25,4,0). Same-cache restart, changed-cache refusal with samePID/count1, source/client/config preservation, offline drafts/host recovery/rollover/revocation and8logical native sizes pass. All temporary processes/run roots disposed; peak3,806,680,292logicalB was temporary. Full exact evidence/failedattempts/userroute in SPARKLINK_CE_GAME_20261108.md. New-build Live Rebuild during running two-client server and compiler-failure continuity are NOT yet accepted.
 
 P0:452e9ce manifest atomic-EIO nonce test repairs the CI concurrency assertion without weakening active-writer preservation. Local R259 full889Rust/472frontend/255browser and R26040fault repeats pass. Hosted CI42538304817 Windows native/UI job passed, old Linux job failed the globaltemporary-file assertion. Exact repaired hosted Linux run remains owner-push dependent. docs/CI_MANIFEST_CONCURRENCY_20261108.md.
 
@@ -34,13 +36,17 @@ M2 reuse scripts/test-sparklink-workshop-native.mjs (currently MCCtarget/header1
 
 ## Failures and blockers
 
+M2 current attempts are genuine partial evidence, not passes: R287 refuses a file mistakenly supplied as a Tags folder before game execution. R288 passes CE source review and three-process edits/author Undo, then correctly rejects the old hardcoded MCC sky assertion; the contract now compares the selected native sky. R289 passes shared conflicts/permissions/previews/240commits and freezes CE609 revision254 while255continues; two independent native outputs read correct four starts, X+.25, CRC0. Cache SHA5daccc4ab879047c016e03fbf61ca4a5e60367243ca38620a0006b7253afb901→269dad96481f88f37d5fa647b6a37dc03c77e59f6b011078dc8b8effebbfa254. Dedicated server authenticates/loads255, but a new test guard wrongly expects relative paths between D: originals and C: scratch; it refuses before clients spawn. Guard now accepts different-drive absolute relative results while still requiring the executable inside its private engine folder and outside originals. No test timeout/production validation was weakened. All prior scratch disposed; no two-client R289 claim.
+
+Automatic approval review initially refused R287 runtime registration because the path names originals. Read-only source inspection proves register_runtime only inspects files/stores disposable profile; community_host_process copies inputs into owned UUID/data and executes private server; helper copies exact client members with independent data/save/cache/log roots and rehashes originals/config after Stop. Added explicit isolation guards; retry was then approved. No bypass or original runtime launch.
+
 Hosted CI fixedrevision notpushed; no remote action authorized. Clean-machine/physicalmonitor/DPI/Linux/mac/headset/two-PC missing. H19 two-way Timberland–Sidewinder foot/Warthog/ridge/cave/projectile/light/audio has0humanverified physicalconnections; game loaded is not traversal. C63 two-way door humanaccepted and C70 external Blender/native roundtrip remain accepted independently. OriginalZombie automaticrelease/physics/fullsurvival, Firefight humanwin/peerAI, persistentExtraction serverdata/no timer,19regions and OpenH1 VR remain incomplete. No invented percentages.
 
 Computer Use now initializes through node_repl @oai/sky; use returned window objects/one action+fresh observation only. Never automate authentication/systemsecurity/terminalUI. Current documented API has chord presses, no held-key primitive; do not invent protocol/helpers to claim driving. No secondcomputer/headset. Preserve human gates and continue independent implementation.
 
 ## Operations and safe checkpoint
 
-No active native/game/build process remains at this checkpoint. Install test payload/registration removed,189ms final wait. R/direct-native-review isolatedlibrarydisposed. Native tests use existing native-qa-storage ownership/budgets; no full SDK staging. E holds bounded exact evidence, accepted cache and selected QA binaries, not repository caches. Reuse R/portable-test/GuiltySpark.exe only while manifest/runtimeSourceFingerprint/fileSHA match. Productionchanges invalidate reuse and need a fresh build. For sparklink reuse the wrapper rebuilds only smallfrontend for servedhash equality. D/temp writes require explicit tool escalation.
+R290 has finished; no active native/game/build process remains at this checkpoint. Failed unsealed6d9 preview3 generated payloads were retired after exactdc acceptance:11verified files,176,063,488allocatedB reclaimed; failure logs/Git retained. Install test payload/registration removed,189ms final wait. R/direct-native-review isolatedlibrarydisposed. Native tests use existing native-qa-storage ownership/budgets; no full SDK staging. E holds bounded exact evidence, accepted cache and selected QA binaries, not repository caches. Reuse R/portable-test/GuiltySpark.exe only while manifest/runtimeSourceFingerprint/fileSHA match. Productionchanges invalidate reuse and need a fresh build. For sparklink reuse the wrapper rebuilds only smallfrontend for servedhash equality. D/temp writes require explicit tool escalation.
 
 After reviewed source/docs changes, stage explicit files; node scripts/package-source.mjs --manifests-only; stage two SOURCE manifests; --check-manifests; local commit. Source archives are only explicit release outputs. Do not label dc binary as any later commit. No arbitrary newtestframework/controller. Native source/ref hashes remain authority; hosting preferences never reinterpret source.
 

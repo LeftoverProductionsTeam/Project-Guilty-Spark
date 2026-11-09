@@ -16,19 +16,21 @@ export async function nativeDedicatedServer({
   compiled,
   trackProcess,
   createScratch,
+  projectId,
+  expectedSpawns,
 }) {
   const hash = async (file) =>
     crypto
       .createHash('sha256')
       .update(await fs.readFile(file))
       .digest('hex');
-  const created = (await call('bootstrap')).entries.find((row) => row.title === 'Native live rebuild');
+  const created = (await call('bootstrap')).entries.find((row) => projectId ? row.id === projectId : row.title === 'Native live rebuild');
   expect(created).toBeTruthy();
   const saved = (await call('open_project', { id: created.id })).project;
   expect(
     saved.builds.some((row) => row.id === compiled.build.id && row.sha256 === compiled.build.sha256),
   ).toBe(true);
-  receipt.liveRebuild.projectId = created.id;
+  (receipt.liveRebuild??={}).projectId = created.id;
 
   const studio = await openStudioMenu(page);
   await studio.getByLabel('Active Halo runtime', { exact: true }).selectOption('chupathingyCe');
@@ -92,6 +94,10 @@ export async function nativeDedicatedServer({
   await page.screenshot({ path: path.join(root, 'native-dedicated-ready.png') });
   const clients = [];
   const runtime = path.resolve(process.env.SPARK_TEST_CHUPATHINGY_ROOT);
+  const sourceMembers=JSON.parse(await fs.readFile(new URL('../docs/fixtures/chupathingy-playtest-members-20261108.json',import.meta.url),'utf8'));
+  const runtimeConfig=path.join(runtime,'config.toml'),configBefore=await fs.readFile(runtimeConfig).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+  const originalClientPins=await Promise.all(sourceMembers.files.map(async row=>({file:path.join(runtime,row.file),sha256:await hash(path.join(runtime,row.file))})));
+  for(let i=0;i<sourceMembers.files.length;i++)expect(originalClientPins[i].sha256).toBe(sourceMembers.files[i].sha256);
   const pin = JSON.parse(
     await fs.readFile(
       new URL('../docs/fixtures/managed-runtime-packages-20261107.json', import.meta.url),
@@ -151,7 +157,13 @@ export async function nativeDedicatedServer({
         HALO_CONSOLE_LOG: 'all',
         SDL_AUDIO_DRIVER: 'dummy',
       });
-      const child = spawn(path.join(client, 'engine', pin.executable), ['--play'], {
+      const privateExecutable=path.resolve(client,'engine',pin.executable);
+      const outsideOriginal=path.relative(runtime,privateExecutable);
+      expect(path.isAbsolute(outsideOriginal)||outsideOriginal.split(path.sep)[0]==='..').toBe(true);
+      expect(path.relative(client,privateExecutable)).toBe(path.join('engine',pin.executable));
+      for(const key of ['HALO_SAVE_ROOT','HALO_CACHE_ROOT','HALO_LOG_ROOT'])expect(path.relative(client,env[key])).not.toMatch(/^\.\.|^[A-Za-z]:/);
+      expect(path.resolve(env.HALO_DATA_ROOT)).toBe(path.resolve(base,'data'));
+      const child = spawn(privateExecutable, ['--play'], {
         cwd: client,
         env,
         windowsHide: true,
@@ -214,6 +226,13 @@ export async function nativeDedicatedServer({
     const localIds = spawned.map((t) => Number(t.line.match(/\| local (\d+) camera/)?.[1]));
     expect(new Set(localIds).size).toBe(2);
     expect(localIds.every((i) => Number.isInteger(i) && i >= 0)).toBe(true);
+    if(expectedSpawns){
+      expect(expectedSpawns).toHaveLength(4);
+      const peerPositions=spawned.map(t=>[...t.line.matchAll(/player (\d+): \(([-.\d]+) ([-.\d]+) ([-.\d]+)\)/g)].map(match=>({player:Number(match[1]),position:match.slice(2).map(Number)})));
+      for(const positions of peerPositions){expect(positions).toHaveLength(2);for(const row of positions)expect(expectedSpawns.some(position=>Math.abs(position[0]-row.position[0])<.05&&Math.abs(position[1]-row.position[1])<.05&&Math.abs(position[2]-row.position[2])<1)).toBe(true);}
+      expect(peerPositions[0]).toEqual(peerPositions[1]);
+      receipt.nativeDedicated.spawnReadback={sourcePositions:expectedSpawns,peerPositions,agreed:true,sourceZAllowance:1,sourceXyAllowance:.05};
+    }
     receipt.nativeDedicated.spawnedClients = spawned;
     receipt.nativeDedicated.joined = session;
     receipt.nativeDedicated.twoClients = true;
@@ -280,6 +299,10 @@ export async function nativeDedicatedServer({
     const stopped = await call('community_server_status');
     expect(stopped.originalInputsUnchanged).toBe(true);
     receipt.nativeDedicated.stopped = stopped;
+    for(const row of originalClientPins)expect(await hash(row.file)).toBe(row.sha256);
+    expect(await fs.readFile(runtimeConfig).catch(error=>{if(error.code==='ENOENT')return null;throw error;})).toEqual(configBefore);
+    receipt.nativeDedicated.originalClientInputsUnchanged=true;
+    receipt.nativeDedicated.executedOnlyDisposableCopies=true;
     receipt.nativeDedicated.originalsUnchanged = true;
     await expect(panel).toContainText('stopped');
     await expect.poll(async () => !!(await fs.stat(base).catch(() => null)), { timeout: 30000 }).toBe(false);

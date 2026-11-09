@@ -1,5 +1,14 @@
 import { assertQaOutputPath } from './native-qa-storage.mjs';
-import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
+import {openStudioMenu,chooseTool} from '../tests/ui/helpers/navigation.ts';
+import {configureNativeCeTarget} from './native-live-rebuild.mjs';
+import {nativeDedicatedServer} from './native-dedicated-server.mjs';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+const runNative=promisify(execFile);
+const chupathingyTrial=process.env.SPARK_QA_SHARED_CHUPATHINGY==='1';
+const ceSource=process.env.SPARK_TEST_CE_SOURCE_MAP;
+if(chupathingyTrial&&(!ceSource||!process.env.SPARK_TEST_CHUPATHINGY_ROOT))throw Error('Select the owned native CE source map and Chupathingy package');
+const targetRuntime=chupathingyTrial?'chupathingyCe':'mccSteam';
 // Opt-in acceptance: three real desktop processes with isolated libraries.
 // Private LAN and a real Radmin adapter on ONE PC do not prove cross-PC delivery.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -105,18 +114,20 @@ async function start(a, restart = false) {
       ...boot.settings,
       onboardingCompleted: true,
       autoBuild: false,
-      preferredHalo: 'mccSteam',
+      preferredHalo: targetRuntime,
       hekDirectory: kit,
-      hekTagsDirectory: tags,
+      hekTagsDirectory: chupathingyTrial ? null : tags,
       hekFlavor: 'h1aEk',
       invaderDirectory: invader,
     },
   });
+  // Registration only performs read-only inspection and stores the profile in this actor's disposable library.
+  if(chupathingyTrial){const runtime=path.resolve(process.env.SPARK_TEST_CHUPATHINGY_ROOT);await a.call('register_runtime',{registration:{id:'shared-native-chupathingy',runtimeId:'chupathingyCe',root:runtime,executable:path.join(runtime,'chupathingy.exe'),dataRoot:runtime,version:'v0.9.0c'}});}
   if (!restart) {
     const created = await a.call('create_quickforge_project', {
       title: `C48 Workshop ${a.slug}`,
       template: 'customBlank',
-      target: 'mccSteam',
+      target: targetRuntime,
     });
     a.id = created.project.id;
     a.title = created.project.title;
@@ -350,7 +361,16 @@ try {
     .filter({ has: a.page.locator('summary', { hasText: 'Halo material paths & player starts' }) });
   await details.locator(':scope > summary').click();
   const shader = a.page.getByRole('textbox', { name: 'Shader path surface', exact: true });
-  await shader.fill('levels/test/tutorial/shaders/example_tutorial_metal_floor');
+  let nativeSource,nativeRecovery;
+  if(chupathingyTrial){
+    const originals=await Promise.all([ceSource,...['bitmaps.map','sounds.map','loc.map'].map(name=>path.join(path.dirname(ceSource),name))].map(async file=>({file,sha256:await fileHash(file)})));
+    [nativeSource]=await a.call('import_paths',{paths:[ceSource]});expect(nativeSource.inspection.header.version).toBe(609);
+    const scenario=nativeSource.inspection.tags.find(tag=>tag.class==='scnr');expect(scenario).toBeTruthy();
+    nativeRecovery=await a.call('extract_selected_tag_tree',{projectId:nativeSource.project.id,tagId:scenario.id});
+    expect(nativeRecovery.sourceSha256).toBe(originals[0].sha256);receipt.ceSource={originals,sourceSha256:nativeRecovery.sourceSha256,version:nativeRecovery.sourceVersion};
+  }
+  const metal=chupathingyTrial?(nativeSource.inspection.tags.find(tag=>tag.class==='senv'&&/metal.*plate.*floor/i.test(tag.path))??nativeSource.inspection.tags.find(tag=>tag.class==='senv'&&/metal.*flat/i.test(tag.path)))?.path:'levels/test/tutorial/shaders/example_tutorial_metal_floor';expect(metal).toBeTruthy();
+  await shader.fill(metal);
   await shader.press('Tab');
   await expect(a.page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
   // The deliberately minimal owned native tag set supplies the tutorial metal
@@ -358,12 +378,13 @@ try {
   // unused grass preview default; keep both material identities/dependencies.
   const grassShader = a.page.getByRole('textbox', { name: 'Shader path grass', exact: true });
   if (await grassShader.count()) {
-    await grassShader.fill('levels/test/tutorial/shaders/example_tutorial_metal_floor');
+    await grassShader.fill(metal);
     await grassShader.press('Tab');
     await expect(a.page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
   }
   const sky = details.getByRole('textbox').last();
-  await sky.fill('levels/test/bloodgulch/bloodgulch');
+  const skyPath=chupathingyTrial?nativeSource.inspection.tags.find(tag=>tag.class.trimEnd()==='sky')?.path:'levels/test/bloodgulch/bloodgulch';expect(skyPath).toBeTruthy();
+  await sky.fill(skyPath);
   await sky.press('Tab');
   await expect(a.page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
   await details.locator(':scope > summary').click();
@@ -380,6 +401,9 @@ try {
   await expect(a.page.locator('.bsp-workshop footer')).toContainText('2 authored portals');
   await portals.locator('summary').click();
   await a.page.keyboard.press('Control+s');
+  if(chupathingyTrial){
+    const configured=await configureNativeCeTarget({page:a.page,kit,invader,sourceRoot:nativeRecovery.tagRoot,current:async()=>(await a.call('open_project',{id:a.id})).project,save:async()=>{await a.page.keyboard.press('Control+s');await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);},hash:fileHash,expect});receipt.ceSource.reviewedRecovery=configured.recovery;
+  }
   const networks = await a.call('forge_session_networks');
   const lan = networks.find((n) => n.networkScope === 'private' && n.address !== '127.0.0.1'),
     vpn = networks.find((n) => n.networkScope === 'radminVpn');
@@ -441,7 +465,7 @@ try {
   // Real source recipes cross three independent native processes. This phase
   // checks collaboration, not radiosity or gameplay (accepted separately).
   const lightingBase=await view(a),recipe={skyPath:lightingBase.document.skyPath,quality:'draft',environment:{previewEnabled:true,skyColor:[0.05,0.1,0.13],ambientColor:[0.7,0.8,0.9],ambientIntensity:0.5,sunColor:[1,0.9,0.8],sunIntensity:2,sunAzimuth:-35,sunElevation:50,fogEnabled:false,fogColor:[0.3,0.4,0.5],fogNear:25,fogFar:180}};
-  expect(recipe.skyPath).toBe('levels/test/bloodgulch/bloodgulch');
+  expect(recipe.skyPath).toBe(skyPath);
   current=(await update(a,lightingBase,d=>{d.nativeLighting=recipe;})).next;
   const acceptedLighting=clone(current.document.nativeLighting);
   await converge(current);
@@ -645,6 +669,7 @@ try {
   current = (
     await update(c, current, (d) => {
       d.workshop.brushes[3].name = 'Changed during frozen native BSP build';
+      if(chupathingyTrial){expect(d.spawns).toHaveLength(4);for(const start of d.spawns)start.position[0]+=.25;}
     })
   ).next;
   await converge(current);
@@ -672,7 +697,7 @@ try {
   );
   expect(snapshot.quickForge.workshop).toEqual(frozen.document.workshop);
   const reopened = await a.call('open_built_map', { projectId: a.id, buildId: jobId });
-  expect(reopened.inspection.header.version).toBe(13);
+  expect(reopened.inspection.header.version).toBe(chupathingyTrial?609:13);
   expect(reopened.inspection.mesh.indices.length).toBeGreaterThan(0);
   expect(reopened.inspection.tags.some((tag) => tag.class === 'sbsp')).toBe(true);
   await mark('frozenSharedBspNativeBuild', {
@@ -680,7 +705,7 @@ try {
     durationMs: performance.now() - buildStart,
     sessionRevision: binding.sessionRevision,
     newerRevision: current.revision,
-    cacheVersion: 13,
+    cacheVersion: chupathingyTrial?609:13,
     compiledCollisionTriangles: reopened.inspection.mesh.indices.length / 3,
     cacheSha256: await fileHash(built.output),
     cacheBytes: (await fs.stat(built.output)).size,
@@ -688,6 +713,33 @@ try {
     portals: snapshot.quickForge.workshop.portals.length,
     readbackTags: reopened.inspection.tags.length,
   });
+  if(chupathingyTrial){
+    async function independentReadback(build,label){
+      const directory=path.join(root,'independent-ce-'+label);await fs.mkdir(directory);
+      const options={windowsHide:true,timeout:30000,maxBuffer:1024*1024};
+      const inspected=await a.call('open_built_map',{projectId:a.id,buildId:build.id});const tag=inspected.inspection.tags.find(row=>row.class==='scnr');expect(tag).toBeTruthy();const nativePath=tag.path+'.scenario';
+      const crc=(await runNative(path.join(invader,'invader-info.exe'),['-T','crc32_mismatched',build.output],options)).stdout.trim();expect(crc).toBe('0');
+      const extracted=await runNative(path.join(invader,'invader-extract.exe'),['-s',nativePath,'-t',directory,build.output],options);expect(extracted.stdout+'\n'+extracted.stderr).not.toMatch(/Failed to extract|ERROR:/i);
+      const count=Number((await runNative(path.join(invader,'invader-edit.exe'),['-t',directory,'-C','player_starting_locations',nativePath],options)).stdout.trim());expect(count).toBe(4);
+      const positions=[];for(let i=0;i<count;i++){const values=(await runNative(path.join(invader,'invader-edit.exe'),['-t',directory,'-G',`player_starting_locations[${i}].position`,nativePath],options)).stdout.trim().split(',').map(Number);expect(values).toHaveLength(3);expect(values.every(Number.isFinite)).toBe(true);positions.push(values);}
+      return {sha256:await fileHash(build.output),positions,crcMismatch:0,independentNativeReadback:true};
+    }
+    receipt.frozenCeReadback=await independentReadback(built,'frozen');
+    const stale=await a.call('quickforge_build_report',{projectId:a.id});expect(stale.current).toBe(false);
+    const gameRevision=current;await Promise.all(actors.map(x=>save(x,current.document)));
+    const nextJob=await a.call('quickforge_build',{projectId:a.id});let gameBuild;
+    await expect.poll(async()=>{const boot=await a.call('bootstrap'),failed=boot.logs.find(row=>row.jobId===nextJob&&['failed','blocked'].includes(row.phase));if(failed)throw Error(failed.message);gameBuild=(await a.call('open_project',{id:a.id})).project.builds.find(row=>row.id===nextJob);return gameBuild?.status;},{timeout:300000,intervals:[1500,3000]}).toBe('validated');
+    const gameBinding=JSON.parse(await fs.readFile(path.join(a.data,'jobs',nextJob,'studio-binding.json'),'utf8'));expect(gameBinding.sessionRevision).toBe(gameRevision.revision);
+    receipt.currentCeReadback=await independentReadback(gameBuild,'game');
+    for(let i=0;i<4;i++)expect(receipt.currentCeReadback.positions[i][0]).toBeCloseTo(receipt.frozenCeReadback.positions[i][0]+.25,5);
+    const ready=await a.call('quickforge_build_report',{projectId:a.id});expect(ready.current).toBe(true);expect(ready.build.id).toBe(nextJob);
+    receipt.sharedGameRevision={sessionId:a.session,sessionRevision:gameRevision.revision,buildId:nextJob,sha256:gameBuild.sha256,frozenOlderBuildRetained:await fileHash(built.output)===receipt.frozenCeReadback.sha256};
+    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,trackProcess:child=>finishStorage.trackProcess(child),createScratch:name=>finishStorage.createScratch(name)});
+    receipt.gameLaunched=true;expect(receipt.nativeDedicated.twoClients).toBe(true);expect(receipt.nativeDedicated.start.mapSha256).toBe(gameBuild.sha256);
+    receipt.ceSource.originalsUnchanged=(await Promise.all(receipt.ceSource.originals.map(async row=>await fileHash(row.file)===row.sha256))).every(Boolean);expect(receipt.ceSource.originalsUnchanged).toBe(true);
+    await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);
+    await mark('sharedCeBuildPrivateTwoGameClients',{...receipt.sharedGameRevision,twoClients:true,gameplayAccepted:false,aiAccepted:false,physicalMachines:1});
+  }
   // Edit through the real UI after owner death, then edit again while the first
   // operation is unacknowledged. Rejoining must retain BOTH drafts and apply
   // each exactly once with the original author and operation identity.

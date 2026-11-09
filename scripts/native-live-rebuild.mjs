@@ -44,16 +44,7 @@ export async function nativeLiveRebuild({page,root,kit,invader,cache,call,receip
  for(const field of materials){await field.fill(shader.path);await field.press('Tab');await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();}
  const sky=source.inspection.tags.find(tag=>tag.class.trimEnd()==='sky');if(sky){const field=materialDetails.getByRole('textbox',{name:'Halo sky tag',exact:true});await field.fill(sky.path);await field.press('Tab');}
  await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();await save();
- await openDrawer(page,'Project setup');const panel=page.getByRole('region',{name:'Project setup panel',exact:true}),mapTools=panel.locator('.gs-map-tools'),targets=panel.locator('.gs-build-targets');
- if(await mapTools.getAttribute('open')===null){const control=mapTools.locator(':scope>summary');await revealPagedControl(control);await control.click();}
- const summary=targets.locator(':scope>summary');await revealPagedControl(summary);if(await targets.getAttribute('open')===null)await summary.click();
- await(await use(targets,'combobox','New engine target runtime')).selectOption('chupathingyCe');await(await use(targets,'button','Add runtime target')).click();
- await(await use(targets,'combobox','Authoring kit generation')).selectOption('h1aEk');
- for(const [label,value]of [[/Map Builder folder/,kit],[/Editable Halo Tags folder/,recovered.tagRoot],[/Invader folder/,invader]]){const field=await use(targets,'textbox',label);await field.fill(value);await field.press('Tab');}
- await(await use(targets,'checkbox',/I selected a CE base tagset/)).check();await(await use(targets,'button','Use this target')).click();await save();
- receipt.reviewedCeRecovery=await reviewNativeCeSource({page,targets,use,current,save,hash,expect,sourceRoot:recovered.tagRoot});
- console.log('LIVE_REBUILD_NATIVE',JSON.stringify({phase:'reviewed-stock-ce-source-corrected',tags:receipt.reviewedCeRecovery.corrections.length}));
- await page.getByRole('button',{name:'Close Project setup',exact:true}).click();
+ const {targets,mapTools,summary,recovery}=await configureNativeCeTarget({page,kit,invader,sourceRoot:recovered.tagRoot,current,save,hash,expect});receipt.reviewedCeRecovery=recovery;
  const firstBuildStart=performance.now();let lastPhase='';
  const lighting=page.locator('.gs-native-bsp-lighting');await lighting.locator(':scope>summary').click();
  const ambient=lighting.getByRole('spinbutton',{name:'Ambient brightness',exact:true});await ambient.fill('0.6');await ambient.press('Tab');
@@ -154,6 +145,21 @@ export async function nativeLiveRebuild({page,root,kit,invader,cache,call,receip
 }
 
 // Shared by the real Live Rebuild and MegaWorld native acceptance paths.
+export async function configureNativeCeTarget({page,kit,invader,sourceRoot,current,save,hash,expect}){
+ const use=async(scope,role,name)=>{const item=scope.getByRole(role,{name,exact:typeof name==='string',includeHidden:true});await revealPagedControl(item);return item;};
+ await openDrawer(page,'Project setup');const panel=page.getByRole('region',{name:'Project setup panel',exact:true}),mapTools=panel.locator('.gs-map-tools'),targets=panel.locator('.gs-build-targets');
+ if(await mapTools.getAttribute('open')===null){const control=mapTools.locator(':scope>summary');await revealPagedControl(control);await control.click();}
+ const summary=targets.locator(':scope>summary');await revealPagedControl(summary);if(await targets.getAttribute('open')===null)await summary.click();
+ await(await use(targets,'combobox','New engine target runtime')).selectOption('chupathingyCe');await(await use(targets,'button','Add runtime target')).click();
+ await(await use(targets,'combobox','Authoring kit generation')).selectOption('h1aEk');
+ for(const [label,value]of [[/Map Builder folder/,kit],[/Editable Halo Tags folder/,sourceRoot],[/Invader folder/,invader]]){const field=await use(targets,'textbox',label);await field.fill(value);await field.press('Tab');}
+ await(await use(targets,'checkbox',/I selected a CE base tagset/)).check();await(await use(targets,'button','Use this target')).click();await save();
+ const recovery=await reviewNativeCeSource({page,targets,use,current,save,hash,expect,sourceRoot:sourceRoot});
+ console.log('LIVE_REBUILD_NATIVE',JSON.stringify({phase:'reviewed-stock-ce-source-corrected',tags:recovery.corrections.length}));
+ await page.getByRole('button',{name:'Close Project setup',exact:true}).click();
+ return {targets,mapTools,summary,recovery};
+}
+
 export async function reviewNativeCeSource({page,targets,use,current,save,hash,expect,sourceRoot}){
  // Use the existing explicit Source Guardian recovery. Raw CE extraction contains
  // three reviewed invalid stock tags; never silently repair or change originals.
