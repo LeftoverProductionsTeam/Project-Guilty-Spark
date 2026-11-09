@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
 Task: Operation110 M2 native creator-to-game completion
-Status: automated acceptance incomplete
+Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 3adcd2394ff53d6f9d98f449f937fe155002b3ab, native-tested postgame identity repair committed locally; source manifests2133files/50,687,629B/SHA24b5d14d38de087825b9c23d205b5c3382609bc5238a1982c123808a940d8c32. No archive/push. Uncommitted work repairs interrupted NumberField scrubs and stage-bound rollback credentials alongside native fault tests.
-Next action: R349 native complete:true/exit0 and R350269browser pass; current475frontend/source/offline/storage and unchanged Rust901/9ignored pass. Review/stage explicit scoped files, regenerate staged-source manifests, verify and commit locally (no ZIP/push). Then resume M2 native tag-field/validated-asset publication on CE using studio_native.rs/studio_native_source.rs and existing Source Guardian/build path; admission is still MCC-only, so do not merely widen the runtime check. Preserve human/two-PC/M3–M6 gates.
+Latest verified revision: 73a1a603e5a96fd8abd864deeeb57323c47dd068, locally committed Workshop/scrolling/native-recovery repair; current runtime source independently matches R349 app fingerprint ad56517e0a1c705a9bbf46d296170ef46caf38bfba20831be5f122ca19c77e46. Source manifest at that commit2133files/50,775,247B/SHAdd23ec2d36d177276f75d903d57ae239755c74168d603120e11b2785cb704c4a. No archive, push or publication.
+Next action: Resume the next existing M2 implementation gate: native semantic field editing plus validated asset import/publication/placement on the CE/Chupathingy path. Inspect crates/spark-core/src/studio_native.rs, src-tauri/src/studio_native_source.rs, scripts/test-sparklink-content-native.mjs and the bounded CE fixture. Reuse Source Guardian/native writer/author Undo/permissions/frozen build; do not merely broaden an MCC runtime check, copy full SDKs or create another controller. Prove owner admission and source/dependency identities, then three real editors and native output. Preserve all human/two-PC/M3–M6 gates and owner-only publication.
 
 ## Acceptance
 
@@ -57,6 +57,8 @@ M2 still needs native startup/unexpected-exit rollback fault, saved source chang
 Human H19 both-way infantry/Warthog/ridge/cave/projectile/material/audio remains pending; verified physically traversable region connections0. No second computer/headset/cleanVM/WSL/Docker. No AIcombat/human gameplay/automatic Zombie release/persistent Extraction/no-timer server/victory/physicalVPN/Steamrelay/newplatform or fullM2 claim.
 
 ## Operations and safe checkpoint
+
+Scoped code/source/docs/manifests committed73a1a603 locally; no pending test process. R351 retires only exact-hash superseded temporary QA r333/r340 executables/manifests after replacement acceptance:100,832,100logicalB, allocated delta unmeasured. E/qa-app-retirement-r351.json retains identities. Current R349 app, all C49/DC/C035/R277 releases/maps, source/history and user originals untouched. This metadata checkpoint does not change tested runtime source.
 
 R349/R350 terminal/passed; owned editors/servers/clients and run-kGxpcb disposed. Child QA peak4,223,693,992logicalB < unchanged4GiB; parent build+native peak6,068,147,174B < unchanged12GiB. Native original pins/CE banks/runtime configuration unchanged. No current QA operation remains. Keep the current R349 source-pinned QA app and protected C49/DC/C035/R277; retire only exact-hash superseded QA binaries after the accepted local commit. No archive/package resealing.
 
