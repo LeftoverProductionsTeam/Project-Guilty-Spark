@@ -556,19 +556,20 @@ pub fn verify_compiled(project: &Project, compiled: &maps::MapInspection) -> Res
         if !used {
             continue;
         }
-        if binding.tag_class == "mach" {
+        if matches!(binding.tag_class.as_str(), "mach" | "scen") {
             let requested:Vec<_>=project.scene.iter().filter(|object|object.source_model.as_ref().and_then(|source|find(project,source)).is_some_and(|value|value.id==binding.id)).collect();
             if !requested.is_empty() {
-                let native=compiled.tags.iter().find(|tag|tag.class=="mach"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&binding.native_path));
-                let placed:Vec<_>=compiled.objects.iter().filter(|object|object.kind=="Machine"&&object.tag_id==native.map(|tag|tag.id)).collect();
+                let kind = if binding.tag_class == "mach" { "Machine" } else { "Scenery" };
+                let native=compiled.tags.iter().find(|tag|tag.class==binding.tag_class&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&binding.native_path));
+                let placed:Vec<_>=compiled.objects.iter().filter(|object|object.kind==kind&&object.tag_id==native.map(|tag|tag.id)).collect();
                 if native.is_none()||placed.len()!=requested.len() {
-                    return invalid("Compiled scenario lost an imported native machine placement");
+                    return invalid(format!("Compiled scenario lost an imported native {} placement", binding.tag_class));
                 }
                 // Match each output at most once, including coincident copies.
                 let mut remaining=placed;
                 for object in requested {
                     let Some(index)=remaining.iter().position(|output|output.position.iter().zip(object.position).all(|(a,b)|(*a-b).abs()<=0.0001)&&output.rotation.iter().zip(object.rotation).all(|(a,b)|((*a-b+std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)-std::f32::consts::PI).abs()<=0.0001)) else {
-                        return invalid("Compiled native machine transform differs from its authored placement");
+                        return invalid(format!("Compiled native {} transform differs from its authored placement", binding.tag_class));
                     };
                     remaining.remove(index);
                 }

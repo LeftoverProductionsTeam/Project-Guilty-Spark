@@ -875,19 +875,36 @@ pub(crate) struct BaseTransform {
     yaw_only: bool,
     tag: Option<String>,
 }
-/// Resolve native fields from the trusted inspection, not renderer offsets.
-/// Structural additions/removals and editor-only metadata cannot be ignored.
-pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result<Vec<BaseTransform>> {
+/// Partition the existing scenario from reviewed, namespaced scenery additions.
+/// These rows still need receipt/hash staging and independent compiled readback.
+pub(crate) fn connected_additions<'a>(project: &'a Project, base: &MapInspection) -> Result<Vec<&'a maps::SceneObject>> {
     project.validate()?;
-    if project.scene.len() != base.objects.len() {
-        return invalid("Connected-world placement additions/removals need native scenario array authoring; no source object will be silently omitted");
+    let originals: BTreeSet<_> = base.objects.iter().map(|row| row.id.as_str()).collect();
+    if originals.len() != base.objects.len() || project.scene.iter().filter(|row| originals.contains(row.id.as_str())).count() != originals.len() {
+        return invalid("Connected-world original placements were removed or have invalid identities; no source object will be silently omitted");
     }
+    let mut additions = vec![];
+    for object in project.scene.iter().filter(|row| !originals.contains(row.id.as_str())) {
+        let binding = object.source_model.as_ref().and_then(|source| crate::native_asset_imports::find(project, source));
+        if uuid::Uuid::parse_str(&object.id).is_err() || object.kind != "Source model" || object.tag_id.is_some()
+            || !crate::native_asset_imports::allowed_addition(project, object, base)
+            || binding.is_none_or(|binding| binding.tag_class != "scen")
+            || object.position.iter().any(|value| !value.is_finite() || value.abs() > 2048.) {
+            return invalid("Connected CE additions require visible, unit-scale, source-bound scenery from Asset library. Other classes, replacements and unbound meshes need their validated native authoring path");
+        }
+        additions.push(object);
+    }
+    Ok(additions)
+}
+/// Resolve native fields from the trusted inspection, not renderer offsets.
+/// Structural removals and editor-only metadata cannot be ignored.
+pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result<Vec<BaseTransform>> {
+    connected_additions(project, base)?;
     let originals: BTreeMap<_,_> = base.objects.iter().map(|row|(row.id.as_str(),row)).collect();
     let mut counts = BTreeMap::new();for row in &base.objects { *counts.entry(row.kind.as_str()).or_insert(0usize) += 1; }
     let mut result = vec![];
     for object in &project.scene {
-        let old = originals.get(object.id.as_str()).copied()
-            .ok_or_else(|| SparkError::Invalid("Connected-world placement identity differs from the original source".into()))?;
+        let Some(old) = originals.get(object.id.as_str()).copied() else { continue; };
         let mut expected = old.clone(); expected.position = object.position; expected.rotation = object.rotation;
         if *object != expected {
             return invalid(format!("{} changes native identity, scale or unsupported placement metadata; only original position/rotation edits are integrated", object.id));
@@ -994,7 +1011,8 @@ pub(crate) fn verify_compiled_base(project: &Project, base: &MapInspection, comp
     let tag = |inspection: &MapInspection,id: Option<u32>| id.and_then(|id|inspection.tags.iter().find(|t|t.id==id))
         .map(|t|(t.class.clone(),t.path.replace('/',"\\").to_ascii_lowercase()));
     let objects: BTreeMap<_,_> = compiled.objects.iter().map(|row|(row.id.as_str(),row)).collect();
-    for expected in &project.scene {
+    let originals: BTreeSet<_> = base.objects.iter().map(|row| row.id.as_str()).collect();
+    for expected in project.scene.iter().filter(|row| originals.contains(row.id.as_str())) {
         let actual = objects.get(expected.id.as_str()).copied()
             .ok_or_else(||SparkError::Invalid(format!("Compiled base placement {} is missing",expected.id)))?;
         if actual.kind != expected.kind || tag(base,expected.tag_id) != tag(compiled,actual.tag_id)
@@ -1048,6 +1066,53 @@ mod base_transform_tests {
         compiled.objects.clear();assert!(verify_compiled_base(&project,&base,&compiled).is_err());
         project.scene=base.objects.clone();let mut compiled=base.clone();compiled.objects[0].rotation[0]=0.1;
         assert!(verify_compiled_base(&project,&base,&compiled).is_err());
+    }
+    // Identity-only fixtures. Native receipt payloads and the real Halo compiler
+    // are independently exercised by the connected-world desktop acceptance.
+    fn imported_source() -> (Project, MapInspection) {
+        let (mut project,base)=source();let id=uuid::Uuid::new_v4().to_string();
+        let binding=crate::native_asset_imports::Binding{id:id.clone(),source_project_id:uuid::Uuid::new_v4().to_string(),
+            source_sha256:"a".repeat(64),tag_id:42,tag_class:"scen".into(),tag_path:"scenery/rock".into(),
+            native_path:format!("gs_assets_{}/scenery/rock",id.replace('-',"")),receipt_sha256:"b".repeat(64),file_count:5};
+        let object=maps::SceneObject{id:uuid::Uuid::new_v4().to_string(),name:"Imported rock".into(),kind:"Source model".into(),tag_id:None,
+            position:[4.,5.,6.],rotation:[0.3,-0.2,0.1],scale:[1.;3],visible:true,source_offset:None,rotation_offset:None,asset_id:None,
+            source_model:Some(maps::SourceModelReference{project_id:binding.source_project_id.clone(),source_sha256:binding.source_sha256.clone(),
+                tag_id:binding.tag_id,path:binding.tag_path.clone(),class:binding.tag_class.clone()})};
+        project.native_asset_imports.push(binding);project.scene.push(object);(project,base)
+    }
+    #[test]
+    fn connected_scenery_keeps_originals_and_rejects_unbound_replacement_and_editor_only_changes() {
+        let (project,base)=imported_source();assert_eq!(connected_additions(&project,&base).unwrap().len(),1);
+        assert!(base_transforms(&project,&base).unwrap().is_empty());
+        let mut moved=project.clone();moved.scene[0].position[0]+=0.25;
+        assert_eq!(base_transforms(&moved,&base).unwrap().len(),1);
+        for change in 0..9 {let mut bad=project.clone();match change {
+            0=>{bad.scene.remove(0);},1=>bad.scene[1].scale=[2.;3],2=>bad.scene[1].visible=false,
+            3=>bad.scene[1].source_model=None,4=>bad.scene[1].position[0]=2049.,5=>bad.scene[1].source_offset=Some(500),
+            6=>bad.scene[1].tag_id=Some(42),7=>bad.scene[1].source_model.as_mut().unwrap().source_sha256="c".repeat(64),
+            _=>bad.scene[1].kind="Scenery".into(),
+        }assert!(base_transforms(&bad,&base).is_err(),"unsafe addition {change}");}
+        let mut replaced=project.clone();replaced.scene[1].id=replaced.scene[0].id.clone();assert!(base_transforms(&replaced,&base).is_err());
+        let mut unsupported=project.clone();unsupported.native_asset_imports[0].tag_class="vehi".into();unsupported.scene[1].source_model.as_mut().unwrap().class="vehi".into();
+        assert!(base_transforms(&unsupported,&base).is_err());
+    }
+    #[test]
+    fn compiled_scenery_requires_every_copy_transform_and_original_including_coincident_copies() {
+        let (mut project,base)=imported_source();let mut copy=project.scene[1].clone();copy.id=uuid::Uuid::new_v4().to_string();project.scene.push(copy);
+        let binding=&project.native_asset_imports[0];let mut compiled=base.clone();
+        compiled.tags.push(maps::Tag{id:100,index:0,class:"scen".into(),path:binding.native_path.clone(),data_offset:Some(1000),external:false,
+            fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None});
+        for (index,object) in project.scene[1..].iter().enumerate(){let mut native=object.clone();native.id=format!("Scenery-{index}");
+            native.kind="Scenery".into();native.tag_id=Some(100);native.source_model=None;compiled.objects.push(native);}
+        let verify=|output:&MapInspection|{verify_compiled_base(&project,&base,output)?;crate::native_asset_imports::verify_compiled(&project,output)};
+        verify(&compiled).unwrap();
+        let mut changed=compiled.clone();changed.objects[1].position[0]+=0.25;assert!(verify(&changed).is_err());
+        changed=compiled.clone();changed.objects[1].rotation[1]+=0.1;assert!(verify(&changed).is_err());
+        changed=compiled.clone();changed.objects.pop();assert!(verify(&changed).is_err());
+        changed=compiled.clone();changed.objects.push(compiled.objects[1].clone());assert!(verify(&changed).is_err());
+        changed=compiled.clone();changed.objects[0].position[0]+=0.25;assert!(verify(&changed).is_err());
+        changed=compiled.clone();changed.objects[1].position[0]=f32::NAN;assert!(verify(&changed).is_err());
+        changed=compiled.clone();changed.tags[0].path="unrelated/rock".into();assert!(verify(&changed).is_err());
     }
     #[test]
     fn missing_native_spans_and_unreviewed_source_kinds_cannot_be_transformed() {

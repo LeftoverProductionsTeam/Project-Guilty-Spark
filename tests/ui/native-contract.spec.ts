@@ -3720,3 +3720,11 @@ for(const [title,required,pinned] of [
  if(required&&!pinned){await expect(setup).toContainText('Map textures need their original bitmaps.map.');await expect(setup.getByRole('button',{name:'Locate Halo Textures',exact:true})).toBeEnabled();}
  else await expect(setup).toHaveCount(0);
 });
+
+
+test('paged audit rechecks a layout changed between settling and the actual reachability read',async({page})=>{
+ await mockDesktop(page);await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountLateTools();});
+ let changed=false;const report=await auditPagedSurface(page.locator('[data-surface="late-tools-regression"]'),{beforePageRead:async()=>{
+  if(changed)return;changed=true;await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).growLateTools();});
+ }});expect(changed).toBe(true);expect(report.controls).toBe(13);
+});

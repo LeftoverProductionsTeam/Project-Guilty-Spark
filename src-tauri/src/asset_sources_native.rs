@@ -303,7 +303,7 @@ pub(super) async fn open_asset_source(
                 let library = lock(&state.library)?;
                 let existing = library.list().map_err(error)?;
                 // Adjacent original resources keep their normal precedence.
-                let (project, inspection) = if preview_only==Some(true){library.preview_map(&candidate.path,candidate.path.parent())}else{library.import_map(&candidate.path, candidate.path.parent())}.map_err(error)?;
+                let (project, inspection) = if preview_only==Some(true){library.preview_map(&candidate.path,candidate.path.parent())}else{library.import_asset_source(&candidate.path, candidate.path.parent())}.map_err(error)?;
                 let fresh = !existing.iter().any(|row| row.id == project.id);
                 Ok((project, inspection, fresh))
             })();

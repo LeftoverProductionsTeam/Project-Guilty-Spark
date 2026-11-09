@@ -156,6 +156,7 @@ pub(crate) fn verify_compiled(
     path: &Path,
     rows: &[Placement],
     namespace: &str,
+    additional_scenery: usize,
 ) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
@@ -166,7 +167,7 @@ pub(crate) fn verify_compiled(
         .iter()
         .filter(|o| o.kind == "Scenery")
         .count()
-        != base_count + rows.len()
+        != base_count + rows.len() + additional_scenery
     {
         return invalid("Compiled donor scenery count differs from the source-bound plan");
     }

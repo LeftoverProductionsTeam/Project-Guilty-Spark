@@ -201,3 +201,23 @@ fn bound_source_preview_rejects_changed_original_before_creating_a_new_identity(
     let temp=tempfile::tempdir().unwrap();let root=temp.path().join("application");let file=temp.path().join("owned.map");let mut bytes=common::fixture(13);std::fs::write(&file,&bytes).unwrap();let library=Library::workspace(&root).unwrap();let(donor,_)=library.import_map(&file,None).unwrap();
     bytes[100]^=1;std::fs::write(&file,&bytes).unwrap();assert!(library.preview_source(donor.source.as_ref().unwrap()).unwrap_err().to_string().contains("native identity"));assert_eq!(library.list().unwrap().len(),1);assert!(!root.join("projects").exists());assert_eq!(std::fs::read(file).unwrap(),bytes);
 }
+
+#[test]
+fn imported_asset_origins_survive_restart_as_metadata_without_copying_maps_or_saving_drafts(){
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("library");let file=temp.path().join("owned.map");std::fs::write(&file,common::fixture(13)).unwrap();
+    let id;let hash=maps::hash_file(&file).unwrap();
+    {
+        let library=Library::workspace(&root).unwrap();let(source,inspection)=library.import_asset_source(&file,None).unwrap();id=source.id.clone();
+        let mut edited=source.clone();edited.scene.push(maps::SceneObject{id:uuid::Uuid::new_v4().to_string(),name:"Unsaved authoring".into(),kind:"Player spawn".into(),tag_id:None,position:[1.,0.,0.],rotation:[0.;3],scale:[1.;3],visible:true,source_offset:None,rotation_offset:None,asset_id:None,source_model:None});
+        assert!(library.save_asset_source_reference(&edited,&inspection).is_err());assert!(!library.project_dir(&id).unwrap().exists());
+        assert!(library.save_asset_source_reference(&source,&inspection).unwrap());
+        let directory=library.project_dir(&id).unwrap();assert!(!directory.join("source.map").exists());assert!(directory.join("project.gsproject").is_file());
+        let descriptor=std::fs::read(directory.join("project.gsproject")).unwrap();
+        assert!(!library.save_asset_source_reference(&edited,&inspection).unwrap(),"a saved source is left untouched, even when another snapshot differs");
+        assert_eq!(std::fs::read(directory.join("project.gsproject")).unwrap(),descriptor);
+        assert_eq!(source.source.as_ref().unwrap().preserved_path,std::fs::canonicalize(&file).unwrap());
+    }
+    let library=Library::workspace(&root).unwrap();let restored=library.get(&id).unwrap();assert_eq!(restored.source.as_ref().unwrap().sha256,hash);
+    assert_eq!(maps::inspect_map(&restored.source.as_ref().unwrap().preserved_path,None).unwrap().sha256,hash);
+    assert_eq!(maps::hash_file(&file).unwrap(),hash);assert_eq!(library.list().unwrap().len(),1);
+}

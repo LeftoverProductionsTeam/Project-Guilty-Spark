@@ -2,11 +2,11 @@
 
 ## Current functional gate — verified checkpoint
 
-**Final UI/release acceptance remains OPEN.** The reviewed project-selection defects and wrong-project Save race are repaired and accepted through current native automated controls. Physical mouse/keyboard input is blocked by an untouched Windows Security network-permission prompt; actual other-DPI/multi-monitor disconnect and the remaining per-feature native/human matrix are unverified. Source-template inventory and browser passes do not substitute for those gates.
+**Final UI/release acceptance remains OPEN.** Project selection, wrong-project Save and bounded Tools-menu audit repairs retain their native/browser evidence. Latest sealed candidate c035b68 has all nine clean-source release groups and real installer/portable startup checks. It does not include later connected-scenery work until that source has its own native acceptance. See RELEASE_CANDIDATE_20261108.md and ACTIVE_TASK.md.
 
-Current evidence: R205 (881locked Rust passes/9opt-in ignored,472frontend, TypeScript,59offline,36storage, fresh Windows build); R202 (249full browser passes); R206 (4focused current-control passes); R207 (same verified app, actual native menus/fields/windows, independent saved-file readback, restart, eight native sizes and direct Host route). All owned scratch was disposed. This supersedes older pending browser counts below while retaining their historical scope.
+Current packaged evidence: E/release-c035b68-preview2/native-regressions.json, complete:true, mockedIpc:false; two source-preview and two project-workflow cases including independent saved A/B/C values0.75/1.25/2, writer/view ownership, Undo/Save and full restart. Every one of eight native logical picker layouts has19reachable commands, no clipped/blocked/scrolling controls and a retained canvas. AppSHA d2a3e8f02e5f92dbac6c1d2f8d44a202211dac03ad452e947375cf669463f477. Full source gates885Rust/9ignored,472frontend,254browser, TypeScript/offline/storage/native diagnostics/release pass.
 
-QA executable: E/interaction-app-r205/GuiltySpark.exe, 50,292,224bytes, SHA256 7b6f760f9d280be996c9d18e55b1e2701ae9a9c610476b6f34beaa948a9b279b. This is a source-pinned QA app, not an installer, portable release or published download.
+Earlier direct computer use encountered an untouched Windows network-permission prompt. The current direct Sky review opened the native File menu only; it did not independently complete the full manual project journey. Other-DPI/physical monitor-disconnect and per-feature human/game/peer gates remain unperformed. A source-template inventory is not interactive acceptance. The existing R207 matrix below is historical named evidence, now repeated within the packaged candidate scope above.
 
 | Reviewed journey | Native/automated result | Boundary |
 |---|---|---|
@@ -21,9 +21,13 @@ QA executable: E/interaction-app-r205/GuiltySpark.exe, 50,292,224bytes, SHA256 7
 Before/after native content screenshots: E/interaction-native-before-r190/project-picker-before.png and E/interaction-r207-project-picker-after.png. Eight current native layout screenshots and restart screenshot use prefix interaction-r207-. The direct Windows computer-use observation showed the OS permission prompt; it was not answered or bypassed. These content screenshots do not establish an unobscured physical click test.
 
 
-Current base: master `5095e9b9ea0979448cd571d56659b4076e5930a2`, dirty continuation. This audit tracks observable interactions; a catalog entry or tooltip is not evidence of operation.
+Current source base: local master1d160ec plus the connected-scenery and source-reference continuation. The c035b68 packaged evidence above is a separate exact revision. This audit tracks observable interactions; a catalog entry or tooltip is not evidence of operation.
 
 ## Repairs and evidence
+
+- Asset library → connected-runtime map: R248 actually returned the edited connected-world project sharing the source hash. Existing import reuse is now source/path/fingerprint-aware for this control; ordinary saved-project opening is unchanged. R252 actual native selection resolves the raw source independently, preserves destination state and supports its textured pointer import.
+- Imported source model after restart: R251 retained both objects/history but the native model read failed with a missing path. Successful imports now retain only a pristine source descriptor through the existing library path, with owner/history guards and no map copy. R252 actual full-restart model decode passes. R252 also passes native compilation/independent two-copy readback/private Chupathingy loading. Exact stock rendering and human gameplay remain open.
+- Full browser repeat remains required after the same-snapshot reachability audit repair; the unchanged clipping, hit, paging and complete-command assertions remain enforced.
 
 - Tools menu: removed the obsolete outer two-column grid. The columns now belong only to its existing command body, so the pager cannot cover Inspector. All visible command centres are hit-tested, in addition to geometry/clip checks. Focused six regression cases and ten layout/click cases pass.
 - Maps: keyboard Home/End/arrows reveal the requested page before focus. Search/Enter waits for the visible command. Help now distinguishes choosing a map in this window from moving that map and its history into another window. Independent native handoff acceptance remains separate.
@@ -44,7 +48,7 @@ Private evidence root: `C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineerin
 | Features / Learning / How To | Every catalog entry has prerequisites/steps/route/limits; action opens actual supported context; searchable guides retain place | Existing catalog coverage tests retained; feature-search paging regression has a focused pass; full current suite remains required. Extraction/server/VR creation must remain explicitly unfinished until implemented. |
 | Editor previews | Full canvas after navigation, paused inactive owner, source-aware invalidation, Retry and source preservation | R25: same retained canvas, zero repeated preview IPC, 116/116 primary shaders and unchanged owned-source hash. Budget eviction/source changes still require reload; no universal load-once claim. |
 | Tooltips | Text matches click, destination, ownership and prerequisite; keyboard focus and Escape | Map-switcher wording/keyboard path repaired; exhaustive per-command/native audit not yet complete. |
-| Release application | Actual embedded build, all eight native sizes, scaling/fullscreen/monitor moves, restart, no mocked IPC | R45 on the optimized R36 app passes all eight native sizes and 90 dashboard controls each with zero overflow/scrolling controls, saved 125%/Auto scale and cache settings, fullscreen and three monitor placements at 100% Windows DPI. Other physical DPI/disconnect/5120 hardware remain untested. No installer sealed. |
+| Release application | Actual embedded build, all eight native sizes, scaling/fullscreen/monitor moves, restart, no mocked IPC | R45 on the optimized R36 app passes all eight native sizes and 90 dashboard controls each with zero overflow/scrolling controls, saved 125%/Auto scale and cache settings, fullscreen and three monitor placements at 100% Windows DPI. Other physical DPI/disconnect/5120 hardware remain untested. Current c035b68 installer is sealed locally; clean-machine/upgrade/platform gates stay open (RELEASE_CANDIDATE_20261108.md). |
 
 Use [HUMAN_TEST_PLAN](HUMAN_TEST_PLAN.md) to record physical outcomes. Native screenshots and before/after metrics must identify their executable hash. Browser viewport emulation is not native/DPI/headset acceptance. No automated pass promotes a feature into human or real-peer acceptance.
 

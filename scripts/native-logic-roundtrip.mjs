@@ -438,6 +438,60 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
 }
 
 
+// Existing Asset library / World authoring route, now exercised before the
+// connected CE build. No placement or history is injected through backend calls.
+export async function nativeConnectedSceneryRoundTrip({page,call,root,receipt,expect}){
+ const id=receipt.projectId,project=async()=>{const view=(await call('read_workspace_history',{projectId:id})).history;return view?.snapshots.find(value=>value.key===view.head.current)?.project??(await call('open_project',{id})).project;};
+ const initial=await project(),normalize=value=>value.replaceAll('\\','/').toLowerCase();
+ const placements=value=>value.scene.filter(object=>object.sourceModel),baseline=initial.scene.length;
+ const trace=stage=>console.log('CONNECTED_SCENERY',JSON.stringify({stage,sourceSha256:initial.source.sha256}));
+ const save=async()=>{await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await call('read_workspace_history',{projectId:id})).history.head.dirty).toBe(false);};
+ for(const label of ['Construction','Objects','Inspector','Object tags']){const panel=page.getByRole('region',{name:label+' panel',exact:true});if(await panel.isVisible())await panel.getByRole('button',{name:'Close '+label,exact:true}).click();}
+ await chooseTool(page,'Level editor');await page.getByRole('combobox',{name:'View from player start',exact:true}).selectOption('');
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});
+ const selector=library.getByRole('combobox',{name:'Asset library map',exact:true}),inventory=await call('discover_asset_sources');
+ const sourceId=crypto.createHash('sha256').update(path.toNamespacedPath(await fs.realpath(process.env.SPARK_QA_MEGAWORLD_BASE)).toLowerCase()).digest('hex');
+ const candidate=inventory.maps.find(row=>row.id===sourceId&&row.cacheVersion===609);expect(candidate).toBeTruthy();
+ await expect(selector.locator('option[value="discovered:'+candidate.id+'"]')).toHaveCount(1);
+ await selector.selectOption('discovered:'+candidate.id);
+ await expect(selector).toHaveValue(/^[0-9a-f-]{36}$/i,{timeout:90000});const selectedId=await selector.inputValue();
+ expect(selectedId,'A raw runtime asset source must not resolve to the edited destination').not.toBe(id);
+ const source=await call('open_project',{id:selectedId});expect(source.project.source.sha256).toBe(initial.source.sha256);
+ expect(source.project.bspAssembly).toBeFalsy();expect(source.project.tagEdits).toEqual([]);expect(source.project.scene).toEqual(source.inspection.objects);
+ expect((await project()).scene).toEqual(initial.scene);expect((await project()).bspAssembly).toEqual(initial.bspAssembly);
+ const sourceTag='scenery/rocks/boulder_granite_small/boulder_granite_small';
+ const tag=source.inspection.tags.find(tag=>tag.class==='scen'&&normalize(tag.path)===sourceTag);
+ if(!tag)throw Error('The reviewed Timberland source must contain '+sourceTag+'.scenery');
+ const name=tag.path.split(/[\\/]/).at(-1);trace('raw runtime source selected independently of destination');
+ await library.getByRole('combobox',{name:'Asset library type',exact:true}).selectOption('scen');
+ await library.getByRole('searchbox',{name:'Search loaded assets',exact:true}).fill(tag.path);
+ const button=library.getByRole('button',{name:'Add '+name+' at view',exact:true}),image=button.locator('..').getByAltText('Actual textured Halo model: '+name);
+ await expect(button).toBeEnabled({timeout:90000});await expect(image).toBeVisible({timeout:120000});trace('actual textured native thumbnail ready');
+ const canvas=page.locator('.world-layout:visible .viewport canvas:visible');await expect(canvas).toHaveAttribute('data-gs-camera-pose',/position/);
+ const rect=await canvas.boundingBox(),pose=JSON.parse(await canvas.getAttribute('data-gs-camera-pose')),camera=new PerspectiveCamera(55,rect.width/rect.height,.03,20000);
+ camera.position.fromArray(pose.position);camera.quaternion.fromArray(pose.quaternion);camera.zoom=pose.zoom;camera.updateMatrixWorld(true);camera.updateProjectionMatrix();
+ const start=initial.scene.find(object=>object.kind==='Player spawn');expect(start).toBeTruthy();
+ const point=new Vector3(...start.position).project(camera),to={x:rect.x+(point.x+1)*rect.width/2,y:rect.y+(1-point.y)*rect.height/2},from=await image.boundingBox();
+ expect(point.z).toBeGreaterThan(-1);expect(point.z).toBeLessThan(1);expect(to.x).toBeGreaterThan(rect.x);expect(to.x).toBeLessThan(rect.x+rect.width);expect(to.y).toBeGreaterThan(rect.y);expect(to.y).toBeLessThan(rect.y+rect.height);
+ await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(to.x,to.y,{steps:16});await expect(page.locator('.viewport-asset-drop-hint:visible')).toBeVisible();await page.mouse.up();
+ await expect.poll(async()=>{const p=await project(),failed=(await call('bootstrap')).logs.findLast(row=>row.projectId===id&&row.phase==='asset-import-failed');if(failed)throw Error(failed.message);return placements(p).length;},{timeout:180000}).toBe(1);
+ const dropped=await project();expect(dropped.scene).toHaveLength(baseline+1);expect(dropped.nativeAssetImports).toHaveLength(1);trace('native dependency import and real pointer placement');
+ await page.screenshot({path:path.join(root,'megaworld-imported-scenery.png')});
+ await library.getByRole('button',{name:'Close Asset library',exact:true}).click();await openDrawer(page,'Inspector');const inspector=page.getByRole('region',{name:'Inspector panel',exact:true});
+ const position=[start.position[0]+2,start.position[1],start.position[2]+.25].map(value=>Number(value.toFixed(6)));
+ for(let axis=0;axis<3;axis++){const field=inspector.getByRole('spinbutton',{name:'Position '+['X','Y','Z'][axis],exact:true});await revealPagedControl(field);await field.fill(String(position[axis]));await field.press('Tab');}
+ const degrees=[17,-11,7];for(let axis=0;axis<3;axis++){const field=inspector.getByRole('spinbutton',{name:'Rotation '+['Yaw','Pitch','Roll'][axis],exact:true});await revealPagedControl(field);await field.fill(String(degrees[axis]));await field.press('Tab');}
+ await page.locator('.runtime-dock-heading').click();await save();await expect.poll(async()=>placements(await project())[0].position).toEqual(position);
+ const rotation=placements(await project())[0].rotation;rotation.forEach((value,axis)=>expect(value).toBeCloseTo(degrees[axis]*Math.PI/180,5));
+ await page.keyboard.press('Control+c');await page.keyboard.press('Control+v');await expect.poll(async()=>placements(await project()).length).toBe(2);
+ await page.keyboard.press('Control+z');await expect.poll(async()=>placements(await project()).length).toBe(1);
+ await page.keyboard.press('Control+y');await expect.poll(async()=>placements(await project()).length).toBe(2);await save();
+ const saved=await project();expect(saved.nativeAssetImports).toHaveLength(1);expect(new Set(placements(saved).map(object=>object.id)).size).toBe(2);trace('two authored copies saved after transform and Undo/Redo');
+ receipt.importedScenery={actualThumbnailDrag:true,sourceProjectId:source.project.id,sourceSha256:source.inspection.sha256,tagPath:tag.path,
+  binding:saved.nativeAssetImports[0],placements:placements(saved),originalCount:baseline,copyPasteOneActionUndoRedo:true,immediateSave:true,compiledReadback:false,gameplayAccepted:false};
+ await inspector.getByRole('button',{name:'Close Inspector',exact:true}).click();
+}
+
 export async function nativeConnectionControl(page,role,name){
  const panel=page.getByRole('region',{name:'Construction panel',exact:true});
  const node=panel.getByRole(role,{name,exact:true,includeHidden:true});await revealPagedControl(node);return node;
@@ -527,9 +581,9 @@ export async function nativeMegaWorldCreation({page,call,receipt,expect,baseFile
   await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
   const assembly=page.locator('.bsp-assembly');if(await assembly.getAttribute('open')===null)await assembly.locator(':scope>summary').click();
   expect(world.bspAssembly.tunnelShaderPath).toMatch(/metal.*plate.*floor/i);
-  await page.getByRole('checkbox',{name:'Open-sky road',exact:true}).check();
-  await page.getByRole('button',{name:'Add infantry tunnel',exact:true}).click();await expect(page.getByLabel('Connection route',{exact:true})).toHaveValue('infantry');
-  await page.getByRole('button',{name:'Apply connection',exact:true}).click();
+  await (await nativeConnectionControl(page,'checkbox','Open-sky road')).check();
+  await (await nativeConnectionControl(page,'button','Add infantry tunnel')).click();await expect(page.getByLabel('Connection route',{exact:true})).toHaveValue('infantry');
+  await (await nativeConnectionControl(page,'button','Apply connection')).click();
  }
  await page.keyboard.press('Control+s');await expect.poll(async()=>(await call('read_workspace_history',{projectId:world.id})).history?.head.dirty).toBe(false);
  world=(await call('open_project',{id:world.id})).project;

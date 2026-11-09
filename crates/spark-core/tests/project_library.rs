@@ -264,3 +264,29 @@ fn exported_asset_workspace_reingests_meshes_with_integrity() {
         Some(imported.assets[0].id.as_str())
     );
 }
+
+#[test]
+fn runtime_asset_source_does_not_reopen_an_edited_same_hash_project_or_duplicate_raw_sources(){
+    for workspace in [false,true]{
+        let temp=tempfile::tempdir().unwrap();let input=temp.path().join("owned.map");common::write_map(&input,6);
+        let root=temp.path().join("library");let library=if workspace{Library::workspace(&root)}else{Library::open(&root)}.unwrap();
+        let(mut edited,inspection)=library.import_map(&input,None).unwrap();
+        let tag=&inspection.tags[1];let field=tag.fields.iter().find(|field|field.key=="bounding-radius").unwrap();
+        edited.title="Creator's edited world".into();edited.tag_edits.push(TagEdit{tag_id:tag.id,field_key:field.key.clone(),value:serde_json::json!(2.)});
+        edited.modified_at=(chrono::Utc::now()+chrono::Duration::seconds(60)).to_rfc3339();
+        library.save(&edited,None).unwrap();if workspace{library.save_explicit(&edited,None).unwrap();}
+        let descriptor=library.project_dir(&edited.id).unwrap().join("project.gsproject");let before=std::fs::read(&descriptor).unwrap();let fingerprint=edited.fingerprint().unwrap();
+        assert_eq!(library.import_map(&input,None).unwrap().0.id,edited.id,"ordinary saved-project reopening stays unchanged");
+        let(raw,raw_inspection)=library.import_asset_source(&input,None).unwrap();assert_ne!(raw.id,edited.id);
+        assert_eq!(raw.scene,inspection.objects);assert!(raw.tag_edits.is_empty());assert_eq!(raw_inspection.sha256,inspection.sha256);
+        assert_eq!(raw.source.as_ref().unwrap().original_path,std::fs::canonicalize(&input).unwrap());
+        for _ in 0..8{assert_eq!(library.import_asset_source(&input,None).unwrap().0.id,raw.id);}
+        assert_eq!(library.list().unwrap().len(),2,"repeated source selection must not create new copies");
+        assert_eq!(library.get(&edited.id).unwrap().fingerprint().unwrap(),fingerprint);assert_eq!(std::fs::read(&descriptor).unwrap(),before);
+        let alternate=temp.path().join("other-runtime/maps");std::fs::create_dir_all(&alternate).unwrap();let second=alternate.join("owned.map");std::fs::copy(&input,&second).unwrap();
+        let(other,_)=library.import_asset_source(&second,None).unwrap();assert_ne!(other.id,raw.id);
+        assert_eq!(other.source.as_ref().unwrap().original_path,std::fs::canonicalize(&second).unwrap());
+        assert_eq!(library.import_asset_source(&second,None).unwrap().0.id,other.id);
+        assert_eq!(maps::hash_file(&input).unwrap(),inspection.sha256);assert_eq!(maps::hash_file(&second).unwrap(),inspection.sha256);assert_eq!(std::fs::read(&descriptor).unwrap(),before);
+    }
+}

@@ -52,6 +52,17 @@ pub struct LibraryEntry {
     #[serde(default,skip_serializing_if="std::ops::Not::not")]
     pub session_only: bool,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MapReuse { Never, EditableProject, NativeAssetSource }
+// A runtime-map picker identifies raw content, not an arbitrary edited project
+// sharing its original cache hash. Reuse the existing native-input fingerprint
+// so geometry, tag and placement drafts never shadow the selected donor.
+fn matches_native_asset_source(project:&Project,inspection:&maps::MapInspection,path:&Path)->Result<bool>{
+    let Some(source)=&project.source else{return Ok(false)};
+    if source.sha256!=inspection.sha256||source.original_path!=fs::canonicalize(path)?{return Ok(false);}
+    let mut original=Project::new(&project.title);original.source=project.source.clone();original.scene=inspection.objects.clone();
+    Ok(project.fingerprint()?==original.fingerprint()?)
+}
 pub struct Library {
     pub root: PathBuf,
     db: Connection,
@@ -437,9 +448,29 @@ impl Library {
         path: &Path,
         resources: Option<&Path>,
     ) -> Result<(Project, maps::MapInspection)> {
+        self.import_map_reusing(path,resources,MapReuse::EditableProject)
+    }
+    /// Asset discovery must not reopen a derived world merely because it has
+    /// the same source hash. Use the existing importer and RAM/preservation
+    /// policy, with raw-source-only reuse; ordinary project reopening is unchanged.
+    pub fn import_asset_source(&self,path:&Path,resources:Option<&Path>)->Result<(Project,maps::MapInspection)>{
+        self.import_map_reusing(path,resources,MapReuse::NativeAssetSource)
+    }
+    /// A successful asset import needs a durable origin after restart. Retain
+    /// only a pristine source descriptor through the existing explicit-save
+    /// path; memory-first workspaces keep the original map referenced in place.
+    /// Existing saved projects and authored drafts are never overwritten here.
+    pub fn save_asset_source_reference(&self,source:&Project,inspection:&maps::MapInspection)->Result<bool>{
+        if self.is_saved(&source.id)?{return Ok(false);}
+        let path=&source.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Asset source has no native origin".into()))?.original_path;
+        if !matches_native_asset_source(source,inspection,path)?{return invalid("Save the edited source separately before importing its native asset; no source draft was saved automatically");}
+        self.save_explicit(source,Some(inspection))?;
+        Ok(true)
+    }
+    fn import_map_reusing(&self,path:&Path,resources:Option<&Path>,reuse:MapReuse)->Result<(Project,maps::MapInspection)>{
         if let Some(session)=&self.session{
             let saved_count:i64=self.db.query_row("SELECT COUNT(*) FROM projects",[],|r|r.get(0))?;
-            if saved_count==0{return session.import_map(path,resources);}
+            if saved_count==0{return session.import_map_reusing(path,resources,reuse);}
             // Reopen a deliberately saved project instead of creating a second
             // document for the same native source. New maps stay in RAM.
             let inspection=maps::inspect_map(path,resources)?;
@@ -448,16 +479,17 @@ impl Library {
                 let entry:LibraryEntry=serde_json::from_str(&row?)?;
                 if entry.sha256.as_deref()==Some(&inspection.sha256){
                     let project=self.get(&entry.id)?;
+                    if reuse==MapReuse::NativeAssetSource&&!matches_native_asset_source(&project,&inspection,path)?{continue;}
                     let source=project.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Saved map has no native source".into()))?;
                     let verified=maps::inspect_map(&source.preserved_path,source.resource_directory.as_deref().or(resources))?;
                     if verified.sha256!=source.sha256{return invalid("Saved source checksum changed");}
                     return Ok((project,verified));
                 }
             }
-            return session.import_map(path,resources);
+            return session.import_map_reusing(path,resources,reuse);
         }
         let transaction=self.db.unchecked_transaction()?;
-        let (project,inspection,mut files)=self.import_map_internal(path,resources,true,false,None)?;
+        let (project,inspection,mut files)=self.import_map_internal(path,resources,reuse,false,None)?;
         if let Err(reason)=transaction.commit(){return Err(abort_import(&mut files,reason.into()));}
         if let Some(files)=&mut files{files.accepted=true;}
         Ok((project,inspection))
@@ -466,17 +498,17 @@ impl Library {
     /// Retain its verified source identity in RAM for the existing decoders.
     pub fn preview_map(&self,path:&Path,resources:Option<&Path>)->Result<(Project,maps::MapInspection)> {
         validate_local_input_path(path)?;crate::reject_links(path)?;
-        let (project,inspection,_)=self.import_map_internal(path,resources,false,true,None)?;
+        let (project,inspection,_)=self.import_map_internal(path,resources,MapReuse::Never,true,None)?;
         Ok((project,inspection))
     }
     /// Reuse the ordinary RAM preview path while retaining an already admitted
     /// source's exact resource pins. Hosting preferences never select its banks.
     pub fn preview_source(&self,source:&Source)->Result<(Project,maps::MapInspection)> {
         for path in [&source.original_path,&source.preserved_path].into_iter().chain(source.resource_directory.iter()).chain(source.audio_resources.iter().map(|a|&a.directory)) {validate_local_input_path(path)?;crate::reject_links(path)?;}
-        let (project,inspection,_)=self.import_map_internal(&source.preserved_path,source.resource_directory.as_deref(),false,true,Some(source))?;
+        let (project,inspection,_)=self.import_map_internal(&source.preserved_path,source.resource_directory.as_deref(),MapReuse::Never,true,Some(source))?;
         Ok((project,inspection))
     }
-    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool,preview:bool,bound_source:Option<&Source>)->Result<(Project,maps::MapInspection,Option<ImportFiles>)> {
+    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:MapReuse,preview:bool,bound_source:Option<&Source>)->Result<(Project,maps::MapInspection,Option<ImportFiles>)> {
         // Persist the location now, so later app working directories cannot
         // reinterpret a relative map/resource selection. Missing resources are
         // still allowed; their absolute location remains explicit.
@@ -496,12 +528,9 @@ impl Library {
                 if matches{return Ok((project,inspection,None));}
             }
         }
-        if let Some(entry) = self
-            .list()?
-            .into_iter()
-            .find(|e| reuse && e.sha256.as_deref() == Some(&inspection.sha256))
-        {
+        for entry in self.list()?.into_iter().filter(|e|reuse!=MapReuse::Never&&e.sha256.as_deref()==Some(&inspection.sha256)) {
             let project = self.get(&entry.id)?;
+            if reuse==MapReuse::NativeAssetSource&&!matches_native_asset_source(&project,&inspection,path)?{continue;}
             let source = project.source.as_ref().ok_or_else(|| {
                 crate::SparkError::Invalid("Indexed map has no preserved source".into())
             })?;
@@ -625,7 +654,7 @@ impl Library {
                     return invalid("Project resources changed; restore them or select resources in the original project before exporting");
                 }
             }
-            let (mut imported,_,files)=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false,false,None)?;
+            let (mut imported,_,files)=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),MapReuse::Never,false,None)?;
             if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}(imported,files)
         } else {
             let p=Project::new(&incoming.title);

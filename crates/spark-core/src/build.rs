@@ -986,7 +986,7 @@ pub fn run_build(
             let samples=crate::bsp_assembly::verify_route(&compiled_collision,assembly)?;
             if assembly.include_donor_scenery {
                 let scenery:Vec<crate::bsp_scenery::Placement>=serde_json::from_value(manifest.get("donorScenery").cloned().ok_or_else(||SparkError::Invalid("Donor scenery receipt is missing".into()))?)?;
-                crate::bsp_scenery::verify_compiled(inspection,&validated,&output,&scenery,&format!("gsbsp_{}_1",&runner.id[..8]))?;
+                crate::bsp_scenery::verify_compiled(inspection,&validated,&output,&scenery,&format!("gsbsp_{}_1",&runner.id[..8]),0)?;
                 runner.emit("bsp-scenery-readback",&format!("{} donor scenery tags, transforms, permutations and placement flags verified in the compiled cache",scenery.len()),92,"success");
             }
             runner.emit("bsp-clearance",&format!("Compiled collision checked at {samples} tunnel floor/clearance samples; manual walkthrough pending"),92,"success");

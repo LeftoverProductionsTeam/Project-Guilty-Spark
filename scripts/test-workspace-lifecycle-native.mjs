@@ -34,6 +34,8 @@ if(rebuildOnly&&!logicOnly)throw Error('Live Rebuild acceptance uses the existin
 const crossRuntime=process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'||process.env.SPARK_QA_MEGAWORLD_ONLY==='1';
 if(crossRuntime&&!logicOnly)throw Error('Cross-runtime asset acceptance uses the existing native logic workflow');
 if(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'&&![process.env.SPARK_QA_RUNTIME_ROOT,process.env.SPARK_QA_MEGAWORLD_BASE,process.env.SPARK_QA_MEGAWORLD_DONOR].every(Boolean))throw Error('MegaWorld native acceptance requires the explicit owned runtime root and both source map paths');
+if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'&&process.env.SPARK_QA_MEGAWORLD_TERRAIN==='1')throw Error('The legacy four-unit route fixture cannot be combined with the six-unit terrain fixture; use SPARK_QA_MEGAWORLD_THREE_ROUTES with terrain instead');
+if(process.env.SPARK_QA_MEGAWORLD_THREE_ROUTES==='1'&&process.env.SPARK_QA_MEGAWORLD_TERRAIN!=='1')throw Error('The three-route terrain fixture requires its source-profile terrain mode');
 if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('Native logic authoring requires its own bounded run');
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20','50'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 or50 edits');
@@ -424,6 +426,12 @@ try{
         await main.screenshot({path:path.join(root,'megaworld-authored-spawn.png')});
         step('Existing Player start moves through actual Objects/Inspector, Undo/Redo and Save controls in the connected world');
       }
+      if(process.env.SPARK_QA_MEGAWORLD_IMPORTS==='1'){
+        if(process.env.SPARK_QA_MEGAWORLD_TARGET!=='chupathingyCe')throw Error('Connected scenery acceptance requires its explicit native CE target');
+        const {nativeConnectedSceneryRoundTrip}=await import('./native-logic-roundtrip.mjs');
+        await nativeConnectedSceneryRoundTrip({page:main,call:(command,args)=>invoke(main,command,args),root,receipt:report.megaWorldCreation,expect});
+        step('Actual native thumbnail drag, scenery transform, copy/paste, one-action Undo/Redo and Save in the connected world');
+      }
     }
 
     const pid=child.pid;
@@ -527,7 +535,12 @@ try{
   if(report.megaWorldCreation){
     const {nativeConnectionControl}=await import('./native-logic-roundtrip.mjs');
     const sharedViewportStarted=performance.now();
-    const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount);
+    const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount+(report.megaWorldCreation.importedScenery?.placements.length??0));
+    if(report.megaWorldCreation.importedScenery){const imported=report.megaWorldCreation.importedScenery;expect(world.scene.filter(object=>object.sourceModel)).toEqual(imported.placements);expect(world.nativeAssetImports).toEqual([imported.binding]);
+      const model=await invoke(main,'preview_owned_object_model',{projectId:imported.sourceProjectId,tagId:imported.binding.tagId,sourceSha256:imported.sourceSha256});
+      expect(model.sourceSha256).toBe(imported.sourceSha256);expect(model.mesh.indices.length).toBeGreaterThan(0);expect(model.mesh.materialRanges.length).toBeGreaterThan(0);
+      imported.sourceModelAfterRestart={sourceSha256:model.sourceSha256,triangles:model.mesh.indices.length/3,vertices:model.mesh.positions.length/3,materials:model.mesh.materialRanges.length};
+      imported.fullProcessRestart=true;}
     await chooseTool(main,'Map library');await main.locator('.map-card').filter({has:main.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(main,'Level editor');await openDrawer(main,'Construction');
     if(report.megaWorldCreation.atlasLayout){expect(world.megaworldLayout).toEqual(report.megaWorldCreation.atlasLayout.expected);const atlas=main.locator('.megaworld-atlas');if(await atlas.getAttribute('open')===null)await atlas.locator(':scope>summary').click();await expect(atlas.getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);report.megaWorldCreation.atlasLayout.fullProcessRestart=true;delete report.megaWorldCreation.atlasLayout.expected;}
     await expect(main.getByLabel('BSP donor map',{exact:true})).toHaveValue(world.bspAssembly.donorProjectId);
@@ -601,8 +614,23 @@ try{
         native.forEach((value,index)=>expect(value).toBeCloseTo(change.expected[index],3));
         actual.position.forEach((value,index)=>expect(value).toBeCloseTo(change.expected[index],3));
         const receipt=JSON.parse(await fs.readFile(path.join(path.dirname(path.dirname(output.output)),'megaworld-receipt.json'),'utf8'));
-        expect(receipt.authoredScenario.transforms).toHaveLength(1);expect(receipt.originalPlacementsVerified).toBe(world.scene.length);
+        expect(receipt.authoredScenario.transforms).toHaveLength(1);expect(receipt.originalPlacementsVerified).toBe(report.megaWorldCreation.sourceObjectCount);
         change.compiledReadback={independentInvader:true,field,values:native,cacheSha256:inspected.inspection.sha256,sourceReceipt:receipt.authoredScenario,originalPlacementsVerified:receipt.originalPlacementsVerified};
+      }
+      if(report.megaWorldCreation.importedScenery){
+        const imported=report.megaWorldCreation.importedScenery,binding=imported.binding,normalize=value=>value.replaceAll('\\','/').toLowerCase();
+        const tag=inspected.inspection.tags.find(tag=>tag.class==='scen'&&normalize(tag.path)===normalize(binding.nativePath));expect(tag).toBeTruthy();
+        const placed=inspected.inspection.objects.filter(object=>object.kind==='Scenery'&&object.tagId===tag.id);expect(placed).toHaveLength(imported.placements.length);
+        const independent=[];
+        for(const expected of imported.placements){const actual=placed.find(object=>object.position.every((value,axis)=>Math.abs(value-expected.position[axis])<.0001));expect(actual).toBeTruthy();
+          const index=Number(actual.id.slice('Scenery-'.length)),field='scenery['+index+'].position',position=(await read(scenario,field)).split(',').map(Number);
+          position.forEach((value,axis)=>expect(value).toBeCloseTo(expected.position[axis],3));const slot=await read(scenario,'scenery['+index+'].type');
+          expect(normalize(await read(scenario,'scenery_palette['+slot+'].name'))).toBe(normalize(binding.nativePath+'.scenery'));
+          const rotationDegrees=(await read(scenario,'scenery['+index+'].rotation')).split(',').map(Number);rotationDegrees.forEach((value,axis)=>expect(value*Math.PI/180).toBeCloseTo(expected.rotation[axis],4));independent.push({field,position,rotationDegrees});
+        }
+        const receipt=JSON.parse(await fs.readFile(path.join(path.dirname(path.dirname(output.output)),'megaworld-receipt.json'),'utf8'));
+        expect(receipt.importedPlacementsVerified).toBe(imported.placements.length);expect(receipt.importedTagFiles).toBe(binding.fileCount);expect(receipt.originalPlacementsVerified).toBe(imported.originalCount);
+        imported.compiledReadback={independentInvader:true,positions:independent,importedPlacementsVerified:receipt.importedPlacementsVerified,importedTagFiles:receipt.importedTagFiles,cacheSha256:inspected.inspection.sha256};
       }
       const ref=await read(scenario,'structure_bsps[0].structure_bsp');expect(ref.replaceAll('\\','/').toLowerCase()).toBe(bsp.replaceAll('\\','/').toLowerCase());
       if(report.megaWorldCreation.terrainSeam){

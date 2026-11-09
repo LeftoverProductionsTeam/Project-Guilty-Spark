@@ -14,7 +14,7 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     if source.sha256!=inspection.sha256||source.scenario_path!=inspection.scenario_path{return invalid("The base inspection belongs to another source revision");}
     if source.cache_version!=609||plan.donor_source.cache_version!=609||inspection.header.version!=609||inspection.mesh.parts.len()!=1||inspection.header.scenario_type!=1{return invalid("Initial CE Megaworld acceptance needs a single-BSP CE multiplayer base and a CE donor; cross-runtime source conversion is a separate step");}
     crate::bsp_compile::base_transforms(project,inspection)?;
-    if !project.tag_edits.is_empty()||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.native_asset_imports.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.conversion_profile.is_some(){return invalid("Connected CE builds support original scenario position/rotation edits. Tag edits, structural placement/asset/audio changes and conversion profiles still require their validated native authoring path; nothing is silently omitted");}
+    if !project.tag_edits.is_empty()||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.conversion_profile.is_some(){return invalid("Connected CE builds support original scenario position/rotation edits and validated scenery imports. Tag edits, other structural placement/asset/audio changes and conversion profiles still require their validated native authoring path; nothing is silently omitted");}
     let tools=Toolchain{h1a_directory:target.hek_directory.clone(),base_tags_directory:target.tags_directory.clone(),invader_directory:target.invader_directory.clone(),..Default::default()};
     if tools.base_tags_directory.as_ref().is_none_or(|p|!p.is_dir())||crate::conversion::native_tool(&tools).is_none(){return invalid("Select matching extracted CE source tags and the installed H1A authoring kit");}
     for name in ["invader-edit","invader-build","invader-info","invader-dependency","invader-refactor"]{if build::tool_path(&tools,name).is_none(){return invalid(format!("{name} is required for connected CE source"));}}
@@ -27,7 +27,10 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("An original region changed after planning");}}
     crate::reject_links(jobs)?;fs::create_dir_all(jobs)?;let dir=jobs.join(id);
     let base=tools.base_tags_directory.as_ref().unwrap();let inputs=crate::native_staging::inventory(base,&cancel)?;
-    let storage_lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(base),crate::storage::estimate_copy(inputs.files.len(),inputs.bytes).saturating_add(2*1024*1024*1024),crate::storage::Category::Staging,"Connected native BSP build; source copy and bounded dependency/compiler allowance")?;
+    let import_root=jobs.parent().ok_or_else(||SparkError::Invalid("Managed import root is missing".into()))?;
+    let imported=crate::native_asset_imports::staging_inventory(import_root,project)?;
+    let additions=crate::bsp_compile::connected_additions(project,inspection)?.len();
+    let storage_lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(base),crate::storage::estimate_copy(inputs.files.len(),inputs.bytes).saturating_add(crate::storage::estimate_copy(imported.files.len(),imported.bytes)).saturating_add(2*1024*1024*1024),crate::storage::Category::Staging,"Connected native BSP build; source copy and bounded dependency/compiler allowance")?;
     crate::reject_links(&dir)?;fs::create_dir(&dir)?;storage_lease.mark_owned()?;let dir=fs::canonicalize(dir)?;
     let runner=Runner{id,project:&project.id,cancel:&cancel,event:&event};
     let edit=build::tool_path(&tools,"invader-edit").unwrap();let base_tags=tools.base_tags_directory.as_ref().unwrap();
@@ -47,12 +50,16 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     fs::create_dir(dir.join("data"))?;
     let authored=crate::bsp_compile::apply_base_transforms(project,inspection,&build::tool_path(&tools,"invader-edit").unwrap(),&runner,&dir,&tags)?;
         project::atomic_write(&dir.join("authored-scenario.json"),&serde_json::to_vec_pretty(&authored)?,false)?;
-        crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags)?;
+    let import_hashes=crate::native_asset_imports::stage(import_root,project,&tags)?;
+    crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags)?;
+    // Donor scenery keeps its stable native array slots. Append authored rows
+    // afterward through the existing Invader schema, never cache offsets.
+    crate::native_asset_imports::append_scenario(project,inspection,&tags,&edit,&dir,&runner)?;
     let output=dir.join("output");fs::create_dir(&output)?;
     let build=build::tool_path(&tools,"invader-build").unwrap();
     runner.run(&build,&["-g".into(),"gbx-custom".into(),"-t".into(),tags.to_string_lossy().into_owned(),"-m".into(),output.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),inspection.scenario_path.clone()],&dir,"compile-ce",80)?;
     let name=inspection.scenario_path.rsplit(['\\','/']).next().ok_or_else(||SparkError::Invalid("No native scenario filename".into()))?;
-    let file=output.join(format!("{name}.map"));let compiled=maps::inspect_map(&file,None)?;crate::bsp_compile::verify_compiled_base(project,inspection,&compiled)?;
+    let file=output.join(format!("{name}.map"));let compiled=maps::inspect_map(&file,None)?;crate::bsp_compile::verify_compiled_base(project,inspection,&compiled)?;crate::native_asset_imports::verify_compiled(project,&compiled)?;
     if compiled.header.version!=609||compiled.header.scenario_type!=1||compiled.mesh.parts.len()!=1||compiled.scenario_path!=inspection.scenario_path{return invalid("Native output has the wrong CE identity or resident BSP count");}
     let info=build::tool_path(&tools,"invader-info").unwrap();for field in ["crc32_mismatched","is_protected","stub_count"]{let value=runner.run(&info,&["-T".into(),field.into(),file.to_string_lossy().into_owned()],&dir,"validate-ce",90)?;if !["0","false"].contains(&value.trim().to_lowercase().as_str()){return invalid(format!("Native CE cache {field} failed: {value}"));}}
     let routes=crate::bsp_assembly::verify_compiled_routes(&file,std::slice::from_ref(plan))?;
@@ -62,13 +69,14 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     let (_,faces)=maps::collision_source(&file,&compiled)?;
     for face in &faces{if let Some(id)=face.shader{let tag=compiled.tags.iter().find(|t|t.id==id).ok_or_else(||SparkError::Invalid("Compiled collision shader is not indexed".into()))?;let name=tag.path.rsplit(['\\','/']).next().unwrap_or("");if expected.get(name).copied()!=Some(face.flags&15){return invalid("Compiled CE collision flags differ from the source surface identities");}}}
     let scenery:Vec<crate::bsp_scenery::Placement>=serde_json::from_value(manifest["donorScenery"].clone())?;
-    if plan.include_donor_scenery{crate::bsp_scenery::verify_compiled(inspection,&compiled,&file,&scenery,&format!("gsbsp_{}_1",&id[..8]))?;}
+    if plan.include_donor_scenery{crate::bsp_scenery::verify_compiled(inspection,&compiled,&file,&scenery,&format!("gsbsp_{}_1",&id[..8]),additions)?;}
     for (relative,sha) in &hashes{if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}if maps::hash_file(&base_tags.join(crate::safe_relative(relative)?))?!=*sha{return invalid("CE source changed while the world was compiling");}}
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("Original region identity changed during build");}}
+    if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported scenery source changed while the world was compiling; the previous-good build was retained");}
     crate::native_lighting::verify_cache(project,&file,&compiled)?;
     let sha=maps::hash_file(&file)?;if sha!=compiled.sha256{return invalid("Compiled connected cache changed during validation");}
     let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message:"Two source regions and their authored connection compiled into one CE BSP; native dependencies, CRC and collision route checked. Player traversal remains unverified.".into(),project_fingerprint:project.fingerprint()?};
-    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":project.scene.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
+    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
     storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated","CE source compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)

@@ -2,7 +2,7 @@ import {expect,type Locator,type Page} from '@playwright/test';
 const controls='button,a[href],input,select,textarea,summary';
 /** Read layout from the actual rendered surface and visit its visible page
  * controls. No scrollIntoView, forced clicks, style edits or mocked bounds. */
-export async function auditPagedSurface(surface:Locator,options:{afterInitialLayout?:()=>Promise<void>}={}){
+export async function auditPagedSurface(surface:Locator,options:{afterInitialLayout?:()=>Promise<void>;beforePageRead?:()=>Promise<void>}={}){
  await expect(surface).toBeVisible();
  await surface.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
  await expect.poll(async()=>Number(await surface.locator(':scope > .gs-page-viewport').evaluate(node=>node.getBoundingClientRect().height))).toBeGreaterThan(35);
@@ -33,6 +33,7 @@ export async function auditPagedSurface(surface:Locator,options:{afterInitialLay
   const choice=surface.locator(':scope > .gs-surface-pages input[type=number]');
   if(count>1){await choice.fill(String(page));await expect(surface).toHaveAttribute('data-page',String(page));}
   if(await settled()!==signature){changed=true;break;}
+  await options.beforePageRead?.();
   const result=await surface.evaluate((root,selector)=>{
    const view=root.querySelector(':scope > .gs-page-viewport')!,box=view.getBoundingClientRect();
    const body=view.firstElementChild!;
@@ -46,8 +47,15 @@ export async function auditPagedSurface(surface:Locator,options:{afterInitialLay
     return [{index,rectangle:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},limit:{left,right,top,bottom},off:node.hasAttribute('data-gs-offpage'),inert:node.inert,clickable:!!hit&&(node===hit||node.contains(hit)),blockedBy:hit?.tagName+':'+(hit?.getAttribute('aria-label')||hit?.className||''),label:(node.getAttribute('aria-label')||node.textContent||node.getAttribute('title')||node.tagName).trim().slice(0,85),fits:r.left>=left-1&&r.right<=right+1&&r.top>=top-1&&r.bottom<=bottom+1}];
    });
    const scrolls=[...body.querySelectorAll<HTMLElement>('*')].flatMap(node=>{const r=node.getBoundingClientRect(),s=getComputedStyle(node);return r.width>0&&r.height>0&&!node.closest('[hidden],[inert]')&&s.visibility!=='hidden'&&((/auto|scroll/.test(s.overflowY)&&node.scrollHeight>node.clientHeight+1)||(/auto|scroll/.test(s.overflowX)&&node.scrollWidth>node.clientWidth+1))?[{tag:node.className,height:node.clientHeight,content:node.scrollHeight}]:[];});
-   return {eligible,visible,scrolls,viewport:{x:box.x,y:box.y,width:box.width,height:box.height}};
+   // A tab can replace its content after the settled read but before this
+   // evaluation. Compare geometry captured in this SAME snapshot before
+   // asserting reachability; a stable clipped layout must still fail below.
+   const bounds=body.getBoundingClientRect(),n=(value:number)=>Math.round(value*1000)/1000;
+   const layoutSignature=JSON.stringify({pages:root.getAttribute('data-pages'),width:n(box.width),height:n(box.height),content:body.scrollHeight,
+    controls:all.map(node=>{const r=node.getBoundingClientRect();return [n(r.left-bounds.left),n(r.top-bounds.top),n(r.width),n(r.height)];})});
+   return {eligible,visible,scrolls,layoutSignature,viewport:{x:box.x,y:box.y,width:box.width,height:box.height}};
   },controls);
+  if(result.layoutSignature!==signature){changed=true;break;}
   expected=result.eligible;for(const item of result.visible)if(item.fits)seen.add(item.index);
   expect(result.scrolls,'Nested control surfaces must use pages, not scrolling').toEqual([]);
   expect(result.visible.filter(item=>!item.fits),'Every visible control must be fully reachable').toEqual([]);
