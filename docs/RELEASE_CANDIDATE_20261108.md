@@ -1,5 +1,34 @@
 # Source-pinned Windows preview candidate — 8 November 2026
 
+## Latest verified Windows candidate: dc4456e / preview4
+
+This later candidate includes the native imported-scenery source-tag workflow and the release-blocking View focus repair. Exact binary/source commit **dc4456ed58d3bdc26889e210fdaf7d51dced1f92**, tree **aecc6a570db12000dc62a1fd706b977581235a2f**, application0.4.1. The previous c035b68 preview2 and C49 remain separate previous-good builds. Failed6d9bb4b preview3 was not sealed. This report's later documentation commit is not the binary source.
+
+Private upload directory: **C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf/release-dc4456e-preview4/windows-x64**. Exactly five upload files total **63354857bytes**. No proprietary Halo content, runtime, SDK, personal files or raw QA logs are bundled.
+
+| Upload file | Bytes | SHA-256 |
+| --- | ---: | --- |
+|Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe|11934495|4bef479be5369f59689654df43cd10f11a12219634ccd610d372f3ef0024d7cb|
+|Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip|16642796|4a538700094eb2e5385239b4345b402e41d01ceaf0c890de1d770017abb17eb3|
+|Project_Guilty_Spark_0.4.1_dc4456ed58d3_Source.zip|34771598|92169321bad1a4f8ed3f3f4fe2a2652419ef857d46222b57a4ea8aca2e15c8dd|
+|Project_Guilty_Spark_0.4.1_windows_x64_manifest.json|5499|Listed in SHA256SUMS-windows-x64.txt|
+|SHA256SUMS-windows-x64.txt|469|Checksums for the four other upload files|
+
+All nine exact-clean-source release groups pass: **894Rust/9explicit opt-in ignored,472frontend,258browser**, TypeScript, offline, storage/repository ownership, native diagnostics and14Python release tests. Native source interfaces and committed source manifests also pass. Gates and hashed logs: R/gates-windows/gates.json (R is the private root above). The sourceZIP has2134members including its two checksum lists; staging compares every member against this Git revision, and sealing/verification checks ZIP integrity and all source checksums.
+
+Actual NSIS installation, installed-app startup, extracted portable startup and owned uninstall pass on this Windows development host. The installed payload differs only by Tauri's documented three-byte UNK-to-NSS marker. Installed SHA7ef3fa41251540d2eee59ff28ba1cf213d5341d1303aa2284a8e94bd2570bcbd; portable executable SHA4b2443ae9440e29446119ad7c4483af2377a0240b219193d7653414e46ba3ff0. Uninstall verifies payload/registration removed (189ms final observation). Workspace-ready samples: portable1112.79ms, installed1080.76ms; one run each, no optimization or clean-machine claim.
+
+The exact packaged portable passes real native preview and project suites (R/native-preview.json, native-projects.json; mockedIpc:false). The joined CE609 cache loads138source shaders,7lightmaps,18cubes and79object model types with no pending materials/reflections or false bitmap prompt; original SHA unchanged. A/B/C project drafts0.75/1.25/2 survive independent navigation, writer/view transfer, Undo/Save and full process restart. All eight requested native logical sizes show19reachable Maps/Work controls, zero measured clipping/scrolling and retained canvas; fullscreen passes. Physical DPI/monitor-disconnect/secondary-monitor tests remain open.
+
+Direct Computer Use on this same packaged app observes View→End visibly focusing Reset layout, File→New→Multiplayer Map→Create editable map, the corrected preview/native-source notice, Ctrl+S→Saved and normal close with owned library disposal (R/direct-native-review.json). This spot check is not a full manual/UI/gameplay acceptance. package.py seal and verify pass; publiclyPublished:false.
+
+Owner handoff: normally push reviewed local history, then invoke existing .github/workflows/release.yml with source_commit **dc4456ed58d3bdc26889e210fdaf7d51dced1f92**, preview_number **4** only if stillunused, prepare_draft:true, build_linux:false until independent Linux acceptance. This prepares a NEW draft prerelease v0.4.1-preview.4 with actual downloadable Release assets. No alpha/C49/tag replacement, force push, remote write or publication occurred here. Hosted CI on repaired exact source, clean-machine Windows, upgrades, Linux/macOS and public anonymous download verification remain open. Owner approval is still required for publication.
+
+The next local objective is the existing combined SparkLink frozen-source→CE compile→private Chupathingy two-client revision/restart/recovery workflow. M1's locally executable gates are closed; its hosted/public/clean-machine gates and all M2–M6 human/peer/engine acceptance remain open.
+
+---
+
+
 Binary/source revision: **c035b686b5cecff77b18c24911de7c76dd7e229e**, tree ed25c4785e8d0188ca07f33a492cbcbee5888638, application0.4.1. This is a locally verified candidate, not a published release or acceptance of the full Unified/100Percent directives. The owner performs the GitHub push and workflow invocation. C49 and existing tags stay intact.
 
 Private output root: C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf/release-c035b68-preview2. The **windows-x64** subdirectory contains exactly five upload files. No raw map, resource bank, engine, SDK or private QA log is part of them.

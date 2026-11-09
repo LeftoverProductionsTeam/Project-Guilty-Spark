@@ -21,3 +21,7 @@ Private E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588
 - Direct Windows Computer Use initializes again. On the actual unsealed portable app, File → New → Multiplayer Map creates an isolated owned project, Ctrl+S reaches Saved, and normal Alt+F4 closes it. The disposable library/profile is removed. This spot check does not certify every command, restart recovery or game behavior. It exposed the ambiguous material notice above. The new focus behavior still requires source-matched native/package verification.
 
 Next: commit this bounded repair with refreshed source checksums, run all nine release groups on that exact clean revision, then build/verify a fresh Windows candidate. Do not seal or publish the failed6d9 preview3. Hosted CI still requires the owner's push/workflow action. Human traversal, real two-computer/gameplay, physical multi-monitor/DPI, headset, Linux/macOS and full product acceptance remain open.
+
+## Exact release follow-through
+
+dc4456ed58d3bdc26889e210fdaf7d51dced1f92 passes all nine release groups including258browser cases, then actual packaged native preview/project tests. Direct Computer Use observes View→End visibly focusing Reset layout and the corrected map-creation notice. Real installer/portable startup and owned uninstall pass; preview4 is sealed and independently verified locally. No hosted-CI/publication, physical monitor or gameplay pass is inferred. See RELEASE_CANDIDATE_20261108.md for exact files/hashes and owner handoff.

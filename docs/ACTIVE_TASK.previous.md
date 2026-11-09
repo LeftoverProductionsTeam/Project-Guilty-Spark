@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
 Task: Operation110 M1 release-blocking View menu focus repair
-Status: implementation incomplete
+Status: automated acceptance incomplete
 Starting revision: 1a60fa15f1582a9fb1021fb46f4779ef25bf6e24, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 6d9bb4b58e2d34066859094da429a0bfa312507a contains accepted R277 P1 native workflow; R278894Rust/9ignored. New exact clean release run passes six groups then fails browser255/256 at View→End→Reset layout, which remains inert on page1. Candidate preview3 built/staged but NOT sealed or accepted.
-Next action: Run the deterministic opening-menu paging regression, repair the existing pager focus-intent lifecycle without weakening reachability or timeouts, verify submenu cancellation and the full browser suite, then commit and rebuild source-matched Windows candidate. Direct Sky portable review confirms File/New/Ctrl+S/normal close and reveals an ambiguous preview-material readiness notice; clarify preview versus native setup. Do not seal6d9 preview3 or claim fullrelease/human acceptance. Continue existing M2 after this M1 blocker.
+Latest verified revision: 6d9bb4b58e2d34066859094da429a0bfa312507a plus bounded pager/notice repair. Native P1 R277 remains exact6d9 evidence; R278894Rust/9ignored. Release6d9 fails255/256browser, is unsealed. R282 deterministically reproduces focus loss; R28415/R28520 focused checks pass after repair; R286frontend472/TypeScript pass.
+Next action: Review/stage the bounded pager/notice repair and its two strict browser regressions, refresh existing source manifests, commit locally, run all nine release groups on that exact clean revision, and build/verify a fresh Windows candidate. Verify native View/End and preview/setup wording through actual controls. No sealing failed6d9 preview3. After M1, continue existing combined M2 creator-to-game work; human/peer/hardware gates remain open.
 
 ## Acceptance
 
