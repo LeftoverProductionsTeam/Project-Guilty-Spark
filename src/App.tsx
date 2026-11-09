@@ -1172,7 +1172,7 @@ export default function App() {
             );
           }
         } catch (error) {
-          notice((previewDefaultsReady?'Default textures are ready. Native building still needs matching source/tools: ':'Native defaults need source setup: ') + String(error), 'info');
+          notice((previewDefaultsReady?'Preview materials assigned. Native tag preparation needs matching source/tools: ':'Native defaults need source setup: ') + String(error), 'info');
         }
       }
     } finally {

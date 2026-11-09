@@ -33,6 +33,7 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
  const [layout,setLayout]=useState({height:180,offsets:[0],total:0,visibility:''});
  const page=Math.max(0,Math.min(Number.isFinite(selected)?Math.floor(selected):0,layout.offsets.length-1)),offset=layout.offsets[page]??0;
  const original=useRef(new Map<HTMLElement,{inert:boolean;hidden:string|null}>());
+ const requestedFocus=useRef<{node:HTMLElement;before:Element|null}|null>(null);
  useLayoutEffect(()=>{
   const root=host.current,content=body.current,view=viewport.current;if(!root||!content||!view)return;
   let frame=0;
@@ -66,21 +67,33 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
    node.toggleAttribute('data-gs-offpage',off);node.inert=off||original.current.get(node)!.inert;
    if(off)node.setAttribute('aria-hidden','true');else{const hidden=original.current.get(node)!.hidden;if(hidden===null)node.removeAttribute('aria-hidden');else node.setAttribute('aria-hidden',hidden);}
   }
- },[offset,layout]);
+  const request=requestedFocus.current;
+  if(request){
+   const active=document.activeElement,node=request.node;
+   if(!node.isConnected||!content.contains(node)||!materialized(node)||active!==node&&active!==request.before&&active!==document.body){requestedFocus.current=null;return;}
+   const range=controlRange(node,content,layout.height);
+   const at=layout.offsets.findIndex(start=>range.top>=start-.5&&range.bottom<=start+layout.height+.5);
+   // Keep the keyboard destination through the first/next real measurement.
+   // A prior one-frame callback could run before React made its page reachable.
+   if(at>=0&&at!==page)setSelected(at);
+   else if(at===page&&!node.closest('[inert]'))node.focus({preventScroll:true});
+  }
+ },[offset,layout,page,setSelected]);
  useEffect(()=>()=>{for(const [node,before]of original.current){node.removeAttribute('data-gs-offpage');node.inert=before.inert;if(before.hidden===null)node.removeAttribute('aria-hidden');else node.setAttribute('aria-hidden',before.hidden);}original.current.clear();},[]);
  useEffect(()=>{
   const content=body.current;if(!content)return;
   const reveal=(event:Event)=>{const node=event.target;if(!(node instanceof HTMLElement)||!content.contains(node))return;
    event.stopPropagation();const range=controlRange(node,content,layout.height);
    const at=layout.offsets.findIndex(offset=>range.top>=offset-.5&&range.bottom<=offset+layout.height+.5);
-   if(at>=0){
-    const before=document.activeElement;setSelected(at);
-    // A visible command needs no deferred focus. An older reveal must not
-    // steal Enter from a submenu the user has already entered.
-    if(at!==page||node.inert)requestAnimationFrame(()=>{if(document.activeElement===before&&node.isConnected&&!node.inert)node.focus();});
-   }
+   requestedFocus.current={node,before:document.activeElement};
+   if(at>=0)setSelected(at);
   };
-  content.addEventListener('guilty-spark-focus-control',reveal);return()=>content.removeEventListener('guilty-spark-focus-control',reveal);
+  // A new user gesture owns focus. Never complete an older reveal after the
+  // creator has entered a submenu, typed elsewhere or selected another page.
+  const cancel=()=>{requestedFocus.current=null;};
+  content.addEventListener('guilty-spark-focus-control',reveal);
+  document.addEventListener('pointerdown',cancel,true);document.addEventListener('keydown',cancel,true);
+  return()=>{content.removeEventListener('guilty-spark-focus-control',reveal);document.removeEventListener('pointerdown',cancel,true);document.removeEventListener('keydown',cancel,true);};
  },[layout,setSelected,page]);
  const choose=(next:number)=>setSelected(Math.max(0,Math.min(Number.isFinite(next)?Math.floor(next):0,layout.offsets.length-1)));
  function find(value:string){

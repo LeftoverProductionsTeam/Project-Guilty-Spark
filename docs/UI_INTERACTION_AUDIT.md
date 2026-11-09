@@ -144,3 +144,10 @@ R229 verifies90 controls per requested native size and saved scale/cache/flavor 
 
 
 UI-RESOURCE-01: the compiled self-contained CE world still advertised Locate Halo Textures. World checked only absent resourceSha256, ignoring the native parser’s required dependency finding. R232 reproduces the false prompt (one failed/two retained cases); R233 passes all three after adding the native requirement guard. Genuine missing-bank repair remains enabled; selecting an unrelated hosting engine cannot reinterpret the source. The native preview harness now independently compares the reader’s dependency finding, current source pin and actual rendered prompt. Native final-package follow-through remains pending.
+
+
+## Release-blocking View focus follow-through
+
+UI-FOCUS-01: exact6d9bb4b release run fails255/256 browser cases when View → End targets Reset layout before paging is measured. The old one-frame reveal leaves the command inert on page1 and focus on body. PagedSurface now retains the requested control through measured layout and cancels it on a later user gesture. Deterministic red R282/five red R283 repeats, green R28415cases and R28520cases (including later-input ownership and scrollTop0) retain all strict assertions/timeouts. Full frontend472/TypeScript pass; fresh source-matched full-release/native acceptance remains required. [Exact failure and evidence](RELEASE_MENU_FOCUS_20261108.md).
+
+UI-MATERIAL-01: direct portable File/New review displays preview readiness while native tag preparation needs a source. The notice now says Preview materials assigned and explicitly retains the native setup failure. This does not bypass extraction, resource identity or compiler admission. Native confirmation belongs to the next candidate; complete texture fidelity remains open.

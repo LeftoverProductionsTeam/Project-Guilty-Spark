@@ -3751,3 +3751,25 @@ test('background asset source opens its own tag editor and preserves destination
  await page.keyboard.press('Control+z');await expect(value).toHaveValue('37');await page.keyboard.press('Control+z');await expect(value).toHaveValue('10');
  expect(await page.evaluate(()=>(window as any).__sparkMock.projects.b.project.tagEdits[0]?.value)).toBe(39);
 });
+
+
+test('End retains its requested menu command across the first paging measurement',async({page})=>{
+ await mockDesktop(page);await page.evaluate(async()=>{const w=window as any;w.__openingRaf=window.requestAnimationFrame;w.__openingFrames=[];window.requestAnimationFrame=callback=>{w.__openingFrames.push(callback);return w.__openingFrames.length;};const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountOpeningView();});
+ const menu=page.getByLabel('Opening View menu',{exact:true});
+ try{
+  await menu.focus();await menu.press('ArrowDown');await expect(page.getByRole('button',{name:'Fullscreen fixture',exact:true})).toBeFocused();
+  await menu.press('End');
+ }finally{await page.evaluate(()=>{const w=window as any,frames=w.__openingFrames;window.requestAnimationFrame=w.__openingRaf;delete w.__openingFrames;delete w.__openingRaf;for(const callback of frames)callback(performance.now());});}
+ const surface=page.locator('[data-surface="opening-view-regression"]');await expect(surface).toHaveAttribute('data-pages','2');
+ console.log('OPENING_MENU_MEASURED',JSON.stringify(await surface.evaluate(root=>({page:root.getAttribute('data-page'),active:document.activeElement?.tagName+':'+document.activeElement?.textContent?.slice(0,45),scrollTop:root.querySelector('.gs-page-viewport')?.scrollTop,reset:[...root.querySelectorAll('button')].filter(n=>n.textContent==='Reset fixture layout').map(n=>({inert:n.inert,off:n.hasAttribute('data-gs-offpage')}))}))));
+ const reset=page.getByRole('button',{name:'Reset fixture layout',exact:true});await expect(reset).toBeFocused();await expect(reset).toBeVisible();await expect(surface).not.toHaveAttribute('data-page','1');await expect.poll(()=>surface.locator('.gs-page-viewport').evaluate(node=>node.scrollTop)).toBe(0);
+});
+
+
+test('a later submenu input cancels a deferred menu focus request',async({page})=>{
+ await mockDesktop(page);await page.evaluate(async()=>{const w=window as any;w.__openingRaf=window.requestAnimationFrame;w.__openingFrames=[];window.requestAnimationFrame=callback=>{w.__openingFrames.push(callback);return w.__openingFrames.length;};const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountOpeningView();});
+ const menu=page.getByLabel('Opening View menu',{exact:true}),input=page.getByRole('textbox',{name:'Later submenu input',exact:true});
+ try{await menu.focus();await menu.press('ArrowDown');await menu.press('End');await input.focus();await input.press('x');}
+ finally{await page.evaluate(()=>{const w=window as any,frames=w.__openingFrames;window.requestAnimationFrame=w.__openingRaf;delete w.__openingFrames;delete w.__openingRaf;for(const callback of frames)callback(performance.now());});}
+ await expect(page.locator('[data-surface="opening-view-regression"]')).toHaveAttribute('data-pages','2');await expect(input).toBeFocused();await expect(input).toHaveValue('x');
+});
