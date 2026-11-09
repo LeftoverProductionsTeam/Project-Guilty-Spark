@@ -770,23 +770,44 @@ test('Windows transient manifest locks preserve the previous receipt and retry b
   await finish.createScratch('content');assert.equal(denied,3);
  }finally{fs.rename=rename;}
  assert.notDeepEqual(await fs.readFile(file),before);
- assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false);
  await finish('passed');
+ assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false);
 }));
 
 test('manifest replacement errors do not delete the previous receipt or leave this writes temporary copy',()=>fixture(async parent=>{
  const storage=await mkdir(path.join(parent,'storage')),output=await mkdir(path.join(storage,'owned'));
  const finish=await beginQaStorage(output,{workflow:'manifest-error-test',appSha256:'a'.repeat(64),storageRoot:storage,reservationBytes:1024**2,totalBytes:64*1024**2,minimumFreeBytes:0});
  await finish.createScratch('baseline');
- const file=path.join(output,'scratch-ownership.json'),before=await fs.readFile(file),rename=fs.rename;let attempts=0;
+ const file=path.join(output,'scratch-ownership.json'),progressFile=path.join(output,'storage-run.json'),before=await fs.readFile(file),rename=fs.rename;
+ let attempts=0,failedTemporary,activeProgress,progress,passed=false,releaseProgress,observeProgress;
+ const held=new Promise(resolve=>observeProgress=resolve),released=new Promise(resolve=>releaseProgress=resolve);
  try {
-  fs.rename=async(from,to)=>{if(to===file){attempts++;throw Object.assign(Error('nontransient failure'),{code:'EIO'});}return rename(from,to);};
+  fs.rename=async(from,to)=>{
+   if(to===file){attempts++;failedTemporary=from;throw Object.assign(Error('nontransient failure'),{code:'EIO'});}
+   if(to===progressFile&&!activeProgress){activeProgress=from;observeProgress();await released;}
+   return rename(from,to);
+  };
+  progress=finish.sample('deterministic-active-progress-writer');await held;
   await assert.rejects(finish.createScratch('content'),{code:'EIO'});
- }finally{fs.rename=rename;}
- assert.equal(attempts,1);assert.deepEqual(await fs.readFile(file),before);
- assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false);
- // A subsequent owned registration persists the already-owned in-memory
- // namespace too; nothing unowned is adopted or silently removed.
- await finish.createScratch('recovered');
- await finish('passed');
+  assert.equal(attempts,1);assert.deepEqual(await fs.readFile(file),before);
+  const remaining=(await fs.readdir(output)).filter(name=>name.includes('.tmp-'));
+  const activeRecord=JSON.parse(await fs.readFile(activeProgress,'utf8'));
+  console.log('MANIFEST_TEMP_REPRO',JSON.stringify({failedTemporary,activeProgress,remaining,activeOwnerPid:activeRecord.ownerPid,activeOperation:activeRecord.workflow,activeNonce:activeRecord.nonce,failedTemporaryExists:await fs.stat(failedTemporary).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;})}));
+  // The failed ownership-manifest write must remove its own nonce. A live
+  // progress writer is independent and must survive until its rename commits.
+  await assert.rejects(fs.stat(failedTemporary),{code:'ENOENT'});
+  assert.deepEqual(remaining,[path.basename(activeProgress)]);
+  assert.equal(activeRecord.ownerPid,process.pid);assert.equal(activeRecord.workflow,'manifest-error-test');
+  assert.equal(activeRecord.nonce,JSON.parse(await fs.readFile(progressFile,'utf8')).nonce);
+  assert.equal(activeRecord.active,true);assert.deepEqual(JSON.parse(await fs.readFile(activeProgress,'utf8')),activeRecord);
+  releaseProgress();await progress;fs.rename=rename;
+  // Retain ownership of the in-memory content namespace after EIO; a later
+  // successful registration persists it without adopting unrelated files.
+  await finish.createScratch('recovered');
+  const recovered=JSON.parse(await fs.readFile(file,'utf8'));assert.deepEqual(recovered.directories.map(row=>row.relative).sort(),['baseline','content','recovered']);
+  passed=true;
+ }finally{
+  releaseProgress();await progress;fs.rename=rename;await finish(passed?'passed':'failed');
+ }
+ assert.equal((await fs.readdir(output)).some(name=>name.includes('.tmp-')),false,'No orphan remains after all owned writers finish');
 }));
