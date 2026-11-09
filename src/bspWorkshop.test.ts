@@ -6,6 +6,7 @@ import {
   extrudeFace,
   rampBrush,
   worldVertex,
+  workshopPivot,
   localVertex,
   viewAxes,
   snapNumber,
@@ -59,6 +60,16 @@ describe('editable Workshop source', () => {
     expect(renamed.name).toBe('Control room'); expect(renamed.id).toBe(a.id); expect(renamed.faces).toEqual(a.faces);
     expect(a.name).toBe('Room 1');
     for (const name of ['', '\n', 'bad\u0000name', '🙂'.repeat(26)]) expect(() => renameWorkshopBrush(a, name)).toThrow();
+  });
+  it('keeps perspective and orthographic pivots on the same transformed volume or selected face', () => {
+    const brush=boxBrush('box','solid',[-2,-3,0],[2,3,4],'metal');
+    brush.position=[8,9,10];brush.rotation=[.1,.2,.7];brush.scale=[2,3,4];
+    const all=brush.vertices.map(vertex=>worldVertex(brush,vertex));
+    expect(workshopPivot(brush)).toEqual(all.reduce((center,p)=>center.map((v,k)=>v+p[k]/all.length) as [number,number,number],[0,0,0] as [number,number,number]));
+    const selected=brush.faces[3].vertices,pivot=workshopPivot(brush,selected);
+    for(let k=0;k<3;k++)expect(pivot[k]).toBeCloseTo(selected.reduce((sum,index)=>sum+all[index][k]/selected.length,0),8);
+    expect(workshopPivot(brush,[...selected,...selected])).toEqual(pivot);
+    expect(()=>workshopPivot(brush,[999])).toThrow(/no longer exist/);
   });
   it('moves only the selected source vertices along world axes under rotated nonuniform transforms', () => {
     const b = boxBrush('box', 'space', [-1, -1, 0], [1, 1, 2], 'm');

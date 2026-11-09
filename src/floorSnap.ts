@@ -27,7 +27,8 @@ export function collisionBounds(mesh: CollisionMesh | undefined, matrix: Matrix4
 }
 /** Nearest support below the selected feet, sampled over their footprint. The
  * same displacement moves a group; individual members keep their relative pose. */
-export function floorSnapDelta(bounds: Box3[], surfaces: FloorSurface[]): number | null {
+export function floorSnapDelta(bounds: Box3[], surfaces: FloorSurface[], clearance = 0.0001): number | null {
+  if (!Number.isFinite(clearance) || clearance < 0 || clearance > 0.01) throw Error('Invalid floor clearance.');
   if (!bounds.length || bounds.some((b) => b.isEmpty())) return null;
   let result = -Infinity;
   const p = new Vector3(),
@@ -67,5 +68,5 @@ export function floorSnapDelta(bounds: Box3[], surfaces: FloorSurface[]): number
       }
     }
   }
-  return Number.isFinite(result) ? result + 0.0001 : null;
+  return Number.isFinite(result) ? result + clearance : null;
 }

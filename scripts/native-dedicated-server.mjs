@@ -4,7 +4,8 @@ import fs from 'node:fs/promises';
 import {watch as watchFs} from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import {promisify} from 'node:util';
 import { chooseTool, openStudioMenu, revealPagedControl } from '../tests/ui/helpers/navigation.ts';
 import { auditPagedSurface } from '../tests/ui/helpers/compactSurfaces.ts';
 import {windowUiScale} from '../src/uiScale.ts';
@@ -22,6 +23,8 @@ export async function nativeDedicatedServer({
   expectedSpawns,
   liveRebuild,
   emptyGameLifecycle=false,
+  verifyLifecycleFaults=false,
+  ownerProcessId,
   checkpoint=async()=>{},
 }) {
   const hash = async (file) =>
@@ -29,6 +32,7 @@ export async function nativeDedicatedServer({
       .createHash('sha256')
       .update(await fs.readFile(file))
       .digest('hex');
+  if(verifyLifecycleFaults&&(!compiled||!liveRebuild||process.platform!=='win32'||!Number.isSafeInteger(ownerProcessId)||ownerProcessId<=0))throw Error('Native lifecycle faults require this harness-owned Windows app and compiled CE session');
   const created = compiled ? (await call('bootstrap')).entries.find((row) => projectId ? row.id === projectId : row.title === 'Native live rebuild') : null;
   if(compiled){
     expect(created).toBeTruthy();
@@ -130,6 +134,11 @@ export async function nativeDedicatedServer({
   async function auditLayouts(phase=''){
   const label = await page.evaluate(() => window.__TAURI_INTERNALS__.metadata.currentWindow.label);
   const layouts=[];
+  // A newly launched game owns foreground input. DOM focus alone can remain
+  // true in an inactive WebView; keyboard layout checks need the real window.
+  await call('plugin:window|set_focus', { label });
+  await checkpoint('native-layout-focus-request');
+  await expect.poll(()=>call('plugin:window|is_focused',{label}),{timeout:45000,message:'Activate only this private Spark owner before native keyboard layout checks'}).toBe(true);
   await call('plugin:window|unmaximize', { label });
   for (const [width, height] of [
     [800, 600],
@@ -167,10 +176,18 @@ export async function nativeDedicatedServer({
   await call('plugin:window|set_size', { label, value: { Logical: { width: 1500, height: 950 } } });
     return layouts;
   }
-  async function startClients(dataBase,label){
+  async function startClients(dataBase,label,reuse=[]){
     clients=[];
     for (let index = 0; index < 2; index++) {
-      const client = await createScratch(label+'-client-' + index);
+      const prior=reuse[index];
+      if(prior){
+        expect(allClients.includes(prior)&&prior.retired).toBe(true);
+        expect(prior.child.exitCode!==null||prior.child.signalCode!==null).toBe(true);
+        expect(prior.retainedSaveFiles.length).toBeGreaterThan(0);
+        for(const row of prior.retainedSaveFiles)expect(await hash(row.file)).toBe(row.sha256);
+        expect(await fs.stat(path.join(prior.client,'engine')).catch(()=>null)).toBeNull();
+      }
+      const client = prior?.client??await createScratch(label+'-client-' + index);
       for (const dir of ['engine', 'save', 'cache', 'logs'])
         await fs.mkdir(path.join(client, dir), { recursive: true });
       const members = JSON.parse(
@@ -266,6 +283,7 @@ export async function nativeDedicatedServer({
         },
       };
       clients.push(peer);allClients.push(peer);
+      if(prior)(receipt.nativeDedicated.reusedPlayerProfiles??=[]).push({previousPid:prior.child.pid,newPid:child.pid,samePrivateDirectory:client===prior.client,retainedFiles:prior.retainedSaveFiles.length,allRetainedFilesHashMatchedBeforeLaunch:true,qaOnly:true});
     }
   }
   async function waitForPeers(expected){
@@ -327,6 +345,7 @@ export async function nativeDedicatedServer({
         const seal=await sealQaScratch(root,target),removed=await disposeQaScratch(root,seal,{ownerFinished:true});bytes+=removed.bytes;
       }
       for(const row of kept)expect(await hash(row.file)).toBe(row.sha256);
+      peer.retainedSaveFiles=kept;peer.retired=true;
       (receipt.nativeDedicated.retiredStoppedClients??=[]).push({pid:peer.child.pid,logicalBytes:bytes,savedFiles:kept.length,savesUnchanged:true,onlyDisposableCopies:true});
     }
     await checkpoint('stopped-old-client-caches-retired-saves-preserved');
@@ -384,6 +403,28 @@ export async function nativeDedicatedServer({
     await page.screenshot({ path: path.join(root, 'native-dedicated-two-clients.png') });
     if(liveRebuild){
       const previous=await call('community_server_status'),previousClients=[...clients],ticksBefore=clients.map(peer=>peer.ticks.at(-1).tick);
+      if(verifyLifecycleFaults){
+        const frozen=await liveRebuild.edit();
+        await panel.getByRole('button',{name:'Live Rebuild · restart round',exact:true}).click();
+        await expect.poll(async()=>(await call('community_server_status'))?.pendingJobId,{timeout:10000}).toBeTruthy();
+        const pending=await call('community_server_status'),racingTicks=clients.map(peer=>peer.ticks.at(-1).tick);
+        expect(pending.processId).toBe(previous.processId);expect(pending.gameSha256).toBe(previous.gameSha256);
+        const advanced=await liveRebuild.editDuringBuild();
+        const afterEdit=await call('community_server_status');
+        expect(afterEdit.pendingJobId,'The actual second edit must occur while the native compiler is still pending').toBe(pending.pendingJobId);
+        expect(afterEdit.sourceFingerprint).not.toBe(pending.sourceFingerprint);
+        await checkpoint('saved-source-advanced-during-native-compile');
+        await expect.poll(async()=>{const next=await call('community_server_status');return next?.pendingJobId===null&&next?.error;},{timeout:300000,intervals:[1000,2000]}).toContain('Source changed during compilation');
+        const refused=await call('community_server_status');
+        expect(refused.processId).toBe(previous.processId);expect(refused.gameSha256).toBe(previous.gameSha256);expect(refused.compiledBuildId).toBe(previous.compiledBuildId);expect(refused.restarts).toBe(previous.restarts);
+        expect(refused.status).toMatchObject({state:'in_game',players:2});expect(await hash(map)).toBe(previous.mapSha256);
+        await expect.poll(()=>clients.every((peer,index)=>peer.ticks.at(-1)?.tick>racingTicks[index]),{timeout:10000}).toBe(true);
+        const readback=await liveRebuild.reviewUnadoptedBuild(pending.pendingJobId,frozen);
+        receipt.nativeDedicated.pendingSourceRace={pending,advanced,afterEdit,refused,readback,serverProcessRetained:true,bothPeersKeptTicking:true,staleOutputNotAdopted:true};
+        await expect(panel).toContainText('Source changed during compilation');
+        await page.screenshot({path:path.join(root,'native-dedicated-source-race.png')});
+        await checkpoint('changed-source-native-output-refused');
+      }
       await liveRebuild.edit();
       await panel.getByRole('button',{name:'Live Rebuild · restart round',exact:true}).click();
       await expect.poll(async()=>(await call('community_server_status'))?.pendingJobId,{timeout:10000}).toBeTruthy();
@@ -433,6 +474,27 @@ export async function nativeDedicatedServer({
       await checkpoint('native-compiler-failure-kept-two-peers');
       console.log('DEDICATED_NATIVE',JSON.stringify({phase:'live-rebuild-native-compiler-failure-kept-two-peers',pid:rejected.processId}));
       await page.screenshot({path:path.join(root,'native-dedicated-live-rebuild-rejected.png')});
+      if(verifyLifecycleFaults){
+        const privateExecutable=path.join(adopted.sessionDirectory,'engine/chupathingyce-server.exe');
+        const relative=path.relative(root,privateExecutable);expect(path.isAbsolute(relative)||relative==='..'||relative.startsWith('..'+path.sep)).toBe(false);
+        expect(await hash(privateExecutable)).toBe('25a206c6c7d6454a6f6a41a8a5987a1e30334db7404e8bf895f1e8429485ce85');
+        const pinnedPath=privateExecutable.replaceAll("'","''");
+        const script=`$ErrorActionPreference='Stop'; $owned=Get-CimInstance Win32_Process -Filter 'ProcessId=${rejected.processId}'; if(!$owned -or $owned.ParentProcessId -ne ${ownerProcessId} -or ![StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetFullPath($owned.ExecutablePath),'${pinnedPath}')){throw 'Refused fault injection outside the exact owned native server'}; Stop-Process -Id ${rejected.processId} -Force -ErrorAction Stop; 'Owned native server exit injected'`;
+        const fault=await promisify(execFile)('pwsh.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:15000,maxBuffer:8192});
+        expect(fault.stdout).toContain('Owned native server exit injected');
+        await expect.poll(async()=>{const next=await call('community_server_status');if(next?.phase==='failed')throw Error(next.detail);return next?.processId!==rejected.processId&&next?.mapSha256===previous.mapSha256&&next?.status&&next;},{timeout:150000,intervals:[1000,2000]}).toMatchObject({sourceBuildId:previous.sourceBuildId});
+        const restoredStart=await call('community_server_status');
+        expect(restoredStart.error).toContain('retained previous-good private stage');expect(restoredStart.compiledSha256).toBe(adopted.mapSha256);expect(restoredStart.sessionDirectory).toBe(base);
+        expect(await hash(map)).toBe(previous.mapSha256);
+        await stopClients(clients);
+        await startClients(base,'rollback-dedicated',previousClients);
+        const restoredPeers=await waitForPeers(expectedSpawns),restored=await call('community_server_status');
+        expect(restored.gameSha256).toBe(previous.mapSha256);expect(restored.gameBuildId).toBe(previous.sourceBuildId);expect(restored.compiledSha256).toBe(adopted.mapSha256);expect(restored.processId).not.toBe(rejected.processId);
+        await expect(panel).toContainText('Game '+previous.mapSha256.slice(0,8));await expect(panel).toContainText('Compiled '+adopted.mapSha256.slice(0,8));await expect(panel).toContainText(/2\/\d+ players · native in_game/);
+        receipt.nativeDedicated.unexpectedServerExit={failed:rejected,restoredStart,restored,spawnReadback:restoredPeers.spawnReadback,peers:restoredPeers.spawned,onlyExactOwnedProcessTerminated:true,previousGoodMapUnchanged:true,existingPrivateProfilesRejoined:true,gameplayAccepted:false};
+        await page.screenshot({path:path.join(root,'native-dedicated-rollback.png')});
+        await checkpoint('native-server-exit-restored-previous-good-two-peers');
+      }
     }
     if(emptyGameLifecycle){
       const before=await call('community_server_status');
@@ -465,7 +527,7 @@ export async function nativeDedicatedServer({
     for (const client of allClients) {
       await stopQaProcess(client.child);
       await waitForQaExit(client.child);
-      await fs.writeFile(path.join(client.client, 'native-client.log'), client.output);
+      await fs.writeFile(path.join(client.client, `native-client-${client.child.pid}.log`), client.output);
     }
     receipt.nativeDedicated.clients = allClients.map((client) => ({
       pid: client.child.pid,
@@ -474,24 +536,33 @@ export async function nativeDedicatedServer({
       networkLog: client.networkLog.slice(-24000),
       tail: client.output.slice(-4000),
     }));
-    const stop = panel.getByRole('button', { name: 'Stop server', exact: true, includeHidden:true });
-    if(!await panel.isVisible()){
-      await chooseTool(page,'Online');
-      await page.getByRole('button',{name:'Host game',exact:true}).click();
+    const terminal = await call('community_server_status');
+    let stopped;
+    if(primaryFailure && terminal?.phase==='failed' && terminal.processId===null){
+      // The adapter already disposed its child/stages. Preserve the real failure;
+      // a terminal failed view correctly offers no Stop control.
+      stopped=terminal;
+      receipt.nativeDedicated.failedAfterDisposal=terminal;
+    }else{
+      const stop = panel.getByRole('button', { name: 'Stop server', exact: true, includeHidden:true });
+      if(!await panel.isVisible()){
+        await chooseTool(page,'Online');
+        await page.getByRole('button',{name:'Host game',exact:true}).click();
+      }
+      await revealPagedControl(stop);await stop.click();
+      await expect
+        .poll(async () => (await call('community_server_status'))?.phase, { timeout: 30000 })
+        .toBe('stopped');
+      stopped = await call('community_server_status');
+      receipt.nativeDedicated.stopped = stopped;
+      await expect(panel).toContainText('stopped');
     }
-    await revealPagedControl(stop);await stop.click();
-    await expect
-      .poll(async () => (await call('community_server_status'))?.phase, { timeout: 30000 })
-      .toBe('stopped');
-    const stopped = await call('community_server_status');
     expect(stopped.originalInputsUnchanged).toBe(true);
-    receipt.nativeDedicated.stopped = stopped;
     for(const row of originalClientPins)expect(await hash(row.file)).toBe(row.sha256);
     expect(await fs.readFile(runtimeConfig).catch(error=>{if(error.code==='ENOENT')return null;throw error;})).toEqual(configBefore);
     receipt.nativeDedicated.originalClientInputsUnchanged=true;
     receipt.nativeDedicated.executedOnlyDisposableCopies=true;
     receipt.nativeDedicated.originalsUnchanged = true;
-    await expect(panel).toContainText('stopped');
     for(const staged of [base,receipt.nativeDedicated.liveRebuild?.adopted.sessionDirectory].filter(Boolean))await expect.poll(async () => !!(await fs.stat(staged).catch(() => null)), { timeout: 30000 }).toBe(false);
     }catch(problem){
       receipt.nativeDedicated.cleanupError=String(problem.stack??problem);

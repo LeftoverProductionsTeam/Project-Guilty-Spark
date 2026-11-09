@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import TransformControls from './HaloTransformControls';
-import { moveWorkshopVertices, worldVertex } from '../bspWorkshop';
+import { moveWorkshopVertices, workshopPivot } from '../bspWorkshop';
 import type { BspBrush, BspTool, WorkshopSelection } from '../bspWorkshop';
 import { workshopPartSelection, workshopPickGeometry } from '../bspPicking';
 import type { Vec3 } from '../types';
@@ -69,14 +69,7 @@ export function BspPartGizmo({
     moving = useRef(false);
   const signature = JSON.stringify([brush, vertices]);
   const pivot = useMemo(
-    () =>
-      vertices.reduce(
-        (center, i) => {
-          const p = worldVertex(brush, brush.vertices[i]);
-          return center.map((v, k) => v + p[k] / vertices.length) as Vec3;
-        },
-        [0, 0, 0] as Vec3,
-      ),
+    () => workshopPivot(brush, vertices),
     [signature],
   );
   const [preview, setPreview] = useState<BspBrush | null>(null);

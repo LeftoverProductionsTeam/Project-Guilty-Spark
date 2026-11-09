@@ -238,6 +238,16 @@ export function worldVertex(b: BspBrush, v: Vec3): Vec3 {
   }
   return p.map((x, k) => x + b.position[k]) as Vec3;
 }
+/** World-space selection center shared by perspective and orthographic handles. */
+export function workshopPivot(brush: BspBrush, vertices?: readonly number[]): Vec3 {
+  const indices = vertices?.length ? [...new Set(vertices)] : brush.vertices.map((_, index) => index);
+  if (!indices.length || indices.some(index => !Number.isInteger(index) || !brush.vertices[index]))
+    throw Error('The selected BSP vertices no longer exist. Select the volume again.');
+  return indices.reduce((center, index) => {
+    const point = worldVertex(brush, brush.vertices[index]);
+    return center.map((value, axis) => value + point[axis] / indices.length) as Vec3;
+  }, [0, 0, 0] as Vec3);
+}
 export function localVertex(b: BspBrush, v: Vec3): Vec3 {
   const p = v.map((x, k) => x - b.position[k]);
   for (let axis = 2; axis >= 0; axis--) {

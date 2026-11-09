@@ -345,3 +345,10 @@
 .bsp-shape-toolbar summary{cursor:pointer;font-size:11px;padding:4px 7px;border:1px solid var(--line);border-radius:4px;}
 .bsp-shape-toolbar [role=group]{position:absolute;top:100%;left:0;z-index:90;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:5px;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:5px;}
 .bsp-shape-toolbar button{min-height:28px;padding:4px;font-size:11px;}
+
+.bsp-ortho-axis {cursor:grab;outline:none;}
+.bsp-ortho-axis:active {cursor:grabbing;}
+.bsp-ortho-axis .bsp-axis-hit {stroke:transparent;pointer-events:stroke;}
+.bsp-ortho-axis:focus-visible .bsp-axis-hit {stroke:var(--accent,#9beada);stroke-opacity:.3;}
+.bsp-ortho-axis:focus-visible>rect {stroke:var(--accent,#9beada);stroke-width:3;}
+.bsp-ortho-axis[aria-disabled="true"] {pointer-events:none;opacity:.45;}

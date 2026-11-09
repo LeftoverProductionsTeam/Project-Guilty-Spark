@@ -1,3 +1,4 @@
+import {workshopExample} from '../../src/bspWorkshop';
 import {auditPagedSurface,samePagedLayout} from './helpers/compactSurfaces';
 import {chooseTool,openDrawer,openViewMenu,openStudioMenu,revealPagedControl} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
@@ -937,7 +938,7 @@ test('object tags open in a hideable drawer without changing workspace, camera l
  await page.getByRole('button',{name:'Selected test weapon',exact:true}).click();
  const drawer=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(drawer).toBeVisible();
  await revealPagedControl(drawer.getByLabel('Velocity',{exact:true}));await expect(drawer.getByLabel('Velocity',{exact:true})).toBeVisible();
- expect((await viewport.boundingBox())!.width).toBeLessThan(before!.width);await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
+ await expect.poll(async()=>(await viewport.boundingBox())!.width).toBeLessThan(before!.width);await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
  const value=drawer.getByLabel('Velocity',{exact:true});await value.fill('23');await value.press('Enter');
  await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await expect(drawer).toBeHidden();
  await openDrawer(page,'Object tags');await expect(drawer.getByLabel('Velocity',{exact:true})).toHaveValue('23');expect((await viewport.boundingBox())!.width).toBeLessThan(before!.width);
@@ -3314,7 +3315,7 @@ for(const [width,height]of [[800,600],[1280,720],[1366,768],[1500,950],[1920,108
 });
 
 
-test('compact first-run pages keep the complete setup reachable',async({page})=>{
+test('compact first-run workspace keeps the complete setup reachable by scrolling',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page,null);await chooseTool(page,'Start here');
  await auditPagedSurface(page.locator('[data-surface="get-started"]'));
 });
@@ -3417,12 +3418,16 @@ test('three-route seam is one source edit with retained route controls and per-r
  await click('Build & playtest connection');await expect(page.getByRole('tab',{name:'Build & playtest',exact:true})).toBeVisible();
 });
 
-test('three-route Construction controls use reachable pages without a nested scroll box',async({page})=>{
+test('three-route Construction controls use one reachable scrolling drawer',async({page})=>{
  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
  const panel=page.getByRole('region',{name:'Construction panel',exact:true});const summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();
  for(const name of ['Plan connected tunnel','Make three-route seam']){const button=panel.getByRole('button',{name,exact:true,includeHidden:true});await revealPagedControl(button);await button.click();}
  const route=panel.getByRole('combobox',{name:'Connection route',exact:true,includeHidden:true});await revealPagedControl(route);await route.selectOption('highGround');
  for(const [width,height] of [[800,600],[1500,950]]){await page.setViewportSize({width,height});await auditPagedSurface(panel.locator('.gs-paged-surface').first());}
+ const view=panel.locator('.gs-page-viewport').first();await view.focus();await page.keyboard.press('End');
+ const top=await view.evaluate(node=>node.scrollTop);expect(top).toBeGreaterThan(30);
+ await panel.getByRole('button',{name:'Close Construction',exact:true}).click();await openDrawer(page,'Construction');
+ await expect.poll(()=>view.evaluate((node,expected)=>Math.abs(node.scrollTop-expected),top)).toBeLessThan(2);
 });
 
 
@@ -3830,4 +3835,90 @@ test('a later submenu input cancels a deferred menu focus request',async({page})
  try{await menu.focus();await menu.press('ArrowDown');await menu.press('End');await input.focus();await input.press('x');}
  finally{await page.evaluate(()=>{const w=window as any,frames=w.__openingFrames;window.requestAnimationFrame=w.__openingRaf;delete w.__openingFrames;delete w.__openingRaf;for(const callback of frames)callback(performance.now());});}
  await expect(page.locator('[data-surface="opening-view-regression"]')).toHaveAttribute('data-pages','2');await expect(input).toBeFocused();await expect(input).toHaveValue('x');
+});
+
+async function openWorkshopControlFixture(page:Page){
+ const source=workshopExample({schemaVersion:1,name:'Synthetic Workshop controls',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[{id:'metal',name:'Metal',color:[.5,.5,.5],shaderPath:'levels/test/metal',uScale:1,vScale:1}],placements:[],spawns:[],objectives:[]});
+ source.workshop!.brushes.find(brush=>brush.id==='ramp')!.position=[0,0,3];
+ await page.addInitScript(source=>localStorage.setItem('spark-test-forge',JSON.stringify(source)),source);
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='quickforge_preview'?{
+  // Synthetic collision contract: real room floor plus the selected solid's
+  // upper face. End must ignore its own faces instead of snapping onto itself.
+  positions:[-8,-6,0,8,-6,0,8,6,0,-8,6,0,-3,-3,4.5,3,-3,4.5,3,1,4.5,-3,1,4.5],normals:[],uvs:[],indices:[0,1,2,0,2,3,4,5,6,4,6,7],parts:[{brushId:'room-a',materialId:'metal',indexStart:0,indexCount:6},{brushId:'ramp',materialId:'metal',indexStart:6,indexCount:6}]
+ }:invoke(command,args);});
+ await openFixture(page);await chooseTool(page,'Level editor');
+ const workshop=page.getByLabel('Native BSP Workshop',{exact:true});await expect(workshop).toBeVisible();
+ await workshop.locator('.bsp-source-list').getByRole('button',{name:/Ramp/,exact:false}).click();
+ await workshop.getByRole('button',{name:'Move',exact:true}).click();
+ await expect(workshop.locator('canvas')).toBeVisible();
+ return workshop;
+}
+test('BSP selected movement axes work in every orthographic view and preserve single-action Undo',async({page})=>{
+ const workshop=await openWorkshopControlFixture(page),position=workshop.getByRole('group',{name:'Position',exact:true});
+ const values=()=>Promise.all(['X','Y','Z'].map(async name=>Number(await position.getByRole('spinbutton',{name,exact:true}).inputValue())));
+ for(const [view,axes] of [['top',['X','Y']],['front',['X','Z']],['side',['Y','Z']]] as const){
+  const viewport=workshop.getByLabel(view+' orthographic editing view',{exact:true});
+  for(const axis of axes){
+   const handle=viewport.getByRole('button',{name:`${view} ${axis} movement axis`,exact:true});await expect(handle).toBeVisible({timeout:5000});
+   const before=await values(),box=(await handle.boundingBox())!,index='XYZ'.indexOf(axis),horizontal=axis===axes[0];
+   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+(horizontal?24:0),box.y+box.height/2-(horizontal?0:24),{steps:8});await page.mouse.up();
+   await expect.poll(async()=>(await values())[index]).toBeGreaterThan(before[index]);
+   const after=await values();for(let k=0;k<3;k++)if(k!==index)expect(after[k]).toBeCloseTo(before[k],5);
+   await handle.focus();await page.keyboard.press('Control+z');await expect.poll(values).toEqual(before);
+   await handle.focus();await page.keyboard.press('ArrowRight');await expect.poll(async()=>(await values())[index]).toBeCloseTo(before[index]+.5,5);
+   await handle.focus();await page.keyboard.press('Control+z');await expect.poll(values).toEqual(before);
+  }
+ }
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.find((b:any)=>b.id==='ramp').position)).toEqual([0,0,3]);
+});
+test('BSP End floor snap excludes the selected solid, preserves typed input, Undo and immediate Save',async({page})=>{
+ const workshop=await openWorkshopControlFixture(page),position=workshop.getByRole('group',{name:'Position',exact:true}),z=position.getByRole('spinbutton',{name:'Z',exact:true});
+ await z.focus();await page.keyboard.press('End');await expect(z).toHaveValue('3');
+ await workshop.getByRole('button',{name:'Move',exact:true}).focus();await page.keyboard.press('End');
+ await expect.poll(async()=>Number(await z.inputValue()),{timeout:5000}).toBeCloseTo(.5,5);
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.find((b:any)=>b.id==='ramp').position[2])).toBeCloseTo(.5,5);
+ await page.keyboard.press('Control+z');await expect(z).toHaveValue('3');await page.keyboard.press('Control+y');await expect.poll(async()=>Number(await z.inputValue())).toBeCloseTo(.5,5);
+});
+
+
+test('workspace compaction scrolls one continuous page and restores its place after navigation and reload',async({page})=>{
+ await page.setViewportSize({width:800,height:600});await mockDesktop(page);await chooseTool(page,'Settings & tools');
+ await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+ const surface=page.locator('[data-surface="settings-interface"]'),view=surface.locator(':scope > .gs-page-viewport');
+ await expect(surface).toHaveAttribute('data-navigation','scroll');await expect(surface).toHaveAttribute('data-pages','1');
+ await expect(surface.locator('.gs-surface-pages')).toHaveCount(0);
+ await expect.poll(()=>view.evaluate(node=>node.scrollHeight-node.clientHeight)).toBeGreaterThan(100);
+ await view.focus();await page.keyboard.press('PageDown');await expect.poll(()=>view.evaluate(node=>node.scrollTop)).toBeGreaterThan(30);
+ await page.keyboard.press('End');await expect.poll(()=>view.evaluate(node=>Math.abs(node.scrollHeight-node.clientHeight-node.scrollTop))).toBeLessThan(2);
+ // Native WebView can deliver these keys without its default scroller.
+ // The focused region must own the command, while its fields keep native keys.
+ await view.dispatchEvent('keydown',{key:'Home',bubbles:true,cancelable:true});await expect.poll(()=>view.evaluate(node=>node.scrollTop)).toBe(0);
+ await view.dispatchEvent('keydown',{key:'End',bubbles:true,cancelable:true});await expect.poll(()=>view.evaluate(node=>Math.abs(node.scrollHeight-node.clientHeight-node.scrollTop))).toBeLessThan(2);
+ const saved=await view.evaluate(node=>node.scrollTop);expect(saved).toBeGreaterThan(100);
+ await expect(surface.locator('[data-gs-offpage]')).toHaveCount(0);
+ expect(await view.evaluate(node=>node.scrollWidth-node.clientWidth)).toBeLessThanOrEqual(1);
+ await chooseTool(page,'Map library');await chooseTool(page,'Settings & tools');
+ await expect.poll(()=>view.evaluate((node,top)=>Math.abs(node.scrollTop-top),saved)).toBeLessThan(2);
+ await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+ await expect.poll(()=>view.evaluate((node,top)=>Math.abs(node.scrollTop-top),saved)).toBeLessThan(2);
+ await surface.getByRole('searchbox',{name:'Find in Settings interface',exact:true}).fill('Reset glow colors');
+ const action=surface.getByRole('button',{name:'Reset glow colors',exact:true});await expect(action).toBeInViewport();
+ await action.click();
+ await page.getByLabel('File menu',{exact:true}).click();const menu=page.locator('[data-surface="file-menu"]');
+ await expect(menu).toHaveAttribute('data-navigation','pages');await auditPagedSurface(menu);
+});
+
+
+test('native window focus loss cancels a numeric scrub even when WebView focus stays true',async({page})=>{
+ const workshop=await openWorkshopControlFixture(page),input=workshop.getByRole('group',{name:'Position',exact:true}).getByRole('spinbutton',{name:'X',exact:true});
+ await expect(workshop.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();await input.focus();await expect(input).toBeInViewport();
+ const initial=await input.inputValue(),box=(await input.boundingBox())!;
+ await page.mouse.move(box.x+Math.min(12,(box.width-18)/2),box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+Math.min(12,(box.width-18)/2)+30,box.y+box.height/2,{steps:8});
+ await expect(input).not.toHaveValue(initial);expect(await page.evaluate(()=>document.hasFocus())).toBe(true);
+ await page.evaluate(async()=>{await (window as any).__sparkMock.emit('tauri://blur');});
+ await expect(input).toHaveValue(initial);await page.mouse.up();await workshop.getByRole('button',{name:'Move',exact:true}).click();
+ await input.fill('0.75');await page.evaluate(async()=>{await (window as any).__sparkMock.emit('tauri://blur');});await input.press('Tab');await expect(input).toHaveValue('0.75');
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.find((brush:any)=>brush.id==='ramp').position[0])).toBe(.75);
+ await page.keyboard.press('Control+z');await expect(input).toHaveValue(initial);await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.find((brush:any)=>brush.id==='ramp').position[0])).toBe(Number(initial));
 });

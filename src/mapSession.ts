@@ -13,7 +13,7 @@ export function configureMapViewWindow(label:string|null){viewWindow=label&&/^[\
 const viewKey=(key:string)=>/^(camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|bitmap\.(image|face)\.|tags\.(selection|focus|query|filter|classes|limit|contexts|context-selection|preview\.animation)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|smart-edit\.open$|build\.(inputsOpen|resourcesOpen|reportOpen|historyOpen)$|bsp\.(view\.|selection$|tool$|maximized$|edgeTarget$|edgePicks$)|creator-studio-pane$)/.test(key);
 // Browsing/category choices are independent UI state even without an active map.
 // Appearance, input preferences, shared source and collaboration stay shared.
-const windowUiKey=(key:string)=>/^(library\.|learning\.|community\.|interface\.section$|tools\.(advanced|dashboard|enginePackage|downloadOpen)$|workspace\.layoutName$|hosting\.runtime$|director\.docked$)/.test(key);
+const windowUiKey=(key:string)=>/^(scroll\.|library\.|learning\.|community\.|interface\.section$|tools\.(advanced|dashboard|enginePackage|downloadOpen)$|workspace\.layoutName$|hosting\.runtime$|director\.docked$)/.test(key);
 function scoped(id:string,key:string){return viewWindow&&!id.includes(':window:')&&(windowUiKey(key)||id!=='global'&&viewKey(key))?`${id}:window:${viewWindow}`:id;}
 // Re-read the storage string on every write for peer-window changes, but do not
 // repeatedly decode an unchanged portrait/camera/layout record. Bound the extra

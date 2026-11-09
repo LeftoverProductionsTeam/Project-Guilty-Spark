@@ -6,6 +6,12 @@ const floor = (z: number) => ({
   matrix: new Matrix4(),
 });
 describe('drop to actual collision', () => {
+  it('allows exact structural contact without changing placed-object clearance', () => {
+    const box=new Box3(new Vector3(-1,-1,2.5),new Vector3(1,1,4.5));
+    expect(floorSnapDelta([box],[floor(0)],0)).toBe(-2.5);
+    expect(floorSnapDelta([box],[floor(0)])).toBeCloseTo(-2.4999,8);
+    for(const invalid of [-1,Infinity,NaN,.1])expect(()=>floorSnapDelta([box],[floor(0)],invalid)).toThrow(/clearance/);
+  });
   it('uses the highest support below the feet and ignores a ceiling', () => {
     const box = new Box3(new Vector3(-0.2, -0.2, 5), new Vector3(0.2, 0.2, 6));
     expect(floorSnapDelta([box], [floor(0), floor(2), floor(8)])).toBeCloseTo(-2.9999, 6);

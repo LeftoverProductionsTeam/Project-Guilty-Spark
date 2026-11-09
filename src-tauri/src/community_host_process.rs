@@ -68,10 +68,24 @@ struct Stage {
     build_id: Option<String>,
     copied_bytes: u64,
 }
+impl Stage {
+    fn dispose(&mut self) -> Reply<()> {
+        if let Some(lease) = self.lease.take() {
+            lease.finish_disposable().map_err(error)?;
+        } else if self.root.exists() {
+            // A blocked deletion may have completed its lease. Retry only the
+            // recorded disposable snapshot; never resnapshot changed content.
+            core::storage::Store::existing_for_output(&self.root).map_err(error)?
+                .ok_or("Private staging ownership record is unavailable; retained")?
+                .dispose_completed(&self.root).map_err(error)?;
+        }
+        Ok(())
+    }
+}
 impl Drop for Stage {
     fn drop(&mut self) {
-        if let Some(lease) = self.lease.take() {
-            if let Err(problem) = lease.finish_disposable() {
+        if self.lease.is_some() {
+            if let Err(problem) = self.dispose() {
                 eprintln!("Private server cleanup pending: {problem}");
             }
         }
@@ -423,6 +437,7 @@ fn stage(
     stage.copied_bytes = total;
     Ok((stage, launch))
 }
+type ControlTokenCell = Arc<Mutex<Option<Arc<host::ControlToken>>>>;
 fn capture_token(
     mut pipe: impl Read + Send + 'static,
     token: Arc<Mutex<Option<Arc<host::ControlToken>>>>,
@@ -461,7 +476,7 @@ struct Running {
     process: ce_host_native::OwnedProcess,
     stage: Stage,
     launch: host::HostLaunchSpec,
-    token: Arc<Mutex<Option<Arc<host::ControlToken>>>>,
+    token: ControlTokenCell,
     started: Instant,
 }
 fn prepared_command(stage: &Stage, launch: &host::HostLaunchSpec) -> Reply<Command> {
@@ -485,9 +500,20 @@ fn prepared_command(stage: &Stage, launch: &host::HostLaunchSpec) -> Reply<Comma
     }
     Ok(command)
 }
-fn launch_prepared(stage: Stage, launch: host::HostLaunchSpec, mut command: Command) -> Reply<Running> {
+// Credentials belong to this one private stage. The pinned server prints its
+// plaintext token only on first use; its on-disk credential is a salted hash.
+// Retain the opaque token only in memory while retaining a previous-good stage.
+struct Stopped {
+    stage: Stage,
+    launch: host::HostLaunchSpec,
+    token: ControlTokenCell,
+}
+fn launch_prepared(stage: Stage, launch: host::HostLaunchSpec, command: Command) -> Reply<Running> {
+    launch_stopped(Stopped{stage,launch,token:Arc::new(Mutex::new(None))},command)
+}
+fn launch_stopped(stopped: Stopped, mut command: Command) -> Reply<Running> {
+    let Stopped{stage,launch,token}=stopped;
     let mut process=ce_host_native::OwnedProcess::spawn(&mut command)?;
-    let token=Arc::new(Mutex::new(None));
     if let Some(pipe)=process.child.stdout.take(){capture_token(pipe,Arc::clone(&token));}
     if let Some(pipe)=process.child.stderr.take(){capture_token(pipe,Arc::clone(&token));}
     Ok(Running{process,stage,launch,token,started:Instant::now()})
@@ -528,14 +554,14 @@ fn retire_stopped_map_caches(stage: &Stage) -> Reply<u64> {
     for (file,_,bytes) in files {fs::remove_file(file).map_err(error)?;removed+=bytes;}
     Ok(removed)
 }
-fn stop_owned(run: Running) -> (Stage, host::HostLaunchSpec) {
-    let Running{process,stage,launch,..}=run;
+fn stop_owned(run: Running) -> Stopped {
+    let Running{process,stage,launch,token,..}=run;
     drop(process); // Kill-on-owner-exit guard waits; never enumerate unrelated games.
     match retire_stopped_map_caches(&stage) {
         Ok(bytes)=>eprintln!("Retired {bytes} logical bytes of stopped private map cache"),
         Err(problem)=>eprintln!("Stopped private cache retirement deferred: {problem}"),
     }
-    (stage,launch)
+    Stopped{stage,launch,token}
 }
 fn publish_running(session: &Session, run: &Running) -> Reply<()> {
     let mut view=lock(&session.view)?;
@@ -580,7 +606,10 @@ fn run(
     let target=host::ControlTarget::new(runtime::RuntimeId::ChupathingyCe,&request.control_address).map_err(error)?;
     let lifetime=Instant::now();let mut next_poll=Instant::now();let mut failure=None;
     // At most one previous stage is retained for rollback, never an SDK/history warehouse.
-    let mut previous: Option<(Stage,host::HostLaunchSpec)>=None;
+    let mut previous: Option<Stopped>=None;
+    // A failed replacement can still supply data to clients until they rejoin.
+    // Retain one retired stage, with its active lease, through that transition.
+    let mut retired: Option<Stage>=None;
     loop {
         if session.stopping.load(Ordering::Relaxed)||app.get_webview_window(owner).is_none(){break;}
         if lifetime.elapsed()>Duration::from_secs(8*60*60){failure=Some("Private dedicated trial reached its eight-hour lifetime".into());break;}
@@ -588,10 +617,10 @@ fn run(
         let startup_expired=running.started.elapsed()>Duration::from_secs(120)&&lock(&session.view)?.status.is_none();
         if exited.is_some()||startup_expired {
             let problem=exited.map(|status|format!("Dedicated server exited ({status})")).unwrap_or_else(||"Dedicated startup did not authenticate within 120 seconds".into());
-            if let Some((old,launch))=previous.take() {
-                let command=prepared_command(&old,&launch)?;
-                drop(stop_owned(running));
-                running=launch_prepared(old,launch,command)?;
+            if let Some(old)=previous.take() {
+                let command=prepared_command(&old.stage,&old.launch)?;
+                retired=Some(stop_owned(running).stage);
+                running=launch_stopped(old,command)?;
                 publish_running(session,&running)?;
                 let mut view=lock(&session.view)?;
                 view.error=Some(format!("{problem}; restarted only the retained previous-good private stage. Clients must rejoin."));
@@ -612,6 +641,10 @@ fn run(
                 let reg=runtime_registration(&state,runtime::RuntimeId::ChupathingyCe)?;
                 if reg.id!=registration.id||reg.root!=registration.root||reg.executable!=registration.executable||reg.data_root!=registration.data_root{
                     return Err("Runtime profile changed during compilation; the existing session was retained".into());
+                }
+                if let Some(failed)=retired.as_mut() {
+                    failed.dispose().map_err(|problem|format!("Retired private stage cleanup is pending: {problem}. Close its clients before another rebuild; the running map was retained."))?;
+                    retired=None;
                 }
                 let (staged,launch)=stage(&state,request,Some(id),session,receivers,Some(&pending.job_id))?;
                 let command=prepared_command(&staged,&launch)?;
@@ -644,8 +677,8 @@ fn run(
                             let mut view=lock(&session.view)?;view.restarts+=1;view.error=None;
                         }
                         Err(problem)=>{
-                            let (old,launch)=old;let command=prepared_command(&old,&launch)?;
-                            running=launch_prepared(old,launch,command)?;publish_running(session,&running)?;
+                            let command=prepared_command(&old.stage,&old.launch)?;
+                            running=launch_stopped(old,command)?;publish_running(session,&running)?;
                             lock(&session.view)?.error=Some(format!("Replacement could not start: {problem}. Previous-good private stage restarted; clients must rejoin."));
                         }
                     }
@@ -691,12 +724,24 @@ fn run(
         }
         thread::sleep(Duration::from_millis(100));
     }
-    drop(stop_owned(running));drop(previous);
+    let mut stopped=stop_owned(running);
+    let mut cleanup=Vec::new();
+    for stage in std::iter::once(&mut stopped.stage)
+        .chain(previous.as_mut().map(|old|&mut old.stage))
+        .chain(retired.as_mut()) {
+        if let Err(problem)=stage.dispose() {
+            cleanup.push(format!("{}: {problem}",stage.root.display()));
+        }
+    }
     let unchanged=original_pins.iter().all(|(file,sha)|maps::hash_file(file).is_ok_and(|actual|&actual==sha));
     let mut view=lock(&session.view)?;
     view.original_inputs_unchanged=Some(unchanged);view.process_id=None;view.game_build_id=None;view.game_sha256=None;view.pending_job_id=None;
     if let Some(problem)=failure{view.phase="failed".into();view.detail=problem;}else{
         view.phase="stopped".into();view.detail="Owned dedicated session stopped; disposable copies removed. Ordinary hosting is not persistent Extraction or AI Apocalypse acceptance.".into();
+    }
+    if !cleanup.is_empty() {
+        view.detail="Owned dedicated session stopped. Some private copies remain because safe cleanup could not complete; review Storage & cache before another trial.".into();
+        view.error=Some(cleanup.join("\n"));
     }
     if !unchanged{view.phase="failed".into();view.detail="An original input changed independently during the trial; review it before starting another session.".into();}
     Ok(())
@@ -874,6 +919,30 @@ mod stopped_cache_tests {
         // A subsequent matching round confirms the same immutable map again.
         assert_eq!(confirmed_game_revision(&stage,"previous",host::ServerState::InGame,"previous"),
             (pinned_build,Some(pinned_hash)));
+    }
+    #[test]
+    fn retired_stage_keeps_its_active_owner_until_the_final_consumer_finishes() {
+        let temp=tempfile::tempdir().unwrap();let mut failed=staged(temp.path());
+        let hash=maps::hash_file(&failed.map).unwrap();
+        let store=core::storage::Store::existing_for_output(&failed.root).unwrap().unwrap();
+        assert!(store.dispose_completed(&failed.root).is_err());
+        assert!(failed.lease.as_ref().unwrap().owned_staging_root().is_ok());
+        assert_eq!(maps::hash_file(&failed.map).unwrap(),hash);
+        failed.dispose().unwrap();assert!(!failed.root.exists());
+        failed.dispose().unwrap(); // Already removed, no second snapshot or deletion.
+    }
+    #[cfg(windows)]
+    #[test]
+    fn blocked_private_stage_cleanup_is_reported_and_retries_the_same_snapshot() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let temp=tempfile::tempdir().unwrap();let mut failed=staged(temp.path());
+        let hash=maps::hash_file(&failed.map).unwrap();
+        // A native consumer can permit readback while denying deletion.
+        let consumer=fs::OpenOptions::new().read(true).share_mode(1).open(&failed.map).unwrap();
+        assert!(failed.dispose().is_err());assert!(failed.root.exists());
+        assert!(failed.lease.is_none());assert_eq!(maps::hash_file(&failed.map).unwrap(),hash);
+        drop(consumer);
+        failed.dispose().unwrap();assert!(!failed.root.exists());
     }
     #[test]
     fn native_build_copy_requires_the_previously_validated_hash() {

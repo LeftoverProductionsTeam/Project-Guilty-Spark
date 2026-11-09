@@ -9,6 +9,21 @@ test('numeric scrubbing commits once and exact typing remains available',async({
   await input.fill('-2.75');await input.press('Enter');await expect(page.getByTestId('commits')).toHaveText('[4,-2.75]');
   await input.fill('20');await input.press('Enter');await expect(input).toHaveAttribute('aria-invalid','true');await expect(page.getByTestId('commits')).toHaveText('[4,-2.75]');
 });
+for(const interrupted of ['released-button','lost-capture','window-blur'] as const)test(`numeric scrubbing cancels ${interrupted} without committing a stale drag`,async({page})=>{
+  const input=page.getByRole('spinbutton',{name:'Test position'}),box=(await input.boundingBox())!;
+  await page.mouse.move(box.x+30,box.y+box.height/2);await page.mouse.down();
+  if(interrupted==='released-button')await input.dispatchEvent('pointermove',{pointerId:1,pointerType:'mouse',clientX:box.x+110,clientY:box.y+box.height/2,buttons:0});
+  else{
+    await page.mouse.move(box.x+60,box.y+box.height/2,{steps:8});
+    if(interrupted==='lost-capture')await input.dispatchEvent('lostpointercapture',{pointerId:1,pointerType:'mouse'});
+    else await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+  }
+  await page.mouse.up();await page.getByRole('button',{name:'Leave field'}).click();
+  await expect(input).toHaveValue('1');await expect(page.getByTestId('commits')).toHaveText('[]');
+  // A window-focus notification must not erase a typed value when no scrub is active.
+  await input.fill('2.75');await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+  await page.getByRole('button',{name:'Leave field'}).click();await expect(input).toHaveValue('2.75');await expect(page.getByTestId('commits')).toHaveText('[2.75]');
+});
 test('End uses object collision above the BSP and does not intercept typing',async({page})=>{
   await page.getByRole('textbox',{name:'Typing here'}).focus();await page.keyboard.press('End');await expect(page.getByTestId('drops')).toHaveText('[]');
   await page.getByRole('button',{name:'Leave field'}).click();await page.keyboard.press('End');await expect(page.getByTestId('height')).toHaveText('2.0001');await expect(page.getByTestId('drops')).toHaveText('[-2.9999]');

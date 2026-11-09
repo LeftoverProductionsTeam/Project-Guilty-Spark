@@ -1,4 +1,5 @@
 import PagedSurface from './PagedSurface';
+import WorkspaceSession from './WorkspaceSession';
 import {navigateComposite,focusCompositeItem} from '../keyboardNavigation';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceActivity } from './WorkspaceActivity';
@@ -517,7 +518,7 @@ export function WorkspacePanel({
           <X size={15} />
         </button>}
       </header>
-      <div className="gs-panel-content"><PagedSurface name={id} label={label+' drawer'} scope={context.scope} fill>{detachError&&<p role="alert">{detachError}</p>}{children}<div ref={appendHost} className="gs-panel-addons"/></PagedSurface></div>
+      <div className="gs-panel-content"><WorkspaceSession id={context.scope} workspace={'drawer-'+id}><PagedSurface name={id} label={label+' drawer'} scope={context.scope} fill>{detachError&&<p role="alert">{detachError}</p>}{children}<div ref={appendHost} className="gs-panel-addons"/></PagedSurface></WorkspaceSession></div>
       <div className="gs-panel-resize" role="separator" tabIndex={0} aria-label={`Resize ${label} drawer`}
         aria-orientation={placement.dock==='top'||placement.dock==='bottom'?'horizontal':'vertical'}
         onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);resize.current={pointer:event.pointerId,x:event.clientX,y:event.clientY,width:placement.width,height:placement.height};}}

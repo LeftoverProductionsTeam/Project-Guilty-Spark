@@ -11,3 +11,10 @@
 
 .application .gs-surface-pages>input[type=search]{margin-right:auto;flex:1;max-width:210px;min-width:60px;width:0;font-size:11px;min-height:23px;}
 .gs-settings-workspace>[role=tabpanel]>.gs-paged-surface{width:100%;}
+
+/* Workspace content stays on one page. The original child controls remain
+   mounted and keyboard focus uses the browser's normal scrolling behavior. */
+.gs-paged-surface[data-navigation='scroll']>.gs-page-viewport{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;}
+.gs-paged-surface[data-navigation='scroll']>.gs-page-viewport:focus-visible{outline:1px solid var(--accent);outline-offset:-2px;}
+.gs-surface-search{display:flex;align-items:center;flex:none;height:28px;border-top:1px solid var(--line);}
+.application .gs-surface-search>input{width:min(100%,260px);min-width:60px;min-height:23px;padding:1px 5px;font-size:11px;}

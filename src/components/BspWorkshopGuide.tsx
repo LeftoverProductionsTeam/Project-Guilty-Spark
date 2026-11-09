@@ -31,7 +31,10 @@ export default function BspWorkshopGuide({
           <b>Name and reshape</b>
           <p>
             Select a volume below and edit Volume name. Faces and edges have movement axes; Extrude face
-            extends them. Join source faces connects matching opposite walls. All use this map’s Undo history.
+            extends them. Drag the colored movement axes in Perspective, Top, Front or Side; the center handle
+            moves within an orthographic view. Focus an axis and use arrow keys to nudge (Shift for fine steps).
+            Press End outside a text field to place the selected volume on supporting geometry below it.
+            Join source faces connects matching opposite walls. All use this map’s Undo history.
           </p>
           <div className="bsp-inline">
             <button onClick={rename}>Name selected volume</button>

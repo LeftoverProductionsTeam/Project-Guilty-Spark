@@ -22,9 +22,9 @@ function controlRange(node:HTMLElement,content:HTMLElement,height:number){
  }
  return {top:top-bounds.top,bottom:bottom-bounds.top};
 }
-/** A view over the existing mounted controls, never a second document or editor.
- * Explicit pages replace wheel/scrollbar navigation. Inputs and Undo stay owned
- * by their original components, and off-page controls are inert, not discarded. */
+/** Keep the existing mounted controls and their document/Undo ownership.
+ * Workspaces and drawers (fill) scroll continuously; compact menus retain pages.
+ * Only menu controls outside their current page become inert. */
 export default function PagedSurface({children,label,name,scope='global',fill=false,maxHeight=440,reserveBottom=12,className=''}:{children:ReactNode;label:string;name:string;scope?:string;fill?:boolean;maxHeight?:number;reserveBottom?:number;className?:string}){
  const host=useRef<HTMLDivElement>(null),body=useRef<HTMLDivElement>(null),viewport=useRef<HTMLDivElement>(null);
  const windowId=native?getCurrentWindow().label:'browser';
@@ -47,8 +47,8 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
    const visibility=nodes.map(node=>materialized(node)?'1':'0').join('');
    const room=Math.max(40,Math.floor(fill?outer.bottom-rect.top:Math.min(maxHeight,window.innerHeight-rect.top-reserveBottom)));
    const height=Math.max(40,Math.min(total||room,room-(total>room?28:0)));
-   const offsets=surfacePages(total,height,ranges);
-   setLayout(old=>old.height===height&&old.total===total&&old.visibility===visibility&&JSON.stringify(old.offsets)===JSON.stringify(offsets)&&nodes.every(node=>original.current.has(node))?old:{height,offsets,total,visibility});
+   const offsets=fill?[0]:surfacePages(total,height,ranges);
+   setLayout(old=>old.height===height&&old.total===total&&old.visibility===visibility&&JSON.stringify(old.offsets)===JSON.stringify(offsets)&&(fill||nodes.every(node=>original.current.has(node)))?old:{height,offsets,total,visibility});
   };
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(measure);};
   const resize=new ResizeObserver(schedule);resize.observe(root);resize.observe(content);
@@ -59,6 +59,7 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
  },[fill,maxHeight,reserveBottom,name,scope]);
  useLayoutEffect(()=>{
   const content=body.current;if(!content)return;const bounds=content.getBoundingClientRect();
+  if(fill)return;
   for(const [node,before]of original.current)if(!content.contains(node)){node.removeAttribute('data-gs-offpage');node.inert=before.inert;if(before.hidden===null)node.removeAttribute('aria-hidden');else node.setAttribute('aria-hidden',before.hidden);original.current.delete(node);}
   for(const node of content.querySelectorAll<HTMLElement>(atomic)){
    if(!original.current.has(node))original.current.set(node,{inert:node.inert,hidden:node.getAttribute('aria-hidden')});
@@ -78,12 +79,13 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
    if(at>=0&&at!==page)setSelected(at);
    else if(at===page&&!node.closest('[inert]'))node.focus({preventScroll:true});
   }
- },[offset,layout,page,setSelected]);
+ },[offset,layout,page,setSelected,fill]);
  useEffect(()=>()=>{for(const [node,before]of original.current){node.removeAttribute('data-gs-offpage');node.inert=before.inert;if(before.hidden===null)node.removeAttribute('aria-hidden');else node.setAttribute('aria-hidden',before.hidden);}original.current.clear();},[]);
  useEffect(()=>{
   const content=body.current;if(!content)return;
   const reveal=(event:Event)=>{const node=event.target;if(!(node instanceof HTMLElement)||!content.contains(node))return;
    event.stopPropagation();const range=controlRange(node,content,layout.height);
+   if(fill&&viewport.current){viewport.current.scrollTop=Math.max(0,range.top-(layout.height-(range.bottom-range.top))/2);node.focus({preventScroll:true});return;}
    const at=layout.offsets.findIndex(offset=>range.top>=offset-.5&&range.bottom<=offset+layout.height+.5);
    requestedFocus.current={node,before:document.activeElement};
    if(at>=0)setSelected(at);
@@ -94,15 +96,22 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
   content.addEventListener('guilty-spark-focus-control',reveal);
   document.addEventListener('pointerdown',cancel,true);document.addEventListener('keydown',cancel,true);
   return()=>{content.removeEventListener('guilty-spark-focus-control',reveal);document.removeEventListener('pointerdown',cancel,true);document.removeEventListener('keydown',cancel,true);};
- },[layout,setSelected,page]);
+ },[layout,setSelected,page,fill]);
  const choose=(next:number)=>setSelected(Math.max(0,Math.min(Number.isFinite(next)?Math.floor(next):0,layout.offsets.length-1)));
  function find(value:string){
   setQuery(value);if(!value.trim()||!body.current)return;const root=body.current,bounds=root.getBoundingClientRect();
   const node=[...root.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,summary')].find(node=>(node.getAttribute('aria-label')??node.closest('label')?.textContent??node.textContent??node.getAttribute('title')??'').toLocaleLowerCase().includes(value.toLocaleLowerCase()));
-  if(node){const {top,bottom}=controlRange(node,root,layout.height);const page=layout.offsets.findIndex(at=>top>=at-.5&&bottom<=at+layout.height+.5);if(page>=0)choose(page);}
+  if(node){const {top,bottom}=controlRange(node,root,layout.height);if(fill&&viewport.current)viewport.current.scrollTop=Math.max(0,top-(layout.height-(bottom-top))/2);else{const page=layout.offsets.findIndex(at=>top>=at-.5&&bottom<=at+layout.height+.5);if(page>=0)choose(page);}}
  }
- return <div ref={host} className={'gs-paged-surface '+className} data-fill={fill||undefined} data-surface={name} data-page={page+1} data-pages={layout.offsets.length} onKeyDownCapture={event=>{if(event.altKey&&['PageDown','PageUp'].includes(event.key)){event.preventDefault();event.stopPropagation();choose(page+(event.key==='PageDown'?1:-1));}}}>
-  <div ref={viewport} className="gs-page-viewport" style={{height:layout.height}}><div ref={body} className="gs-page-body" style={{transform:'translateY(-'+offset+'px)'}}>{children}</div></div>
+ return <div ref={host} className={'gs-paged-surface '+className} data-fill={fill||undefined} data-navigation={fill?'scroll':'pages'} data-surface={name} data-page={page+1} data-pages={layout.offsets.length} onKeyDownCapture={event=>{
+   if(fill&&event.target===viewport.current&&!event.altKey&&!event.metaKey&&(!event.ctrlKey||['Home','End'].includes(event.key))){
+    const view=viewport.current,step=Math.max(40,view.clientHeight*.9);
+    const next=event.key==='Home'?0:event.key==='End'?view.scrollHeight:event.key==='PageDown'?view.scrollTop+step:event.key==='PageUp'?view.scrollTop-step:null;
+    if(next!==null){event.preventDefault();event.stopPropagation();view.scrollTop=next;}
+   }else if(!fill&&event.altKey&&['PageDown','PageUp'].includes(event.key)){event.preventDefault();event.stopPropagation();choose(page+(event.key==='PageDown'?1:-1));}
+  }}>
+  <div ref={viewport} className="gs-page-viewport" data-scroll-id={'surface.'+name} role={fill?'region':undefined} aria-label={fill?label:undefined} tabIndex={fill?0:undefined} style={{height:layout.height}}><div ref={body} className="gs-page-body" style={fill?undefined:{transform:'translateY(-'+offset+'px)'}}>{children}</div></div>
+  {fill&&layout.total>layout.height&&<div className="gs-surface-search"><input type="search" aria-label={'Find in '+label} placeholder="Find controls…" value={query} onChange={event=>find(event.target.value)}/></div>}
   {layout.offsets.length>1&&<nav className="gs-surface-pages" aria-label={label+' pages'}>
    <input type="search" aria-label={'Find in '+label} placeholder="Find controls…" value={query} onChange={event=>find(event.target.value)}/>
    <button type="button" aria-label={'Previous page of '+label} title="Previous page · Alt+PageUp" disabled={page===0} onClick={()=>choose(page-1)}><ChevronLeft size={13}/></button>

@@ -25,6 +25,7 @@ import RendererQuality from './RendererQuality';
 import { useRendererQuality } from './RendererQuality';
 import { NumberField, HelpTip, Notice } from './ui';
 import { call } from '../api';
+import useEndToFloor from '../useEndToFloor';
 import { useMapState } from '../mapSession';
 import { beginProjectMutation } from '../projectMutation';
 import { mergeForge } from '../forgeSession';
@@ -34,6 +35,7 @@ import {
   clipBrush,
   extrudeFace,
   worldVertex,
+  workshopPivot,
   viewAxes,
   snapNumber,
   sub,
@@ -95,8 +97,8 @@ function sendDrag(projectId: string, brush: BspBrush | null) {
   );
 }
 const toolList: [BspTool, string, string][] = [
-  ['select', 'Select', 'Select a volume; Ctrl-click adds to selection in QuickForge.'],
-  ['move', 'Move', 'Drag a volume in any orthographic view, or use the 3D axis gizmo.'],
+  ['select', 'Select', 'Select a volume. Movement axes are available in all four views.'],
+  ['move', 'Move', 'Drag a selected axis in any view. End snaps the selected volume down to supporting geometry.'],
   ['rotate', 'Rotate', 'Use the 3D gizmo or the precise angle fields.'],
   ['scale', 'Scale', 'Scale a brush with the 3D gizmo or exact values.'],
   [
@@ -178,7 +180,7 @@ function BrushGizmo({
       (p, v) => p.map((x, k) => x + v[k] / brush.vertices.length) as Vec3,
       [0, 0, 0] as Vec3,
     );
-    return { center, pivot: worldVertex(brush, center), rotation: new THREE.Euler(...brush.rotation, 'ZYX') };
+    return { center, pivot: workshopPivot(brush), rotation: new THREE.Euler(...brush.rotation, 'ZYX') };
   }, [signature]);
   const transformed = () => {
     const t = target.current;
@@ -267,10 +269,50 @@ function Ortho({
     end: Vec3;
     brush?: BspBrush;
     indices?: number[];
+    axis?: number;
     pan?: { x: number; y: number; screenX: number; screenY: number };
   } | null>(null);
+  const [viewportSize, setViewportSize] = useState({width: 600, height: 300});
+  useEffect(() => {
+    const node=svg.current;if(!node)return;
+    const resize=()=>{const rect=node.getBoundingClientRect();setViewportSize(previous=>previous.width===rect.width&&previous.height===rect.height?previous:{width:Math.max(1,rect.width),height:Math.max(1,rect.height)});};
+    resize();const observer=new ResizeObserver(resize);observer.observe(node);
+    return()=>observer.disconnect();
+  },[]);
+  useEffect(() => {
+    const cancel=()=>{setDrag(null);onGesture(false);};
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')cancel();};
+    window.addEventListener('blur',cancel);window.addEventListener('keydown',escape);
+    return()=>{window.removeEventListener('blur',cancel);window.removeEventListener('keydown',escape);};
+  },[]);
   const width = 72 / camera.zoom,
     vertical = 36 / camera.zoom;
+  const movement=(end:Vec3,source:NonNullable<typeof drag>):Vec3=>{
+    const delta=sub(end,source.start);
+    return source.axis===undefined?delta:delta.map((value,axis)=>axis===source.axis?value:0) as Vec3;
+  };
+  const movedBrush=(source:NonNullable<typeof drag>,end:Vec3)=>{
+    const delta=movement(end,source);
+    return source.indices?moveWorkshopVertices(source.brush!,source.indices,delta):{...source.brush!,position:source.brush!.position.map((value,axis)=>value+delta[axis]) as Vec3};
+  };
+  const selectedBrush=brushes.find(brush=>brush.id===selected?.brushId);
+  const selectedVertices=['face','edge','vertex'].includes(tool)?selected?.vertices:undefined;
+  const moveHandles=!!selectedBrush&&['select','move','face','edge','vertex'].includes(tool)&&(!['face','edge','vertex'].includes(tool)||!!selectedVertices?.length);
+  const localPreview=drag?.brush&&!drag.pan?movedBrush(drag,drag.end):null;
+  const pivot=selectedBrush?workshopPivot(localPreview??selectedBrush,selectedVertices):null;
+  function axisStart(event:ReactPointerEvent<SVGGElement>,axis?:number){
+    event.stopPropagation();if(disabled||event.button!==0||!selectedBrush)return;
+    event.preventDefault();event.currentTarget.focus();svg.current!.setPointerCapture(event.pointerId);
+    const start=point(event);setDrag({start,end:start,brush:selectedBrush,indices:selectedVertices,axis});onGesture(true);
+  }
+  function axisKey(event:React.KeyboardEvent<SVGGElement>,axis?:number){
+    if(disabled||!selectedBrush||event.ctrlKey||event.metaKey||event.altKey)return;
+    const direction=['ArrowRight','ArrowUp'].includes(event.key)?1:['ArrowLeft','ArrowDown'].includes(event.key)?-1:0;if(!direction)return;
+    event.preventDefault();event.stopPropagation();
+    const delta:Vec3=[0,0,0],component=axis??(['ArrowLeft','ArrowRight'].includes(event.key)?axes[0]:axes[1]);
+    delta[component]=direction*(grid||.1)*(event.shiftKey ? .1 : 1);
+    onMove(selectedVertices?moveWorkshopVertices(selectedBrush,selectedVertices,delta):{...selectedBrush,position:selectedBrush.position.map((value,index)=>value+delta[index]) as Vec3});
+  }
   const point = (event: { clientX: number; clientY: number }, snapped = true): Vec3 => {
     const r = svg.current!.getBoundingClientRect(),
       p: Vec3 = [0, 0, 0];
@@ -318,13 +360,11 @@ function Ortho({
   function finish(e: ReactPointerEvent<SVGSVGElement>) {
     if (!drag) return;
     const end = point(e),
-      d = sub(end, drag.start);
+      d = movement(end, drag);
     setDrag(null);
     if (!drag.pan && tool !== 'measure') {
       if (drag.brush) {
-        if (Math.hypot(...d) > 1e-6) onMove(drag.indices
-          ? moveWorkshopVertices(drag.brush, drag.indices, d)
-          : {...drag.brush, position: drag.brush.position.map((x, k) => x + d[k]) as Vec3});
+        if (Math.hypot(...d) > 1e-6) onMove(movedBrush(drag,end));
       } else if (Math.hypot(...d) > 0.01) {
         const lo: Vec3 = [0, 0, 0],
           hi: Vec3 = [height, height, height];
@@ -367,6 +407,7 @@ function Ortho({
       onPointerDown={start}
       onPointerMove={(e) => {
         if (!drag) return;
+        if(!drag.pan&&(e.buttons&1)===0){setDrag(null);onGesture(false);return;}
         const p = point(e);
         if (drag.pan) {
           const rect = svg.current!.getBoundingClientRect();
@@ -378,10 +419,7 @@ function Ortho({
         } else {
           setDrag({ ...drag, end: p });
           if (drag.brush && !drag.indices)
-            sendDrag(projectId, {
-              ...drag.brush,
-              position: drag.brush.position.map((v, k) => v + p[k] - drag.start[k]) as Vec3,
-            });
+            sendDrag(projectId, movedBrush(drag,p));
         }
       }}
       onPointerUp={finish}
@@ -402,7 +440,7 @@ function Ortho({
         height={vertical}
         fill={`url(#${gridId})`}
       />
-      {ghosts.map((b, i) => (
+      {[...ghosts,...(localPreview?[localPreview]:[])].map((b, i) => (
         <g key={`${b.id}-${i}`} pointerEvents="none" data-workshop-preview={b.id}>
           {b.faces.map((f) => (
             <polygon
@@ -480,6 +518,23 @@ function Ortho({
           )}
         </g>
       ))}
+      {moveHandles&&pivot&&<g className="bsp-ortho-gizmo" transform={`translate(${pivot[axes[0]]} ${-pivot[axes[1]]}) scale(${width/viewportSize.width} ${vertical/viewportSize.height})`}>
+        {axes.slice(0,2).map((axis,index)=>{
+          const horizontal=index===0,color=['#ee5555','#58d86b','#568bff'][axis],name='XYZ'[axis];
+          return <g key={axis} role="button" tabIndex={disabled?-1:0} aria-disabled={disabled} aria-label={`${view} ${name} movement axis`} data-bsp-axis={name} className="bsp-ortho-axis"
+            onPointerDown={event=>axisStart(event,axis)} onKeyDown={event=>axisKey(event,axis)}>
+            <title>{name} axis: drag to move only {name}. Arrow keys: nudge; Shift: fine. End: floor snap.</title>
+            <line className="bsp-axis-hit" x1={horizontal?8:0} y1={horizontal?0:-8} x2={horizontal?48:0} y2={horizontal?0:-48} strokeWidth={14}/>
+            <line x1={0} y1={0} x2={horizontal?46:0} y2={horizontal?0:-46} stroke={color} strokeWidth={2} pointerEvents="none"/>
+            <path d={horizontal?'M 50 0 L 40 -4 L 40 4 Z':'M 0 -50 L -4 -40 L 4 -40 Z'} fill={color}/>
+            <text x={horizontal?54:-4} y={horizontal?4:-55} fill={color} fontSize={11} pointerEvents="none">{name}</text>
+          </g>;
+        })}
+        <g role="button" tabIndex={disabled?-1:0} aria-disabled={disabled} aria-label={`${view} free movement handle`} className="bsp-ortho-axis" onPointerDown={event=>axisStart(event)} onKeyDown={event=>axisKey(event)}>
+          <title>Drag in this view's plane. End snaps the selected volume to supporting geometry.</title>
+          <rect x={-5} y={-5} width={10} height={10} fill="#c5ede2" stroke="#102a34" strokeWidth={1}/>
+        </g>
+      </g>}
       {preview && (
         <rect
           x={preview.x}
@@ -673,6 +728,18 @@ export default function BspWorkshop(props: Props) {
   const brush = w?.brushes.find((b) => b.id === selection?.brushId),
     face = brush?.faces.find((f) => f.id === selection?.faceId),
     disabled = busy || props.readOnly;
+  // Use the same evaluated source mesh as the viewport/compiler. Exclude the
+  // selected volume and non-collision portals so a brush cannot support itself.
+  useEndToFloor({
+    enabled:!!brush&&!disabled&&!!props.mesh,
+    clearance:0,
+    revision:JSON.stringify(doc),
+    selected:brush?[{id:brush.id,name:brush.name,matrix:new THREE.Matrix4(),collision:{positions:brush.vertices.flatMap(vertex=>worldVertex(brush,vertex)),indices:[]}}]:[],
+    others:[],
+    terrain:props.mesh?{positions:props.mesh.positions,indices:props.mesh.parts.filter(part=>part.brushId!==brush?.id&&!w?.portals.some(portal=>portal.id===part.brushId)).flatMap(part=>props.mesh!.indices.slice(part.indexStart,part.indexStart+part.indexCount))}:null,
+    onDrop:delta=>{if(brush)updateBrush({...brush,position:[brush.position[0],brush.position[1],brush.position[2]+delta]},'Snap BSP volume to floor');},
+    onError:setError,
+  });
   const seamTargets = w?.brushes.filter(b => b.role === 'space' && b.id !== brush?.id) ?? [];
   const seamTarget = seamTargets.find(b => b.id === seamTargetId) ?? seamTargets[0];
   const seamEnd = seamTarget?.faces.find(f => f.id === seamFaceId) ?? seamTarget?.faces.find(f =>

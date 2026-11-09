@@ -170,3 +170,13 @@ test('runtime dashboard pages and engine setup stay independent across live wind
  session.configureMapViewWindow('runtime-one');expect(session.readMapSession('global','tools.dashboard','')).toBe('setup');expect(session.readMapSession('global','tools.enginePackage','')).toBe('openh1');
  session.configureMapViewWindow('runtime-two');expect(session.readMapSession('global','tools.dashboard','')).toBe('packs');expect(session.readMapSession('global','tools.enginePackage','')).toBe('faber');
 });
+
+
+test('global workspace scroll remains window-local across shared preference updates',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');
+ session.writeMapSession('global','scroll.settings',{'surface.settings-interface':[399,0]});
+ session.configureMapViewWindow('tools-popout');session.writeMapSession('global','scroll.settings',{'surface.settings-interface':[120,0]});
+ expect(session.readMapSession('global','scroll.settings',{})).toEqual({'surface.settings-interface':[120,0]});
+ session.configureMapViewWindow('main');
+ expect(session.readMapSession('global','scroll.settings',{})).toEqual({'surface.settings-interface':[399,0]});
+});

@@ -6,7 +6,13 @@ test.beforeEach(async ({ page }) => {
     w.isTauri = true;
     w.calls = [];
     w.__TAURI_INTERNALS__ = {
+      metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
+      transformCallback: () => 1,
       invoke: async (command: string, args: any) => {
+        // Window plumbing is separate from the save-plan IPC under test.
+        if (command === 'plugin:window|is_focused') return true;
+        if (command === 'plugin:event|listen') return 1;
+        if (command === 'plugin:event|unlisten') return;
         w.calls.push({ command, args });
         if (command === 'smart_edit_plan') {
           const result = {

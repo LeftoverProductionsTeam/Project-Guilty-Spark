@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {createPortal} from 'react-dom';
 import { AlertTriangle, Check, X } from 'lucide-react';
+import {observeWindowFocus} from '../windowFocus';
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: string }) {
   return <span className={`pill ${tone}`}>{children}</span>;
 }
@@ -116,9 +117,23 @@ export function NumberField({
   const display = (n: number) => Number(n.toPrecision(7)).toString();
   const [draft, setDraft] = useState(display(value));
   const [error, setError] = useState('');
-  const scrub=useRef<{pointer:number;x:number;value:number;next:number;moved:boolean}|null>(null);
-  useEffect(() => {scrub.current=null;setDraft(display(value));}, [value]);
+  const scrub=useRef<{pointer:number;x:number;value:number;next:number;moved:boolean}|null>(null),cancelledScrub=useRef(false);
+  useEffect(() => {scrub.current=null;cancelledScrub.current=false;setDraft(display(value));}, [value]);
+  function cancelScrub() {
+    if(!scrub.current)return;
+    scrub.current=null;cancelledScrub.current=true;setDraft(display(value));
+  }
+  useEffect(()=>{
+    const blur=()=>cancelScrub();window.addEventListener('blur',blur);
+    // WebView2 can report document focus in two native windows at once.
+    // Reuse the existing window authority; a native blur cancels only a scrub.
+    const stop=observeWindowFocus(focused=>{if(!focused)cancelScrub();});
+    return()=>{stop();window.removeEventListener('blur',blur);};
+  },[value]);
   function commit() {
+    // Native windows can lose capture without receiving pointer-up. A later
+    // blur must not commit that interrupted gesture's stale displayed value.
+    if(cancelledScrub.current){cancelledScrub.current=false;return;}
     if (draft === display(value)) {
       setError('');
       return;
@@ -144,12 +159,13 @@ export function NumberField({
         title="Drag left or right to adjust. Shift: fine adjustment. Click and type an exact value."
         onPointerDown={e=>{
           if(e.button!==0||disabled||e.clientX>e.currentTarget.getBoundingClientRect().right-18)return;
-          const parsed=Number(draft);
+          const parsed=Number(draft);cancelledScrub.current=false;
           scrub.current={pointer:e.pointerId,x:e.clientX,value:Number.isFinite(parsed)?parsed:value,next:value,moved:false};
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
         onPointerMove={e=>{
           const drag=scrub.current;if(!drag||drag.pointer!==e.pointerId)return;
+          if((e.buttons&1)===0){cancelScrub();return;}
           const delta=e.clientX-drag.x;if(!drag.moved&&Math.abs(delta)<4)return;
           drag.moved=true;e.preventDefault();
           const unit=typeof step==='number'?step:0.1;
@@ -161,9 +177,10 @@ export function NumberField({
           scrub.current=null;
           if(drag.moved){e.preventDefault();e.stopPropagation();if(drag.next!==value)onCommit(drag.next);}
         }}
-        onPointerCancel={()=>{scrub.current=null;setDraft(display(value));}}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onPointerCancel={cancelScrub}
+        onLostPointerCapture={e=>{if(scrub.current?.pointer===e.pointerId)cancelScrub();}}
+        onChange={(e) => {cancelledScrub.current=false;setDraft(e.target.value);}}
+        onBlur={()=>{if(scrub.current)cancelScrub();else commit();}}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
           if (e.key === 'Escape') {

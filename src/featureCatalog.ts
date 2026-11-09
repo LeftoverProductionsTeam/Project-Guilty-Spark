@@ -171,6 +171,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
       'Switch already open maps with their tabs or the Maps list. Left/Right while a map tab has focus and Ctrl+PageUp/PageDown also switch open maps. Work → Saved projects opens projects not already open.',
       'The Maps arrow moves that map and its draft to another window. Work → Saved projects → the window icon opens another view while keeping this window. Work → Workspace in this window changes tools without changing projects.',
       'Close a map with ×. Unsaved changes offer Save, Discard or Cancel. Save with Ctrl+S; workspace Back/Forward is separate from source Undo/Redo.',
+      'Long workspaces and drawers stay on one continuous page: use the wheel, scrollbar or PageUp/PageDown, or Find controls. Your scroll position is remembered. Compact application menus keep their own navigation.',
       'To resume windows after restart: Settings & tools → Interface Studio → Restore my saved workspace layout on launch; then View → Save workspace windows. Ctrl+S saves the project, not the window layout.',
     ],
   ),

@@ -1,5 +1,6 @@
 import { assertQaOutputPath,sealQaScratch,disposeQaScratch } from './native-qa-storage.mjs';
 import {openStudioMenu,chooseTool,openDrawer,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
+import {auditPagedSurface} from '../tests/ui/helpers/compactSurfaces.ts';
 import {configureNativeCeTarget} from './native-live-rebuild.mjs';
 import {nativeDedicatedServer} from './native-dedicated-server.mjs';
 import {execFile} from 'node:child_process';
@@ -129,6 +130,16 @@ async function start(a, restart = false) {
     .flatMap((c) => c.pages())
     .find((p) => p.url().includes('tauri.localhost'));
   a.page.on('pageerror', (e) => errors.push({ actor: a.slug, error: String(e) }));
+  await a.page.addInitScript(()=>{
+    window.__sparkQaSourceEvents=[];
+    for(const kind of ['input','change','pointerdown','pointerup'])document.addEventListener(kind,event=>{
+      const target=event.target;if(!(target instanceof HTMLElement))return;
+      if((kind==='input'||kind==='change')&&!target.closest('.bsp-workshop'))return;
+      const node=target.closest('input,select,button,canvas,svg');if(!node)return;
+      const row={kind,label:(node.getAttribute('aria-label')||node.closest('label')?.textContent||node.textContent||node.tagName).trim().slice(0,100),value:node instanceof HTMLInputElement||node instanceof HTMLSelectElement?node.value:null,x:event.clientX,y:event.clientY,time:performance.now()};
+      window.__sparkQaSourceEvents.push(row);if(window.__sparkQaSourceEvents.length>96)window.__sparkQaSourceEvents.shift();
+    },true);
+  });
   a.call = (command, params = {}) =>
     a.page.evaluate(({ command, params }) => window.__TAURI_INTERNALS__.invoke(command, params), {
       command,
@@ -275,6 +286,7 @@ async function update(a, base, change, id = crypto.randomUUID()) {
   return { next, document, operationId: id, revision: base.revision };
 }
 async function converge(expected) {
+  try {
   await expect
     .poll(
       async () => {
@@ -305,6 +317,10 @@ async function converge(expected) {
     }),
   );
   return report;
+  }catch(problem){
+    receipt.failedConvergence={expected,actors:await Promise.all(actors.map(async actor=>({slug:actor.slug,backend:await view(actor).catch(error=>({error:String(error)})),savedProject:await actor.call('open_project',{id:actor.id}).then(value=>({document:value.project.quickForge,modifiedAt:value.project.modifiedAt})).catch(error=>({error:String(error)})),ui:await actor.page.evaluate(()=>({hash:document.querySelector('[aria-label="Native BSP Workshop"]')?.getAttribute('data-source-sha'),sourceFields:[...document.querySelectorAll('.bsp-source-fields input')].map(node=>({label:node.getAttribute('aria-label')||node.closest('label')?.textContent,value:node.value})),names:[...document.querySelectorAll('.bsp-source-list button')].map(node=>node.textContent),events:window.__sparkQaSourceEvents,studioSummary:document.querySelector('.studio-panel>summary')?.textContent,alerts:[...document.querySelectorAll('.studio-panel [role=alert]')].map(node=>node.textContent?.slice(0,2000))})).catch(error=>({error:String(error)}))})))};
+    await mark('nativeSourceConvergenceFailed',true);throw problem;
+  }
 }
 // Only completed generated tag staging inside this test's declared scratch.
 // Keep frozen project source, receipts/logs, current input tags and every map.
@@ -385,6 +401,68 @@ async function uiName(a, index, name) {
     })),
   );
   await expect(a.page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
+}
+async function workshopControlAcceptance(a){
+  const workshop=a.page.getByLabel('Native BSP Workshop',{exact:true});
+  await a.call('plugin:window|set_focus',{label:'main'});
+  await mark('nativeWindowFocusRequest',{actor:'owner',reason:'Workshop input',authority:'nativeWindow',requestedAt:new Date().toISOString()});
+  await expect.poll(()=>a.call('plugin:window|is_focused',{label:'main'}),{message:'Activate the exact private Workshop owner before native input'}).toBe(true);
+  await workshop.locator('.bsp-source-list').getByRole('button',{name:/Ramp/,exact:false}).click();
+  await expect(workshop.getByRole('textbox',{name:'Volume name',exact:true})).toHaveValue('Ramp');
+  await workshop.getByRole('button',{name:'Move',exact:true}).click();
+  const position=workshop.getByRole('group',{name:'Position',exact:true});
+  const source=async()=>(await a.call('open_project',{id:a.id})).project.quickForge;
+  const ramp=async()=>(await source()).workshop.brushes.find(brush=>brush.id==='ramp');
+  const original=clone(await ramp()),verified=[];
+  for(const [view,axes]of [['top',['X','Y']],['front',['X','Z']],['side',['Y','Z']]]){
+    const viewport=workshop.getByLabel(view+' orthographic editing view',{exact:true});
+    for(const [at,axis]of axes.entries()){
+      const handle=viewport.getByRole('button',{name:`${view} ${axis} movement axis`,exact:true}),index='XYZ'.indexOf(axis),before=clone(await ramp());
+      await expect(handle).toBeVisible();const box=await handle.boundingBox();expect(box).toBeTruthy();
+      const target=await handle.evaluate(node=>{const box=node.getBoundingClientRect(),hit=document.elementFromPoint(box.x+box.width/2,box.y+box.height/2);return {hit:!!hit&&(node===hit||node.contains(hit)),tag:hit?.tagName,label:hit?.getAttribute('aria-label'),nativeDocumentFocus:document.hasFocus()};});
+      await mark('nativeWorkshopAxisInput',{view,axis,beforePosition:before.position,box,target,windowFocused:await a.call('plugin:window|is_focused',{label:'main'})});
+      expect(target.hit,'The actual handle center must receive the native pointer').toBe(true);
+      await a.page.mouse.move(box.x+box.width/2,box.y+box.height/2);await a.page.mouse.down();
+      await a.page.mouse.move(box.x+box.width/2+(at===0?12:0),box.y+box.height/2-(at===0?0:12),{steps:8});await a.page.mouse.up();
+      await expect.poll(async()=>(await ramp()).position[index]).toBeGreaterThan(before.position[index]);
+      const moved=await ramp();for(let k=0;k<3;k++)if(k!==index)expect(moved.position[k]).toBe(before.position[k]);
+      await handle.focus();await a.page.keyboard.press('Control+z');await expect.poll(ramp).toEqual(before);
+      await handle.focus();await a.page.keyboard.press('ArrowRight');await expect.poll(async()=>(await ramp()).position[index]).toBeCloseTo(before.position[index]+.5,6);
+      await handle.focus();await a.page.keyboard.press('Control+z');await expect.poll(ramp).toEqual(before);
+      verified.push({view,axis,actualMouseDrag:true,keyboardNudge:true,unrelatedAxesUnchanged:true,singleActionUndo:true});
+    }
+  }
+  const z=position.getByRole('spinbutton',{name:'Z',exact:true});await z.fill('3');await z.press('Tab');
+  await expect.poll(async()=>(await ramp()).position[2]).toBe(3);
+  const report=await a.call('quickforge_validate',{document:await source()});await expect(workshop).toHaveAttribute('data-source-sha',report.sourceSha256);
+  await z.focus();await a.page.keyboard.press('End');expect((await ramp()).position[2]).toBe(3);
+  await workshop.getByRole('button',{name:'Move',exact:true}).focus();await a.page.keyboard.press('End');
+  await expect.poll(async()=>(await ramp()).position[2]).toBeCloseTo(.5,6);
+  await a.page.keyboard.press('Control+s');await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);
+  await a.page.keyboard.press('Control+z');await expect.poll(async()=>(await ramp()).position[2]).toBe(3);
+  await a.page.keyboard.press('Control+y');await expect.poll(async()=>(await ramp()).position[2]).toBeCloseTo(.5,6);
+  await a.page.keyboard.press('Control+s');await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);
+  const snapped=await ramp();expect(Math.min(...snapped.vertices.map(vertex=>vertex[2]*snapped.scale[2]+snapped.position[2]))).toBeCloseTo(0,6);
+  await a.page.screenshot({path:path.join(root,'native-workshop-axis-floor.png')});
+  await mark('nativeWorkshopAxisAndFloor',{axes:verified,originalPosition:original.position,snappedPosition:snapped.position,minimumSourceZ:0,typedEndIgnored:true,immediateSave:true,undoRedo:true,sharedFloorSnapImplementation:true,nativeCompilePending:true});
+}
+async function continuousWorkspaceAcceptance(a){
+  const source=async()=>(await a.call('open_project',{id:a.id})).project.quickForge;
+  const before=hash(JSON.stringify(await source()));
+  await a.call('plugin:window|set_size',{label:'main',value:{Logical:{width:800,height:600}}});
+  await chooseTool(a.page,'Settings & tools');await a.page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  const surface=a.page.locator('[data-surface="settings-interface"]'),viewport=surface.locator(':scope > .gs-page-viewport');
+  await expect(surface).toHaveAttribute('data-navigation','scroll');await expect(surface).toHaveAttribute('data-pages','1');
+  const layout=await auditPagedSurface(surface);
+  const top=await viewport.evaluate(node=>node.scrollTop),maximum=await viewport.evaluate(node=>node.scrollHeight-node.clientHeight);
+  await a.page.screenshot({path:path.join(root,'native-workspace-scroll.png')});
+  await chooseTool(a.page,'Level editor');await chooseTool(a.page,'Settings & tools');
+  await a.page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  await expect.poll(()=>viewport.evaluate((node,expected)=>Math.abs(node.scrollTop-expected),top)).toBeLessThan(2);
+  await chooseTool(a.page,'Level editor');await expect(a.page.getByLabel('Native BSP Workshop',{exact:true})).toBeVisible();
+  expect(hash(JSON.stringify(await source()))).toBe(before);
+  await a.call('plugin:window|set_size',{label:'main',value:{Logical:{width:1500,height:950}}});
+  await mark('nativeWorkspaceScrolling',{logicalWindow:{width:800,height:600},navigation:'scroll',maximumScroll:maximum,retainedScroll:top,layout,sourceUnchanged:true,workspaceNavigationRestored:true,webviewRestartTested:false});
 }
 async function memory(label) {
   const samples = [];
@@ -480,6 +558,8 @@ try {
   if(chupathingyTrial){
     const configured=await configureNativeCeTarget({page:a.page,kit,invader,sourceRoot:nativeRecovery.tagRoot,current:async()=>(await a.call('open_project',{id:a.id})).project,save:async()=>{await a.page.keyboard.press('Control+s');await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);},hash:fileHash,expect});receipt.ceSource.reviewedRecovery=configured.recovery;
   }
+  await workshopControlAcceptance(a);
+  await continuousWorkspaceAcceptance(a);
   const networks = await a.call('forge_session_networks');
   const lan = networks.find((n) => n.networkScope === 'private' && n.address !== '127.0.0.1'),
     vpn = networks.find((n) => n.networkScope === 'radminVpn');
@@ -498,6 +578,31 @@ try {
     network: 'actual private LAN interface',
     participants: current.participants.length,
   });
+  // A real native-window focus transfer must cancel a held numeric scrub;
+  // an inactive creator must not later publish that abandoned gesture.
+  await select(c,0);await c.page.getByRole('button',{name:'Select',exact:true}).click();
+  const positionX=c.page.locator('.bsp-source-fields').getByRole('spinbutton',{name:'X',exact:true}).first();
+  await revealPagedControl(positionX);await c.call('plugin:window|set_focus',{label:'main'});
+  await mark('nativeWindowFocusRequest',{actor:'editor-c',authority:'nativeWindow',requestedAt:new Date().toISOString()});
+  await expect.poll(()=>c.call('plugin:window|is_focused',{label:'main'}),{message:'Activate the exact private editor-c native window'}).toBe(true);
+  const initialPosition=Number(await positionX.inputValue()),scrubBounds=await positionX.boundingBox();expect(scrubBounds).toBeTruthy();
+  try{
+    await c.page.mouse.move(scrubBounds.x+20,scrubBounds.y+scrubBounds.height/2);await c.page.mouse.down();
+    await c.page.mouse.move(scrubBounds.x+50,scrubBounds.y+scrubBounds.height/2,{steps:8});
+    await expect.poll(async()=>Number(await positionX.inputValue())).not.toBe(initialPosition);
+    await a.call('plugin:window|set_focus',{label:'main'});
+    await mark('nativeWindowFocusRequest',{actor:'owner',authority:'nativeWindow',requestedAt:new Date().toISOString()});
+    const focus=async()=>({owner:{native:await a.call('plugin:window|is_focused',{label:'main'}),webview:await a.page.evaluate(()=>document.hasFocus())},editor:{native:await c.call('plugin:window|is_focused',{label:'main'}),webview:await c.page.evaluate(()=>document.hasFocus())},displayed:await positionX.inputValue()});
+    try{
+      await expect.poll(async()=>{const state=await focus();return state.owner.native&&!state.editor.native;},{message:'Native window authority must leave the scrub owner; WebView focus is diagnostic only'}).toBe(true);
+      await expect(positionX).toHaveValue(String(initialPosition));
+    }catch(error){await mark('nativeScrubFocusFailure',await focus());throw error;}
+  }finally{await c.page.mouse.up();}
+  await c.call('plugin:window|set_focus',{label:'main'});await c.page.getByRole('button',{name:'Select',exact:true}).click();
+  await converge(current);expect((await view(a)).revision).toBe(current.revision);
+  expect(await c.call('forge_studio_pending',{projectId:c.id})).toBeNull();
+  await c.page.screenshot({path:path.join(root,'native-interrupted-number-field.png')});
+  await mark('nativeInterruptedNumericScrub',{actualNativeWindowFocusTransfer:true,sourceRevisionUnchanged:current.revision,positionRestored:initialPosition,pendingOperationAbsent:true,noAbandonedScrubCommitted:true});
   // Each creator makes a simultaneous genuine GUI edit to a different brush.
   const began = performance.now();
   await Promise.all([
@@ -789,6 +894,18 @@ try {
     portals: snapshot.quickForge.workshop.portals.length,
     readbackTags: reopened.inspection.tags.length,
   });
+  if(receipt.stages.nativeWorkshopAxisAndFloor){
+    const ramp=frozen.document.workshop.brushes.find(brush=>brush.id==='ramp');
+    expect(ramp.rotation).toEqual([0,0,0]);expect(ramp.scale).toEqual([1,1,1]);
+    const highest=Math.max(...ramp.vertices.map(vertex=>vertex[2]));
+    const upper=ramp.vertices.filter(vertex=>vertex[2]===highest).map(vertex=>vertex.map((value,axis)=>value+ramp.position[axis]));
+    const positions=reopened.inspection.mesh.positions;
+    for(const point of upper){
+      let found=false;for(let index=0;index<positions.length;index+=3)if(point.every((value,axis)=>Math.abs(value-positions[index+axis])<.0001)){found=true;break;}
+      expect(found,'The actual native collision must contain the floor-snapped ramp upper edge').toBe(true);
+    }
+    await mark('nativeWorkshopAxisAndFloor',{...receipt.stages.nativeWorkshopAxisAndFloor,nativeCompilePending:false,compiledCollisionUpperEdge:upper,compiledCacheSha256:await fileHash(built.output),compiledBuildId:jobId});
+  }
   if(chupathingyTrial){
     async function independentReadback(build,label){
       const directory=path.join(root,'independent-ce-'+label);await fs.mkdir(directory);
@@ -815,11 +932,25 @@ try {
     if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireFrozenQaMap(a,built,gameBuild);
     const hostPage=async()=>{await chooseTool(a.page,'Online');await a.page.getByRole('button',{name:'Host game',exact:true}).click();};
     const liveRebuild=process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1'?{
-      async edit(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await hostPage();receipt.sharedRebuildRevision={sessionId:a.session,sessionRevision:current.revision,documentSha256:(await a.call('quickforge_validate',{document:current.document})).sourceSha256,realPeerInspectorEdits:true};},
+      async edit(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await hostPage();receipt.sharedRebuildRevision={sessionId:a.session,sessionRevision:current.revision,documentSha256:(await a.call('quickforge_validate',{document:current.document})).sourceSha256,realPeerInspectorEdits:true};return {revision:current.revision,positions:current.document.spawns.map(spawn=>[...spawn.position])};},
+      async editDuringBuild(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await save(a,current.document);await hostPage();return {revision:current.revision,positions:current.document.spawns.map(spawn=>[...spawn.position]),sourceSha256:(await a.call('quickforge_validate',{document:current.document})).sourceSha256};},
+      async reviewUnadoptedBuild(job,frozen){
+        const project=(await a.call('open_project',{id:a.id})).project,build=project.builds.find(row=>row.id===job);expect(build?.status).toBe('validated');
+        const native=await independentReadback(build,'unadopted-source-race');expect(native.positions).toEqual(frozen.positions);
+        const snapshot=path.join(a.data,'jobs',job,'workspace','project.gsproject'),snapshotHash=await fileHash(snapshot),binding=JSON.parse(await fs.readFile(path.join(a.data,'jobs',job,'studio-binding.json'),'utf8'));
+        expect(binding.sessionRevision).toBe(frozen.revision);expect(current.revision).toBeGreaterThan(frozen.revision);
+        await retireQaTagIntermediates(a,build);expect(await fileHash(build.output)).toBe(native.sha256);
+        // This QA candidate was independently read back and explicitly refused;
+        // it is neither the running nor retained rollback map. Keep its source receipt.
+        expect(build.id).not.toBe(gameBuild.id);expect(await fileHash(gameBuild.output)).toBe(gameBuild.sha256);
+        const seal=await sealQaScratch(root,build.output),removed=await disposeQaScratch(root,seal,{ownerFinished:true});
+        expect(await fileHash(snapshot)).toBe(snapshotHash);expect(await fileHash(gameBuild.output)).toBe(gameBuild.sha256);
+        return {...native,sessionRevision:binding.sessionRevision,sourceSnapshotSha256:snapshotHash,retiredQaOnlyAfterReadback:true,retiredLogicalBytes:removed.bytes,currentGameOutputPreserved:true};
+      },
       async readback(adopted){
         const project=(await a.call('open_project',{id:a.id})).project,build=project.builds.find(row=>row.id===adopted.sourceBuildId);expect(build?.status).toBe('validated');
         const readback=await independentReadback(build,'dedicated-rebuilt');
-        for(let i=0;i<4;i++)expect(readback.positions[i][0]).toBeCloseTo(receipt.currentCeReadback.positions[i][0]+.25,5);
+        for(let i=0;i<4;i++)for(let axis=0;axis<3;axis++)expect(readback.positions[i][axis]).toBeCloseTo(current.document.spawns[i].position[axis],5);
         const binding=JSON.parse(await fs.readFile(path.join(a.data,'jobs',build.id,'studio-binding.json'),'utf8'));expect(binding.sessionRevision).toBe(current.revision);expect(binding.sessionId).toBe(a.session);
         receipt.sharedRebuildRevision.buildId=build.id;receipt.sharedRebuildRevision.sha256=readback.sha256;
         await retireQaTagIntermediates(a,build);
@@ -840,7 +971,7 @@ try {
         await hostPage();return diagnostics;
       },
     }:undefined;
-    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,checkpoint:async phase=>{
+    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,verifyLifecycleFaults:process.env.SPARK_QA_DEDICATED_FAULTS==='1',ownerProcessId:a.child.pid,checkpoint:async phase=>{
       await qaFootprint(phase);
       const history=await a.call('read_workspace_history',{projectId:a.id});
       const saveState={phase,historyDirty:history?.history?.head?.dirty,historyHead:history?.history?.head?.current,visibleSaveChanges:await a.page.getByRole('button',{name:'Save changes',exact:true}).count()};

@@ -48,6 +48,8 @@ export default function useEndToFloor(config: {
   selected: DropBody[];
   others: DropBody[];
   terrain?: CollisionMesh | null;
+  /** Structural brush seams need exact contact; placed objects keep a small clearance. */
+  clearance?: number;
   onDrop: (delta: number) => void;
   onError: (message: string) => void;
 }) {
@@ -107,7 +109,7 @@ export default function useEndToFloor(config: {
           latest.current.selected.map((x) => x.id).join() !== c.selected.map((x) => x.id).join()
         )
           throw Error('Selection changed while collision loaded. Press End again.');
-        const delta = floorSnapDelta(selected, surfaces);
+        const delta = floorSnapDelta(selected, surfaces, c.clearance);
         if (delta === null) throw Error('No supporting collision surface was found below the selection.');
         if (Math.abs(delta) > 0.0002) c.onDrop(delta);
       })()
