@@ -116,7 +116,7 @@ export default function Build({
         description="A traceable pipeline. A separate package. Your installation protected."
         actions={
           <>
-            {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>{validated.target==='mcc-direct'?'Open edited map copy':'Open compiled map'}</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
+            {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>{['mcc-direct','ce-direct'].includes(validated.target)?'Open edited map copy':'Open compiled map'}</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
             <button onClick={()=>void onAction(async()=>{if(dirty)await onSave(true);onRefresh();})}>
               <RefreshCw size={14} />
               {dirty?'Save & refresh checks':'Refresh checks'}

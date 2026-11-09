@@ -74,7 +74,7 @@ pub fn format_contract(project: &Project, inspection: &MapInspection) -> FormatC
     let operations = vec![
         NativeRoute {operation:"inspect",status:Available,detail:"This exact preserved cache was read by its native parser; counts are decoder evidence."},
         NativeRoute {operation:"assetPreview",status:RequiresPreflight,detail:"Resolve exact resource identities and supported bitmap/model/audio payloads. Rendering and audible playback remain separate acceptance."},
-        NativeRoute {operation:"compiledCacheEdit",status:if plain&&inspection.header.version==13 {RequiresPreflight}else{Unsupported},detail:"The current direct writer reviews bounded MCC v13 cells/CRC. It cannot add arrays, tags or BSP topology; Smart Edit must admit each transaction."},
+        NativeRoute {operation:"compiledCacheEdit",status:if plain&&[13,609].contains(&inspection.header.version) {RequiresPreflight}else{Unsupported},detail:"Smart Edit reviews bounded MCC13 cells or embedded CE609 scenery bounding radius, with matching output runtime, whole-file footprint and native CRC checks. Arrays, references, other CE fields and BSP topology require their native source route."},
         NativeRoute {operation:"looseTagRebuild",status:if rebuild {RequiresPreflight}else{Unsupported},detail:"Existing imported-cache publication rebuilds into MCC using matching native tools, complete recovered tags and explicit conversion preflight."},
         NativeRoute {operation:"bspTopology",status:if rebuild&&project.bsp_assembly.is_some(){RequiresPreflight}else{RequiresSource},detail:"Use existing BSP assembly or editable QuickForge/Workshop source. Selecting a compiled triangle does not make it editable source."},
     ];

@@ -52,7 +52,7 @@ fn source(path:&std::path::Path,inspection:&maps::MapInspection)->Project {
         assert!(contract.compilation_targets.iter().skip(1).all(|route|route.status==Unsupported));
         assert!(contract.operations.iter().all(|route|route.operation!="liveWrite"));
         assert_eq!(contract.operations.iter().find(|route|route.operation=="compiledCacheEdit").unwrap().status,
-            if version==13{RequiresPreflight}else{Unsupported});
+            if [13,609].contains(&version){RequiresPreflight}else{Unsupported});
         for compressed in [false,true] {
             inspection.header.extended=!compressed;inspection.header.compressed=compressed;
             assert!(!source_identity::mcc_conversion_source(&inspection));

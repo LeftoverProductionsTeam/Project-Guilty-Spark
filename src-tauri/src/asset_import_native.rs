@@ -12,6 +12,38 @@ fn source_for_import(state:&AppState,id:&str)->Reply<Project>{
     }
     Ok(source)
 }
+/// Compare only used imports with available editable origins. Legacy frozen
+/// closures remain self-contained if their optional origin descriptor is absent;
+/// their owned receipts/payload hashes are still checked during native staging.
+pub(super) fn guard_import_sources(state:&AppState,project:&Project)->Reply<()> {
+    let mut origins=std::collections::BTreeMap::<String,Option<Project>>::new();
+    for binding in project.native_asset_imports.iter().filter(|binding|core::native_asset_imports::is_used(project,binding)) {
+        if !origins.contains_key(&binding.source_project_id) {
+            let present={
+                let library=lock(&state.library)?;
+                match library.get(&binding.source_project_id) {
+                    Ok(_)=>true,
+                    Err(core::SparkError::Io(reason)) if reason.kind()==std::io::ErrorKind::NotFound=>false,
+                    Err(reason)=>return Err(error(reason)),
+                }
+            };
+            let source=if present {
+                let source=source_for_import(state,&binding.source_project_id)?;
+                let native=source.source.as_ref().ok_or("Imported asset origin has no native source")?;
+                if maps::hash_file(&native.preserved_path).map_err(error)?!=native.sha256 {
+                    return Err("Imported asset origin changed outside Spark; review and re-import its native revision before building".into());
+                }
+                Some(source)
+            }else{None};
+            origins.insert(binding.source_project_id.clone(),source);
+        }
+        if let Some(source)=origins.get(&binding.source_project_id).and_then(Option::as_ref) {
+            core::native_asset_imports::require_origin_revision(binding,source).map_err(error)?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub(super) async fn prepare_native_asset_import(
     app: tauri::AppHandle,
@@ -62,7 +94,11 @@ pub(super) async fn prepare_native_asset_import(
                         if draft.fingerprint().map_err(error)?!=source.fingerprint().map_err(error)?{return Err("Save the source project's pending edits separately before importing; they were not saved or discarded by this asset operation".into());}
                     }
                 }
-                library.save_asset_source_reference(&source,&inspection).map_err(error)?;
+                // This is an owned publication, not an external change. The
+                // earlier provenance read may have attached an empty history;
+                // publish through its existing descriptor/history boundary.
+                let dir=library.project_dir(&source_project_id).map_err(error)?.join("window-history");
+                history.save_with(&dir,&source,||library.save_asset_source_reference(&source,&inspection)).map_err(error)?;
             }
             check_document_owner(&state,&project_id,&owner)?;
             if lock(&state.forge_session)?.as_ref().is_some_and(|s|s.project_id==project_id){return Err("The project joined a shared session during extraction; no local placement was committed".into());}

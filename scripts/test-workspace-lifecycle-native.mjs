@@ -534,13 +534,20 @@ try{
 
   if(report.megaWorldCreation){
     const {nativeConnectionControl}=await import('./native-logic-roundtrip.mjs');
-    const sharedViewportStarted=performance.now();
-    const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount+(report.megaWorldCreation.importedScenery?.placements.length??0));
+
+    let world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount+(report.megaWorldCreation.importedScenery?.placements.length??0));
     if(report.megaWorldCreation.importedScenery){const imported=report.megaWorldCreation.importedScenery;expect(world.scene.filter(object=>object.sourceModel)).toEqual(imported.placements);expect(world.nativeAssetImports).toEqual([imported.binding]);
       const model=await invoke(main,'preview_owned_object_model',{projectId:imported.sourceProjectId,tagId:imported.binding.tagId,sourceSha256:imported.sourceSha256});
       expect(model.sourceSha256).toBe(imported.sourceSha256);expect(model.mesh.indices.length).toBeGreaterThan(0);expect(model.mesh.materialRanges.length).toBeGreaterThan(0);
       imported.sourceModelAfterRestart={sourceSha256:model.sourceSha256,triangles:model.mesh.indices.length/3,vertices:model.mesh.positions.length/3,materials:model.mesh.materialRanges.length};
       imported.fullProcessRestart=true;}
+    if(report.megaWorldCreation.importedScenery?.sourcePropertyEdit){
+      const {nativeFinishConnectedSourceTagImport}=await import('./native-logic-roundtrip.mjs');
+      await nativeFinishConnectedSourceTagImport({page:main,call:(command,args)=>invoke(main,command,args),root,receipt:report.megaWorldCreation,expect,restart:async()=>{for(const view of [...pages()].reverse())if(!view.isClosed())await close(view,'save');await waitForQaExit(child);await browser.close();await launchNative();return main;}});
+      world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;
+      step('Source-tag edit survives native process restart, explicit map-copy reimport and one-action replacement Undo/Save/restart');
+    }
+    const sharedViewportStarted=performance.now();
     await chooseTool(main,'Map library');await main.locator('.map-card').filter({has:main.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(main,'Level editor');await openDrawer(main,'Construction');
     if(report.megaWorldCreation.atlasLayout){expect(world.megaworldLayout).toEqual(report.megaWorldCreation.atlasLayout.expected);const atlas=main.locator('.megaworld-atlas');if(await atlas.getAttribute('open')===null)await atlas.locator(':scope>summary').click();await expect(atlas.getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);report.megaWorldCreation.atlasLayout.fullProcessRestart=true;delete report.megaWorldCreation.atlasLayout.expected;}
     await expect(main.getByLabel('BSP donor map',{exact:true})).toHaveValue(world.bspAssembly.donorProjectId);
@@ -629,8 +636,14 @@ try{
           const rotationDegrees=(await read(scenario,'scenery['+index+'].rotation')).split(',').map(Number);rotationDegrees.forEach((value,axis)=>expect(value*Math.PI/180).toBeCloseTo(expected.rotation[axis],4));independent.push({field,position,rotationDegrees});
         }
         const receipt=JSON.parse(await fs.readFile(path.join(path.dirname(path.dirname(output.output)),'megaworld-receipt.json'),'utf8'));
-        expect(receipt.importedPlacementsVerified).toBe(imported.placements.length);expect(receipt.importedTagFiles).toBe(binding.fileCount);expect(receipt.originalPlacementsVerified).toBe(imported.originalCount);
+        expect(receipt.importedPlacementsVerified).toBe(imported.placements.length);expect(receipt.importedTagFiles).toBe((imported.bindings??[binding]).reduce((total,value)=>total+value.fileCount,0));expect(receipt.originalPlacementsVerified).toBe(imported.originalCount);
         imported.compiledReadback={independentInvader:true,positions:independent,importedPlacementsVerified:receipt.importedPlacementsVerified,importedTagFiles:receipt.importedTagFiles,cacheSha256:inspected.inspection.sha256};
+        if(imported.sourcePropertyEdit){
+          const nativeTag=binding.nativePath+'.scenery',extraction=await runOwned(path.join(invaderDirectory,'invader-extract.exe'),['-s',nativeTag,'-t',extracted,output.output],{windowsHide:true,timeout:30000});expect(extraction.stdout+'\n'+extraction.stderr).not.toMatch(/Failed to extract|ERROR:/i);
+          const value=Number(await read(nativeTag,'bounding_radius'));expect(value,'Compiled imported scenery must contain the edited native property').toBeCloseTo(imported.sourcePropertyEdit.expected,6);
+          expect(tag.fields.find(field=>field.key==='bounding-radius').value).toBeCloseTo(value,6);
+          imported.compiledReadback.property={independentInvader:true,nativeTag,field:'bounding_radius',value,expected:imported.sourcePropertyEdit.expected,sourceSha256:imported.sourceSha256};
+        }
       }
       const ref=await read(scenario,'structure_bsps[0].structure_bsp');expect(ref.replaceAll('\\','/').toLowerCase()).toBe(bsp.replaceAll('\\','/').toLowerCase());
       if(report.megaWorldCreation.terrainSeam){

@@ -437,6 +437,11 @@ export default function Tags({
             )}
             </div>
             <div className="tag-context-panel" role="tabpanel" id="tag-panel-Native-Output" aria-labelledby="tag-context-Native-Output" hidden={context!=='Native Output'}>
+              <button type="button" className="small-button" disabled={!project.source || !onSave}
+                title="Review the current tag edits and save a validated native map copy. Your original map stays unchanged."
+                onClick={() => {writeMapSession(project.id,'smart-edit.open',true);chooseContext('Properties');}}>
+                Save edited map copy…
+              </button>
               <details className="tag-secondary-actions">
                 <summary>Extract, export or transfer tags</summary>
                 <div className="tag-exchange-actions">

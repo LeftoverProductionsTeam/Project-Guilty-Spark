@@ -147,6 +147,32 @@ pub fn find<'a>(
             && b.tag_path == source.path
     })
 }
+/// Current placements select immutable imports; older unused receipts remain
+/// available to Undo but must not block a replacement's newer source revision.
+pub fn is_used(project: &Project, binding: &Binding) -> bool {
+    project.scene.iter().any(|object| {
+        object.source_model.as_ref().and_then(|source| find(project, source))
+            .is_some_and(|value| value.id == binding.id)
+    }) || project.quick_forge.as_ref().is_some_and(|document| {
+        document.placements.iter().any(|placement| {
+            placement.source_project_id.as_ref() == Some(&binding.source_project_id)
+                && placement.source_sha256.as_ref() == Some(&binding.source_sha256)
+                && placement.tag_id == Some(binding.tag_id)
+        })
+    })
+}
+/// A known editable origin cannot silently supersede its extracted native bytes.
+pub fn require_origin_revision(binding: &Binding, source: &Project) -> Result<()> {
+    if source.id != binding.source_project_id
+        || source.source.as_ref().map(|value| value.sha256.as_str()) != Some(binding.source_sha256.as_str())
+    {
+        return invalid("Imported asset origin no longer matches its pinned source revision");
+    }
+    require_native_source(source).map_err(|_| SparkError::Invalid(
+        "Imported asset source has tag changes newer than its extracted revision. In Tag editor → Native Output, save a validated map copy, open it, then use Asset library → Replace selected for every affected placement. Existing imports and previous-good builds are unchanged.".into()
+    ))
+}
+
 pub fn allowed_addition(
     project: &Project,
     object: &crate::maps::SceneObject,
@@ -541,18 +567,7 @@ pub fn stage(
 }
 pub fn verify_compiled(project: &Project, compiled: &maps::MapInspection) -> Result<()> {
     for binding in &project.native_asset_imports {
-        let used = project.scene.iter().any(|o| {
-            o.source_model
-                .as_ref()
-                .and_then(|source| find(project, source))
-                .is_some_and(|b| b.id == binding.id)
-        }) || project.quick_forge.as_ref().is_some_and(|doc| {
-            doc.placements.iter().any(|p| {
-                p.source_project_id.as_ref() == Some(&binding.source_project_id)
-                    && p.source_sha256.as_ref() == Some(&binding.source_sha256)
-                    && p.tag_id == Some(binding.tag_id)
-            })
-        });
+        let used = is_used(project, binding);
         if !used {
             continue;
         }
@@ -771,6 +786,28 @@ pub(crate) fn append_scenario(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn used_imports_require_their_actual_origin_revision_while_unused_history_stays_independent() {
+        let mut source=Project::new("Owned native source");
+        source.source=Some(project::Source{original_path:"owned.map".into(),preserved_path:"owned.map".into(),sha256:"a".repeat(64),cache_version:609,engine:"Custom Edition".into(),scenario_path:"levels/test".into(),archive:None,resource_directory:None,resource_sha256:BTreeMap::new(),audio_resources:None});
+        let id=uuid::Uuid::new_v4().to_string();
+        let binding=Binding{id:id.clone(),source_project_id:source.id.clone(),source_sha256:"a".repeat(64),tag_id:42,tag_class:"scen".into(),tag_path:"scenery/rock".into(),native_path:format!("gs_assets_{}/scenery/rock",id.replace('-',"")),receipt_sha256:"b".repeat(64),file_count:1};
+        require_origin_revision(&binding,&source).unwrap();
+        let mut target=Project::new("Independent destination");target.native_asset_imports.push(binding.clone());
+        assert!(!is_used(&target,&binding));
+        target.scene.push(maps::SceneObject{id:uuid::Uuid::new_v4().to_string(),name:"Rock".into(),kind:"Source model".into(),tag_id:None,position:[0.;3],rotation:[0.;3],scale:[1.;3],visible:true,source_offset:None,rotation_offset:None,asset_id:None,source_model:Some(maps::SourceModelReference{project_id:source.id.clone(),source_sha256:binding.source_sha256.clone(),tag_id:binding.tag_id,path:binding.tag_path.clone(),class:binding.tag_class.clone()})});
+        assert!(is_used(&target,&binding));
+        source.tag_edits.push(project::TagEdit{tag_id:42,field_key:"bounding-radius".into(),value:serde_json::json!(0.75)});
+        assert!(require_origin_revision(&binding,&source).unwrap_err().to_string().contains("Replace selected"));
+        target.scene[0].source_model.as_mut().unwrap().source_sha256="c".repeat(64);
+        assert!(!is_used(&target,&binding),"An older unused receipt must not invalidate a deliberately replaced placement");
+        source.tag_edits.clear();source.source.as_mut().unwrap().sha256="c".repeat(64);
+        assert!(require_origin_revision(&binding,&source).is_err());
+        source.source.as_mut().unwrap().sha256=binding.source_sha256.clone();source.id=uuid::Uuid::new_v4().to_string();
+        assert!(require_origin_revision(&binding,&source).is_err(),"Equal bytes never grant another project's ownership");
+    }
+
     #[test]
     fn native_import_never_silently_discards_authored_tag_changes() {
         let clean=Project::new("Native cache source");

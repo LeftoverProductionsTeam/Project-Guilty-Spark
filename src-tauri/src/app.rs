@@ -374,7 +374,7 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
         let state=app.state::<AppState>();
         let mut source=lock(&state.library)?.get(&project_id).map_err(error)?;
         let build=match verified_build(&state,&source,&build_id){Ok(build)=>build,Err(original)=>{
-            if source.builds.iter().any(|b|b.id==build_id&&b.target=="mcc-direct") {
+            if source.builds.iter().any(|b|b.id==build_id&&core::smart_edit::is_direct_target(&b.target)) {
                 source=smart_edit_native::output_snapshot(&state,&source,&build_id)?;
             }else{
                 if !state.root.join("jobs").join(&build_id).join("studio-binding.json").is_file(){return Err(original);}
@@ -386,15 +386,18 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
         // Native revisions consult library settings. Resolve before taking the
         // import lock so opening a compiled map cannot recursively lock it.
         let inherited_tags=if build.target=="mcc-cea"{runtime_workbench::compiled_tags(&state,&source,&build).ok()}else{None};
+        let direct_copy=core::smart_edit::is_direct_target(&build.target);
+        let direct_resources=if direct_copy{source.source.as_ref().and_then(|native|native.resource_directory.clone())}else{None};
         let library=lock(&state.library)?;
         let entries=library.list().map_err(error)?;
         let existed=entries.iter().any(|e|e.sha256.as_deref()==build.sha256.as_deref());
-        let(mut project,inspection)=library.import_map(build.output.as_ref().ok_or("Build output is missing")?,None).map_err(error)?;
+        let(mut project,inspection)=library.import_map(build.output.as_ref().ok_or("Build output is missing")?,direct_resources.as_deref()).map_err(error)?;
         if !existed{
+            if direct_copy{core::smart_edit::bind_copy_resources(&source,&mut project,&inspection).map_err(error)?;}
             let label=|value:&str|value.chars().filter(|c|c.is_alphanumeric()).flat_map(char::to_lowercase).collect::<String>();
             let mut base=if let Some(assembly)=&source.bsp_assembly{
                 if label(&source.title).contains(&label(&assembly.donor_title)){format!("{} · compiled",source.title)}else{format!("{} + {} · compiled",source.title,assembly.donor_title)}
-            }else{format!("{} · {}",source.title,if build.target=="mcc-direct"{"edited copy"}else{"compiled"})};
+            }else{format!("{} · {}",source.title,if core::smart_edit::is_direct_target(&build.target){"edited copy"}else{"compiled"})};
             while base.len()>180{base.pop();}
             let mut title=base.clone();let mut ordinal=2;
             while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
@@ -761,6 +764,7 @@ async fn quickforge_preview(document: quickforge::QuickForgeDocument) -> Reply<q
 fn forge_provenance_blockers(state: &AppState, project: &Project) -> Vec<String> {
     let mut blockers = vec![];
     let Some(document) = project.quick_forge.as_ref() else {return vec!["No QuickForge document".into()]};
+    if let Err(reason)=asset_import_native::guard_import_sources(state,project){blockers.push(reason);}
     for placement in &document.placements {
         let Some(source_id) = placement.source_project_id.as_ref() else {continue};
         let result=(||->Reply<()> {
@@ -1511,10 +1515,13 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
         let p = lock(&state.library)?.get(&id).map_err(error)?;
         let i = inspect(&state, &p)?;
-        if core::megaworld_build::selected(&p){let blockers=core::megaworld_build::preflight(&p,&i).err().map(|e|vec![e.to_string()]).unwrap_or_default();return Ok(build::CompatibilityReport{target:"gbx-custom".into(),pipeline:"Original CE regions → authored merged geometry → H1A structure/lightmaps → Invader CE cache → CRC/collision/scenery readback".into(),ready:blockers.is_empty(),blockers,warnings:vec!["One resident BSP; native compilation is separate from player traversal. Painted detail payloads are refused until transformed native preservation is implemented.".into()],bitmap_dependencies:None});}
+        let origin_issue=asset_import_native::guard_import_sources(&state,&p).err();
+        if core::megaworld_build::selected(&p){let mut blockers=core::megaworld_build::preflight(&p,&i).err().map(|e|vec![e.to_string()]).unwrap_or_default();if let Some(reason)=origin_issue{blockers.push(reason);}return Ok(build::CompatibilityReport{target:"gbx-custom".into(),pipeline:"Original CE regions → authored merged geometry → H1A structure/lightmaps → Invader CE cache → CRC/collision/scenery readback".into(),ready:blockers.is_empty(),blockers,warnings:vec!["One resident BSP; native compilation is separate from player traversal. Painted detail payloads are refused until transformed native preservation is implemented.".into()],bitmap_dependencies:None});}
         let tools=project_tools(&state,&p)?;
         let resolved=native_resources_native::for_project(&state,&p,&i).unwrap_or_else(|_|p.clone());
-        Ok(build::compatibility(&resolved, &i, &tools))
+        let mut report=build::compatibility(&resolved, &i, &tools);
+        if let Some(reason)=origin_issue{report.blockers.push(reason);report.ready=false;}
+        Ok(report)
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -1548,6 +1555,7 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let state = app.state::<AppState>();
     let project = lock(&state.library)?.get(&id).map_err(error)?;
     baboon_native::guard_regeneration(&state,&project)?;
+    asset_import_native::guard_import_sources(&state,&project)?;
     snapshot_project_state(&state,&project,"before-build")?;
     let inspection = inspect(&state, &project)?;
     let tools = project_tools(&state, &project)?;

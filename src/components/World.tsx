@@ -1632,10 +1632,10 @@ export default function World({
               />
             </>
           ) : (
-            <p>
-              Open this model’s source map in a tab to edit its tags. Its preview keeps the original source
-              identity.
-            </p>
+            <>
+              <p>Edit the original source tags in their own map. Placed copies keep their validated import revision until you save a native copy and replace their import.</p>
+              {library && tagRequest !== null && <button disabled={library.busy} onClick={() => void library.onOpenSourceTag(tagSource, tagRequest)}>Open source map in Tag editor</button>}
+            </>
           )}
         </WorkspacePanel>
       )}
@@ -1707,7 +1707,7 @@ export default function World({
               {chosen.sourceModel && (
                 <>
                   <p className="subtle">
-                    Source-linked model preview · compile editable scenario/model tags before a game build.
+                    Native import from a pinned source revision. Save a native copy of source tag edits, replace the affected placements, then build this map.
                   </p>
                   {modelIssues[forgeModelKey(sourcePlacement(chosen)!)] && (
                     <Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>

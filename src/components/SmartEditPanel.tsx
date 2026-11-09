@@ -34,7 +34,7 @@ export default function SmartEditPanel({
     'smart-edit.runtime',
     project.quickForge?.runtimeId ??
       project.buildTargets?.find((t) => t.id === project.activeBuildTarget)?.runtimeId ??
-      'mccSteam',
+      (project.source?.cacheVersion===609?'haloCustomEdition':'mccSteam'),
   );
   const [plan, setPlan] = useState<EditPlan | null>(null),
     [result, setResult] = useState<EditExecution | null>(null);

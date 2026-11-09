@@ -23,6 +23,19 @@ Before/after native content screenshots: E/interaction-native-before-r190/projec
 
 Current source base: local master1d160ec plus the connected-scenery and source-reference continuation. The c035b68 packaged evidence above is a separate exact revision. This audit tracks observable interactions; a catalog entry or tooltip is not evidence of operation.
 
+## Operation110 source-tag journey — current scope
+
+R277 completes nine real Windows cases with mockedIpc:false: actual source handoff, native edit/Undo/Save/two full restarts, stale dependency refusal, independently validated CE609 map copy with exact shared-resource pins, both replacements and one-action Undo, connected native compile/readback and exact private Chupathingy map loading. R272 passes the full256 browser cases in10.4min. See [source-tag evidence](NATIVE_SOURCE_TAG_EDIT_20261108.md) and H23 in [the human plan](HUMAN_TEST_PLAN.md). These results do not close human gameplay or the complete application audit.
+
+| Control | Expected actual journey | Repair / native evidence |
+| --- | --- | --- |
+| Inspector → Edit model source tags | Open the actual source owner/tag without erasing the destination draft | Existing App.openProject and source-bound tag focus; native R277 and browser R272 pass. |
+| Owning source File → Save | Publish its own descriptor/history atomically; refuse another writer | Existing history.save_with publication; actual Save/restart/head retained. Independent external-writer refusal remains tested. |
+| Native Output → Save edited map copy | Admit only reviewed fields, preserve all other bytes and exact shared dependencies | R277 verifies CE609 scenery radius, complete byte comparison, CRC/info, persisted source bank/audio context and unchanged originals. |
+| Edited-copy Asset library → Replace selected | Re-extract changed native bytes; preserve identity/transform and one-step Undo | R277 uses the actual button for both copies, confirms Undo/Redo/Save/restart and final independently read-back0.75. R275's real missing-resource failure is repaired. |
+| Build & playtest after source-tag change | Refuse stale extracted dependencies with an explicit working update route | R277 verifies disabled controls and rejected native start_build preserve build history, then successfully compiles only after both replacements. |
+
+
 ## Repairs and evidence
 
 - Asset library → connected-runtime map: R248 actually returned the edited connected-world project sharing the source hash. Existing import reuse is now source/path/fingerprint-aware for this control; ordinary saved-project opening is unchanged. R252 actual native selection resolves the raw source independently, preserves destination state and supports its textured pointer import.

@@ -3728,3 +3728,26 @@ test('paged audit rechecks a layout changed between settling and the actual reac
   if(changed)return;changed=true;await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).growLateTools();});
  }});expect(changed).toBe(true);expect(report.controls).toBe(13);
 });
+
+
+test('background asset source opens its own tag editor and preserves destination history',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ const initial=page.getByRole('spinbutton',{name:'Velocity',exact:true});await initial.fill('37');await initial.press('Tab');await chooseTool(page,'Level editor');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   if(command==='discover_asset_sources')return{maps:[{id:'source-only',name:'candidate.map',location:'Synthetic owned runtime',engine:'Custom Edition',cacheVersion:609,archive:false,bytes:100}],notices:[],elapsedMs:1};
+   if(command==='open_asset_source')return[structuredClone(w.__sparkMock.projects.b)];return invoke(command,args);
+  };window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
+ });
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});await library.getByLabel('Asset library map',{exact:true}).selectOption('discovered:source-only');await expect(library.getByLabel('Asset library map',{exact:true})).toHaveValue('b');
+ const add=library.getByRole('button',{name:'Add test at view',exact:true,includeHidden:true});await revealPagedControl(add);await add.click();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');
+ await expect(page.locator('.map-tab[data-map-tab-id="b"]')).toHaveCount(0);
+ await library.getByRole('button',{name:'Close Asset library',exact:true}).click();await page.locator('.viewport-object-actions').getByRole('button',{name:'Object tags',exact:true}).click();
+ const drawer=page.getByRole('region',{name:'Object tags panel',exact:true}),open=drawer.getByRole('button',{name:'Open source map in Tag editor',exact:true,includeHidden:true});await expect(open).toBeEnabled();await revealPagedControl(open);await open.click();
+ await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','tags');await expect(page.locator('.map-tab[data-map-tab-id="b"] [role="tab"]')).toHaveAttribute('aria-selected','true');
+ const value=page.getByRole('spinbutton',{name:'Velocity',exact:true});await expect(value).toHaveValue('25');await value.fill('39');await value.press('Tab');await page.keyboard.press('Control+z');await expect(value).toHaveValue('25');await page.keyboard.press('Control+y');await expect(value).toHaveValue('39');await value.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('b');
+ await page.getByRole('tab',{name:'Native Output',exact:true}).click();await page.getByRole('button',{name:'Save edited map copy…',exact:true}).click();await expect(page.getByRole('tab',{name:'Properties',exact:true})).toHaveAttribute('aria-selected','true');await expect(page.locator('.smart-edit:visible')).toHaveAttribute('open','');
+ await page.locator('.map-tab[data-map-tab-id="a"] [role="tab"]').click();await chooseTool(page,'Tag editor');await expect(value).toHaveValue('37');
+ await page.keyboard.press('Control+z');await expect(value).toHaveValue('37');await page.keyboard.press('Control+z');await expect(value).toHaveValue('10');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.projects.b.project.tagEdits[0]?.value)).toBe(39);
+});

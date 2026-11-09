@@ -167,3 +167,25 @@ fn a_first_save_before_an_undo_head_keeps_the_later_session_baseline_current() {
     let view=Session::default().read(&dir,&saved).unwrap().unwrap();
     assert_eq!(current(&view).title,p.title);assert!(!view.head.dirty);
 }
+
+#[test]
+fn imported_origin_publication_keeps_the_attached_source_history_editable() {
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("library");let input=temp.path().join("owned.map");
+    let bytes=common::fixture(13);fs::write(&input,&bytes).unwrap();let library=Library::workspace(&root).unwrap();
+    let(mut source,inspection)=library.import_asset_source(&input,None).unwrap();
+    let dir=library.project_dir(&source.id).unwrap().join("window-history");let mut history=Session::default();
+    // The real importer reads provenance before retaining a pristine origin.
+    assert!(history.read(&dir,&source).unwrap().is_none());
+    assert!(history.save_with(&dir,&source,||library.save_asset_source_reference(&source,&inspection)).unwrap());
+    let file=dir.parent().unwrap().join("project.gsproject");let origin=fs::read(&file).unwrap();
+    assert!(!dir.parent().unwrap().join("source.map").exists());
+    source.title="Editable retained asset source".into();select(&mut history,&dir,&source);
+    library.save_with_history(&mut history,&source).unwrap();
+    let saved=project::load_project(&file).unwrap();assert_eq!(saved.title,source.title);
+    let reopened=Session::default().read(&dir,&saved).unwrap().unwrap();assert_eq!(current(&reopened).title,source.title);assert!(!reopened.head.dirty);
+    assert_eq!(fs::read(project::project_recovery_path(&file).unwrap()).unwrap(),origin);
+    // The fix must never adopt an unrelated writer as its own publication.
+    let mut external=saved.clone();external.title="Independent external edit".into();project::save_project(&file,&external).unwrap();
+    let protected=fs::read(&file).unwrap();assert!(library.save_with_history(&mut history,&source).is_err());assert_eq!(fs::read(&file).unwrap(),protected);
+    assert_eq!(fs::read(&input).unwrap(),bytes);
+}

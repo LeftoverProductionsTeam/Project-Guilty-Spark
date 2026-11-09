@@ -35,16 +35,18 @@ struct LiveWork {
 /// independently verified copy, never readiness for the newer current draft.
 pub(super) fn output_snapshot(state:&AppState,current:&Project,build_id:&str)->Reply<Project> {
     uuid::Uuid::parse_str(build_id).map_err(error)?;
-    let record=current.builds.iter().find(|b|b.id==build_id&&b.target=="mcc-direct"&&b.status=="validated").ok_or("No validated direct output belongs to this map")?.clone();
+    let record=current.builds.iter().find(|b|b.id==build_id&&router::is_direct_target(&b.target)&&b.status=="validated").ok_or("No validated direct output belongs to this map")?.clone();
     let job=state.root.join("jobs").join(build_id);core::reject_links(&job).map_err(error)?;
     let mut snapshot:Project=serde_json::from_slice(&bounded_read(&job.join("project.gsproject"),32*1024*1024)?).map_err(error)?;
     snapshot.validate().map_err(error)?;
     let proof:serde_json::Value=serde_json::from_slice(&bounded_read(&job.join("smart-edit-receipt.json"),4*1024*1024)?).map_err(error)?;
     let source=snapshot.source.as_ref().ok_or("Direct output snapshot has no source")?;
-    if snapshot.id!=current.id || current.source.as_ref().map(|s|s.sha256.as_str())!=Some(source.sha256.as_str())
+    if ![13,609].contains(&source.cache_version) || snapshot.id!=current.id || current.source.as_ref().map(|s|s.sha256.as_str())!=Some(source.sha256.as_str())
         || snapshot.fingerprint().map_err(error)?!=record.project_fingerprint
         || proof["route"]!="directCache" || proof["projectId"]!=current.id
         || proof["projectFingerprint"]!=record.project_fingerprint || proof["sourceSha256"]!=source.sha256
+        || proof["cacheVersion"].as_u64()!=Some(source.cache_version as u64)
+        || record.target!=(if source.cache_version==609{"ce-direct"}else{"mcc-direct"})
         || proof["outputSha256"].as_str()!=record.sha256.as_deref() || proof["allOtherBytesPreserved"]!=true || proof["compilerRan"]!=false {
         return Err("Direct output snapshot/receipt no longer matches its source, revision or output.".into());
     }
@@ -183,8 +185,8 @@ fn plan(
     let preservation = baboon_native::guard_regeneration(state, &p);
     let tools = editing_tools(state, &p)?;
     let mut choices = Vec::new();
-    let direct_issue = if !runtime_matches {
-        Some("This direct writer is reviewed for MCC Halo 1 only. Runtime/edition selection cannot bypass its cache-format gate.".into())
+    let direct_issue = if !inspection.as_ref().is_some_and(|map|router::direct_runtime_compatible(runtime_id,map.header.version)) {
+        Some("Choose MCC for an MCC13 source, or Custom Edition/Chupathingy for the reviewed CE609 scenery-radius route. Runtime selection never converts the cache format.".into())
     } else if let Some(issue) = analysis.direct_blockers.first() {
         Some(issue.clone())
     } else if inspection.is_none() {
@@ -615,6 +617,7 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
     let source = p.source.as_ref().ok_or("A source map is required")?;
     let crc = validator(&state, &p, "invader-crc.exe", CRC_SHA)?;
     let info = validator(&state, &p, "invader-info.exe", INFO_SHA)?;
+    if !router::direct_runtime_compatible(plan.runtime_id,source.cache_version){return Err("Direct output runtime does not match its source cache edition".into());}
     let bytes = router::read_direct_source(&p).map_err(error)?;
     let sha = source.sha256.clone();
     if Some(&sha) != plan.source_sha256.as_ref() {
@@ -673,7 +676,7 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
                 "Candidate changed between byte-footprint verification and reopening.".into(),
             );
         }
-        if inspected.header.version != 13 || inspected.tags.len() != inspect(&state, &p)?.tags.len()
+        if inspected.header.version != source.cache_version || inspected.tags.len() != inspect(&state, &p)?.tags.len()
         {
             return Err("Reopened cache edition/tag index differs unexpectedly.".into());
         }
@@ -703,8 +706,8 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
             return Err("Output map name must be a single native filename.".into());
         }
         let output = output_dir.join(relative);
-        let record=BuildRecord{id:id.clone(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"mcc-direct".into(),output:Some(output.clone()),sha256:Some(inspected.sha256.clone()),message:"Direct MCC cache copy validated: exact native cells, complete byte footprint, format-specific CRC and independent Invader checks. No extraction or source compilation ran. Ready for target-game testing; gameplay is unverified.".into(),project_fingerprint:plan.project_fingerprint.clone()};
-        let evidence = serde_json::json!({"schemaVersion":1,"route":"directCache","projectId":p.id,"projectFingerprint":plan.project_fingerprint,"sourceSha256":sha,"outputSha256":inspected.sha256,"cacheVersion":13,"intents":plan.intents,"cells":analysis.cells,"changedNativeBytes":changed,"crcToolSha256":CRC_SHA,"infoToolSha256":INFO_SHA,"crcOutput":crc_output,"nativeChecks":native_checks,"allOtherBytesPreserved":true,"extractedTags":false,"compilerRan":false,"gameplayTested":false});
+        let record=BuildRecord{id:id.clone(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:(if inspected.header.version==609{"ce-direct"}else{"mcc-direct"}).into(),output:Some(output.clone()),sha256:Some(inspected.sha256.clone()),message:format!("Direct {} cache copy validated: exact native cells, complete byte footprint, format-specific CRC and independent Invader checks. No extraction or source compilation ran. Target-game testing remains separate.",if inspected.header.version==609{"Custom Edition scenery-radius"}else{"MCC"}),project_fingerprint:plan.project_fingerprint.clone()};
+        let evidence = serde_json::json!({"schemaVersion":1,"route":"directCache","projectId":p.id,"projectFingerprint":plan.project_fingerprint,"sourceSha256":sha,"outputSha256":inspected.sha256,"cacheVersion":inspected.header.version,"intents":plan.intents,"cells":analysis.cells,"changedNativeBytes":changed,"crcToolSha256":CRC_SHA,"infoToolSha256":INFO_SHA,"crcOutput":crc_output,"nativeChecks":native_checks,"allOtherBytesPreserved":true,"extractedTags":false,"compilerRan":false,"gameplayTested":false});
         project::atomic_write(
             &job.join("smart-edit-receipt.json"),
             &serde_json::to_vec_pretty(&evidence).map_err(error)?,

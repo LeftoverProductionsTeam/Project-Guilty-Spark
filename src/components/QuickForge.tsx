@@ -2032,10 +2032,14 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       edit={edit}
                       notify={notify}
                       onSave={() => library.onSaveMap(tagProject.id)}
+                      onFullEditor={id => void library.onOpenSourceTag(tagProject.id, id)}
                     />
                   </>
                 ) : (
-                  <p>Open this placement’s source map in a tab to edit its tags in this drawer.</p>
+                  <>
+                    <p>Edit the original source tags in their own map. Placed copies keep their validated import revision until you save a native copy and replace their import.</p>
+                    {tagRequest !== null && <button disabled={library.busy} onClick={() => void library.onOpenSourceTag(tagSource, tagRequest)}>Open source map in Tag editor</button>}
+                  </>
                 )}
               </WorkspacePanel>
             )}

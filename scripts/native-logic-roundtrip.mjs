@@ -445,7 +445,7 @@ export async function nativeConnectedSceneryRoundTrip({page,call,root,receipt,ex
  const initial=await project(),normalize=value=>value.replaceAll('\\','/').toLowerCase();
  const placements=value=>value.scene.filter(object=>object.sourceModel),baseline=initial.scene.length;
  const trace=stage=>console.log('CONNECTED_SCENERY',JSON.stringify({stage,sourceSha256:initial.source.sha256}));
- const save=async()=>{await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await call('read_workspace_history',{projectId:id})).history.head.dirty).toBe(false);};
+ const save=async(owner=id)=>{await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await call('read_workspace_history',{projectId:owner})).history.head.dirty).toBe(false);};
  for(const label of ['Construction','Objects','Inspector','Object tags']){const panel=page.getByRole('region',{name:label+' panel',exact:true});if(await panel.isVisible())await panel.getByRole('button',{name:'Close '+label,exact:true}).click();}
  await chooseTool(page,'Level editor');await page.getByRole('combobox',{name:'View from player start',exact:true}).selectOption('');
  await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});
@@ -489,7 +489,119 @@ export async function nativeConnectedSceneryRoundTrip({page,call,root,receipt,ex
  const saved=await project();expect(saved.nativeAssetImports).toHaveLength(1);expect(new Set(placements(saved).map(object=>object.id)).size).toBe(2);trace('two authored copies saved after transform and Undo/Redo');
  receipt.importedScenery={actualThumbnailDrag:true,sourceProjectId:source.project.id,sourceSha256:source.inspection.sha256,tagPath:tag.path,
   binding:saved.nativeAssetImports[0],placements:placements(saved),originalCount:baseline,copyPasteOneActionUndoRedo:true,immediateSave:true,compiledReadback:false,gameplayAccepted:false};
- await inspector.getByRole('button',{name:'Close Inspector',exact:true}).click();
+ if(process.env.SPARK_QA_MEGAWORLD_SOURCE_TAGS==='1'){
+  const before=(await call('read_workspace_history',{projectId:id})).history;
+  const editSource=inspector.getByRole('button',{name:'Edit model source tags',exact:true,includeHidden:true});await revealPagedControl(editSource);await editSource.click();
+  const tags=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(tags).toBeVisible();
+  receipt.importedScenery.sourceTagHandoff={actualInspectorAction:true,sourceProjectId:source.project.id,destinationProjectId:id,opened:false};
+  await tags.screenshot({path:path.join(root,'megaworld-source-tags-before.png')});
+  const open=tags.getByRole('button',{name:'Open source map in Tag editor',exact:true,includeHidden:true});await expect(open).toBeEnabled();await revealPagedControl(open);await open.click();
+  await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','tags');
+  await expect(page.locator('.map-tab[data-map-tab-id="'+source.project.id+'"] [role="tab"]')).toHaveAttribute('aria-selected','true');
+  const pane=page.locator('.tag-detail:visible');await expect(pane).toContainText(tag.path);
+  receipt.importedScenery.sourceTagHandoff.opened=true;
+
+  const radius=page.getByRole('spinbutton',{name:'Bounding radius',exact:true}),original=Number(await radius.inputValue());
+  await radius.fill('0.75');await radius.press('Tab');await save(source.project.id);
+  await page.keyboard.press('Control+z');await expect(radius).toHaveValue(String(original));await save(source.project.id);
+  await page.keyboard.press('Control+y');await expect(radius).toHaveValue('0.75');await save(source.project.id);
+  const sourceSaved=(await call('open_project',{id:source.project.id})).project;
+  expect(sourceSaved.tagEdits.find(edit=>edit.tagId===tag.id&&edit.fieldKey==='bounding-radius')?.value).toBe(.75);
+  await pane.locator('.tag-properties-pane').screenshot({path:path.join(root,'megaworld-source-tags-after.png')});
+  receipt.importedScenery.sourcePropertyEdit={tagId:tag.id,original,expected:.75,sourceProjectId:source.project.id,actualField:true,undoRedo:true,explicitSourceSave:true,sourceSha256:sourceSaved.source.sha256,savedHistory:((view)=>({head:view.head,revision:view.revision}))((await call('read_workspace_history',{projectId:source.project.id})).history)};
+  const compatibility=await call('compatibility',{id});receipt.importedScenery.staleBindingPreflight={ready:compatibility.ready,blockers:compatibility.blockers};
+  expect(compatibility.ready,'An edited origin cannot silently build its earlier extracted closure').toBe(false);
+  expect(compatibility.blockers.join('\n')).toMatch(/import.*source.*tag changes/i);
+  expect((await project()).scene).toEqual(saved.scene);expect((await call('read_workspace_history',{projectId:id})).history.head).toEqual(before.head);
+  await page.locator('.map-tab[data-map-tab-id="'+id+'"] [role="tab"]').click();await chooseTool(page,'Level editor');
+  expect((await call('read_workspace_history',{projectId:id})).history.head).toEqual(before.head);
+  receipt.importedScenery.sourceTagHandoff={...receipt.importedScenery.sourceTagHandoff,opened:true,destinationHistoryPreserved:true,returnedToDestination:true};
+  await chooseTool(page,'Build & playtest');const blocked=page.getByRole('button',{name:'Build for Chupathingy',exact:true,includeHidden:true});await revealPagedControl(blocked);await expect(blocked).toBeDisabled();await expect(page.locator('.build-page .report-line.blocked')).toContainText(/Imported asset source has tag changes/);
+  const priorBuilds=(await project()).builds;await expect(call('start_build',{id})).rejects.toThrow(/Imported asset source has tag changes/);expect((await project()).builds).toEqual(priorBuilds);receipt.importedScenery.staleBindingPreflight.actualBuildControlsBlocked=true;receipt.importedScenery.staleBindingPreflight.previousBuildHistoryPreserved=true;
+  await chooseTool(page,'Level editor');
+  const remaining=page.getByRole('region',{name:'Object tags panel',exact:true});if(await remaining.isVisible())await remaining.getByRole('button',{name:'Close Object tags',exact:true}).click();
+ }
+ if(await inspector.isVisible())await inspector.getByRole('button',{name:'Close Inspector',exact:true}).click();
+}
+
+
+// Continue the same real creator journey after the owning source's process
+// restart. A validated native copy is explicit; no old binding is retargeted.
+export async function nativeFinishConnectedSourceTagImport({page,call,root,receipt,expect,restart}){
+ const imported=receipt.importedScenery,change=imported.sourcePropertyEdit,id=receipt.projectId;
+ if(!change)return;
+ const project=async()=>{const view=(await call('read_workspace_history',{projectId:id})).history;return view?.snapshots.find(value=>value.key===view.head.current)?.project??(await call('open_project',{id})).project;};
+ const normalize=value=>value.replaceAll('\\','/').toLowerCase();
+ const savedSource=(await call('open_project',{id:change.sourceProjectId})).project;
+ expect(savedSource.tagEdits.find(edit=>edit.tagId===change.tagId&&edit.fieldKey==='bounding-radius')?.value).toBe(change.expected);
+ const history=(await call('read_workspace_history',{projectId:change.sourceProjectId})).history;
+ expect(history.head).toEqual(change.savedHistory.head);expect(history.revision).toBe(change.savedHistory.revision);
+ await chooseTool(page,'Map library');await page.locator('.map-card[data-project-id="'+change.sourceProjectId+'"]').click();await chooseTool(page,'Tag editor');
+ await page.getByRole('textbox',{name:'Search tags',exact:true}).fill(imported.tagPath);await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('scen');await page.locator('.tag-row:visible').click();
+ await expect(page.getByRole('spinbutton',{name:'Bounding radius',exact:true})).toHaveValue(String(change.expected));
+ await page.locator('.tag-detail:visible .tag-properties-pane').screenshot({path:path.join(root,'megaworld-source-tags-restarted.png')});change.fullProcessRestart=true;change.sourceUndoHeadPreserved=true;
+ await page.getByRole('tab',{name:'Native Output',exact:true}).click();
+ const output=page.getByRole('button',{name:'Save edited map copy…',exact:true,includeHidden:true});await revealPagedControl(output);await output.click();
+ const smart=page.locator('.smart-edit:visible');await expect(smart).toHaveAttribute('open','');
+ await smart.getByRole('combobox',{name:'Smart edit runtime',exact:true}).selectOption('chupathingyCe');
+ await smart.getByRole('button',{name:'Review save plan',exact:true}).click();await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');
+ await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
+ const beforeIds=new Set((await call('bootstrap')).entries.map(project=>project.id));
+ await smart.getByRole('button',{name:/Open edited copy in a new tab|Add edited copy to map library/}).click();
+ let entry;await expect.poll(async()=>{entry=(await call('bootstrap')).entries.find(project=>!beforeIds.has(project.id));return !!entry;}).toBe(true);
+ const copy=await call('open_project',{id:entry.id}),tag=copy.inspection.tags.find(value=>value.class==='scen'&&normalize(value.path)===normalize(imported.tagPath));
+ expect(copy.project.id).not.toBe(change.sourceProjectId);expect(copy.project.source.sha256).not.toBe(imported.sourceSha256);expect(copy.project.tagEdits).toEqual([]);expect(tag.fields.find(field=>field.key==='bounding-radius').value).toBeCloseTo(change.expected,6);
+ expect(copy.project.source.resourceDirectory).toEqual(savedSource.source.resourceDirectory);expect(copy.project.source.resourceSha256).toEqual(savedSource.source.resourceSha256);expect(copy.project.source.audioResources).toEqual(savedSource.source.audioResources);
+ console.log('SOURCE_TAG_NATIVE',JSON.stringify({stage:'validated CE copy retains exact original resource pins',sourceSha256:copy.project.source.sha256}));
+ const copyBuild=(await call('open_project',{id:change.sourceProjectId})).project.builds.findLast(build=>build.target==='ce-direct'&&build.status==='validated'&&build.sha256===copy.project.source.sha256);expect(copyBuild).toBeTruthy();
+ const beforeBytes=await fs.readFile(savedSource.source.preservedPath),afterBytes=await fs.readFile(copy.project.source.preservedPath);expect(afterBytes.length).toBe(beforeBytes.length);expect(afterBytes.readUInt32LE(4)).toBe(609);
+ const originalTag=(await call('open_project',{id:change.sourceProjectId})).inspection.tags.find(value=>value.id===change.tagId),offset=originalTag.fields.find(field=>field.key==='bounding-radius').offset,differences=[];
+ for(let at=0;at<beforeBytes.length;at++)if(beforeBytes[at]!==afterBytes[at]){expect((at>=offset&&at<offset+4)||(at>=0x64&&at<0x68),'Unexpected independent CE copy byte at '+at).toBe(true);differences.push(at);}
+ expect(differences.some(at=>at>=offset&&at<offset+4)).toBe(true);expect(afterBytes.readFloatLE(offset)).toBeCloseTo(change.expected,6);
+ const proof=JSON.parse(await fs.readFile(path.join(root,'library/jobs',copyBuild.id,'smart-edit-receipt.json'),'utf8'));expect(proof.cacheVersion).toBe(609);expect(proof.compilerRan).toBe(false);expect(proof.extractedTags).toBe(false);expect(proof.allOtherBytesPreserved).toBe(true);expect(proof.cells).toHaveLength(1);expect(proof.cells[0].offset).toBe(offset);
+ imported.nativeCopyByteAudit={independentWholeFileComparison:true,sourceSha256:imported.sourceSha256,outputSha256:copy.project.source.sha256,sourceAndOutputBytes:beforeBytes.length,cacheVersion:609,fieldOffset:offset,changedOffsets:differences,nativeChecks:proof.nativeChecks,buildId:copyBuild.id};
+ const priorPlacements=structuredClone(imported.placements),originalBinding=structuredClone(imported.binding);
+ // A normal restart does not opt into restoring every previous tab. Return via
+ // the actual saved-project picker, which also works when tabs are condensed.
+ const title=(await project()).title;await page.getByLabel('File menu',{exact:true}).click();
+ const browse=page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Open saved project…',exact:true,includeHidden:true});await revealPagedControl(browse);await browse.click();
+ const work=page.getByRole('dialog',{name:'Open work',exact:true});await work.getByLabel('Search open work',{exact:true}).fill(title);
+ await work.getByRole('button',{name:'Open saved project '+title,exact:true}).click();await chooseTool(page,'Level editor');
+ await expect(page.locator('.map-tab[data-map-tab-id="'+id+'"] [role="tab"]')).toHaveAttribute('aria-selected','true');
+ const save=async()=>{await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await call('read_workspace_history',{projectId:id})).history.head.dirty).toBe(false);};
+ for(let index=0;index<priorPlacements.length;index++){
+  const prior=priorPlacements[index],current=await project(),rowIndex=current.scene.filter(object=>object.name===prior.name).findIndex(object=>object.id===prior.id);
+  expect(rowIndex).toBeGreaterThanOrEqual(0);await openDrawer(page,'Objects');const objects=page.getByRole('region',{name:'Objects panel',exact:true});
+  await objects.getByRole('textbox',{name:'Search scene objects',exact:true}).fill(prior.name);
+  const row=objects.getByRole('button',{name:prior.name,exact:true,includeHidden:true}).nth(rowIndex);await revealPagedControl(row);await row.click();await expect(page.locator('.viewport-object-actions strong')).toHaveText(prior.name);if(await objects.isVisible())await objects.getByRole('button',{name:'Close Objects',exact:true}).click();
+  const tags=page.getByRole('region',{name:'Object tags panel',exact:true});if(await tags.isVisible())await tags.getByRole('button',{name:'Close Object tags',exact:true}).click();
+  await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});
+  await library.getByRole('combobox',{name:'Asset library map',exact:true}).selectOption(copy.project.id);await library.getByRole('combobox',{name:'Asset library type',exact:true}).selectOption('scen');await library.getByRole('searchbox',{name:'Search loaded assets',exact:true}).fill(tag.path);
+  const replace=library.getByRole('button',{name:'Replace selected with '+tag.path.replaceAll('\\','/').split('/').at(-1),exact:true,includeHidden:true});await revealPagedControl(replace);await expect(replace).toBeEnabled();await replace.click();
+  await expect.poll(async()=>(await project()).scene.find(object=>object.id===prior.id).sourceModel.projectId,{timeout:180000}).toBe(copy.project.id);
+  await library.getByRole('button',{name:'Close Asset library',exact:true}).click();await page.locator('.runtime-dock-heading').click();
+  await page.keyboard.press('Control+z');await expect.poll(async()=>(await project()).scene.find(object=>object.id===prior.id).sourceModel.projectId).toBe(prior.sourceModel.projectId);
+  await page.keyboard.press('Control+y');await expect.poll(async()=>(await project()).scene.find(object=>object.id===prior.id).sourceModel.projectId).toBe(copy.project.id);await save();
+  const result=(await project()).scene.find(object=>object.id===prior.id);for(const field of ['id','position','rotation','scale','visible'])expect(result[field]).toEqual(prior[field]);
+  console.log('SOURCE_TAG_NATIVE',JSON.stringify({stage:'replacement saved after one-action Undo/Redo',index,sourceProjectId:result.sourceModel.projectId}));
+  if(index+1<priorPlacements.length){const still=await call('compatibility',{id});expect(still.ready,'The remaining old placement is still a stale import').toBe(false);}
+ }
+ const updated=await project(),currentBinding=updated.nativeAssetImports.find(binding=>binding.sourceProjectId===copy.project.id&&binding.tagId===tag.id);
+ expect(currentBinding).toBeTruthy();expect(currentBinding.sourceSha256).toBe(copy.project.source.sha256);expect(updated.scene).toHaveLength(imported.originalCount+priorPlacements.length);
+ expect(updated.nativeAssetImports).toContainEqual(originalBinding);expect(updated.nativeAssetImports).toHaveLength(2);
+ const compatibility=await call('compatibility',{id});expect(compatibility.ready,compatibility.blockers.join('\n')).toBe(true);
+ imported.originalImport={sourceProjectId:imported.sourceProjectId,sourceSha256:imported.sourceSha256,binding:originalBinding};
+ imported.sourceProjectId=copy.project.id;imported.sourceSha256=copy.project.source.sha256;imported.binding=currentBinding;imported.bindings=updated.nativeAssetImports;imported.placements=updated.scene.filter(object=>object.sourceModel);
+ imported.sourcePropertyNativeCopy={sourceProjectId:copy.project.id,sourceSha256:copy.project.source.sha256,tagId:tag.id,value:tag.fields.find(field=>field.key==='bounding-radius').value};
+ imported.explicitReimport={bothPlacementsUpdated:true,oneActionUndoRedo:true,originalIdsAndTransformsPreserved:true,oldUnusedReceiptRetained:true,ready:true};
+ await openDrawer(page,'Inspector');const inspected=page.getByRole('region',{name:'Inspector panel',exact:true});await inspected.screenshot({path:path.join(root,'megaworld-source-tags-updated-import.png')});await inspected.getByRole('button',{name:'Close Inspector',exact:true}).click();
+ const targetHistory=(await call('read_workspace_history',{projectId:id})).history;
+ page=await restart();
+ const reopened=await call('open_project',{id}),after=(await call('read_workspace_history',{projectId:id})).history;
+ expect(reopened.project.scene).toEqual(updated.scene);expect(reopened.project.nativeAssetImports).toEqual(updated.nativeAssetImports);expect(after.head).toEqual(targetHistory.head);expect(after.revision).toBe(targetHistory.revision);
+ const original=(await call('open_project',{id:change.sourceProjectId})).project;expect(original.tagEdits).toEqual(savedSource.tagEdits);
+ expect((await call('read_workspace_history',{projectId:change.sourceProjectId})).history.head).toEqual(change.savedHistory.head);
+ imported.explicitReimport.fullProcessRestart=true;
 }
 
 export async function nativeConnectionControl(page,role,name){

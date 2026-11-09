@@ -16,6 +16,7 @@ export interface ViewportLibraryControls {
   onImportSound: (position?: Vec3, path?: string) => Promise<boolean>;
   onPlaceMesh: (item: ViewportAsset, position: Vec3, replaceId?: string | null) => Promise<void>;
   onSaveMap: (id: string) => Promise<void>;
+  onOpenSourceTag: (id: string, tagId: number) => Promise<void>;
   busy: boolean;
 }
 

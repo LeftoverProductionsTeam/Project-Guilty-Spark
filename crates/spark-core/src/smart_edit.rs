@@ -9,6 +9,38 @@ use crate::{
 use serde::{Deserialize, Serialize};
 pub const MAX_DIRECT_BYTES: u64 = 256 * 1024 * 1024;
 
+/// A runtime choice never changes the source edition. CE609 currently admits
+/// only embedded scenery bounding-radius edits; MCC13 retains its own allowlist.
+pub fn direct_runtime_compatible(runtime: crate::runtime::RuntimeId, version: u32) -> bool {
+    use crate::runtime::RuntimeId;
+    matches!((version,runtime),(13,RuntimeId::MccSteam)|(609,RuntimeId::HaloCustomEdition|RuntimeId::ChupathingyCe))
+}
+pub fn is_direct_target(target: &str) -> bool {
+    matches!(target,"mcc-direct"|"ce-direct")
+}
+
+
+/// Only after a bounded native copy has passed its complete footprint/CRC
+/// checks: keep the exact source resource pins, never re-admit different banks
+/// beside a generated output or infer them from the selected hosting runtime.
+pub fn bind_copy_resources(original: &Project, copy: &mut Project, map: &MapInspection) -> Result<()> {
+    original.validate()?;
+    copy.validate()?;
+    let origin=original.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Direct copy origin has no native source".into()))?;
+    let target=copy.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Direct copy has no native output".into()))?;
+    crate::source_identity::validate(target,map)?;
+    if ![13,609].contains(&map.header.version) || origin.cache_version!=map.header.version
+        || origin.scenario_path.replace('\\',"/").to_lowercase()!=map.scenario_path.replace('\\',"/").to_lowercase()
+        || map.header.compressed || map.header.extended || map.header.legacy_tag_size_repair {
+        return invalid("Direct copy resource context requires the same reviewed cache edition and scenario");
+    }
+    let target=copy.source.as_mut().unwrap();
+    target.resource_directory=origin.resource_directory.clone();
+    target.resource_sha256=origin.resource_sha256.clone();
+    target.audio_resources=origin.audio_resources.clone();
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Preference {
@@ -91,7 +123,7 @@ pub fn read_direct_source(project: &Project) -> Result<Vec<u8>> {
         return invalid("Direct map copies are limited to 256 MiB; use the matching source workflow for larger maps");
     }
     let (header, bytes, sha) = crate::maps::read_cache_snapshot(&source.preserved_path)?;
-    if header.version != 13
+    if ![13,609].contains(&header.version) || header.version != source.cache_version
         || header.compressed
         || header.extended
         || header.legacy_tag_size_repair
@@ -99,7 +131,7 @@ pub fn read_direct_source(project: &Project) -> Result<Vec<u8>> {
         || sha != source.sha256
     {
         return invalid(
-            "Cache identity or format no longer matches the reviewed MCC direct writer",
+            "Cache identity or format no longer matches the reviewed MCC13/CE609 direct writer",
         );
     }
     Ok(bytes)
@@ -156,12 +188,12 @@ pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
     if map.header.file_size > MAX_DIRECT_BYTES {
         a.direct_blockers.push("Direct map copies are limited to 256 MiB; larger caches require a verified source workflow.".into());
     }
-    if map.header.version != 13
+    if ![13,609].contains(&map.header.version)
         || map.header.compressed
         || map.header.extended
         || map.header.legacy_tag_size_repair
     {
-        a.direct_blockers.push("Direct writes currently require an unextended, uncompressed MCC Halo 1 cache (13); other editions keep their own read/source routes.".into());
+        a.direct_blockers.push("Direct writes require an unextended, uncompressed MCC13 cache or a CE609 scenery-radius edit. Other editions retain their native source routes.".into());
     }
     if project.quick_forge.is_some() {
         a.intents.push(Intent::GeneratedGeometry);
@@ -218,7 +250,8 @@ pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
         if edit.value.as_f64() == field.value.as_f64() {
             continue;
         }
-        let supported = field.kind == "f32"
+        let supported = (map.header.version != 609 || tag.class == "scen" && field.key == "bounding-radius")
+            && field.kind == "f32"
             && !tag.external
             && tag
                 .data_offset
@@ -271,6 +304,10 @@ pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
             continue;
         }
         if object.position == old.position && object.rotation == old.rotation {
+            continue;
+        }
+        if map.header.version == 609 {
+            a.direct_blockers.push("CE placement changes require the supported native scenario rebuild; this CE copy route only writes scenery bounding radius.".into());
             continue;
         }
         if !["Scenery", "Vehicle", "Player spawn", "Netgame item"].contains(&old.kind.as_str())
@@ -349,7 +386,7 @@ fn validate_cells(bytes: &[u8], cells: &[Cell]) -> Result<()> {
     }
     Ok(())
 }
-/// Check every byte, including opaque structures. Only the reviewed MCC header
+/// Check every byte, including opaque structures. Only the reviewed MCC/CE header
 /// checksum cell may additionally differ after the pinned native CRC utility.
 pub fn verify_footprint(before: &[u8], after: &[u8], cells: &[Cell]) -> Result<usize> {
     if before.len() != after.len() {

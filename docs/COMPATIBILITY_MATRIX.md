@@ -33,7 +33,7 @@ C42 adds a [bounded shared external-tool route](C42_SHARED_EXTERNAL_EDITING.md):
 
 | C41 operation | Verified implementation boundary | Required separate acceptance |
 | --- | --- | --- |
-| Direct cache copy | Windows MCC H1 cache 13; reviewed internal object/weapon scalars and existing placement transforms; pinned Invader CRC/info, complete byte footprint and semantic reopen | Actual target-game load/gameplay; other direct-write editions |
+| Direct cache copy | Reviewed MCC13 scalars/placements; additionally embedded CE609 scenery Bounding radius targeting CE/Chupathingy. Pinned Invader CRC/info, full-byte footprint, semantic reopen and retained exact source resource pins. R277 replaces two imports, compiles, independently reads0.75 and loads the rebuilt CE cache in private Chupathingy | This is not format conversion. Other CE fields/classes, references, arrays and BSP edits need native source rebuilding; direct-copy-specific game behavior, human/peer and other-edition acceptance remain separate. [Exact evidence](NATIVE_SOURCE_TAG_EDIT_20261108.md) |
 | Native source | Existing compatible MCC extraction/Tool, accepted working-tag revisions and reviewed QuickForge targets; native integrity/dependencies retained | Specific asset/scenario/game behavior; unsupported source imports |
 | Visual editing | Same Project/TagFields in class tree and drawer; actual source-placement transforms can publish through direct routing | New imported-cache arrays/models and arbitrary custom native import |
 | Live position plan | Explicit existing-object bindings, exact reviewed MCC session/map, ten-second expiry, before/readback journal | Fresh game presentation, collision relinking and peer agreement; persistent save separate |

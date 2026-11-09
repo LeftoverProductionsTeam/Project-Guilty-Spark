@@ -1,6 +1,9 @@
 # Canonical cumulative feature and evidence ledger
 
-## Current reconciliation - 7 November 2026
+## Current reconciliation - 8 November 2026
+
+**8 November imported-source completion:** R277 verifies the real scenery source-tag handoff, acknowledged Save/Undo/two restarts, stale-import refusal, bounded CE609 radius copy with retained source bank identities, replacement of both placed assets, connected native build, independent0.75 readback and exact private Chupathingy load. All475 requirement identities and existing wider acceptance gates remain unchanged. This is a scoped creator/native milestone; human traversal, game interaction, full peer/platform/release acceptance and general CE field conversion remain open. [Exact evidence and failed iterations](NATIVE_SOURCE_TAG_EDIT_20261108.md).
+
 
 **7 November prototype closure:** the existing native builder now compiles an open road and separate infantry route with independently read-back source metal materials, collision and CRC validation. The current Windows app verifies Chupathingy Xbox-source asset contexts, skeletal animation, measured output audio and reversible editor greenscreen with camera-key Undo/Save/process restart; all12 multiwindow cases and full automated regressions pass. Chupathingy is the fresh-setup preference without overriding saved source/runtime choices. These are prototype/editor gates, not game or peer acceptance. Superseding OpenH1 in-headset Forge and natural19-map terrain remain incomplete; verified physically traversable region connections remains0. [Evidence and user steps](DOUBLE_ACTION_20261107.md#reversible-prototype-closure--current-dirty-master). Nineteen-source hex planning now passes real Windows Undo/Save/restart; it is not physical geometry acceptance. The338c79d5 correction prioritizes one natural seam, then one authoritative randomized teleport, then expansion. All475 requirement identities and prior goals remain unchanged.
 
