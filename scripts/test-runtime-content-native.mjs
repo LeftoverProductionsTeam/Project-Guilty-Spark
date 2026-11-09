@@ -6,11 +6,13 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {nativeDedicatedServer} from './native-dedicated-server.mjs';
 import {encodeHaloSourceTiff} from '../src/haloTiff.ts';
 import {chromium,expect} from '@playwright/test';
 import {beginQaStorage,assertQaOutputPath,waitForQaExit,stopQaProcess} from './native-qa-storage.mjs';
 import {chooseTool,openStudioMenu,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 const [executable,output,runtimes]=process.argv.slice(2);
+const dedicatedLifecycleOnly=process.env.SPARK_QA_DEDICATED_EMPTY_STATE==='1';
 if(!executable||!output||!runtimes)throw Error('Choose the exact QA application, fresh output and owned Runtimes folder');
 const root=await assertQaOutputPath(path.resolve(output));
 const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
@@ -21,7 +23,7 @@ const before=Object.fromEntries(await Promise.all(originals.map(async p=>[p,awai
 report.verifiedInputs=before;
 report.appSha256=await hash(path.resolve(executable));
 await fs.mkdir(root);
-const finish=await beginQaStorage(root,{workflow:'runtime-content',appSha256:report.appSha256,reservationBytes:1536*1024**2});
+const finish=await beginQaStorage(root,{workflow:'runtime-content',appSha256:report.appSha256,reservationBytes:(dedicatedLifecycleOnly?4096:1536)*1024**2});
 const app=path.join(root,'application/GuiltySpark.exe');
 let child,browser,page,engineOutput='',engineTail='';
 const listener=net.createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));const consolePort=listener.address().port;await new Promise(resolve=>listener.close(resolve));
@@ -34,6 +36,13 @@ await fs.mkdir(path.join(shared,'maps'));
 await fs.copyFile(path.join(source,'OpenCE/maps/ui.map'),path.join(shared,'maps/ui.map'),fs.constants.COPYFILE_EXCL);
  await startSpark();
  const bootstrap=await call('bootstrap');await call('save_settings',{settings:{...bootstrap.settings,onboardingCompleted:true}});await page.reload();
+ if(dedicatedLifecycleOnly){
+  const registration={id:'qa-chupa-lifecycle',runtimeId:'chupathingyCe',root:path.join(source,'Chupathingy'),executable:path.join(source,'Chupathingy/chupathingy.exe'),dataRoot:null,version:null,networkVersion:null};
+  expect((await call('inspect_runtime_registration',{registration})).validation).toBe('pass');
+  await call('register_runtime',{registration});
+  await nativeDedicatedServer({page,root,call,expect,receipt:report,emptyGameLifecycle:true,trackProcess:child=>finish.trackProcess(child),createScratch:name=>finish.createScratch(name),checkpoint:async phase=>{report.nativePhase=phase;await fs.writeFile(path.join(root,'native-progress.json'),JSON.stringify(report,null,2));console.log('DEDICATED_LIFECYCLE',phase);}});
+  report.cases.push({name:'Two real Chupathingy clients leave an owned Xbox game; staged and non-playing game identities remain distinct',passed:true});
+ }else{
  const registrations=[['ce','haloCustomEdition','Halo Custom Edition','haloce.exe',null],['upstream','openCe','OpenCE','halo.exe',shared],['faber','openCe','OpenCEFaber','halo.exe',shared],['chupa','chupathingyCe','Chupathingy','halo.exe',shared],['openh1','openCe','OpenH1-Windows','halo.exe',shared]].map(([id,runtimeId,folder,exe,dataRoot])=>({id,runtimeId,root:path.join(source,folder),executable:path.join(source,folder,exe),dataRoot,version:null,networkVersion:null}));
  for(const registration of registrations){const inspected=await call('inspect_runtime_registration',{registration});expect(inspected.validation).toBe('pass');await call('register_runtime',{registration});}
  let profiles=await call('list_runtime_registrations');expect(profiles.length).toBe(5);expect(profiles.filter(p=>p.runtimeId==='openCe').length).toBe(3);
@@ -93,6 +102,7 @@ await fs.copyFile(path.join(source,'OpenCE/maps/ui.map'),path.join(shared,'maps/
   expect((await call('install_downloaded_community_map',installArgs)).reused).toBe(true);
   report.cases.push({name:'Real advertised map setup admits a native imported source and reuses identical bytes without joining',passed:true,sourceSha256:originalHash});
  }else report.providerMapSetup={status:'blocked',reason:'No compatible owned Blood Gulch map was in the current real listing; no server data was invented'};
+ }
  for(const [p,h]of Object.entries(before))expect(await hash(path.join(source,p))).toBe(h);
  report.originalsUnchanged=true;report.complete=true;
 }catch(e){report.errors.push(e?.stack??String(e));process.exitCode=1;await page?.screenshot({path:path.join(root,'runtime-failure.png')}).catch(()=>{});}

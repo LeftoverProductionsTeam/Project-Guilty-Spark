@@ -547,6 +547,20 @@ fn publish_running(session: &Session, run: &Running) -> Reply<()> {
     view.detail="Private dedicated process started with the checked cache; awaiting authenticated loaded-map state. Matching clients must rejoin.".into();
     Ok(())
 }
+// Staged and compiled identities survive a round ending, but an active-game
+// confirmation must follow every authenticated status, including postgame.
+fn confirmed_game_revision(
+    stage: &Stage,
+    expected_map: &str,
+    state: host::ServerState,
+    observed_map: &str,
+) -> (Option<String>, Option<String>) {
+    if state == host::ServerState::InGame && observed_map == expected_map {
+        (stage.build_id.clone(), Some(stage.map_sha256.clone()))
+    } else {
+        (None, None)
+    }
+}
 fn run(
     app: &tauri::AppHandle,
     owner: &str,
@@ -666,11 +680,9 @@ fn run(
                         let mut view=lock(&session.view)?;
                         if view.status.is_none(){view.detail="Private server authenticated; loaded-map identity and native state are shown below.".into();}
                         view.phase=if matches!(status.state,host::ServerState::InGame){"inGame"}else{"ready"}.into();
-                        if matches!(status.state,host::ServerState::InGame)&&status.map==request.entries[0].map {
-                            // A fresh owned process, immutable validated stage and authenticated
-                            // in-game state agree. Human/peer behavior remains a separate gate.
-                            view.game_build_id=running.stage.build_id.clone();view.game_sha256=Some(running.stage.map_sha256.clone());
-                        }
+                        (view.game_build_id, view.game_sha256) = confirmed_game_revision(
+                            &running.stage, &request.entries[0].map, status.state, &status.map,
+                        );
                         view.status=Some(status);
                     }
                     Err(problem)=>lock(&session.view)?.detail=problem,
@@ -845,6 +857,23 @@ mod stopped_cache_tests {
         let map=root.join("data/maps_ce/previous.map");fs::write(&map,b"previous-good native map").unwrap();
         let budget=store.tool_budget(&root).unwrap().unwrap();
         Stage{root,budget,lease:Some(lease),originals:vec![],map,map_sha256:String::new(),build_id:None,copied_bytes:0}
+    }
+    #[test]
+    fn game_confirmation_tracks_current_native_state_without_discarding_the_staged_revision() {
+        let temp=tempfile::tempdir().unwrap();let mut stage=staged(temp.path());
+        stage.map_sha256=maps::hash_file(&stage.map).unwrap();stage.build_id=Some("validated-build".into());
+        let pinned_hash=stage.map_sha256.clone();let pinned_build=stage.build_id.clone();
+        assert_eq!(confirmed_game_revision(&stage,"previous",host::ServerState::InGame,"previous"),
+            (pinned_build.clone(),Some(pinned_hash.clone())));
+        for state in [host::ServerState::Starting,host::ServerState::Lobby,host::ServerState::Loading,host::ServerState::Postgame] {
+            assert_eq!(confirmed_game_revision(&stage,"previous",state,"previous"),(None,None));
+        }
+        assert_eq!(confirmed_game_revision(&stage,"previous",host::ServerState::InGame,"another-map"),(None,None));
+        assert_eq!(stage.build_id,pinned_build);assert_eq!(stage.map_sha256,pinned_hash);
+        assert_eq!(maps::hash_file(&stage.map).unwrap(),pinned_hash);
+        // A subsequent matching round confirms the same immutable map again.
+        assert_eq!(confirmed_game_revision(&stage,"previous",host::ServerState::InGame,"previous"),
+            (pinned_build,Some(pinned_hash)));
     }
     #[test]
     fn native_build_copy_requires_the_previously_validated_hash() {

@@ -5,7 +5,7 @@ import {watch as watchFs} from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { chooseTool, openStudioMenu } from '../tests/ui/helpers/navigation.ts';
+import { chooseTool, openStudioMenu, revealPagedControl } from '../tests/ui/helpers/navigation.ts';
 import { auditPagedSurface } from '../tests/ui/helpers/compactSurfaces.ts';
 import {windowUiScale} from '../src/uiScale.ts';
 import {stopQaProcess,waitForQaExit,sealQaScratch,disposeQaScratch} from './native-qa-storage.mjs';
@@ -21,6 +21,7 @@ export async function nativeDedicatedServer({
   projectId,
   expectedSpawns,
   liveRebuild,
+  emptyGameLifecycle=false,
   checkpoint=async()=>{},
 }) {
   const hash = async (file) =>
@@ -28,14 +29,23 @@ export async function nativeDedicatedServer({
       .createHash('sha256')
       .update(await fs.readFile(file))
       .digest('hex');
-  const created = (await call('bootstrap')).entries.find((row) => projectId ? row.id === projectId : row.title === 'Native live rebuild');
-  expect(created).toBeTruthy();
-  const saved = (await call('open_project', { id: created.id })).project;
-  expect(
-    saved.builds.some((row) => row.id === compiled.build.id && row.sha256 === compiled.build.sha256),
-  ).toBe(true);
-  (receipt.liveRebuild??={}).projectId = created.id;
+  const created = compiled ? (await call('bootstrap')).entries.find((row) => projectId ? row.id === projectId : row.title === 'Native live rebuild') : null;
+  if(compiled){
+    expect(created).toBeTruthy();
+    const saved = (await call('open_project', { id: created.id })).project;
+    expect(saved.builds.some((row) => row.id === compiled.build.id && row.sha256 === compiled.build.sha256)).toBe(true);
+    (receipt.liveRebuild??={}).projectId = created.id;
+  }else expect(liveRebuild).toBeUndefined();
 
+  await page.evaluate(()=>{
+    window.__sparkQaHostClicks=[];
+    document.addEventListener('pointerdown',event=>{
+      const button=event.target?.closest?.('button');if(!button)return;
+      const rect=button.getBoundingClientRect();
+      window.__sparkQaHostClicks.push({label:(button.getAttribute('aria-label')||button.textContent||'').trim().slice(0,160),x:event.clientX,y:event.clientY,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},zoom:document.documentElement.style.zoom,selected:[...document.querySelectorAll('.online-toolbar button.selected')].map(node=>node.textContent.trim())});
+      if(window.__sparkQaHostClicks.length>32)window.__sparkQaHostClicks.shift();
+    },true);
+  });
   const studio = await openStudioMenu(page);
   await studio.getByLabel('Active Halo runtime', { exact: true }).selectOption('chupathingyCe');
   await studio.getByLabel('Studio options', { exact: true }).click();
@@ -59,7 +69,8 @@ export async function nativeDedicatedServer({
   expect(await hash(installed.executable)).toBe(
     '25a206c6c7d6454a6f6a41a8a5987a1e30334db7404e8bf895f1e8429485ce85',
   );
-  await panel.getByRole('checkbox', { name: /Use current CE build/ }).check();
+  if(compiled)await panel.getByRole('checkbox', { name: /Use current CE build/ }).check();
+  else await expect(panel.getByRole('checkbox', { name: /Use current CE build/ })).toHaveCount(0);
   await panel.getByText('Local trial routing', { exact: true }).click();
   await panel.getByRole('textbox', { name: 'Private trial client addresses', exact: true }).fill('127.0.0.1');
   await panel.getByRole('button', { name: 'Start private dedicated server', exact: true }).click();
@@ -80,10 +91,10 @@ export async function nativeDedicatedServer({
       { timeout: 240000, intervals: [1000, 2000] },
     )
     .toMatchObject({ version: '0.9.0c', networkVersion: 32, public: false });
-  expect(session.sourceBuildId).toBe(compiled.build.id);
-  expect(session.mapSha256).toBe(compiled.build.sha256);
+  if(compiled){expect(session.sourceBuildId).toBe(compiled.build.id);expect(session.mapSha256).toBe(compiled.build.sha256);}
+  else{expect(session.sourceBuildId).toBeNull();expect(session.map).toBe('bloodgulch');}
   const base = session.sessionDirectory,
-    map = path.join(base, 'data/maps_ce', session.map.replace(/@ce$/, '') + '.map');
+    map = path.join(base, session.map.endsWith('@ce')?'data/maps_ce':'data/maps', session.map.replace(/@ce$/, '') + '.map');
   expect(await hash(map)).toBe(session.mapSha256);
   console.log(
     'DEDICATED_NATIVE',
@@ -320,6 +331,7 @@ export async function nativeDedicatedServer({
     }
     await checkpoint('stopped-old-client-caches-retired-saves-preserved');
   }
+  let primaryFailure;
   try {
     await startClients(base,'dedicated');
     const firstPeers=await waitForPeers(expectedSpawns);
@@ -396,6 +408,8 @@ export async function nativeDedicatedServer({
       const newPeers=await waitForPeers(readback.positions);
       const loaded=await call('community_server_status');expect(loaded.gameSha256).toBe(adopted.mapSha256);expect(loaded.gameBuildId).toBe(adopted.sourceBuildId);
       receipt.nativeDedicated.liveRebuild={compiling,adopted,loaded,readback,spawnReadback:newPeers.spawnReadback,peers:newPeers.spawned,previousStageUnchanged:true,roundReset:true,clientsExplicitlyRejoined:true};
+      await expect(panel).toContainText('Game '+loaded.gameSha256.slice(0,8));
+      await expect(panel).toContainText(/2\/\d+ players · native in_game/);
       await page.screenshot({path:path.join(root,'native-dedicated-live-rebuild.png')});
       await checkpoint('new-revision-readback-and-two-rejoined-clients');
       await checkpoint('before-invalid-source-selection');
@@ -420,8 +434,34 @@ export async function nativeDedicatedServer({
       console.log('DEDICATED_NATIVE',JSON.stringify({phase:'live-rebuild-native-compiler-failure-kept-two-peers',pid:rejected.processId}));
       await page.screenshot({path:path.join(root,'native-dedicated-live-rebuild-rejected.png')});
     }
+    if(emptyGameLifecycle){
+      const before=await call('community_server_status');
+      expect(before.status).toMatchObject({state:'in_game',players:2});
+      expect(before.gameSha256).toBe(before.mapSha256);
+      await stopClients(clients);
+      await expect.poll(async()=>{const next=await call('community_server_status');return next?.status?.players;},{timeout:30000,intervals:[1000]}).toBe(0);
+      await expect.poll(async()=>{const next=await call('community_server_status');return next?.status?.state;},{timeout:90000,intervals:[1000,2000]}).not.toBe('in_game');
+      const after=await call('community_server_status');
+      receipt.nativeDedicated.emptyGame={before,after,allClientsExited:clients.every(peer=>peer.child.exitCode!==null||peer.child.signalCode!==null),gameplayAccepted:false};
+      await checkpoint('empty-game-native-state-observed');
+      await expect(panel).toContainText('native '+after.status.state);
+      await page.screenshot({path:path.join(root,'native-dedicated-empty.png')});
+      expect(after.processId).toBe(before.processId);expect(after.mapSha256).toBe(before.mapSha256);
+      expect(await hash(map)).toBe(before.mapSha256);
+      expect(after.gameSha256,'A non-playing native state must not confirm the prior cache as the active game revision').toBeNull();
+      expect(after.gameBuildId).toBeNull();
+      if(compiled)await expect(panel).toContainText('Game not confirmed');
+      else await expect(panel).toContainText('native '+after.status.state);
+    }
 
+  } catch(problem) {
+    primaryFailure=problem;
+    receipt.nativeDedicated.primaryFailure={error:String(problem.stack??problem),ui:await page.locator('body').innerText().then(text=>text.slice(0,16000)).catch(()=>''),clicks:await page.evaluate(()=>window.__sparkQaHostClicks).catch(()=>[])};
+    await page.screenshot({path:path.join(root,'native-dedicated-primary-failure.png')}).catch(()=>{});
+    await checkpoint('native-primary-failure-before-cleanup').catch(()=>{});
+    throw problem;
   } finally {
+    try {
     for (const client of allClients) {
       await stopQaProcess(client.child);
       await waitForQaExit(client.child);
@@ -434,8 +474,12 @@ export async function nativeDedicatedServer({
       networkLog: client.networkLog.slice(-24000),
       tail: client.output.slice(-4000),
     }));
-    const stop = panel.getByRole('button', { name: 'Stop server', exact: true });
-    if (await stop.isVisible()) await stop.click();
+    const stop = panel.getByRole('button', { name: 'Stop server', exact: true, includeHidden:true });
+    if(!await panel.isVisible()){
+      await chooseTool(page,'Online');
+      await page.getByRole('button',{name:'Host game',exact:true}).click();
+    }
+    await revealPagedControl(stop);await stop.click();
     await expect
       .poll(async () => (await call('community_server_status'))?.phase, { timeout: 30000 })
       .toBe('stopped');
@@ -449,6 +493,10 @@ export async function nativeDedicatedServer({
     receipt.nativeDedicated.originalsUnchanged = true;
     await expect(panel).toContainText('stopped');
     for(const staged of [base,receipt.nativeDedicated.liveRebuild?.adopted.sessionDirectory].filter(Boolean))await expect.poll(async () => !!(await fs.stat(staged).catch(() => null)), { timeout: 30000 }).toBe(false);
+    }catch(problem){
+      receipt.nativeDedicated.cleanupError=String(problem.stack??problem);
+      if(!primaryFailure)throw problem;
+    }
   }
   receipt.nativeDedicated.layouts=await auditLayouts();
   await checkpoint('stopped-originals-rechecked-and-layouts');

@@ -181,7 +181,12 @@ try {
         const output=path.join(context.directory,'qa','runtime');await fs.mkdir(path.dirname(output),{recursive:true});
         try{await run('Actual runtime profiles, shared native folders and CE requirements',[
           'scripts/test-runtime-content-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release/GuiltySpark.exe'),output,process.env.SPARK_TEST_RUNTIME_ROOT]);}
-        finally{const text=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(text)report.runtimeContent=JSON.parse(text);}
+        finally{
+          const text=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(text)report.runtimeContent=JSON.parse(text);
+          if(receiptFile)for(const name of ['runtime-failure.png','native-dedicated-empty.png','native-dedicated-primary-failure.png']){
+            const file=path.join(output,name),info=await fs.stat(file).catch(()=>null);if(info?.isFile()&&info.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(file,target,fs.constants.COPYFILE_EXCL);(report.runtimeScreenshots??=[]).push({file:target,bytes:info.size});}
+          }
+        }
       }
       if (stages.includes('native')) {
         const hash = async (file) =>
