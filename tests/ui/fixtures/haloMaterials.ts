@@ -87,6 +87,18 @@ export function renderMaterialChecks() {
     return sample(material,exterior);
   };
   const nativeGlow=glowSample(grey,emissiveMask,false),advancedGlow=glowSample(grey,emissiveMask,true),unmasked=glowSample(grey,noEmissionMask,false),blackGlow=glowSample(black,emissiveMask,false);
+  // Constant source colours make the native detail/reflection order observable
+  // in real WebGL pixels without a lighting/exposure or texture fallback.
+  const cubeFaces=Array.from({length:6},()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const context=canvas.getContext('2d')!;context.fillStyle='rgb(64,64,64)';context.fillRect(0,0,1,1);return canvas;});
+  const cube=new THREE.CubeTexture(cubeFaces);cube.colorSpace=THREE.NoColorSpace;cube.needsUpdate=true;
+  const diffuse=texture([96,96,96,255]),detail=texture([64,64,64,255]),addDetail=texture([160,160,160,255]);
+  const reflection={bitmapTagId:1,perpendicularBrightness:1,parallelBrightness:1,perpendicularTint:[1,1,1] as [number,number,number],parallelTint:[1,1,1] as [number,number,number],falloff:0,cutoff:0};
+  const detailOrder=[0,1,2].map(detailFunction=>[false,true].map(detailAfterReflection=>sample(createHaloMaterial(diffuse,half,{...metadata,kind:'model',detailFunction,detailScales:[1,1,1],reflection,detailAfterReflection},{primaryDetail:detailFunction===2?addDetail:detail,reflectionCube:cube}),exterior)));
+  const noReflectionDetail=[false,true].map(detailAfterReflection=>sample(createHaloMaterial(diffuse,half,{...metadata,kind:'model',detailFunction:0,detailScales:[1,1,1],detailAfterReflection},{primaryDetail:detail}),exterior));
+  const pcMasks=texture([0,0,128,0]),xboxMasks=texture([128,0,0,0]);
+  const maskedDetailOrder=[false,true].map(multipurposeXbox=>[false,true].map(detailAfterReflection=>sample(createHaloMaterial(diffuse,half,{...metadata,kind:'model',detailFunction:0,detailMask:2,detailScales:[1,1,1],reflection,detailAfterReflection,multipurposeXbox},{primaryDetail:detail,multipurpose:multipurposeXbox?xboxMasks:pcMasks,reflectionCube:cube}),exterior)));
+  for(const t of[pcMasks,xboxMasks])t.dispose();
+  for(const t of[cube,diffuse,detail,addDetail])t.dispose();
   camera.position.z = -2;
   camera.lookAt(0, 0, 0);
   const back = sample(createHaloMaterial(green, null, { ...metadata, kind: 'model' }, {}), exterior);
@@ -95,5 +107,5 @@ export function renderMaterialChecks() {
   for (const t of [black, green, red, half,emissiveMask,noEmissionMask,grey]) t.dispose();
   target.dispose();
   renderer.dispose();
-  return { neutral, added, alphaAdded, combined, model, back,nativeGlow,advancedGlow,unmasked,blackGlow, errors };
+  return { neutral, added, alphaAdded, combined, model, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder, errors };
 }

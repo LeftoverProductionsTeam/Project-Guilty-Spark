@@ -280,7 +280,34 @@ async function nativeVehiclePreview(opened,originalHash){
     const actual=await invoke(main,'preview_owned_object_model',{projectId:opened.project.id,tagId:vehicle.id,sourceSha256:originalHash});
     expect(actual.sourceSha256).toBe(originalHash);expect(actual.mesh.uvs.length).toBe(expected.length);expect(expected.length).toBeGreaterThan(0);
     const mismatches=actual.mesh.uvs.reduce((sum,value,index)=>sum+(Math.abs(value-expected[index])>1e-6*Math.max(1,Math.abs(expected[index]))?1:0),0);
-    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
+    const [sourceShaders,shaderCount]=block(at+220,32,256),sourceShaderReferences=[];
+    for(let slot=0;slot<shaderCount;slot++){
+      const reference=sourceShaders+slot*32,id=u32(reference+12),nativeClass=bytes.subarray(reference,reference+4).toString('ascii').split('').reverse().join('');
+      const sourceTag=opened.inspection.tags.find(tag=>tag.id===id);expect(sourceTag?.class,'Original vehicle material reference '+slot).toBe(nativeClass);
+      sourceShaderReferences.push({slot,id,class:nativeClass,path:sourceTag.path});
+    }
+    const materialOrder=[];
+    for(const id of new Set(actual.mesh.materialRanges.map(range=>range.shaderTagId))){
+      const shader=opened.inspection.tags.find(tag=>tag.id===id);expect(shader,'Actual vehicle shader identity').toBeTruthy();
+      expect(sourceShaderReferences.some(ref=>ref.id===id&&ref.class===shader.class),'Actual material belongs to the original model').toBe(true);
+      if(shader.class!=='soso'){
+        if(shader.shaderPreview)expect(shader.shaderPreview.detailAfterReflection,'Other shader flags are not model detail order').toBe(false);
+        continue;
+      }
+      const body=shader.dataOffset;if(!Number.isSafeInteger(body)||body<tagStart||body+440>tagEnd)throw Error('Vehicle shader body escapes native source');
+      const flags=bytes.readUInt16LE(body+40),detailAfterReflection=!!(flags&1);
+      expect(shader.shaderPreview?.detailAfterReflection,'Native detail/reflection order for '+shader.path).toBe(detailAfterReflection);
+      materialOrder.push({shaderPath:shader.path,flags,detailAfterReflection});
+    }
+    let materialAcceptance='native-shader-source-readback';
+    if(expectedCacheVersion===6&&/^vehicles[\\/]rwarthog[\\/]rwarthog$/i.test(model.path)){
+      // This preserved zombie carrier deliberately references lights, not
+      // materials. Geometry/UV recovery cannot establish rendered fidelity.
+      expect(sourceShaderReferences).toHaveLength(15);expect(sourceShaderReferences.every(ref=>ref.class==='ligh'&&ref.path==='effects\\lights\\coop teleport')).toBe(true);
+      expect(actual.mesh.materialRanges).toHaveLength(0);expect(materialOrder).toHaveLength(0);
+      materialAcceptance='unsupported-original-non-shader-references';
+    }else expect(materialOrder.length).toBeGreaterThan(0);
+    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,sourceShaderReferences,materialAcceptance,materialOrder,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
   }
   expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
   expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);

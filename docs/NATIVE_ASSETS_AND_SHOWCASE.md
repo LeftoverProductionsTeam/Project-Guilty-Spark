@@ -6,6 +6,34 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## 10 November native vehicle detail and reflection order
+
+Original Scorpion shaders set shader_model's detail-after-reflection flag. Spark discarded it and always combined detail first. The shared parser now preserves the read-only flag, and the existing shared material renderer follows it. World, Asset Library and large tag previews retain one material path. UVs, normals, source colours, reflection cubes, lighting and alpha remain intact; no exposure adjustment, generic replacement material or native-tag mutation was introduced. Other shader classes do not reinterpret their first flag; old serialized previews default to false.
+
+Format reference: Invader [696830ff80af227e84e7237c2ef26eb2301ed110, shader_model.json](https://github.com/SnowyMouse/invader/blob/696830ff80af227e84e7237c2ef26eb2301ed110/src/tag/hek/definition/shader_model.json). OpenCE899219cc0a14b03bc12f0517a1e9ee4c37158af8 source/rasterizer/xbox/rasterizer_xbox_models.c was reviewed read-only; no engine implementation was imported.
+
+R399 genuinely fails real WebGL: flag toggling leaves pixel pairs88/88,76/76,145/145 across three detail functions. R400 and full R401 pass independently calculated88/56,76/28,145/177. Without reflection both orders remain24/24. Partial masks produce68/60 for PC-blue and Xbox-red conventions; alpha255 and existing transparency/glow/culling checks remain.
+
+| Original source | Cache | Models / UV coordinates | soso references / after-reflection | Native evidence |
+| --- | --- | --- | --- | --- |
+| MCC Blood Gulch |13|5 /25302|24 /4|R401; strengthened R407|
+| CE Timberland |609|5 /25302|24 /4|R402|
+| Chupathingy Xbox Blood Gulch |5|3 /14660|15 /4|R403|
+| OpenCE Xbox Blood Gulch |5|3 /14660|15 /4|R404|
+| Original Zombie Apocalypse Demo |6|2 /15924|5 /0 on supported Warthog|R406; second carrier geometry/UV-only|
+
+All checked UV mismatches are0. Each run uses actual Work → Tag editor → Search tags → Vehicle → model selection, preview material loading, Level Editor and independent original-cache readback. Source ordering flags match every checked soso slot. Chupathingy/OpenCE caches have the same hash; these are two installation checks, not independent formats.
+
+**Demo limitation:** R405 failed the assumption that every vehicle has a model shader. The original rwarthog instead declares15 ligh references to effects\lights\coop teleport, with no supported material ranges. R406 explicitly records unsupported-original-non-shader-references rather than fabricating shaders or promoting UV recovery into rendered fidelity. Its other Warthog retains5 model shaders. An unrelated original bottle-glass reflection lacks an exact resource-index path and remains unavailable; fuzzy substitution is refused.
+
+R401 full current-source regression passes909Rust tests/9explicit opt-in ignores,476frontend,271browser, TypeScript,1071source-module contracts, offline regressions and storage ownership. Fresh Windows build183.305s; native MCC24.513s, CE26.176s, Chupa22.776s, OpenCE22.296s, Demo25.706s; strengthened MCC23.972s. R406/R407 wrapper and child complete with0JavaScript errors, unchanged originals and disposed owned temporary data. No full SDK is staged for this read-only preview path.
+
+QA E/qa-vehicle-order-r401/GuiltySpark.exe:49,772,544B, SHAc1a7feacee7096a3dd5a95d35d721b93f8f488d056bffe3a5a0335e7cecee2af; runtime-source fingerprint adae9e70c7c272c9303deb4b2a9a979bf9a6d2a325c1d423ee2696c12feb3316. Built from7b01cea plus this reviewed production diff; this is not a clean-source installer/release. E is the existing external Temp GuiltySpark-Engineering-d49eb02588bf root. JSON/log basenames: vehicle-material-r401, vehicle-order-ce-r402, vehicle-order-chupa-r403, vehicle-order-opence-r404, vehicle-order-demo-r406, vehicle-order-mcc-r407. R405 remains a failed fixture attempt.
+
+Native screenshots: E/vehicle-after-r388-native-vehicle-scorpion.png before this ordering repair; E/vehicle-order-mcc-r407-native-vehicle-scorpion.png after. Corresponding native-vehicle-warthog.png and owned-native-bsp.png show the shared source-material path. No proprietary content is packaged in Git.
+
+This accepts the demonstrated UV/ordering defects and native editor checks. Matched actual-game reflection, local lighting, glass, geometry/LOD and animation comparison remains H29. No new game/native-compilation acceptance is inferred; the accepted native build/recovery pipeline remains protected.
+
 ## 9 November vehicle texture-coordinate repair
 
 The owner reported vehicles still differed from the game. R387 reproduces a real shared-reader failure in the native Windows app: the Warthog has **7,380 wrong UV coordinates**, the Scorpion 4,768, rocket Warthog 8,544 and Banshee 2,098. The Ghost's unit-scale mapping already matches. All required Warthog/Scorpion images and their 4/1 reflection cubes were loaded, so decoding success alone did not detect this error.

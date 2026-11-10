@@ -152,9 +152,11 @@ R372 completes the current CE609three-author native functional journey, includin
 
 For restart recovery, after all three creators see the placement, close/reopen the owner Spark process and reconnect through its private invitation workflow. Confirm each editor can still display the actual model and the same original source identity, and that independently retained peer edits are applied once. Record app/source/shared revision, model visibility, pending-operation identity and outcome; unavailable original source must be reported rather than silently reinterpreted.
 
+R398 current-source follow-through (10 November): the explicit server-crash/full three-editor CE609 → native build → private Chupathingy two-client Live Rebuild/recovery gate passes with original hashes and storage guards. Both clients are hidden with dummy audio; H28 human interaction, H29 matched in-game vehicle/material comparison and physical two-PC LAN/VPN remain pending. Exact hashes, stage results and boundaries are in CHUPATHINGY_DEDICATED_20261108.md#r398-accepted-current-source-crash-rollback--10-november.
+
 ## H29 — Vehicle appearance against the same native game source
 
-**Prerequisites:** source-matched R388 QA app (SHA20b8038e…), an owned MCC/CE/Xbox/Demo map and matching playable runtime. Automated R388/R389/R390/R391/R393 checks pass model UVs/material availability and original hashes; human game parity remains unaccepted.
+**Prerequisites:** source-matched R401 QA app (SHAc1a7feac…), an owned MCC/CE/Xbox/Demo map and matching playable runtime. R401–R404/R406/R407 pass native UVs, source detail/reflection order and supported materials with unchanged originals. Human game parity remains unaccepted. The original Demo Evolved Zombie Container references lights instead of shaders: record unsupported material rendering, not stock vehicle appearance.
 
 1. Open that map in Spark. Use Work → Tag editor, Search tags, Vehicle class, then select Warthog or Scorpion. For the original Zombie mod use its actual Undead Demolisher or Evolved Zombie Container.
 2. Orbit with mouse drag and zoom with the wheel. Inspect tire tread, panels/decals, windshield, turret and tracks. Materials must identify the original shader and bitmap; record missing or misaligned areas.
@@ -162,6 +164,3 @@ For restart recovery, after all three creators see the placement, close/reopen t
 4. Return to Spark's Level Editor and inspect the placed vehicle. Record source SHA, app SHA, runtime/version, both screenshots and pass/fail separately for mapping, reflections, lighting, geometry/LOD and animation.
 
 No original map is edited. Do not prefill human/game parity from native preview tests.
-
-
-R398 current-source follow-through (10 November): the explicit server-crash/full three-editor CE609 → native build → private Chupathingy two-client Live Rebuild/recovery gate passes with original hashes and storage guards. Both clients are hidden with dummy audio; H28 human interaction, H29 matched in-game vehicle/material comparison and physical two-PC LAN/VPN remain pending. Exact hashes, stage results and boundaries are in CHUPATHINGY_DEDICATED_20261108.md#r398-accepted-current-source-crash-rollback--10-november.

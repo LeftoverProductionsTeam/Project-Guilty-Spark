@@ -27,7 +27,7 @@ uniform samplerCube reflectionCube;uniform bool hasReflection;uniform mat3 viewT
 uniform sampler2D baseMap,lightMap,primaryDetail,secondaryDetail,microDetail,alphaMask,layer1,layer2,layer3;
 uniform bool hasBase,hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
 uniform int kind,shaderType,detailFunction,microFunction,layerCount,detailMask;
-uniform bool bumpIsSpecular;uniform float detailVScale;
+uniform bool bumpIsSpecular,detailAfterReflection;uniform float detailVScale;
 uniform vec2 baseScale,layerScale[4],layerOffset[4];uniform float layerRotation[4];
 uniform vec2 rotationCenter[4];uniform vec4 motionU[4],motionV[4],motionRotation[4];uniform int layerFlags[4];uniform float time;
 uniform vec3 detailScales;uniform int colorFunction[4],alphaFunction[4];
@@ -83,7 +83,7 @@ void main(){
       float specular=multipurposeXbox?masks.r:masks.b,change=multipurposeXbox?masks.b:masks.a,aux=multipurposeXbox?masks.a:masks.r;
       float selected=detailMask<=2?specular:detailMask<=4?masks.g:detailMask<=6?change:aux;
       detailAmount=mod(float(detailMask),2.0)>0.5?1.0-selected:selected;}
-    if(hasDetail)base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
+    if(hasDetail&&!(kind==1&&detailAfterReflection))base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
     if(hasMicro)base.rgb=detailBlend(base.rgb,texture2D(microDetail,haloUv*detailScales.z).rgb,microFunction);
     if(kind==1&&hasMultipurpose&&hasChangeColor){vec4 masks=texture2D(multipurpose,haloUv*baseScale);float mask=multipurposeXbox?masks.b:masks.a;base.rgb*=mix(vec3(1.0),changeColor,mask);}
     if(alphaTest){float mask=hasMask?texture2D(alphaMask,haloUv).a:base.a;if(mask<0.5)discard;}
@@ -111,6 +111,9 @@ void main(){
       else if(kind==0&&shaderType==2)mask=base.a;
       float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
       base.rgb+=textureCube(reflectionCube,reflected).rgb*tint*brightness*mask*fade;}
+    // Preserve the model tag's authored combiner order. Reflection remains
+    // source-coloured; detail can modulate it only when that flag is set.
+    if(kind==1&&detailAfterReflection&&hasDetail)base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
     if(!alphaBlended)base.a=1.0;
   }
   if(fogEnabled){float amount=clamp((haloDepth-fogNear)/max(0.001,fogFar-fogNear),0.0,1.0)*fogMaximum;
@@ -193,6 +196,7 @@ export function createHaloMaterial(
       shaderType: { value: m?.shaderType ?? 0 },
       detailFunction: { value: m?.detailFunction ?? 0 },
       detailMask:{value:m?.detailMask??0},
+      detailAfterReflection:{value:!!m?.detailAfterReflection},
       detailVScale:{value:m?.detailVScale||1},
       bumpIsSpecular:{value:!!m?.bumpIsSpecular},
       microFunction: { value: m?.microDetailFunction ?? 0 },

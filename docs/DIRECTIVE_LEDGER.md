@@ -1,5 +1,7 @@
 # Directive completion ledger
 
+Vehicle material follow-through R401–R407 accepts the repaired native detail/reflection ordering and installed-source preview checks. Original Demo carrier non-shader references and matched-game H29 remain open. Exact evidence: NATIVE_ASSETS_AND_SHOWCASE.md#10-november-native-vehicle-detail-and-reflection-order. No whole-directive/gameplay/release acceptance follows.
+
 Operation110f3bd3ec0 remains active; full instruction in Master Engineering Prompts/GS_2026-11-08_Operation_110_Product_Execution.txt. Operation110 M2 R398 now passes the complete current-source three-editor CE609 native field/asset/placement → frozen compile/readback → two real private Chupathingy clients → Live Rebuild/native failure preservation → exact-owned server-crash rollback and rejoined peers → editor-owner recovery/rollover/revocation. Wrapper/child exit0 and unchanged storage guards pass. R396 separately accepts current MCC13 native content/compile/recovery; neither proves retail MCC gameplay. Vehicle UV repair is committed3e34299. Human gameplay, physical two-PC/display/headset/platform and M3–M6 remain open. Preserve475IDs and the full mandate; no push/publication.
 
 M1 exact dc4456e Windows installer/portable/source candidate remains sealed/protected and predates this source; hosted CI/remote release remain owner-push dependent. Exact evidence and next action are in ACTIVE_TASK and CHUPATHINGY_DEDICATED_20261108.md.

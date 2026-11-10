@@ -193,6 +193,7 @@ pub struct ShaderPreview {
     #[serde(default)] pub first_map_screenspace:bool,
     #[serde(default)] pub scale_first_map_with_distance:bool,
     #[serde(default)] pub detail_mask:u16,
+    #[serde(default)] pub detail_after_reflection:bool,
     #[serde(default)] pub detail_v_scale:f32,
     #[serde(default)] pub bump_is_specular:bool,
     #[serde(default,skip_serializing_if="Option::is_none")] pub glass_tint:Option<[f32;3]>,
@@ -1010,7 +1011,7 @@ fn shader_bitmap_references(
         if source>4||function>11||!period.is_finite()||!(0.0..=86400.).contains(&period)||lower.iter().chain(&upper).any(|v|!v.is_finite()||!(0.0..=1.0).contains(v)){return invalid("Model self-illumination metadata is invalid");}
         Some(ShaderSelfIllumination{source,function,period:if period==0.{1.}else{period},lower,upper})
     }else{None};
-    tag.shader_preview=Some(ShaderPreview{self_illumination,glass_diffuse_absent:glass_diffuse_absent.then_some(true),change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+    tag.shader_preview=Some(ShaderPreview{self_illumination,glass_diffuse_absent:glass_diffuse_absent.then_some(true),change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,detail_after_reflection:tag.class=="soso"&&flags&1!=0,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
         two_sided:if glass{flags&4!=0}else{tag.class=="soso"&&flags&2!=0},uv_scale:if glass{[shader_scale(r,at+0x154)?;2]}else{uv_scale},
         alpha_blended:glass||tag.class=="soso"&&flags&8!=0,decal:if glass{flags&2!=0}else{tag.class=="soso"&&flags&8!=0},
@@ -1640,6 +1641,25 @@ mod shader_dependency_tests {
         assert_eq!(tag.references[1].label, "Multipurpose map");
         let glow=tag.shader_preview.unwrap().self_illumination.unwrap();assert_eq!(glow.function,2);assert_eq!(glow.period,2.);assert_eq!(glow.upper,[0.75,0.,0.]);
         bytes[64+0x84..64+0x88].copy_from_slice(&f32::NAN.to_le_bytes());let mut bad=shader_fixture("soso");assert!(shader_bitmap_references(&Reader(&bytes),&region,&mut bad,&ids,64).is_err());
+    }
+    #[test]
+    fn model_detail_order_preserves_the_native_flag_without_reinterpreting_environment_alpha() {
+        let mut bytes=vec![0u8;1200];let at=64;
+        install_ref(&mut bytes,at+0xa4,88,b"mtib");
+        let ids=std::collections::HashMap::from([(88,"bitm".into())]);
+        let region=Space{begin:0,end:bytes.len(),address:0};
+        for flags in [0u16,1,4,64,65] {
+            bytes[at+40..at+42].copy_from_slice(&flags.to_le_bytes());
+            let original=bytes.clone();let mut tag=shader_fixture("soso");
+            shader_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,at).unwrap();
+            let preview=tag.shader_preview.unwrap();assert_eq!(preview.detail_after_reflection,flags&1!=0);
+            assert!(tag.fields.is_empty());assert_eq!(bytes,original);
+            let mut old=serde_json::to_value(&preview).unwrap();old.as_object_mut().unwrap().remove("detailAfterReflection");
+            assert!(!serde_json::from_value::<ShaderPreview>(old).unwrap().detail_after_reflection);
+        }
+        install_ref(&mut bytes,at+0x88,88,b"mtib");bytes[at+40..at+42].copy_from_slice(&1u16.to_le_bytes());
+        let mut environment=shader_fixture("senv");shader_bitmap_references(&Reader(&bytes),&region,&mut environment,&ids,at).unwrap();
+        let preview=environment.shader_preview.unwrap();assert!(preview.alpha_test);assert!(!preview.detail_after_reflection);
     }
     #[test]
     fn native_glass_keeps_tint_reflection_and_transparency_instead_of_an_opaque_shell(){

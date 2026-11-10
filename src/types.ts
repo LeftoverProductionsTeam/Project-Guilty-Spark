@@ -93,6 +93,7 @@ export interface ShaderPreview {
   firstMapScreenspace?:boolean;
   scaleFirstMapWithDistance?:boolean;
   detailMask?:number;
+  detailAfterReflection?:boolean;
   detailVScale?:number;
   bumpIsSpecular?:boolean;
   glassTint?:Vec3|null;
