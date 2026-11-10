@@ -1,5 +1,9 @@
 # Source-pinned Windows preview candidate — 8 November 2026
 
+## 10 November follow-through — current-source build pending
+
+Owner requires fresh10November binaries, not relabeled8November files. The sealed dc4456e preview4 remains preserved and is not current master. Chrome authenticated the exact-source preview4 draft (GitHub release440963621), but its attachment count is0; nothing is public. Browser upload permission remains refused after the owner enabled it; no security bypass was attempted. Owner can upload, but has been told to hold the old files. Prepare a new source-pinned preview5 via the existing gates/build/stage/native-startup/install/seal process in E/release-20261110-preview5. Do not replace preview4, C49 or existing tags, and do not claim current files until all package checks pass. The owner retains Git push/publication control.
+
 ## Latest verified Windows candidate: dc4456e / preview4
 
 This later candidate includes the native imported-scenery source-tag workflow and the release-blocking View focus repair. Exact binary/source commit **dc4456ed58d3bdc26889e210fdaf7d51dced1f92**, tree **aecc6a570db12000dc62a1fd706b977581235a2f**, application0.4.1. The previous c035b68 preview2 and C49 remain separate previous-good builds. Failed6d9bb4b preview3 was not sealed. This report's later documentation commit is not the binary source.

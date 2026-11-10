@@ -29,7 +29,7 @@ jobs:
         run: python -B scripts/maintenance/test_qa_vault.py
       - run: node --test scripts/native-qa-storage.test.mjs
       - run: pnpm install --frozen-lockfile
-      - run: node --test scripts/check-source-entrypoints.test.mjs
+      - run: node --test scripts/check-source-entrypoints.test.mjs scripts/frontend-tests.test.mjs
       - run: node scripts/cargo.mjs test -p spark-core --locked
       - run: pnpm check
       - run: pnpm test
@@ -59,7 +59,7 @@ jobs:
         run: python -B scripts/maintenance/test_qa_vault.py
       - run: node --test scripts/native-qa-storage.test.mjs
       - run: pnpm install --frozen-lockfile
-      - run: node --test scripts/check-source-entrypoints.test.mjs
+      - run: node --test scripts/check-source-entrypoints.test.mjs scripts/frontend-tests.test.mjs
       - run: node scripts/cargo.mjs test --workspace --locked
       - run: pnpm test:engine-sources
       - run: node --test scripts/probe-mcc-h1-interface.test.mjs scripts/analyze-opence-ai.test.mjs scripts/native-runtime-health.test.mjs scripts/recover-zombie-carriers-native.test.mjs scripts/native-tag-readback.test.mjs scripts/verify-native-sound-chains.test.mjs scripts/prepare-native-adpcm-waves.test.mjs

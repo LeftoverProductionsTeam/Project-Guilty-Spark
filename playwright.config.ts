@@ -19,6 +19,6 @@ export default defineConfig({
   webServer: {
     command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${port} --strictPort`,
     url: baseURL,
-    reuseExistingServer: process.env.SPARK_RELEASE_GATES !== '1' && !process.env.CI,
+    reuseExistingServer: false,
   },
 });
