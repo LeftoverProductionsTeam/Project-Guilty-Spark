@@ -6,6 +6,34 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## 9 November vehicle texture-coordinate repair
+
+The owner reported vehicles still differed from the game. R387 reproduces a real shared-reader failure in the native Windows app: the Warthog has **7,380 wrong UV coordinates**, the Scorpion 4,768, rocket Warthog 8,544 and Banshee 2,098. The Ghost's unit-scale mapping already matches. All required Warthog/Scorpion images and their 4/1 reflection cubes were loaded, so decoding success alone did not detect this error.
+
+Cached model vertices have normalized texture coordinates and separate model U/V factors. The reader omitted those factors. Native CE/MCC/Xbox Warthog factors are approximately 1.999474 × 3.000816; Scorpion 4.14882 × 0.999792. The shared reader in crates/spark-core/src/render.rs now applies validated factors once to PC float and Xbox compressed UVs. Zero retains the documented unit-factor meaning; nonfinite/excessive values fail. Position, topology, normals, rig, LOD selection, shader UV scales, materials and lighting are unchanged. World, Asset Library and large tag previews consume the same corrected mesh.
+
+Read-only format research used Invader commit 696830ff80af227e84e7237c2ef26eb2301ed110: src/tag/hek/definition/gbxmodel.json fields and src/recover/recover_method.cpp model UV restoration. No third-party implementation was copied.
+
+The existing bounded native lifecycle test independently reads the original cache's model factors and selected vertex streams, compares every returned UV, opens actual Vehicle tags through Search tags/class selection, waits for all preview materials and captures Warthog/Scorpion images. The Demo mod has two Warthog-derived carrier objects instead of a stock Scorpion; R393 verifies those exact preserved objects. R392's stock-fixture assumption remains a failed attempt. R386's new-test hash-parameter error was corrected before the genuine R387 failure; neither is acceptance.
+
+| Original source | Cache | Models checked | UV coordinates checked | Mismatches | Accepted native run |
+| --- | --- | --- | --- | --- | --- |
+| MCC Blood Gulch | 13 | 5 | 25302 | 0 | vehicle-after-r388 |
+| Custom Edition Timberland | 609 | 5 | 25302 | 0 | vehicle-ce-r389 |
+| Chupathingy Xbox Blood Gulch | 5 | 3 | 14660 | 0 | vehicle-chupa-r390 |
+| OpenCE Xbox Blood Gulch | 5 | 3 | 14660 | 0 | vehicle-opence-r391 |
+| Zombie Apocalypse Demo | 6 | 2 | 15924 | 0 | vehicle-demo-r393 |
+
+Each accepted run completes 3 real native cases with 0 JavaScript errors, no mocked IPC, all required preview materials, unchanged original hashes and normal app close. Owned build/profile/library scratch is disposed under existing budgets. These are **native editor/source fidelity checks**, not new game-process or human gameplay acceptance.
+
+R388 also passes the full Rust workspace: 908 passed, 9 explicit opt-in ignores. Source-entrypoint check: 1,071 modules / 0 issues. Frontend source is unchanged; frontend 476/browser 271 remains historical R368 evidence, not newly rerun. PC/Xbox geometry regression additionally verifies 2×3 mapping, native zero factors, unchanged geometry/normals/indices and corrupt-factor refusal.
+
+QA app: E/qa-vehicle-uv-r388/GuiltySpark.exe, 49,771,520 bytes, SHA 20b8038e101b51fbaae3577eb94c5c7575c6c59f55fe524371efc5b4151a93a3; runtime-source fingerprint 74e4d46f070c945ff71a47dc9e9879b6712cb5b2fdfbf507733edd447d8c92eb, built from 79588ca plus the reviewed dirty source. This is not an installer or published release. E is the existing external GuiltySpark-Engineering-d49eb02588bf Temp evidence root. R387-before and R388-after native PNGs remain there beside each JSON/log; no Halo bytes enter Git.
+
+**User path:** Open the owned map → Work → Tag editor → search its vehicle path and select Vehicle class → select the result. The large preview and that map's Level Editor use corrected coordinates automatically. Materials shows original shader/bitmap references; orbit and wheel zoom remain available. No new setting or conversion is required.
+
+**Still open:** matched in-game lighting/reflection/LOD/material comparison, vehicle animation states and gameplay. Four runtime source-map previews do not certify four engine adapters or game-renderer parity. H29 records the human comparison; existing M2/M3–M6 gates and all 475 requirement identities remain open where previously unaccepted.
+
 ## Workflow
 
 Home renders the actual monitor from an owned installed MCC campaign cache directly over the page. It has a transparent background, source textures/reflections, presentation lighting and gentle cursor response. The C41 polish prioritizes an available monitor source directly; Chief/other characters remain fallbacks when that source is unavailable. Spark does not bundle Halo art.

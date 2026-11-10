@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "purpose": "Verified stock SDK closure for the accepted native door and source-aware editor grass/metal defaults; no proprietary tag bytes are stored here. Extract only these inputs into an owned disposable job when explicitly testing.",
+  "purpose": "Verified stock SDK closure for the accepted native door, source-aware editor grass/metal defaults and MCC shared boulder admission; no proprietary tag bytes are stored here. Extract only these inputs into an owned disposable job when explicitly testing.",
   "sourceArchive": {
     "file": "HCEEK.7z",
     "bytes": 1030150472,
@@ -9006,9 +9006,34 @@
       "path": "levels/test/bloodgulch/shaders/cap_metal.shader_environment",
       "bytes": 982,
       "sha256": "af16af1e607c7a9fcc2b8ac809ced15cc41e681ad29ef2ab99f34c313bfe0ac5"
+    },
+    {
+      "path": "scenery/rocks/boulder/bitmaps/boulder.bitmap",
+      "bytes": 218826,
+      "sha256": "97c138f44901125f1c525d67d9e380b073631d96cade751cea136ee4d2701f27"
+    },
+    {
+      "path": "scenery/rocks/boulder/boulder.gbxmodel",
+      "bytes": 2950,
+      "sha256": "483557611bf8c6fedab23a42273f54246817f07731447f34ea267469c030034f"
+    },
+    {
+      "path": "scenery/rocks/boulder/boulder.model_collision_geometry",
+      "bytes": 4868,
+      "sha256": "ea99136e0ded71278f44b5787d6eb2dee3490757aae7160617f877709bf28398"
+    },
+    {
+      "path": "scenery/rocks/boulder/boulder.scenery",
+      "bytes": 632,
+      "sha256": "4628d9e21433d417d833d74eef3e49fe2a6af3caa8742c0b5fc2ae06b273680c"
+    },
+    {
+      "path": "scenery/rocks/boulder/shaders/boulder.shader_model",
+      "bytes": 542,
+      "sha256": "8de5556b516c8e1bd68e1cf0cf87b10120db1018dfc64638693ea4bc0bc90a16"
     }
   ],
-  "logicalTagBytes": 107744329,
+  "logicalTagBytes": 107972147,
   "excludedGeneratedInputs": [
     ".spark-restored-native-tags.json",
     "levels/quickforge/c66_bounded_native_door/c66_bounded_native_door.bitmap",

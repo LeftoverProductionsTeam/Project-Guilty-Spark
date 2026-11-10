@@ -1,4 +1,4 @@
-// Extend the existing three-process Workshop fixture with real CE source
+// Extend the existing three-process Workshop fixture with real CE/MCC source
 // admission and user-facing semantic edits/publication. No mocked IPC/state.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -43,10 +43,12 @@ export async function verifyRetainedNativePreviews({actors,hash,expect,mark}) {
  await mark('durableNativePreviewSources',references);return references;
 }
 
-export async function prepareSharedNativeContent({actors,source,templateTags,kit,invader,expect,hash,panel,uiBuild,save,retire,mark}) {
+export async function prepareSharedNativeContent({actors,source,sourcePath,cacheVersion,templateTags,kit,invader,expect,hash,panel,uiBuild,save,retire,mark}) {
+ expect([609,13]).toContain(cacheVersion);expect(source.inspection.header.version).toBe(cacheVersion);
  const owner=actors[0],original=(await owner.call('open_project',{id:owner.id})).project;
- const scenery=source.inspection.tags.find(tag=>tag.class==='scen'&&/scenery[\\/]rocks[\\/]boulder_granite_small[\\/]boulder_granite_small$/i.test(tag.path));
- if(!scenery)throw Error('The owned CE fixture must supply the real boulder scenery template');
+ const sceneryPath=cacheVersion===609?'scenery/rocks/boulder_granite_small/boulder_granite_small':'scenery/rocks/boulder/boulder';
+ const scenery=source.inspection.tags.find(tag=>tag.class==='scen'&&tag.path.replaceAll('\\','/').toLowerCase()===sceneryPath);
+ if(!scenery)throw Error('The owned native fixture must supply the source edition’s real boulder scenery template');
  const template=scenery.path.replaceAll('\\','/')+'.scenery';
  const templateHash=await hash(path.join(templateTags,template));
  const admissions=[];
@@ -61,11 +63,11 @@ export async function prepareSharedNativeContent({actors,source,templateTags,kit
    await fs.writeFile(descriptor,JSON.stringify(project),{flag:'wx'});
    const [imported]=await actor.call('import_paths',{paths:[descriptor]});
    expect(imported.project.id).not.toBe(actor.id);actor.id=imported.project.id;actor.title=imported.project.title;
-   [preview]=await actor.call('import_paths',{paths:[process.env.SPARK_TEST_CE_SOURCE_MAP]});
+   [preview]=await actor.call('import_paths',{paths:[sourcePath]});
    await actor.page.reload();
    await actor.page.locator('.map-card').filter({has:actor.page.getByRole('heading',{name:actor.title,exact:true})}).click();
    await actor.call('claim_project_document',{id:actor.id});
-   await configureNativeCeTarget({page:actor.page,kit,invader,sourceRoot:templateTags,current:async()=>(await actor.call('open_project',{id:actor.id})).project,save:async()=>{await actor.page.keyboard.press('Control+s');await expect.poll(async()=>(await actor.call('read_workspace_history',{projectId:actor.id})).history?.head.dirty).toBe(false);},hash,expect,reviewSource:false});
+   if(cacheVersion===609)await configureNativeCeTarget({page:actor.page,kit,invader,sourceRoot:templateTags,current:async()=>(await actor.call('open_project',{id:actor.id})).project,save:async()=>{await actor.page.keyboard.press('Control+s');await expect.poll(async()=>(await actor.call('read_workspace_history',{projectId:actor.id})).history?.head.dirty).toBe(false);},hash,expect,reviewSource:false});
   }
   expect(preview.inspection.sha256).toBe(source.inspection.sha256);
   await mark('nativeAdmissionProgress',{actor:actor.slug,phase:'native-seed-build'});
@@ -86,11 +88,11 @@ export async function prepareSharedNativeContent({actors,source,templateTags,kit
   catch(problem){const diagnostic=(await actor.panel.locator('.notice.error').allTextContents()).join(' ').slice(0,3000);await mark('nativeAdmissionRejected',{actor:actor.slug,build:job,diagnostic});throw new Error('Native source admission failed: '+diagnostic,{cause:problem});}
   // Admission enters the same actual UI history; explicitly acknowledge Save.
   await actor.page.keyboard.press('Control+s');
-  await expect.poll(async()=>(await actor.call('open_project',{id:actor.id})).project.quickForge.native?.source.cacheVersion).toBe(609);
+  await expect.poll(async()=>{const native=(await actor.call('open_project',{id:actor.id})).project.quickForge.native;return native?(native.source.cacheVersion??13):null;}).toBe(cacheVersion);
   const document=(await actor.call('open_project',{id:actor.id})).project.quickForge;
   await save(actor,document);
   const saved=(await actor.call('open_project',{id:actor.id})).project.quickForge;
-  expect(saved.native.source.cacheVersion).toBe(609);expect(saved.native.source.templateSha256).toBe(templateHash);
+  expect(saved.native.source.cacheVersion??13).toBe(cacheVersion);expect(saved.native.source.templateSha256).toBe(templateHash);
   const actual=await admittedFiles(actor,hash),contract=JSON.parse(await fs.readFile(path.join(actor.data,'jobs',job,'reuse-contract.json'),'utf8'));
   const expected=Object.fromEntries([...new Set([...Object.keys(contract.inputHashes),...Object.keys(contract.importedHashes??{})])].map(name=>[name,contract.compiledTags[name]]));
   Object.assign(expected,saved.native.source.dependencies,{[saved.native.source.templateTag]:saved.native.source.templateSha256});
@@ -102,8 +104,8 @@ export async function prepareSharedNativeContent({actors,source,templateTags,kit
  await verifyRetainedNativePreviews({actors,hash,expect,mark});
  for(const admitted of admissions)expect(admitted).toEqual(admissions[0]);
  expect(await hash(path.join(templateTags,template))).toBe(templateHash);
- await mark('independentCeNativeAdmissions',{cacheVersion:609,processes:actors.map(actor=>({pid:actor.child.pid,projectId:actor.id,library:actor.data})),source:admissions[0],helperSha256:crypto.createHash('sha256').update(await fs.readFile(new URL(import.meta.url))).digest('hex'),generatedGeometryExcluded:true,separateNativeTrees:true,readOnlySharedSeedInputs:true});
- return {template:path.join(templateTags,template),source:admissions[0]};
+ await mark(cacheVersion===609?'independentCeNativeAdmissions':'independentMccNativeAdmissions',{cacheVersion,processes:actors.map(actor=>({pid:actor.child.pid,projectId:actor.id,library:actor.data})),source:admissions[0],helperSha256:crypto.createHash('sha256').update(await fs.readFile(new URL(import.meta.url))).digest('hex'),generatedGeometryExcluded:true,separateNativeTrees:true,readOnlySharedSeedInputs:true});
+ return {template:path.join(templateTags,template),source:admissions[0],assetName:cacheVersion===609?'Shared CE boulder':'Shared MCC boulder'};
 }
 
 export async function exerciseSharedNativeContent({actors,admission,expect,hash,panel,view,converge,update,root,mark}) {
@@ -111,7 +113,7 @@ export async function exerciseSharedNativeContent({actors,admission,expect,hash,
  for(const actor of actors)await panel(actor);
  const initial=await view(a),radius=initial.document.native.source.boundingRadius===.225?.25:.225;
  const file=path.join(root,'editor-b','owned-native-boulder.scenery');await fs.copyFile(admission.template,file,fs.constants.COPYFILE_EXCL);
- const assetName='Shared CE boulder';
+ const assetName=admission.assetName;
  const use=async(actor,role,name)=>{const node=actor.panel.getByRole(role,{name,exact:true,includeHidden:true});await revealPagedControl(node);return node;};
  await(await use(a,'spinbutton','Shared pistol bounding radius')).fill(String(radius));
  const summary=b.panel.locator('.studio-native-import > summary');await revealPagedControl(summary);await summary.click();
@@ -138,7 +140,7 @@ export async function exerciseSharedNativeContent({actors,admission,expect,hash,
  }
  await c.page.getByRole('button',{name:'Close SparkLink',exact:true}).click();
  await c.page.getByRole('button',{name:'Objects & gameplay',exact:true}).click();
- await openDrawer(c.page,'Build tools');await c.page.locator('.forge-tree-select').filter({hasText:/^Shared CE boulder$/}).click();
+ await openDrawer(c.page,'Build tools');await c.page.locator('.forge-tree-select').filter({hasText:new RegExp('^'+assetName+'$')}).click();
  await openDrawer(c.page,'Inspector');await c.page.getByRole('button',{name:'Properties',exact:true}).click();
  const x=c.page.getByRole('spinbutton',{name:'Position X',exact:true});await x.fill('6');await x.evaluate(node=>node.blur());
  await expect.poll(async()=>(await view(a)).document.placements.find(placement=>placement.publishedAssetId===asset.id)?.position[0]).toBe(6);
@@ -153,7 +155,7 @@ export async function exerciseSharedNativeContent({actors,admission,expect,hash,
  const committed=await update(a,current,doc=>{doc.native.fields[0].boundingRadius=.35;});
  await expect(update(c,current,doc=>{doc.native.fields[0].boundingRadius=.4;})).rejects.toThrow(/conflict/);
  await expect(update(b,committed.next,doc=>{doc.native.assets[0].bytes[0]^=1;})).rejects.toThrow(/hash|complete|asset/i);
- await expect(update(c,committed.next,doc=>{doc.runtimeId='mccSteam';doc.native.source.cacheVersion=13;})).rejects.toThrow(/admission|runtime|source/i);
+ await expect(update(c,committed.next,doc=>{doc.runtimeId=(admission.source.cacheVersion??13)===609?'mccSteam':'haloCustomEdition';doc.native.source.cacheVersion=(admission.source.cacheVersion??13)===609?13:609;})).rejects.toThrow(/admission|runtime|source/i);
  current=await view(a);await converge(current);
  const previousAdmission=a.nativeAdmission;
  const sourceFile=path.join(previousAdmission.tags,current.document.native.source.fieldTag),originalBytes=await fs.readFile(sourceFile);
@@ -174,7 +176,7 @@ export async function exerciseSharedNativeContent({actors,admission,expect,hash,
  const retired=await disposeQaScratch(root,await sealQaScratch(root,previousAdmission.tags),{ownerFinished:true});
  await mark('redundantQaAdmissionRetired',{logicalBytes:retired.bytes,files:retired.files,exactRecoveryVerified:true,originalBytesRestoredBeforeRetirement:true,qaOnly:true});
  for(const actor of actors){const close=actor.page.getByRole('button',{name:'Close SparkLink',exact:true});if(await close.isVisible())await close.click();}
- await mark('threeAuthorCeNativeContent',{revision:current.revision,documentSha256:crypto.createHash('sha256').update(JSON.stringify(current.document)).digest('hex'),convergenceMs:performance.now()-began,fieldTag:current.document.native.source.fieldTag,boundingRadius:.35,assetId:asset.id,assetPath:`${asset.id}.scenery`,assetBytes:asset.bytes.length,simultaneousFieldAndPublication:true,thirdAuthorPlacement:true,actualInspectorTransform:true,actualModelsInThreeViewports:true,authorUndoPreservesOtherAuthors:true,referencedAssetWithdrawalRefused:true,staleFieldConflict:true,corruptBytesRefused:true,sourceReinterpretationRefused:true,corruptSourceRefused:true,exactSourceRecoveryThroughUi:true});
+ await mark((admission.source.cacheVersion??13)===609?'threeAuthorCeNativeContent':'threeAuthorMccNativeContent',{revision:current.revision,documentSha256:crypto.createHash('sha256').update(JSON.stringify(current.document)).digest('hex'),convergenceMs:performance.now()-began,fieldTag:current.document.native.source.fieldTag,boundingRadius:.35,assetId:asset.id,assetPath:`${asset.id}.scenery`,assetBytes:asset.bytes.length,simultaneousFieldAndPublication:true,thirdAuthorPlacement:true,actualInspectorTransform:true,actualModelsInThreeViewports:true,authorUndoPreservesOtherAuthors:true,referencedAssetWithdrawalRefused:true,staleFieldConflict:true,corruptBytesRefused:true,sourceReinterpretationRefused:true,corruptSourceRefused:true,exactSourceRecoveryThroughUi:true});
  return current;
 }
 
@@ -189,7 +191,7 @@ export async function readbackSharedNativeContent({actor,build,document,director
  expect(radius).toBeCloseTo(document.native.fields[0].boundingRadius,6);
  const model=(await runNative(path.join(invader,'invader-edit.exe'),['-t',directory,'-G','model',assetPath],options)).stdout.trim();expect(model).toMatch(/boulder/i);
  const opened=await actor.call('open_built_map',{projectId:actor.id,buildId:build.id});
- expect(opened.inspection.header.version).toBe(609);
+ expect(opened.inspection.header.version).toBe(document.native.source.cacheVersion??13);
  const nativeTag=opened.inspection.tags.find(tag=>tag.class==='scen'&&tag.path.replaceAll('\\','/')===`scenery/sparklink/${asset.id}`);expect(nativeTag).toBeTruthy();
  const placed=opened.inspection.objects.find(object=>object.tagId===nativeTag.id);
  if(!placed)throw Error('Independent cache inspection did not find the published scenery placement');

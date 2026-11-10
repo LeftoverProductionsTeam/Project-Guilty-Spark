@@ -151,3 +151,14 @@ Historical R361 passes the three-editor field/publication/placement/transform/co
 R372 completes the current CE609three-author native functional journey, including compilation/readback, two real same-computer Chupathingy clients, source-race/compiler/prerequisite failures, private-server crash rollback and owner-process/offline-edit/model-preview recovery. No source maps are copied. Current Rust904/9explicit ignores passes; unchanged frontend476/browser271 remain R368 evidence. R372 retains its failed8MiB diagnostic-retention outcome. R375 now passes the full native wrapper and storage guard after retiring duplicate progress/generated readback tags: peak4,277,002,618bytes<4GiB, terminal7,455,517bytes<8MiB. R37636storage tests pass; all owned scratch/processes are disposed. Exact accepted evidence is CHUPATHINGY_DEDICATED_20261108.md#r375-accepted-native-source-game-reload-and-recovery--9-november. Physical two-computer LAN/VPN, actual human object interaction/combat and independent current MCC13 native-content acceptance remain open. No new human action is requested while the owner is away.
 
 For restart recovery, after all three creators see the placement, close/reopen the owner Spark process and reconnect through its private invitation workflow. Confirm each editor can still display the actual model and the same original source identity, and that independently retained peer edits are applied once. Record app/source/shared revision, model visibility, pending-operation identity and outcome; unavailable original source must be reported rather than silently reinterpreted.
+
+## H29 — Vehicle appearance against the same native game source
+
+**Prerequisites:** source-matched R388 QA app (SHA20b8038e…), an owned MCC/CE/Xbox/Demo map and matching playable runtime. Automated R388/R389/R390/R391/R393 checks pass model UVs/material availability and original hashes; human game parity remains unaccepted.
+
+1. Open that map in Spark. Use Work → Tag editor, Search tags, Vehicle class, then select Warthog or Scorpion. For the original Zombie mod use its actual Undead Demolisher or Evolved Zombie Container.
+2. Orbit with mouse drag and zoom with the wheel. Inspect tire tread, panels/decals, windshield, turret and tracks. Materials must identify the original shader and bitmap; record missing or misaligned areas.
+3. In matching Halo gameplay, find that same vehicle on the same map. Compare comparable angle, distance and environment, including reflection direction, glass, lighting and detail level. Different source editions are not exact comparisons.
+4. Return to Spark's Level Editor and inspect the placed vehicle. Record source SHA, app SHA, runtime/version, both screenshots and pass/fail separately for mapping, reflections, lighting, geometry/LOD and animation.
+
+No original map is edited. Do not prefill human/game parity from native preview tests.

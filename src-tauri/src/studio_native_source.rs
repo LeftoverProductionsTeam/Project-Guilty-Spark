@@ -176,6 +176,25 @@ pub(super) fn matches(state:&AppState, project:&str, doc:&quickforge::QuickForge
 }
 fn dependencies(state:&AppState,p:&Project,tags:&Path,tag:&str)->Reply<BTreeMap<String,String>> {
     let exe=native_operations_native::executable(state,p,"invaderDependency")?;
+    let h1a=content::target_cache_version(p.quick_forge.as_ref().ok_or("Native collaboration requires QuickForge source")?.runtime_id).map_err(error)?==13;
+    if h1a {
+        // H1A's publisher source can reference mode while providing an exact
+        // same-path mod2 tag. Reuse compilation's verified provider traversal;
+        // every other missing dependency stays a hard failure. CE stays strict.
+        let (mut files,_)=core::native_staging::collect_dependency_files(tags,std::collections::BTreeSet::from([tag.to_owned()]),true,257,257,|requested| {
+            let args=recipes::Operation::Dependencies.arguments(tags,"scen",requested)?;
+            let (ok,out,err)=native_operations_native::run(&exe,&args).map_err(core::SparkError::Invalid)?;
+            if !ok {return core::invalid(format!("Native dependency validation failed: {err}"));}
+            let _=recipes::dependency_lines(&out)?;
+            Ok(out)
+        }).map_err(error)?;
+        files.remove(&tag.to_ascii_lowercase());
+        if files.is_empty()||files.len()>256 {return Err("Native asset has no bounded, validated dependency closure".into());}
+        return files.into_iter().map(|relative| {
+            let file=tags.join(core::safe_relative(&relative).map_err(error)?);core::reject_links(&file).map_err(error)?;
+            Ok((relative,maps::hash_file(&file).map_err(error)?))
+        }).collect();
+    }
     let args=recipes::Operation::Dependencies.arguments(tags,"scen",tag).map_err(error)?;
     let (ok,out,err)=native_operations_native::run(&exe,&args)?;
     if !ok {return Err(format!("Native dependency validation failed: {err}"));}

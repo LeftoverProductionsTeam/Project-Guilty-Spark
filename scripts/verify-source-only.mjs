@@ -209,7 +209,7 @@ try {
         // route. The unfinished C71 object/behavior initiative is a separate gate.
         try {
           await run(
-            'Native map edit, Undo, Save, export and readback',
+            process.env.SPARK_LIFECYCLE_VEHICLES==='1'?'Native vehicle preview and source UV readback':'Native map edit, Undo, Save, export and readback',
             [
               'scripts/test-workspace-lifecycle-native.mjs',
               selectedApp??path.join(context.env.CARGO_TARGET_DIR, 'release', 'GuiltySpark.exe'),
@@ -228,7 +228,7 @@ try {
           const receipt = await fs.readFile(path.join(output, 'acceptance.json'), 'utf8').catch(() => null);
           if (receipt) report.native = JSON.parse(receipt);
           report.originalSourceUnchanged = (await hash(sourceMap)) === report.sourceMapSha256;
-          if(receiptFile)for(const name of ['owned-native-bsp.png','native-context-materials.png','native-context-reflection.png','native-context-collision.png','native-context-sound.png','native-tag-animation.png','native-machinima-greenscreen.png','failure-window-0.png']){
+          if(receiptFile)for(const name of ['owned-native-bsp.png','native-context-materials.png','native-context-reflection.png','native-context-collision.png','native-context-sound.png','native-vehicle-warthog.png','native-vehicle-scorpion.png','native-vehicle-rwarthog.png','native-tag-animation.png','native-machinima-greenscreen.png','failure-window-0.png']){
             const file=path.join(output,name),stat=await fs.stat(file).catch(()=>null);if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(file,target,fs.constants.COPYFILE_EXCL);(report.nativeScreenshots??=[]).push({file:target,bytes:stat.size});}
           }
         }

@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
+import {inflateSync} from 'node:zlib';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {chromium,expect as assertion} from '@playwright/test';
@@ -17,6 +18,8 @@ if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must 
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
 const launchOnly=process.env.SPARK_LIFECYCLE_LAUNCH_ONLY==='1'||process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1';
 const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
+const vehiclePreview=process.env.SPARK_LIFECYCLE_VEHICLES==='1';
+if(vehiclePreview&&(!nativeOnly||!previewOnly))throw Error('Vehicle source fidelity uses the existing read-only native preview workflow');
 const contextOnly=process.env.SPARK_LIFECYCLE_TAG_CONTEXTS==='1';
 if(contextOnly&&(!nativeOnly||previewOnly))throw Error('Native asset-context acceptance requires native-only mode and its own small bounded run');
 const contextReadOnly=process.env.SPARK_LIFECYCLE_CONTEXT_READ_ONLY==='1';
@@ -224,6 +227,84 @@ async function independentNativeWindows(id){
   report.windowIndependence.restart={stoppedPid:pid,restartedPid:child.pid,restoredWindows:after.length,historyPreserved:true,sourcePreserved:true,menusClosed:true,eyeTintPreserved:true,cachedPortraitReused:true};
   step('Detached native editor keeps editing after the original closes; normal application restart restores the saved independent layout and exact source/Undo head',report.windowIndependence.restart);
 }
+// Independent cache-byte comparison: model UV normalization is separate from
+// each material's own UV scale. No proprietary content is retained in evidence.
+async function nativeVehiclePreview(opened,originalHash){
+  const encoded=await fs.readFile(path.resolve(nativeMap));let bytes=encoded;
+  const xbox=expectedCacheVersion===5;
+  if(xbox&&opened.inspection.header.compressed){
+    const declared=encoded.readUInt32LE(8);if(declared<2048||declared>128*1024**2)throw Error('Vehicle source exceeds the bounded readback budget');
+    const body=inflateSync(encoded.subarray(2048),{maxOutputLength:declared-2048});
+    if(body.length!==declared-2048)throw Error('Vehicle source decompression differs from its declared size');
+    bytes=Buffer.concat([encoded.subarray(0,2048),body]);
+  }
+  const u32=at=>{if(!Number.isSafeInteger(at)||at<0||at+4>bytes.length)throw Error('Vehicle readback escapes source');return bytes.readUInt32LE(at);};
+  const f32=at=>{u32(at);const value=bytes.readFloatLE(at);if(!Number.isFinite(value))throw Error('Invalid source vehicle float');return value;};
+  const tagStart=u32(expectedCacheVersion===6?0x5ec:0x10),tagEnd=tagStart+u32(expectedCacheVersion===6?0x2c4:0x14);
+  const address=expectedCacheVersion===6?0x4bf10000:expectedCacheVersion===13?u32(tagStart)-40:xbox?0x803a6000:0x40440000;
+  const pointer=(raw,length)=>{const at=tagStart+raw-address;if(!Number.isSafeInteger(at)||at<tagStart||at+length>tagEnd||tagEnd>bytes.length)throw Error('Vehicle pointer escapes native tag region');return at;};
+  const block=(at,stride,limit)=>{const count=u32(at);if(count>limit)throw Error('Vehicle block exceeds source bound');return[count?pointer(u32(at+4),count*stride):0,count];};
+  const rawStart=u32(tagStart+20),rawSize=u32(tagStart+28);if(!xbox&&rawStart+rawSize>bytes.length)throw Error('Vehicle vertices escape source');
+  const seen=new Set(),results=[];
+  for(const vehicle of opened.inspection.tags.filter(tag=>tag.class==='vehi')){
+    const reference=vehicle.references.find(ref=>ref.label==='Model'&&ref.class===(xbox?'mode':'mod2'));
+    const model=reference&&opened.inspection.tags.find(tag=>tag.id===reference.targetId&&tag.class===(xbox?'mode':'mod2'));
+    if(!model||seen.has(model.id)||!/^vehicles[\\/](?:r?warthog|scorpion|ghost|banshee)[\\/]/i.test(model.path))continue;
+    seen.add(model.id);const at=model.dataOffset;if(!Number.isSafeInteger(at)||at<tagStart||at+232>tagEnd)throw Error('Vehicle model has no bounded native body');
+    const scales=[f32(at+48),f32(at+52)].map(value=>value===0?1:value),selected=new Set();
+    const [regions,regionCount]=block(at+196,76,32),[geometries,geometryCount]=block(at+208,48,256);
+    for(let region=0;region<regionCount;region++){
+      const [permutations,count]=block(regions+region*76+64,88,32);if(!count)continue;
+      for(const offset of[72,70,68,66,64]){const index=bytes.readUInt16LE(permutations+offset);if(index<geometryCount){selected.add(index);break;}}
+    }
+    if(!selected.size&&geometryCount)selected.add(0);
+    const expected=[];
+    for(const index of[...selected].sort((a,b)=>a-b)){
+      const [parts,count]=block(geometries+index*48+36,xbox?104:132,32);
+      for(let part=0;part<count;part++){
+        const record=parts+part*(xbox?104:132),n=u32(record+88);if(!u32(record+72)||!n)continue;
+        const offset=u32(record+100);if(n>65535||!xbox&&offset+n*68>rawSize)throw Error('Vehicle UVs escape native vertices');
+        let vertexStart=rawStart+offset;
+        if(xbox){
+          if(bytes.readUInt16LE(record+84)!==5)throw Error('Vehicle source does not declare compressed Xbox vertices');
+          vertexStart=pointer(u32(pointer(offset,12)+4),n*32);
+        }
+        for(let vertex=0;vertex<n;vertex++)for(let axis=0;axis<2;axis++){
+          let coordinate;
+          if(xbox){const value=bytes.readUInt16LE(vertexStart+vertex*32+24+axis*2);coordinate=Math.fround(Math.fround((value&32767)/32767)-(value&32768?1:0));}
+          else coordinate=f32(vertexStart+vertex*68+48+axis*4);
+          expected.push(Math.fround(coordinate*scales[axis]));
+        }
+      }
+    }
+    const actual=await invoke(main,'preview_owned_object_model',{projectId:opened.project.id,tagId:vehicle.id,sourceSha256:originalHash});
+    expect(actual.sourceSha256).toBe(originalHash);expect(actual.mesh.uvs.length).toBe(expected.length);expect(expected.length).toBeGreaterThan(0);
+    const mismatches=actual.mesh.uvs.reduce((sum,value,index)=>sum+(Math.abs(value-expected[index])>1e-6*Math.max(1,Math.abs(expected[index]))?1:0),0);
+    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
+  }
+  expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
+  expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);
+  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
+  await chooseTool(main,'Tag editor');
+  // The recovered Demo mod retains two Warthog-derived carrier objects,
+  // rather than a stock Scorpion. Inspect those exact original objects.
+  for(const name of(expectedCacheVersion===6?['warthog','rwarthog']:['warthog','scorpion'])){
+    const row=results.find(row=>new RegExp('vehicles[\\\\/]'+name+'[\\\\/]','i').test(row.modelPath));if(!row)throw Error('Vehicle fixture lacks '+name);
+    await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(row.vehiclePath);
+    await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('vehi');
+    await main.locator('.tag-row').click();
+    const preview=main.getByRole('region',{name:'Actual model preview',exact:true}).locator('.native-model-preview');
+    await expect(preview).toHaveAttribute('data-model-first-frame','true',{timeout:90000});
+    await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
+    row.preview=await preview.evaluate(element=>({...element.dataset}));
+    await main.screenshot({path:path.join(root,'native-vehicle-'+name+'.png')});
+    expect(Number(row.preview.modelMaterialGaps)).toBe(0);
+  }
+  for(const row of results)expect(row.mismatches,'Actual native UV coordinates for '+row.modelPath).toBe(0);
+  expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
+  step('Actual native vehicle previews preserve authored model UV scales, source materials and original bytes',report.vehiclePreview);
+}
+
 async function projectDirectories(){return fs.readdir(path.join(root,'library/projects')).catch(error=>{if(error.code==='ENOENT')return[];throw error;});}
 async function nativeMemoryLifecycle(){
   const original=await fs.readFile(path.resolve(nativeMap)),hash=crypto.createHash('sha256').update(original).digest('hex');
@@ -966,6 +1047,7 @@ try{
       expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
       report.sourcePreview={cacheVersion:expectedCacheVersion,engine:opened.inspection.header.engine,sourceSha256:originalHash,resources:actualSource.resourceSha256??{},requiredPrimaryShaders:required,missingPrimaryShaders:missing,requiredLightmapPages:lightmaps.size,spartanTagId:spartan?.id??null,spartanModelClass:expectedCacheVersion===5?'mode':'mod2',visibleObjects:opened.project.scene.filter(object=>object.visible).length,readOnly,gameplayAccepted:false};
       step('Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged');
+      if(vehiclePreview)await nativeVehiclePreview(opened,originalHash);
       if(contextOnly){
         if(!pistol)throw Error('Native asset-context acceptance requires the actual pistol');
         await main.evaluate(()=>{window.__GS_PROFILE__=true;performance.clearMeasures();});

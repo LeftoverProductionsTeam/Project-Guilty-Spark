@@ -278,6 +278,11 @@ fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:u
 }
 fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,raw_vertex_size:usize,raw_model_size:usize,xbox:bool,variant:Option<&str>)->Result<MeshData>{
     r.bytes(model_at,232)?;
+    // Cached model vertices normalize UVs independently of each shader's
+    // texture scale. Restore the source model factor before every shared
+    // viewport/preview consumes this mesh (PC floats and Xbox compressed UVs).
+    let uv_scale=[finite_model_float(r,model_at+48)?,finite_model_float(r,model_at+52)?]
+        .map(|value|if value==0.{1.}else{value});
     let (nodes,node_count)=region.block(r,model_at+184,156,64)?;
     let (geometries,n_geometries)=region.block(r,model_at+208,48,256)?;
     let (shaders,n_shaders)=region.block(r,model_at+220,32,32)?;
@@ -345,8 +350,18 @@ fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,
             for i in 0..vertex_count {
                 let v=i*vertex_stride;
                 for off in [0,4,8] {mesh.positions.push(finite_model_float(&verts,v+off)?);}
-                if xbox {mesh.normals.extend(crate::xbox_cache::normal(verts.u32(v+12)?));for off in [24,26]{mesh.uvs.push(crate::xbox_cache::signed_fraction(verts.u16(v+off)? as u32,16));}}
-                else {for off in [12,16,20] {mesh.normals.push(finite_model_float(&verts,v+off)?);}for off in [48,52] {mesh.uvs.push(finite_model_float(&verts,v+off)?);}}
+                let uv=if xbox {
+                    mesh.normals.extend(crate::xbox_cache::normal(verts.u32(v+12)?));
+                    [24,26].map(|off|verts.u16(v+off).map(|value|crate::xbox_cache::signed_fraction(value as u32,16)))
+                }else{
+                    for off in [12,16,20]{mesh.normals.push(finite_model_float(&verts,v+off)?);}
+                    [48,52].map(|off|finite_model_float(&verts,v+off))
+                };
+                for (coordinate,scale) in uv.into_iter().zip(uv_scale){
+                    let coordinate=coordinate?*scale;
+                    if !coordinate.is_finite()||coordinate.abs()>100_000.{return invalid("Model texture coordinate exceeds preview safety bounds");}
+                    mesh.uvs.push(coordinate);
+                }
                 if let Some(skeleton)=rig.as_mut(){let mut ids=if xbox {let indices=verts.bytes(v+28,2)?;[indices[0],indices[1]].map(|node|if node<128&&node%3==0{u16::from(node/3)}else{u16::MAX})}else{[verts.u16(v+56)?,verts.u16(v+58)?]};let mut weights=if xbox {let weight=crate::xbox_cache::signed_fraction(verts.u16(v+30)? as u32,16);[weight,1.-weight]}else{[verts.f32(v+60).unwrap_or(-1.),verts.f32(v+64).unwrap_or(-1.)]};
                     if local_nodes&&!xbox{let count=r.bytes(part+107,1)?[0]as usize;for id in &mut ids{if *id!=u16::MAX{*id=if (*id as usize)<count&&count<=22{r.bytes(part+108+*id as usize,1)?[0]as u16}else{u16::MAX};}}}
                     for j in 0..2{if ids[j]==u16::MAX&&weights[j].abs()<0.001{ids[j]=0;weights[j]=0.;}}
@@ -777,6 +792,8 @@ mod geometry_tests {
         for (i,pos) in [[0.0,0.0,0.0],[1.0,0.0,0.0],[0.0,1.0,0.0]].iter().enumerate(){
             for k in 0..3{putf(&mut b,raw+i*68+k*4,pos[k]);}
             putf(&mut b,raw+i*68+20,1.0);
+            putf(&mut b,raw+i*68+48,if i==1{1.}else{0.});
+            putf(&mut b,raw+i*68+52,if i==2{1.}else{0.});
         }
         let indices=raw+3*68;
         put16(&mut b,indices,0);put16(&mut b,indices+2,1);put16(&mut b,indices+4,2);
@@ -785,11 +802,21 @@ mod geometry_tests {
         assert_eq!(mesh.indices,[0,1,2]);
         assert_eq!(mesh.positions.len(),9);
         assert_eq!(mesh.parts.len(),1);
+        assert_eq!(mesh.uvs,[0.,0.,1.,0.,0.,1.],"native zero UV factors mean unit scale");
+        putf(&mut b,model+48,2.);putf(&mut b,model+52,3.);
+        let tiled=gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6,false).unwrap();
+        assert_eq!(tiled.uvs,[0.,0.,2.,0.,0.,3.]);
+        assert_eq!(tiled.positions,mesh.positions);assert_eq!(tiled.normals,mesh.normals);assert_eq!(tiled.indices,mesh.indices);
+        for invalid_scale in [f32::NAN,f32::INFINITY,100_001.]{
+            putf(&mut b,model+48,invalid_scale);
+            assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6,false).is_err());
+        }
+        putf(&mut b,model+48,2.);
         let mut xbox=b.clone();put16(&mut xbox,p+84,5);put32(&mut xbox,p+100,base+0x500);put32(&mut xbox,0x504,base+0x600);put32(&mut xbox,p+76,base+0x900);
         for (i,pos) in [[0.,0.,0.],[1.,0.,0.],[0.,1.,0.]].iter().enumerate(){let at=0x600+i*32;for axis in 0..3{putf(&mut xbox,at+axis*4,pos[axis]);}put32(&mut xbox,at+12,511<<22);put16(&mut xbox,at+24,if i==1{32767}else{0});put16(&mut xbox,at+26,if i==2{32767}else{0});}
         for(i,index)in [0,1,2].into_iter().enumerate(){put16(&mut xbox,0x900+i*2,index);}
         let recovered=gbxmodel_static_mesh(&Reader(&xbox),region,model,0,0,0,true).unwrap();
-        assert_eq!(recovered.indices,[0,1,2]);assert_eq!(recovered.uvs,[0.,0.,1.,0.,0.,1.]);
+        assert_eq!(recovered.indices,[0,1,2]);assert_eq!(recovered.uvs,[0.,0.,2.,0.,0.,3.]);
         put32(&mut xbox,0x504,base+0x17f0);assert!(gbxmodel_static_mesh(&Reader(&xbox),region,model,0,0,0,true).is_err());
         put16(&mut b,indices+4,4);
         assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6,false).is_err());

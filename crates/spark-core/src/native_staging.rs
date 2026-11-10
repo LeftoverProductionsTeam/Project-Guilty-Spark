@@ -206,6 +206,33 @@ pub fn dependency_plan(log: &str, root: &Path, requested: &str, h1a: bool) -> Re
         model_class_bindings: bindings,
     })
 }
+/// Follow exact native model providers through the same bounded dependency
+/// planner used by compilation. A same-path H1A binding never changes tag bytes
+/// and is incomplete until the provider's own dependencies have been checked.
+/// Keep query-root and total-file limits separate: compilation retains its
+/// existing source-inventory ceiling, while local asset admission is smaller.
+pub fn collect_dependency_files(
+    source: &Path, mut roots: BTreeSet<String>, h1a: bool, maximum_files: usize, maximum_roots: usize,
+    mut read: impl FnMut(&str) -> Result<String>,
+) -> Result<(BTreeSet<String>, BTreeMap<String, String>)> {
+    if maximum_files == 0 || maximum_files > 200000 || maximum_roots == 0 || maximum_roots > 20000 { return invalid("Invalid native dependency review bound"); }
+    let mut selected = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    let mut bindings = BTreeMap::new();
+    while let Some(requested) = roots.pop_first() {
+        if !visited.insert(requested.clone()) { continue; }
+        if visited.len() > maximum_roots { return invalid("Native dependency planning exceeded its root budget"); }
+        let file = source.join(admitted_relative(&requested)?);
+        reject_links(&file)?;
+        if !file.is_file() { return invalid(format!("Native dependency is missing: {requested}. No job or tag staging was created.")); }
+        let log = read(&requested)?;
+        let dependencies = dependency_plan(&log, source, &requested, h1a)?;
+        selected.extend(dependencies.files);
+        if selected.len() > maximum_files { return invalid("Native dependency closure exceeds its review bound"); }
+        roots.extend(dependencies.followup); bindings.extend(dependencies.model_class_bindings);
+    }
+    Ok((selected, bindings))
+}
 pub fn selected_inventory(all: &Inventory, selected: &BTreeSet<String>) -> Result<Inventory> {
     let files = all
         .files
@@ -368,6 +395,56 @@ mod tests {
         header[36..40].copy_from_slice(b"bitm");
         fs::write(d.path().join("test.gbxmodel"), header).unwrap();
         assert!(dependency_plan("test.model [BROKEN]", d.path(), "test.gbxmodel", true).is_err());
+    }
+    #[test]
+    fn complete_h1a_closure_reads_the_real_provider_without_retagging_source() {
+        let d = tempfile::tempdir().unwrap();
+        fs::write(d.path().join("object.scenery"), b"publisher reference").unwrap();
+        fs::write(d.path().join("diffuse.bitmap"), b"native image").unwrap();
+        let mut model = vec![0;64]; model[36..40].copy_from_slice(b"mod2"); model[60..64].copy_from_slice(b"blam");
+        fs::write(d.path().join("mesh.gbxmodel"), &model).unwrap();
+        let roots = BTreeSet::from(["object.scenery".to_owned()]);
+        let mut queries = vec![];
+        let (files,bindings) = collect_dependency_files(d.path(),roots.clone(),true,4,4,|tag| {
+            queries.push(tag.to_owned());
+            Ok(match tag { "object.scenery"=>"mesh.model [BROKEN]", "mesh.gbxmodel"=>"diffuse.bitmap", _=>panic!("unexpected query") }.into())
+        }).unwrap();
+        assert_eq!(queries,vec!["object.scenery","mesh.gbxmodel"]);
+        assert_eq!(files,BTreeSet::from(["object.scenery".into(),"mesh.gbxmodel".into(),"diffuse.bitmap".into()]));
+        assert_eq!(bindings["mesh.model"],"mesh.gbxmodel");
+        assert!(!d.path().join("mesh.model").exists());
+        assert_eq!(fs::read(d.path().join("mesh.gbxmodel")).unwrap(),model);
+        assert_eq!(fs::read(d.path().join("object.scenery")).unwrap(),b"publisher reference");
+        assert!(collect_dependency_files(d.path(),roots,false,4,4,|_|Ok("mesh.model [BROKEN]".into())).is_err());
+    }
+    #[test]
+    fn h1a_provider_does_not_hide_missing_secondary_dependencies() {
+        let d = tempfile::tempdir().unwrap();fs::write(d.path().join("object.scenery"),b"source").unwrap();
+        let mut model=vec![0;64];model[36..40].copy_from_slice(b"mod2");model[60..64].copy_from_slice(b"blam");
+        fs::write(d.path().join("mesh.gbxmodel"),model).unwrap();
+        let error=collect_dependency_files(d.path(),BTreeSet::from(["object.scenery".into()]),true,8,8,|tag| {
+            Ok(if tag=="object.scenery"{"mesh.model [BROKEN]"}else{"missing.bitmap [BROKEN]"}.into())
+        }).unwrap_err();
+        assert!(error.to_string().contains("missing.bitmap"));
+    }
+    #[test]
+    fn recursive_files_do_not_consume_the_compiler_query_root_budget() {
+        let d=tempfile::tempdir().unwrap();
+        for file in ["object.scenery","a.bitmap","b.bitmap"] { fs::write(d.path().join(file),b"input").unwrap(); }
+        let roots=BTreeSet::from(["object.scenery".into()]);let mut queries=0;
+        let (files,_)=collect_dependency_files(d.path(),roots,true,3,1,|_| {
+            queries+=1;Ok("a.bitmap\nb.bitmap".into())
+        }).unwrap();
+        assert_eq!(queries,1);assert_eq!(files.len(),3);
+    }
+    #[test]
+    fn shared_dependency_walker_keeps_path_and_closure_budgets_before_staging() {
+        let d=tempfile::tempdir().unwrap();
+        for file in ["object.scenery","a.bitmap","b.bitmap"] { fs::write(d.path().join(file),b"input").unwrap(); }
+        let roots=BTreeSet::from(["object.scenery".into()]);
+        assert!(collect_dependency_files(d.path(),roots.clone(),true,2,4,|_|Ok("a.bitmap\nb.bitmap".into())).is_err());
+        assert!(collect_dependency_files(d.path(),roots,true,4,0,|_|panic!("invalid bound must not query a tool")).is_err());
+        assert!(collect_dependency_files(d.path(),BTreeSet::from(["../object.scenery".into()]),true,4,4,|_|panic!("unsafe source must not query a tool")).is_err());
     }
     #[test]
     fn cancelled_truncated_and_changed_copies_never_adopt_a_tag() {

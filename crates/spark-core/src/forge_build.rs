@@ -309,7 +309,7 @@ fn dependency_subset(
     source: &Path, all: &crate::native_staging::Inventory,
     dependencies: &[quickforge::ForgeDependency], generated: &std::collections::BTreeSet<String>,
     imported: &std::collections::BTreeSet<String>, extra_roots: std::collections::BTreeSet<String>,
-    h1a: bool, mut read: impl FnMut(&str) -> Result<String>,
+    h1a: bool, read: impl FnMut(&str) -> Result<String>,
 ) -> Result<(crate::native_staging::Inventory, BTreeMap<String, String>)> {
     let mut roots = std::collections::BTreeSet::from(["globals/globals.globals".to_owned()]);
     for dependency in dependencies {
@@ -320,19 +320,7 @@ fn dependency_subset(
     }
     roots.extend(extra_roots);
     roots.retain(|path| !imported.contains(&path.replace('\\', "/").to_ascii_lowercase()));
-    let mut selected = std::collections::BTreeSet::new();
-    let mut visited = std::collections::BTreeSet::new();
-    let mut bindings = BTreeMap::new();
-    while let Some(requested) = roots.pop_first() {
-        if !visited.insert(requested.clone()) { continue; }
-        if visited.len() > 20000 { return invalid("Native dependency planning exceeded its root budget"); }
-        let requested_file = source.join(crate::native_staging::admitted_relative(&requested)?);
-        crate::reject_links(&requested_file)?;
-        if !requested_file.is_file() { return invalid(format!("Native dependency is missing: {requested}. No job or tag staging was created.")); }
-        let log = read(&requested)?;
-        let dependencies = crate::native_staging::dependency_plan(&log, source, &requested, h1a)?;
-        selected.extend(dependencies.files); roots.extend(dependencies.followup); bindings.extend(dependencies.model_class_bindings);
-    }
+    let (selected,bindings)=crate::native_staging::collect_dependency_files(source,roots,h1a,all.files.len().max(1),20000,read)?;
     Ok((crate::native_staging::selected_inventory(all, &selected)?, bindings))
 }
 pub fn run_job(

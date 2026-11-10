@@ -12,7 +12,9 @@ const chupathingyTrial=process.env.SPARK_QA_SHARED_CHUPATHINGY==='1';
 const ceSource=process.env.SPARK_TEST_CE_SOURCE_MAP;
 if(chupathingyTrial&&(!ceSource||!process.env.SPARK_TEST_CHUPATHINGY_ROOT))throw Error('Select the owned native CE source map and Chupathingy package');
 const targetRuntime=chupathingyTrial?'chupathingyCe':'mccSteam';
-if(sharedNativeContent&&!chupathingyTrial)throw Error('The CE content acceptance extension requires the bounded Chupathingy fixture');
+const cacheVersion=chupathingyTrial?609:13;
+const nativeSourceMap=chupathingyTrial?ceSource:process.env.SPARK_TEST_MCC_SOURCE_MAP;
+if(sharedNativeContent&&!nativeSourceMap)throw Error('Select the owned source map for the actual native target edition');
 // Opt-in acceptance: three real desktop processes with isolated libraries.
 // Private LAN and a real Radmin adapter on ONE PC do not prove cross-PC delivery.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -585,6 +587,11 @@ try {
     nativeRecovery=await a.call('extract_selected_tag_tree',{projectId:nativeSource.project.id,tagId:scenario.id});
     expect(nativeRecovery.sourceSha256).toBe(originals[0].sha256);receipt.ceSource={originals,sourceSha256:nativeRecovery.sourceSha256,version:nativeRecovery.sourceVersion};
   }
+  if(sharedNativeContent&&!chupathingyTrial){
+    const sha256=await fileHash(nativeSourceMap);[nativeSource]=await a.call('import_paths',{paths:[nativeSourceMap]});
+    expect(nativeSource.inspection.header.version).toBe(cacheVersion);expect(nativeSource.inspection.sha256).toBe(sha256);
+    receipt.mccSource={originals:[{file:nativeSourceMap,sha256}],sourceSha256:sha256,version:cacheVersion};
+  }
   const metal=chupathingyTrial?(nativeSource.inspection.tags.find(tag=>tag.class==='senv'&&/metal.*plate.*floor/i.test(tag.path))??nativeSource.inspection.tags.find(tag=>tag.class==='senv'&&/metal.*flat/i.test(tag.path)))?.path:'levels/test/tutorial/shaders/example_tutorial_metal_floor';expect(metal).toBeTruthy();
   await shader.fill(metal);
   await shader.press('Tab');
@@ -623,7 +630,7 @@ try {
   await workshopControlAcceptance(a);
   await continuousWorkspaceAcceptance(a);
   let nativeAdmission;
-  if(sharedNativeContent)nativeAdmission=await prepareSharedNativeContent({actors,source:nativeSource,templateTags:receipt.ceSource.reviewedRecovery.tagsDirectory,kit,invader,expect,hash:fileHash,panel,uiBuild,save,retire:retireQaTagIntermediates,mark});
+  if(sharedNativeContent)nativeAdmission=await prepareSharedNativeContent({actors,source:nativeSource,sourcePath:nativeSourceMap,cacheVersion,templateTags:chupathingyTrial?receipt.ceSource.reviewedRecovery.tagsDirectory:tags,kit,invader,expect,hash:fileHash,panel,uiBuild,save,retire:retireQaTagIntermediates,mark});
   const networks = await a.call('forge_session_networks');
   const lan = networks.find((n) => n.networkScope === 'private' && n.address !== '127.0.0.1'),
     vpn = networks.find((n) => n.networkScope === 'radminVpn');
@@ -971,9 +978,8 @@ try {
     }
     await mark('nativeWorkshopAxisAndFloor',{...receipt.stages.nativeWorkshopAxisAndFloor,nativeCompilePending:false,compiledCollisionUpperEdge:upper,compiledCacheSha256:await fileHash(built.output),compiledBuildId:jobId});
   }
-  if(chupathingyTrial){
-    async function independentReadback(build,label){
-      const directory=await finishStorage.createScratch('independent-ce-'+label);
+  async function independentReadback(build,label){
+      const directory=await finishStorage.createScratch('independent-'+cacheVersion+'-'+label);
       const options={windowsHide:true,timeout:30000,maxBuffer:1024*1024};
       const inspected=await a.call('open_built_map',{projectId:a.id,buildId:build.id});const tag=inspected.inspection.tags.find(row=>row.class==='scnr');expect(tag).toBeTruthy();const nativePath=tag.path+'.scenario';
       const crc=(await runNative(path.join(invader,'invader-info.exe'),['-T','crc32_mismatched',build.output],options)).stdout.trim();expect(crc).toBe('0');
@@ -987,12 +993,19 @@ try {
       }
       return {sha256:await fileHash(build.output),positions,crcMismatch:0,independentNativeReadback:true,...(nativeContent?{nativeContent}:{})};
     }
-    receipt.frozenCeReadback=await independentReadback(built,'frozen');
+  if(chupathingyTrial||sharedNativeContent){
+    receipt.frozenNativeReadback=await independentReadback(built,'frozen');
+    if(chupathingyTrial)receipt.frozenCeReadback=receipt.frozenNativeReadback;
     if(sharedNativeContent){
       await retireNativeSeeds({actors,root,hash:fileHash,expect,mark});
-      const retired=await disposeQaScratch(root,await sealQaScratch(root,nativeRecovery.tagRoot),{ownerFinished:true});
-      await mark('unusedQaRawExtractionRetired',{logicalBytes:retired.bytes,files:retired.files,correctedProfileAndOriginalMapPreserved:true,qaOnly:true});
+      if(nativeRecovery){
+        const retired=await disposeQaScratch(root,await sealQaScratch(root,nativeRecovery.tagRoot),{ownerFinished:true});
+        await mark('unusedQaRawExtractionRetired',{logicalBytes:retired.bytes,files:retired.files,correctedProfileAndOriginalMapPreserved:true,qaOnly:true});
+      }
+      if(!chupathingyTrial)await retireQaTagIntermediates(a,built);
     }
+  }
+  if(chupathingyTrial){
     if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireQaTagIntermediates(a,built);
     const stale=await a.call('quickforge_build_report',{projectId:a.id});expect(stale.current).toBe(false);
     const gameRevision=current;await Promise.all(actors.map(x=>save(x,current.document)));
@@ -1273,6 +1286,7 @@ try {
   await mark('revokedParticipantCannotReconnect');
   for (const x of actors) await x.page.screenshot({ path: path.join(x.dir, 'final.png') });
   expect(errors).toEqual([]);
+  if(receipt.mccSource){receipt.mccSource.originalsUnchanged=(await Promise.all(receipt.mccSource.originals.map(async row=>await fileHash(row.file)===row.sha256))).every(Boolean);expect(receipt.mccSource.originalsUnchanged).toBe(true);await mark('mccOriginalSourcePreserved',{sourceSha256:receipt.mccSource.sourceSha256,originalsUnchanged:true});}
   receipt.pageErrors = errors;
   receipt.elapsedMs = performance.now() - receipt.begin;
   delete receipt.begin;
@@ -1303,7 +1317,7 @@ try {
     a.child?.kill();
     if (a.child) await waitForQaExit(a.child);
   }
-  if(receipt.complete){
+  try{if(receipt.complete){
     // The terminal receipt contains every progress stage. Keep one canonical
     // diagnostic, rather than a second full copy of the finished checkpoint.
     const terminal=path.join(root,'acceptance.json'),progress=path.join(root,'progress.json');
@@ -1314,6 +1328,12 @@ try {
     const terminalSha256=await fileHash(terminal);
     await disposeQaScratch(root,await sealQaScratch(root,progress),{ownerFinished:true});
     expect(await fileHash(terminal)).toBe(terminalSha256);
+  }
+  }catch(problem){
+    // A failed receipt comparison must still close its owned storage lease.
+    // Keep both failures if cleanup also refuses; never report a false pass.
+    try{await finishStorage('failed');}catch(cleanup){throw new AggregateError([problem,cleanup],'Native receipt preservation and owned cleanup failed');}
+    throw problem;
   }
   await finishStorage(receipt.complete?'passed':'failed');
 }
