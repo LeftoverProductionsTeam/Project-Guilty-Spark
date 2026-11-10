@@ -254,7 +254,7 @@ pub fn viewport_surfaces(geometry:&AssemblyGeometry,base:&MapInspection,donor:&M
                     mesh.uvs.extend_from_slice(&geometry.mesh.uvs[old*2..old*2+2]);next
                 });mesh.indices.push(mapped);}
             }
-            if mesh.indices.len()>start {mesh.material_ranges.push(maps::MeshMaterialRange{shader_tag_id:tag.id,bsp_index:0,lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,lightmap_bitmap_tag_id:None,index_start:start,index_count:mesh.indices.len()-start});}
+            if mesh.indices.len()>start {mesh.material_ranges.push(maps::MeshMaterialRange{shader_tag_id:tag.id,bsp_index:0,lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,has_incident_radiosity:false,lightmap_bitmap_tag_id:None,index_start:start,index_count:mesh.indices.len()-start});}
         }
         if !mesh.indices.is_empty(){result.push(AssemblyViewportSurface{source,mesh});}
     }

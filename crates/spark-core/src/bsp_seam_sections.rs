@@ -120,7 +120,7 @@ mod tests {
     fn edge_provenance_rejects_other_sources_off_edge_points_and_invented_vertices(){
         let hash="a".repeat(64);let pick=SeamEdge{source_sha256:hash.clone(),bsp_index:0,vertices:[[0.,0.,0.],[2.,0.,0.]],point:[1.,0.,0.]};pick.validate(&hash,0).unwrap();assert!(pick.validate(&"b".repeat(64),0).is_err());assert!(pick.validate(&hash,1).is_err());
         let mut off=pick.clone();off.point[1]=0.1;assert!(off.validate(&hash,0).is_err());
-        let mesh=MeshData{positions:vec![0.,0.,0.,2.,0.,0.,0.,2.,0.],indices:vec![0,1,2],material_ranges:vec![maps::MeshMaterialRange{shader_tag_id:1,bsp_index:0,lightmap_index:0,lightmap_page:-1,lightmap_bitmap_tag_id:None,has_lightmap_uvs:false,index_start:0,index_count:3}],..Default::default()};
+        let mesh=MeshData{positions:vec![0.,0.,0.,2.,0.,0.,0.,2.,0.],indices:vec![0,1,2],material_ranges:vec![maps::MeshMaterialRange{shader_tag_id:1,bsp_index:0,lightmap_index:0,lightmap_page:-1,lightmap_bitmap_tag_id:None,has_lightmap_uvs:false,has_incident_radiosity:false,index_start:0,index_count:3}],..Default::default()};
         matching_edge(&mesh,&pick).unwrap();off=pick.clone();off.vertices[1][0]=3.;assert!(matching_edge(&mesh,&off).is_err());
     }
 }

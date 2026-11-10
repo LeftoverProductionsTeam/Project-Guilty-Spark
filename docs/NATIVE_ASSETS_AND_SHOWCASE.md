@@ -6,6 +6,28 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## Source-local lighting data — 10 November
+
+This is an accepted source-data increment, **not a new visual/game-parity pass**. Independent R440 readback proves original Xbox, MCC, CE and Demo BSP lightmap vertices contain non-unit incident-radiosity vectors which the existing reader discarded. Beneath the diagnostic Blood Gulch Warthog point the vector is approximately[.615502,.116209,.679006], rather than the surface normal. The existing bounded reader now preserves those vectors and their original magnitude; each material declares whether its secondary stream is valid. Missing/corrupt data remains unavailable with aligned zero padding. It never substitutes a geometric normal, and a bad lighting vector does not discard valid diffuse geometry or lightmap UVs. Old metadata remains readable; newly authored/unbaked meshes do not claim native radiosity.
+
+The existing haloLightmap module can query the nearest source floor, its exact BSP/page/shader identity, UVs, interpolated incident vector, direction and accuracy. It rejects missing/invalid data and ambiguous coincident BSPs; it cannot use a lower floor's lighting through an unavailable upper floor. This helper changes no scene colours and retains no new global cache. R445 measures4.413ms on actual Chupathingy IPC geometry; MCC4.207ms, CE5.053ms, OpenCE5.404ms and Demo3.167ms. These are single diagnostic queries, not cold-load/FPS improvements or measured runtime lighting. The altered Demo vehicle lies outside the sampled floor and correctly returns null.
+
+| Original source | Native run | Incident coordinates compared | Valid ranges | Mismatches | Duration |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Chupathingy Blood Gulch |R445|17370|35|0|24.009s|
+| MCC Blood Gulch |R446|17286|35|0|24.831s|
+| CE Timberland |R447|26988|95|0|27.089s|
+| OpenCE Blood Gulch |R448|17370|35|0|23.614s|
+| Original Zombie Demo |R449|17286|35|0|26.120s|
+
+Each real Windows run also retains original vehicle UV/material/reflection assertions, actual source preview controls, normal close,0JavaScript errors, unchanged original hashes and disposed owned scratch. Original-byte calculations are independent of the Rust decoder. Chupathingy/OpenCE use the same source bytes; separate installations do not imply distinct formats. There is no new gameplay, local-shadow, animation, dashboard or exact-renderer acceptance.
+
+R442 passes756 locked spark-core tests,7explicit opt-in ignores, including the actual geometry_tests BSP case. R441 had a wrong test-module filter and ran0tests; it is compile-only evidence. R444 passes480frontend tests, TypeScript, source contracts, offline checks and40storage/repository checks. The broad274browser suite last passed R433 before this source-data increment; it is not presented as a fresh full pass.
+
+The fresh R443 Windows build succeeds in174.870s, but that wrapper requested the incompatible workspace scope and its unchanged guard refuses native vehicle mode before app launch. R445–R449 use the correct native scope and the exact exported app:50,511,360bytes, SHAb3176dd1087fe3cad94edfb87957e9b30068fadec9923112d1d65f0de6479ca8; runtime fingerprintd33d924787fc4cc7adb1be7c23e7ee4dd814be82d9f343dbd9db82fac3980be9. It is a QA app from14b6b1e plus reviewed source, not a release. Evidence: E/vehicle-source-radiosity-r440.json, vehicle-radiosity-r441/r442.log, vehicle-radiosity-r443.json/log, vehicle-radiosity-frontend-r444.json/log and vehicle-radiosity-{chupa-r445,mcc-r446,ce-r447,opence-r448,demo-r449}.json/log. No SDK was extracted for previews; all owned build/test payloads were disposed.
+
+Read-only format reference: Invadere8b58542fd1e0a239d0fbc689ac4e55b80e79442 scenario_structure_bsp lightmap vertices (20B PC/8B Xbox). OpenCE899219cc0a14b03bc12f0517a1e9ee4c37158af8 object_lights.c sample_lightmap/sample_diffuse_texture/lights_distant_lighting_at_point and bitmaps.c::bitmap_2d_get_pixel establish that object lighting additionally needs actual lightmap/diffuse pixels and mip selection. Spark currently previews top mips and generates display mipmaps; those are not automatically the authored lower mips used by native sampling. **Next: recover/validate the required original mips, then apply and compare local vehicle lighting.** No third-party engine implementation was imported.
+
 ## Placed-object source lighting — 10 November
 
 The actual World code only enabled native-material lighting when an explicit editor environment override existed. Its placed vehicles therefore bypassed the verified source sky which the large tag preview already used. World now opts source objects into that existing environment/material path. Baked lightmaps retain ownership of BSP/prelit-object illumination, sky geometry remains exempt, reflection is still added separately, and an unavailable source sky does not authorize a replacement rig. No source colours, sky values, exposure, normal data, native tags or original maps are changed.

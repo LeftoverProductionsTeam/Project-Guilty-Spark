@@ -211,6 +211,20 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                         })
                 } else { None };
                 let has_lightmap_uvs=lightmap_values.is_some();
+                // The same native secondary vertex stream begins with incident
+                // radiosity. Its magnitude is confidence, so never normalize it
+                // or substitute the geometric surface normal. Invalid lighting
+                // data does not discard otherwise valid geometry/texture UVs.
+                let incident_values=if has_lightmap_uvs {lightmap_at.and_then(|at|r.bytes(at,vertices*lightmap_stride).ok()).and_then(|bytes|{
+                    let lm=Reader(bytes);let mut values=Vec::with_capacity(vertices*3);
+                    for vertex in 0..vertices {let at=vertex*lightmap_stride;
+                        let vector=if compressed {crate::xbox_cache::normal(lm.u32(at).ok()?)}else{[lm.f32(at).ok()?,lm.f32(at+4).ok()?,lm.f32(at+8).ok()?]};
+                        if vector.iter().any(|v|!v.is_finite())||vector.iter().map(|v|v*v).sum::<f32>()>1.05{return None;}
+                        values.extend_from_slice(&vector);
+                    }Some(values)
+                })}else{None};
+                let has_incident_radiosity=incident_values.is_some();
+                mesh.incident_radiosity.extend(incident_values.unwrap_or_else(||vec![0.;vertices*3]));
                 mesh.lightmap_uvs.extend(lightmap_values.unwrap_or_else(||vec![0.0; vertices*2]));
                 let base=(mesh.positions.len()/3) as u32;
                 for v in 0..vertices {
@@ -247,7 +261,7 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                 }
                 if mesh.indices.len() > material_index_start {
                     mesh.material_ranges.push(MeshMaterialRange {
-                        shader_tag_id, bsp_index, lightmap_index:l,lightmap_page,has_lightmap_uvs,
+                        shader_tag_id, bsp_index, lightmap_index:l,lightmap_page,has_lightmap_uvs,has_incident_radiosity,
                         lightmap_bitmap_tag_id,
                         index_start:material_index_start,
                         index_count:mesh.indices.len()-material_index_start,
@@ -423,7 +437,7 @@ fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,
                     let datum=r.u32(reference+12)?;
                     if datum!=u32::MAX && matches!(class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla") {
                         mesh.material_ranges.push(MeshMaterialRange{shader_tag_id:datum,bsp_index:0,
-                            lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,lightmap_bitmap_tag_id:None,
+                            lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,has_incident_radiosity:false,lightmap_bitmap_tag_id:None,
                             index_start:first_index,index_count:mesh.indices.len()-first_index});
                     }
                 }
@@ -753,6 +767,17 @@ mod geometry_tests {
         assert_eq!(lit.lightmap_uvs,vec![0.,0.,0.25,0.5,0.5,1.0]);
         assert_eq!(lit.material_ranges[0].lightmap_page,2);
         assert!(lit.material_ranges[0].has_lightmap_uvs);
+        for i in 0..3 {let at=0x4000+3*56+i*20;putf(&mut b,at,0.25);putf(&mut b,at+4,-0.5);putf(&mut b,at+8,0.125);}
+        let radiosity=bsp_render_geometry(&b,&header,scenario).unwrap();
+        assert!(radiosity.material_ranges[0].has_incident_radiosity);
+        assert_eq!(radiosity.incident_radiosity,[0.25,-0.5,0.125].repeat(3));
+        assert_ne!(radiosity.incident_radiosity,radiosity.normals);
+        putf(&mut b,0x4000+3*56,f32::NAN);
+        let invalid_radiosity=bsp_render_geometry(&b,&header,scenario).unwrap();
+        assert!(!invalid_radiosity.material_ranges[0].has_incident_radiosity);
+        assert_eq!(invalid_radiosity.incident_radiosity,vec![0.;9]);
+        assert!(invalid_radiosity.material_ranges[0].has_lightmap_uvs);
+        assert_eq!(invalid_radiosity.lightmap_uvs,lit.lightmap_uvs);
         putf(&mut b,0x4000+3*56+12,f32::INFINITY);
         let corrupt=bsp_render_geometry(&b,&header,scenario).unwrap();
         assert!(!corrupt.material_ranges[0].has_lightmap_uvs);

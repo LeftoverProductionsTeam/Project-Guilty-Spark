@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {inspectLightmapPages,lightmapPageKey,materialLightmapKey} from '../src/haloLightmap.ts';
+import {inspectLightmapPages,lightmapPageKey,materialLightmapKey,sampleIncidentRadiosity} from '../src/haloLightmap.ts';
 const source={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],lightmapUvs:[0,0,.5,0,0,.5],
  materialRanges:[{shaderTagId:42,bspIndex:0,lightmapIndex:1,lightmapPage:3,hasLightmapUvs:true,indexStart:0,indexCount:3}]};
 assert.deepEqual(inspectLightmapPages(source),[{key:'bsp0:page3',bspIndex:0,page:3,materials:1,triangles:1,bspIndices:[0],withRealUvs:true}]);
@@ -18,3 +18,19 @@ assert.equal(materialLightmapKey({...source.materialRanges[0],bspIndex:1},true,{
 assert.equal(materialLightmapKey(source.materialRanges[0],false,{'bsp0:page3':true}),null);
 assert.equal(materialLightmapKey({...source.materialRanges[0],hasLightmapUvs:false},true,{'bsp0:page3':true}),null);
 console.log('PASS: independent per-BSP lightmap keys, bounded page provenance and read-only UV coverage');
+
+const radiosity={...source,normals:[0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,0,1],incidentRadiosity:[0,0,.25,0,.5,0,0,0,1],materialRanges:[{...source.materialRanges[0],hasIncidentRadiosity:true,lightmapBitmapTagId:12}]};
+const probe=sampleIncidentRadiosity(radiosity,[.25,.25,1]);
+assert.ok(probe);assert.deepEqual(probe.point,[.25,.25,0]);assert.deepEqual(probe.barycentric,[.5,.25,.25]);assert.deepEqual(probe.incident,[0,.125,.375]);assert.equal(probe.accuracy,.5);
+assert.deepEqual(probe.surfaceUv,[.25,.25]);assert.deepEqual(probe.lightmapUv,[.125,.125]);assert.equal(probe.lightmapKey,'bsp0:page3');assert.equal(probe.lightmapBitmapTagId,12);
+assert.ok(Math.abs(probe.direction[1]-1/Math.sqrt(10))<1e-9);assert.ok(Math.abs(probe.direction[2]-3/Math.sqrt(10))<1e-9);
+assert.equal(sampleIncidentRadiosity(radiosity,[2,2,1]),null);assert.equal(sampleIncidentRadiosity(radiosity,[.25,.25,11]),null);assert.equal(sampleIncidentRadiosity(radiosity,[.25,.25,-1]),null);
+assert.equal(sampleIncidentRadiosity({...radiosity,incidentRadiosity:[NaN,...radiosity.incidentRadiosity.slice(1)]},[.25,.25,1]),null);
+assert.equal(sampleIncidentRadiosity({...radiosity,incidentRadiosity:[3,...radiosity.incidentRadiosity.slice(1)]},[.25,.25,1]),null);
+assert.equal(sampleIncidentRadiosity({...radiosity,incidentRadiosity:[]},[.25,.25,1]),null);
+assert.equal(sampleIncidentRadiosity({...radiosity,materialRanges:[{...radiosity.materialRanges[0],hasIncidentRadiosity:false}]},[.25,.25,1]),null);
+const occluded={...radiosity,positions:[...radiosity.positions,0,0,.5,1,0,.5,0,1,.5],indices:[...radiosity.indices,3,4,5],normals:[...radiosity.normals,...radiosity.normals],uvs:[...radiosity.uvs,...radiosity.uvs],lightmapUvs:[...radiosity.lightmapUvs,...radiosity.lightmapUvs],incidentRadiosity:[...radiosity.incidentRadiosity,...radiosity.incidentRadiosity],materialRanges:[...radiosity.materialRanges,{...radiosity.materialRanges[0],indexStart:3,hasIncidentRadiosity:false}]};
+assert.equal(sampleIncidentRadiosity(occluded,[.25,.25,1]),null,'Unavailable upper floor must not use lower-floor lighting');
+const overlap={...occluded,positions:[...radiosity.positions,...radiosity.positions],materialRanges:[radiosity.materialRanges[0],{...radiosity.materialRanges[0],bspIndex:1,indexStart:3}]};
+assert.equal(sampleIncidentRadiosity(overlap,[.25,.25,1]),null,'Coincident BSPs require explicit source region');assert.equal(sampleIncidentRadiosity(overlap,[.25,.25,1],10,1)?.bspIndex,1);
+console.log('PASS: native incident magnitude/direction, nearest-floor occlusion, exact BSP/page identity and malformed-input refusal');

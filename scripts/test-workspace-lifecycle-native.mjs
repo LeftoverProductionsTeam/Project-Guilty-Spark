@@ -245,6 +245,37 @@ async function nativeVehiclePreview(opened,originalHash){
   const pointer=(raw,length)=>{const at=tagStart+raw-address;if(!Number.isSafeInteger(at)||at<tagStart||at+length>tagEnd||tagEnd>bytes.length)throw Error('Vehicle pointer escapes native tag region');return at;};
   const block=(at,stride,limit)=>{const count=u32(at);if(count>limit)throw Error('Vehicle block exceeds source bound');return[count?pointer(u32(at+4),count*stride):0,count];};
   const rawStart=u32(tagStart+20),rawSize=u32(tagStart+28);if(!xbox&&rawStart+rawSize>bytes.length)throw Error('Vehicle vertices escape source');
+  // Independently recover the source secondary stream, including its original
+  // non-unit incident vectors. This does not use the Rust reader under test.
+  const scenarioSource=opened.inspection.tags.find(tag=>tag.class==='scnr'&&tag.path===opened.inspection.scenarioPath)?.dataOffset;
+  if(!Number.isSafeInteger(scenarioSource))throw Error('Native source scenario is unavailable');
+  const [bspRows,bspCount]=block(scenarioSource+0x5a4,32,16),expectedIncident=[],expectedIncidentRanges=[];
+  const fraction=(value,bits)=>{const sign=1<<(bits-1);return Math.fround(Math.fround((value&(sign-1))/(sign-1))-(value&sign?1:0));};
+  for(let bi=0;bi<bspCount;bi++){
+    const row=bspRows+bi*32,begin=u32(row),size=u32(row+4),address=u32(row+8);
+    const bspPointer=(raw,n)=>{const at=begin+raw-address;if(!Number.isSafeInteger(at)||at<begin||at+n>begin+size||begin+size>bytes.length)throw Error('Radiosity stream escapes source BSP');return at;};
+    const sourceBlock=(at,stride,limit)=>{const n=u32(at);if(n>limit)throw Error('Radiosity block exceeds bound');return[n?bspPointer(u32(at+4),n*stride):0,n];};
+    const body=bspPointer(u32(begin),648),[lightmaps,lightmapCount]=sourceBlock(body+0x104,32,256);
+    for(let l=0;l<lightmapCount;l++){
+      const lm=lightmaps+l*32,page=bytes.readInt16LE(lm),[materials,materialCount]=sourceBlock(lm+20,256,2048);
+      for(let j=0;j<materialCount;j++){
+        const m=materials+j*256,n=u32(m+180);if(!n||!u32(m+24))continue;if(n>100000||expectedIncident.length+n*3>3_000_000)throw Error('Radiosity aggregate exceeds bound');
+        const compressed=xbox&&bytes.readUInt16LE(m+176)===1,stride=compressed?32:56,secondaryStride=compressed?8:20;let start=null;
+        if(page>=0){
+          if(compressed){const length=u32(m+236),at=bspPointer(u32(m+248),length);if(u32(m+200)===n&&n*(stride+secondaryStride)<=length)start=at+n*stride;}
+          else if(expectedCacheVersion===13){const pool=u32(begin+8),poolSize=u32(begin+4),offset=u32(m+204);if(u32(m+200)===n&&offset+n*20<=poolSize&&pool+poolSize<=begin)start=pool+offset;}
+          else if(n*76<=u32(m+216))start=bspPointer(u32(m+228),n*76)+n*56;
+        }
+        const incident=[];if(start!==null)for(let i=0;i<n;i++){const at=start+i*secondaryStride,raw=compressed?u32(at):null;incident.push(...(compressed?[fraction(raw,11),fraction(raw>>>11,11),fraction(raw>>>22,10)]:[f32(at),f32(at+4),f32(at+8)]));}
+        for(const value of(start===null?Array(n*3).fill(0):incident))expectedIncident.push(value);expectedIncidentRanges.push(start!==null);
+      }
+    }
+  }
+  const sourceMesh=opened.inspection.renderMesh,actualIncident=sourceMesh?.incidentRadiosity;
+  expect(actualIncident,'Native BSP must retain source incident radiosity').toBeDefined();expect(actualIncident.length).toBe(expectedIncident.length);expect(actualIncident.length).toBe(sourceMesh.positions.length);
+  let incidentMismatches=0,nonzeroIncident=0;for(let k=0;k<expectedIncident.length;k++){if(Math.abs(actualIncident[k]-expectedIncident[k])>0.000001)incidentMismatches++;if(actualIncident[k]!==0)nonzeroIncident++;}
+  expect(incidentMismatches).toBe(0);expect(nonzeroIncident).toBeGreaterThan(0);expect(sourceMesh.materialRanges.map(range=>!!range.hasIncidentRadiosity)).toEqual(expectedIncidentRanges);
+  const incidentReadback={coordinates:expectedIncident.length,validatedRanges:expectedIncidentRanges.filter(Boolean).length,nonzeroCoordinates:nonzeroIncident,mismatches:incidentMismatches,originalMagnitudeRetained:true,lightingParityAccepted:false};
   const seen=new Set(),results=[];
   for(const vehicle of opened.inspection.tags.filter(tag=>tag.class==='vehi')){
     const reference=vehicle.references.find(ref=>ref.label==='Model'&&ref.class===(xbox?'mode':'mod2'));
@@ -349,7 +380,7 @@ async function nativeVehiclePreview(opened,originalHash){
   }
   expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
   expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);
-  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
+  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,incidentReadback,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
   await chooseTool(main,'Tag editor');
   // The recovered Demo mod retains two Warthog-derived carrier objects,
   // rather than a stock Scorpion. Inspect those exact original objects.
@@ -380,6 +411,16 @@ async function nativeVehiclePreview(opened,originalHash){
   const placed=warthog&&opened.project.scene.find(object=>object.visible&&object.tagId===warthog.vehicleId);
   if(expectedCacheVersion!==6)expect(placed,'Stock source fixture must contain a placed Warthog').toBeTruthy();
   if(placed){
+    const {sampleIncidentRadiosity}=await import('../src/haloLightmap.ts');
+    const probeOrigin=expectedCacheVersion===5||expectedCacheVersion===13?[29.137,-90.8342,1]:[placed.position[0],placed.position[1],placed.position[2]+1];
+    const beforeProbe=performance.now(),probe=sampleIncidentRadiosity(sourceMesh,probeOrigin);const probeMs=performance.now()-beforeProbe;
+    if(expectedCacheVersion===5||expectedCacheVersion===13){
+      expect(probe,'Verified Blood Gulch source probe must find its native floor').toBeTruthy();
+      const expected=expectedCacheVersion===5?[.615502118235366,.11620920145640734,.6790058523294471]:[.627102307245265,.11677092284058391,.6790837674489463];
+      for(let axis=0;axis<3;axis++)expect(Math.abs(probe.incident[axis]-expected[axis])).toBeLessThan(.000001);
+      expect(Math.abs(probe.point[2]-.2853357008287968)).toBeLessThan(.000001);
+    }
+    report.vehiclePreview.incidentReadback.probe={scope:'production CPU source sampler on actual native IPC geometry; not applied model lighting',origin:probeOrigin,result:probe,milliseconds:probeMs};
     await chooseTool(main,'Level editor');await openDrawer(main,'Objects');
     await main.getByRole('textbox',{name:'Search scene objects',exact:true}).fill(placed.name);
     await main.locator('.object-list .object-name').filter({hasText:placed.name}).first().click();

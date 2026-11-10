@@ -280,6 +280,9 @@ pub struct MeshMaterialRange {
     /// The bounded raw stream provided real secondary UVs, not default coordinates.
     #[serde(default)]
     pub has_lightmap_uvs: bool,
+    /// The bounded secondary stream also contains finite authored radiosity vectors.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub has_incident_radiosity: bool,
     /// The compiled sbsp header references the bitmap tag containing its
     /// lightmap pages. This is candidate provenance only; callers must match
     /// it against a real bitm tag ID in the inspected cache before reading.
@@ -304,6 +307,10 @@ pub struct MeshData {
     /// Second UV channel sourced from the compiled BSP uncompressed lightmap stream.
     #[serde(default)]
     pub lightmap_uvs: Vec<f32>,
+    /// Source incident-radiosity vectors, with magnitude retained (not unit normals).
+    /// Zero padding is unavailable unless the material declares validated data.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub incident_radiosity: Vec<f32>,
     pub label: String,
     pub source: String,
     #[serde(default)]

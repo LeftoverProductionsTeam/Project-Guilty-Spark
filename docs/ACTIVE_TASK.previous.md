@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: ee12b9ea26014d0c360ab53c7809d8737ba21f29 plus reviewed source-object lighting diff passes R432 fresh Windows, R433480frontend/274browser, R434 and R436–R439native source-family checks. R435 actual Chupathingy matched camera observed; no full game-parity/human acceptance. Local commit follows explicit staged-source manifests.
-Next action: Commit the accepted source-object lighting repair and exact evidence locally after staged-source manifest verification. Continue H29 source-local illumination/pose/dynamic-material fidelity using existing native reader/shared renderer; no brightness/fallback workaround. Human visual/driving and wider M1–M6 gates remain open.
+Latest verified revision: 99cb36466efd7608038e9576bc2363aebad8b7ee commits placed-object source lighting, R432 fresh Windows, R433480frontend/274browser, R434 and R436–R439native source-family checks; working tree clean after commit. R435actual Chupathingy matched camera observed. Source manifest2134files/51,010,498B/SHAe282033323a95c6ed15761a1a31dc36b490c5ee9c3fb491a967b089ba1cd1c80 verified before commit. No full game-parity/human acceptance.
+Next action: Preserve bounded BSP incident-radiosity vectors in the existing mesh reader, then connect verified local lightmap sampling to the shared material path. R440 independently proves source vectors differ from surface normals in Xbox/MCC/CE/Demo; original hashes unchanged. Keep full H29 game parity and broader M1–M6 open. No new renderer, light rig or source writer.
 
 ## Acceptance
 
@@ -51,6 +51,8 @@ M3R277 protected connected CE map E/connected-source-tags-r277-timberland.map77,
 
 ## Changed work
 
+R440 independent original-cache readback: Chupa5534/MCC5506/CE8619/Demo5506 nonzero incident-radiosity vectors; most differ from surface normals. At the documented diagnostic point above the Chupa Warthog, source vector[.61550,.11621,.67901], not its surface normal. Original4hashes unchanged; only E/vehicle-source-radiosity-r440.json retained. This is source evidence, not rendered or game acceptance. Native source schema uses published 20B PC/8B Xbox lightmap vertex layouts. Current mesh reader discards the first12/4bytes; preserve these within existing bounds and keep malformed/unavailable samples explicit.
+
 Current10Nov dirty repair: native soso decal flag8 suppresses opaque alpha-test; old cached metadata is also guarded. Native sgla glass uses alpha-weighted diffuse over reflection/tint, with a neutral-tint one-pass fast path or ordered shared-texture tint/surface passes. HaloMesh/BSP/QuickForge use the same material builder. Exact native Background tint map and scale are read-only metadata. New red→green source/GPU tests preserve cutouts/glow/reflection order and image ownership; native app acceptance next.
 
 10Nov vehicle shader follow-through: independent originalMCC/CE sourceflags show Scorpion hull_double/hull_darkened/treads set native detail-after-reflection while Warthog hull does not. Existing parser/material omitted the flag. R399 actualWebGL red: toggledflag yields same88/76/145grey pixels for three detailfunctions; independent expectedafter56/28/177. R400 focusedGPUgreen respects order, sourcealbedo/normal/UV/lighting unchanged, reflection-free24grey unchanged. Current uncommitted parser adds read-only/defaultfalsemetadata; shared haloMaterial consumes it; focused native flag/environment-alpha/oldserde guards and real vehicle original-byte assertions added. No nativefield/tagwriter/copying ofengine implementation. PinnedpublishedInvader696830ff80af227e84e7237c2ef26eb2301ed110 shader_model.json is the formatreference; engine checkout899219cc0a14b03bc12f0517a1e9ee4c37158af8 reviewedread-only.
@@ -93,7 +95,7 @@ R432/R433/R434/R435/R436–R439 are terminal; complete receipts verified, origin
 
 Current QA E/qa-vehicle-lighting-r432/GuiltySpark.exe49,762,816B SHA795ffce4eee20b643e57eb16eacae3ad1e54c27ac7b15f7b4dac2f25fae13332/runtimeFP0a1462e402aa7c0eca9ddbd222243b5852e6864fe7f3043959f88496aec729a5; built fromee12b9e plus reviewed current source, not a release. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Original R435 camera evidence and unmodifiedJPEG live in E/vehicle-matched-camera-r435.json and -warthog.jpg. Prior R375–R431 terminal/failure/storage details remain in existing evidence reports and ee12b9e:docs/ACTIVE_TASK.md; none is rerun or upgraded by this checkpoint.
 
-Commit procedure: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Recordresult through existing atomic checkpoint, no selfhash/amend/historyrewrite. ContinueGoalafter scopedcommit. No push/workflow/publication.
+Scoped source repair is locally committed99cb364; no push. Further changes must invalidate the QA fingerprint when production changes. Commit procedure for the next accepted increment: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Recordresult through existing atomic checkpoint, no selfhash/amend/historyrewrite. ContinueGoalafter scopedcommit. No push/workflow/publication.
 
 ## Deferred requests
 

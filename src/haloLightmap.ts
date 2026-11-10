@@ -3,7 +3,7 @@
  * Never silently share a texture between BSPs which both have page 0.
  * No cache data is changed; no game texture pixels are guessed or bundled.
  */
-import type { MeshData } from './types';
+import type { MeshData, Vec3 } from './types';
 
 export interface LightmapPageCoverage {
   key: string;
@@ -115,4 +115,52 @@ export function matchLocalLightmapPages(pages: readonly LightmapPageCoverage[], 
     } else assignments.push(items[0]);
   }
   return {assignments,skipped};
+}
+
+/** A source-data sample, not a replacement lighting rig or native game state. */
+export interface IncidentRadiositySample {
+  triangle:number; bspIndex:number; shaderTagId:number; lightmapKey:string;
+  lightmapBitmapTagId:number; point:Vec3; barycentric:Vec3;
+  surfaceNormal:Vec3; surfaceUv:[number,number]; lightmapUv:[number,number];
+  incident:Vec3; direction:Vec3; accuracy:number;
+}
+/** Downward source probe. Select the nearest surface before checking lighting:
+ * an unavailable floor must never leak light from another floor behind it.
+ * Native incident-vector lengths are retained independently from direction.
+ * No texture is decoded, no source is copied and no scene lighting is changed.
+ */
+export function sampleIncidentRadiosity(mesh:MeshData|null|undefined,point:Vec3,maximumDistance=10,bspIndex?:number):IncidentRadiositySample|null {
+  if(!mesh||point.length!==3||!point.every(Number.isFinite)||!Number.isFinite(maximumDistance)||maximumDistance<=0||maximumDistance>100||
+    mesh.positions.length%3||mesh.positions.length>3_000_000||mesh.indices.length%3||mesh.indices.length>1_500_000||
+    (bspIndex!==undefined&&(!Number.isInteger(bspIndex)||bspIndex<0||bspIndex>15)))return null;
+  const ranges=mesh.materialRanges??[];if(ranges.length>131072)return null;
+  if(!ranges.some(range=>range.hasIncidentRadiosity===true))return null;
+  let hit:{triangle:number;ids:number[];weights:Vec3;z:number;range:typeof ranges[number]|undefined}|undefined,ambiguous=false;
+  for(let at=0;at<mesh.indices.length;at+=3){
+    const ids=mesh.indices.slice(at,at+3);if(ids.some(id=>!Number.isSafeInteger(id)||id<0||id*3+2>=mesh.positions.length))return null;
+    const a=mesh.positions.slice(ids[0]*3,ids[0]*3+3),b=mesh.positions.slice(ids[1]*3,ids[1]*3+3),c=mesh.positions.slice(ids[2]*3,ids[2]*3+3);
+    if(![...a,...b,...c].every(Number.isFinite))return null;
+    if(point[0]<Math.min(a[0],b[0],c[0])||point[0]>Math.max(a[0],b[0],c[0])||point[1]<Math.min(a[1],b[1],c[1])||point[1]>Math.max(a[1],b[1],c[1]))continue;
+    const denominator=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);if(Math.abs(denominator)<1e-12)continue;
+    const u=((b[1]-c[1])*(point[0]-c[0])+(c[0]-b[0])*(point[1]-c[1]))/denominator,v=((c[1]-a[1])*(point[0]-c[0])+(a[0]-c[0])*(point[1]-c[1]))/denominator,w=1-u-v;
+    if(Math.min(u,v,w)<-1e-7)continue;const z=a[2]*u+b[2]*v+c[2]*w;if(z>point[2]+1e-7||point[2]-z>maximumDistance)continue;
+    const matches=ranges.filter(range=>Number.isSafeInteger(range.indexStart)&&Number.isSafeInteger(range.indexCount)&&range.indexStart<=at&&at+3<=range.indexStart+range.indexCount);
+    const range=matches.length===1?matches[0]:undefined;
+    if(bspIndex!==undefined&&range?.bspIndex!==bspIndex)continue;
+    if(hit&&Math.abs(z-hit.z)<1e-7&&range?.bspIndex!==hit.range?.bspIndex){ambiguous=true;continue;}
+    if(!hit||z>hit.z+1e-7){hit={triangle:at/3,ids,weights:[u,v,w],z,range};ambiguous=false;}
+  }
+  if(!hit||ambiguous||!hit.range?.hasIncidentRadiosity||!hit.range.hasLightmapUvs)return null;
+  const {ids,weights,range}=hit,radiosity=mesh.incidentRadiosity,normals=mesh.normals,uvs=mesh.uvs,lightUvs=mesh.lightmapUvs;
+  if(!radiosity||radiosity.length!==mesh.positions.length||!normals||normals.length!==mesh.positions.length||!uvs||uvs.length!==mesh.positions.length/3*2||!lightUvs||lightUvs.length!==uvs.length||
+    !Number.isSafeInteger(range.shaderTagId)||!Number.isSafeInteger(range.lightmapBitmapTagId)||range.lightmapBitmapTagId!<0)return null;
+  const interpolate=(values:number[],stride:number):number[]=>Array.from({length:stride},(_,axis)=>ids.reduce((sum,id,k)=>sum+values[id*stride+axis]*weights[k],0));
+  const unit=(vector:Vec3):Vec3=>{const length=Math.hypot(...vector);return length>1e-9?vector.map(n=>n/length) as Vec3:[0,0,0];};
+  const incident=interpolate(radiosity,3) as Vec3,surface=interpolate(normals,3) as Vec3,surfaceUv=interpolate(uvs,2) as [number,number],lightmapUv=interpolate(lightUvs,2) as [number,number];
+  const lengths=ids.map(id=>Math.hypot(...radiosity.slice(id*3,id*3+3)));
+  if(![...incident,...surface,...surfaceUv,...lightmapUv,...lengths].every(Number.isFinite)||lengths.some(n=>n>Math.sqrt(1.05)))return null;
+  const direction=unit([0,1,2].map(axis=>ids.reduce((sum,id,k)=>sum+(lengths[k]>1e-9?radiosity[id*3+axis]/lengths[k]:0)*weights[k],0)) as Vec3);
+  let key:string;try{key=lightmapPageKey(range.bspIndex,range.lightmapPage??-1);}catch{return null;}
+  return {triangle:hit.triangle,bspIndex:range.bspIndex,shaderTagId:range.shaderTagId,lightmapKey:key,lightmapBitmapTagId:range.lightmapBitmapTagId!,
+    point:[point[0],point[1],hit.z],barycentric:weights,surfaceNormal:unit(surface),surfaceUv,lightmapUv,incident,direction,accuracy:lengths.reduce((sum,n,k)=>sum+n*weights[k],0)};
 }

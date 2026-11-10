@@ -146,11 +146,13 @@ export interface MeshData {
   uvs?: number[];
   /** Only real read-only BSP lightmap UVs; unverified/missing data is zero-filled. */
   lightmapUvs?: number[];
+  /** Authored BSP incident radiosity; magnitude is meaningful. Range flag gates zero padding. */
+  incidentRadiosity?: number[];
   label: string;
   source: string;
   parts?: { name: string; indexStart: number; indexCount: number }[];
   /** Actual shader-tag provenance for untextured BSP spans. */
-  materialRanges?: { shaderTagId: number; bspIndex: number; lightmapIndex: number; lightmapPage?: number; hasLightmapUvs?: boolean; lightmapBitmapTagId?: number | null; indexStart: number; indexCount: number }[];
+  materialRanges?: { shaderTagId: number; bspIndex: number; lightmapIndex: number; lightmapPage?: number; hasLightmapUvs?: boolean; hasIncidentRadiosity?: boolean; lightmapBitmapTagId?: number | null; indexStart: number; indexCount: number }[];
 }
 export interface MapInspection {
   header: MapHeader;
