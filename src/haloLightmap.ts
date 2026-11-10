@@ -119,7 +119,7 @@ export function matchLocalLightmapPages(pages: readonly LightmapPageCoverage[], 
 
 /** A source-data sample, not a replacement lighting rig or native game state. */
 export interface IncidentRadiositySample {
-  triangle:number; bspIndex:number; shaderTagId:number; lightmapKey:string;
+  triangle:number; bspIndex:number; shaderTagId:number; shaderPermutation:number; lightmapKey:string;
   lightmapBitmapTagId:number; point:Vec3; barycentric:Vec3;
   surfaceNormal:Vec3; surfaceUv:[number,number]; lightmapUv:[number,number];
   incident:Vec3; direction:Vec3; accuracy:number;
@@ -161,6 +161,68 @@ export function sampleIncidentRadiosity(mesh:MeshData|null|undefined,point:Vec3,
   if(![...incident,...surface,...surfaceUv,...lightmapUv,...lengths].every(Number.isFinite)||lengths.some(n=>n>Math.sqrt(1.05)))return null;
   const direction=unit([0,1,2].map(axis=>ids.reduce((sum,id,k)=>sum+(lengths[k]>1e-9?radiosity[id*3+axis]/lengths[k]:0)*weights[k],0)) as Vec3);
   let key:string;try{key=lightmapPageKey(range.bspIndex,range.lightmapPage??-1);}catch{return null;}
-  return {triangle:hit.triangle,bspIndex:range.bspIndex,shaderTagId:range.shaderTagId,lightmapKey:key,lightmapBitmapTagId:range.lightmapBitmapTagId!,
+  return {triangle:hit.triangle,bspIndex:range.bspIndex,shaderTagId:range.shaderTagId,shaderPermutation:range.shaderPermutation??0,lightmapKey:key,lightmapBitmapTagId:range.lightmapBitmapTagId!,
     point:[point[0],point[1],hit.z],barycentric:weights,surfaceNormal:unit(surface),surfaceUv,lightmapUv,incident,direction,accuracy:lengths.reduce((sum,n,k)=>sum+n*weights[k],0)};
+}
+
+/** Static source-preview lighting, not live engine state. The native object
+ * offset is relative to its root bone, then transformed by the placed object.
+ * A geometric AABB centre is not an interchangeable sampling location. */
+export function objectLightingPoint(mesh:MeshData|undefined,object:{position:Vec3;rotation:Vec3;scale:Vec3}):Vec3|null {
+  const info=mesh?.objectLighting,root=mesh?.rig?.nodes[0];
+  if(!info||!root||root.parent!==-1||![...info.offset,info.radius,...root.position,...root.rotation,...object.position,...object.rotation,...object.scale].every(Number.isFinite)||
+    info.offset.some(n=>Math.abs(n)>1000)||info.radius<0||info.radius>1000||object.scale.some(n=>n<=0||n>1000))return null;
+  const q=root.rotation,ql=Math.hypot(...q);if(ql<1e-9)return null;
+  const [qx,qy,qz,qw]=q.map(n=>n/ql),[vx,vy,vz]=info.offset;
+  const tx=2*(qy*vz-qz*vy),ty=2*(qz*vx-qx*vz),tz=2*(qx*vy-qy*vx);
+  let x=(vx+qw*tx+qy*tz-qz*ty+root.position[0])*object.scale[0];
+  let y=(vy+qw*ty+qz*tx-qx*tz+root.position[1])*object.scale[1];
+  let z=(vz+qw*tz+qx*ty-qy*tx+root.position[2])*object.scale[2];
+  const [yaw,pitch,roll]=object.rotation;
+  // Match the existing World group: stored radians, composed in ZYX order.
+  const rx=Math.cos(roll)*y-Math.sin(roll)*z,rz=Math.sin(roll)*y+Math.cos(roll)*z;y=rx;z=rz;
+  const px=Math.cos(pitch)*x+Math.sin(pitch)*z,pz=-Math.sin(pitch)*x+Math.cos(pitch)*z;x=px;z=pz;
+  const point:Vec3=[Math.cos(yaw)*x-Math.sin(yaw)*y+object.position[0],Math.sin(yaw)*x+Math.cos(yaw)*y+object.position[1],z+object.position[2]];
+  return point.every(n=>Number.isFinite(n)&&Math.abs(n)<1e6)?point:null;
+}
+export interface SourceObjectLighting {
+  point:Vec3;ambient:Vec3;primary:Vec3;primaryDirection:Vec3;
+  bounce:Vec3;bounceDirection:Vec3;reflection:Vec3;reflectionBrightness:number;
+}
+/** Native integer texture sampling uses nearest-even at texel centres and
+ * repeats at image boundaries. It does not sample generated GPU mipmaps. */
+export function sampleNativeLightPixel(image:{width:number;height:number;pixels:Uint8Array},uv:[number,number]):Vec3|null {
+  const {width,height,pixels}=image;
+  if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>4096||height>4096||pixels.length!==width*height*4||!uv.every(n=>Number.isFinite(n)&&Math.abs(n)<=1e6))return null;
+  const nearestEven=(n:number)=>{const lower=Math.floor(n),fraction=n-lower;return fraction===.5?(lower%2===0?lower:lower+1):Math.round(n);};
+  const wrap=(n:number,size:number)=>((n%size)+size)%size;
+  const index=(wrap(nearestEven(height*uv[1]-.5),height)*width+wrap(nearestEven(width*uv[0]-.5),width))*4;
+  return [pixels[index]/255,pixels[index+1]/255,pixels[index+2]/255];
+}
+/** BSP stores a signed 16-bit permutation. Preserve its remainder semantics:
+ * a negative nonzero result is unavailable, never a wrapped last image. */
+export function nativeDiffuseImageIndex(permutation:number,imageCount:number|undefined):number|null {
+  if(!Number.isInteger(permutation)||permutation< -32768||permutation>65535||!Number.isInteger(imageCount)||imageCount!<1||imageCount!>2048)return null;
+  const signed=permutation>=32768?permutation-65536:permutation,index=signed%imageCount!;
+  return index<0?null:index===0?0:index;
+}
+/** The source's declared count includes Xbox padded tails. Never derive this
+ * from the number of displayable levels or substitute a generated average. */
+export function nativeDiffuseLightMip(nativeMipmaps:number|undefined,usableLevels:number|undefined):number|null {
+  if(!Number.isInteger(nativeMipmaps)||nativeMipmaps!<0||nativeMipmaps!>16||!Number.isInteger(usableLevels)||usableLevels!<1||usableLevels!>17||usableLevels!>nativeMipmaps!+1)return null;
+  const value=Math.fround(Math.fround(1-Math.fround(.3))*nativeMipmaps!),lower=Math.floor(value),level=value-lower===.5?(lower%2===0?lower:lower+1):Math.round(value);
+  return level<usableLevels!?level:null;
+}
+/** Independently expressed static preview equations from the pinned native
+ * lighting contract. Source RGB remains encoded, as in Halo's material math;
+ * emission and authored reflection parameters are composed by haloMaterial.
+ * Contact shadows, dynamic lights and runtime pose/lighting flags are separate.
+ */
+export function sourceObjectLighting(sample:IncidentRadiositySample,diffuse:Vec3,light:Vec3,brighten=false):SourceObjectLighting|null {
+  if(![...diffuse,...light,...sample.direction,...sample.surfaceNormal,...sample.point].every(Number.isFinite)||[...diffuse,...light].some(n=>n<0||n>1))return null;
+  const clamp=(n:number)=>Math.min(1,Math.max(0,n)),brightness=light[0]*.299+light[1]*.587+light[2]*.114;
+  const boost=(rgb:Vec3,fraction:number):Vec3=>{if(!brighten)return rgb;const peak=Math.max(...rgb);return peak===0?rgb:rgb.map(n=>n*Math.min(1,Math.max(fraction,peak*(1+fraction)))/peak) as Vec3;};
+  return {point:sample.point,ambient:boost(light.map(n=>.03+.4*n) as Vec3,.2),primary:boost([...light],.3),primaryDirection:sample.direction,
+    bounce:boost(diffuse.map(n=>n*brightness) as Vec3,.2),bounceDirection:sample.surfaceNormal.map(n=>-n) as Vec3,
+    reflection:boost(diffuse.map((n,i)=>clamp(.5+3*n)*clamp(.25+2*light[i])) as Vec3,.5),reflectionBrightness:brighten?1:clamp(.25+1.5*brightness)};
 }

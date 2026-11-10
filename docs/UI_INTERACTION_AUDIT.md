@@ -2,7 +2,7 @@
 
 ## Current functional gate — verified checkpoint
 
-**Final UI/release acceptance remains OPEN.** Project selection, wrong-project Save and bounded Tools-menu audit repairs retain their native/browser evidence. Latest sealed candidate c035b68 has all nine clean-source release groups and real installer/portable startup checks. It does not include later connected-scenery work until that source has its own native acceptance. See RELEASE_CANDIDATE_20261108.md and ACTIVE_TASK.md.
+**Final UI/release acceptance remains OPEN.** Project selection, wrong-project Save and bounded Tools-menu audit repairs retain their native/browser evidence. Historical sealed candidate c035b68 has all nine then-current clean-source release groups and real installer/portable startup checks. The later dc4456e candidate and subsequent source have separate evidence; none automatically includes this current vehicle increment. See RELEASE_CANDIDATE_20261108.md and ACTIVE_TASK.md.
 
 Current packaged evidence: E/release-c035b68-preview2/native-regressions.json, complete:true, mockedIpc:false; two source-preview and two project-workflow cases including independent saved A/B/C values0.75/1.25/2, writer/view ownership, Undo/Save and full restart. Every one of eight native logical picker layouts has19reachable commands, no clipped/blocked/scrolling controls and a retained canvas. AppSHA d2a3e8f02e5f92dbac6c1d2f8d44a202211dac03ad452e947375cf669463f477. Full source gates885Rust/9ignored,472frontend,254browser, TypeScript/offline/storage/native diagnostics/release pass.
 
@@ -22,6 +22,12 @@ Before/after native content screenshots: E/interaction-native-before-r190/projec
 
 
 Current source base: local master1d160ec plus the connected-scenery and source-reference continuation. The c035b68 packaged evidence above is a separate exact revision. This audit tracks observable interactions; a catalog entry or tooltip is not evidence of operation.
+
+## Placed vehicle appearance and camera controls — 10 November
+
+**Control:** Work → Level editor → Tools → Objects → search/select vehicle → close drawer → F; Escape deselects and the wheel zooms. **Expected:** the placed model retains source colours/materials and uses its source environment, with a full, usable viewport. **Defect:** startup bypassed the native object reader and dropped bounds/flags/change colours, so the World could not apply the new exact lightmap/diffuse sample even when the interactive model had metadata. R465 reproduces the missing applied Warthog result. **Repair:** shared reader in render.rs, source-local data in haloLightmap/useNativeObjectLighting and the existing World/HaloMesh/haloMaterial; no alternate UI/renderer or source writes. The tooltips/control paths remain those actually exercised.
+
+**Evidence:** R466 source/native repair; R471 full275browser checks; R473 and final R480 fresh Windows/current frontend; R474 real GPU; R475–R479 source-matched native CE/MCC/Demo/OpenCE/Chupathingy. Actual pointer selection, F target, drawer resize, Escape and24wheel gestures preserve target while distance7.889867→2.303760; original screenshots and all source pins are retained. Undo/Save/navigation code is unchanged. MCC explicitly reports unverified local sampling; unsupported dynamic-meter/effect materials remain visible diagnostics. Bounds/capped decode failures never authorize fallback data. [Exact receipts, limits and current app](NATIVE_ASSETS_AND_SHOWCASE.md#applied-native-vehicle-lighting--10-november). No accepted pixel/game/physics/animation parity or final UI/release claim.
 
 ## Operation110 source-tag journey — current scope
 

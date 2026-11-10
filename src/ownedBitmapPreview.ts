@@ -12,6 +12,7 @@ export interface OwnedBitmapPreview {
   /** Level in the original image, independent of its image-array index. */
   mipLevel?: number;
   mipLevels?: number;
+  nativeMipmaps?: number;
   width: number;
   height: number;
   format: string;
@@ -64,6 +65,8 @@ export function decodeOwnedBitmapPreview(
   const imageIndex = target.imageIndex ?? 0;
   const mipLevel = target.mipLevel ?? 0;
   const mipLevels = preview.mipLevels ?? 1;
+  if(preview.nativeMipmaps!=null&&(!Number.isInteger(preview.nativeMipmaps)||preview.nativeMipmaps<0||preview.nativeMipmaps>16||mipLevels>preview.nativeMipmaps+1))
+    throw Error('Invalid original native bitmap mip count');
   if (!Number.isInteger(mipLevel)||mipLevel<0||mipLevel>16||
       (preview.mipLevel??0)!==mipLevel||!Number.isInteger(mipLevels)||
       mipLevels<1||mipLevels>17||mipLevel>=mipLevels)
@@ -141,6 +144,7 @@ export function decodeOwnedBitmapPreview(
     imageIndex,
     mipLevel,
     mipLevels,
+    preview.nativeMipmaps ?? null,
     preview.sourceKind ?? 'internal-cache',
     preview.resourceSha256 ?? null,
     preview.imageCount ?? null,

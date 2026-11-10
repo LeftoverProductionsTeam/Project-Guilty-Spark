@@ -5,6 +5,7 @@ import type { MeshData, ShaderPreview } from '../types';
 import { shaderLegend, shaderForTriangle } from '../renderView';
 import { renderIndices } from '../haloGeometry';
 import { materialLightmapKey } from '../haloLightmap';
+import type {SourceObjectLighting} from '../haloLightmap';
 import { createHaloMaterialPasses, updateHaloMaterial } from '../haloMaterial';
 import {glassWithoutDiffuse} from '../nativeShaderTextures';
 import {createChromaMaterial} from '../chromaKey';
@@ -24,6 +25,7 @@ export default function HaloMesh({
   extraTextures = {},
   sky = false,
   sourceObject = false,
+  localLighting,
   greenScreen = false,
 }: {
   data: MeshData;
@@ -39,6 +41,7 @@ export default function HaloMesh({
   extraTextures?: Record<string, THREE.Texture>;
   sky?: boolean;
   sourceObject?: boolean;
+  localLighting?:SourceObjectLighting|null;
   greenScreen?: boolean;
 }) {
   const {invalidate}=useThree();
@@ -81,6 +84,10 @@ export default function HaloMesh({
     }
     return{values,slots};
   },[legend,materialKeys,shaderTextures,lightmapTextures,materialLens,shaderMetadata,data.changeColors,extraTextures,sky,sourceObject,wireframe]);
+  useEffect(()=>{
+    for(const material of materials?.values??[])material.userData.haloObjectLighting=localLighting??null;
+    invalidate();
+  },[materials,localLighting,invalidate]);
   // Texture completion may replace a material without rebuilding its geometry.
   // Rebuild groups only if the ordered native pass layout actually changes.
   const materialLayout=materials?[...materials.slots].map(([key,slots])=>key+':'+slots.join(',')).join(';'):'';

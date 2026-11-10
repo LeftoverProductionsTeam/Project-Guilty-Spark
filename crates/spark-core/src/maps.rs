@@ -272,6 +272,9 @@ pub struct MeshPart {
 #[serde(rename_all = "camelCase")]
 pub struct MeshMaterialRange {
     pub shader_tag_id: u32,
+    /// Original BSP signed-short permutation bits, distinct from the shader datum.
+    #[serde(default)]
+    pub shader_permutation: u16,
     pub bsp_index: usize,
     pub lightmap_index: usize,
     /// Actual bitmap page index in the BSP lightmap block, -1 when unlit.
@@ -294,6 +297,9 @@ pub struct MeshMaterialRange {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeshData {
+    /// Read-only native object bounds used by static source-lighting previews.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub object_lighting:Option<ObjectLighting>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub change_colors:Option<Vec<[f32;3]>>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -318,6 +324,9 @@ pub struct MeshData {
     #[serde(default)]
     pub material_ranges: Vec<MeshMaterialRange>,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ObjectLighting{pub tag_class:String,pub offset:[f32;3],pub radius:f32,pub brighten:bool}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ModelBone{pub name:String,pub parent:i16,pub position:[f32;3],pub rotation:[f32;4]}

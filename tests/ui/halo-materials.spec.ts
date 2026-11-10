@@ -58,4 +58,8 @@ test('source-sky lighting reaches placed objects without relighting baked BSPs o
   await page.goto('/tests/ui/fixtures/haloMaterials.html');const result=await page.evaluate(async()=>{const {renderObjectLightingChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderObjectLightingChecks();});console.log('HALO_OBJECT_LIGHTING',JSON.stringify(result));
   expect(result.errors).toEqual([]);for(const [frame,value]of[[result.object,64],[result.unavailable,160],[result.baked,96],[result.bakedObject,96],[result.override,48]] as const){for(const channel of[0,1,2])expect(Math.abs(frame.pixel[channel]-value)).toBeLessThanOrEqual(1);expect(frame.pixel[3]).toBe(255);expect(frame.draws).toBe(1);expect(frame.triangles).toBe(2);}
   expect(result.object.geometry).toBe(result.unavailable.geometry);expect(result.green.pixel).toEqual([0,255,0,255]);
+  for(const [i,expected]of[27,50,60,255].entries())expect(Math.abs(result.localZero.pixel[i]-expected)).toBeLessThanOrEqual(1);
+  for(const frame of[result.local,result.localNoSky])for(const [i,expected]of[53,101,137,255].entries())expect(Math.abs(frame.pixel[i]-expected)).toBeLessThanOrEqual(1);
+  for(const [frame,value]of[[result.localOverride,64],[result.localBaked,96],[result.localNonObject,160],[result.removed,64]] as const)for(const i of[0,1,2])expect(Math.abs(frame.pixel[i]-value)).toBeLessThanOrEqual(1);
+  expect(result.localGreen.pixel).toEqual([0,255,0,255]);expect(result.local.geometry).toBe(result.localBaseline.geometry);expect(result.localNoSky.geometry).toBe(result.local.geometry);expect(result.removed.geometry).toBe(result.beforeRemove.geometry);
 });

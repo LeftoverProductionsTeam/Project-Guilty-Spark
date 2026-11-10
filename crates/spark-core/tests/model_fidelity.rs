@@ -2,7 +2,7 @@ use spark_core::{assets, maps::{MeshData,MeshMaterialRange,Tag},model_build::{co
 fn fixture() -> (MeshData,Vec<SourceMaterialRange>,MeshData,Vec<Tag>) {
     let source=assets::parse_obj(include_str!("fixtures/static_wedge.obj")).unwrap().mesh;
     let mut output=source.clone();
-    output.material_ranges=vec![MeshMaterialRange{shader_tag_id:42,bsp_index:0,lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,has_incident_radiosity:false,lightmap_bitmap_tag_id:None,index_start:0,index_count:output.indices.len()}];
+    output.material_ranges=vec![MeshMaterialRange{shader_permutation:0,shader_tag_id:42,bsp_index:0,lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,has_incident_radiosity:false,lightmap_bitmap_tag_id:None,index_start:0,index_count:output.indices.len()}];
     let ranges=vec![SourceMaterialRange{shader_path:"models/own/surface".into(),index_start:0,index_count:source.indices.len()}];
     let tags=vec![serde_json::from_value(serde_json::json!({"id":42,"index":0,"class":"soso","path":"models\\own\\surface","dataOffset":0,"external":false,"fields":[],"references":[]})).unwrap()];
     (source,ranges,output,tags)

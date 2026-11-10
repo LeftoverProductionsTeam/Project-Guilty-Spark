@@ -29,6 +29,8 @@ console.log('Owned cache bitmap preview protocol: exact-source identity, top-mip
 
 const mip={...preview,mipLevel:1,mipLevels:3};
 assert.deepEqual(decodeOwnedBitmapPreview(mip,{...target,mipLevel:1}).pixels,image.pixels);
+assert.deepEqual(decodeOwnedBitmapPreview({...mip,nativeMipmaps:9},{...target,mipLevel:1}).pixels,image.pixels);
+for(const nativeMipmaps of [-1,17,NaN,.5,1])assert.throws(()=>decodeOwnedBitmapPreview({...mip,nativeMipmaps},{...target,mipLevel:1}),/original native bitmap mip count/);
 for(const bad of [undefined,-1,0,3,17,NaN])
   assert.throws(()=>decodeOwnedBitmapPreview({...mip,mipLevel:bad},{...target,mipLevel:1}),/authored mip/);
 for(const count of [0,1,18,NaN])

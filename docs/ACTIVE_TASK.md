@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 29661942bade7a3545a5e171fc4054d2cdeb37b7 commits the authored bitmap-level repair, exact IPC/cache identities and existing preview controls. R454914Rust/9explicitignored,480frontend/275browser/TypeScript/contracts/offline/40storage checks and R454–R458 actual Windows original-mip/vehicle fixtures pass. Source manifest2134files/51,061,326B/SHA44a2e9284222f544aeb0b13ba513b7a3db00498c9e517733c283bfd15b02a878 verified; no archive created. Full game-renderer parity/H29 remains open.
-Next action: Continue the vehicle-fidelity repair by using verified original BSP diffuse/lightmap samples and exact source object lighting-point metadata in the existing shared renderer. Respect native declared mip counts (Xbox padding differs), root/bounding transforms and source identity. Validate actual GPU/game results before claiming parity; generated display mips, local shadows and dynamic vehicle animation remain open. No competing renderer or engine-source import.
+Latest verified revision: 752599a prior clean commit; current reviewed vehicle increment passes914Rust/9ignored (R466),275browser (R471), final480frontend/TypeScript/contracts/offline/40storage checks and freshWindows158.598s/Chupa28.739s (R480). R4743real-GPU cases and R475–R479allfive source/installation checks pass. All operations terminal,0JSerrors/normalclose/originalhashesunchanged/ownedscratchdisposed. Current source-matched QA50,524,672B SHAdb1e9b57…/runtimeFPb02da9ed… .
+Next action: Review/stage this accepted source-lighting/startup-reader increment, regenerate/check source manifests and commit locally. Retain one current QA app and compact receipts; retire only manifest-verified superseded owned QA executables. Then resume native game-matched vertex/reflection/shadow/pose and MCC sampling gaps; H29/full Operation110 remains open, no push/publication.
 
 ## Acceptance
 
@@ -12,6 +12,10 @@ Operation110 f3bd3ec0 full text: docs/Master Engineering Prompts/GS_2026-11-08_O
 
 Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHAa47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a; sortedIDsetSHAb990f65f7c1ccb092b776feab2065a1207926a0aca5aeee05cf5d63547736077. CSV remains byte-unchanged vs HEAD and has475rows/0duplicateIDs. Keep all later Master Engineering Prompts, research, source, Git/history/stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85, original Halo runtimes/ISOs/maps/mods/tags/SDKs, C49 and accepted c035/dc releases. No new branch/worktree/clone/archive/SDK warehouse or queue system. No push, remote workflow or publication: owner performs those.
 
+
+## Current uncommitted increment
+
+Shared startup/native object reader retains bounds/flags/change colours; exact classic mip/lightmap/incident samples reach existing World/HaloMesh illumination/reflection. Signed16 image-index, optional bad-bounds geometry retention and explicit budget status are verified. Real F/Escape/24wheel gestures zoom7.889867→2.303760, original close PNGs retained. CE/Chupa/OpenCE selectedWarthog has local sample; alteredDemo car lacksfloor, MCCpack sampler remainsunverified. R480112/112eligible World samples/2488msworker (not speedbenchmark). Final QA/source hash/screens/evidence in NATIVE_ASSETS_AND_SHOWCASE.md; H29/UI audit updated.475CSV unchanged. No newrenderer/nativewrites/SDK. Native GPUmips/shadows/pose/fullgame parity remainopen.
 
 ## Verified milestones
 
@@ -95,15 +99,11 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-Latest source-matched QA is E/qa-vehicle-mips-r454/GuiltySpark.exe50,508,800B SHAb88d13c3e4f91114b70a7e4c3414f3489bb643eb94f96d7fa359d136d4d62671/runtimeFP765c498dfda9fee8d293ab7d55ddc4cc06afdddef9943a72786ec68d34e22a61; built from3a33a75 plus the implementation now committed2966194. Not a release. No owned operation remains active. Next native production edits invalidate reuse; reports/tests/docs changes alone do not.
+R459–R480 are terminal. Current source-matched app E/qa-vehicle-local-r480/GuiltySpark.exe50,524,672B SHAdb1e9b57bfdd46cce04090afc1ab2d71a96e119e6e5f71697d410eee317412e5/runtimeFPb02da9ed3878d3b49734ffa4f67f3fdfae848eab8a5acf9339c02cc0df068108. Built from752599a plus the reviewed increment, not a release. Source code changes invalidate reuse; docs/tests-only changes do not. R480disposes1,853,152,900logicalB of owned build/test payloads; no SDK and no physical free-space-delta claim. Native close capture E/vehicle-local-final-r480-native-vehicle-world-closeup.png SHAb1bfe0de5bd3c64dade5ebf5154b0193513e6256e29ca74a9d865fb349a1dbc7.
 
-R450–R458 are terminal. Full source-matched R454 and all four reused-app native runs complete:true/exit0, originals unchanged and all owned scratch disposed. Existing sourceData/game-parity gates below remain separate. No native or compilation operation is active.
+E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Exact source/failure/matrix/QA histories R401–R480 are in NATIVE_ASSETS_AND_SHOWCASE.md and receipts. R464/R466/R471/R473 QA executables are superseded owned build outputs; verify manifests/regular paths/current R480 pass before retiring only those binaries, keeping compact receipts/captures and originalC49/c035/dc releases. Native R435game observation remains separate from H29 parity. No active QA/game/compiler operation remains.
 
-R440–R449 are terminal. R441 used a wrong module filter and ran0tests; R442actualcore suite confirms the BSP geometry test runs/passes. R443Windows build succeeded but its incorrectly requested workspace scope was refused before app launch. R445correct native scope and R446–R449 allpass against exact same source-matched app; no guard/assertion relaxed and no SDK staged. R444frontend source/data regressions also pass. All owned compilation/native payloads disposed; actual original hashesunchanged. No source edits occurred during build; later fixture-only corrections do not change runtime fingerprint. No active owned test operation at this write.
-
-Prior source-data QA E/qa-vehicle-radiosity-r443/GuiltySpark.exe50,511,360B SHAb3176dd1087fe3cad94edfb87957e9b30068fadec9923112d1d65f0de6479ca8/runtimeFPd33d924787fc4cc7adb1be7c23e7ee4dd814be82d9f343dbd9db82fac3980be9. Built from14b6b1e plus reviewed source; not a release. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Previous R432visual source-sky app and R435nativecamera/image remain valid for their exact earlier source and scope; no new local-lighting visual pass inferred. Original R440diagnostic is read-only and preserved. Full prior terminal/failure/storage details remain in existing reports and Git14b6b1e:docs/ACTIVE_TASK.md.
-
-Native incident-data increment locally committed5a646fb; originals/475IDs unchanged; no push. Commit procedure for subsequent accepted increments: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Preserve full475IDs. ContinueGoalafter scopedcommit. No push/workflow/publication.
+Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
 
 ## Deferred requests
 

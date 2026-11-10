@@ -53,7 +53,7 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
             let pointer=r.u32(at+100)?.checked_sub(base).ok_or_else(||SparkError::Invalid("Invalid MCC bitmap collection pointer".into()))? as usize;let table=start+pointer;if table.checked_add(count*48).is_none_or(|e|e>end){return invalid("MCC bitmap collection escapes its source region");}
             if r.u16(table+request.image_index*48+14)?&0x100==0 {
                 let original=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;let(meta,span)=select_mip(&original,request.mip_level)?;if spent+meta.size>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}if original.raw_offset<2048{return invalid("Bitmap offset overlaps the protected cache header");}Reader(&bytes).bytes(original.raw_offset,original.declared_size)?;let pixels=linear_top_mip(&meta,Reader(&bytes).bytes(meta.raw_offset,meta.size)?)?;spent+=meta.size;
-                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:span.levels,image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"internal-cache".into(),resource_sha256:None});
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:span.levels,native_mipmaps:Some(original.mipmaps),image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"internal-cache".into(),resource_sha256:None});
             }
             let key=crate::mcc_textures::texture_key(&tag.path,request.image_index)?;
             if inspection.tags.iter().filter(|t|t.class=="bitm"&&t.id!=tag.id).any(|t|crate::mcc_textures::texture_key(&t.path,request.image_index).ok().as_deref()==Some(&key)){return invalid("MCC canonical bitmap key has a source tag collision");}
@@ -61,7 +61,7 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
             let bundle=bundle.as_mut().ok_or_else(||SparkError::Invalid("MCC texture bundle unavailable".into()))?;
             if bundle.contains_key(&key)? {
                 let mip=bundle.mip(&key,request.mip_level)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
-                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:mip.mip_levels,image_count:count,shared_native_bitmap_path:None,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:mip.mip_levels,native_mipmaps:None,image_count:count,shared_native_bitmap_path:None,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
             }
             let hash=hashes.get("mcc-shared-bitmaps.map").ok_or_else(||SparkError::Invalid("Exact MCC texture key is missing; reconnect Halo Textures to verify MCC's shared bitmaps.map".into()))?;
             if shared.is_none() {
@@ -74,7 +74,7 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
             let (file,index,_)=shared.as_mut().ok_or_else(||SparkError::Invalid("MCC shared bitmaps unavailable".into()))?;
             let pixels=crate::resource_map::read_external_mip_from_verified(file,index,&tag.path,original.raw_offset as u64,original.declared_size as u64,original.size,span.offset,span.size,13,request.image_index)?;
             spent+=pixels.len();
-            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:span.levels,image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
+            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:span.levels,native_mipmaps:Some(original.mipmaps),image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
         })();let(preview,error,error_code)=match attempt{Ok(p)=>(Some(p),None,None),Err(e)=>{let(code,reason)=bitmap_failure(&e);(None,Some(reason),Some(code.into()))}};items.push(OwnedBitmapBatchItem{bitmap_tag_id:request.bitmap_tag_id,image_index:request.image_index,mip_level:request.mip_level,preview,error,error_code});
     }
     if let Some((file,_,hash))=&mut shared { crate::resource_map::verify_open_handle_hash(file,hash)?; }
@@ -100,6 +100,9 @@ pub fn mcc_uses_external_bitmaps(path:&Path,expected:&str,inspection:&MapInspect
 pub struct OwnedBitmapPreview {
     pub bitmap_tag_id: u32,
     pub image_index: usize,
+    /// Classic native mip count below the base, including Xbox padded tails.
+    /// MCC pack counts are a different contract and do not supply this value.
+    #[serde(default,skip_serializing_if="Option::is_none")] pub native_mipmaps: Option<u16>,
     #[serde(default)] pub mip_level: usize,
     /// Usable authored levels including level zero; never generated display mips.
     #[serde(default="single_image")] pub mip_levels: usize,
@@ -615,7 +618,7 @@ fn cube_from_snapshot(header: &MapHeader, bytes: &[u8], actual: &str, inspection
         Reader(&bytes).bytes(meta.raw_offset,total)?.to_vec()
     };
     let mut faces=Vec::with_capacity(6);
-    for index in 0..6{let native_index=if meta.xbox {match index{1=>2,2=>1,_=>index}}else{index};let at=native_index*face_span;let face=linear_top_mip(&meta,&pixels[at..at+meta.size])?;faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,mip_level:0,mip_levels:1,image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
+    for index in 0..6{let native_index=if meta.xbox {match index{1=>2,2=>1,_=>index}}else{index};let at=native_index*face_span;let face=linear_top_mip(&meta,&pixels[at..at+meta.size])?;faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,mip_level:0,mip_levels:1,native_mipmaps:Some(meta.mipmaps),image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
     *raw_bytes += total;
     *rgba_bytes += rgba;
     Ok(OwnedCubePreview{source_sha256:actual.to_owned(),resource_sha256:resource_hash,bitmap_tag_id,faces})
@@ -795,7 +798,7 @@ pub fn preview_owned_bitmap_batch_with_resources(
             Ok(OwnedBitmapPreview {
                 bitmap_tag_id: request.bitmap_tag_id,
                 image_index: request.image_index,
-                mip_level:request.mip_level,mip_levels:span.levels,
+                mip_level:request.mip_level,mip_levels:span.levels,native_mipmaps:Some(meta.mipmaps),
                 image_count:meta.image_count,shared_native_bitmap_path,
                 width: selected.width,
                 height: selected.height,
@@ -858,7 +861,7 @@ mod tests {
         let result=preview_owned_bitmap_batch_with_resources(source.path(),&inspection.sha256,&inspection,&requests,None).unwrap();
         for (n,item) in result.items.iter().enumerate(){
             let p=item.preview.as_ref().unwrap();let dimension=4>>n;
-            assert_eq!((item.mip_level,p.mip_level,p.mip_levels,p.width,p.height),(n,n,3,dimension,dimension));
+            assert_eq!((item.mip_level,p.mip_level,p.mip_levels,p.width,p.height),(n,n,3,dimension,dimension));assert_eq!(p.native_mipmaps,Some(2));
             assert_eq!(p.dds_base64,base64(&dds_top_mip(dimension,dimension,"DXT3",&[n as u8+1;16]).unwrap()));
         }
         assert!(preview_owned_bitmap_mip_with_resources(source.path(),&inspection.sha256,&inspection,0x1234,0,3,None).is_err());

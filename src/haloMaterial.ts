@@ -7,6 +7,7 @@ import type {ShaderPreview} from './types';
 import {sunlightPosition} from './environment';
 import {applyHaloBlend,genericCombiner,haloWaveGlsl} from './haloTransparency';
 import {glassWithoutDiffuse} from './nativeShaderTextures';
+import type {SourceObjectLighting} from './haloLightmap';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
 const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
 attribute vec2 uv1;
@@ -33,11 +34,12 @@ uniform vec2 baseScale,layerScale[4],layerOffset[4];uniform float layerRotation[
 uniform vec2 rotationCenter[4];uniform vec4 motionU[4],motionV[4],motionRotation[4];uniform int layerFlags[4];uniform float time;
 uniform vec3 detailScales;uniform int colorFunction[4],alphaFunction[4];
 uniform bool fogEnabled;uniform vec3 fogColor;uniform float fogNear,fogFar,fogMaximum;
-uniform bool overrideLighting;uniform vec3 lightDirection,ambientFill,sunFill;
+uniform bool overrideLighting,localObjectLighting;uniform vec3 lightDirection,ambientFill,sunFill,bounceFill,bounceDirection,localReflectionTint;uniform float localReflectionBrightness;
 uniform sampler2D normalMap,multipurpose;uniform bool hasNormal,hasMultipurpose,multipurposeXbox,linearOutput,enhancedNormal,enhancedSpecular,enhancedSelfIllum;
 uniform float normalScale,normalStrength,specularStrength,selfIllumStrength;
 uniform bool hasNativeSelfIllum;uniform vec3 selfIllumLower,selfIllumUpper;uniform vec2 selfIllumAnimation;
 uniform bool hasChangeColor,firstMapScreenspace,scaleFirstMapWithDistance;uniform vec3 changeColor;
+vec3 lightUnit(vec3 value){return value/max(length(value),.000001);}
 vec4 sourceColor(vec4 c){return baseEncoded?c:sRGBTransferOETF(c);}
 ${haloWaveGlsl}
 float animation(vec4 m){return haloWave(m.x,time/max(abs(m.y),0.001)+m.z)*m.w;}
@@ -102,11 +104,12 @@ void main(){
       vec3 a=cross(dp2,n),b=cross(n,dp1),t=a*duv1.x+b*duv2.x,bt=a*duv1.y+b*duv2.y;
       float length2=max(dot(t,t),dot(bt,bt));if(length2>.00000001){float inv=inversesqrt(length2);vec3 sampleN=texture2D(normalMap,haloUv*normalScale).rgb*2.0-1.0;
         sampleN.xy*=normalStrength;vec3 perturbed=normalize(mat3(t*inv,bt*inv,n)*sampleN);
-        float baseDiffuse=max(.25,dot(n,normalize(lightDirection))*.5+.5),relief=max(.25,dot(perturbed,normalize(lightDirection))*.5+.5);
+        float baseDiffuse=max(.25,dot(n,lightUnit(lightDirection))*.5+.5),relief=max(.25,dot(perturbed,lightUnit(lightDirection))*.5+.5);
         base.rgb*=clamp(relief/baseDiffuse,.25,2.0);n=perturbed;}}
     if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);
-      if(enhancedSpecular){float mask=multipurposeXbox?masks.r:masks.b;vec3 halfVector=normalize(normalize(lightDirection)+normalize(-haloView));base.rgb+=sunFill*mask*pow(max(0.0,dot(n,halfVector)),32.0)*specularStrength;}}
-    if(overrideLighting)base.rgb*=ambientFill+sunFill*max(0.0,dot(n,normalize(lightDirection)));
+      if(enhancedSpecular){float mask=multipurposeXbox?masks.r:masks.b;vec3 halfVector=normalize(lightUnit(lightDirection)+normalize(-haloView));base.rgb+=sunFill*mask*pow(max(0.0,dot(n,halfVector)),32.0)*specularStrength;}}
+    if(overrideLighting||localObjectLighting)base.rgb*=ambientFill+sunFill*max(0.0,dot(n,lightUnit(lightDirection)))+
+      (localObjectLighting?bounceFill*max(0.0,dot(n,lightUnit(bounceDirection))):vec3(0.0));
     // Native emission adds to diffuse illumination before multiplication by
     // the surface colour. It survives darkness and does not require optional
     // post-processing. A black diffuse texel still cannot invent light.
@@ -129,6 +132,7 @@ void main(){
       float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
       vec3 cubeColour=textureCube(reflectionCube,reflected).rgb;
       vec3 reflectionColour=kind==4?mix(pow(cubeColour,vec3(8.0)),cubeColour,tint):cubeColour*tint;
+      if(localObjectLighting&&kind<=1)reflectionColour*=localReflectionTint*localReflectionBrightness;
       base.rgb+=reflectionColour*brightness*mask*fade*(kind==4?1.0-glassOpacity:1.0);}
     // Preserve the model tag's authored combiner order. Reflection remains
     // source-coloured; detail can modulate it only when that flag is set.
@@ -257,6 +261,8 @@ export function createHaloMaterial(
       fogNear: { value: 0 },
       fogFar: { value: 1 },
       fogMaximum: { value: 1 },
+      localObjectLighting:{value:false},bounceFill:{value:new THREE.Vector3()},bounceDirection:{value:new THREE.Vector3(0,0,-1)},
+      localReflectionTint:{value:new THREE.Vector3(1,1,1)},localReflectionBrightness:{value:1},
       overrideLighting: { value: false },
       lightDirection: { value: new THREE.Vector3() },
       ambientFill: { value: new THREE.Vector3() },
@@ -329,6 +335,16 @@ export function updateHaloMaterial(material: THREE.Material, scene: THREE.Scene,
   // retains its existing scope. Missing source lighting never invents a rig.
   const sourceObjectLighting=material.userData.haloSourceObject&&environment?.sourceObjectLighting&&!m.uniforms.hasLight.value;
   m.uniforms.overrideLighting.value=!!(environment?.overrideLighting||sourceObjectLighting)&&!!environment?.value?.previewEnabled&&!material.userData.sky;
-  if(environment?.value){const v=environment.value;m.uniforms.lightDirection.value.fromArray(sunlightPosition(v)).transformDirection(camera.matrixWorldInverse);
+  const local=material.userData.haloObjectLighting as SourceObjectLighting|undefined;
+  const useLocal=!!local&&!!material.userData.haloSourceObject&&!m.uniforms.hasLight.value&&!material.userData.sky&&!environment?.overrideLighting;
+  m.uniforms.localObjectLighting.value=useLocal;
+  if(useLocal){
+    m.uniforms.overrideLighting.value=false;
+    m.uniforms.ambientFill.value.fromArray(local!.ambient);m.uniforms.sunFill.value.fromArray(local!.primary);
+    m.uniforms.lightDirection.value.fromArray(local!.primaryDirection).transformDirection(camera.matrixWorldInverse);
+    m.uniforms.bounceFill.value.fromArray(local!.bounce);m.uniforms.bounceDirection.value.fromArray(local!.bounceDirection).transformDirection(camera.matrixWorldInverse);
+    m.uniforms.localReflectionTint.value.fromArray(local!.reflection);m.uniforms.localReflectionBrightness.value=local!.reflectionBrightness;
+  }
+  if(!useLocal&&environment?.value){const v=environment.value;m.uniforms.lightDirection.value.fromArray(sunlightPosition(v)).transformDirection(camera.matrixWorldInverse);
     m.uniforms.ambientFill.value.fromArray(v.ambientColor).multiplyScalar(v.ambientIntensity);m.uniforms.sunFill.value.fromArray(v.sunColor).multiplyScalar(v.sunIntensity);}
 }

@@ -129,6 +129,7 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                 let material=materials + m*256;
                 // TagDependency.datum at +12. Reference is immutable provenance.
                 let shader_tag_id=r.u32(material+12)?;
+                let shader_permutation=r.u16(material+16)?;
                 let material_index_start=mesh.indices.len();
                 // Material surface_start/count are signed, but the valid range is nonnegative.
                 let start=r.u32(material+20)? as usize;
@@ -261,7 +262,7 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                 }
                 if mesh.indices.len() > material_index_start {
                     mesh.material_ranges.push(MeshMaterialRange {
-                        shader_tag_id, bsp_index, lightmap_index:l,lightmap_page,has_lightmap_uvs,has_incident_radiosity,
+                        shader_tag_id, shader_permutation, bsp_index, lightmap_index:l,lightmap_page,has_lightmap_uvs,has_incident_radiosity,
                         lightmap_bitmap_tag_id,
                         index_start:material_index_start,
                         index_count:mesh.indices.len()-material_index_start,
@@ -436,7 +437,7 @@ fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,
                     let class=r.fourcc(reference)?;
                     let datum=r.u32(reference+12)?;
                     if datum!=u32::MAX && matches!(class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla") {
-                        mesh.material_ranges.push(MeshMaterialRange{shader_tag_id:datum,bsp_index:0,
+                        mesh.material_ranges.push(MeshMaterialRange{shader_permutation:0,shader_tag_id:datum,bsp_index:0,
                             lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,has_incident_radiosity:false,lightmap_bitmap_tag_id:None,
                             index_start:first_index,index_count:mesh.indices.len()-first_index});
                     }
@@ -461,7 +462,7 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
         return (HashMap::new(),vec!["Static object preview requires a supported PC-derived cache; unsupported models are not drawn".into()]);
     }
     let r=Reader(bytes);
-    let region=match tag_space(&r,header){Ok(r)=>r,Err(e)=>return (HashMap::new(),vec![e.to_string()])};
+    let _region=match tag_space(&r,header){Ok(r)=>r,Err(e)=>return (HashMap::new(),vec![e.to_string()])};
     let mut models=HashMap::new();
     let mut notes=Vec::new();
     let mut processed=HashSet::new();
@@ -479,22 +480,13 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
     for object_id in requested {
         if !processed.insert(object_id) {continue;}
         if processed.len()>MAX_MODEL_TYPES {notes.push("Model preview capped at 128 distinct object types".into());break;}
-        let Some(object_tag)=tag_lookup.get(&object_id) else {continue};
-        let Some(object_at)=object_tag.data_offset else {continue};
-        if object_tag.class=="itmc" {
-            match object_model_mesh(bytes,header,tags,object_id,0){Ok((_,mesh))=>{models.insert(object_id,mesh);},Err(error)=>{if notes.len()<32{notes.push(format!("{}: {error}",object_tag.path));}}}
-            continue;
-        }
-        // Common object header model TagDependency at offset 40, datum ID +12.
-        let model_id=match r.u32(object_at+52) {Ok(id)=>id,Err(_)=>continue};
-        let Some(model_tag)=tag_lookup.get(&model_id) else {continue};
-        if model_tag.class!=if header.version==5{"mode"}else{"mod2"} {continue;}
-        let Some(model_at)=model_tag.data_offset else {continue};
-        match gbxmodel_static_mesh(&r,region,model_at,raw_start,raw_vertex_size,raw_model_size,header.version==5) {
-            Ok(mut mesh)=>{mesh.material_ranges.retain(|m|tag_lookup.get(&m.shader_tag_id)
+        // Startup and interactive previews use the same exact object reader:
+        // native change colours, bounds and type must not disappear in World.
+        match object_model_mesh(bytes,header,tags,object_id,0) {
+            Ok((_,mut mesh))=>{mesh.material_ranges.retain(|m|tag_lookup.get(&m.shader_tag_id)
                 .is_some_and(|t|matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla")));
                 models.insert(object_id,mesh);},
-            Err(e)=>{if notes.len()<32 {notes.push(format!("{}: {}",model_tag.path,e));}},
+            Err(e)=>{if notes.len()<32 {notes.push(format!("Object #{object_id}: {e}"));}},
         }
     }
     if models.len()<MAX_MODEL_TYPES {
@@ -548,7 +540,13 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     if at<region.begin||at.checked_add(56).is_none_or(|end|end>region.end){return invalid("Object model dependency escapes tag region");}
     if r.fourcc(at+40)?!=if header.version==5{"mode"}else{"mod2"} {return invalid("Object does not reference a supported native world model");}
     let model_id=r.u32(at+52)?;let mut mesh=cached_model_mesh(bytes,header,tags,model_id)?;
-    mesh.change_colors=object_colors(&r,region,at)?;Ok((model_id,mesh))
+    mesh.change_colors=object_colors(&r,region,at)?;
+    // Optional illumination metadata cannot invalidate otherwise sound geometry.
+    let radius=f32::from_bits(r.u32(at+4)?);let offset=[f32::from_bits(r.u32(at+8)?),f32::from_bits(r.u32(at+12)?),f32::from_bits(r.u32(at+16)?)];
+    if radius.is_finite()&&(0.0..=1000.0).contains(&radius)&&offset.iter().all(|v|v.is_finite()&&v.abs()<=1000.0){
+        mesh.object_lighting=Some(crate::maps::ObjectLighting{tag_class:object.class.clone(),offset,radius,brighten:r.u16(at+2)?&4!=0});
+    }
+    Ok((model_id,mesh))
 }
 fn object_colors(r:&Reader,region:Region,at:usize)->Result<Option<Vec<[f32;3]>>>{
     if at.checked_add(380).is_none_or(|end|end>region.end){return Ok(None);}
@@ -573,7 +571,7 @@ pub fn preview_owned_object_variant(path:&std::path::Path,expected:&str,inspecti
     let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Character variation source changed");}
     let (id,original)=object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)?;
-    let mut mesh=cached_model_variant_mesh(&bytes,&header,&inspection.tags,id,Some(variant))?;mesh.change_colors=original.change_colors;Ok((id,mesh))
+    let mut mesh=cached_model_variant_mesh(&bytes,&header,&inspection.tags,id,Some(variant))?;mesh.change_colors=original.change_colors;mesh.object_lighting=original.object_lighting;Ok((id,mesh))
 }
 pub fn owned_model_variants(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<Vec<String>>{
     let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
@@ -874,7 +872,13 @@ mod geometry_tests {
         for i in 0..3{let at=0x1700+i*24;put32(&mut b,at,i as u32);put32(&mut b,at+4,((i+1)%3)as u32);put32(&mut b,at+8,((i+1)%3)as u32);put32(&mut b,at+20,u32::MAX);}
         let mesh=object_collision_mesh(&b,&header,&tags,1).unwrap().unwrap();assert_eq!(mesh.positions,[2.,3.,4.,3.,3.,4.,2.,4.,4.]);assert_eq!(mesh.indices,[0,1,2]);
         putf(&mut b,0x600+60,std::f32::consts::FRAC_1_SQRT_2);putf(&mut b,0x600+64,std::f32::consts::FRAC_1_SQRT_2);
+        put16(&mut b,0x102,4);putf(&mut b,0x104,2.75);putf(&mut b,0x108,1.);putf(&mut b,0x10c,2.);putf(&mut b,0x110,3.);
         let (_,model)=object_model_mesh(&b,&header,&tags,1,0).unwrap();assert!(model.rig.unwrap().nodes[0].rotation[2]<0.);
+        let lighting=model.object_lighting.unwrap();assert_eq!(lighting.tag_class,"scen");
+        let (startup,notes)=static_object_models(&b,&header,&tags,&[]);assert!(notes.is_empty(),"{notes:?}");let startup_lighting=startup.get(&1).unwrap().object_lighting.as_ref().unwrap();assert_eq!(startup_lighting.offset,lighting.offset);assert_eq!(startup_lighting.radius,lighting.radius);assert_eq!(startup_lighting.tag_class,"scen");
+        assert_eq!(lighting.offset,[1.,2.,3.]);assert_eq!(lighting.radius,2.75);assert!(lighting.brighten);
+        for bad in [f32::NAN,f32::INFINITY,-1.,1001.]{putf(&mut b,0x104,bad);assert!(object_model_mesh(&b,&header,&tags,1,0).unwrap().1.object_lighting.is_none());}
+        putf(&mut b,0x104,2.75);putf(&mut b,0x108,f32::NAN);assert!(object_model_mesh(&b,&header,&tags,1,0).unwrap().1.object_lighting.is_none());
         let rotated=object_collision_mesh(&b,&header,&tags,1).unwrap().unwrap();
         for(actual,expected)in rotated.positions.iter().zip([2.,3.,4.,2.,2.,4.,3.,3.,4.]){assert!((actual-expected).abs()<0.00001);}
         putf(&mut b,0x600+60,0.);putf(&mut b,0x600+64,1.);

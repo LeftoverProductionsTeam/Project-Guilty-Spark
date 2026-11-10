@@ -82,7 +82,10 @@ import { encodeHaloSourceTiff } from '../haloTiff';
 import { matchLocalShaderTextures } from '../shaderTextureMatching';
 import { buildMaterialAudit } from '../materialAudit';
 import { auditHaloBspRender } from '../bspRenderAudit';
-import { inspectLightmapPages, matchLocalLightmapPages, lightmapPageKey } from '../haloLightmap';
+import { inspectLightmapPages, matchLocalLightmapPages, lightmapPageKey,objectLightingPoint,sampleIncidentRadiosity } from '../haloLightmap';
+import type {SourceObjectLighting} from '../haloLightmap';
+import {useNativeObjectLighting} from '../useNativeObjectLighting';
+import type {ObjectLightProbe} from '../useNativeObjectLighting';
 import { exportMeshObj } from '../haloObj';
 import { downloadLocalText } from '../exportHelpers';
 import { validateSceneTransform } from '../sourcePreflight';
@@ -171,7 +174,7 @@ function ObjectVisual({
   size,
   wireframe,
   shaderTextures,
-  shaderMetadata,extraTextures,greenScreen=false,
+  shaderMetadata,extraTextures,greenScreen=false,localLighting,
 }: {
   object: SceneObject;
   asset?: MeshData;
@@ -179,10 +182,11 @@ function ObjectVisual({
   size: number;
   wireframe: boolean;
   greenScreen?: boolean;
+  localLighting?:SourceObjectLighting|null;
   shaderTextures?:Record<number,THREE.Texture>;
   shaderMetadata?:Record<number,ShaderPreview>;extraTextures?:Record<string,THREE.Texture>;
 }) {
-  if (asset) return <Mesh data={asset} sourceObject greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
+  if (asset) return <Mesh data={asset} sourceObject localLighting={localLighting} greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
   return null;
 }
 function ViewportDropPoint({point,onReady}:{point:MutableRefObject<((x:number,y:number)=>Vec3|null)|null>;onReady:(ready:boolean)=>void}){
@@ -332,6 +336,27 @@ function Scene({
   const markerSize = inspection ? 0.22 : 0.15;
   const shaderMetadata=useMemo(()=>Object.fromEntries((inspection?.tags??[]).filter(t=>t.shaderPreview).map(t=>[t.id,t.shaderPreview!])),[inspection]);
   const spartan=sourceSpartan(inspection),spawnModel=spartan?inspection?.modelMeshes?.[spartan.id]:undefined;
+  const lightProbes=useMemo(()=>{
+    if(!inspection||![5,6,7,609].includes(inspection.header.version))return [];
+    const shaders=new Map(buildMaterialAudit(inspection,inspection.renderMesh).shaders.filter(s=>s.status==='resolved'&&s.bitmapTagId!==null).map(s=>[s.shaderTagId,s.bitmapTagId!]));
+    const probes:ObjectLightProbe[]=[];
+    for(const object of project.scene){
+      if(!object.visible)continue;
+      const linked=sourcePlacement(object);if(linked&&linked.sourceSha256!==inspection.sha256)continue;
+      const asset=linked?ownedModels[forgeModelKey(linked)]?.mesh:object.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,object.tagId,object.assetId,assetMeshes);
+      // Units/items use centre sampling. Static scenery has a separate native
+      // bounds-averaging path and retains the existing source-sky preview.
+      if(!['vehi','bipd','weap','eqip'].includes(asset?.objectLighting?.tagClass??''))continue;
+      const point=objectLightingPoint(asset,object);if(!point)continue;
+      const sample=sampleIncidentRadiosity(inspection.renderMesh,point);if(!sample)continue;
+      const shader=inspection.tags.find(t=>t.id===sample.shaderTagId);if(shader?.shaderPreview?.kind!=='environment')continue;
+      const bitmapTagId=shaders.get(sample.shaderTagId);if(bitmapTagId!==undefined)probes.push({id:object.id,sample,bitmapTagId,brighten:!!asset?.objectLighting?.brighten});
+    }
+    return probes;
+  },[inspection,project.scene,ownedModels,spawnModel,assetMeshes]);
+  const localLightState=useNativeObjectLighting(project.id,project.source?.sha256===inspection?.sha256?inspection?.sha256:undefined,project.source?.resourceSha256?.['bitmaps.map']??null,inspection?.header.version,lightProbes);
+  const nativeLights=localLightState.lights;
+  useEffect(()=>{gl.domElement.dataset.gsObjectLighting=JSON.stringify({probed:lightProbes.length,applied:nativeLights?.size??0,sourceSha256:inspection?.sha256??null,method:'native-default-pose-centre',runtimeCornerSampling:false,pending:localLightState.pending,reason:localLightState.reason,milliseconds:localLightState.milliseconds,lights:[...(nativeLights??[])].map(([id,value])=>({id,...value}))});},[gl,lightProbes,nativeLights,inspection?.sha256,localLightState.pending,localLightState.reason,localLightState.milliseconds]);
   const dropBody=(object:SceneObject):DropBody=>{
     const linked=sourcePlacement(object),view=linked?ownedModels[forgeModelKey(linked)]:undefined;
     const preview=object.assetId?assetMeshes[object.assetId]:view?.mesh??(object.tagId!==null?inspection?.modelMeshes?.[object.tagId]:undefined);
@@ -421,7 +446,7 @@ function Scene({
             <SceneObjectVisual
               inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel}
               shaderMetadata={shaderMetadata} extraTextures={extraTextures}
-              object={o}
+              object={o} localLighting={nativeLights?.get(o.id)}
               greenScreen={greenScreen}
               selected={false}
               size={markerSize}
@@ -433,7 +458,7 @@ function Scene({
       {chosen?.visible && (
         <>
           <group userData={{assetSurface:true}} ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale} onClick={event=>{if(event.button!==0||event.delta>5)return;event.stopPropagation();setSelected(chosen.id);}}>
-            <SceneObjectVisual greenScreen={greenScreen} inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel} shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen}
+            <SceneObjectVisual greenScreen={greenScreen} inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel} shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen} localLighting={nativeLights?.get(chosen.id)}
               selected size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?shaderTextures:EMPTY_SHADER_TEXTURES}/>
           </group>
         <TransformControls

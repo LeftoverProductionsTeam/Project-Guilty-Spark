@@ -42,6 +42,7 @@ fn mcc_bsp_uses_separate_raw_vertex_pool_and_preserves_real_lightmap_uvs() {
     u32at(&mut b, lm + 20, 1);
     u32at(&mut b, lm + 24, 0x53000480);
     u32at(&mut b, mat + 12, 9);
+    u16at(&mut b, mat + 16, 7);
     u32at(&mut b, mat + 24, 1);
     u32at(&mut b, mat + 180, 3);
     u32at(&mut b, mat + 200, 3);
@@ -62,6 +63,7 @@ fn mcc_bsp_uses_separate_raw_vertex_pool_and_preserves_real_lightmap_uvs() {
     }
     let header = maps::parse_header(&b, b.len() as u64).unwrap();
     let mesh = render::bsp_render_geometry(&b, &header, scenario).unwrap();
+    assert_eq!(mesh.material_ranges[0].shader_permutation,7);
     assert_eq!(mesh.indices, [0, 1, 2]);
     assert_eq!(mesh.lightmap_uvs, [0., 0.25, 0.5, 0.25, 1., 0.25]);
     assert!(mesh.material_ranges[0].has_lightmap_uvs);

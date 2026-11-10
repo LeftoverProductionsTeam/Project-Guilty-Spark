@@ -33,6 +33,9 @@ export interface VerifiedBatchImage {
   bitmapTagId: number;
   imageIndex: number;
   mipLevel?: number;
+  nativeMipmaps?: number;
+  mipLevels?: number;
+  imageCount?: number;
   image: DdsImage | null;
   sourceKind: 'internal-cache' | 'verified-resource' | null;
   error: string | null;
@@ -162,6 +165,7 @@ function decodeBatch(
         bitmapTagId: wanted.bitmapTagId,
         imageIndex: wanted.imageIndex ?? 0,
         mipLevel:wanted.mipLevel??0,
+        nativeMipmaps:actual.preview.nativeMipmaps,mipLevels:actual.preview.mipLevels,imageCount:actual.preview.imageCount,
         image,
         sourceKind: actual.preview.sourceKind ?? 'internal-cache',
         error: null,

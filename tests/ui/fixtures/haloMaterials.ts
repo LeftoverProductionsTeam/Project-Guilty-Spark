@@ -197,11 +197,15 @@ export async function renderObjectLightingChecks(){
   const metadata:ShaderPreview={kind:'model',twoSided:false,alphaTest:false,uvScale:[1,1],reflection};
   const value={...DEFAULT_ENVIRONMENT,ambientColor:[1,1,1] as [number,number,number],ambientIntensity:.25,sunIntensity:0,fogEnabled:false};
   const target=new THREE.WebGLRenderTarget(32,32),pause=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
-  async function read(sourceObject:boolean,sourceObjectLighting:boolean,baked=false,overrideLighting=false,greenScreen=false){
-    root.render(createElement(Fragment,null,createElement(SceneEnvironment,{value,sourceObjectLighting,overrideLighting}),createElement(HaloMesh,{data,sourceObject,greenScreen,shaderTextures:{7:base},shaderMetadata:{7:baked?{...metadata,kind:'environment'}:metadata},lightmapTextures:baked?{'bsp0:page0':light}:{},extraTextures:{'7:reflectionCube':cube}})));await pause();if(!state)throw Error('Object-lighting renderer did not initialize');
+  async function read(sourceObject:boolean,sourceObjectLighting:boolean,baked=false,overrideLighting=false,greenScreen=false,localLighting?:import('../../../src/haloLightmap').SourceObjectLighting){
+    root.render(createElement(Fragment,null,createElement(SceneEnvironment,{value,sourceObjectLighting,overrideLighting}),createElement(HaloMesh,{data,sourceObject,greenScreen,localLighting,shaderTextures:{7:base},shaderMetadata:{7:baked?{...metadata,kind:'environment'}:metadata},lightmapTextures:baked?{'bsp0:page0':light}:{},extraTextures:{'7:reflectionCube':cube}})));await pause();if(!state)throw Error('Object-lighting renderer did not initialize');
     state.gl.setRenderTarget(target);state.gl.clear();state.gl.render(state.scene,camera);const pixel=new Uint8Array(4);state.gl.readRenderTargetPixels(target,16,16,1,1,pixel);
     const mesh=state.scene.children.find(o=>o instanceof THREE.Mesh) as THREE.Mesh;return{pixel:[...pixel],geometry:mesh.geometry.uuid,draws:state.gl.info.render.calls,triangles:state.gl.info.render.triangles};
   }
   const object=await read(true,true),unavailable=await read(true,false),baked=await read(false,true,true),bakedObject=await read(true,true,true),override=await read(false,false,true,true),green=await read(true,true,false,false,true);
-  root.unmount();await new Promise(r=>setTimeout(r,600));for(const t of[base,light,cube])t.dispose();target.dispose();return{object,unavailable,baked,bakedObject,override,green,errors};
+  const localLighting:import('../../../src/haloLightmap').SourceObjectLighting={point:[0,0,0],ambient:[.11,.19,.27],primary:[.2,.4,.6],primaryDirection:[0,0,1],bounce:[.0363,.0726,.1089],bounceDirection:[0,0,-1],reflection:[.52,1,1],reflectionBrightness:.7945};
+  const localBaseline=await read(true,true);
+  const localZero=await read(true,true,false,false,false,{...localLighting,primaryDirection:[0,0,0]});
+  const local=await read(true,true,false,false,false,localLighting),localNoSky=await read(true,false,false,false,false,localLighting),localOverride=await read(true,true,false,true,false,localLighting),localBaked=await read(true,true,true,false,false,localLighting),localNonObject=await read(false,true,false,false,false,localLighting),localGreen=await read(true,true,false,false,true,localLighting),beforeRemove=await read(true,true,false,false,false,localLighting),removed=await read(true,true);
+  root.unmount();await new Promise(r=>setTimeout(r,600));for(const t of[base,light,cube])t.dispose();target.dispose();return{object,unavailable,baked,bakedObject,override,green,localBaseline,localZero,local,localNoSky,localOverride,localBaked,localNonObject,localGreen,beforeRemove,removed,errors};
 }

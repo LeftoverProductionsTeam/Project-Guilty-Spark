@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {inspectLightmapPages,lightmapPageKey,materialLightmapKey,sampleIncidentRadiosity} from '../src/haloLightmap.ts';
+import {inspectLightmapPages,lightmapPageKey,materialLightmapKey,sampleIncidentRadiosity,objectLightingPoint,nativeDiffuseImageIndex,nativeDiffuseLightMip,sampleNativeLightPixel,sourceObjectLighting} from '../src/haloLightmap.ts';
 const source={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],lightmapUvs:[0,0,.5,0,0,.5],
  materialRanges:[{shaderTagId:42,bspIndex:0,lightmapIndex:1,lightmapPage:3,hasLightmapUvs:true,indexStart:0,indexCount:3}]};
 assert.deepEqual(inspectLightmapPages(source),[{key:'bsp0:page3',bspIndex:0,page:3,materials:1,triangles:1,bspIndices:[0],withRealUvs:true}]);
@@ -34,3 +34,27 @@ assert.equal(sampleIncidentRadiosity(occluded,[.25,.25,1]),null,'Unavailable upp
 const overlap={...occluded,positions:[...radiosity.positions,...radiosity.positions],materialRanges:[radiosity.materialRanges[0],{...radiosity.materialRanges[0],bspIndex:1,indexStart:3}]};
 assert.equal(sampleIncidentRadiosity(overlap,[.25,.25,1]),null,'Coincident BSPs require explicit source region');assert.equal(sampleIncidentRadiosity(overlap,[.25,.25,1],10,1)?.bspIndex,1);
 console.log('PASS: native incident magnitude/direction, nearest-floor occlusion, exact BSP/page identity and malformed-input refusal');
+
+const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} differs from ${b}`);
+const nativeObject={objectLighting:{offset:[1,0,0],radius:2,brighten:false},rig:{nodes:[{parent:-1,position:[2,3,4],rotation:[0,0,Math.SQRT1_2,Math.SQRT1_2]}]}};
+const transform={position:[10,20,30],rotation:[Math.PI/2,0,0],scale:[2,3,4]};
+objectLightingPoint(nativeObject,transform).forEach((n,i)=>close(n,[-2,24,46][i]));
+assert.equal(objectLightingPoint({...nativeObject,objectLighting:null},transform),null);
+assert.equal(objectLightingPoint(nativeObject,{...transform,scale:[0,1,1]}),null);
+assert.equal(objectLightingPoint({...nativeObject,rig:{nodes:[{...nativeObject.rig.nodes[0],parent:0}]}},transform),null);
+for(const [permutation,count,expected]of[[7,3,1],[65535,1,0],[-1,1,0],[65535,2,null],[65534,2,0],[65534,3,null],[-32768,2048,0],[32768,2048,0],[65536,1,null],[-32769,1,null],[0,0,null],[0,2049,null],[0,undefined,null],[NaN,1,null],[1.5,2,null]])assert.equal(nativeDiffuseImageIndex(permutation,count),expected);
+for(const [count,levels,expected]of[[9,8,6],[9,10,6],[7,8,5],[5,6,4],[3,4,2],[0,1,0],[1,1,null],[undefined,8,null],[9,11,null]])assert.equal(nativeDiffuseLightMip(count,levels),expected);
+const pixels=new Uint8Array([0,64,128,255,255,128,64,0]);
+assert.deepEqual(sampleNativeLightPixel({width:2,height:1,pixels},[.5,0]),[0,64/255,128/255],'half-texel ties use nearest-even, not floor or Math.round');
+assert.deepEqual(sampleNativeLightPixel({width:2,height:1,pixels},[-.25,0]),[1,128/255,64/255]);
+assert.equal(sampleNativeLightPixel({width:2,height:1,pixels:pixels.slice(1)},[0,0]),null);
+assert.equal(sampleNativeLightPixel({width:2,height:1,pixels},[NaN,0]),null);
+const local=sourceObjectLighting(probe,[.1,.2,.3],[.2,.4,.6]);assert.ok(local);
+local.ambient.forEach((n,i)=>close(n,[.11,.19,.27][i]));
+local.bounce.forEach((n,i)=>close(n,[.0363,.0726,.1089][i]));
+local.reflection.forEach((n,i)=>close(n,[.52,1,1][i]));close(local.reflectionBrightness,.7945);
+local.bounceDirection.forEach((n,i)=>close(n,[0,0,-1][i]));assert.deepEqual(local.primaryDirection,probe.direction);
+assert.equal(sourceObjectLighting(probe,[NaN,0,0],[1,1,1]),null);
+const zeroDirection=sourceObjectLighting({...probe,direction:[0,0,0]},[.1,.2,.3],[.2,.4,.6]);assert.ok(zeroDirection);assert.deepEqual(zeroDirection.ambient,local.ambient);
+const black=sourceObjectLighting(probe,[0,0,0],[0,0,0],true);assert.ok(black);assert.ok([...black.primary,...black.bounce,...black.ambient].every(Number.isFinite));
+console.log('PASS: root/placement lighting centre, signed image permutation, exact native mip selection, nearest-even pixel sampling, local illumination and reflection response');

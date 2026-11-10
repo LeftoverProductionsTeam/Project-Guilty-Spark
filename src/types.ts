@@ -138,6 +138,7 @@ export interface SceneObject {
   sourceModel?: { projectId: string; sourceSha256: string; tagId: number; path: string; class: import('./forge').ForgePlacement['tagClass'] } | null;
 }
 export interface MeshData {
+  objectLighting?:{tagClass:string;offset:Vec3;radius:number;brighten:boolean}|null;
   changeColors?:[number,number,number][]|null;
   rig?:ModelRig|null;
   positions: number[];
@@ -152,7 +153,7 @@ export interface MeshData {
   source: string;
   parts?: { name: string; indexStart: number; indexCount: number }[];
   /** Actual shader-tag provenance for untextured BSP spans. */
-  materialRanges?: { shaderTagId: number; bspIndex: number; lightmapIndex: number; lightmapPage?: number; hasLightmapUvs?: boolean; hasIncidentRadiosity?: boolean; lightmapBitmapTagId?: number | null; indexStart: number; indexCount: number }[];
+  materialRanges?: { shaderTagId: number; shaderPermutation?:number; bspIndex: number; lightmapIndex: number; lightmapPage?: number; hasLightmapUvs?: boolean; hasIncidentRadiosity?: boolean; lightmapBitmapTagId?: number | null; indexStart: number; indexCount: number }[];
 }
 export interface MapInspection {
   header: MapHeader;

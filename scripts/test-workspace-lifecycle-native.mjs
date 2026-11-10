@@ -249,7 +249,7 @@ async function nativeVehiclePreview(opened,originalHash){
   // non-unit incident vectors. This does not use the Rust reader under test.
   const scenarioSource=opened.inspection.tags.find(tag=>tag.class==='scnr'&&tag.path===opened.inspection.scenarioPath)?.dataOffset;
   if(!Number.isSafeInteger(scenarioSource))throw Error('Native source scenario is unavailable');
-  const [bspRows,bspCount]=block(scenarioSource+0x5a4,32,16),expectedIncident=[],expectedIncidentRanges=[];
+  const [bspRows,bspCount]=block(scenarioSource+0x5a4,32,16),expectedIncident=[],expectedIncidentRanges=[],expectedShaderPermutations=[];
   const fraction=(value,bits)=>{const sign=1<<(bits-1);return Math.fround(Math.fround((value&(sign-1))/(sign-1))-(value&sign?1:0));};
   for(let bi=0;bi<bspCount;bi++){
     const row=bspRows+bi*32,begin=u32(row),size=u32(row+4),address=u32(row+8);
@@ -267,14 +267,14 @@ async function nativeVehiclePreview(opened,originalHash){
           else if(n*76<=u32(m+216))start=bspPointer(u32(m+228),n*76)+n*56;
         }
         const incident=[];if(start!==null)for(let i=0;i<n;i++){const at=start+i*secondaryStride,raw=compressed?u32(at):null;incident.push(...(compressed?[fraction(raw,11),fraction(raw>>>11,11),fraction(raw>>>22,10)]:[f32(at),f32(at+4),f32(at+8)]));}
-        for(const value of(start===null?Array(n*3).fill(0):incident))expectedIncident.push(value);expectedIncidentRanges.push(start!==null);
+        for(const value of(start===null?Array(n*3).fill(0):incident))expectedIncident.push(value);expectedIncidentRanges.push(start!==null);expectedShaderPermutations.push(bytes.readUInt16LE(m+16));
       }
     }
   }
   const sourceMesh=opened.inspection.renderMesh,actualIncident=sourceMesh?.incidentRadiosity;
   expect(actualIncident,'Native BSP must retain source incident radiosity').toBeDefined();expect(actualIncident.length).toBe(expectedIncident.length);expect(actualIncident.length).toBe(sourceMesh.positions.length);
   let incidentMismatches=0,nonzeroIncident=0;for(let k=0;k<expectedIncident.length;k++){if(Math.abs(actualIncident[k]-expectedIncident[k])>0.000001)incidentMismatches++;if(actualIncident[k]!==0)nonzeroIncident++;}
-  expect(incidentMismatches).toBe(0);expect(nonzeroIncident).toBeGreaterThan(0);expect(sourceMesh.materialRanges.map(range=>!!range.hasIncidentRadiosity)).toEqual(expectedIncidentRanges);
+  expect(incidentMismatches).toBe(0);expect(nonzeroIncident).toBeGreaterThan(0);expect(sourceMesh.materialRanges.map(range=>!!range.hasIncidentRadiosity)).toEqual(expectedIncidentRanges);expect(sourceMesh.materialRanges.map(range=>range.shaderPermutation)).toEqual(expectedShaderPermutations);
   const incidentReadback={coordinates:expectedIncident.length,validatedRanges:expectedIncidentRanges.filter(Boolean).length,nonzeroCoordinates:nonzeroIncident,mismatches:incidentMismatches,originalMagnitudeRetained:true,lightingParityAccepted:false};
   // Verify real authored levels from the original bytes, independently of the
   // Rust span calculation. One vehicle bitmap keeps the transaction bounded.
@@ -340,7 +340,7 @@ async function nativeVehiclePreview(opened,originalHash){
     expect(expected.length).toBeGreaterThan(1);
     const requests=expected.map(row=>({bitmapTagId:bitmap.id,imageIndex:0,mipLevel:row.level}));
     const response=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests});expect(response.sourceSha256).toBe(originalHash);expect(response.items).toHaveLength(expected.length);
-    for(let k=0;k<expected.length;k++){const wanted=expected[k],item=response.items[k],preview=item.preview;expect(item.error).toBeNull();expect(item.mipLevel).toBe(k);expect(preview).toBeTruthy();expect(preview.mipLevel).toBe(k);expect(preview.mipLevels).toBe(expected.length);expect(preview.width).toBe(wanted.width);expect(preview.height).toBe(wanted.height);expect(preview.format).toBe(format);expect(preview.sourceSha256).toBe(originalHash);expect(Buffer.from(preview.ddsBase64,'base64').subarray(128).equals(wanted.pixels),'Original authored mip bytes '+k).toBe(true);}
+    for(let k=0;k<expected.length;k++){const wanted=expected[k],item=response.items[k],preview=item.preview;expect(item.error).toBeNull();expect(item.mipLevel).toBe(k);expect(preview).toBeTruthy();expect(preview.mipLevel).toBe(k);expect(preview.mipLevels).toBe(expected.length);if(expectedCacheVersion!==13)expect(preview.nativeMipmaps).toBe(levels-1);expect(preview.width).toBe(wanted.width);expect(preview.height).toBe(wanted.height);expect(preview.format).toBe(format);expect(preview.sourceSha256).toBe(originalHash);expect(Buffer.from(preview.ddsBase64,'base64').subarray(128).equals(wanted.pixels),'Original authored mip bytes '+k).toBe(true);}
     const invalid=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[{bitmapTagId:bitmap.id,imageIndex:0,mipLevel:16}]});expect(invalid.items[0].preview).toBeNull();expect(invalid.items[0].error).toBeTruthy();
     const badDuplicate=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[requests[0],requests[0]]}).then(()=>'',String);expect(badDuplicate).toContain('unique');
     await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(bitmap.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bitm');await main.locator('.tag-row').filter({has:main.locator('strong').filter({hasText:/^warthog$/i})}).click();
@@ -398,6 +398,11 @@ async function nativeVehiclePreview(opened,originalHash){
       }
     }
     const actual=await invoke(main,'preview_owned_object_model',{projectId:opened.project.id,tagId:vehicle.id,sourceSha256:originalHash});
+    const objectAt=vehicle.dataOffset;
+    if(!Number.isSafeInteger(objectAt)||objectAt<tagStart||objectAt+20>tagEnd)throw Error('Vehicle lighting header escapes source');
+    const objectLighting={tagClass:vehicle.class,radius:f32(objectAt+4),offset:[f32(objectAt+8),f32(objectAt+12),f32(objectAt+16)],brighten:!!(bytes.readUInt16LE(objectAt+2)&4)};
+    expect(actual.mesh.objectLighting.tagClass).toBe(vehicle.class);expect(opened.inspection.modelMeshes[vehicle.id]?.objectLighting).toEqual(actual.mesh.objectLighting);expect(opened.inspection.modelMeshes[vehicle.id]?.changeColors).toEqual(actual.mesh.changeColors);
+    expect(actual.mesh.objectLighting.brighten).toBe(objectLighting.brighten);expect(Math.fround(actual.mesh.objectLighting.radius)).toBe(objectLighting.radius);expect(actual.mesh.objectLighting.offset.map(Math.fround)).toEqual(objectLighting.offset);
     expect(actual.sourceSha256).toBe(originalHash);expect(actual.mesh.uvs.length).toBe(expected.length);expect(expected.length).toBeGreaterThan(0);
     const mismatches=actual.mesh.uvs.reduce((sum,value,index)=>sum+(Math.abs(value-expected[index])>1e-6*Math.max(1,Math.abs(expected[index]))?1:0),0);
     const [sourceShaders,shaderCount]=block(at+220,32,256),sourceShaderReferences=[];
@@ -455,7 +460,7 @@ async function nativeVehiclePreview(opened,originalHash){
       expect(actual.mesh.materialRanges).toHaveLength(0);expect(materialOrder).toHaveLength(0);
       materialAcceptance='unsupported-original-non-shader-references';
     }else expect(materialOrder.length).toBeGreaterThan(0);
-    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,unassignedTriangles:sourceUnassignedTriangles,unsupportedSourceParts,sourceShaderReferences,materialAcceptance,materialOrder,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
+    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,unassignedTriangles:sourceUnassignedTriangles,unsupportedSourceParts,sourceShaderReferences,materialAcceptance,materialOrder,objectLighting,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
   }
   expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
   expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);
@@ -511,9 +516,31 @@ async function nativeVehiclePreview(opened,originalHash){
     await expect.poll(()=>worldCanvas.evaluate(node=>{const r=node.getBoundingClientRect(),v=node.closest('.viewport').getBoundingClientRect();return Math.abs(r.width-v.width)<2&&Math.abs(r.height-v.height)<2&&Math.abs(node.width/node.height-r.width/r.height)<.01;})).toBe(true);
     const target=[placed.position[0],placed.position[1],placed.position[2]+.3];
     await expect.poll(()=>worldCanvas.evaluate((node,target)=>{const camera=JSON.parse(node.dataset.gsCamera??'null');return camera?.target?.every((n,k)=>Math.abs(n-target[k])<.001)??false;},target)).toBe(true);
+    await expect.poll(()=>worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsObjectLighting??'null')?.pending),{timeout:90000}).toBe(false);
+    const appliedLighting=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsObjectLighting??'null'));
+    report.vehiclePreview.appliedLighting={...appliedLighting,scope:'Actual World source-pinned lighting; native unit/item centre, scenery averaging separate'};
+    expect(appliedLighting.sourceSha256).toBe(originalHash);
+    const vehicleLighting=appliedLighting.lights.find(light=>light.id===placed.id)??null;
+    if(expectedCacheVersion===5||expectedCacheVersion===609){expect(appliedLighting.reason).toBeNull();expect(vehicleLighting,'Actual World Warthog must receive verified native lightmap/diffuse illumination').toBeTruthy();}
+    if(expectedCacheVersion===13){expect(appliedLighting.applied).toBe(0);expect(appliedLighting.reason).toContain('no verified');}
+    if(vehicleLighting)for(const field of['ambient','primary','bounce','reflection','point'])expect(vehicleLighting[field].every(Number.isFinite)).toBe(true);
+    report.vehiclePreview.appliedLighting={...appliedLighting,lights:undefined,vehicle:vehicleLighting,scope:'Actual native World component with source-pinned diffuse mip/lightmap samples; default-pose centre only, not game parity'};
     const framedViewport=await worldCanvas.evaluate(node=>{const r=node.getBoundingClientRect();return{width:r.width,height:r.height,bufferWidth:node.width,bufferHeight:node.height,camera:JSON.parse(node.dataset.gsCamera)};});
     await main.screenshot({path:path.join(root,'native-vehicle-world-warthog.png')});
     report.vehiclePreview.placedVehicle={id:placed.id,position:placed.position,rotation:placed.rotation,sourceSkyLightingChecked:true,framedThroughUi:true,framedViewport,gameParityAccepted:false};
+    // Inspect the actual vehicle through normal user camera controls. Keep the
+    // preceding F-frame intact for comparison; no evidence image is cropped.
+    await main.keyboard.press('Escape');
+    const rect=await worldCanvas.boundingBox();if(!rect)throw Error('World canvas has no native bounds');
+    await main.mouse.move(rect.x+rect.width*.7,rect.y+rect.height*.5);
+    const distance=camera=>Math.hypot(...camera.position.map((n,k)=>n-camera.target[k]));
+    const beforeDistance=distance(framedViewport.camera);
+    for(let k=0;k<24;k++){await main.mouse.wheel(0,-400);await main.waitForTimeout(35);}
+    await expect.poll(async()=>distance(await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera)))).toBeLessThan(beforeDistance*.35);
+    const closeupCamera=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera));
+    for(let axis=0;axis<3;axis++)expect(Math.abs(closeupCamera.target[axis]-framedViewport.camera.target[axis])).toBeLessThan(.001);
+    await main.screenshot({path:path.join(root,'native-vehicle-world-closeup.png')});
+    report.vehiclePreview.placedVehicle.wheelZoom={beforeDistance,afterDistance:distance(closeupCamera),camera:closeupCamera,actualMouseWheel:true};
   }
   step('Actual native vehicle previews preserve authored model UV scales, source materials and original bytes',report.vehiclePreview);
 }
@@ -1215,6 +1242,7 @@ try{
       const appearance=await invoke(main,'inspect_source_appearance',{projectId:opened.project.id});expect(appearance.sourceSha256).toBe(originalHash);
       const canvas=main.locator('.world-layout canvas');
       await expect.poll(()=>canvas.evaluate(node=>JSON.parse(node.dataset.gsEnvironment??'null')?.sourceObjectLighting)).toBe(!!appearance.environment);
+      await expect.poll(()=>canvas.evaluate(node=>JSON.parse(node.dataset.gsObjectLighting??'null')?.pending),{timeout:90000}).toBe(false);
       nativeObjectLighting=await canvas.evaluate(node=>JSON.parse(node.dataset.gsEnvironment));
       if(appearance.environment&&!opened.project.worldEnvironment)for(const key of['ambientColor','ambientIntensity','sunColor','sunIntensity'])expect(nativeObjectLighting[key]).toEqual(appearance.environment[key]);
     }
