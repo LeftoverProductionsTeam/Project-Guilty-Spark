@@ -24,6 +24,7 @@ export interface OwnedBitmapBatchResponse {
   sourceSha256: string;
   resourceSha256?: string | null;
   items: OwnedBitmapBatchItem[];
+  mipItems?: OwnedBitmapBatchItem[];
 }
 export interface VerifiedBatchImage {
   recoveredResourceProjectId?: string;
@@ -39,6 +40,7 @@ export interface VerifiedBatchImage {
   image: DdsImage | null;
   originalMipmaps?: DdsImage[];
   mipError?: string;
+  mipErrorCode?: string;
   sourceKind: 'internal-cache' | 'verified-resource' | null;
   error: string | null;
   errorCode?: string | null;
@@ -96,14 +98,36 @@ export function decodeOwnedBitmapBatch(
     profileEnd('spark.decode.bitmap-batch', start);
   }
 }
-function decodeBatch(
+function decodeBatch(response:OwnedBitmapBatchResponse,requests:readonly OwnedBitmapTarget[]):Map<string,VerifiedBatchImage>{
+  if(!Array.isArray(requests)||!requests.length||requests.length>MAX_NATIVE_BITMAP_BATCH||!Array.isArray(response?.items)||response.items.length!==requests.length)throw Error('Batch result count differs from bounded request');
+  const chains=requests.some(r=>r.includeMips);
+  if(!chains){if(response.mipItems!==undefined&&(!Array.isArray(response.mipItems)||response.mipItems.length))throw Error('Unsolicited original mip images');return decodeItems(response,requests);}
+  if(requests.some(r=>r.includeMips!==true||(r.mipLevel??0)!==0))throw Error('Whole original chains require uniform base requests');
+  const lower:OwnedBitmapTarget[]=[];
+  for(let i=0;i<requests.length;i++){const preview=response.items[i]?.preview;if(!preview)continue;const count=preview.mipLevels??1;if(!Number.isInteger(count)||count<1||count>17)throw Error('Invalid original chain count');for(let mipLevel=1;mipLevel<count;mipLevel++)lower.push({...requests[i],mipLevel,includeMips:undefined});}
+  if((response.mipItems!==undefined&&!Array.isArray(response.mipItems))||lower.length!==(response.mipItems??[]).length)throw Error('Original mip response count differs from requested chains');
+  const all=decodeItems({...response,items:[...response.items,...(response.mipItems??[])]},[...requests,...lower],MAX_NATIVE_BITMAP_BATCH*17);
+  const result=new Map<string,VerifiedBatchImage>();
+  for(const wanted of requests){const key=bitmapImageKey(wanted.bitmapTagId,wanted.imageIndex??0),base=all.get(key)!;result.set(key,base);if(!base.image)continue;
+    const count=base.mipLevels??1;if(count>1+Math.floor(Math.log2(Math.max(base.image.width,base.image.height))))throw Error('Invalid original chain dimensions/count');base.originalMipmaps=[base.image];
+    for(let level=1;level<count;level++){const item=all.get(bitmapImageKey(wanted.bitmapTagId,wanted.imageIndex??0,level))!;
+      if(!item.image){base.mipError='Original texture detail unavailable: '+(item.error??'native source refused');const code=item.errorCode??'verification-failed';base.mipErrorCode=base.mipErrorCode&&base.mipErrorCode!==code?'verification-failed':code;continue;}
+      if(item.mipLevels!==base.mipLevels||item.nativeMipmaps!==base.nativeMipmaps||item.imageCount!==base.imageCount||item.image.format!==base.image.format||item.image.width!==Math.max(1,Math.floor(base.image.width/2**level))||item.image.height!==Math.max(1,Math.floor(base.image.height/2**level)))throw Error('Original chain dimensions, encoding or source metadata changed');
+      base.originalMipmaps[level]=item.image;
+    }
+    if(base.mipError)base.originalMipmaps=[base.image];
+  }
+  return result;
+}
+function decodeItems(
   response: OwnedBitmapBatchResponse,
   requests: readonly OwnedBitmapTarget[],
+  maximum=MAX_NATIVE_BITMAP_BATCH,
 ): Map<string, VerifiedBatchImage> {
   if (
     !Array.isArray(requests) ||
     !requests.length ||
-    requests.length > MAX_NATIVE_BITMAP_BATCH ||
+    requests.length > maximum ||
     !Array.isArray(response?.items) ||
     response.items.length !== requests.length
   )
@@ -150,7 +174,7 @@ function decodeBatch(
     rgbaBytes += Number(preview.width) * Number(preview.height) * 4;
     if (
       !Number.isSafeInteger(packedBytes) ||
-      packedBytes > MAX_NATIVE_BATCH_RAW_BYTES + 128 * MAX_NATIVE_BITMAP_BATCH ||
+      packedBytes > MAX_NATIVE_BATCH_RAW_BYTES + 128 * maximum ||
       !Number.isSafeInteger(rgbaBytes) ||
       rgbaBytes > MAX_NATIVE_BATCH_RGBA_BYTES
     )

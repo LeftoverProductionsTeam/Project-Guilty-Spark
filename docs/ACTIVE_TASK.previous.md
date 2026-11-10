@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 50ec0d8f424f2148536489a91fd9d8c45ba0b074 accepted original2D GPU mip increment; R501486frontend/TypeScript/contracts/offline/40storage/freshWindows158.695s, R501–R505five-source native, R5064WebGL cases pass. R507retains exactR501QA and retires only2superseded nonrunning manifest-verified QA executables101,029,888logicalB.475CSVunchanged; no game/human/release acceptance.
-Next action: Profile texture IPC/cache reuse through the existing native harness on the exactR501QA, especially CE fixture51.229s vs pre-mip34.054s. Record actual duplicate requests/timings before optimizing existing nativePreviewResources; do not drop original levels or create another cache/renderer. H29shadows/pose/game and M1–M6 remain open.
+Latest verified revision: 6cf00f4 parent; R509916Rust/9ignored,490frontend/offline/storage, R510freshWindows+CE and4GPU pass. Wholechain bytes identical, first material-ready map23.0→12.4s/66→16bitmapIPC; same167465tris/294textures, but initial sampledRAM higher: memory follow-through pending. R511cache partial-refusal regression reproduced and repaired; final-source native verification pending.
+Next action: R519red→green: aggregate packed-budget refusals retry smaller verified level batches; permanent failures do not repeat. R512old/R513new matched profiles19.233→9.789s with unchanged coverage and lower settled sample, not peak claim. R514run didnotlaunch: reuse of already-owned qa/logic correctly refusedEEXIST. R520–R524 now verify frozen final source with separate owned workspaces, fullfrontend/browser, freshWindows and five native sources; retain original baselines until pass.
 
 ## Acceptance
 

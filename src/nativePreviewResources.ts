@@ -27,7 +27,7 @@ export async function nativePreviewResource<T>(command:Command,args:Record<strin
     if(command==='preview_owned_object_model'&&value.objectTagId!==args.tagId)throw Error('Native model tag identity changed.');
     if(command==='preview_owned_reflection_cube'&&value.bitmapTagId!==args.bitmapTagId)throw Error('Native reflection tag identity changed.');
     // Refusals/missing resources are retryable, never retained as valid images.
-    const incomplete=Array.isArray(value.items)&&value.items.some((item:any)=>!item.preview||item.error);
+    const incomplete=[value.items,value.mipItems].some(items=>Array.isArray(items)&&items.some((item:any)=>!item.preview||item.error));
     const size=JSON.stringify(value).length*2;
     if(incomplete||size>16*1024*1024){remove(key,entry);return value;}
     if(entries.get(key)===entry){

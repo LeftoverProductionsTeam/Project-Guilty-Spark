@@ -789,9 +789,9 @@ export default function World({
       currentInspectionRef.current===source && currentProjectRef.current===projectAtStart &&
       currentTextureScopeRef.current===resourceScopeAtStart;
     try {
-      const targets=uniqueBitmapTargets(tasks,source,recordedResource);
+      const targets=uniqueBitmapTargets(tasks,source,recordedResource).map(t=>({...t,includeMips:true}));
       const response=await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch', {
-        projectId:projectAtStart,
+        projectId:projectAtStart,includeMips:true,
         requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:t.imageIndex??0})),
       });
       if(!isCurrent())return;

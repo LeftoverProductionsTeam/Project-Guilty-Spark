@@ -30,6 +30,7 @@ export interface OwnedBitmapTarget {
   /** Optional top-mip *image* index in a multi-page bitm (not a mip level). */
   imageIndex?: number;
   mipLevel?: number;
+  includeMips?: boolean;
   resourceSha256?: string | null;
 }
 const MAX_PREVIEW_BASE64 = 23 * 1024 * 1024; // 16 MiB top mip plus DDS header, base64 expansion

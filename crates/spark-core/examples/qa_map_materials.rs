@@ -2,9 +2,22 @@
 use spark_core::{maps,bitmap_preview as bitmap};
 use std::path::PathBuf;
 fn main()->Result<(),Box<dyn std::error::Error>>{
- let args:Vec<_>=std::env::args_os().skip(1).collect();if args.len()!=2{return Err("usage: qa_map_materials <owned-map> <matching-bitmaps.map>".into());}
+ let args:Vec<_>=std::env::args_os().skip(1).collect();if args.len()!=2&&!(args.len()==3&&args[2]=="--mip-timing"){return Err("usage: qa_map_materials <owned-map> <matching-bitmaps.map>".into());}
  let path=PathBuf::from(&args[0]);let resource=PathBuf::from(&args[1]);
  let inspection=maps::inspect_map(&path,resource.parent())?;let original=inspection.sha256.clone();let resource_hash=maps::hash_file(&resource)?;
+ if args.len()==3{
+  let tag=inspection.tags.iter().find(|t|t.class=="bitm"&&t.path.replace('\\',"/").ends_with("vehicles/warthog/bitmaps/warthog")).ok_or("Owned Warthog bitmap missing")?;
+  let base=bitmap::OwnedBitmapRequest{bitmap_tag_id:tag.id,image_index:0,mip_level:0};let mut rows=vec![];
+  for round in 0..3{
+   let started=std::time::Instant::now();let head=bitmap::preview_owned_bitmap_batch_with_resources(&path,&original,&inspection,&[base],Some((&resource,&resource_hash)))?;let count=head.items[0].preview.as_ref().ok_or("Owned Warthog bitmap refused")?.mip_levels;
+   let mut separate=head.items;for mip_level in 1..count{separate.extend(bitmap::preview_owned_bitmap_batch_with_resources(&path,&original,&inspection,&[bitmap::OwnedBitmapRequest{mip_level,..base}],Some((&resource,&resource_hash)))?.items);}let separate_ms=started.elapsed().as_secs_f64()*1000.;
+   let started=std::time::Instant::now();let chain=bitmap::preview_owned_bitmap_chains_with_resources(&path,&original,&inspection,&[base],Some((&resource,&resource_hash)))?;let chain_ms=started.elapsed().as_secs_f64()*1000.;
+   let joined:Vec<_>=chain.items.into_iter().chain(chain.mip_items).collect();if serde_json::to_value(&separate)?!=serde_json::to_value(&joined)?{return Err("Original mip bytes/identity changed between read paths".into());}
+   rows.push(serde_json::json!({"round":round+1,"levels":count,"separateMs":separate_ms,"chainMs":chain_ms,"identicalSourcePayloads":true}));
+  }
+  if maps::hash_file(&path)?!=original||maps::hash_file(&resource)?!=resource_hash{return Err("Owned source changed during timing".into());}
+  println!("{}",serde_json::to_string_pretty(&serde_json::json!({"sourceSha256":original,"resourceSha256":resource_hash,"resourceBytes":std::fs::metadata(&resource)?.len(),"conditions":"Read-only same source; OS cache not cleared; individual path first each round; not a UI benchmark","rows":rows,"originalsUnchanged":true}))?);return Ok(());
+ }
  let compatibility=bitmap::verify_resource_for_source(&path,&original,&inspection,&resource,&resource_hash);
  let mut requests=Vec::new();let mut shaders=Vec::new();
  let mesh=serde_json::to_value(&inspection.render_mesh)?;let bsp_ids:std::collections::HashSet<u32>=mesh["materialRanges"].as_array().into_iter().flatten().filter_map(|r|r["shaderTagId"].as_u64().map(|id|id as u32)).collect();

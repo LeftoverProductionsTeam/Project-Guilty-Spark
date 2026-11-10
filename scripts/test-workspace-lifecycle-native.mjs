@@ -29,6 +29,8 @@ const expectedCacheVersion=Number(process.env.SPARK_LIFECYCLE_CACHE_VERSION??'13
 if(![5,6,7,13,609].includes(expectedCacheVersion)||expectedCacheVersion!==13&&!readOnly||previewOnly&&!nativeOnly)throw Error('Other native cache families require explicit read-only preview acceptance');
 const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
+const profileSettle=Number(process.env.SPARK_LIFECYCLE_PROFILE_SETTLE??'0');
+if(![0,30].includes(profileSettle)||profileSettle&&!profilePreview)throw Error('Optional non-forced-GC preview settling sample requires profiling and exactly30 seconds');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const logicOnly=process.env.SPARK_LIFECYCLE_LOGIC==='1';
 const rebuildOnly=process.env.SPARK_LIFECYCLE_LIVE_REBUILD==='1';
@@ -1328,6 +1330,17 @@ try{
       report.previewProfile.sameCanvas=await canvas.evaluate(element=>element===window.c71WorldCanvas);expect(report.previewProfile.sameCanvas).toBe(true);
       report.previewProfile.resumeCalls=(await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})))).slice(requestsBefore);
       expect(report.previewProfile.resumeCalls.filter(row=>row.command.startsWith('preview_owned_'))).toEqual([]);
+      if(profileSettle){
+        report.previewProfile.settling={conditions:'Same retained viewport; no forced garbage collection; cumulative seconds after initial ready process sample',samples:[]};
+        let previous=0;for(const seconds of [10,30]){
+          await new Promise(resolve=>setTimeout(resolve,(seconds-previous)*1000));previous=seconds;
+          expect(await canvas.evaluate(element=>element===window.c71WorldCanvas)).toBe(true);
+          await expect(main.locator('.world-layout')).toHaveAttribute('data-material-loading','false');
+          const process=JSON.parse((await promisify(execFile)('pwsh.exe',['-NoProfile','-File',path.resolve('scripts/profile-process-tree.ps1'),'-RootProcessId',String(child.pid)],{windowsHide:true,timeout:30000,maxBuffer:1024*1024})).stdout);
+          const heap=await main.evaluate(()=>{const memory=performance.memory;return memory?{used:memory.usedJSHeapSize,total:memory.totalJSHeapSize,limit:memory.jsHeapSizeLimit}:null;});
+          report.previewProfile.settling.samples.push({seconds,process,heap});
+        }
+      }
       expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
     }
     expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);

@@ -74,13 +74,13 @@ export function useWorkshopTextures(
         );
         const resource =
           bitmapResourceSha256(source.project.source);
-        const requests = uniqueBitmapTargets(tasks, inspection.sha256, resource),
+        const requests = uniqueBitmapTargets(tasks, inspection.sha256, resource).map(t=>({...t,includeMips:true})),
           pool = new Map<number, THREE.Texture>();
         let bytes = 0;const mipWarnings:string[]=[];
         for (let offset = 0; offset < requests.length; offset += 24) {
           const wanted = requests.slice(offset, offset + 24);
           const response = await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch', {
-            projectId: source.project.id,
+            projectId: source.project.id,includeMips:true,
             requests: wanted.map((r) => ({ bitmapTagId: r.bitmapTagId, imageIndex: 0 })),
           });
           if (!alive) return;

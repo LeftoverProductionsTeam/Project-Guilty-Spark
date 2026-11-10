@@ -112,9 +112,9 @@ export function useOwnedForgeModels(
                 bitmapTagId,
                 imageIndex,
                 sourceSha256: result.sourceSha256,
-                resourceSha256: result.resourceSha256,
+                resourceSha256: result.resourceSha256,includeMips:true,
               }));
-            const response=await nativePreviewResource<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch',{projectId:placement.sourceProjectId,requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:t.imageIndex}))},placement.sourceSha256);
+            const response=await nativePreviewResource<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch',{projectId:placement.sourceProjectId,includeMips:true,requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:t.imageIndex}))},placement.sourceSha256);
             if(!live)return;
             let images=decodeOwnedBitmapBatch(response,targets);
             if([...images.values()].some(i=>!i.image&&['missing-resource','resource-mismatch','resource-unavailable'].includes(i.errorCode??''))){

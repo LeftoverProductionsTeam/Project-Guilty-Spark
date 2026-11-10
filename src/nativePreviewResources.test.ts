@@ -60,3 +60,10 @@ it('never retains native responses beyond the saved CPU share and trims on a low
   expect(nativePreviewResourceStats().entries).toBeLessThan(25);
  }finally{vi.unstubAllGlobals();}
 });
+
+it('does not cache a refused original lower level as a complete native image',async()=>{
+ const request={projectId:'preview-project',requests:[{bitmapTagId:1,imageIndex:0}],includeMips:true};
+ vi.mocked(call).mockResolvedValue({sourceSha256:hash,items:[{preview:{ddsBase64:'verified-base'}}],mipItems:[{preview:null,error:'original level missing'}]});
+ await nativePreviewResource('preview_owned_cache_bitmap_batch',request,hash);await nativePreviewResource('preview_owned_cache_bitmap_batch',request,hash);
+ expect(call).toHaveBeenCalledTimes(2);expect(nativePreviewResourceStats().entries).toBe(0);
+});

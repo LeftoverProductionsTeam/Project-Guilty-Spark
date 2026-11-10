@@ -615,6 +615,7 @@ async fn preview_owned_cache_bitmap_batch(
     app: tauri::AppHandle,
     project_id: String,
     requests: Vec<core::bitmap_preview::OwnedBitmapRequest>,
+    include_mips: Option<bool>,
 ) -> Reply<core::bitmap_preview::OwnedBitmapBatch> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
@@ -622,14 +623,16 @@ async fn preview_owned_cache_bitmap_batch(
         let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
         let inspection = inspect(&state, &project)?;
         if inspection.header.version==13&&source.resource_sha256.contains_key("mcc-textures") {
-            return core::bitmap_preview::preview_mcc_bitmap_batch(&source.preserved_path,&source.sha256,&inspection,&requests,source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?,&source.resource_sha256).map_err(error);
+            let preview=if include_mips.unwrap_or(false){core::bitmap_preview::preview_mcc_bitmap_chains}else{core::bitmap_preview::preview_mcc_bitmap_batch};
+            return preview(&source.preserved_path,&source.sha256,&inspection,&requests,source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?,&source.resource_sha256).map_err(error);
         }
         let pinned = source.resource_directory.as_ref().and_then(|folder| {
             source.resource_sha256.get("bitmaps.map")
                 .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
         });
         let resource_args = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
-        core::bitmap_preview::preview_owned_bitmap_batch_with_resources(
+        let preview=if include_mips.unwrap_or(false){core::bitmap_preview::preview_owned_bitmap_chains_with_resources}else{core::bitmap_preview::preview_owned_bitmap_batch_with_resources};
+        preview(
             &source.preserved_path, &source.sha256, &inspection, &requests, resource_args,
         ).map_err(error)
     }).await.map_err(error)?

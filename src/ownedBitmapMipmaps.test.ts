@@ -1,4 +1,5 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {decodeOwnedBitmapBatch} from './ownedBitmapBatch';
 import type {VerifiedBatchImage} from './ownedBitmapBatch';
 const read=vi.hoisted(()=>vi.fn());vi.mock('./nativePreviewResources',()=>({nativePreviewResource:read}));
 import {readOwnedBitmapMipmaps} from './ownedBitmapMipmaps';
@@ -7,7 +8,7 @@ function base():VerifiedBatchImage{return{bitmapTagId:42,imageIndex:0,mipLevel:0
 function result(level:number,size=4/2**level){
  const bytes=new Uint8Array(128+size*size*4),v=new DataView(bytes.buffer);bytes.set([68,68,83,32]);for(const[at,n]of[[4,124],[12,size],[16,size],[20,size*4],[76,32],[80,0x41],[88,32],[92,0xff0000],[96,0xff00],[100,0xff],[104,0xff000000]])v.setUint32(at,n,true);
  bytes.set(Array.from({length:size*size},()=>[56,208,24,255]).flat(),128);
- return{bitmapTagId:42,imageIndex:0,mipLevel:level,preview:{bitmapTagId:42,imageIndex:0,mipLevel:level,mipLevels:3,nativeMipmaps:2,imageCount:1,width:size,height:size,format:'BGRA8',sourceSha256:hash,sourceKind:'internal-cache',ddsBase64:btoa(String.fromCharCode(...bytes))},error:null};
+ return{bitmapTagId:42,imageIndex:0,mipLevel:level,preview:{bitmapTagId:42,imageIndex:0,mipLevel:level,mipLevels:3,nativeMipmaps:2,imageCount:1,width:size,height:size,format:'BGRA8',sourceSha256:hash,sourceKind:'internal-cache' as const,ddsBase64:btoa(String.fromCharCode(...bytes))},error:null};
 }
 beforeEach(()=>read.mockReset());
 describe('source-owned texture mip chains',()=>{
@@ -34,5 +35,37 @@ describe('source-owned texture mip chains',()=>{
  it('enforces batch/unique/base bounds and stops native reads after cancellation',async()=>{
   const images=new Map([['42:0',base()]]);await expect(readOwnedBitmapMipmaps('owned',Array(25).fill(target),images)).rejects.toThrow(/bound/);await expect(readOwnedBitmapMipmaps('owned',[target,target],images)).rejects.toThrow(/Duplicate/);await expect(readOwnedBitmapMipmaps('owned',[{...target,mipLevel:1}],images)).rejects.toThrow(/base/);
   const entry=(await readOwnedBitmapMipmaps('owned',[target],images,()=>false)).get('42:0')!;expect(read).not.toHaveBeenCalled();expect(entry.originalMipmaps).toHaveLength(1);expect(entry.mipError).toContain('incomplete');
+ });
+});
+
+describe('explicit native whole-chain response',()=>{
+ const targetWithMips={...target,includeMips:true};const batch=()=>({sourceSha256:hash,items:[result(0)],mipItems:[result(1),result(2)]});
+ it('uses verified returned levels without another native read',async()=>{
+  const decoded=decodeOwnedBitmapBatch(batch(),[targetWithMips]),entry=decoded.get('42:0')!;expect(entry.originalMipmaps?.map(m=>m.width)).toEqual([4,2,1]);
+  const output=await readOwnedBitmapMipmaps('owned',[targetWithMips],decoded);expect(read).not.toHaveBeenCalled();expect(output.get('42:0')!.originalMipmaps).toBe(entry.originalMipmaps);
+ });
+ it('refuses unsolicited, missing, reordered or differently shaped lower images',()=>{
+  expect(()=>decodeOwnedBitmapBatch(batch(),[target])).toThrow(/Unsolicited/);
+  expect(()=>decodeOwnedBitmapBatch({...batch(),mipItems:[]},[targetWithMips])).toThrow(/count/);
+  expect(()=>decodeOwnedBitmapBatch({...batch(),mipItems:[result(2),result(1)]},[targetWithMips])).toThrow(/reordered/);
+  expect(()=>decodeOwnedBitmapBatch({...batch(),mipItems:[result(1,1),result(2)]},[targetWithMips])).toThrow(/dimensions/);
+ });
+ it('keeps the base and a clear reason without retrying a native lower-level refusal',async()=>{
+  const entry=decodeOwnedBitmapBatch({...batch(),mipItems:[result(1),{bitmapTagId:42,imageIndex:0,mipLevel:2,preview:null,error:'source level unavailable',errorCode:'verification-failed'}]},[targetWithMips]).get('42:0')!;
+  expect(entry.originalMipmaps).toEqual([entry.image]);expect(entry.mipError).toContain('source level unavailable');
+  const retained=await readOwnedBitmapMipmaps('owned',[targetWithMips],new Map([['42:0',entry]]));expect(read).not.toHaveBeenCalled();expect(retained.get('42:0')!.mipError).toBe(entry.mipError);
+ });
+ it('retries an aggregate native budget refusal in smaller verified level batches',async()=>{
+  const reply={sourceSha256:hash,items:[result(0)],mipItems:[result(1),{bitmapTagId:42,imageIndex:0,mipLevel:2,preview:null,error:'combined packed limit',errorCode:'budget-exceeded'}]};
+  const decoded=decodeOwnedBitmapBatch(reply,[targetWithMips]);read.mockResolvedValue({sourceSha256:hash,items:[result(1),result(2)]});
+  const entry=(await readOwnedBitmapMipmaps('owned',[targetWithMips],decoded)).get('42:0')!;
+  expect(read).toHaveBeenCalledTimes(1);expect(read.mock.calls[0][1]).toEqual({projectId:'owned',requests:[{bitmapTagId:42,imageIndex:0,mipLevel:1},{bitmapTagId:42,imageIndex:0,mipLevel:2}]});
+  expect(entry.originalMipmaps?.map(m=>m.width)).toEqual([4,2,1]);expect(entry.mipError).toBeUndefined();
+ });
+ it('applies aggregate memory, source and resource guards to the entire response',()=>{
+  const oversized=batch();oversized.items[0].preview.width=4096;oversized.items[0].preview.height=4096;expect(()=>decodeOwnedBitmapBatch(oversized,[targetWithMips])).toThrow(/budget/);
+  expect(()=>decodeOwnedBitmapBatch({...batch(),sourceSha256:'b'.repeat(64)},[targetWithMips])).toThrow(/SHA-256/);
+  const corrupt=batch();(corrupt.mipItems[0].preview as any).sourceKind='verified-resource';(corrupt.mipItems[0].preview as any).resourceSha256='c'.repeat(64);
+  expect(()=>decodeOwnedBitmapBatch({...corrupt,resourceSha256:'b'.repeat(64)},[{...targetWithMips,resourceSha256:'b'.repeat(64)}])).toThrow(/resource/);
  });
 });

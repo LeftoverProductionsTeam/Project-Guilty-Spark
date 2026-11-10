@@ -6,6 +6,46 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## Whole original texture chains without repeated source reads — 10 November
+
+Continues6cf00f4. The R508profile demonstrated redundant lower-level bitmap batches, each repeating legitimate same-handle resource hashes. The existing native batch command now accepts explicit includeMips and reads each requested original2Dchain under the same map snapshot/resource handle. Classic/MCC readers share their existing extraction paths; all source/resource hashes, full native ranges, before/after handle verification and validation remain. Ordinary clients retain the old24-request protocol. Explicit mode permits24base images and at most408derived base/lower results, with aggregate16MiBpacked/64MiBRGBA admission before client decompression. No renderer, writer, resampler, disk cache, game data or guessed native metadata is added.
+
+World, owned-model/Asset Library and Workshop loaders opt into the same protocol; exact level identity, order, count, encoding and dimensions are checked before the existing shared texture renderer receives original pixels. A whole-chain packed-budget refusal retries smaller ordinary level batches within the unchanged total pixel bound, preserving legitimate detail. Permanent source failures retain a valid base with a clear warning instead of looping. Missing lower levels are never cached as a complete image. R511reproduces that cache defect (one call instead of the required retry); R519reproduces suppressed budget retry (zero reads instead of one). Both new regressions pass after repair; malformed/stale/foreign/resource/dimension/oversized results remain refused.
+
+| Source in the exact final Windows app | Run | Warthog main original levels | World primary2Dtextures | Local samples | Fixture duration |
+|---|---|---:|---:|---:|---:|
+| CE Timberland609 | ce-r520 | 10 | 118 | 145 | 73.479s |
+| Chupathingy Blood Gulch5 | chupa-r521 | 8 | 111 | 112 | 29.733s |
+| MCC Blood Gulch13 | mcc-r522 | 8 | 121 | 135 | 36.567s |
+| OpenCE Blood Gulch5 | opence-r523 | 8 | 111 | 112 | 29.468s |
+| Original Zombie Demo6 | demo-r524 | 10 | 105 | 165 | 34.607s |
+
+All five real Windows runs are complete with0JavaScript errors, normal close, unchanged original maps, strict native source/UV/shader/reflection/level readback and disposed owned scratch. Chupathingy/OpenCE installations share the tested Xbox bytes; these are separate installation checks, not separate binary formats. The CE fixture includes profiling and a nominal30ssettling wait, so its total duration is not a startup measurement. Source-specific unsupported parts remain visible and unaccepted.
+
+R509passes916Rust workspace tests/9explicit opt-in ignores; final R520passes492frontend tests, TypeScript, source module contracts, offline checks,40storage/repository tests and all276browser cases, including4actual shared WebGL cases. Fresh Windows build161.614s. Native test wrappers remain source-fingerprint checked. R514did not launch: reusing an already owned qa/logic directory correctly refused EEXIST. Subsequent sources run in separate owned disposable operations; no guard/assertion was weakened.
+
+### Comparable loading and memory evidence
+
+Same CE609Timberland/hash69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea, bitmaps.map123,547,749B/hash317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d, fresh app/profile, same settings/readiness, OS cache not cleared. R512explicitly pins the historical previous-good R501app; it is a baseline, never current-source acceptance.
+
+| Measurement | Before | Final R520 |
+|---|---:|---:|
+| Complete material-ready map | R50822.999s; repeated R51219.233s | 9.116s |
+| Bitmap batch IPC calls |66|16|
+| Native app window | R5081.280s | 1.264s |
+| Retained editor return | R5080.667s | 0.710s; same canvas,0asset reloads |
+| Draws/triangles/geometries/textures |796/167465/237/294|796/167465/237/294|
+
+Read-only optimized native timing R509compares ten individual Warthog levels with one whole-chain call: 1.920–1.951s versus0.191–0.200s over three rounds. Every serialized DDS/identity field is identical and originals remain unchanged. Individual path runs first each round; this is a source-reader measurement, not UI/startup/game timing. R510/R513earlier iterations separately measure12.365/9.789s ready. No universal speed guarantee is claimed.
+
+Final decoded cache128entries/17359920estimatedB stays within33,554,432B. At readiness R520reports100FPS/10.0ms with identical scene counts; frame-rate improvement is not established. Process-tree working-set/private sums are1,898,496,000/1,795,506,176B. After the nominal30s wait plus counter collection (actual37.727s), they are1,769,508,864/1,762,123,776B; R512historical baseline after33.049s is2,047,455,232/2,034,343,936B. These sums are not unique physical RAM or peaks. Natural GC was not forced; R510's higher initial sample2,538,123,264B demonstrates variability. No guaranteed memory reduction or peak bound is claimed.
+
+The full1500x950Chupathingy vehicle close-up is byte-identical before/after this loading optimization: SHA9f12bc5ce5914e96d1dadd79a0c854312b75df025ab5d36f7b4ee38abbf9c9b9,2,563,553B. Actual files E/vehicle-native-mips-r501-native-vehicle-world-closeup.png and E/vehicle-chain-chupa-r521-native-vehicle-world-closeup.png were viewed without pixel edits. This proves that selected captured editor frame is unchanged, not stock-game parity.
+
+Final temporary QA: E/qa-vehicle-chains-r520/GuiltySpark.exe49991680B, SHAb92e30c4f44364924bfba8e15098f950ad27187a31c2dd0a69d5c707998713b3, runtime-source fingerprint7b7bb29f90e99dd2e8e45b5c94fa7fc69675fb8f9400c37816dbe15ab9c0d4a4; built from6cf00f4plus this reviewed increment, not a release. E is C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Exact metadata/logs: vehicle-chain-r509, vehicle-chain-baseline-r512, vehicle-chain-ce-r520, vehicle-chain-{chupa-r521,mcc-r522,opence-r523,demo-r524}, vehicle-chain-verification-r520 and vehicle-chain-checkpoint-r526. R525removes only the three nonrunning, manifest/hash-verified supersededR501/R510/R513QA executables (150500352logicalB); currentQA, metadata/captures, original inputs and protected releases stay. No physical free-space delta or new archive/SDK tree is claimed.
+
+**Open:** H29actual-game appearance, contact shadows, native lighting/reflection interpolation and vehicle poses/animation/physics, scenery bounds averaging and original reflection-cube lower levels. Four Warthog dashboard meter triangles and3179Demo carrier light-reference triangles remain unsupported. No new Halo game launch, gameplay, native map compilation, human/peer/platform or release acceptance. All475requirement IDs/wordings remain unchanged.
+
 ## Original 2D texture levels on the GPU — 10 November
 
 R494 reproduces another fidelity defect in the existing texture setup: a deliberately distinct authored lower level is replaced by a generated average of the largest image. Actual WebGL reads red240/16/32 at every level, although the original lower image is green24/208/56. R495/R506 now read the correct base and authored lower colours, with0GL/shader errors and automatic generation disabled. A valid shortened4x4→2x2chain clamps to its last original image instead of inventing a1pxlevel; this covers the same GPU completeness requirement as the Xbox chain ending at4px. The fixture uses synthetic colours, not bundled Halo art.
