@@ -1022,3 +1022,104 @@ pub fn preview(config: &FirefightConfig, completed_waves: u16) -> Result<Simulat
     }
     invalid("Preview step budget exceeded; reduce wave counts or complexity")
 }
+
+// Standard scenario authoring for the existing opt-in solo round exporter.
+// Only fresh QuickForge scenarios consume these commands; no recovered native
+// encounter table or installed game is edited. Published format reference:
+// Invader 696830ff80af227e84e7237c2ef26eb2301ed110 scenario.json.
+pub const NATIVE_ROUND_BINDING: &str = "; Spark native Firefight configuration: ";
+pub fn has_native_round_source(doc: &crate::quickforge::QuickForgeDocument) -> bool {
+    doc.game_mode == "firefight" && doc.logic.as_ref().is_some_and(|logic|
+        logic.handwritten_sources.iter().any(|source| source.filename == "gs_firefight.hsc" && source.content.starts_with(NATIVE_ROUND_BINDING)))
+}
+#[derive(Clone, Debug)]
+pub struct NativeRoundPlan {
+    pub dependencies: Vec<crate::quickforge::ForgeDependency>,
+    pub commands: Vec<crate::quickforge::ForgeCommand>,
+    pub encounter_names: Vec<String>,
+}
+pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<NativeRoundPlan>> {
+    let Some(doc) = &project.quick_forge else { return Ok(None); };
+    if !has_native_round_source(doc) { return Ok(None); }
+    if doc.native.is_some() || !matches!(doc.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition | crate::runtime::RuntimeId::ChupathingyCe | crate::runtime::RuntimeId::MccSteam) {
+        return invalid("Native solo Firefight requires a supported editable source build; shared native sources and original Zombie restoration remain separate workflows");
+    }
+    let config = project.firefight.as_ref().ok_or_else(|| SparkError::Invalid("Native Firefight source has no originating rules; preserve the script and reconcile its configuration".into()))?;
+    validate(config)?;
+    let source = doc.logic.as_ref().unwrap().handwritten_sources.iter().find(|source|source.filename=="gs_firefight.hsc").unwrap();
+    let binding = source.content.lines().next().unwrap().strip_prefix(NATIVE_ROUND_BINDING).unwrap();
+    let bound: FirefightConfig = serde_json::from_str(binding).map_err(|_|SparkError::Invalid("Invalid native Firefight configuration binding; prepare the round again without discarding handwritten source".into()))?;
+    if &bound != config { return invalid("Firefight rules changed after preparing the native controller. Prepare native solo round again before building; the previous-good map remains unchanged"); }
+    if config.player_count != 1 || config.team_lives != 1 || config.allow_revives || config.endless || config.rounds > 32 || config.waves.len() > 32 || config.max_alive > 32 ||
+       config.max_spawn_attempts != 1 || config.difficulty_step_percent != 0 || config.extra_player_count_percent != 0 || config.replenish_ammo_each_wave || !config.starting_equipment.is_empty() || !config.supply_drop_tags.is_empty() ||
+       config.preparation_ms + config.countdown_ms > 600000 || config.spawn_timeout_ms < 1000 || config.stuck_timeout_ms > 600000 {
+        return invalid("Native solo round supports one player/life, one spawn attempt, finite waves, bounded ten-minute timings and no revives/scaling/supply overrides");
+    }
+    let count:usize = config.waves.iter().map(|wave|wave.groups.len()).sum();
+    if count > 128 { return invalid("Native Firefight exceeds the standard scenario's 128 encounter limit"); }
+    let zones = config.spawn_zones.iter().filter(|zone|zone.enabled).collect::<Vec<_>>();
+    let scenario = crate::quickforge::scenario_path(doc)?;
+    let tag = format!("{scenario}.scenario");
+    let mut plan = NativeRoundPlan { dependencies:vec![],commands:vec![],encounter_names:vec![] };
+    let mut palette = BTreeMap::<String,usize>::new();
+    let add = |plan:&mut NativeRoundPlan,args:Vec<String>| plan.commands.push(crate::quickforge::ForgeCommand {
+        phase:"firefight-scenario".into(),tool:"invaderEdit".into(),args,expected_outputs:vec![format!("tags/{}",tag.replace('\\',"/"))],
+    });
+    let set = |args:&mut Vec<String>,key:String,value:String|args.extend(["-S".into(),key,value]);
+    let vector = |position:[f32;3]|position.map(|value|value.to_string()).join(",");
+    for (w,wave) in config.waves.iter().enumerate() {
+        let actors:u32=wave.groups.iter().map(|group|group.count as u32).sum();
+        if wave.groups.len()>8 || actors>config.max_alive as u32 || wave.score_multiplier_milli>10000 {return invalid("Native wave must fit 1–8 groups, maxAlive and the native score multiplier bound");}
+        for (g,group) in wave.groups.iter().enumerate() {
+            let enemy = config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).unwrap();
+            let path=enemy.actor_variant_path.replace('\\',"/");
+            if path.ends_with(".actor_variant") {return invalid("Select an actor-variant tag path without its extension");}
+            let next=palette.len();
+            let index=*palette.entry(path.clone()).or_insert(next);
+            if index==next {
+                plan.dependencies.push(crate::quickforge::ForgeDependency {kind:"firefightActor".into(),tag_path:path.clone(),tag_class:"actor_variant".into(),source_project_id:None,source_sha256:None});
+                add(&mut plan,vec!["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{index}].reference"),format!("{path}.actor_variant"),tag.clone()]);
+            }
+            let encounter=plan.encounter_names.len();
+            let name=format!("gs_w{:02}_g{:02}",w+1,g+1);plan.encounter_names.push(name.clone());
+            let e=format!("encounters[{encounter}]");let s=format!("{e}.squads[0]");
+            let mut args=vec!["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into()];
+            for (key,value) in [(format!("{e}.name"),name),(format!("{e}.flags.not_initially_created"),"1".into()),(format!("{e}.team_index"),"default_by_unit".into()),(format!("{e}.manual_bsp_index"),"-1".into()),
+                (format!("{s}.name"),"round_squad".into()),(format!("{s}.actor_type"),index.to_string()),(format!("{s}.platoon"),"-1".into()),(format!("{s}.initial_state"),"alert".into()),(format!("{s}.return_state"),"alert".into()),(format!("{s}.maneuver_to_squad"),"-1".into()),
+                (format!("{s}.normal_diff_count"),group.count.to_string()),(format!("{s}.insane_diff_count"),group.count.to_string()),(format!("{s}.major_upgrade"),"none".into())] {set(&mut args,key,value);}
+            let zone=zones[(w+g)%zones.len()];
+            let zone_index=(w+g)%zones.len();
+            let same_zone=|j:usize|(w+j)%zones.len()==zone_index;
+            let total:usize=wave.groups.iter().enumerate().filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
+            let offset:usize=wave.groups.iter().enumerate().take(g).filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
+            let side=(total as f32).sqrt().ceil() as usize;
+            for a in 0..group.count as usize {
+                let center=(side-1) as f32/2.0;
+                let slot=offset+a;let dx=(slot%side) as f32-center;let dy=(slot/side) as f32-center;
+                let position=[zone.position[0]+dx*0.75,zone.position[1]+dy*0.75,zone.position[2]];
+                if position.iter().any(|value|value.abs()>2048.0) {return invalid("Native actor position exceeds the editable level coordinate bound");}
+                if (dx*dx+dy*dy).sqrt()*0.75>zone.radius {return invalid("Native actor starting positions do not fit the authored spawn-zone radius; enlarge or split the group");}
+                if doc.spawns.iter().any(|spawn|spawn.position.iter().zip(position).map(|(a,b)|(a-b).powi(2)).sum::<f32>()<4.0) {return invalid("Move the enemy spawn zone at least two world units from the player start before preparing a native round");}
+                let p=format!("{s}.starting_locations[{a}]");let f=format!("{e}.firing_positions[{a}]");
+                args.extend(["-I".into(),format!("{s}.starting_locations"),"1".into(),"end".into(),"-I".into(),format!("{e}.firing_positions"),"1".into(),"end".into()]);
+                for (key,value) in [(format!("{p}.position"),vector(position)),(format!("{p}.facing"),"0".into()),(format!("{p}.sequence_id"),"-1".into()),(format!("{p}.flags.required"),"1".into()),(format!("{p}.initial_state"),"alert".into()),(format!("{p}.return_state"),"alert".into()),(format!("{p}.actor_type"),"-1".into()),(format!("{p}.command_list"),"-1".into()),(format!("{f}.position"),vector(position)),(format!("{f}.group_index"),"a".into())] {set(&mut args,key,value);}
+            }
+            args.push(tag.clone());add(&mut plan,args);
+        }
+    }
+    let total_score:u64=config.waves.iter().map(|wave|wave.groups.iter().map(|group| {
+        let points=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).unwrap().points as u64;
+        group.count as u64*points*wave.score_multiplier_milli as u64/1000
+    }).sum::<u64>()).sum::<u64>()*config.rounds as u64;
+    if total_score>i32::MAX as u64 {return invalid("Native Firefight score exceeds Halo long range");}
+    Ok(Some(plan))
+}
+pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection)->Result<()> {
+    for name in &plan.encounter_names {
+        if !map.encounters.iter().any(|encounter|&encounter.name==name && encounter.squads==["round_squad"]) {return invalid(format!("Compiled Firefight encounter/squad missing: {name}"));}
+    }
+    for name in ["gs_firefight","gs_ff_reset","gs_ff_bootstrap"] {
+        if !map.scripts.iter().any(|script|script.name==name) {return invalid(format!("Compiled Firefight script missing: {name}"));}
+    }
+    Ok(())
+}

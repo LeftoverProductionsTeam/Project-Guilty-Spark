@@ -162,6 +162,38 @@ test('C63 immediate Undo then Save in one frame saves the undone revision',async
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='save_project')?.args.project.tagEdits)).toEqual([]);
 });
 
+test('Save waits for the in-flight Workshop example before capturing its source revision',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Pending geometry',template:'customBlank',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[{id:'metal',name:'Metal',color:'#777777',shaderPath:'levels/test/metal',uScale:1,vScale:1}],spawns:[],objectives:[],placements:[]})));
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
+ await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;let held=false;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='quickforge_validate'&&!held&&args.document.workshop?.brushes?.length){held=true;w.__geometryHeld=true;await new Promise<void>(resolve=>{w.__releaseGeometry=resolve;});}
+   return invoke(command,args);
+  };w.__sparkMock.calls.length=0;
+ });
+ await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__geometryHeld)).toBe(true);
+ await page.keyboard.press('Control+s');
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='save_project'))).toBe(false);
+ await page.evaluate(()=>(window as any).__releaseGeometry());
+
+ try {
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop?.brushes?.length)).toBe(4);
+ } catch (error) {
+  const diagnostic=await page.evaluate(()=>{
+   const mock=(window as any).__sparkMock;
+   return {calls:mock.calls.filter((call:any)=>['save_project','update_project','commit_workspace_history'].includes(call.command)),saved:mock.saved,staged:mock.staged,body:document.body.innerText.slice(-700)};
+  });
+  console.log('PENDING_SAVE_FAILURE',JSON.stringify(diagnostic));throw error;
+ }
+
+ await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).not.toHaveAttribute('aria-description','Unsaved changes');
+ await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop?.brushes?.length??0)).toBe(0);
+});
+
 test('C61 build notifications use source-bound metadata and retain unsaved edits without reopening map buffers',async({page})=>{
   await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('39');await field.press('Tab');
   await page.evaluate(()=>{const m=(window as any).__sparkMock;m.calls.length=0;m.emit('spark:library-changed');});

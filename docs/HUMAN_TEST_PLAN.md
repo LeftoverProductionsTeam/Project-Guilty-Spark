@@ -170,3 +170,11 @@ R425/R427–R430 pass native Windows vehicle/source checks after the native glas
 R424 adds an actual private Chupathingy0.9.0c/b506ba74 game Warthog screenshot, native camera save/load and matching game-camera telemetry. It does not establish equal preview/game angles, source-local lighting, stable driving or human acceptance. Compare the actual placed vehicle with a matched native view; H29 remains open. See NATIVE_ASSETS_AND_SHOWCASE.md#native-glass-angular-response--10-november-follow-through.
 
 No original map is edited. Do not prefill human/game parity from native preview tests.
+
+## H12 native solo source follow-through — R621 checkpoint
+
+Status: native authoring/compilation/readback PASS; game load/combat/HUD/peers NOT RUN. Prerequisites: source-matched R621 QA app or a new verified build, compatible owned native tag set/tools, and an independently checked player weapon/profile. Reproduce the owned fixture with scripts/test-firefight-native.mjs through the existing source-only verifier; its temporary map is disposed on completion. FIREFIGHT_ENGINE.md records exact hashes and boundaries.
+
+In the native app open an authored solo Firefight source level with verified working-tag actor paths. Firefight rules → Use solo native rules → configure enabled spawn zones safely inside collision and at least two units from player starts → Prepare native solo round → Save → Level editor → Build & check playtest. Reprepare after rule changes; manual HSC changes remain protected. Verify native source and cache identity before launching an isolated supported runtime. The action does not prove extraction/conversion of custom actors selected from another map.
+
+In game verify a usable starting weapon, hostile spawn/navigation/attacks, normal player damage, actual player kills, first-wave completion/cleanup, second wave, victory and defeat/restart. Record script globals separately from HUD/per-player scoring, which is not implemented. Repeat peer tests only on a verified runtime. Record tester/date, app/runtime/cache/source hashes, screenshots/logs and Pass/Fail/Blocked/Not run. No current player combat or shared victory pass.

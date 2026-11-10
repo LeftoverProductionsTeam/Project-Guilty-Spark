@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native vehicle fidelity and failed-test writer recovery
+Task: Operation110 — native fidelity, safe validation recovery and creator acceptance
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 289cf118350e12690f0fbce9c6965d5fd43771f6 runtime; scoped failed-action writer cleanup now passes R602 actual Chupathingy failure/original22pins/previous-good cache/disposal and R603 final50storage/repository/contracts/checkpoint tests plus offline gates. Local commit pending; runtime code and QA e75731d7 remain unchanged. R600/R601 failures and later native camera measurements are separately retained.
-Next action: Seal the scoped scripts/docs/source manifests and commit locally, then complete the existing H05 native guided-walkthrough acceptance through actual controls and restart. H29 matched vehicle poses/game appearance, human gameplay, physical peers/headset/platform and fullOperation110 remain open. No push/publication.
+Latest verified revision: a7ff16a6d459705af5a6a096a3192a39aa6843bf accepts H05 native17loadedguide steps, File/New/Save/Libraryreopen and two process restarts. ecbb422f8a4e88944b1ef616e20c3163d4c29662 fixes failed-action writers; R602realChupa/22pins/previous-good/disposal and R60350scoped checks plusoffline pass. Runtime289cf11/QAe75731d7/FP8eb59374 unchanged. R593922Rust/9ignored,501frontend,279browser are prior full runtime evidence, not rerun here.
+Next action: R616 actual native Tool compiled solo Firefight but final verifier incorrectly required multiplayer type1. Compare against existing native_scenario_type instead. R62010Save/history browser tests now pass atomic geometry/default commit before lease release. R621 full Rust/frontend/freshWindows/native independent readback starts; no gameplay accepted.
 
 ## Acceptance
 
@@ -18,6 +18,8 @@ Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHA
 R494WebGL red: authored lower24/208/56renders generated240/16/32. R495/R506green uses original levels, valid shortenedchain clamps,0GLerrors. Shared configureSourceTexture + small ownedBitmapMipmaps adapter reuse native reader/decoder/cache, source/hash/mip identities,24baseimages/24requests/chunk/64MiBtotalpixels and cancellation. World, largepreview/AssetLibrary/ownedplacements/Workshop share it; optionaldetailwarnings preserve validbase/readiness, corrupt/stalesource stillrefused. NativeWarthogmaincounts and World111/121/118/111/105primary2Dtexturemetadata checked in R501–R505. At R501 checkpoint, now retired perR525: E/qa-vehicle-mips-r501/GuiltySpark.exe50,516,992B SHAa9ace215142deba5fdb24560e0c7227aa73d106f826f8866bf8fb23e28975496/runtimeFP9c49cf54068beeb4b664c88512af8ef4afe7874fcd3474a35008330fef418b30. Original2Dlevels accepted only; game/shadows/pose/cubechains/human/peer/platform remainopen. Exact complete evidence NATIVE_ASSETS_AND_SHOWCASE.md.
 
 ## Verified milestones
+
+R60350storage/repository/contracts/checkpoint plusoffline pass for ecbb422. R604guide navigation/state passed without content readiness; R605strengthens it and passes17loadedworkspaces, File/New/Ctrl+S/savedLibraryreopen, Settings/manualguide/two native restarts,0errors/normalclose/disposed in19.594s. R606two browserguides pass. E/native-walkthrough-r605.json/screens and failed-writer-regressions-r603.log retain exact scope.
 
 R580exact native GPU programs establish vertex reflection despite per-pixel diffuse. R582red tint31/0/32 vs24/0/34 and wrongcubeY→R583/R584all6GPUgreen incl signed backside,93/0/110vertexclamp,0GLerror. FrozenR585500frontend/278browser/types/contracts/offline/40storage,Windows169.216s; R585Chupa38.374s/R586CE40.786s/R587MCC41.808s/R588OpenCE33.020s/R589Demo36.950s allpass actualWindows/sourceUV/images/cubes/reset/samecanvas+camera/0newreads/0errors/normalclose/originalsunchanged/disposed. Fourfixtures8shadows/Demo0localunavailable. CurrentQA E/qa-vehicle-vertex-r585/GuiltySpark.exe50458624B SHAe85257cebf09920d12d2b1bb64325aa4a4b61314e3ffd20f960d303336c35562. R590exactreceipt; H29game/poses/materialgaps and fullmandate open.
 
@@ -77,6 +79,8 @@ Earlier R349scroll/axis/End,953CE609/MCC13source contracts/tool-profile fixes, R
 
 ## Failures and blockers
 
+R600failed:30s exit-wait during240s private game, no camera/peer acceptance; original21hashes laterverified/owned1697612352logicalB recovered. R601startup camera mismatch stays failed; exit0/pinsunchanged/disposed877471121B. Later native load/save repeat within.000032worldunits is independent readback, not H29parity. Full receipts NATIVE_ASSETS_AND_SHOWCASE.md and E/r600/r601 files.
+
 Post-report continuity check initially failed the unchanged32KiB pending-document bound because two new vehicle summaries duplicated linked evidence. Only those duplicate summaries were compacted; full reports/requirement IDs remain. The existing5checks then pass; no limit/assertion is relaxed.
 
 R408 genuine current Windows red: original Demo rwarthog3179/3179 triangles lack supported materials but existingUIreports0gaps. Its otherWarthog4/2798triangles also lack source attribution. Sourceunchanged/ownedscratchdisposed; wrapperexit1. New coverage helper and visible compact status preserve geometry/lighting/source; 4focusedunit and1browserworkflow checks pass before full R409.
@@ -101,7 +105,7 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-R580/R581–R590 are terminal. All5native runs close normally, originals unchanged and owned compiler/profile output disposed. Exact currentQA/sourceFP above is enforced before reuse; source edits invalidate it. NativegameR580two real peers exit0; camera input is not native-save/parity evidence. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Earlier accepted release binaries remain protected. R591removed only superseded manifest/hash-verified nonrunning R572QA50458624logicalB after replacement5sourceacceptance; retained all metadata/screens/currentQA and protected releases. No active app/game/compiler remains.
+R616 terminal native failure: real Tool built1449-tag65.04M solo cache, existing encounter/script/source verifiers passed, final hardcoded multiplayer-type guard rejected it. Inputs/disposable staging protected. R613 immediate Save/Undo/Redo/restart pass; R62010browser including deliberately delayed geometry Save now green after atomic source commit. R621 begins on702da54+dirty, dynamic existing source-type check; no game/native Firefight acceptance yet. E/firefight-native-r616.json/log; E/save-atomic-r620-browser.log. No remote operations.
 
 Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
 

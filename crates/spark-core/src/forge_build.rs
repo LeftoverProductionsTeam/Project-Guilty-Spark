@@ -351,7 +351,9 @@ pub fn run_prepared_job(
     let directory=jobs_root.join(job_id);
     let selected_tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
     let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
-    let (mut requirements,source_blockers)=quickforge::source_requirements(document)?;
+    let (mut requirements,mut source_blockers)=quickforge::source_requirements(document)?;
+    let native_round=match crate::firefight::native_round_plan(project) {Ok(plan)=>plan,Err(error)=>{source_blockers.push(error.to_string());None}};
+    if let Some(plan)=&native_round {requirements.extend(plan.dependencies.clone());}
     let native_inputs=if !export_only && extra_blockers.is_empty() && source_blockers.is_empty() && !cancel.load(Ordering::Relaxed) {
         if let (Some(tags),Some(dependency_tool))=(selected_tags.as_ref().filter(|p|p.is_dir()),invader(tools,"invader-dependency")) {
             let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
@@ -386,6 +388,12 @@ pub fn run_prepared_job(
         if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
         emit("geometry","Validating editable geometry and writing JMS source".into(),5,"info");
         let mut sources=quickforge::export_sources(document,&directory.join("workspace"))?;
+        if let Some(plan)=&native_round {
+            sources.commands.extend(plan.commands.clone());sources.dependencies.extend(plan.dependencies.clone());
+            project::atomic_write(&sources.scenario_plan_path,&serde_json::to_vec_pretty(&sources.commands)?,false)?;
+            project::atomic_write(&sources.directory.join("source-export.json"),&serde_json::to_vec_pretty(&sources)?,false)?;
+        }
+        sources.blockers.extend(source_blockers.clone());
         // Include resolved model shader classes in the native build receipt.
         sources.dependencies.extend(requirements.iter().filter(|dependency|dependency.kind=="modelShader").cloned());
         match crate::native_audio::plan(project) {
@@ -401,7 +409,7 @@ pub fn run_prepared_job(
         if export_only {receipt.status="exported".into();return Ok(());}
         if document.native.is_some() && prepared.is_none() {return invalid("Native shared source requires an explicit local verified materialization before compilation");}
         let engine=match target(document.runtime_id){Ok(v)=>Some(v),Err(e)=>{receipt.blockers.push(e.to_string());None}};
-        if project.firefight.is_some(){receipt.blockers.push("Firefight rules are authored and locally simulated, but no supported game-side wave bridge has been implemented or verified. A Firefight game build is blocked.".into());}
+        if project.firefight.is_some() && native_round.is_none(){receipt.blockers.push("Firefight rules are authored and locally simulated, but no supported game-side wave bridge has been implemented or verified. A Firefight game build is blocked.".into());}
         let tool=tool_file(tools);
         if let Err(problem)=authoring_preflight(project,tools,document) {receipt.blockers.push(problem.to_string());}
         if tool.is_none(){receipt.blockers.push("Halo 1 Editing Kit Tool is missing. Select the separately installed matching HEK or H1A kit folder in Settings.".into());}
@@ -521,12 +529,13 @@ pub fn run_prepared_job(
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
+        if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;
         if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;
         if !custom.models.is_empty(){emit("verify","Imported static models: native topology, winding, normals, UVs, shader identities and collision bounds match source.".into(),93,"info");}
-        if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
+        if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=quickforge::native_scenario_type(document) || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
         for check in ["crc32_mismatched","is_protected","stub_count"] {
             let value=runner.run(&invader(tools,"invader-info").unwrap(),&["-T".into(),check.into(),output.to_string_lossy().into_owned()],workspace,"verify",94)?;
             if !["0","false"].contains(&value.trim().to_ascii_lowercase().as_str()){return invalid(format!("Output {check} verification failed: {value}"));}

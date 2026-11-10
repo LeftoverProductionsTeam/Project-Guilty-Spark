@@ -1,5 +1,9 @@
 # UI interaction acceptance audit
 
+## Workshop Save ordering — 10 November
+
+R612 reproduced a real native Save toast while the newly generated Workshop source remained dirty. Save captured an old document before geometry validation/default shader binding committed. The existing source-mutation leases now settle before Save; App commits validated source synchronously before releasing the lease. Idle saves retain their request-time snapshot and unrelated projects remain independent. Source: App.tsx, projectMutation.ts, QuickForge.tsx. R62010browser checks include deliberately held geometry → Ctrl+S → release → saved4brushes → immediate Undo/Save, plus prior Save, donor ownership and pop-out regressions. R621 real Windows4brush immediate Save, Prepare/Undo/Redo/Save, two normal closes and restart/Library reopen pass with0pageerrors. No human gameplay follows. The full280browser run was deliberately interrupted for owner shutdown, not accepted. See FIREFIGHT_ENGINE.md for exact hashes/receipts and native compiler repairs.
+
 ## H05 native walkthrough acceptance — 10 November
 
 R605 uses the current source-matched Windows app (SHAe75731d7359d20d75ee4ee9416c524b9b73bb6cf9931b2ee591e64bdc8fed0b2), fresh owned library/WebView and no mocked IPC. File → New → Multiplayer Map creates the fixture, Ctrl+S saves it, and its Library card reopens it after a full process restart. Settings → Interface Studio enables the guide; enabled state survives restart. Mouse and Enter follow all17distinct existing guide destinations, waiting for visible workspace content. Turn off, manual Start/Finish and completion survive a second full process restart; manual restart remains available.0pageerrors, normal app close and owned disposal pass in19.594s.

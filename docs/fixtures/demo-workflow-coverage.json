@@ -650,6 +650,12 @@
       "featureId": "dependency-guide",
       "kind": "workflow",
       "scope": "Games & tools saves independent community engine profiles and a shared compatible content directory; Online prepares owned CE banks and a matching imported map. Native app setup and source preservation do not prove a game join, Firefight or multiplayer compatibility."
+    },
+    {
+      "artifact": "scripts/test-firefight-native.mjs",
+      "featureId": "native-firefight-round",
+      "kind": "workflow",
+      "scope": "Actual native UI preparation, author-owned history, Save/restart, standard encounter/script compilation and independent cache readback. Human combat and multiplayer remain separate acceptance gates."
     }
   ]
 }

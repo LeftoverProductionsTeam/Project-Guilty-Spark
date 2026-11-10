@@ -1,7 +1,7 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
-import { exportHaloCeFirefightRound, scriptManifest } from '../haloScript';
+import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
 import { call } from '../api';
 import type {
@@ -121,6 +121,12 @@ export default function Firefight({
     } finally {
       setBusy(false);
     }
+  }
+  function prepareNativeRound() {
+    try {
+      edit(attachNativeFirefightRound(project), 'Prepare native solo Firefight encounters and script');
+      setError('');
+    } catch (error) { setError(String(error)); }
   }
   function exportRound() {
     if(!config)return;
@@ -523,6 +529,14 @@ export default function Firefight({
           ))}
           </section><section className="firefight-validation">
           <div className="analysis-actions">
+            <button disabled={busy} onClick={() => change(nativeSoloFirefightRules(config), 'Use solo native Firefight rules')}
+              title="One player, one life, one finite round, one spawn attempt, bounded preparation/timeouts; no revives, scaling, starting-equipment overrides or resupply. Enemy groups and zones are retained. Undo restores the previous rules.">
+              Use solo native rules
+            </button>
+            <button disabled={busy || !project.quickForge} onClick={prepareNativeRound}
+              title="Prepare a solo round with native actor encounters and startup HaloScript. One player/life, finite waves, no scaling or supplies. Save, then use Build & playtest; compilation and gameplay remain separate checks.">
+              Prepare native solo round
+            </button>
             <button disabled={busy} onClick={() => void run('validate')}>
               <ShieldCheck size={14} />
               Validate rules & actors
@@ -535,6 +549,8 @@ export default function Firefight({
               <Download size={14} />Export native round source
             </button>
           </div>
+          {project.quickForge?.logic?.handwrittenSources?.some(source => source.filename === 'gs_firefight.hsc') &&
+            <p role="status" className="subtle">Native solo source attached. Save and build to validate. Changed rules need preparing again; manual source edits are protected.</p>}
           {validation && (
             <div className="forge-rule-result">
               <Pill tone={validation.valid ? 'green' : 'amber'}>

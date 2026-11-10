@@ -18,7 +18,7 @@ import type {SavedWorkspaceLayout,SavedWorkspaceWindow} from './useWorkspaceWind
 import OpenWork from './components/OpenWork';
 import type {LearningSection,WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
-import {projectMutationPending} from './projectMutation';
+import {projectMutationPending,afterProjectMutation} from './projectMutation';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
@@ -408,8 +408,19 @@ export default function App() {
       const p = id?documentsRef.current.documents.find(d=>d.id===id)?.history.current:historyRef.current.current;
       if (!p) return Promise.resolve();
       if(!announce&&!forceStage&&closingDocuments.current.has(p.id))return Promise.resolve();
+      // Capture an idle document immediately as before. If an already-started
+      // source edit is validating, wait for that transaction before selecting
+      // its immutable snapshot. A queued Save still cannot consume later edits.
+      const snapshot = afterProjectMutation(p.id, () => {
+        const latest = documentsRef.current.documents.find(document => document.id === p.id)?.history.current;
+        if (!latest) throw Error('The project closed before its pending source edit could be saved.');
+        return latest;
+      }).then(project => ({project}), error => ({error}));
       const operation = saveQueue.current.then(async () => {
         try {
+          const settled = await snapshot;
+          if ('error' in settled) throw settled.error;
+          const p = settled.project;
           if(native){if(windowWritersRef.current[p.id]===false)return;const h=documentsRef.current.documents.find(d=>d.id===p.id)?.history;if(h?.current===p)await windowHistories.current.persist(p.id,h);await windowHistories.current.flush(p.id);}
           const entry=checkedSaveReceipt(p,await call<LibraryEntry>(announce||!native?'save_project':'update_project', { project: p }));
           setData(data=>applyLibraryReceipt(data,entry));
@@ -778,11 +789,13 @@ export default function App() {
   }, [save,help,createModal,applyHistory,busy]);
   function edit(project: Project, description: string) {
     if(native&&!windowHistories.current.writable(project.id)){notice('This view follows the editing window. Choose Edit here in Changes to take over safely.');return;}
-    dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
+    const commit=()=>dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
+    // A validated source transaction must commit before its lease releases.
+    if(projectMutationPending(project.id))flushSync(commit);else commit();
   }
   function materialDefaults(projectId:string,materials:ForgeMaterial[]){
     if(native&&!windowHistories.current.writable(projectId))return;
-    dispatchDocument({type:'history',id:projectId,action:{type:'forge-defaults',projectId,materials}});
+    flushSync(()=>dispatchDocument({type:'history',id:projectId,action:{type:'forge-defaults',projectId,materials}}));
   }
   async function importFiles(paths?: string[], destination?: 'build') {
     setBusy(true);

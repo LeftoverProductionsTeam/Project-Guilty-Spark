@@ -1,3 +1,4 @@
+import {beginProjectMutation} from '../projectMutation';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import {openMapPreviewSource} from '../mapPreviewSource';
@@ -713,6 +714,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     )
       return;
     defaultPreviewAttempt.current = project.id;
+    const releaseSource = beginProjectMutation(project.id, {history:false});
     let alive = true;
     void runtimeTextureSource(doc.runtimeId)
       .then((open) => {
@@ -731,9 +733,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       })
       .catch((reason) => {
         if (alive) notify('Default materials need an owned runtime map: ' + String(reason), 'info');
-      });
+      }).finally(releaseSource);
     return () => {
-      alive = false;
+      alive = false;releaseSource();
       if (defaultPreviewAttempt.current === project.id) defaultPreviewAttempt.current = '';
     };
   }, [studioRole, project.id, doc.runtimeId, doc.materials.some((m) => !m.shaderPath && !m.name.startsWith('+'))]);

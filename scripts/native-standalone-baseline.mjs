@@ -25,7 +25,7 @@ export function nextNativeDependencies(paths,archiveIndex,staged,bindings=new Ma
  }return [...result.values()];
 }
 
-export async function nativeStandaloneBaseline({context,archive,kit,invader,report,scenario='levels/test/bloodgulch/bloodgulch.scenario',reviewSeconds=120}){
+export async function nativeStandaloneBaseline({context,archive,kit,invader,report,scenario='levels/test/bloodgulch/bloodgulch.scenario',reviewSeconds=120,additionalRoots=[],prepareOnly=false,onPrepared}){
   report.scope='Unmodified owner-installed H1A SDK source baseline; setup/launch diagnostic, not Spark authoring or retail cache acceptance';
   report.visualAcceptance=false;report.gameplayAcceptance=false;report.complete=false;
   const spec=JSON.parse(await fs.readFile(new URL('../docs/fixtures/source-only-h1a-inputs.json',import.meta.url),'utf8'));
@@ -37,14 +37,16 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
   const listed=await run('tar.exe',['-tf',archive]);const archiveIndex=new Map();
   for(const line of listed.stdout.split(/\r?\n/).filter(value=>value.startsWith('tags/')&&!value.endsWith('/'))){nativeTagPath(line.slice(5));const key=line.toLowerCase();if(archiveIndex.has(key))throw Error('Ambiguous SDK archive path');archiveIndex.set(key,line);}
   if(JSON.stringify(shell.sourceArchive)!==JSON.stringify(spec.sourceArchive))throw Error('Native baseline fixtures use different SDK identities');
-  const roots=[scenario,'globals/globals.globals',...shell.roots];
+  if(!Array.isArray(additionalRoots)||additionalRoots.length>16||additionalRoots.some(value=>nativeTagPath(value)!==value))throw Error('Invalid bounded native scene roots');
+  const roots=[scenario,'globals/globals.globals',...shell.roots,...additionalRoots];
   // Reuse the already verified dependency-sized authoring/shell manifests.
   // Native recursive queries still discover and validate this scene's closure.
   let replayRows=[];
   if(process.env.SPARK_BASELINE_SEED_RECEIPT){
     const file=path.resolve(process.env.SPARK_BASELINE_SEED_RECEIPT),info=await fs.lstat(file);
     if(!info.isFile()||info.isSymbolicLink()||info.size>2*1024**2)throw Error('Invalid bounded SDK seed receipt');
-    const prior=JSON.parse(await fs.readFile(file,'utf8')).standaloneBaseline?.source;
+    const receipt=JSON.parse(await fs.readFile(file,'utf8'));
+    const prior=receipt.standaloneBaseline?.source??receipt.firefight?.sourcePreparation?.source;
     if(prior?.archiveSha256!==spec.sourceArchive.sha256||!Array.isArray(prior.manifest)||prior.manifest.length>4096)throw Error('SDK seed belongs to another source');
     replayRows=prior.manifest;report.seedReceiptSha256=await hash(file);
   }
@@ -82,6 +84,13 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
     for(const [requested,actual] of bindings){const header=Buffer.alloc(64),handle=await fs.open(path.join(root,'tags',actual));try{await handle.read(header,0,64,0);}finally{await handle.close();}if(header.toString('ascii',36,40)!=='mod2'||header.toString('ascii',60,64)!=='blam')throw Error('H1A provider is not the exact native GBX class: '+requested);}
     report.nativeModelClassBindings=Object.fromEntries(bindings);
     manifest.sort((a,b)=>a.path.localeCompare(b.path));report.source={scenario,archiveSha256:spec.sourceArchive.sha256,files:manifest.length,bytes,dependencyQueries:queries.length,manifestSha256:crypto.createHash('sha256').update(JSON.stringify(manifest)).digest('hex'),fullSdkCopied:false,manifest};
+    if(prepareOnly){
+      if(typeof onPrepared!=='function')throw Error('Prepared native scene requires its explicit bounded acceptance callback');
+      await onPrepared({root,drive,run,tags:path.join(root,'tags')});
+      for(const input of manifest)if(await hash(path.join(root,'tags',input.path))!==input.sha256)throw Error('Acceptance changed its staged publisher input: '+input.path);
+      if(await hash(archive)!==spec.sourceArchive.sha256)throw Error('Original SDK archive changed');
+      report.originalInputsUnchanged=true;report.complete=true;report.scope='Bounded owner-installed SDK closure supplied to the existing native source builder; no original inputs changed';return;
+    }
     const nativeRead=await run(path.join(invader,'invader-edit.exe'),['-t',drive+bs+'tags','-G','type','-C','player_starting_locations',scenario.replaceAll('/',bs)]);report.scenarioReadback=nativeRead.stdout.trim();
     const resources=[];for(const relative of ['shaders/fx.bin','shaders/psh.bin','shaders/vsh.bin','steam_appid.txt']){const input=path.join(kit,relative),buffer=await fs.readFile(input);if(buffer.length>16*1024**2||!buffer.length)throw Error('Invalid native launch resource');if(relative==='steam_appid.txt'&&buffer.toString('utf8').trim()!=='1532190')throw Error('Unexpected official tool identity');await fs.mkdir(path.dirname(path.join(root,relative)),{recursive:true});await fs.writeFile(path.join(root,relative),buffer,{flag:'wx'});resources.push({relative,sha256:await hash(input),bytes:buffer.length});}
     const executable=path.join(kit,'halo_tag_test.exe');report.executable={sha256:await hash(executable),bytes:(await fs.stat(executable)).size};

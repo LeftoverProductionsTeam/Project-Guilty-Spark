@@ -1325,10 +1325,14 @@ fn scenario_issues(doc:&QuickForgeDocument)->Vec<GeometryIssue> {
             }
         } else {tag_origins.insert(key,placed.source_sha256.clone());}
     }
-    if doc.spawns.len() < 4 {
+    // A prepared native solo controller exports a singleplayer scenario. Keep
+    // the multiplayer arena requirement for every other source workflow.
+    let solo_round = crate::firefight::has_native_round_source(doc);
+    if doc.spawns.len() < if solo_round { 1 } else { 4 } {
         issues.push(issue(
             "SPAWN_MINIMUM",
-            "A QuickForge arena needs at least four player starts",
+            if solo_round { "A native solo round needs at least one player start" }
+            else { "A QuickForge arena needs at least four player starts" },
             vec![],
         ));
     }
@@ -2009,7 +2013,7 @@ pub fn source_requirements(doc: &QuickForgeDocument) -> Result<(Vec<ForgeDepende
     if doc.geometry.iter().any(|brush| brush.kind == BrushKind::CaveTunnel) {
         blockers.push("Cave tunnel source geometry (including joined tunnel seams) has not been connected to the enclosing Halo BSP using verified CSG, collision, portals, PVS, lighting or AI navigation. JMS source export is permitted, but a playable QuickForge cache build is blocked until these systems are implemented and tested.".into());
     }
-    if ["firefight", "zombie"].contains(&doc.game_mode.as_str()) {
+    if ["firefight", "zombie"].contains(&doc.game_mode.as_str()) && !crate::firefight::has_native_round_source(doc) {
         blockers.push("Firefight campaign geometry is exportable; encounter/script integration and runtime wave execution must be validated before a playable build is claimed".into());
     }
     Ok((dependencies, blockers))

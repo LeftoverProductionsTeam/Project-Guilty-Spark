@@ -10,7 +10,7 @@ import { withDevelopmentWorkspace, runDevelopmentCommand, exportDevelopmentBuild
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
-if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime', 'baseline', 'sparklink'].includes(s)))
+if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime', 'baseline', 'sparklink', 'firefight'].includes(s)))
   throw Error('Unknown source-only verification stage');
 if (stages.includes('native') && ![sourceMap, kit, tags, invader].every(Boolean))
   throw Error('Native verification requires the selected owned map, kit, small tag source and Invader paths');
@@ -143,7 +143,7 @@ try {
       }
       if(stages.includes('logic'))for(const file of ['scripts/native-logic-roundtrip.mjs','scripts/test-workspace-lifecycle-native.mjs'])
         await run('Native acceptance syntax '+file,['--check',file]);
-      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')||stages.includes('runtime')||stages.includes('sparklink')){
+      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')||stages.includes('runtime')||stages.includes('sparklink')||stages.includes('firefight')){
         if(!selectedApp){
           const beforeBuild=await runtimeFingerprint();
           await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
@@ -175,6 +175,17 @@ try {
           }
         }
         if(!report.sparklink?.complete)throw Error('Real shared-source native acceptance did not pass');
+      }
+      if(stages.includes('firefight')){
+        if(![kit,tags,invader].every(Boolean))throw Error('Native Firefight acceptance requires the selected owned kit/archive/Invader');
+        const output=path.join(context.directory,'qa','firefight');await fs.mkdir(path.dirname(output),{recursive:true});
+        try{await run('Actual native solo Firefight preparation, Undo, Save, restart and compilation',[
+          'scripts/test-firefight-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release/GuiltySpark.exe'),output,path.resolve(kit),path.resolve(tags),path.resolve(invader)]);}
+        finally{
+          const data=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(data)report.firefight=JSON.parse(data);
+          if(receiptFile)for(const name of ['firefight-prepared.png','firefight-built.png','firefight-failure.png']){const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(info?.isFile()&&info.size<4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(source,target,fs.constants.COPYFILE_EXCL);(report.firefightScreenshots??=[]).push({file:target,bytes:info.size});}}
+        }
+        if(!report.firefight?.complete)throw Error('Native solo Firefight acceptance did not pass');
       }
       if(stages.includes('runtime')){
         if(!process.env.SPARK_TEST_RUNTIME_ROOT)throw Error('Runtime acceptance needs the explicitly selected owned runtime folder');
@@ -306,7 +317,7 @@ try {
       }
     },
     {
-      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry' || s === 'logic' || s === 'workspace' || s === 'runtime' || s === 'sparklink')
+      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry' || s === 'logic' || s === 'workspace' || s === 'runtime' || s === 'sparklink' || s === 'firefight')
         ? 12 * 1024 ** 3
         : 1024 ** 3,
     },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { exportHaloCeFirefightRound } from './haloScript';
+import { attachNativeFirefightRound, exportHaloCeFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
+import type { Project } from './types';
 import type { FirefightConfig } from './firefight';
 export function nativeRoundFixture():FirefightConfig {
   return {schemaVersion:1,title:'Native round',sourceSha256:null,seed:1,playerCount:1,teamLives:1,allowRevives:false,
@@ -59,4 +60,44 @@ describe('opt-in native Firefight round source',()=>{
     for(const points of [-1,NaN,100001])expect(()=>exportHaloCeFirefightRound({...config,enemies:[{...config.enemies[0],points}]})).toThrow(/points/);
     expect(()=>exportHaloCeFirefightRound({...config,rounds:32,waves:Array.from({length:32},()=>({...config.waves[0],groups:[{enemyId:'elite',count:4}],scoreMultiplierMilli:10000})),enemies:[{...config.enemies[0],points:100000}]})).toThrow(/long range/);
   });
+});
+
+describe('native round attachment to existing source document',()=>{
+  const project=()=>({firefight:nativeRoundFixture(),quickForge:{gameMode:'firefight',runtimeId:'haloCustomEdition',logic:{schemaVersion:1,triggers:[],devices:[],rules:[],handwrittenSources:[{filename:'original.hsc',content:'; original manual source'}]}}}) as unknown as Project;
+  it('binds the current rules and startup through existing handwritten modules, preserving unrelated source and input identity',()=>{
+    const original=project(),next=attachNativeFirefightRound(original);
+    expect(original.quickForge!.logic!.handwrittenSources).toHaveLength(1);
+    expect(next.quickForge!.logic!.handwrittenSources![0]).toEqual(original.quickForge!.logic!.handwrittenSources![0]);
+    const source=next.quickForge!.logic!.handwrittenSources![1].content;
+    expect(JSON.parse(source.split('\r\n')[0].slice(nativeRoundBinding.length))).toEqual(original.firefight);
+    expect(source).toContain('(script startup gs_ff_bootstrap');
+    expect(source).toContain('(set gs_ff_start true)');
+    expect(attachNativeFirefightRound(next)).toEqual(next);
+  });
+  it('refreshes only untouched generated controllers and refuses to overwrite manual edits',()=>{
+    const bound=attachNativeFirefightRound(project());
+    bound.firefight!.waves[0].groups[0].count=3;
+    const refreshed=attachNativeFirefightRound(bound);
+    expect(refreshed.quickForge!.logic!.handwrittenSources![1].content).toContain('(ai_living_count gs_w01_g01) 3');
+    refreshed.quickForge!.logic!.handwrittenSources![1].content+='; manual edit';
+    expect(()=>attachNativeFirefightRound(refreshed)).toThrow(/manual edits/);
+    expect(refreshed.quickForge!.logic!.handwrittenSources![1].content).toContain('; manual edit');
+  });
+  it('refuses unsupported source modes and keeps non-ASCII configuration outside native script bytes',()=>{
+    for(const patch of [{gameMode:'zombie'},{runtimeId:'openCe'},{native:{}}]) {
+      const p=project();Object.assign(p.quickForge!,patch);
+      expect(()=>attachNativeFirefightRound(p)).toThrow(/editable solo/);
+    }
+    const p=project();p.firefight!.title='Sûrvival';
+    const source=attachNativeFirefightRound(p).quickForge!.logic!.handwrittenSources![1].content;
+    expect([...source].every(character=>character.charCodeAt(0)<128)).toBe(true);
+  });
+});
+
+it('native solo preset keeps encounters/zones and leaves the prior authoring rules untouched',()=>{
+  const original={...nativeRoundFixture(),playerCount:2,teamLives:5,maxSpawnAttempts:3,difficultyStepPercent:25};
+  const next=nativeSoloFirefightRules(original);
+  expect(next.waves).toEqual(original.waves);expect(next.spawnZones).toEqual(original.spawnZones);
+  expect(original.playerCount).toBe(2);expect(next.playerCount).toBe(1);expect(next.teamLives).toBe(1);expect(next.maxSpawnAttempts).toBe(1);
+  expect(()=>exportHaloCeFirefightRound(next)).not.toThrow();
 });

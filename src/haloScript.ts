@@ -7,6 +7,7 @@
 import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
 import type { FirefightConfig } from './firefight';
+import type { Project } from './types';
 export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
@@ -235,4 +236,50 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
 export function scriptManifest(out:ScriptExport):string {
   return JSON.stringify({schemaVersion:1,kind:'guilty-spark-h1-script-source',file:out.filename,
     status:'exportedNotCompiled',gameplayVerified:false,scenarioType:out.scenarioType??null,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings},null,2);
+}
+
+/** Attach the existing solo controller to an editable level. Configuration is
+ * bound as ASCII authoring metadata, never a native tag field. A later rules
+ * edit is refused by the compiler until this explicit action refreshes it.
+ * Handwritten changes are retained rather than silently regenerated. */
+export const nativeRoundBinding = '; Spark native Firefight configuration: ';
+const nativeRoundBootstrap = '\r\n(script startup gs_ff_bootstrap\r\n  (sleep 1)\r\n  (set gs_ff_start true)\r\n)\r\n';
+function nativeRoundModule(config: FirefightConfig): string {
+  const source = exportHaloCeFirefightRound(config);
+  const binding = JSON.stringify(config).replace(/[\u007f-\uffff]/g, character =>
+    '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0'));
+  return nativeRoundBinding + binding + '\r\n' + source.content + nativeRoundBootstrap;
+}
+export function attachNativeFirefightRound(project: Project): Project {
+  const doc = project.quickForge, config = project.firefight;
+  if (!doc || !config || doc.gameMode !== 'firefight' ||
+      !['mccSteam','haloCustomEdition','chupathingyCe'].includes(doc.runtimeId) || doc.native)
+    throw Error('Open an editable solo Firefight level with a supported native build target first. Original Zombie restoration and shared-source scenarios use separate acceptance paths.');
+  if (config.maxSpawnAttempts !== 1) throw Error('Native solo rounds require one spawn attempt; retries remain an authoring rule.');
+  if (config.waves.reduce((n,wave)=>n+wave.groups.length,0)>128) throw Error('Native scenario supports at most 128 encounters.');
+  const module = {filename:'gs_firefight.hsc', content:nativeRoundModule(config)};
+  const logic = structuredClone(doc.logic ?? {schemaVersion:1 as const,triggers:[],devices:[],rules:[]});
+  const sources = logic.handwrittenSources ?? [];
+  const existing = sources.find(source => source.filename.toLowerCase() === module.filename);
+  if (existing && existing.content !== module.content) {
+    const firstEnd = existing.content.indexOf('\r\n');
+    if (!existing.content.startsWith(nativeRoundBinding) || firstEnd < 0)
+      throw Error('gs_firefight.hsc is handwritten. Preserve or rename it in Logic / Events before preparing a generated round.');
+    let original: string;
+    try { original = nativeRoundModule(JSON.parse(existing.content.slice(nativeRoundBinding.length,firstEnd))); }
+    catch { throw Error('The existing round source has an invalid binding; preserve it in Logic / Events before replacing it.'); }
+    if (existing.content !== original)
+      throw Error('The round source contains manual edits. Preserve or rename it in Logic / Events before regenerating.');
+  }
+  if (sources.some(source => source.filename.toLowerCase() === 'gs_firefight.hsc' && source !== existing))
+    throw Error('Duplicate native round source; retain and reconcile each source in Logic / Events.');
+  logic.handwrittenSources = [...sources.filter(source => source !== existing),module];
+  return {...project, quickForge:{...doc,logic}};
+}
+
+export function nativeSoloFirefightRules(config: FirefightConfig): FirefightConfig {
+  return {...config,playerCount:1,teamLives:1,allowRevives:false,rounds:1,endless:false,
+    preparationMs:1000,countdownMs:1000,intermissionMs:1000,spawnTimeoutMs:5000,stuckTimeoutMs:60000,
+    maxSpawnAttempts:1,maxAlive:32,maxTotalPerWave:32,difficultyStepPercent:0,extraPlayerCountPercent:0,
+    startingEquipment:[],replenishAmmoEachWave:false,supplyDropTags:[]};
 }
