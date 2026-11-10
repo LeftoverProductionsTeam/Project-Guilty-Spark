@@ -71,3 +71,8 @@ test('native authored mip colours reach GPU sampling without generated replaceme
  expect(result.errors).toEqual([]);expect(result.glError).toBe(0);expect(result.base).toEqual([240,16,32,255]);
  expect(result.authored).toEqual([24,208,56,255]);expect(result.last).toEqual(result.authored);expect(result.generated).toBe(false);expect(result.levels).toBe(2);
 });
+
+test('original reflection levels and zero-alpha RGB survive native cube GPU upload',async({page})=>{
+ await page.goto('/tests/ui/fixtures/haloMaterials.html');const result=await page.evaluate(async()=>{const {renderAuthoredCubeChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderAuthoredCubeChecks();});console.log('HALO_ORIGINAL_CUBE_MIPS',JSON.stringify(result));
+ expect(result.errors).toEqual([]);expect(result.glError).toBe(0);expect(result.base).toEqual([240,16,32,255]);expect(result.authored).toEqual([24,208,56,255]);expect(result.last).toEqual(result.authored);expect(result.transparent).toEqual([80,160,224,255]);expect(result.generated).toBe(false);expect(result.levels).toBe(2);
+});

@@ -304,6 +304,7 @@ export default function NativeModelPreview({
       data-model-lighting-ready={!!environment||sourceLighting?.key===key}
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
       data-model-original-mips={view?JSON.stringify(Object.entries(view.shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps}))):undefined}
+      data-model-original-cube-mips={view?JSON.stringify(Object.entries(view.extraTextures).filter(([,texture])=>texture instanceof THREE.CubeTexture).map(([key,texture])=>({key,bitmapTagId:texture.userData.sourceTagId,levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps,rgbaBytes:texture.userData.rgbaBytes}))):undefined}
       data-model-missing-shaders={missingShaderCount}
       data-model-texture-warnings={view?.textureWarnings?.length??0}
       data-model-unassigned-triangles={view?(unassignedTriangles??'unknown'):undefined}

@@ -228,3 +228,26 @@ export async function renderAuthoredMipChecks() {
   const state={base,authored,last,glError,generated:texture.generateMipmaps,levels:texture.mipmaps.length,errors};
   texture.dispose();material.dispose();geometry.dispose();target.dispose();renderer.dispose();return state;
 }
+
+/** Exercise the real native cube decoder/uploader, including original RGB beneath alpha. */
+export async function renderAuthoredCubeChecks(){
+ const {decodeReflectionCube,createDecodedReflectionCubeTexture}=await import('../../../src/ownedReflectionCube');
+ const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas')!,antialias:false});renderer.setSize(8,8);
+ const errors:string[]=[];renderer.debug.onShaderError=(gl,_program,vs,fs)=>errors.push(String(gl.getShaderInfoLog(vs)),String(gl.getShaderInfoLog(fs)));
+ const source='a'.repeat(64);
+ function face(size:number,colour:number[],mipLevel:number,mipLevels:number){
+  const bytes=new Uint8Array(128+size*size*4),v=new DataView(bytes.buffer);bytes.set([68,68,83,32]);for(const[at,n]of[[4,124],[12,size],[16,size],[20,size*4],[76,32],[80,0x41],[88,32],[92,0xff0000],[96,0xff00],[100,0xff],[104,0xff000000]])v.setUint32(at,n,true);
+  bytes.set(Array.from({length:size*size},()=>[colour[2],colour[1],colour[0],colour[3]]).flat(),128);
+  return{bitmapTagId:7,imageIndex:0,mipLevel,mipLevels,nativeMipmaps:mipLevels-1,width:size,height:size,format:'BGRA8',sourceSha256:source,sourceKind:'internal-cache' as const,ddsBase64:btoa(String.fromCharCode(...bytes))};
+ }
+ const response={sourceSha256:source,bitmapTagId:7,resourceSha256:null,faces:Array.from({length:6},()=>face(4,[240,16,32,255],0,2)),mipFaces:[Array.from({length:6},()=>face(2,[24,208,56,255],1,2))]};
+ const texture=createDecodedReflectionCubeTexture(decodeReflectionCube(response,source,7,{}),7);
+ const transparent={...response,faces:Array.from({length:6},()=>face(1,[80,160,224,0],0,1)),mipFaces:[]};
+ const alpha=createDecodedReflectionCubeTexture(decodeReflectionCube(transparent,source,7,{}),7);
+ const target=new THREE.WebGLRenderTarget(8,8),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
+ const geometry=new THREE.PlaneGeometry(2,2),material=new THREE.ShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{source:{value:texture},level:{value:0}},vertexShader:'void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'precision highp float;uniform samplerCube source;uniform float level;out vec4 pixel;void main(){pixel=vec4(textureLod(source,vec3(1.,0.,0.),level).rgb,1.);}'});
+ scene.add(new THREE.Mesh(geometry,material));renderer.setRenderTarget(target);
+ const sample=(cube:THREE.CubeTexture,level:number)=>{material.uniforms.source.value=cube;material.uniforms.level.value=level;renderer.render(scene,camera);const pixel=new Uint8Array(4);renderer.readRenderTargetPixels(target,4,4,1,1,pixel);return[...pixel];};
+ const result={base:sample(texture,0),authored:sample(texture,1),last:sample(texture,8),transparent:sample(alpha,0),generated:texture.generateMipmaps,levels:texture.userData.originalMipLevels,glError:renderer.getContext().getError(),errors};
+ texture.dispose();alpha.dispose();material.dispose();geometry.dispose();target.dispose();renderer.dispose();return result;
+}

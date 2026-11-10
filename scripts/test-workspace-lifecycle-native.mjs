@@ -498,7 +498,57 @@ async function nativeVehiclePreview(opened,originalHash){
   }
   expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
   expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);
-  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,incidentReadback,mipReadback,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
+  // Independently read the original cube layout and compare every returned
+  // face/level. Resource handles stay read-only and are rehashed before close.
+  const cubeIds=[...new Set(results.flatMap(row=>row.sourceShaderReferences.flatMap(ref=>{
+    const id=opened.inspection.tags.find(tag=>tag.id===ref.id)?.shaderPreview?.reflection?.bitmapTagId;return id==null?[]:[id];
+  })))],cubeReadback=[],cubeHandlesStart=handles.length,cubePinsStart=pinnedInputs.length,banks=new Map();
+  const cubeBank=async()=>{
+    const mcc=!!mipSource.resourceSha256['mcc-textures'];
+    const directory=mcc?path.join(path.dirname(path.dirname(mipSource.resourceDirectory)),'maps'):mipSource.resourceDirectory;
+    const filename=path.join(directory,'bitmaps.map'),pin=mipSource.resourceSha256[mcc?'mcc-shared-bitmaps.map':'bitmaps.map'];
+    if(!banks.has(filename))banks.set(filename,await openPinned(filename,pin));return banks.get(filename);
+  };
+  try{
+    for(const id of cubeIds){
+      const tag=opened.inspection.tags.find(tag=>tag.id===id&&tag.class==='bitm');expect(tag).toBeTruthy();
+      let record,bank,entries;
+      const readEntries=async()=>{
+        if(entries)return;bank=await cubeBank();const header=await bank.range(0,16),n=header.readUInt32LE(12),table=await bank.range(header.readUInt32LE(8),n*12);if(!n||n>65536)throw Error('Independent cube resource index exceeds bound');entries=[];
+        for(let i=0;i<n;i++){const at=i*12,nameAt=header.readUInt32LE(4)+table.readUInt32LE(at),name=await bank.range(nameAt,Math.min(1025,bank.size-nameAt)),zero=name.indexOf(0);if(zero<0)throw Error('Unterminated cube resource name');entries.push({name:name.toString('utf8',0,zero).replaceAll('\\','/').toLowerCase(),size:table.readUInt32LE(at+4),at:table.readUInt32LE(at+8)});}
+      };
+      if(tag.external){
+        await readEntries();const table=pointer(u32(tagStart),u32(tagStart+12)*32),index=u32(table+tag.index*32+20),entry=entries[index];expect(entry.name).toBe(tag.path.replaceAll('\\','/').toLowerCase());
+        const body=await bank.range(entry.at,entry.size),images=body.readUInt32LE(100);if(images<108||images+48>body.length)throw Error('Independent cube resource metadata escapes body');record=body.subarray(images,images+48);
+      }else{const at=pointer(u32(tag.dataOffset+100),48);record=bytes.subarray(at,at+48);}
+      const width=record.readUInt16LE(4),height=record.readUInt16LE(6),nativeMipmaps=record.readUInt16LE(20),encoding=record.readUInt16LE(12),flags=record.readUInt16LE(14),start=record.readUInt32LE(24),declared=record.readUInt32LE(28);
+      expect(record.readUInt16LE(10)).toBe(2);expect(width).toBe(height);if(!width||width>1024||nativeMipmaps>10||declared>16*1024**2)throw Error('Independent cube layout exceeds bound');
+      const formats={0:['A8',1],1:['Y8',1],3:['A8Y8',2],6:['R5G6B5',2],8:['A1R5G5B5',2],9:['A4R4G4B4',2],10:['BGRX8',4],11:['BGRA8',4],14:['DXT1',8],15:['DXT3',16],16:['DXT5',16]},layout=formats[encoding];if(!layout)throw Error('Independent cube encoding unavailable');
+      const[format,stride]=layout,compressed=encoding>=14,spans=[];let edge=width,offset=0,rgba=0;
+      for(let level=0;level<=nativeMipmaps;level++){if(xbox&&compressed&&edge<4&&level>0)break;const size=compressed?Math.ceil(edge/4)**2*stride:edge**2*stride;spans.push({width:edge,size,offset});offset+=size;rgba+=edge**2*4*6;edge=Math.max(1,edge>>1);}
+      const faceStride=xbox?Math.ceil(offset/128)*128:offset;if(faceStride*6>declared||rgba>16*1024**2)throw Error('Independent original cube span exceeds budget');
+      let payload;
+      if(flags&0x100){
+        await readEntries();const wanted=tag.path.replaceAll('\\','/').toLowerCase()+(expectedCacheVersion===609?'__pixels':'_0'),matches=entries.filter(entry=>entry.name===wanted);expect(matches).toHaveLength(1);const entry=matches[0];if(start<entry.at||start+declared>entry.at+entry.size)throw Error('Independent cube pixels escape exact resource entry');payload=await bank.range(start,declared);
+      }else{if(start<2048||start+declared>bytes.length)throw Error('Independent cube pixels escape original cache');payload=bytes.subarray(start,start+declared);}
+      const response=await invoke(main,'preview_owned_reflection_cube',{projectId:opened.project.id,bitmapTagId:id,sourceSha256:originalHash,includeMips:true});
+      expect(response.sourceSha256).toBe(originalHash);expect(response.bitmapTagId).toBe(id);const levels=[response.faces,...(response.mipFaces??[])];expect(levels).toHaveLength(spans.length);const hashes=[];
+      for(let level=0;level<spans.length;level++){
+        const span=spans[level];expect(levels[level]).toHaveLength(6);const faces=[];
+        for(let face=0;face<6;face++){
+          const nativeFace=xbox?(face===1?2:face===2?1:face):face,at=xbox?nativeFace*faceStride+span.offset:span.offset*6+face*span.size;
+          let expected=payload.subarray(at,at+span.size);
+          if(flags&8){if(!xbox||compressed||span.width&(span.width-1))throw Error('Invalid independent cube swizzle');const linear=Buffer.alloc(expected.length);for(let y=0;y<span.width;y++)for(let x=0;x<span.width;x++){let address=0;for(let bit=0;(1<<bit)<span.width;bit++){address|=((x>>bit)&1)<<(bit*2);address|=((y>>bit)&1)<<(bit*2+1);}expected.copy(linear,(y*span.width+x)*stride,address*stride,(address+1)*stride);}expected=linear;}
+          const image=levels[level][face],dds=Buffer.from(image.ddsBase64,'base64');expect(image).toMatchObject({bitmapTagId:id,imageIndex:0,width:span.width,height:span.width,mipLevel:level,mipLevels:spans.length,nativeMipmaps,format,sourceSha256:originalHash});expect(dds.readUInt32LE(12)).toBe(span.width);expect(dds.readUInt32LE(16)).toBe(span.width);expect(dds.subarray(128).equals(expected),'Exact original cube '+id+' level '+level+' face '+face).toBe(true);faces.push(sha(expected));
+        }
+        hashes.push({level,width:span.width,faces});
+      }
+      cubeReadback.push({bitmapTagId:id,path:tag.path,format,nativeMipmaps,levels:spans.length,rgbaBytes:rgba,originalFaces:hashes,sourceSha256:originalHash,resourceSha256:response.resourceSha256});
+    }
+    for(const input of pinnedInputs.slice(cubePinsStart))expect(await input.hash(),'Original cube resource unchanged').toBe(input.pin);
+  }finally{for(const handle of handles.slice(cubeHandlesStart))await handle.close();}
+  expect(cubeReadback.length,'Representative vehicle original reflection cubes').toBeGreaterThan(0);
+  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,incidentReadback,mipReadback,cubeReadback,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
   await chooseTool(main,'Tag editor');
   // The recovered Demo mod retains two Warthog-derived carrier objects,
   // rather than a stock Scorpion. Inspect those exact original objects.
@@ -519,6 +569,11 @@ async function nativeVehiclePreview(opened,originalHash){
       for(const shader of shaderIds)expect(originalMips.find(t=>t.shader===shader)?.levels,'Original Warthog GPU levels').toBe(mipReadback.levels.length);
     }
     row.originalGpuMips=originalMips;
+    const originalCubes=JSON.parse(row.preview.modelOriginalCubeMips);
+    expect(originalCubes).toHaveLength(Number(row.preview.modelReflections));
+    const requiredCubeIds=[...new Set(row.sourceShaderReferences.flatMap(ref=>{const id=opened.inspection.tags.find(t=>t.id===ref.id)?.shaderPreview?.reflection?.bitmapTagId;return id==null?[]:[id];}))];
+    for(const id of requiredCubeIds){const expected=cubeReadback.find(cube=>cube.bitmapTagId===id),textures=originalCubes.filter(cube=>cube.bitmapTagId===id);expect(textures.length,'Original vehicle cube bound to preview').toBeGreaterThan(0);for(const texture of textures)expect(texture).toMatchObject({levels:expected.levels,generated:false,rgbaBytes:expected.rgbaBytes});}
+    row.originalGpuCubeMips=originalCubes;
     const camera=JSON.parse(await preview.locator('canvas').getAttribute('data-gs-preview-camera'));
     expect(camera.sourceHash,'Camera belongs to this native map').toBe(originalHash);
     for(const vector of[camera.position,camera.target]){expect(vector).toHaveLength(3);expect(vector.every(Number.isFinite)).toBe(true);}
@@ -584,6 +639,10 @@ async function nativeVehiclePreview(opened,originalHash){
     const floorShader=opened.inspection.tags.find(t=>t.references?.some(ref=>ref.targetId===mipReadback.bitmapTagId&&ref.label==='Base map'));
     expect(worldMips.find(t=>t.shader===floorShader?.id)?.levels,'World retains the source Warthog original levels').toBe(mipReadback.levels.length);
     report.vehiclePreview.placedVehicle.originalGpuMips=worldMips;
+    const worldCubes=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsOriginalCubeMips));
+    for(const texture of worldCubes){expect(texture.generated).toBe(false);expect(texture.levels).toBeGreaterThan(0);expect(texture.rgbaBytes).toBeGreaterThan(0);}
+    for(const id of new Set(warthog.sourceShaderReferences.flatMap(ref=>{const id=opened.inspection.tags.find(t=>t.id===ref.id)?.shaderPreview?.reflection?.bitmapTagId;return id==null?[]:[id];}))){const expected=cubeReadback.find(cube=>cube.bitmapTagId===id),textures=worldCubes.filter(cube=>cube.bitmapTagId===id);expect(textures.length,'Original Warthog reflection bound in World').toBeGreaterThan(0);for(const texture of textures)expect(texture).toMatchObject({levels:expected.levels,generated:false,rgbaBytes:expected.rgbaBytes});}
+    report.vehiclePreview.placedVehicle.originalGpuCubeMips=worldCubes;
     const closeupCamera=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera));
     for(let axis=0;axis<3;axis++)expect(Math.abs(closeupCamera.target[axis]-framedViewport.camera.target[axis])).toBeLessThan(.001);
     await main.screenshot({path:path.join(root,'native-vehicle-world-closeup.png')});

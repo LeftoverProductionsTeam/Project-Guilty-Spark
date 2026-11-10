@@ -1,5 +1,11 @@
 import { expect, it, vi } from 'vitest';
-import { decodeReflectionCube, decodeReflectionCubeBatch } from './ownedReflectionCube';
+import * as THREE from 'three';
+import { decodedBitmapStats } from './ownedBitmapPreview';
+import {
+  decodeReflectionCube,
+  decodeReflectionCubeBatch,
+  createDecodedReflectionCubeTexture,
+} from './ownedReflectionCube';
 import type { OwnedCubeResponse } from './ownedReflectionCube';
 const source = 'a'.repeat(64);
 function cube(): OwnedCubeResponse {
@@ -113,11 +119,189 @@ it('validates the entire ordered cube batch while keeping explicit missing-resou
     decodeReflectionCubeBatch(
       {
         sourceSha256: source,
-        items: [1, 2, 3, 4].map((id) => ({ bitmapTagId: id, preview: giant, error: null })),
+        items: [1, 2, 3, 4].map((id) => ({
+          bitmapTagId: id,
+          preview: {
+            ...giant,
+            bitmapTagId: id,
+            faces: giant.faces.map((face) => ({ ...face, bitmapTagId: id })),
+          },
+          error: null,
+        })),
       },
       source,
       [1, 2, 3, 4],
       {},
     ),
   ).toThrow(/budget/);
+});
+
+function originalCube(id = 17): OwnedCubeResponse {
+  const base = cube();
+  const levels = Array.from({ length: 3 }, (_, level) =>
+    base.faces.map((face, index) => {
+      const bytes = Buffer.from(face.ddsBase64, 'base64'),
+        edge = 4 >> level;
+      bytes.writeUInt32LE(edge, 12);
+      bytes.writeUInt32LE(edge, 16);
+      bytes.writeUInt16LE((level * 6 + index + 1) * 0x800, 128);
+      return {
+        ...face,
+        bitmapTagId: id,
+        width: edge,
+        height: edge,
+        mipLevel: level,
+        mipLevels: 3,
+        nativeMipmaps: 2,
+        imageCount: 1,
+        ddsBase64: bytes.toString('base64'),
+      };
+    }),
+  );
+  return { ...base, bitmapTagId: id, faces: levels[0], mipFaces: levels.slice(1) };
+}
+it('keeps every original face and level distinct in the shared warm decoder', () => {
+  const input = originalCube(),
+    decoded = decodeReflectionCube(input, source, input.bitmapTagId, {});
+  const levels = [decoded.faces, ...decoded.mipFaces!];
+  expect(levels.map((faces) => faces.map((face) => face.width))).toEqual([
+    [4, 4, 4, 4, 4, 4],
+    [2, 2, 2, 2, 2, 2],
+    [1, 1, 1, 1, 1, 1],
+  ]);
+  expect(new Set(levels.flat().map((face) => [...face.pixels.subarray(0, 4)].join(','))).size).toBe(18);
+  expect(decoded.bytes).toBe((16 + 4 + 1) * 4 * 6);
+  const before = decodedBitmapStats();
+  const again = decodeReflectionCube(input, source, input.bitmapTagId, {});
+  expect(decodedBitmapStats().hits - before.hits).toBe(18);
+  decoded.mipFaces![0][4].pixels.fill(255);
+  expect(again.mipFaces![0][4].pixels).not.toEqual(decoded.mipFaces![0][4].pixels);
+});
+it('rejects incomplete, reordered or foreign original reflection levels before any decode', () => {
+  const input = originalCube(18);
+  const mutations: ((value: OwnedCubeResponse) => void)[] = [
+    (value) => {
+      value.mipFaces!.pop();
+    },
+    (value) => {
+      value.mipFaces!.reverse();
+    },
+    (value) => {
+      value.mipFaces![1].pop();
+    },
+    (value) => {
+      value.mipFaces![1][5].width = 2;
+    },
+    (value) => {
+      value.mipFaces![1][5].format = 'DXT3';
+    },
+    (value) => {
+      value.mipFaces![1][5].imageCount = 2;
+    },
+    (value) => {
+      value.mipFaces![1][5].bitmapTagId++;
+    },
+    (value) => {
+      value.mipFaces![1][5].imageIndex = 1;
+    },
+    (value) => {
+      value.mipFaces![1][5].sourceSha256 = 'c'.repeat(64);
+    },
+    (value) => {
+      value.mipFaces![1][5].resourceSha256 = 'c'.repeat(64);
+    },
+    (value) => {
+      value.mipFaces![1][5].nativeMipmaps = 3;
+    },
+    (value) => {
+      value.mipFaces![1][5].sourceKind = 'verified-resource';
+    },
+  ];
+  const before = decodedBitmapStats();
+  for (const mutate of mutations) {
+    const value = structuredClone(input);
+    mutate(value);
+    expect(() => decodeReflectionCube(value, source, value.bitmapTagId, {})).toThrow();
+  }
+  expect(decodedBitmapStats().misses).toBe(before.misses);
+  expect(decodedBitmapStats().hits).toBe(before.hits);
+});
+it('preflights every cube in a batch and refuses missing resource pins and excess pixels', () => {
+  const first = originalCube(19),
+    last = originalCube(20);
+  last.mipFaces![1][5].sourceSha256 = 'c'.repeat(64);
+  const response = {
+    sourceSha256: source,
+    items: [first, last].map((preview) => ({ bitmapTagId: preview.bitmapTagId, preview, error: null })),
+  };
+  const before = decodedBitmapStats();
+  expect(() => decodeReflectionCubeBatch(response, source, [19, 20], {})).toThrow(/Source map changed/);
+  expect(decodedBitmapStats()).toEqual(before);
+  const pinned = originalCube(21),
+    bank = 'd'.repeat(64);
+  pinned.resourceSha256 = bank;
+  for (const face of [pinned.faces, ...pinned.mipFaces!].flat())
+    Object.assign(face, { sourceKind: 'verified-resource', resourceSha256: bank });
+  expect(() => decodeReflectionCube(pinned, source, 21, {})).toThrow(/recorded pins/);
+  expect(decodeReflectionCube(pinned, source, 21, { 'bitmaps.map': bank }).bytes).toBe(504);
+  const giant = cube();
+  giant.faces.forEach((face) => {
+    face.width = 1024;
+    face.height = 1024;
+  });
+  expect(() => decodeReflectionCube(giant, source, 7, {})).toThrow(/budget/);
+  const overpacked = cube(),
+    packed = 'A'.repeat(4 * 1024 * 1024);
+  overpacked.faces.forEach((face) => {
+    face.ddsBase64 = packed;
+  });
+  expect(() => decodeReflectionCube(overpacked, source, 7, {})).toThrow(/budget/);
+});
+it('uploads original CPU buffers directly, preserving all levels and exact accounting', () => {
+  const decoded = decodeReflectionCube(originalCube(22), source, 22, {});
+  const texture = createDecodedReflectionCubeTexture(decoded, 22);
+  expect(texture.generateMipmaps).toBe(false);
+  expect(texture.minFilter).toBe(THREE.LinearMipmapLinearFilter);
+  expect(texture.flipY).toBe(false);
+  expect(texture.colorSpace).toBe(THREE.NoColorSpace);
+  expect(texture.userData).toMatchObject({
+    sourceTagId: 22,
+    originalMipLevels: 3,
+    rgbaBytes: 504,
+    sourceEncoded: true,
+  });
+  const images = [texture.image, ...texture.mipmaps.map((level) => (level as THREE.CubeTexture).image)];
+  for (let level = 0; level < images.length; level++)
+    for (let face = 0; face < 6; face++) {
+      expect(images[level][face]).toBeInstanceOf(THREE.DataTexture);
+      expect((images[level][face] as THREE.DataTexture).image.data).toBe(
+        [decoded.faces, ...decoded.mipFaces!][level][face].pixels,
+      );
+    }
+  texture.dispose();
+  expect(() => createDecodedReflectionCubeTexture({ ...decoded, bytes: decoded.bytes - 1 }, 22)).toThrow(
+    /budget/,
+  );
+  expect(() => createDecodedReflectionCubeTexture({ ...decoded, mipFaces: [decoded.faces] }, 22)).toThrow(
+    /layout/,
+  );
+});
+it('never fabricates lower levels for legacy base-only or shortened native cube chains', () => {
+  const decoded = decodeReflectionCube(cube(), source, 7, {}),
+    base = createDecodedReflectionCubeTexture(decoded, 7);
+  expect(base.mipmaps).toHaveLength(0);
+  expect(base.generateMipmaps).toBe(false);
+  expect(base.minFilter).toBe(THREE.LinearFilter);
+  base.dispose();
+  const shortened = originalCube(23);
+  shortened.mipFaces!.pop();
+  for (const face of [shortened.faces, ...shortened.mipFaces!].flat()) {
+    face.mipLevels = 2;
+    face.nativeMipmaps = 2;
+  }
+  const texture = createDecodedReflectionCubeTexture(decodeReflectionCube(shortened, source, 23, {}), 23);
+  expect(texture.mipmaps).toHaveLength(1);
+  expect(texture.userData.originalMipLevels).toBe(2);
+  expect(texture.generateMipmaps).toBe(false);
+  texture.dispose();
 });

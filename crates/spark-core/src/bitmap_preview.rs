@@ -551,6 +551,9 @@ pub struct OwnedCubePreview {
     pub resource_sha256:Option<String>,
     pub bitmap_tag_id:u32,
     pub faces:Vec<OwnedBitmapPreview>,
+    /// Level-major original lower faces, only on explicit chain requests.
+    #[serde(skip_serializing_if="Vec::is_empty")]
+    pub mip_faces:Vec<Vec<OwnedBitmapPreview>>,
 }
 pub const MAX_CUBE_BATCH_REQUESTS: usize = 4;
 #[derive(Serialize)]
@@ -569,7 +572,10 @@ pub struct OwnedCubeBatch {
 /// Classic/H1A linear cube top faces are mip-major: the six level-zero faces
 /// precede lower mipmaps. No face may escape the original declared image span.
 pub fn preview_owned_cube(path:&Path,expected:&str,inspection:&MapInspection,bitmap_tag_id:u32,resources:Option<(&Path,&str)>)->Result<OwnedCubePreview>{
-    let batch = preview_owned_cube_batch(path, expected, inspection, &[bitmap_tag_id], resources)?;
+    preview_owned_cube_with_mips(path,expected,inspection,bitmap_tag_id,resources,false)
+}
+pub fn preview_owned_cube_with_mips(path:&Path,expected:&str,inspection:&MapInspection,bitmap_tag_id:u32,resources:Option<(&Path,&str)>,include_mips:bool)->Result<OwnedCubePreview>{
+    let batch = preview_owned_cube_batch_with_mips(path, expected, inspection, &[bitmap_tag_id], resources,include_mips)?;
     let item = batch.items.into_iter().next().unwrap();
     item.preview.ok_or_else(|| SparkError::Invalid(item.error.unwrap()))
 }
@@ -578,6 +584,9 @@ pub fn preview_owned_cube(path:&Path,expected:&str,inspection:&MapInspection,bit
 /// The resource is hashed before/after indexing AND after all range reads.
 pub fn preview_owned_cube_batch(path: &Path, expected: &str, inspection: &MapInspection,
     ids: &[u32], resources: Option<(&Path, &str)>) -> Result<OwnedCubeBatch> {
+    preview_owned_cube_batch_with_mips(path,expected,inspection,ids,resources,false)
+}
+pub fn preview_owned_cube_batch_with_mips(path:&Path,expected:&str,inspection:&MapInspection,ids:&[u32],resources:Option<(&Path,&str)>,include_mips:bool)->Result<OwnedCubeBatch>{
     if ids.is_empty() || ids.len() > MAX_CUBE_BATCH_REQUESTS ||
         ids.iter().copied().collect::<HashSet<_>>().len() != ids.len() {
         return invalid("Reflection batch requires 1 to 4 distinct bitmap IDs");
@@ -594,7 +603,7 @@ pub fn preview_owned_cube_batch(path: &Path, expected: &str, inspection: &MapIns
     let mut metadata_bytes = 0usize;
     for &bitmap_tag_id in ids {
         let result = cube_from_snapshot(&header, &bytes, &actual, inspection, bitmap_tag_id,
-            resources, &mut resource_snapshot, &mut resource_failure, &mut raw_bytes, &mut rgba_bytes, &mut metadata_bytes);
+            resources, &mut resource_snapshot, &mut resource_failure, &mut raw_bytes, &mut rgba_bytes, &mut metadata_bytes,include_mips);
         match result {
             Ok(preview) => items.push(OwnedCubeBatchItem { bitmap_tag_id, preview: Some(preview), error: None }),
             Err(error) => items.push(OwnedCubeBatchItem { bitmap_tag_id, preview: None,
@@ -612,7 +621,7 @@ pub fn preview_owned_cube_batch(path: &Path, expected: &str, inspection: &MapIns
 fn cube_from_snapshot(header: &MapHeader, bytes: &[u8], actual: &str, inspection: &MapInspection,
     bitmap_tag_id: u32, resources: Option<(&Path, &str)>,
     resource_snapshot: &mut Option<(File, crate::resource_map::ResourceIndex)>,
-    resource_failure: &mut Option<String>, raw_bytes: &mut usize, rgba_bytes: &mut usize, metadata_bytes:&mut usize) -> Result<OwnedCubePreview> {
+    resource_failure: &mut Option<String>, raw_bytes: &mut usize, rgba_bytes: &mut usize, metadata_bytes:&mut usize,include_mips:bool) -> Result<OwnedCubePreview> {
     let tag=inspection.tags.iter().find(|t|t.id==bitmap_tag_id&&t.class=="bitm").ok_or_else(||SparkError::Invalid("Reflection cube tag is unavailable in the preserved map".into()))?;
     let meta=if tag.external {
         ensure_bitmap_resource(resources,resource_snapshot,resource_failure)?;
@@ -622,13 +631,19 @@ fn cube_from_snapshot(header: &MapHeader, bytes: &[u8], actual: &str, inspection
         let at=tag.data_offset.ok_or_else(||SparkError::Invalid("Reflection cube tag has no bounded body".into()))?;
         read_image_metadata(bytes,header,at,0,true)?
     };
-    let face_span=if meta.xbox{xbox_cube_face_span(&meta)?}else{meta.size};
+    let compressed=matches!(meta.format,"DXT1"|"DXT3"|"DXT5");
+    let count=if include_mips{flat_mip_span(meta.width,meta.height,compressed,meta.texel_stride,usize::from(meta.mipmaps)+1,0,meta.declared_size,meta.xbox)?.levels}else{1};
+    let spans:Vec<BitmapMipSpan>=(0..count).map(|level|{
+        if include_mips{flat_mip_span(meta.width,meta.height,compressed,meta.texel_stride,usize::from(meta.mipmaps)+1,level,meta.declared_size,meta.xbox)}
+        else{Ok(BitmapMipSpan{width:meta.width,height:meta.height,offset:0,size:meta.size,levels:1})}
+    }).collect::<Result<_>>()?;
+    let last=spans.last().ok_or_else(||SparkError::Invalid("Reflection cube has no valid image levels".into()))?;
+    let face_span=if meta.xbox{xbox_cube_face_span(&meta)?}else{last.offset+last.size};
     let total=face_span.checked_mul(6).ok_or_else(||SparkError::Invalid("Cube face byte count overflow".into()))?;
     if total>MAX_BATCH_RAW_BYTES||total>meta.declared_size{return invalid("Reflection cube faces exceed the declared image span or 16 MiB budget");}
-    let rgba = usize::from(meta.width) * usize::from(meta.height) * 4 * 6;
-    if total > 64 * 1024 * 1024 - *raw_bytes || rgba > 64 * 1024 * 1024 - *rgba_bytes {
-        return invalid("Reflection batch exceeds the 64 MiB packed or decoded budget");
-    }
+    let rgba=spans.iter().try_fold(0usize,|n,m|n.checked_add(usize::from(m.width)*usize::from(m.height)*4*6).ok_or_else(||SparkError::Invalid("Reflection cube pixel count overflow".into())))?;
+    if rgba>16*1024*1024{return invalid("Reflection cube exceeds the 16 MiB decoded budget");}
+    if total>64*1024*1024-*raw_bytes||rgba>64*1024*1024-*rgba_bytes{return invalid("Reflection batch exceeds the 64 MiB packed or decoded budget");}
     let mut resource_hash=None;
     let pixels=if meta.external {
         let (resource,hash)=resources.ok_or_else(||SparkError::Invalid("Reflection cube needs its exact original pinned bitmaps.map".into()))?;
@@ -644,13 +659,23 @@ fn cube_from_snapshot(header: &MapHeader, bytes: &[u8], actual: &str, inspection
         resource_hash=Some(hash.to_owned());pixels
     }else{
         if meta.raw_offset<2048{return invalid("Reflection cube pixels overlap the cache header");}
-        Reader(&bytes).bytes(meta.raw_offset,total)?.to_vec()
+        Reader(&bytes).bytes(meta.raw_offset,meta.declared_size)?;Reader(&bytes).bytes(meta.raw_offset,total)?.to_vec()
     };
-    let mut faces=Vec::with_capacity(6);
-    for index in 0..6{let native_index=if meta.xbox {match index{1=>2,2=>1,_=>index}}else{index};let at=native_index*face_span;let face=linear_top_mip(&meta,&pixels[at..at+meta.size])?;faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,mip_level:0,mip_levels:1,native_mipmaps:Some(meta.mipmaps),image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
-    *raw_bytes += total;
-    *rgba_bytes += rgba;
-    Ok(OwnedCubePreview{source_sha256:actual.to_owned(),resource_sha256:resource_hash,bitmap_tag_id,faces})
+    let mut levels=Vec::with_capacity(count);
+    for (level,span) in spans.iter().enumerate(){
+        let mut selected=meta;selected.width=span.width;selected.height=span.height;selected.size=span.size;
+        let mut faces=Vec::with_capacity(6);
+        for index in 0..6{
+            let native_index=if meta.xbox{match index{1=>2,2=>1,_=>index}}else{index};
+            let at=if meta.xbox{native_index*face_span+span.offset}else{span.offset*6+index*span.size};
+            let face=linear_top_mip(&selected,Reader(&pixels).bytes(at,span.size)?)?;
+            faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,mip_level:level,mip_levels:count,native_mipmaps:Some(meta.mipmaps),image_count:meta.image_count,shared_native_bitmap_path:None,width:span.width,height:span.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(span.width,span.height,meta.format,&face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});
+        }
+        levels.push(faces);
+    }
+    let faces=levels.remove(0);
+    *raw_bytes+=total;*rgba_bytes+=rgba;
+    Ok(OwnedCubePreview{source_sha256:actual.to_owned(),resource_sha256:resource_hash,bitmap_tag_id,faces,mip_faces:levels})
 }
 #[cfg(test)]
 fn checked_top_mip(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize) -> Result<(u16, u16, &'static str, Vec<u8>)> {
@@ -1388,6 +1413,123 @@ mod tests {
         assert!(preview_owned_bitmap(file.path(),&sha,&inspection,0x1234,0).is_err());
         bytes[0x99c..0x9a0].copy_from_slice(&16u32.to_le_bytes());std::fs::write(file.path(),bytes).unwrap();let changed=maps::hash_file(file.path()).unwrap();inspection.sha256=changed.clone();
         assert!(preview_owned_cube(file.path(),&changed,&inspection,0x1234,None).is_err());assert!(preview_owned_cube(file.path(),&sha,&inspection,0x1234,None).is_err());
+    }
+
+
+    // Synthetic cache payloads deliberately give each face/level distinct
+    // bytes. This checks native addressing independently of the DDS decoder.
+    fn cube_chain_fixture(version:u32)->(tempfile::NamedTempFile,MapInspection) {
+        let (file,mut inspection)=compatibility_fixture(version,0,17);
+        let mut bytes=std::fs::read(file.path()).unwrap();
+        if version==5{bytes[0x964..0x968].copy_from_slice(&0x803a6180u32.to_le_bytes());}
+        bytes[0x984..0x986].copy_from_slice(&8u16.to_le_bytes());
+        bytes[0x986..0x988].copy_from_slice(&8u16.to_le_bytes());
+        bytes[0x98a..0x98c].copy_from_slice(&2u16.to_le_bytes());
+        bytes[0x994..0x996].copy_from_slice(&3u16.to_le_bytes());
+        bytes[0x99c..0x9a0].copy_from_slice(&(if version==5{768u32}else{672}).to_le_bytes());
+        let spans=if version==5{vec![(0,64),(64,16)]}else{vec![(0,64),(64,16),(80,16),(96,16)]};
+        for (level,(offset,size)) in spans.into_iter().enumerate() {for face in 0..6 {
+            let at=0x2000+if version==5{face*128+offset}else{offset*6+face*size};
+            bytes[at..at+size].fill((level*6+face+1)as u8);
+        }}
+        std::fs::write(file.path(),bytes).unwrap();inspection.sha256=maps::hash_file(file.path()).unwrap();
+        (file,inspection)
+    }
+    #[test]
+    fn original_cube_chains_preserve_pc_mip_major_and_xbox_padded_face_major_bytes() {
+        for version in [7,13,5] {
+            let (file,inspection)=cube_chain_fixture(version);
+            let original=std::fs::read(file.path()).unwrap();
+            let cube=preview_owned_cube_with_mips(file.path(),&inspection.sha256,&inspection,17,None,true).unwrap();
+            let count=if version==5{2}else{4};
+            assert_eq!(cube.mip_faces.len(),count-1);
+            for (level,faces) in std::iter::once(&cube.faces).chain(&cube.mip_faces).enumerate(){
+                assert_eq!(faces.len(),6);
+                for (face,image)in faces.iter().enumerate(){
+                    let native_face=if version==5{match face{1=>2,2=>1,_=>face}}else{face};
+                    let edge=8u16>>level;let size=if level==0{64}else{16};
+                    assert_eq!((image.width,image.height,image.mip_level,image.mip_levels),(edge,edge,level,count));
+                    assert_eq!(image.native_mipmaps,Some(3));assert_eq!(image.image_count,1);
+                    assert_eq!(image.source_sha256,inspection.sha256);
+                    assert_eq!(image.dds_base64,base64(&dds_top_mip(edge,edge,"DXT3",&vec![(level*6+native_face+1)as u8;size]).unwrap()));
+                }
+            }
+            let legacy=preview_owned_cube(file.path(),&inspection.sha256,&inspection,17,None).unwrap();
+            assert!(legacy.mip_faces.is_empty());assert_eq!(legacy.faces[0].mip_levels,1);
+            assert!(serde_json::to_value(&legacy).unwrap().get("mipFaces").is_none());
+            for face in 0..6{assert_eq!(legacy.faces[face].dds_base64,cube.faces[face].dds_base64);}
+            assert_eq!(std::fs::read(file.path()).unwrap(),original);
+            for ids in [&[][..],&[17,17],&[17,18,19,20,21]]{assert!(preview_owned_cube_batch_with_mips(file.path(),&inspection.sha256,&inspection,ids,None,true).is_err());}
+            assert!(preview_owned_cube_with_mips(file.path(),&"0".repeat(64),&inspection,17,None,true).is_err());
+        }
+    }
+    #[test]
+    fn original_xbox_cube_unswizzles_each_level_without_losing_rgb_under_zero_alpha() {
+        let(file,mut inspection)=cube_chain_fixture(5);let mut bytes=std::fs::read(file.path()).unwrap();
+        for at in [0x984,0x986]{bytes[at..at+2].copy_from_slice(&4u16.to_le_bytes());}
+        bytes[0x98c..0x98e].copy_from_slice(&11u16.to_le_bytes());
+        bytes[0x98e..0x990].copy_from_slice(&8u16.to_le_bytes());bytes[0x994..0x996].copy_from_slice(&2u16.to_le_bytes());
+        let mut expected=vec![vec![Vec::new();6];3];
+        for (level,edge,offset)in [(0usize,4usize,0usize),(1,2,64),(2,1,80)]{for face in 0..6 {for y in 0..edge{for x in 0..edge{
+            let rgba=[(face*30+x)as u8,(level*50+y)as u8,(x+y)as u8,0];
+            expected[level][face].extend_from_slice(&rgba);
+            let morton=(x&1)|((y&1)<<1)|((x&2)<<1)|((y&2)<<2);
+            let at=0x2000+face*128+offset+morton*4;bytes[at..at+4].copy_from_slice(&rgba);
+        }}}}
+        std::fs::write(file.path(),&bytes).unwrap();inspection.sha256=maps::hash_file(file.path()).unwrap();
+        let cube=preview_owned_cube_with_mips(file.path(),&inspection.sha256,&inspection,17,None,true).unwrap();
+        for(level,faces)in std::iter::once(&cube.faces).chain(&cube.mip_faces).enumerate(){for(face,image)in faces.iter().enumerate(){
+            let native=match face{1=>2,2=>1,_=>face};let edge=4>>level;
+            assert_eq!(image.dds_base64,base64(&dds_top_mip(edge,edge,"BGRA8",&expected[level][native]).unwrap()));
+        }}
+        assert_eq!(std::fs::read(file.path()).unwrap(),bytes);
+    }
+    #[test]
+    fn original_cube_chain_refuses_truncated_lower_faces_and_excessive_decoded_budget() {
+        let (file,mut inspection)=cube_chain_fixture(7);let original=std::fs::read(file.path()).unwrap();
+        let mut bytes=original.clone();bytes[0x99c..0x9a0].copy_from_slice(&384u32.to_le_bytes());
+        std::fs::write(file.path(),&bytes).unwrap();inspection.sha256=maps::hash_file(file.path()).unwrap();
+        assert!(preview_owned_cube(file.path(),&inspection.sha256,&inspection,17,None).is_ok());
+        assert!(preview_owned_cube_with_mips(file.path(),&inspection.sha256,&inspection,17,None,true).is_err());
+        // A declared whole chain cannot read beyond the actual cache snapshot.
+        let mut bytes=original.clone();bytes.truncate(0x2000+671);let size=bytes.len()as u32;bytes[8..12].copy_from_slice(&size.to_le_bytes());
+        std::fs::write(file.path(),&bytes).unwrap();inspection.sha256=maps::hash_file(file.path()).unwrap();
+        assert!(preview_owned_cube_with_mips(file.path(),&inspection.sha256,&inspection,17,None,true).is_err());
+        let mut bytes=original;
+        for at in [0x984,0x986]{bytes[at..at+2].copy_from_slice(&1024u16.to_le_bytes());}
+        bytes[0x98c..0x98e].copy_from_slice(&14u16.to_le_bytes());bytes[0x994..0x996].fill(0);
+        bytes[0x99c..0x9a0].copy_from_slice(&(6u32*1024*1024/2).to_le_bytes());
+        std::fs::write(file.path(),&bytes).unwrap();inspection.sha256=maps::hash_file(file.path()).unwrap();
+        let error=preview_owned_cube_with_mips(file.path(),&inspection.sha256,&inspection,17,None,true).err().unwrap().to_string();
+        assert!(error.contains("16 MiB decoded budget"),"{error}");
+    }
+    #[test]
+    fn original_indexed_ce_cube_chain_keeps_exact_body_pixels_and_resource_pin() {
+        let(source,inspection,directory,_)=ce_indexed_fixture();let path=directory.path().join("bitmaps.map");
+        let mut resource=std::fs::read(&path).unwrap();resource.resize(0x600,0);
+        let put=|b:&mut[u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
+        put(&mut resource,0x24,288);put(&mut resource,0x28,0x300);
+        let record=0x140+108;
+        resource[record+10..record+12].copy_from_slice(&2u16.to_le_bytes());
+        resource[record+20..record+22].copy_from_slice(&2u16.to_le_bytes());
+        put(&mut resource,record+24,0x300);put(&mut resource,record+28,288);
+        for level in 0..3 {for face in 0..6{let at=0x300+level*96+face*16;resource[at..at+16].fill((level*6+face+1)as u8);}}
+        std::fs::write(&path,&resource).unwrap();let hash=maps::hash_file(&path).unwrap();
+        let original=std::fs::read(source.path()).unwrap();
+        let cube=preview_owned_cube_with_mips(source.path(),&inspection.sha256,&inspection,0x1234,Some((&path,&hash)),true).unwrap();
+        assert_eq!(cube.resource_sha256.as_deref(),Some(hash.as_str()));assert_eq!(cube.mip_faces.len(),2);
+        for(level,faces)in std::iter::once(&cube.faces).chain(&cube.mip_faces).enumerate(){for(face,image)in faces.iter().enumerate(){
+            assert_eq!(image.resource_sha256.as_deref(),Some(hash.as_str()));assert_eq!(image.source_kind,"verified-resource");
+            assert_eq!(image.dds_base64,base64(&dds_top_mip(4>>level,4>>level,"DXT3",&[(level*6+face+1)as u8;16]).unwrap()));
+        }}
+        assert_eq!(std::fs::read(&path).unwrap(),resource);assert_eq!(std::fs::read(source.path()).unwrap(),original);
+        // Corrupt only a final lower face, keeping length/index unchanged.
+        resource[0x300+287]^=1;std::fs::write(&path,&resource).unwrap();
+        assert!(preview_owned_cube_with_mips(source.path(),&inspection.sha256,&inspection,0x1234,Some((&path,&hash)),true).is_err());
+        let pin=maps::hash_file(&path).unwrap();put(&mut resource,record+28,287);std::fs::write(&path,&resource).unwrap();
+        assert!(preview_owned_cube_with_mips(source.path(),&inspection.sha256,&inspection,0x1234,Some((&path,&pin)),true).is_err());
+        let short_pin=maps::hash_file(&path).unwrap();
+        assert!(preview_owned_cube_with_mips(source.path(),&inspection.sha256,&inspection,0x1234,Some((&path,&short_pin)),true).is_err());
     }
 
     fn cube_batch_fixture(external: bool) -> (tempfile::NamedTempFile, MapInspection) {

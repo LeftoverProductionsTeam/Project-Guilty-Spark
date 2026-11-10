@@ -1,52 +1,122 @@
 import * as THREE from 'three';
 import { call } from './api';
-import {nativePreviewResource} from './nativePreviewResources';
+import { nativePreviewResource } from './nativePreviewResources';
 import { decodeOwnedBitmapPreview } from './ownedBitmapPreview';
 import type { OwnedBitmapPreview } from './ownedBitmapPreview';
+import type { DdsImage } from './haloDds';
 export interface OwnedCubeResponse {
   sourceSha256: string;
   resourceSha256: string | null;
   bitmapTagId: number;
   faces: OwnedBitmapPreview[];
+  mipFaces?: OwnedBitmapPreview[][];
 }
 export const MAX_REFLECTION_BATCH = 4;
 export interface OwnedCubeBatchResponse {
   sourceSha256: string;
   items: { bitmapTagId: number; preview: OwnedCubeResponse | null; error: string | null }[];
 }
-export type DecodedReflectionCube = ReturnType<typeof decodeReflectionCube>;
+export interface DecodedReflectionCube {
+  faces: DdsImage[];
+  mipFaces?: DdsImage[][];
+  bytes: number;
+}
 export type DecodedReflectionItem = { cube: DecodedReflectionCube | null; error: string | null };
-export function decodeReflectionCube(
+/** Admit every face and original level before decoding any payload. Xbox
+ * compressed chains can legitimately end above one pixel. */
+function cubeLayout(
   response: OwnedCubeResponse,
   source: string,
   tagId: number,
   resourceHashes: Record<string, string>,
 ) {
-  if (response.sourceSha256 !== source || response.bitmapTagId !== tagId || response.faces.length !== 6)
-    throw Error('Reflection cube identity or face count differs from its source shader.');
+  if (
+    !response ||
+    response.sourceSha256 !== source ||
+    response.bitmapTagId !== tagId ||
+    !/^[a-f\d]{64}$/i.test(source) ||
+    !Number.isSafeInteger(tagId) ||
+    tagId < 0 ||
+    tagId > 0xffffffff
+  )
+    throw Error('Reflection cube identity differs from its source shader.');
   if (response.resourceSha256 && !Object.values(resourceHashes).includes(response.resourceSha256))
     throw Error('Reflection cube resources differ from the map’s recorded pins.');
-  let edge = 0,
-    bytes = 0;
-  const faces = response.faces.map((face, cubeFaceIndex) => {
-    const image = decodeOwnedBitmapPreview(
-      face,
-      {
-        bitmapTagId: tagId,
-        imageIndex: 0,
-        sourceSha256: source,
-        resourceSha256: response.resourceSha256,
-      },
-      cubeFaceIndex,
-    );
-    if (image.width !== image.height || image.width > 1024 || (edge && edge !== image.width))
-      throw Error('Reflection faces must have the same bounded square dimensions.');
-    edge = image.width;
-    bytes += image.pixels.byteLength;
-    return image;
-  });
-  if (bytes > 16 * 1024 * 1024) throw Error('Reflection cube exceeds the 16 MiB decoded budget.');
-  return { faces, bytes };
+  if (
+    !Array.isArray(response.faces) ||
+    response.faces.length !== 6 ||
+    (response.mipFaces !== undefined && !Array.isArray(response.mipFaces))
+  )
+    throw Error('Reflection cube face count differs from its source shader.');
+  const first = response.faces[0],
+    edge = first?.width,
+    count = first?.mipLevels ?? 1;
+  if (
+    !Number.isInteger(edge) ||
+    edge < 1 ||
+    edge > 1024 ||
+    !Number.isInteger(count) ||
+    count < 1 ||
+    count > 11 ||
+    count > 1 + Math.floor(Math.log2(edge)) ||
+    (response.mipFaces ?? []).length !== count - 1
+  )
+    throw Error('Reflection original level count or dimensions are invalid.');
+  const levels = [response.faces, ...(response.mipFaces ?? [])];
+  let packed = 0,
+    rgba = 0;
+  for (const [level, faces] of levels.entries()) {
+    if (!Array.isArray(faces) || faces.length !== 6)
+      throw Error('Reflection original level has an invalid face count.');
+    const expected = Math.max(1, Math.floor(edge / 2 ** level));
+    for (const face of faces) {
+      if (!face || face.bitmapTagId !== tagId || face.imageIndex !== 0 || face.sourceSha256 !== source)
+        throw Error('Source map changed or reflection face refers to a different tag or image.');
+      if (
+        face.width !== expected ||
+        face.height !== expected ||
+        (face.mipLevel ?? 0) !== level ||
+        (face.mipLevels ?? 1) !== count ||
+        face.nativeMipmaps !== first.nativeMipmaps ||
+        (face.imageCount ?? 1) !== (first.imageCount ?? 1) ||
+        face.format !== first.format ||
+        (face.sourceKind ?? 'internal-cache') !== (first.sourceKind ?? 'internal-cache') ||
+        (face.resourceSha256 ?? null) !== response.resourceSha256
+      )
+        throw Error('Reflection original face dimensions, encoding or source metadata changed.');
+      if (typeof face.ddsBase64 !== 'string' || face.ddsBase64.length > 23 * 1024 * 1024)
+        throw Error('Reflection face exceeds its bounded image layout.');
+      packed += Math.floor(face.ddsBase64.length / 4) * 3;
+      rgba += expected * expected * 4;
+    }
+  }
+  if (packed > 16 * 1024 * 1024 + 128 * 6 * count || rgba > 16 * 1024 * 1024)
+    throw Error('Reflection cube exceeds its packed or decoded 16MiB budget.');
+  return { levels, packed, rgba };
+}
+export function decodeReflectionCube(
+  response: OwnedCubeResponse,
+  source: string,
+  tagId: number,
+  resourceHashes: Record<string, string>,
+): DecodedReflectionCube {
+  const layout = cubeLayout(response, source, tagId, resourceHashes);
+  const levels = layout.levels.map((faces, mipLevel) =>
+    faces.map((face, cubeFaceIndex) =>
+      decodeOwnedBitmapPreview(
+        face,
+        {
+          bitmapTagId: tagId,
+          imageIndex: 0,
+          mipLevel,
+          sourceSha256: source,
+          resourceSha256: response.resourceSha256,
+        },
+        cubeFaceIndex,
+      ),
+    ),
+  );
+  return { faces: levels[0], mipFaces: levels.slice(1), bytes: layout.rgba };
 }
 /** Validate the complete transaction before admitting any GPU textures. One
  * malformed identity poisons the batch; explicit per-cube refusals stay visible. */
@@ -78,27 +148,12 @@ export function decodeReflectionCubeBatch(
         throw Error('Reflection batch refusal is invalid.');
       continue;
     }
-    if (!Array.isArray(item.preview.faces) || item.preview.faces.length !== 6)
-      throw Error('Reflection batch has an invalid face count.');
-    for (const face of item.preview.faces) {
-      if (
-        !face ||
-        typeof face.ddsBase64 !== 'string' ||
-        face.ddsBase64.length > 23 * 1024 * 1024 ||
-        !Number.isInteger(face.width) ||
-        !Number.isInteger(face.height) ||
-        face.width <= 0 ||
-        face.height <= 0 ||
-        face.width > 1024 ||
-        face.height > 1024
-      )
-        throw Error('Reflection batch face exceeds its bounded image layout.');
-      packed += Math.floor(face.ddsBase64.length / 4) * 3;
-      rgba += face.width * face.height * 4;
-    }
+    const layout = cubeLayout(item.preview, source, item.bitmapTagId, resourceHashes);
+    packed += layout.packed;
+    rgba += layout.rgba;
   }
-  if (packed > 64 * 1024 * 1024 + 128 * 6 * ids.length || rgba > 64 * 1024 * 1024)
-    throw Error('Reflection batch exceeds its packed or decoded 64 MiB budget.');
+  if (packed > 64 * 1024 * 1024 + 128 * 6 * 11 * ids.length || rgba > 64 * 1024 * 1024)
+    throw Error('Reflection batch exceeds its packed or decoded 64MiB budget.');
   return new Map(
     response.items.map((item) => [
       item.bitmapTagId,
@@ -121,6 +176,7 @@ export async function loadReflectionCubeBatch(
     projectId,
     sourceSha256: source,
     bitmapTagIds: ids,
+    includeMips: true,
   });
   return decodeReflectionCubeBatch(response, source, ids, resourceHashes);
 }
@@ -135,11 +191,16 @@ export async function loadReflectionCube(
 }
 /** Raw bytes only; callers must validate/decode before creating any texture. */
 export function readReflectionCube(projectId: string, source: string, tagId: number) {
-  return nativePreviewResource<OwnedCubeResponse>('preview_owned_reflection_cube', {
-    projectId,
-    bitmapTagId: tagId,
-    sourceSha256: source,
-  },source);
+  return nativePreviewResource<OwnedCubeResponse>(
+    'preview_owned_reflection_cube',
+    {
+      projectId,
+      bitmapTagId: tagId,
+      includeMips: true,
+      sourceSha256: source,
+    },
+    source,
+  );
 }
 export function createReflectionCubeTexture(
   response: OwnedCubeResponse,
@@ -151,24 +212,46 @@ export function createReflectionCubeTexture(
   return createDecodedReflectionCubeTexture(decoded, tagId);
 }
 export function createDecodedReflectionCubeTexture(decoded: DecodedReflectionCube, tagId: number) {
-  const images = decoded.faces.map((face) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = face.width;
-    canvas.height = face.height;
-    const context = canvas.getContext('2d');
-    if (!context) throw Error('Reflection image canvas is unavailable');
-    const pixels = context.createImageData(face.width, face.height);
-    pixels.data.set(face.pixels);
-    context.putImageData(pixels, 0, 0);
-    return canvas;
-  });
-  const texture = new THREE.CubeTexture(images);
+  const levels = [decoded.faces, ...(decoded.mipFaces ?? [])],
+    edge = decoded.faces[0]?.width;
+  if (
+    !Number.isInteger(edge) ||
+    edge < 1 ||
+    edge > 1024 ||
+    levels.length > 11 ||
+    levels.length > 1 + Math.floor(Math.log2(edge))
+  )
+    throw Error('Invalid original reflection texture levels');
+  let bytes = 0;
+  for (const [level, faces] of levels.entries()) {
+    const size = Math.max(1, Math.floor(edge / 2 ** level));
+    if (
+      faces.length !== 6 ||
+      faces.some(
+        (face) => face.width !== size || face.height !== size || face.pixels.byteLength !== size * size * 4,
+      )
+    )
+      throw Error('Invalid original reflection face layout');
+    bytes += size * size * 4 * 6;
+  }
+  if (bytes !== decoded.bytes || bytes > 16 * 1024 * 1024)
+    throw Error('Original reflection pixel budget differs from decoded data');
+  // Data images preserve RGB beneath alpha; a canvas round trip cannot.
+  const images = levels.map((faces) =>
+    faces.map((face) => new THREE.DataTexture(face.pixels, face.width, face.height, THREE.RGBAFormat)),
+  );
+  const texture = new THREE.CubeTexture(images[0]);
+  // Three's uncompressed cube upload expects lower levels without the base.
+  texture.mipmaps = images.slice(1).map((faces) => new THREE.CubeTexture(faces));
   texture.colorSpace = THREE.NoColorSpace;
   texture.flipY = false;
-  texture.generateMipmaps = true;
-  texture.needsUpdate = true;
-  texture.userData.rgbaBytes = decoded.bytes;
+  texture.generateMipmaps = false;
+  texture.minFilter = levels.length > 1 ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.userData.originalMipLevels = levels.length;
+  texture.userData.rgbaBytes = bytes;
   texture.userData.sourceEncoded = true;
   texture.userData.sourceTagId = tagId;
+  texture.needsUpdate = true;
   return texture;
 }
