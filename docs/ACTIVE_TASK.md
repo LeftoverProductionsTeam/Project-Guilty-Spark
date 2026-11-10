@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: e70dab2 parent + reviewed MCC increment: R48322bitmap/4pack Rust; R485481frontend/TypeScript/contracts/offline/40storage/freshWindows158.065s. R487–R491all5source-native checks pass, source/pack mismatch preserved, Studio choice cannot change source lighting; R4923real-GPU cases pass. Original hashes unchanged/0errors/normalclose/disposal.
-Next action: Verify manifests/checkpoint, commit this MCC source-lighting/resource repair locally, then address remaining source-native vehicle fidelity (authored3D GPU mip chains/lighting interpolation) in existing pipeline. H29game, shadows/poses and M1–M6 human/hardware gates remain open.
+Latest verified revision: 67807697bc4ead98535b28e767e06ad94381a371 clean source; R48322bitmap/4pack Rust; R485481frontend/TypeScript/contracts/offline/40storage/freshWindows158.065s; R487–R491five-source native and R4923GPU pass. R493verifies currentQA fingerprint against commit; retires only2superseded nonrunning QA executables101,037,568logicalB, retains receipts/captures/currentR485 and protected releases.
+Next action: Continue remaining native vehicle fidelity in existing shared pipeline: inspect original authored mip-chain use on3D GPU textures, reproduce a genuine displayed discrepancy before changing it; keep H29matched game/shadow/pose and all M1–M6 acceptance gates open. No repeat full audits/tests without new changes.
 
 ## Acceptance
 
