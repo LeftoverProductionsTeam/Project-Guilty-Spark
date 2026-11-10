@@ -468,9 +468,17 @@ async function uiName(a, index, name) {
 }
 async function workshopControlAcceptance(a){
   const workshop=a.page.getByLabel('Native BSP Workshop',{exact:true});
+  const focusState=async()=>Promise.all(actors.map(async actor=>({actor:actor.slug,native:await actor.call('plugin:window|is_focused',{label:'main'}),visible:await actor.call('plugin:window|is_visible',{label:'main'}),minimized:await actor.call('plugin:window|is_minimized',{label:'main'}),webview:await actor.page.evaluate(()=>({focused:document.hasFocus(),visibility:document.visibilityState,title:document.title,window:window.__TAURI_INTERNALS__.metadata.currentWindow.label,screen:{x:screenX,y:screenY},viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio}}))})));
+  await mark('nativeWorkshopFocusBefore',await focusState());
+  // Put the isolated native test's keyboard owner through an actual window
+  // restore. Other creators remain separate processes with their own documents.
+  for(const actor of actors)await actor.call('plugin:window|minimize',{label:'main'});
+  await a.call('plugin:window|unminimize',{label:'main'});
   await a.call('plugin:window|set_focus',{label:'main'});
+  await mark('nativeWorkshopFocusRestored',await focusState());
   await mark('nativeWindowFocusRequest',{actor:'owner',reason:'Workshop input',authority:'nativeWindow',requestedAt:new Date().toISOString()});
-  await expect.poll(()=>a.call('plugin:window|is_focused',{label:'main'}),{message:'Activate the exact private Workshop owner before native input'}).toBe(true);
+  try{await expect.poll(()=>a.call('plugin:window|is_focused',{label:'main'}),{message:'Activate the exact private Workshop owner before native input'}).toBe(true);}
+  catch(error){await mark('nativeWorkshopFocusFailure',await focusState());throw error;}
   await workshop.locator('.bsp-source-list').getByRole('button',{name:/Ramp/,exact:false}).click();
   await expect(workshop.getByRole('textbox',{name:'Volume name',exact:true})).toHaveValue('Ramp');
   await workshop.getByRole('button',{name:'Move',exact:true}).click();
@@ -629,6 +637,7 @@ try {
   }
   await workshopControlAcceptance(a);
   await continuousWorkspaceAcceptance(a);
+  for(const actor of actors.slice(1))await actor.call('plugin:window|unminimize',{label:'main'});
   let nativeAdmission;
   if(sharedNativeContent)nativeAdmission=await prepareSharedNativeContent({actors,source:nativeSource,sourcePath:nativeSourceMap,cacheVersion,templateTags:chupathingyTrial?receipt.ceSource.reviewedRecovery.tagsDirectory:tags,kit,invader,expect,hash:fileHash,panel,uiBuild,save,retire:retireQaTagIntermediates,mark});
   const networks = await a.call('forge_session_networks');
@@ -658,6 +667,22 @@ try {
   await mark('nativeWindowFocusRequest',{actor:'editor-c',authority:'nativeWindow',requestedAt:new Date().toISOString()});
   await expect.poll(()=>c.call('plugin:window|is_focused',{label:'main'}),{message:'Activate the exact private editor-c native window'}).toBe(true);
   const initialPosition=Number(await positionX.inputValue()),scrubBounds=await positionX.boundingBox();expect(scrubBounds).toBeTruthy();
+  // Observe real native input before changing production behavior. Retain a
+  // bounded event trace on failure; it never drives or synthesizes input.
+  await positionX.evaluate((input,bounds)=>{
+    const events=[];
+    const record=event=>{
+      const target=event.target,rect=input.getBoundingClientRect();
+      events.push({kind:event.type,time:performance.now(),trusted:event.isTrusted,target:target instanceof HTMLElement?(target.getAttribute('aria-label')||target.tagName):null,x:event.clientX,y:event.clientY,buttons:event.buttons,pointer:event.pointerId,captured:typeof event.pointerId==='number'&&input.hasPointerCapture(event.pointerId),value:input.value,focused:document.activeElement===input,documentFocused:document.hasFocus(),bounds:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}});
+      if(events.length>64)events.shift();
+    };
+    const kinds=['pointerdown','pointermove','pointerup','pointercancel','gotpointercapture','lostpointercapture','dragstart','dragend','select','focusin','focusout','blur','focus'];
+    for(const kind of kinds)window.addEventListener(kind,record,true);
+    const hit=document.elementFromPoint(bounds.x+20,bounds.y+bounds.height/2);
+    window.__sparkQaReadScrubTrace=()=>({events,value:input.value,connected:input.isConnected,disabled:input.disabled,focused:document.activeElement===input,documentFocused:document.hasFocus(),hitWasInput:hit===input,hitLabel:hit instanceof HTMLElement?(hit.getAttribute('aria-label')||hit.tagName):null,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},screen:{x:screenX,y:screenY}});
+    window.__sparkQaEndScrubTrace=()=>{for(const kind of kinds)window.removeEventListener(kind,record,true);delete window.__sparkQaReadScrubTrace;delete window.__sparkQaEndScrubTrace;};
+  },scrubBounds);
+  const scrubTrace=async phase=>({phase,nativeFocused:await c.call('plugin:window|is_focused',{label:'main'}),...await c.page.evaluate(()=>window.__sparkQaReadScrubTrace())});
   try{
     await c.page.mouse.move(scrubBounds.x+20,scrubBounds.y+scrubBounds.height/2);await c.page.mouse.down();
     await c.page.mouse.move(scrubBounds.x+50,scrubBounds.y+scrubBounds.height/2,{steps:8});
@@ -669,7 +694,10 @@ try {
       await expect.poll(async()=>{const state=await focus();return state.owner.native&&!state.editor.native;},{message:'Native window authority must leave the scrub owner; WebView focus is diagnostic only'}).toBe(true);
       await expect(positionX).toHaveValue(String(initialPosition));
     }catch(error){await mark('nativeScrubFocusFailure',await focus());throw error;}
-  }finally{await c.page.mouse.up();}
+    await mark('nativeScrubInputTrace',await scrubTrace('cancelled-by-native-window-transfer'));
+  }catch(error){
+    await mark('nativeScrubInputTrace',await scrubTrace('failed-before-acceptance'));throw error;
+  }finally{await c.page.mouse.up();await c.page.evaluate(()=>window.__sparkQaEndScrubTrace?.());}
   await c.call('plugin:window|set_focus',{label:'main'});await c.page.getByRole('button',{name:'Select',exact:true}).click();
   await converge(current);expect((await view(a)).revision).toBe(current.revision);
   expect(await c.call('forge_studio_pending',{projectId:c.id})).toBeNull();
