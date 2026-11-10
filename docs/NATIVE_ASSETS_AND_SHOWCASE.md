@@ -6,6 +6,26 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## Native vehicle diffuse-light range — 10 November follow-through
+
+Committed shadow repair35f5646 is extended within the same shared Halo material. R553 actual GPU pixels reproduce[186,122,211] where bounded native diffuse lighting plus the separate source reflection expects[160,122,160]. The ambient/primary/bounce sum could exceed native colour range before texture multiplication. The shader now saturates only verified source-local diffuse illumination; authored emission/reflection, textures/alpha/UVs, baked BSPs, native geometry and explicit user HDR lighting remain separate. This is source-compatible rendering math, not exposure adjustment or fallback material.
+
+R555 all6GPU cases pass with exact expected colours,0GLerrors and unchanged geometry reuse. Artist HDR remains[255,255,255]. R554 is a failed patch-guard attempt followed by5/6tests, despite its historical filename containing green; it is not accepted evidence. R556 passes500frontend, TypeScript, contracts, offline and40storage checks; fresh Windows build169.085s. Backend is unchanged since the920Rust/9ignored R542 pass. The prior frozen278browser pass belongs to the shadow revision; the current material-specific6GPU checks are independently rerun after this change.
+
+| Original native source | Evidence | Native Windows check | Source-local vehicle light |
+|---|---|---:|---|
+| Chupathingy Xbox5 | vehicle-light-range-chupa-r556.json | 36.904s | verified |
+| CE Timberland609 | vehicle-light-range-ce-r558.json | 39.506s | verified |
+| MCC Blood Gulch13 | vehicle-light-range-mcc-r559.json | 41.310s | verified |
+| OpenCE Xbox5 | vehicle-light-range-opence-r560.json | 32.494s | verified |
+| Original Zombie Demo6 | vehicle-light-range-demo-r561.json | 37.422s | unavailable; source preview only |
+
+All five runs complete/0errors/normalclose with unchanged original hashes, same retained viewport and0newpreview reads on return. Only the four source-lit fixtures accept the local lighting/shadow path. Demo has no invented lighting/shadow fallback. Exact receipt vehicle-light-range-acceptance-r562.json and unmodified before/after close-ups preserve the numerical/native limits. H29 dynamic poses, complete material families, native vertex interpolation and full matching-game acceptance remain open. No new native map build or human/game-peer/release claim.
+
+Current QA E/qa-vehicle-light-range-r556/GuiltySpark.exe,50458624B,SHA5ebc280f9b80c26dbfa40e0ef8cf96e9f7e9fde83aa146d98003d533efeed067; runtime fingerprint5d4d439c1f3baf7625912c268dfb95938d7c493235e5e683fae8054f3521f67f. Built from35f5646 plus the reviewed range correction, not a release. Current frame E/vehicle-light-range-chupa-r556-native-vehicle-world-closeup.png. Superseded cube QA R532 was retired only after hash/normalclose/five-source replacement acceptance (vehicle-shadow-qa-retirement-r557.json); its source, manifests and screenshots remain.
+
+Read-only primary research: [Chupathingy9990568 model lighting](https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/port/linux/src/nv2a_psh.c#L537-L596). Its bounded diffuse-colour contract informs this independent equation; no engine implementation is imported. The research commit differs from installed0.9.0c/b506ba74; that exact commit is unavailable in the local pinned source history. No matching-build renderer parity is inferred.
+
 ## Vehicle shadows: real-game comparison and shared-renderer repair — 10 November
 
 R541 uses two actual isolated Chupathingy0.9.0c/b506ba74 processes on private loopback Blood Gulch. Native logs report both players, loaded map and camera ticks. The visible host's documented camera save/load was operated through the native console. This installed build resolves camera.txt under its owned data root, not executable working directory. Position readback differs by at most0.000001world units; direction quantization measures0.019552°forward/0.015652°up. The captured projection/vehicle size is not equal to Spark's, so this is not pixel-parity acceptance. Both games exit0, all21original input pins are unchanged and1,698,298,339logical bytes of owned scratch are disposed. No human driving/combat/AI/peer-gameplay result follows. R539/R540 remain unsuccessful single-player lobby trials.
@@ -18,7 +38,7 @@ The same viewport GL context owns at most8near-visible128px targets (524288RGBA 
 
 Focused CPU checks pass3cases. Real shared-component GPU checks pass6cases: floor[200,150,100]→source-shadow[40,60,60], unchanged/moved/hidden/old-metadata/cutout/chroma behaviour, target restoration, zeroGLerrors, warm0updates and13eligible casters bounded to8targets. R543 reproduces hidden-pass cache accounting0instead of1; R544green retains65536B while paused. Initial GPU blend-state and test-camera resizing defects were corrected without relaxing expected pixels. Frozen R546 passes500frontend/278browser, TypeScript, contracts, offline and40storage checks; its fresh Windows build takes168.552s. R542 passes920Rust/9explicit ignores on this unchanged backend. R542’s earlier277/278browser failure and R543’s red memory-accounting test are retained; unchanged idle R545 and full frozen R546 pass. No assertions were relaxed.
 
-Actual Windows native source checks all complete with0errors, normal close, unchanged original map/resource hashes and disposed owned scratch. The placed-Warthog close-up reports8cached targets/524288B,0warm silhouette updates and0refused receivers in every source. Source reads and required primary materials remain complete; no extracted count is promoted to game parity.
+Actual Windows native source checks all complete with0errors, normal close, unchanged original map/resource hashes and disposed owned scratch. The four source-lit CE/Chupathingy/MCC/OpenCE close-ups report8cached targets/524288B,0warm silhouette updates and0refused receivers. The original Demo carrier has no verified local-lighting result and draws0shadows; its passing source/preview checks do not accept shadow fidelity. Source reads and required primary materials remain complete; no extracted count is promoted to game parity.
 
 | Source fixture | Evidence | Native check | Receiver triangles in close-up |
 |---|---|---:|---:|

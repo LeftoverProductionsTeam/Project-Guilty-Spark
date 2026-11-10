@@ -61,6 +61,9 @@ test('source-sky lighting reaches placed objects without relighting baked BSPs o
   for(const [i,expected]of[27,50,60,255].entries())expect(Math.abs(result.localZero.pixel[i]-expected)).toBeLessThanOrEqual(1);
   for(const frame of[result.local,result.localNoSky])for(const [i,expected]of[53,101,137,255].entries())expect(Math.abs(frame.pixel[i]-expected)).toBeLessThanOrEqual(1);
   for(const [frame,value]of[[result.localOverride,64],[result.localBaked,96],[result.localNonObject,160],[result.removed,64]] as const)for(const i of[0,1,2])expect(Math.abs(frame.pixel[i]-value)).toBeLessThanOrEqual(1);
+  expect(result.glError).toBe(0);
+  for(const [i,expected]of[160,122,160,255].entries())expect(Math.abs(result.localBright.pixel[i]-expected)).toBeLessThanOrEqual(1);
+  expect(result.artistHdr.pixel).toEqual([255,255,255,255]);expect(result.localBright.geometry).toBe(result.removed.geometry);
   expect(result.localGreen.pixel).toEqual([0,255,0,255]);expect(result.local.geometry).toBe(result.localBaseline.geometry);expect(result.localNoSky.geometry).toBe(result.local.geometry);expect(result.removed.geometry).toBe(result.beforeRemove.geometry);
 });
 

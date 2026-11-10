@@ -207,7 +207,13 @@ export async function renderObjectLightingChecks(){
   const localBaseline=await read(true,true);
   const localZero=await read(true,true,false,false,false,{...localLighting,primaryDirection:[0,0,0]});
   const local=await read(true,true,false,false,false,localLighting),localNoSky=await read(true,false,false,false,false,localLighting),localOverride=await read(true,true,false,true,false,localLighting),localBaked=await read(true,true,true,false,false,localLighting),localNonObject=await read(false,true,false,false,false,localLighting),localGreen=await read(true,true,false,false,true,localLighting),beforeRemove=await read(true,true,false,false,false,localLighting),removed=await read(true,true);
-  root.unmount();await new Promise(r=>setTimeout(r,600));for(const t of[base,light,cube])t.dispose();target.dispose();return{object,unavailable,baked,bakedObject,override,green,localBaseline,localZero,local,localNoSky,localOverride,localBaked,localNonObject,localGreen,beforeRemove,removed,errors};
+  // Native diffuse illumination saturates before texture multiplication;
+  // reflection remains a later, independent source contribution.
+  const brightLighting={...localLighting,ambient:[.4,.5,.6] as [number,number,number],primary:[.8,.2,.8] as [number,number,number],reflection:[1,1,1] as [number,number,number],reflectionBrightness:1};
+  const localBright=await read(true,true,false,false,false,brightLighting);
+  value.ambientIntensity=2;const artistHdr=await read(true,true,false,true,false,brightLighting);value.ambientIntensity=.25;
+  const glError=state!.gl.getContext().getError();
+  root.unmount();await new Promise(r=>setTimeout(r,600));for(const t of[base,light,cube])t.dispose();target.dispose();return{object,unavailable,baked,bakedObject,override,green,localBaseline,localZero,local,localNoSky,localOverride,localBaked,localNonObject,localGreen,beforeRemove,removed,localBright,artistHdr,glError,errors};
 }
 
 /** Distinct authored levels must survive GPU upload; averaging level zero

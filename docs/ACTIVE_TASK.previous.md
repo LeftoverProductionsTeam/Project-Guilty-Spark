@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 74b273586bb6f19e7b4296b962a97de56ae928c0; accepted original-cube source/GPU increment. R532920Rust/9ignored,497frontend,277browser/TypeScript/contracts/offline/40storage/freshWindows167.818s; R532–R536 five native sources complete/0errors/normalclose/originalsunchanged/scratchdisposed. RuntimeFP9358963e… matches committed source/currentQA SHAc382b610…. R537 retires only verified supersededR520QA. H29game/shadows/poses and all M1–M6 remain open.
-Next action: R546 frozen500frontend/278browser/TypeScript/contracts/offline/40storage pass, including unchanged idle rendering; fresh Windows build RUNNING under owner64529. R542920Rust/9ignored on unchanged backend; its earlier browser1failure remains recorded. R543 paused-cache GPU red fixed/R544all6GPUgreen. Finish R546 native Chupa, four other source formats and local source acceptance commit; preserve H29 game parity/pose. R541 original pins/games/scratch terminal and preserved in linked evidence.
+Latest verified revision: 35f5646be857e3e2baeaf91da6752dc7c13ff630 native vehicle shadows committed locally. R546–R549/R551 five Windows sources complete/0errors/originals unchanged/disposed;920Rust/9ignored,500frontend/278browser/6GPU. Exact evidence/QA: NATIVE_ASSETS_AND_SHOWCASE.md and E/vehicle-shadow-acceptance-r552.json.
+Next action: R553 GPU red proves native-light saturation mismatch[186,122,211]vs[160,122,160]; R555 all6GPU green after shared shader repair, authored reflection/emission and artist HDR preserved. Build frozen Windows/native Chupa R556, verify other four sources, update evidence/manifests and commit. Three runtime/test files dirty; no game active. R554 patch-guard failure retained, not a green result. H29/full M1–M6 remain open.
 
 ## Acceptance
 

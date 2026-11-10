@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 931ec6cf9fb7e6bf3a46afbb411c1008bfe601c7 plus reviewed source-shadow changes; R546–R549/R551 five native sources complete/0errors/originals unchanged/disposed. R542920Rust/9ignored; R546500frontend/278browser/6GPU/TypeScript/contracts/offline/40storage/freshWindows168.552s. Exact QA fingerprint, captures and failures: NATIVE_ASSETS_AND_SHOWCASE.md; E/vehicle-shadow-acceptance-r552.json.
-Next action: Commit verified vehicle-shadow increment locally, then reproduce native illumination-range mismatch in real GPU pixels and repair only source-native lighting. R550 profiling false-positive repaired by request-start boundary; R551 passes unchanged zero-new-preview-read assertion. No active game/native process. H29 game appearance/pose and full M1–M6 remain open.
+Latest verified revision: 35f5646be857e3e2baeaf91da6752dc7c13ff630 plus reviewed diffuse-range shader repair. R556/R558–R561 five native Windows source previews pass, four verified source-lit/Demo limited;0errors/originals unchanged/disposed.500frontend/current6GPU/types/contracts/offline/40storage; prior278browser/920Rust9ignored remain distinct. Exact binary/hash/evidence: NATIVE_ASSETS_AND_SHOWCASE.md, E/vehicle-light-range-acceptance-r562.json.
+Next action: Commit verified native-light range repair and exact documentation locally. Then reproduce retained shadow GPU context-loss recovery before further H29 native shader/pose comparison. R553red/R555green and failedR554 preserved. All native wrappers terminal; no game active. Keep Demo missing local light, meter/light-reference parts and full game parity open; no source-map compile/release claim.
 
 ## Acceptance
 

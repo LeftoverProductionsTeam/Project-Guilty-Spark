@@ -108,8 +108,11 @@ void main(){
         base.rgb*=clamp(relief/baseDiffuse,.25,2.0);n=perturbed;}}
     if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);
       if(enhancedSpecular){float mask=multipurposeXbox?masks.r:masks.b;vec3 halfVector=normalize(lightUnit(lightDirection)+normalize(-haloView));base.rgb+=sunFill*mask*pow(max(0.0,dot(n,halfVector)),32.0)*specularStrength;}}
-    if(overrideLighting||localObjectLighting)base.rgb*=ambientFill+sunFill*max(0.0,dot(n,lightUnit(lightDirection)))+
+    if(overrideLighting||localObjectLighting){vec3 illumination=ambientFill+sunFill*max(0.0,dot(n,lightUnit(lightDirection)))+
       (localObjectLighting?bounceFill*max(0.0,dot(n,lightUnit(bounceDirection))):vec3(0.0));
+      // Native diffuse lighting saturates before modulating the texture. Keep
+      // source reflections/emission and explicit artist HDR overrides separate.
+      base.rgb*=localObjectLighting?clamp(illumination,0.0,1.0):illumination;}
     // Native emission adds to diffuse illumination before multiplication by
     // the surface colour. It survives darkness and does not require optional
     // post-processing. A black diffuse texel still cannot invent light.
