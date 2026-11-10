@@ -8,6 +8,7 @@ import {fillRuntimeTexturePreviews} from './runtimeTexturePreview';
 import {decodeOwnedBitmapBatch,MAX_NATIVE_BATCH_RGBA_BYTES,bitmapImageKey} from './ownedBitmapBatch';
 import type {OwnedBitmapBatchResponse} from './ownedBitmapBatch';
 import {configureSourceTexture} from './sourceTexture';
+import {readOwnedBitmapMipmaps} from './ownedBitmapMipmaps';
 import {extraTextureKey} from './haloMaterial';
 import {useTextureResourceScopes,bitmapResourceSha256} from './textureResourceScope';
 import {nativeShaderTextureRole,glassWithoutDiffuse} from './nativeShaderTextures';
@@ -16,6 +17,7 @@ import {planOwnedMaterialPreviews} from './ownedMaterialBatch';
 import {decalTextureRequests} from './mapDecals';
 
 export interface OwnedModelView {
+  textureWarnings?: string[];
   ready?: boolean;
   mesh: MeshData;
   lightmapTextures?: Record<string,THREE.Texture>;
@@ -121,12 +123,15 @@ export function useOwnedForgeModels(
               if(source.inspection?.sha256===placement.sourceSha256)images=await fillRuntimeTexturePreviews(source.project,source.inspection,targets,images);
             }
             if(!live)return;
+            images=await readOwnedBitmapMipmaps(placement.sourceProjectId!,targets,images,()=>live);
+            if(!live)return;
             for(const image of images.values())if(image.image){
-            const raw=image.image,bytes=Math.ceil(raw.pixels.byteLength*4/3);
+            if(image.mipError)view.textureWarnings=[...new Set([...(view.textureWarnings??[]),image.mipError])];
+            const raw=image.image,bytes=(image.originalMipmaps??[raw]).reduce((n,m)=>n+m.pixels.byteLength,0);
             const roles=new Set(tasks.filter(task=>task.bitmap===image.bitmapTagId&&task.imageIndex===image.imageIndex).map(task=>roleFor(task.role)));
             for(const role of roles){const pixelKey=textureKey(image.bitmapTagId,image.imageIndex,role);if(pool.has(pixelKey))continue;
               if(textureBytes+bytes>MAX_NATIVE_BATCH_RGBA_BYTES){errors[key]='Some native textures exceed the 64 MiB viewport budget';continue;}
-              const texture=configureSourceTexture(new THREE.DataTexture(raw.pixels,raw.width,raw.height,THREE.RGBAFormat),role);
+              const texture=configureSourceTexture(new THREE.DataTexture(raw.pixels,raw.width,raw.height,THREE.RGBAFormat),role,image.originalMipmaps??[raw]);
               textureBytes+=bytes;pool.set(pixelKey,texture);
             }
           }

@@ -37,6 +37,8 @@ export interface VerifiedBatchImage {
   mipLevels?: number;
   imageCount?: number;
   image: DdsImage | null;
+  originalMipmaps?: DdsImage[];
+  mipError?: string;
   sourceKind: 'internal-cache' | 'verified-resource' | null;
   error: string | null;
   errorCode?: string | null;

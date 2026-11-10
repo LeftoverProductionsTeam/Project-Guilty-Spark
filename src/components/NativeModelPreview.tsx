@@ -303,7 +303,9 @@ export default function NativeModelPreview({
       data-model-lighting={environment?'custom':sourceLighting?.key===key&&sourceLighting.value?.environment?'source':'inspection'}
       data-model-lighting-ready={!!environment||sourceLighting?.key===key}
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
+      data-model-original-mips={view?JSON.stringify(Object.entries(view.shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps}))):undefined}
       data-model-missing-shaders={missingShaderCount}
+      data-model-texture-warnings={view?.textureWarnings?.length??0}
       data-model-unassigned-triangles={view?(unassignedTriangles??'unknown'):undefined}
       data-model-material-gaps={missingShaderCount+(incompleteAttribution?1:0)}
       data-model-reflections={
@@ -353,6 +355,7 @@ export default function NativeModelPreview({
       )}
       <ShieldLoading phase={pendingPhase} active={activity.active&&visible}/>
       {failures[key] && <small role="status">{failures[key]} <button type="button" onClick={()=>{setFirstFrame('');setRetry(n=>n+1);}}>Retry preview</button></small>}
+      {!!view?.textureWarnings?.length&&<small className="model-material-coverage" role="status" aria-label="Original texture detail warning">{view.textureWarnings.join(' ')}</small>}
       {surface==='collision'&&collisionValue&&<small className="model-collision-status" role="status">
         {collisionValue.error?<>Native collision rejected: {collisionValue.error} <button onClick={()=>setCollisionRetry(n=>n+1)}>Retry collision</button></>:collisionValue.mesh?`${collisionValue.mesh.indices.length/3} native collision triangles · default pose`:'No native collision geometry is attached to this object.'}
       </small>}

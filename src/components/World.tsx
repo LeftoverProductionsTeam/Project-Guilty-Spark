@@ -43,6 +43,7 @@ import { extraTextureKey } from '../haloMaterial';
 import {nativeEdgePick,donorPoint} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import {configureSourceTexture} from '../sourceTexture';
+import {readOwnedBitmapMipmaps} from '../ownedBitmapMipmaps';
 import {playerStartCamera} from '../sourceCamera';
 import {sourceSpartan} from '../sourceSpartan';
 import SceneEnvironment from './SceneEnvironment';
@@ -356,6 +357,7 @@ function Scene({
   },[inspection,project.scene,ownedModels,spawnModel,assetMeshes]);
   const localLightState=useNativeObjectLighting(project.id,project.source?.sha256===inspection?.sha256?inspection?.sha256:undefined,bitmapResourceSha256(project.source),inspection?.header.version,lightProbes);
   const nativeLights=localLightState.lights;
+  useEffect(()=>{gl.domElement.dataset.gsOriginalMips=JSON.stringify(Object.entries(shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps})));},[gl,shaderTextures]);
   useEffect(()=>{gl.domElement.dataset.gsObjectLighting=JSON.stringify({probed:lightProbes.length,applied:nativeLights?.size??0,sourceSha256:inspection?.sha256??null,method:'native-default-pose-centre',runtimeCornerSampling:false,pending:localLightState.pending,reason:localLightState.reason,milliseconds:localLightState.milliseconds,lights:[...(nativeLights??[])].map(([id,value])=>({id,...value}))});},[gl,lightProbes,nativeLights,inspection?.sha256,localLightState.pending,localLightState.reason,localLightState.milliseconds]);
   const dropBody=(object:SceneObject):DropBody=>{
     const linked=sourcePlacement(object),view=linked?ownedModels[forgeModelKey(linked)]:undefined;
@@ -713,10 +715,14 @@ export default function World({
         resourceSha256: bitmapResourceSha256(project.source),
       });
       const texture = new THREE.DataTexture(image.pixels, image.width, image.height, THREE.RGBAFormat);
-      configureSourceTexture(texture,'shader');
+      const target={bitmapTagId,imageIndex:0,sourceSha256,resourceSha256:bitmapResourceSha256(project.source)};
+      const chain=await readOwnedBitmapMipmaps(expectedProjectId,[target],new Map([[bitmapImageKey(bitmapTagId,0),{bitmapTagId,imageIndex:0,mipLevel:0,mipLevels:response.mipLevels,nativeMipmaps:response.nativeMipmaps,imageCount:response.imageCount,image,sourceKind:response.sourceKind??'internal-cache',error:null}]]),()=>currentInspectionRef.current===sourceSha256&&currentProjectRef.current===expectedProjectId);
+      const original=chain.get(bitmapImageKey(bitmapTagId,0))!;
+      configureSourceTexture(texture,'shader',original.originalMipmaps??[image]);
+      if(original.mipError)notify(original.mipError);
       const metadata=inspection.tags.find(t=>t.id===shaderTagId)?.shaderPreview;
       if(metadata){texture.userData.alphaTest=metadata.alphaTest;texture.repeat.set(...metadata.uvScale);}
-      texture.userData.rgbaBytes=image.pixels.byteLength;
+      texture.userData.rgbaBytes=texture.userData.rgbaBytes??image.pixels.byteLength;
       texture.name = `Read-only Halo cache bitmap ${image.format} #${bitmapTagId}`;
       withinTextureBudget(texture,texturesRef.current[shaderTagId]);
       if (currentInspectionRef.current !== sourceSha256 || currentProjectRef.current !== expectedProjectId) {
@@ -791,7 +797,8 @@ export default function World({
       if(!isCurrent())return;
       // Reject the WHOLE payload on one stale ID, changed hash, unsolicited
       // image, oversized DDS, or malformed success/refusal pair.
-      const decoded=await fillRuntimeTexturePreviews(project,inspection,targets,decodeOwnedBitmapBatch(response,targets));
+      const baseImages=await fillRuntimeTexturePreviews(project,inspection,targets,decodeOwnedBitmapBatch(response,targets));
+      const decoded=await readOwnedBitmapMipmaps(projectAtStart,targets,baseImages,isCurrent);
       if(!isCurrent())return;
       let textureBytes=0;
       for(const task of tasks){
@@ -800,7 +807,8 @@ export default function World({
         if (!found?.image) {failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,
           code:found?.errorCode??'verification-failed',reason:found?.error??'No image returned'});continue;}
         const image=found.image;
-        const byteCount=image.pixels.byteLength;
+        const byteCount=(found.originalMipmaps??[image]).reduce((n,m)=>n+m.pixels.byteLength,0);
+        if(found.mipError){failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,code:'incomplete-original-mips',reason:found.mipError});}
         if (byteCount > MAX_NATIVE_BATCH_RGBA_BYTES-textureBytes) {failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,code:'budget-exceeded',reason:'Decoded textures exceed the 64 MiB operation budget'});continue;}
         if (task.kind==='shader' && (texturesRef.current[task.shaderTagId] || shaderLoaded.has(task.shaderTagId))) {
           failed++;continue;
@@ -809,7 +817,7 @@ export default function World({
           failed++;continue;
         }
         const texture = new THREE.DataTexture(image.pixels,image.width,image.height,THREE.RGBAFormat);
-        configureSourceTexture(texture,task.kind);
+        configureSourceTexture(texture,task.kind,found.originalMipmaps??[image]);
         try{withinTextureBudget(texture);}catch(e){failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,code:'budget-exceeded',reason:String(e)});continue;}
         if(task.kind==='shader') {const metadata=inspection.tags.find(t=>t.id===task.shaderTagId)?.shaderPreview;
           if(metadata){texture.userData.alphaTest=metadata.alphaTest;texture.repeat.set(...metadata.uvScale);}}

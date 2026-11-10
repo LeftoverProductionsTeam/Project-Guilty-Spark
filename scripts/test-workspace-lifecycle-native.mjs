@@ -509,6 +509,14 @@ async function nativeVehiclePreview(opened,originalHash){
     await expect(preview).toHaveAttribute('data-model-first-frame','true',{timeout:90000});
     await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
     row.preview=await preview.evaluate(element=>({...element.dataset}));
+    expect(Number(row.preview.modelTextureWarnings),'Original native vehicle mip chains complete').toBe(0);
+    const originalMips=JSON.parse(row.preview.modelOriginalMips);for(const texture of originalMips){expect(texture.generated,'Source model texture must not generate replacement levels').toBe(false);expect(texture.levels).toBeGreaterThan(0);}
+    if(name==='warthog'){
+      const shaderIds=opened.inspection.tags.filter(t=>row.sourceShaderReferences.some(ref=>ref.id===t.id)&&t.references.some(ref=>ref.targetId===mipReadback.bitmapTagId&&ref.label==='Base map')).map(t=>t.id);
+      expect(shaderIds.length,'Warthog original base-image shader').toBeGreaterThan(0);
+      for(const shader of shaderIds)expect(originalMips.find(t=>t.shader===shader)?.levels,'Original Warthog GPU levels').toBe(mipReadback.levels.length);
+    }
+    row.originalGpuMips=originalMips;
     const camera=JSON.parse(await preview.locator('canvas').getAttribute('data-gs-preview-camera'));
     expect(camera.sourceHash,'Camera belongs to this native map').toBe(originalHash);
     for(const vector of[camera.position,camera.target]){expect(vector).toHaveLength(3);expect(vector.every(Number.isFinite)).toBe(true);}
@@ -569,6 +577,11 @@ async function nativeVehiclePreview(opened,originalHash){
     const beforeDistance=distance(framedViewport.camera);
     for(let k=0;k<24;k++){await main.mouse.wheel(0,-400);await main.waitForTimeout(35);}
     await expect.poll(async()=>distance(await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera)))).toBeLessThan(beforeDistance*.35);
+    const worldMips=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsOriginalMips));
+    for(const texture of worldMips){expect(texture.generated).toBe(false);expect(texture.levels).toBeGreaterThan(0);}
+    const floorShader=opened.inspection.tags.find(t=>t.references?.some(ref=>ref.targetId===mipReadback.bitmapTagId&&ref.label==='Base map'));
+    expect(worldMips.find(t=>t.shader===floorShader?.id)?.levels,'World retains the source Warthog original levels').toBe(mipReadback.levels.length);
+    report.vehiclePreview.placedVehicle.originalGpuMips=worldMips;
     const closeupCamera=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera));
     for(let axis=0;axis<3;axis++)expect(Math.abs(closeupCamera.target[axis]-framedViewport.camera.target[axis])).toBeLessThan(.001);
     await main.screenshot({path:path.join(root,'native-vehicle-world-closeup.png')});

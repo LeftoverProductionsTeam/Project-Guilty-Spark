@@ -4,6 +4,7 @@ import { call, native } from './api';
 import { decodeOwnedBitmapBatch, uniqueBitmapTargets, MAX_NATIVE_BATCH_RGBA_BYTES } from './ownedBitmapBatch';
 import type { OwnedBitmapBatchResponse } from './ownedBitmapBatch';
 import { configureSourceTexture } from './sourceTexture';
+import {readOwnedBitmapMipmaps} from './ownedBitmapMipmaps';
 import { loadReflectionCube } from './ownedReflectionCube';
 import { nativeShaderTextureRole } from './nativeShaderTextures';
 import { textureResourceScope,bitmapResourceSha256 } from './textureResourceScope';
@@ -75,7 +76,7 @@ export function useWorkshopTextures(
           bitmapResourceSha256(source.project.source);
         const requests = uniqueBitmapTargets(tasks, inspection.sha256, resource),
           pool = new Map<number, THREE.Texture>();
-        let bytes = 0;
+        let bytes = 0;const mipWarnings:string[]=[];
         for (let offset = 0; offset < requests.length; offset += 24) {
           const wanted = requests.slice(offset, offset + 24);
           const response = await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch', {
@@ -83,15 +84,18 @@ export function useWorkshopTextures(
             requests: wanted.map((r) => ({ bitmapTagId: r.bitmapTagId, imageIndex: 0 })),
           });
           if (!alive) return;
-          for (const image of decodeOwnedBitmapBatch(response, wanted).values()) {
+          const images=await readOwnedBitmapMipmaps(source.project.id,wanted,decodeOwnedBitmapBatch(response,wanted),()=>alive);
+          if(!alive)return;
+          for (const image of images.values()) {
             if (!image.image) continue;
             const raw = image.image;
-            bytes += Math.ceil((raw.pixels.byteLength * 4) / 3);
+            bytes += (image.originalMipmaps??[raw]).reduce((n,m)=>n+m.pixels.byteLength,0);
+            if(image.mipError)mipWarnings.push(image.mipError);
             if (bytes > MAX_NATIVE_BATCH_RGBA_BYTES)
               throw Error('Workshop textures exceed the 64 MiB preview budget');
             const texture = configureSourceTexture(
               new THREE.DataTexture(raw.pixels, raw.width, raw.height, THREE.RGBAFormat),
-              'shader',
+              'shader',image.originalMipmaps??[raw],
             );
             owned.push(texture);
             pool.set(image.bitmapTagId, texture);
@@ -100,7 +104,7 @@ export function useWorkshopTextures(
         const result: Record<string, WorkshopMaterialView> = {},
           base: Record<string, THREE.Texture> = {},
           cubePool = new Map<number, THREE.CubeTexture>(),
-          warnings: string[] = [];
+          warnings: string[] = [...new Set(mipWarnings)];
         for (const { material, tag } of materials) {
           const baseId = tasks.find((t) => t.material === material && t.role === 'base')?.bitmapTagId;
           const texture = baseId === undefined ? null : pool.get(baseId);

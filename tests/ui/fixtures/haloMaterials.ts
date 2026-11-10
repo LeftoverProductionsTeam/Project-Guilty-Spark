@@ -209,3 +209,22 @@ export async function renderObjectLightingChecks(){
   const local=await read(true,true,false,false,false,localLighting),localNoSky=await read(true,false,false,false,false,localLighting),localOverride=await read(true,true,false,true,false,localLighting),localBaked=await read(true,true,true,false,false,localLighting),localNonObject=await read(false,true,false,false,false,localLighting),localGreen=await read(true,true,false,false,true,localLighting),beforeRemove=await read(true,true,false,false,false,localLighting),removed=await read(true,true);
   root.unmount();await new Promise(r=>setTimeout(r,600));for(const t of[base,light,cube])t.dispose();target.dispose();return{object,unavailable,baked,bakedObject,override,green,localBaseline,localZero,local,localNoSky,localOverride,localBaked,localNonObject,localGreen,beforeRemove,removed,errors};
 }
+
+/** Distinct authored levels must survive GPU upload; averaging level zero
+ * cannot reproduce the deliberately different lower-level colour. */
+export async function renderAuthoredMipChecks() {
+  const {configureSourceTexture}=await import('../../../src/sourceTexture');
+  const renderer=new THREE.WebGLRenderer({canvas:document.querySelector('canvas')!,antialias:false});renderer.setSize(8,8);
+  const errors:string[]=[];renderer.debug.onShaderError=(_gl,_program,vs,fs)=>errors.push(String(_gl.getShaderInfoLog(vs)),String(_gl.getShaderInfoLog(fs)));
+  const rgba=(size:number,c:number[])=>({width:size,height:size,pixels:Uint8Array.from(Array.from({length:size*size},()=>c).flat()),format:'BGRA8' as const});
+  const levels=[rgba(4,[240,16,32,255]),rgba(2,[24,208,56,255])];
+  const texture=new THREE.DataTexture(levels[0].pixels,4,4,THREE.RGBAFormat);
+  configureSourceTexture(texture,'shader',levels);
+  const target=new THREE.WebGLRenderTarget(8,8),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
+  const geometry=new THREE.PlaneGeometry(2,2),material=new THREE.ShaderMaterial({glslVersion:THREE.GLSL3,uniforms:{source:{value:texture},level:{value:1}},vertexShader:'out vec2 v;void main(){v=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'precision highp float;uniform sampler2D source;uniform float level;in vec2 v;out vec4 pixel;void main(){pixel=textureLod(source,v,level);}'});
+  scene.add(new THREE.Mesh(geometry,material));renderer.setRenderTarget(target);
+  const sample=(level:number)=>{material.uniforms.level.value=level;renderer.render(scene,camera);const pixel=new Uint8Array(4);renderer.readRenderTargetPixels(target,4,4,1,1,pixel);return [...pixel];};
+  const base=sample(0),authored=sample(1),last=sample(8),glError=renderer.getContext().getError();
+  const state={base,authored,last,glError,generated:texture.generateMipmaps,levels:texture.mipmaps.length,errors};
+  texture.dispose();material.dispose();geometry.dispose();target.dispose();renderer.dispose();return state;
+}
