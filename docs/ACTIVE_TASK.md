@@ -3,7 +3,7 @@
 Task: Operation110 — native fidelity, safe validation recovery and creator acceptance
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 702da54 baseline plus scoped uncommitted R621 native solo Firefight/Save repairs, to be committed as an explicit WIP source checkpoint. R621926Rust/9ignored,508frontend/types/offline/42storage, real native UI/compile/independent readback pass; R62010focusedbrowser pass. Full280browser intentionally interrupted for owner shutdown. Exact hashes and boundaries FIREFIGHT_ENGINE.md.
+Latest verified revision: 1858fc9b830140268161302be08ae81f8d3660d5 — explicit WIP native solo Firefight/verified Save checkpoint since702da54. R621926Rust/9ignored,508frontend/types/offline/42storage, real Windows UI/compiler/independent readback pass; R62010focusedbrowser pass. Full280browser deliberately interrupted at177started. Gameplay/HUD/peers and fullM1–M6 remain OPEN.
 Next action: Deliberate session shutdown. On resumption finish the interrupted280browser suite, verify actor-source fidelity/user workflow and starting weapon/profile, then actual supported runtime load/combat. No further development this session. Firefight gameplay/HUD/peers and Operation110 remain OPEN.
 
 ## Acceptance
@@ -105,7 +105,7 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-R621 complete/exit0: native Tool59.263s, cache13/solo0 SHA257cc1fc0d36296d2c5964577dcc777d0d1847c920c4feacb9bf0344bf16b4fe, independent Invader actor/count/position/script readback pass. Two normal app closes,0pageerrors, original SDK unchanged; owned5543231770logicalB disposed. R62010focusedbrowser pass. Full280browser intentionally stopped at started test177/280; its owner disposed26068848logicalB. No active test/native/game remains after shutdown verification. E/firefight-native-r621.json and FIREFIGHT_ENGINE.md hold exact hashes/failures. No remote operation; fullM1–M6/475IDs remain.
+R621 complete/exit0: native Tool59.263s, cache13/solo0 SHA257cc1fc0d36296d2c5964577dcc777d0d1847c920c4feacb9bf0344bf16b4fe, independent Invader actor/count/position/script readback pass. Two normal app closes,0pageerrors, original SDK unchanged; owned5543231770logicalB disposed. R62010focusedbrowser pass. Full280browser intentionally stopped at started test177/280; its owner disposed26068848logicalB. R621 and the interrupted browser owner have exited; their owned output is disposed. Final scoped process check follows. E/firefight-native-r621.json and FIREFIGHT_ENGINE.md hold exact hashes/failures. No remote operation; fullM1–M6/475IDs remain.
 
 Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
 

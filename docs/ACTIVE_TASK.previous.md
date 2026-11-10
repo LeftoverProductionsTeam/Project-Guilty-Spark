@@ -3,8 +3,8 @@
 Task: Operation110 — native fidelity, safe validation recovery and creator acceptance
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: a7ff16a6d459705af5a6a096a3192a39aa6843bf accepts H05 native17loadedguide steps, File/New/Save/Libraryreopen and two process restarts. ecbb422f8a4e88944b1ef616e20c3163d4c29662 fixes failed-action writers; R602realChupa/22pins/previous-good/disposal and R60350scoped checks plusoffline pass. Runtime289cf11/QAe75731d7/FP8eb59374 unchanged. R593922Rust/9ignored,501frontend,279browser are prior full runtime evidence, not rerun here.
-Next action: R616 actual native Tool compiled solo Firefight but final verifier incorrectly required multiplayer type1. Compare against existing native_scenario_type instead. R62010Save/history browser tests now pass atomic geometry/default commit before lease release. R621 full Rust/frontend/freshWindows/native independent readback starts; no gameplay accepted.
+Latest verified revision: 702da54 baseline plus scoped uncommitted R621 native solo Firefight/Save repairs, to be committed as an explicit WIP source checkpoint. R621926Rust/9ignored,508frontend/types/offline/42storage, real native UI/compile/independent readback pass; R62010focusedbrowser pass. Full280browser intentionally interrupted for owner shutdown. Exact hashes and boundaries FIREFIGHT_ENGINE.md.
+Next action: Deliberate session shutdown. On resumption finish the interrupted280browser suite, verify actor-source fidelity/user workflow and starting weapon/profile, then actual supported runtime load/combat. No further development this session. Firefight gameplay/HUD/peers and Operation110 remain OPEN.
 
 ## Acceptance
 
@@ -105,7 +105,7 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-R616 terminal native failure: real Tool built1449-tag65.04M solo cache, existing encounter/script/source verifiers passed, final hardcoded multiplayer-type guard rejected it. Inputs/disposable staging protected. R613 immediate Save/Undo/Redo/restart pass; R62010browser including deliberately delayed geometry Save now green after atomic source commit. R621 begins on702da54+dirty, dynamic existing source-type check; no game/native Firefight acceptance yet. E/firefight-native-r616.json/log; E/save-atomic-r620-browser.log. No remote operations.
+R621 complete/exit0: native Tool59.263s, cache13/solo0 SHA257cc1fc0d36296d2c5964577dcc777d0d1847c920c4feacb9bf0344bf16b4fe, independent Invader actor/count/position/script readback pass. Two normal app closes,0pageerrors, original SDK unchanged; owned5543231770logicalB disposed. R62010focusedbrowser pass. Full280browser intentionally stopped at started test177/280; its owner disposed26068848logicalB. No active test/native/game remains after shutdown verification. E/firefight-native-r621.json and FIREFIGHT_ENGINE.md hold exact hashes/failures. No remote operation; fullM1–M6/475IDs remain.
 
 Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
 
