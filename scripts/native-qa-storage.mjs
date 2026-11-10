@@ -1229,6 +1229,54 @@ export async function beginQaStorage(
     record.writers = [...writers].map((child) => child.pid);
     await persistRecord();
   };
+  // Only completed, regenerable CRX installers in a freshly declared QA
+  // WebView profile. Installed components, browser state and unknown files
+  // stay intact. Never admit an existing user profile or follow an alias.
+  finish.retireWebviewInstallers = async (relative) => {
+    const owned = registry.directories.find(row => row.relative === relative);
+    if (finished || !owned) throw Error('Installer cache requires declared active QA scratch');
+    const directory = path.join(absolute, relative);
+    await noLinks(directory);
+    const identity = await fs.lstat(directory, { bigint: true });
+    if (String(identity.dev) !== owned.dev || String(identity.ino) !== owned.ino)
+      throw Error('QA profile ownership changed; installer cache retained');
+    const cache = path.join(directory, 'webview', 'EBWebView', 'component_crx_cache');
+    await noLinks(cache);
+    const info = await fs.lstat(cache).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (!info) return { logicalBytes: 0, retired: [], kept: [], qaOnly: true };
+    if (!info.isDirectory()) throw Error('QA component installer cache is not a directory');
+    const entries = await fs.readdir(cache, { withFileTypes: true });
+    if (entries.length > 128) throw Error('QA installer cache exceeds its inventory bound');
+    const candidates = [], kept = [];
+    let bytes = 0;
+    for (const entry of entries) {
+      const file = path.join(cache, entry.name);
+      await noLinks(file);
+      const stat = await fs.lstat(file);
+      if (!stat.isFile()) { kept.push({ name: entry.name, reason: 'not an installer file' }); continue; }
+      bytes += stat.size;
+      if (bytes > 128 * 1024 ** 2) throw Error('QA installer cache exceeds its byte bound');
+      const handle = await fs.open(file, 'r'), header = Buffer.alloc(12);
+      let read;
+      try { read = await handle.read(header, 0, header.length, 0); } finally { await handle.close(); }
+      const headerBytes = header.readUInt32LE(8);
+      if (read.bytesRead !== 12 || header.toString('ascii', 0, 4) !== 'Cr24' ||
+          header.readUInt32LE(4) !== 3 || headerBytes < 1 || headerBytes > 1024 ** 2 ||
+          headerBytes + 12 >= stat.size) {
+        kept.push({ name: entry.name, bytes: stat.size, reason: 'not a complete CRX3 installer' });
+        continue;
+      }
+      candidates.push({ name: entry.name, seal: await sealQaScratch(absolute, file, 128 * 1024 ** 2) });
+    }
+    const retired = [];
+    for (const candidate of candidates) {
+      const sha256 = candidate.seal.inventory.rows.find(row => !row.directory).sha256;
+      const result = await disposeQaScratch(absolute, candidate.seal, { ownerFinished: true });
+      retired.push({ name: candidate.name, bytes: result.bytes, sha256 });
+    }
+    return { logicalBytes: retired.reduce((total, row) => total + row.bytes, 0), retired, kept,
+      qaOnly: true, installedComponentsAndProfilePreserved: true };
+  };
   finish.sample = monitor.sample;
   finish.interrupt = async () => {
     await Promise.all([...writers].map(stopQaProcess));

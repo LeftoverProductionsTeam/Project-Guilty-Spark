@@ -229,18 +229,33 @@ fn reserve_revision(output:&Path,parts:&[(&Path,&Inventory)])->Result<crate::sto
 pub fn fork(source: &Path, output: &Path, cancel: Arc<AtomicBool>) -> Result<Inventory> {
     let output = destination_outside_sources(output, &[source])?;
     let hashes = inventory(source)?;
+    fork_inventory(source, &output, &hashes, &hashes, cancel)
+}
+
+/// Fork only an exact previously validated dependency inventory. Generated
+/// scenario/BSP outputs and unrelated SDK files never enter the new baseline.
+pub fn fork_selected(source: &Path, output: &Path, selected: &Inventory, cancel: Arc<AtomicBool>) -> Result<Inventory> {
+    crate::working_tag_changes::validate_baseline(selected)?;
+    let output = destination_outside_sources(output, &[source])?;
+    let before = inventory(source)?;
+    if selected.iter().any(|(path, hash)| before.get(path) != Some(hash)) {
+        return invalid("Selected native inputs changed; no revision was created");
+    }
+    fork_inventory(source, &output, selected, &before, cancel)
+}
+fn fork_inventory(source: &Path, output: &Path, hashes: &Inventory, before: &Inventory, cancel: Arc<AtomicBool>) -> Result<Inventory> {
     if cancel.load(Ordering::Relaxed) {
         return invalid("Source staging cancelled before creating a revision");
     }
-    let lease=reserve_revision(&output,&[(source,&hashes)])?;
+    let lease=reserve_revision(output,&[(source,hashes)])?;
     fs::create_dir(&output)?;
     lease.mark_owned()?;
     copy_inventory(source, &output, &hashes, &cancel)?;
-    if inventory(source)? != hashes || inventory(&output)? != hashes {
+    if inventory(source)? != *before || inventory(output)? != *hashes {
         return invalid("Source changed while staging; the partial fork is retained for diagnosis and cannot be accepted");
     }
     use sha2::Digest;let revision=crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(&hashes)?));lease.finish(true,Some(revision))?;
-    Ok(hashes)
+    Ok(hashes.clone())
 }
 
 /// Stage a new result of a reviewed merge. The caller must retain the baseline
@@ -308,6 +323,22 @@ mod tests {
     use super::*;
     fn cancel() -> Arc<AtomicBool> {
         Arc::new(AtomicBool::new(false))
+    }
+    #[test]
+    fn selected_fork_retains_only_validated_inputs_and_refuses_changed_or_unsafe_names() {
+        let root=tempfile::tempdir().unwrap();let source=root.path().join("compiled");fs::create_dir(&source).unwrap();
+        fs::write(source.join("input.weapon"),b"validated input").unwrap();
+        fs::write(source.join("generated.scenario_structure_bsp"),b"previous geometry").unwrap();
+        let before=inventory(&source).unwrap();let selected=Inventory::from([("input.weapon".into(),before["input.weapon"].clone())]);
+        let output=root.path().join("admitted");assert_eq!(fork_selected(&source,&output,&selected,cancel()).unwrap(),selected);
+        assert_eq!(inventory(&source).unwrap(),before);assert!(!output.join("generated.scenario_structure_bsp").exists());
+        fs::write(output.join("input.weapon"),b"external candidate").unwrap();assert_eq!(inventory(&source).unwrap(),before);
+        let target=root.path().join("refused");fs::write(source.join("input.weapon"),b"changed input").unwrap();
+        assert!(fork_selected(&source,&target,&selected,cancel()).is_err());assert!(!target.exists());
+        let unsafe_names=Inventory::from([("../input.weapon".into(),before["input.weapon"].clone())]);
+        assert!(fork_selected(&source,&target,&unsafe_names,cancel()).is_err());assert!(!target.exists());
+        assert!(fork_selected(&source,&source.join("nested"),&inventory(&source).unwrap(),cancel()).is_err());
+        assert!(!source.join("nested").exists());
     }
     #[test]
     fn geometry_and_saved_placements_merge_into_a_new_revision_without_touching_either_editor() {

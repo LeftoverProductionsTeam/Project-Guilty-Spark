@@ -51,6 +51,8 @@ export interface ForgeObjective extends ForgeEntity {
   sequence: number;
 }
 export interface StudioNativeSource {
+  /** Omitted admissions are legacy MCC13; CE609 is explicit. */
+  cacheVersion?: number;
   inventorySha256: string; fieldTag: string; fieldTagSha256: string; boundingRadius: number;
   templateTag: string; templateSha256: string; dependencies: Record<string,string>;
   previewSha256: string; previewTagId: number; previewTagPath: string;

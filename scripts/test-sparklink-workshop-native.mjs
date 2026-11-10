@@ -3,6 +3,8 @@ import {openStudioMenu,chooseTool,openDrawer,revealPagedControl} from '../tests/
 import {auditPagedSurface} from '../tests/ui/helpers/compactSurfaces.ts';
 import {configureNativeCeTarget} from './native-live-rebuild.mjs';
 import {nativeDedicatedServer} from './native-dedicated-server.mjs';
+import {prepareSharedNativeContent,exerciseSharedNativeContent,readbackSharedNativeContent,retireNativeSeeds} from './native-shared-content.mjs';
+const sharedNativeContent=process.env.SPARK_QA_SHARED_NATIVE_CONTENT==='1';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const runNative=promisify(execFile);
@@ -10,6 +12,7 @@ const chupathingyTrial=process.env.SPARK_QA_SHARED_CHUPATHINGY==='1';
 const ceSource=process.env.SPARK_TEST_CE_SOURCE_MAP;
 if(chupathingyTrial&&(!ceSource||!process.env.SPARK_TEST_CHUPATHINGY_ROOT))throw Error('Select the owned native CE source map and Chupathingy package');
 const targetRuntime=chupathingyTrial?'chupathingyCe':'mccSteam';
+if(sharedNativeContent&&!chupathingyTrial)throw Error('The CE content acceptance extension requires the bounded Chupathingy fixture');
 // Opt-in acceptance: three real desktop processes with isolated libraries.
 // Private LAN and a real Radmin adapter on ONE PC do not prove cross-PC delivery.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -285,6 +288,21 @@ async function update(a, base, change, id = crypto.randomUUID()) {
   expect(next.acknowledgedOperationId).toBe(id);
   return { next, document, operationId: id, revision: base.revision };
 }
+// Resolve only this participant's exact local source identity. The shared
+// document and durable proposal retain null private library references.
+async function localProjection(a,expected){
+  const document=clone(expected);
+  if(document.placements.some(placement=>placement.sourceSha256)){
+    const entries=(await a.call('bootstrap')).entries;
+    for(const placement of document.placements)if(placement.sourceSha256){
+      const entry=entries.find(entry=>entry.sha256===placement.sourceSha256);
+      expect(entry,{message:`${a.slug} must have the exact source for its local preview`}).toBeTruthy();
+      placement.sourceProjectId=entry.id;
+    }
+  }
+  return document;
+}
+async function validateForActor(a,document){return a.call('quickforge_validate',{document:await localProjection(a,document)});}
 async function converge(expected) {
   try {
   await expect
@@ -300,10 +318,12 @@ async function converge(expected) {
       { intervals: [600] },
     )
     .toBe(true);
-  const report = await actors[0].call('quickforge_validate', { document: expected.document });
-  // Check actual React/native CSG consumption, not just backend transport caches.
+  // A network document deliberately carries hashes rather than another
+  // participant's private library IDs. Validate each actual local projection,
+  // as the existing UI does, before comparing its React/native CSG report.
   await Promise.all(
     actors.map(async (a) => {
+      const report=await validateForActor(a,expected.document);
       await expect(a.page.getByLabel('Native BSP Workshop')).toHaveAttribute(
         'data-source-sha',
         report.sourceSha256,
@@ -316,7 +336,6 @@ async function converge(expected) {
         ).toHaveCount(1);
     }),
   );
-  return report;
   }catch(problem){
     receipt.failedConvergence={expected,actors:await Promise.all(actors.map(async actor=>({slug:actor.slug,backend:await view(actor).catch(error=>({error:String(error)})),savedProject:await actor.call('open_project',{id:actor.id}).then(value=>({document:value.project.quickForge,modifiedAt:value.project.modifiedAt})).catch(error=>({error:String(error)})),ui:await actor.page.evaluate(()=>({hash:document.querySelector('[aria-label="Native BSP Workshop"]')?.getAttribute('data-source-sha'),sourceFields:[...document.querySelectorAll('.bsp-source-fields input')].map(node=>({label:node.getAttribute('aria-label')||node.closest('label')?.textContent,value:node.value})),names:[...document.querySelectorAll('.bsp-source-list button')].map(node=>node.textContent),events:window.__sparkQaSourceEvents,studioSummary:document.querySelector('.studio-panel>summary')?.textContent,alerts:[...document.querySelectorAll('.studio-panel [role=alert]')].map(node=>node.textContent?.slice(0,2000))})).catch(error=>({error:String(error)}))})))};
     await mark('nativeSourceConvergenceFailed',true);throw problem;
@@ -335,7 +354,18 @@ async function retireQaTagIntermediates(a,build){
   expect(output).toBe(build.sha256);
   const seal=await sealQaScratch(root,target),removed=await disposeQaScratch(root,seal,{ownerFinished:true});
   expect(await fs.stat(target).catch(()=>null)).toBeNull();expect(await fileHash(build.output)).toBe(output);expect(await fileHash(path.join(job,'workspace','project.gsproject'))).toBe(snapshot);
-  (receipt.retiredQaTagIntermediates??=[]).push({buildId:build.id,bytes:removed.bytes,files:removed.files,outputSha256:output,projectSnapshotSha256:snapshot,inputsAndMapsPreserved:true,qaOnly:true});
+  let preparedInput;
+  if(sharedNativeContent&&(await fs.readFile(path.join(job,'workspace/project.gsproject'),'utf8').then(JSON.parse)).quickForge.native){
+   const staging=JSON.parse(await fs.readFile(path.join(job,'staging-plan.json'),'utf8'));
+   const source=await fs.realpath(staging.source),parts=path.relative(path.join(a.data,'studio-native'),source).split(path.sep);
+   expect(parts).toHaveLength(3);expect(parts[0]).toMatch(/^[0-9a-f-]{36}$/);expect(parts[1]).toMatch(/^build-[0-9a-f-]{36}$/);expect(parts[2]).toBe('tags');
+   const preparation=JSON.parse(await fs.readFile(path.join(path.dirname(source),'prepared.json'),'utf8'));
+   const inputs=JSON.parse(await fs.readFile(path.join(job,'input-tags.json'),'utf8'));expect(preparation[2]).toEqual(inputs);
+   expect(source).not.toBe(await fs.realpath(a.nativeAdmission.tags));
+   const inputSeal=await sealQaScratch(root,source);preparedInput=await disposeQaScratch(root,inputSeal,{ownerFinished:true});
+   expect(await fileHash(build.output)).toBe(output);expect(await fileHash(path.join(job,'workspace','project.gsproject'))).toBe(snapshot);
+  }
+  (receipt.retiredQaTagIntermediates??=[]).push({buildId:build.id,bytes:removed.bytes,files:removed.files,preparedInput,outputSha256:output,projectSnapshotSha256:snapshot,inputsAndMapsPreserved:true,qaOnly:true});
   await mark('completedQaIntermediatesRetired',receipt.retiredQaTagIntermediates);
 }
 // The frozen QA output has completed its independent readback and preservation
@@ -350,12 +380,42 @@ async function retireFrozenQaMap(a,frozen,current){
   receipt.retiredFrozenQaOutput={buildId:frozen.id,sha256:receipt.frozenCeReadback.sha256,logicalBytes:removed.bytes,sourceSnapshotSha256:sourceSha,retiredOnlyAfterNativeReadbackAndConcurrentBuildCheck:true,currentGameOutputPreserved:true,qaOnly:true};
   await mark('finishedFrozenQaOutputRetired',receipt.retiredFrozenQaOutput);
 }
+// A rejected script run is finished before this is called. Retire only its
+// regenerable QA tag copies; retain the script/project, diagnostics, admission,
+// recovery inputs and both independently checked playable stage maps.
+async function retireRejectedQaNativeInputs(a,jobId){
+  expect(jobId).toMatch(/^[0-9a-f-]{36}$/);
+  const session=await a.call('community_server_status');expect(session.pendingJobId).toBeNull();
+  const boot=await a.call('bootstrap');expect(boot.logs.some(row=>row.projectId===a.id&&row.jobId===jobId&&row.phase==='logic-script'&&row.message.includes('gs_qa_missing_function'))).toBe(true);
+  const job=path.join(a.data,'jobs',jobId),snapshot=path.join(job,'workspace/project.gsproject'),snapshotHash=await fileHash(snapshot);
+  const originalMap=path.join(receipt.nativeDedicated.start.sessionDirectory,'data/maps_ce',receipt.nativeDedicated.start.map.replace(/@ce$/,'')+'.map');
+  expect(await fileHash(originalMap)).toBe(receipt.nativeDedicated.start.mapSha256);
+  const project=(await a.call('open_project',{id:a.id})).project,active=project.builds.find(build=>build.id===session.compiledBuildId);
+  expect(active?.status).toBe('validated');expect(await fileHash(active.output)).toBe(session.compiledSha256);
+  const staging=JSON.parse(await fs.readFile(path.join(job,'staging-plan.json'),'utf8'));
+  const source=await fs.realpath(staging.source),parts=path.relative(path.join(a.data,'studio-native'),source).split(path.sep);
+  expect(parts).toHaveLength(3);expect(parts[0]).toMatch(/^[0-9a-f-]{36}$/);expect(parts[1]).toMatch(/^build-[0-9a-f-]{36}$/);expect(parts[2]).toBe('tags');
+  const preparation=JSON.parse(await fs.readFile(path.join(path.dirname(source),'prepared.json'),'utf8'));
+  expect(preparation[2]).toEqual(JSON.parse(await fs.readFile(path.join(job,'input-tags.json'),'utf8')));
+  expect(source).not.toBe(await fs.realpath(a.nativeAdmission.tags));
+  const removed=[];
+  for(const target of [path.join(job,'workspace/tags'),source]){
+    for(const profile of project.buildTargets??[])if(profile.tagsDirectory){const relative=path.relative(await fs.realpath(profile.tagsDirectory),await fs.realpath(target));expect(relative===''||(!path.isAbsolute(relative)&&relative!=='..'&&!relative.startsWith('..'+path.sep))).toBe(false);}
+    removed.push(await disposeQaScratch(root,await sealQaScratch(root,target),{ownerFinished:true}));
+  }
+  expect(await fileHash(snapshot)).toBe(snapshotHash);expect(await fileHash(active.output)).toBe(session.compiledSha256);expect(await fileHash(originalMap)).toBe(receipt.nativeDedicated.start.mapSha256);
+  await mark('rejectedQaNativeInputsRetired',{jobId,removed,sourceSnapshotSha256:snapshotHash,diagnosticsAndBothPlayableMapsPreserved:true,qaOnly:true});
+}
 async function uiBuild(a){
   const seen=new Set((await a.call('bootstrap')).logs.map(row=>row.jobId).filter(Boolean));
   const button=a.page.getByRole('button',{name:'Build & check playtest',exact:true,includeHidden:true});
-  await revealPagedControl(button);await expect(button).toBeEnabled();await button.click();
+  await revealPagedControl(button);await expect(button).toBeEnabled();const began=performance.now();await button.click();
   let job;
-  await expect.poll(async()=>{job=(await a.call('bootstrap')).logs.find(row=>row.projectId===a.id&&row.jobId&&!seen.has(row.jobId))?.jobId;return job;},{timeout:15000}).toBeTruthy();
+  // Native admitted content is first materialized into a checked private
+  // source fork. This precedes the compiler job; keep its own bounded wait
+  // and measured duration, without relaxing compiler/readback acceptance.
+  await expect.poll(async()=>{job=(await a.call('bootstrap')).logs.find(row=>row.projectId===a.id&&row.jobId&&!seen.has(row.jobId))?.jobId;return job;},{timeout:sharedNativeContent?120000:15000}).toBeTruthy();
+  if(sharedNativeContent)await mark('nativeContentBuildPreparation',{actor:a.slug,jobId:job,milliseconds:performance.now()-began});
   return job;
 }
 async function uiMoveStarts(a,delta){
@@ -373,10 +433,12 @@ async function uiMoveStarts(a,delta){
   return view(a);
 }
 async function save(a, expected) {
+  const local=await localProjection(a,expected);
   await a.page.keyboard.press('Control+s');
   await expect
     .poll(async () => JSON.stringify((await a.call('open_project', { id: a.id })).project.quickForge))
-    .toBe(JSON.stringify(expected));
+    .toBe(JSON.stringify(local));
+  await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);
 }
 async function select(a, index) {
   await a.page.locator('.bsp-source-list button').nth(index).click();
@@ -560,6 +622,8 @@ try {
   }
   await workshopControlAcceptance(a);
   await continuousWorkspaceAcceptance(a);
+  let nativeAdmission;
+  if(sharedNativeContent)nativeAdmission=await prepareSharedNativeContent({actors,source:nativeSource,templateTags:receipt.ceSource.reviewedRecovery.tagsDirectory,kit,invader,expect,hash:fileHash,panel,uiBuild,save,retire:retireQaTagIntermediates,mark});
   const networks = await a.call('forge_session_networks');
   const lan = networks.find((n) => n.networkScope === 'private' && n.address !== '127.0.0.1'),
     vpn = networks.find((n) => n.networkScope === 'radminVpn');
@@ -572,6 +636,7 @@ try {
   await join(c, text);
   let current = await view(a);
   await converge(current);
+  if(sharedNativeContent)current=await exerciseSharedNativeContent({actors,admission:nativeAdmission,expect,hash:fileHash,panel,view,converge,update,root,mark});
   await mark('threeIndependentWorkshopEditors', {
     tls: true,
     durable: true,
@@ -915,9 +980,19 @@ try {
       const extracted=await runNative(path.join(invader,'invader-extract.exe'),['-s',nativePath,'-t',directory,build.output],options);expect(extracted.stdout+'\n'+extracted.stderr).not.toMatch(/Failed to extract|ERROR:/i);
       const count=Number((await runNative(path.join(invader,'invader-edit.exe'),['-t',directory,'-C','player_starting_locations',nativePath],options)).stdout.trim());expect(count).toBe(4);
       const positions=[];for(let i=0;i<count;i++){const values=(await runNative(path.join(invader,'invader-edit.exe'),['-t',directory,'-G',`player_starting_locations[${i}].position`,nativePath],options)).stdout.trim().split(',').map(Number);expect(values).toHaveLength(3);expect(values.every(Number.isFinite)).toBe(true);positions.push(values);}
-      return {sha256:await fileHash(build.output),positions,crcMismatch:0,independentNativeReadback:true};
+      let nativeContent;
+      if(sharedNativeContent){
+       const snapshot=JSON.parse(await fs.readFile(path.join(a.data,'jobs',build.id,'workspace/project.gsproject'),'utf8'));
+       nativeContent=await readbackSharedNativeContent({actor:a,build,document:snapshot.quickForge,directory,invader,runNative,expect,hash:fileHash});
+      }
+      return {sha256:await fileHash(build.output),positions,crcMismatch:0,independentNativeReadback:true,...(nativeContent?{nativeContent}:{})};
     }
     receipt.frozenCeReadback=await independentReadback(built,'frozen');
+    if(sharedNativeContent){
+      await retireNativeSeeds({actors,root,hash:fileHash,expect,mark});
+      const retired=await disposeQaScratch(root,await sealQaScratch(root,nativeRecovery.tagRoot),{ownerFinished:true});
+      await mark('unusedQaRawExtractionRetired',{logicalBytes:retired.bytes,files:retired.files,correctedProfileAndOriginalMapPreserved:true,qaOnly:true});
+    }
     if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireQaTagIntermediates(a,built);
     const stale=await a.call('quickforge_build_report',{projectId:a.id});expect(stale.current).toBe(false);
     const gameRevision=current;await Promise.all(actors.map(x=>save(x,current.document)));
@@ -931,9 +1006,17 @@ try {
     receipt.sharedGameRevision={sessionId:a.session,sessionRevision:gameRevision.revision,buildId:nextJob,sha256:gameBuild.sha256,frozenOlderBuildRetained:await fileHash(built.output)===receipt.frozenCeReadback.sha256};
     if(process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1')await retireFrozenQaMap(a,built,gameBuild);
     const hostPage=async()=>{await chooseTool(a.page,'Online');await a.page.getByRole('button',{name:'Host game',exact:true}).click();};
+    let retainedInvader;
+    async function selectQaInvader(folder){
+      await chooseTool(a.page,'Level editor');await openDrawer(a.page,'Project setup');
+      const panel=a.page.getByRole('region',{name:'Project setup panel',exact:true});
+      for(const details of [panel.locator('.gs-map-tools'),panel.locator('.gs-build-targets')])if(await details.getAttribute('open')===null){const summary=details.locator(':scope > summary');await revealPagedControl(summary);await summary.click();}
+      const input=panel.locator('.gs-build-targets').getByRole('textbox',{name:/Invader folder/,includeHidden:true});await revealPagedControl(input);await input.fill(folder);await input.evaluate(node=>node.blur());
+      await a.page.getByRole('button',{name:'Close Project setup',exact:true}).click();await hostPage();
+    }
     const liveRebuild=process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1'?{
-      async edit(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await hostPage();receipt.sharedRebuildRevision={sessionId:a.session,sessionRevision:current.revision,documentSha256:(await a.call('quickforge_validate',{document:current.document})).sourceSha256,realPeerInspectorEdits:true};return {revision:current.revision,positions:current.document.spawns.map(spawn=>[...spawn.position])};},
-      async editDuringBuild(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await save(a,current.document);await hostPage();return {revision:current.revision,positions:current.document.spawns.map(spawn=>[...spawn.position]),sourceSha256:(await a.call('quickforge_validate',{document:current.document})).sourceSha256};},
+      async edit(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await hostPage();receipt.sharedRebuildRevision={sessionId:a.session,sessionRevision:current.revision,documentSha256:(await validateForActor(a,current.document)).sourceSha256,realPeerInspectorEdits:true};return {revision:current.revision,positions:current.document.spawns.map(spawn=>[...spawn.position])};},
+      async editDuringBuild(){current=await uiMoveStarts(b,.25);await chooseTool(a.page,'Level editor');if(!await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await save(a,current.document);await hostPage();return {revision:current.revision,positions:current.document.spawns.map(spawn=>[...spawn.position]),sourceSha256:(await validateForActor(a,current.document)).sourceSha256};},
       async reviewUnadoptedBuild(job,frozen){
         const project=(await a.call('open_project',{id:a.id})).project,build=project.builds.find(row=>row.id===job);expect(build?.status).toBe('validated');
         const native=await independentReadback(build,'unadopted-source-race');expect(native.positions).toEqual(frozen.positions);
@@ -957,6 +1040,16 @@ try {
         return readback;
       },
       async breakBuild(){
+        if(sharedNativeContent){
+          await chooseTool(a.page,'Level editor');
+          if(await a.page.getByLabel('Native BSP Workshop').isVisible())await a.page.getByRole('button',{name:'Objects & gameplay',exact:true}).click();
+          await openDrawer(a.page,'Inspector');await a.page.getByRole('button',{name:'Properties',exact:true}).click();
+          const logic=a.page.locator('.forge-logic-events'),summary=logic.locator(':scope>summary');await revealPagedControl(summary);if(!await logic.evaluate(node=>node.open))await summary.click();
+          const handwritten=logic.locator('.forge-handwritten-sources'),sourceSummary=handwritten.locator(':scope>summary');await revealPagedControl(sourceSummary);if(!await handwritten.evaluate(node=>node.open))await sourceSummary.click();
+          await handwritten.getByLabel('Import handwritten HaloScript').setInputFiles({name:'gs_qa_failure.hsc',mimeType:'text/plain',buffer:Buffer.from('(script startup gs_qa_failure (gs_qa_missing_function))\n')});
+          await expect.poll(async()=>(await view(a)).document.logic?.handwrittenSources?.[0]?.filename).toBe('gs_qa_failure.hsc');current=await view(a);
+          await a.page.getByRole('button',{name:'Close Inspector',exact:true}).click();await a.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await converge(current);await hostPage();return;
+        }
         await chooseTool(a.page,'Level editor');await openDrawer(a.page,'Project setup');
         const panel=a.page.getByRole('region',{name:'Project setup panel',exact:true}),mapTools=panel.locator('.gs-map-tools'),targets=panel.locator('.gs-build-targets');
         for(const details of [mapTools,targets])if(await details.getAttribute('open')===null){const summary=details.locator(':scope>summary');await revealPagedControl(summary);await summary.click();}
@@ -964,6 +1057,14 @@ try {
         await a.page.getByRole('button',{name:'Close Project setup',exact:true}).click();await hostPage();
       },
       async restoreBuild(){
+        if(sharedNativeContent){
+          const diagnostics=(await a.call('bootstrap')).logs.filter(row=>row.projectId===a.id&&row.phase==='logic-script').slice(-120);
+          const rejected=diagnostics.find(row=>row.message.includes('gs_qa_missing_function'));expect(rejected).toBeTruthy();
+          await retireRejectedQaNativeInputs(a,rejected.jobId);
+          await chooseTool(a.page,'Level editor');await panel(a);const undo=a.panel.getByRole('button',{name:'Undo my shared edit',exact:true,includeHidden:true});await revealPagedControl(undo);await undo.click();
+          await expect.poll(async()=>(await view(a)).document.logic?.handwrittenSources?.length??0).toBe(0);current=await view(a);await converge(current);await save(a,current.document);
+          await a.page.getByRole('button',{name:'Close SparkLink',exact:true}).click();await hostPage();return diagnostics;
+        }
         const diagnostics=(await a.call('bootstrap')).logs.filter(row=>row.projectId===a.id&&row.phase==='compile').slice(-300);
         expect(diagnostics.some(row=>row.message.includes('ActorVariant::grenade_type is out of range'))).toBe(true);
         await chooseTool(a.page,'Level editor');await a.page.locator('.runtime-dock-heading').click();await a.page.keyboard.press('Control+z');await save(a,current.document);
@@ -971,7 +1072,13 @@ try {
         await hostPage();return diagnostics;
       },
     }:undefined;
-    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,verifyLifecycleFaults:process.env.SPARK_QA_DEDICATED_FAULTS==='1',ownerProcessId:a.child.pid,checkpoint:async phase=>{
+    if(sharedNativeContent&&liveRebuild)liveRebuild.prerequisiteFailure={
+      uiPreflightError:/The system cannot find the file specified\. \(os error 2\)/,
+      async breakBuild(){const project=(await a.call('open_project',{id:a.id})).project;retainedInvader=project.buildTargets.find(target=>target.id===project.activeBuildTarget).invaderDirectory;expect(retainedInvader).toBeTruthy();await selectQaInvader(path.join(a.dir,'missing-qa-invader'));},
+      async restoreBuild(){await selectQaInvader(retainedInvader);await a.page.keyboard.press('Control+s');await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);const project=(await a.call('open_project',{id:a.id})).project;expect(project.buildTargets.find(target=>target.id===project.activeBuildTarget).invaderDirectory).toBe(retainedInvader);return {actualUiToolPathRestored:true,missingPrerequisiteNotCompilerSuccess:true};},
+    };
+    if(sharedNativeContent)await mark('retiredQaWebviewInstallers',await Promise.all(actors.map(async actor=>({actor:actor.slug,...await finishStorage.retireWebviewInstallers(actor.slug)}))));
+    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,compilerFailureBeforeRebuild:sharedNativeContent,verifyLifecycleFaults:process.env.SPARK_QA_DEDICATED_FAULTS==='1',ownerProcessId:a.child.pid,checkpoint:async phase=>{
       await qaFootprint(phase);
       const history=await a.call('read_workspace_history',{projectId:a.id});
       const saveState={phase,historyDirty:history?.history?.head?.dirty,historyHead:history?.history?.head?.current,visibleSaveChanges:await a.page.getByRole('button',{name:'Save changes',exact:true}).count()};
@@ -1008,7 +1115,7 @@ try {
   await uiName(b, 3, 'Newer local draft kept during reconnect');
   const newerLocal = clone(pending.document);
   newerLocal.workshop.brushes[3].name = 'Newer local draft kept during reconnect';
-  const localReport = await b.call('quickforge_validate', { document: newerLocal });
+  const localReport = await validateForActor(b,newerLocal);
   await expect(b.page.getByLabel('Native BSP Workshop')).toHaveAttribute(
     'data-source-sha',
     localReport.sourceSha256,
@@ -1018,7 +1125,7 @@ try {
   await mark('twoGenuineOfflineUiEditsRetained', {
     operationId: pending.operationId,
     baseline: pending.revision,
-    pendingSourceSha256: (await b.call('quickforge_validate', { document: pending.document })).sourceSha256,
+    pendingSourceSha256: (await validateForActor(b,pending.document)).sourceSha256,
     newerDraftSourceSha256: localReport.sourceSha256,
   });
   await start(a, true);

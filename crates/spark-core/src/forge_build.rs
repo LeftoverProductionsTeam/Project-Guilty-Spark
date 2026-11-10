@@ -50,6 +50,11 @@ pub struct QuickForgeBuildReceipt {
     pub build: Option<BuildRecord>,
     pub tool_identities: BTreeMap<String,String>,
 }
+/// Used only after the caller verifies the exact current native build and its
+/// owned source. Retain the dependency subset without prior generated geometry.
+pub fn collaboration_input_hashes(job: &Path, tags: &Path) -> Result<BTreeMap<String,String>> {
+    crate::forge_reuse::admission_inputs(job, tags)
+}
 /// H1A loads these native tags outside the scenario's recursive cache closure.
 /// Keep this exact SDK contract separate from CE or Xbox runtime resources.
 pub fn h1a_scene_roots(scenario_type:u16)->Result<Vec<&'static str>> {

@@ -53,7 +53,9 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
       // Source before a Workshop/native admission remains a complete older
       // schema. Retrofitting only a changed brush/field would invent missing
       // portal materials or native dependencies in that undo snapshot.
-      if(!!p.quickForge.workshop!==!!before.workshop||!sameJson(p.quickForge.native?.source,before.native?.source))return p;
+      // First local verification also changes the current admission boundary;
+      // preserve older complete snapshots instead of merging a session into them.
+      if(!!p.quickForge.workshop!==!!before.workshop||!sameJson(p.quickForge.native?.source,before.native?.source)||!sameJson(before.native?.source,incoming.native?.source))return p;
       // A bake recipe belongs to its admitted sky. Rebase unrelated peer
       // changes into older snapshots without inventing that recipe beside a
       // different sky (or erasing the older snapshot's coherent recipe).

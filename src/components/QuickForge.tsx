@@ -327,6 +327,7 @@ export function NewMapWizard({
 function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocument; onNew: () => void }) {
   const activity=useWorkspaceActivity();
   const { project, document: doc, data, edit, notify } = props;
+  const activeBuildTarget = project.buildTargets?.find((target) => target.id === project.activeBuildTarget);
   const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
   const [surfaceSelection, setSurfaceSelection] = useMapState<{brushId:string;faceId?:string}|null>(project.id, 'forge.sourceSurface', () => null);
@@ -2807,13 +2808,20 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   </select>
                 </label>
               </div>
-              <p className="forge-hint">
-                Halo Tool: {data.settings.hekDirectory ?? 'not configured'}
+              <div className="forge-hint" role="group" aria-label="Build tool paths">
+                Halo Tool: {(activeBuildTarget ? activeBuildTarget.hekDirectory : data.settings.hekDirectory) || 'not configured'}
                 <br />
-                Source tag root: {data.settings.hekTagsDirectory ?? 'not configured'}
-              </p>
+                Source tag root: {(activeBuildTarget ? activeBuildTarget.tagsDirectory : data.settings.hekTagsDirectory) || 'not configured'}
+                <br />
+                Invader: {(activeBuildTarget ? activeBuildTarget.invaderDirectory : data.settings.invaderDirectory) || 'not configured'}
+              </div>
               <div className="analysis-actions">
-                <button className="small-button" onClick={props.onSettings}>
+                <button className="small-button" onClick={() => {
+                  if (!activeBuildTarget) { props.onSettings(); return; }
+                  writeMapSession(project.id, 'tools.open', true);
+                  writeMapSession(project.id, 'tools.targetsOpen', true);
+                  revealPanel('project-setup');
+                }}>
                   Configure build tools
                 </button>
                 <button className="small-button" onClick={props.onRuntimes}>

@@ -10,6 +10,10 @@ pub const MAX_ASSET_BYTES: usize = 16 * 1024;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Source {
+    /// Edition of the independently validated target cache, not a hosting preference.
+    /// Omitted legacy admissions retain their original MCC-only contract.
+    #[serde(default="legacy_cache_version", skip_serializing_if="is_legacy_cache")]
+    pub cache_version: u32,
     pub inventory_sha256: String,
     pub field_tag: String,
     pub field_tag_sha256: String,
@@ -51,13 +55,23 @@ pub fn inventory_hash(files: &BTreeMap<String, String>) -> Result<String> {
     Ok(digest(&serde_json::to_vec(files)?))
 }
 fn hash(s: &str) -> bool { s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) }
+fn legacy_cache_version() -> u32 { 13 }
+fn is_legacy_cache(version: &u32) -> bool { *version == 13 }
+pub fn target_cache_version(runtime: crate::runtime::RuntimeId) -> Result<u32> {
+    use crate::runtime::RuntimeId;
+    match runtime {
+        RuntimeId::MccSteam => Ok(13),
+        RuntimeId::HaloCustomEdition | RuntimeId::ChupathingyCe => Ok(609),
+        _ => invalid("Native shared-content compilation is verified only for MCC and CE/Chupathingy targets"),
+    }
+}
 pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     let Some(native) = &doc.native else {
         if doc.placements.iter().any(|p|p.published_asset_id.is_some()) { return invalid("Published asset has no admitted native source"); }
         return Ok(());
     };
     let s = &native.source;
-    if doc.runtime_id != crate::runtime::RuntimeId::MccSteam || !hash(&s.inventory_sha256)
+    if target_cache_version(doc.runtime_id)? != s.cache_version || !hash(&s.inventory_sha256)
         || !hash(&s.field_tag_sha256) || !hash(&s.template_sha256) || !hash(&s.preview_sha256)
         || s.field_tag != "weapons/pistol/pistol.weapon" || !s.template_tag.ends_with(".scenery")
         || s.dependencies.is_empty() || s.dependencies.len() > 256 || native.fields.len() > 1 || native.assets.len() > 8 {

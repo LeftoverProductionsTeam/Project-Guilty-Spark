@@ -24,6 +24,7 @@ export async function nativeDedicatedServer({
   liveRebuild,
   emptyGameLifecycle=false,
   verifyLifecycleFaults=false,
+  compilerFailureBeforeRebuild=false,
   ownerProcessId,
   checkpoint=async()=>{},
 }) {
@@ -403,6 +404,35 @@ export async function nativeDedicatedServer({
     await page.screenshot({ path: path.join(root, 'native-dedicated-two-clients.png') });
     if(liveRebuild){
       const previous=await call('community_server_status'),previousClients=[...clients],ticksBefore=clients.map(peer=>peer.ticks.at(-1).tick);
+      async function rejectBuild(baseline,actions,kind){
+      await actions.breakBuild();
+      await checkpoint(kind+'-invalid-source-selected');
+      const failedTicks=clients.map(peer=>peer.ticks.at(-1).tick);
+      const stagesParent=path.dirname(base),stagesBefore=(await fs.readdir(stagesParent)).sort(),newStages=new Set();let watchError;
+      const watcher=watchFs(stagesParent,(_event,name)=>{if(name&&/^[0-9a-f-]{36}$/.test(String(name))&&!stagesBefore.includes(String(name)))newStages.add(String(name));});
+      watcher.on('error',error=>{watchError=String(error);});
+      const priorError=(await call('community_server_status')).error;
+      const feedback=actions.uiPreflightError?panel.locator('.notice.warning').filter({hasText:actions.uiPreflightError}):null;
+      if(feedback)await expect(feedback).toHaveCount(0);
+      let uiPreflightError=null,observedJob=false;
+      try{
+        await panel.getByRole('button',{name:'Live Rebuild · restart round',exact:true}).click();
+        if(feedback){
+          await expect(feedback).toBeVisible();uiPreflightError=await feedback.innerText();
+          const next=await call('community_server_status');expect(next.pendingJobId).toBeNull();expect(next.error).toBe(priorError);
+        }else await expect.poll(async()=>{const next=await call('community_server_status');observedJob ||= !!next?.pendingJobId;return next?.pendingJobId===null&&next?.error&&(observedJob||next.error!==priorError);},{timeout:300000,intervals:[1000,2000]}).toBeTruthy();
+      }finally{watcher.close();}
+      expect(watchError).toBeUndefined();expect([...newStages]).toEqual([]);expect((await fs.readdir(stagesParent)).sort()).toEqual(stagesBefore);
+      const rejected=await call('community_server_status');
+      expect(rejected.processId).toBe(baseline.processId);expect(rejected.gameSha256).toBe(baseline.gameSha256);expect(rejected.compiledBuildId).toBe(baseline.compiledBuildId);expect(rejected.restarts).toBe(baseline.restarts);expect(rejected.status).toMatchObject({state:'in_game',players:2});
+      expect(await hash(path.join(baseline.sessionDirectory,'data/maps_ce',baseline.map.replace(/@ce$/,'')+'.map'))).toBe(baseline.mapSha256);
+      await expect.poll(()=>clients.every((peer,index)=>peer.ticks.at(-1)?.tick>failedTicks[index]),{timeout:10000}).toBe(true);
+      const diagnostics=await actions.restoreBuild();
+        const result={rejected,diagnostics,failureChannel:feedback?'ui-preflight':'native-job',uiPreflightError,serverProcessRetained:true,previousGoodCacheRetained:true,bothPeersKeptTicking:true,rejectedBeforeRuntimeCopy:true,newRuntimeStages:[...newStages]};
+        await checkpoint(kind+'-failure-kept-two-peers');
+        await page.screenshot({path:path.join(root,'native-dedicated-'+kind+'-rejected.png')});
+        return result;
+      }
       if(verifyLifecycleFaults){
         const frozen=await liveRebuild.edit();
         await panel.getByRole('button',{name:'Live Rebuild · restart round',exact:true}).click();
@@ -425,6 +455,11 @@ export async function nativeDedicatedServer({
         await page.screenshot({path:path.join(root,'native-dedicated-source-race.png')});
         await checkpoint('changed-source-native-output-refused');
       }
+      // The large native-content fixture checks the real compiler rejection
+      // before retaining a second runtime stage. It additionally checks an
+      // actual prerequisite failure after successful adoption. No checks or
+      // inputs are omitted and the same 4 GiB QA budget remains in force.
+      const earlyCompilerFailure=compilerFailureBeforeRebuild?await rejectBuild(previous,liveRebuild,'native-compiler'):null;
       await liveRebuild.edit();
       await panel.getByRole('button',{name:'Live Rebuild · restart round',exact:true}).click();
       await expect.poll(async()=>(await call('community_server_status'))?.pendingJobId,{timeout:10000}).toBeTruthy();
@@ -453,27 +488,12 @@ export async function nativeDedicatedServer({
       await expect(panel).toContainText(/2\/\d+ players · native in_game/);
       await page.screenshot({path:path.join(root,'native-dedicated-live-rebuild.png')});
       await checkpoint('new-revision-readback-and-two-rejoined-clients');
-      await checkpoint('before-invalid-source-selection');
-      await liveRebuild.breakBuild();
-      await checkpoint('after-invalid-source-selection');
-      const failedTicks=clients.map(peer=>peer.ticks.at(-1).tick);
-      const stagesParent=path.dirname(base),stagesBefore=(await fs.readdir(stagesParent)).sort(),newStages=new Set();let watchError;
-      const watcher=watchFs(stagesParent,(_event,name)=>{if(name&&/^[0-9a-f-]{36}$/.test(String(name))&&!stagesBefore.includes(String(name)))newStages.add(String(name));});
-      watcher.on('error',error=>{watchError=String(error);});
-      try{
-        await panel.getByRole('button',{name:'Live Rebuild · restart round',exact:true}).click();
-        await expect.poll(async()=>{const next=await call('community_server_status');return next?.pendingJobId===null&&next?.error;},{timeout:300000,intervals:[1000,2000]}).toBeTruthy();
-      }finally{watcher.close();}
-      expect(watchError).toBeUndefined();expect([...newStages]).toEqual([]);expect((await fs.readdir(stagesParent)).sort()).toEqual(stagesBefore);
-      const rejected=await call('community_server_status');
-      expect(rejected.processId).toBe(loaded.processId);expect(rejected.gameSha256).toBe(loaded.gameSha256);expect(rejected.compiledBuildId).toBe(loaded.compiledBuildId);expect(rejected.restarts).toBe(loaded.restarts);expect(rejected.status).toMatchObject({state:'in_game',players:2});
-      expect(await hash(path.join(adopted.sessionDirectory,'data/maps_ce',adopted.map.replace(/@ce$/,'')+'.map'))).toBe(loaded.mapSha256);
-      await expect.poll(()=>clients.every((peer,index)=>peer.ticks.at(-1)?.tick>failedTicks[index]),{timeout:10000}).toBe(true);
-      const diagnostics=await liveRebuild.restoreBuild();
-      receipt.nativeDedicated.liveRebuild.failedBuild={rejected,diagnostics,serverProcessRetained:true,previousGoodCacheRetained:true,bothPeersKeptTicking:true,rejectedBeforeRuntimeCopy:true,newRuntimeStages:[...newStages]};
-      await checkpoint('native-compiler-failure-kept-two-peers');
-      console.log('DEDICATED_NATIVE',JSON.stringify({phase:'live-rebuild-native-compiler-failure-kept-two-peers',pid:rejected.processId}));
-      await page.screenshot({path:path.join(root,'native-dedicated-live-rebuild-rejected.png')});
+      await checkpoint('before-post-rebuild-failure-tests');
+      const compilerFailure=earlyCompilerFailure??await rejectBuild(loaded,liveRebuild,'native-compiler');
+      receipt.nativeDedicated.liveRebuild.failedBuild={...compilerFailure,beforeValidReplacement:compilerFailureBeforeRebuild};
+      const prerequisiteFailure=liveRebuild.prerequisiteFailure?await rejectBuild(loaded,liveRebuild.prerequisiteFailure,'native-prerequisite'):null;
+      if(prerequisiteFailure)receipt.nativeDedicated.liveRebuild.prerequisiteFailure=prerequisiteFailure;
+      const rejected=(prerequisiteFailure??compilerFailure).rejected;
       if(verifyLifecycleFaults){
         const privateExecutable=path.join(adopted.sessionDirectory,'engine/chupathingyce-server.exe');
         const relative=path.relative(root,privateExecutable);expect(path.isAbsolute(relative)||relative==='..'||relative.startsWith('..'+path.sep)).toBe(false);

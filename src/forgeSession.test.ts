@@ -100,3 +100,31 @@ it('rebases shared lighting into compatible history without attaching it to an o
   expect(previous.past[0].quickForge?.skyPath).toBe('sky/earlier');
   expect(previous.past[0].quickForge?.workshop?.brushes[1].name).toBe('Peer room');
 });
+
+
+it('preserves complete Undo and Redo snapshots when locally verified native source is first admitted',()=>{
+  for(const cacheVersion of [13,609]){
+    const initial=structuredClone(base);if(cacheVersion===609)initial.runtimeId='chupathingyCe';
+    let state=historyReducer(initialHistory,{type:'load',project:project(initial)});
+    const moved=structuredClone(initial);moved.geometry[0].position[0]=2;
+    state=historyReducer(state,{type:'edit',project:project(moved),description:'Move authored room'});
+    const renamed=project(moved);renamed.title='Local title';
+    state=historyReducer(state,{type:'edit',project:renamed,description:'Rename project'});
+    state=historyReducer(state,{type:'undo'});
+    const previousPast=structuredClone(state.past),previousFuture=structuredClone(state.future);
+    const admitted=structuredClone(state.current!.quickForge!);
+    admitted.native={source:{...(cacheVersion===609?{cacheVersion}:{}),inventorySha256:'a'.repeat(64),fieldTag:'weapons/pistol/pistol.weapon',fieldTagSha256:'b'.repeat(64),boundingRadius:0.1,templateTag:'scenery/rock.scenery',templateSha256:'c'.repeat(64),dependencies:{'scenery/rock.gbxmodel':'d'.repeat(64)},previewSha256:'e'.repeat(64),previewTagId:1,previewTagPath:'scenery/rock'},fields:[],assets:[]};
+    state=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:admitted});
+    expect(state.current?.quickForge?.native).toEqual(admitted.native);expect(state.dirty).toBe(true);
+    expect(state.past).toEqual(previousPast);expect(state.future).toEqual(previousFuture);
+    const peer=structuredClone(admitted);peer.native!.fields=[{id:'pistolBoundingRadius',boundingRadius:0.3}];
+    state=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:peer});
+    expect(state.past).toEqual(previousPast);expect(state.future).toEqual(previousFuture);
+    state=historyReducer(state,{type:'undo'});expect(state.current?.quickForge?.native).toBeUndefined();
+    expect(state.current?.quickForge?.geometry[0].position).toEqual([0,0,0]);
+    state=historyReducer(state,{type:'redo'});expect(state.current?.quickForge?.native).toEqual(peer.native);
+    expect(state.current?.quickForge?.geometry[0].position).toEqual([2,0,0]);
+    // First local admission must not relax the immutable-source network merge.
+    expect(()=>mergeForge(moved,admitted,moved)).toThrow(/Native source admission changed/);
+  }
+});

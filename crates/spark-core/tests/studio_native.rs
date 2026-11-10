@@ -6,7 +6,7 @@ fn id()->String {uuid::Uuid::new_v4().to_string()}
 fn document()->quickforge::QuickForgeDocument {
     let mut d=quickforge::create_arena("native", "emptyArena").unwrap();
     let bytes=vec![0u8;64];
-    d.native=Some(Document{source:Source{inventory_sha256:"a".repeat(64),field_tag:"weapons/pistol/pistol.weapon".into(),field_tag_sha256:"b".repeat(64),bounding_radius:0.1,template_tag:"scenery/rock.scenery".into(),template_sha256:digest(&bytes),dependencies:BTreeMap::from([("scenery/rock.gbxmodel".into(),"c".repeat(64))]),preview_sha256:"d".repeat(64),preview_tag_id:10,preview_tag_path:"scenery/rock".into()},fields:vec![],assets:vec![]});d
+    d.native=Some(Document{source:Source{cache_version:13,inventory_sha256:"a".repeat(64),field_tag:"weapons/pistol/pistol.weapon".into(),field_tag_sha256:"b".repeat(64),bounding_radius:0.1,template_tag:"scenery/rock.scenery".into(),template_sha256:digest(&bytes),dependencies:BTreeMap::from([("scenery/rock.gbxmodel".into(),"c".repeat(64))]),preview_sha256:"d".repeat(64),preview_tag_id:10,preview_tag_path:"scenery/rock".into()},fields:vec![],assets:vec![]});d
 }
 #[test]
 fn native_field_publication_placement_order_and_author_inverses() {
@@ -30,4 +30,25 @@ fn corrupt_asset_unknown_field_admission_changes_and_same_field_conflict_refuse(
     let mut changed=j.document.clone();changed.native.as_mut().unwrap().source.inventory_sha256="e".repeat(64);assert!(j.propose(&id(),&id(),0,changed).is_err());
     let mut corrupt=j.document.clone();corrupt.native.as_mut().unwrap().assets.push(Asset{id:id(),name:"Bad".into(),sha256:j.document.native.as_ref().unwrap().source.template_sha256.clone(),bytes:vec![1;64]});assert!(j.propose(&id(),&id(),0,corrupt).is_err());
     let value=serde_json::json!({"id":"pistolBoundingRadius","boundingRadius":1,"offset":128});assert!(serde_json::from_value::<Field>(value).is_err());
+}
+
+#[test]
+fn cache_identity_is_explicit_and_legacy_admissions_stay_mcc_only() {
+    use spark_core::runtime::RuntimeId::*;
+    let original=document();
+    let json=serde_json::to_value(&original).unwrap();
+    assert!(json["native"]["source"].get("cacheVersion").is_none());
+    let legacy:quickforge::QuickForgeDocument=serde_json::from_value(json).unwrap();
+    assert_eq!(legacy,original);
+    for runtime in [MccSteam,HaloCustomEdition,ChupathingyCe,OpenCe,ArenaEvolved,HaloPc,HaloXbox,MacRetail,MacDemo,HaloMd,HaloPcTrial] {
+        let mut doc=legacy.clone();doc.runtime_id=runtime;
+        assert_eq!(validate(&doc).is_ok(),runtime==MccSteam,"Legacy source cannot be reinterpreted: {runtime:?}");
+        doc.native.as_mut().unwrap().source.cache_version=609;
+        assert_eq!(validate(&doc).is_ok(),matches!(runtime,HaloCustomEdition|ChupathingyCe),"Unverified target: {runtime:?}");
+    }
+    let mut ce=legacy;ce.runtime_id=ChupathingyCe;ce.native.as_mut().unwrap().source.cache_version=609;
+    let json=serde_json::to_value(&ce).unwrap();assert_eq!(json["native"]["source"]["cacheVersion"],609);
+    assert_eq!(serde_json::from_value::<quickforge::QuickForgeDocument>(json).unwrap(),ce);
+    let j=Journal::new(ce).unwrap();let mut changed=j.document.clone();changed.native.as_mut().unwrap().source.cache_version=13;changed.runtime_id=MccSteam;
+    assert!(j.propose(&id(),&id(),0,changed).is_err());
 }

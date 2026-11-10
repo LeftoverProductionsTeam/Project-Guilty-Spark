@@ -6,7 +6,12 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
-struct Admission { project_id:String, tags:PathBuf, source:content::Source }
+struct Admission {
+    project_id:String, tags:PathBuf, source:content::Source,
+    /// Local-only complete input manifest. Legacy admissions have no subset.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    inputs_sha256:Option<String>,
+}
 fn key(id:&str)->String { format!("studio-native-source-{id}") }
 fn admitted(state:&AppState, project:&str)->Reply<Admission> {
     let a:Option<Admission>=lock(&state.library)?.setting(&key(project)).map_err(error)?;
@@ -19,7 +24,7 @@ fn admitted(state:&AppState, project:&str)->Reply<Admission> {
     let marker=a.tags.parent().ok_or("Native source has no owner")?.join("admission.json");
     core::reject_links(&marker).map_err(error)?;
     let stored:Admission=serde_json::from_slice(&bounded_read(&marker,128*1024)?).map_err(error)?;
-    if stored.project_id!=a.project_id||stored.tags!=a.tags||stored.source!=a.source {return Err("Native admission receipt changed; restore its retained source before building".into());}
+    if stored.project_id!=a.project_id||stored.tags!=a.tags||stored.source!=a.source||stored.inputs_sha256!=a.inputs_sha256 {return Err("Native admission receipt changed; restore its retained source before building".into());}
     Ok(a)
 }
 pub(super) fn require_unshared(state:&AppState,project:&str)->Reply<()> {
@@ -191,6 +196,8 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
         check_document_owner(&state,&project_id,&owner)?;
         if lock(&state.forge_session)?.is_some(){return Err("Leave the current session before admitting another native source".into());}
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        native_operations_native::require_idle(&state)?;
+        let cache_version=content::target_cache_version(p.quick_forge.as_ref().ok_or("Native collaboration requires QuickForge source")?.runtime_id).map_err(error)?;
         baboon_native::guard_regeneration(&state,&p)?;
         let preview=lock(&state.library)?.get(&preview_project_id).map_err(error)?;
         let inspection=inspect(&state,&preview)?;let preserved=preview.source.as_ref().ok_or("Use an owned imported model source")?;
@@ -209,7 +216,8 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
             let _=native_operations_native::fields(&state,&p,&a.tags,&a.source.field_tag)?;
             return Ok(native.clone());
         }
-        let build=current_build(&state,&p)?;let base=runtime_workbench::compiled_tags(&state,&p,&build)?;
+        let build=current_build(&state,&p)?;let base=runtime_workbench::collaboration_tags(&state,&p,&build)?;
+        let selected=core::forge_build::collaboration_input_hashes(&state.root.join("jobs").join(&build.id),&base).map_err(error)?;
         if let Some(expected)=working_tag_changes_native::baseline(&state.root.join("jobs").join(&build.id))? {
             if transaction::inventory(&base).map_err(error)?!=expected {return Err("Reconcile external native saves before admission. The retained source differs from its validated native build; no edits were discarded.".into());}
         }
@@ -223,7 +231,7 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
         let _=native_operations_native::fields(&state,&p,&asset_root,&template_tag)?;
         let root=state.root.join("studio-native");core::reject_links(&root).map_err(error)?;fs::create_dir_all(&root).map_err(error)?;
         let parent=root.join(uuid::Uuid::new_v4().to_string());fs::create_dir(&parent).map_err(error)?;let tags=parent.join("tags");
-        let base_inventory=transaction::fork(&base,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;
+        let base_inventory=transaction::fork_selected(&base,&tags,&selected,Arc::new(AtomicBool::new(false))).map_err(error)?;
         let mut closure=dep.clone();closure.insert(template_tag.clone(),template_sha256.clone());
         for (path,sha) in &closure {
             let file=tags.join(core::safe_relative(path).map_err(error)?);
@@ -233,13 +241,18 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
             fs::create_dir_all(file.parent().unwrap()).map_err(error)?;project::atomic_write(&file,&data,false).map_err(error)?;
         }
         if dependencies(&state,&p,&asset_root,&template_tag)?!=dep||maps::hash_file(&asset_root.join(&template_tag)).map_err(error)?!=template_sha256 {return Err("Native template source changed while validating".into());}
+        if core::forge_build::collaboration_input_hashes(&state.root.join("jobs").join(&build.id),&base).map_err(error)?!=selected {
+            return Err("Validated native input inventory changed during admission; no new source was selected".into());
+        }
         let field_tag="weapons/pistol/pistol.weapon".to_string();
         let fields=native_operations_native::fields(&state,&p,&tags,&field_tag)?;
         let files=transaction::inventory(&tags).map_err(error)?;
-        let source=content::Source{inventory_sha256:content::inventory_hash(&files).map_err(error)?,field_tag_sha256:files[&field_tag].clone(),field_tag,bounding_radius:recipes::number(&fields,"bounding_radius").map_err(error)?,template_tag,template_sha256,dependencies:dep,preview_sha256:inspection.sha256.clone(),preview_tag_id,preview_tag_path:tag.path.replace('\\',"/")};
+        let source=content::Source{cache_version,inventory_sha256:content::inventory_hash(&files).map_err(error)?,field_tag_sha256:files[&field_tag].clone(),field_tag,bounding_radius:recipes::number(&fields,"bounding_radius").map_err(error)?,template_tag,template_sha256,dependencies:dep,preview_sha256:inspection.sha256.clone(),preview_tag_id,preview_tag_path:tag.path.replace('\\',"/")};
         let native=content::Document{source:source.clone(),fields:vec![],assets:vec![]};
         let mut doc=p.quick_forge.clone().ok_or("Native collaboration currently requires QuickForge source")?;doc.native=Some(native.clone());quickforge::validate_document(&doc).map_err(error)?;
-        let admission=Admission{project_id:project_id.clone(),tags,source};
+        let inputs=serde_json::to_vec_pretty(&selected).map_err(error)?;
+        project::atomic_write(&parent.join("base-inputs.json"),&inputs,false).map_err(error)?;
+        let admission=Admission{project_id:project_id.clone(),tags,source,inputs_sha256:Some(content::digest(&inputs))};
         project::atomic_write(&parent.join("admission.json"),&serde_json::to_vec_pretty(&admission).map_err(error)?,false).map_err(error)?;
         lock(&state.library)?.set_setting(&key(&project_id),&Some(admission)).map_err(error)?;Ok(native)
     }).await.map_err(error)?
@@ -277,12 +290,21 @@ pub(super) async fn studio_native_recover_source(app:tauri::AppHandle,window:tau
         let a=admitted(&state,&project_id)?;let p=lock(&state.library)?.get(&project_id).map_err(error)?;
         let tools=forge_build::tools_for_target(&p,forge_tools(&state)?).map_err(error)?;
         let base=tools.hek_tags_directory.or_else(||tools.hek_directory.map(|d|d.join("tags"))).ok_or("Choose the original matching native base tags in this map's tool profile before recovering")?;
-        let mut expected=transaction::inventory(&base).map_err(error)?;
+        let inputs=if let Some(expected)=&a.inputs_sha256 {
+            let file=a.tags.parent().ok_or("Native source has no owner")?.join("base-inputs.json");core::reject_links(&file).map_err(error)?;
+            let bytes=bounded_read(&file,4*1024*1024)?;
+            if content::digest(&bytes)!=*expected{return Err("Native recovery input manifest changed; no source was replaced".into());}
+            let hashes:BTreeMap<String,String>=serde_json::from_slice(&bytes).map_err(error)?;
+            core::working_tag_changes::validate_baseline(&hashes).map_err(error)?;Some((bytes,hashes))
+        }else{None};
+        let mut expected=if let Some((_,hashes))=&inputs {hashes.clone()}else{transaction::inventory(&base).map_err(error)?};
         let mut closure=a.source.dependencies.clone();closure.insert(a.source.template_tag.clone(),a.source.template_sha256.clone());
         for (file,sha) in &closure {if expected.get(file).is_some_and(|old|old!=sha){return Err(format!("Recovery base conflicts with admitted dependency: {file}"));}expected.insert(file.clone(),sha.clone());}
         if content::inventory_hash(&expected).map_err(error)?!=a.source.inventory_sha256{return Err("These base tags do not reconstruct the exact acknowledged native source. Select the matching preserved baseline; no source was replaced.".into());}
         let root=state.root.join("studio-native").join(uuid::Uuid::new_v4().to_string());fs::create_dir(&root).map_err(error)?;
-        let tags=root.join("tags");transaction::fork(&base,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;
+        let tags=root.join("tags");
+        if let Some((_,selected))=&inputs {transaction::fork_selected(&base,&tags,selected,Arc::new(AtomicBool::new(false))).map_err(error)?;}
+        else {transaction::fork(&base,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;}
         for (relative,sha) in &closure {
             let target=tags.join(core::safe_relative(relative).map_err(error)?);if target.is_file(){continue;}
             let mut choices=vec![a.tags.join(core::safe_relative(relative).map_err(error)?)];
@@ -293,7 +315,8 @@ pub(super) async fn studio_native_recover_source(app:tauri::AppHandle,window:tau
             fs::create_dir_all(target.parent().unwrap()).map_err(error)?;project::atomic_write(&target,&bytes,false).map_err(error)?;
         }
         if transaction::inventory(&tags).map_err(error)?!=expected{return Err("Recovery file inventory differs; no source revision was selected".into());}
-        let recovered=Admission{project_id:project_id.clone(),tags:tags.clone(),source:a.source.clone()};
+        let recovered=Admission{project_id:project_id.clone(),tags:tags.clone(),source:a.source.clone(),inputs_sha256:a.inputs_sha256.clone()};
+        if let Some((bytes,_))=&inputs {project::atomic_write(&root.join("base-inputs.json"),bytes,false).map_err(error)?;}
         project::atomic_write(&root.join("admission.json"),&serde_json::to_vec_pretty(&recovered).map_err(error)?,false).map_err(error)?;
         project::atomic_write(&root.join("recovery.json"),&serde_json::to_vec_pretty(&(&a.tags,&base,&expected)).map_err(error)?,false).map_err(error)?;
         lock(&state.library)?.set_setting(&key(&project_id),&Some(recovered)).map_err(error)?;

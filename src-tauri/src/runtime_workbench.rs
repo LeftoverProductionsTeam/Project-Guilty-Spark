@@ -247,6 +247,20 @@ fn source_context_for_build(
     if build.target != "mcc-cea" {
         return Err("This tool route requires an MCC Halo 1 build; use the selected runtime's build workflow".into());
     }
+    owned_source_context(state, project, build)
+}
+/// Shared source admission has its own reviewed native edition contract. It
+/// does not enable H1A scene tools or Live Link operations on CE runtimes.
+pub(super) fn collaboration_tags(state: &AppState, project: &Project, build: &BuildRecord) -> Reply<PathBuf> {
+    let document=project.quick_forge.as_ref().ok_or("Native collaboration requires QuickForge source")?;
+    let version=core::studio_native::target_cache_version(document.runtime_id).map_err(error)?;
+    let expected=if version==13 {"mcc-cea"}else{"gbx-custom"};
+    if build.target!=expected {return Err("The validated build uses another native cache edition; select and build the matching target before admission".into());}
+    let output=build.output.as_ref().ok_or("Validated map output is unavailable")?;
+    if maps::inspect_header(output).map_err(error)?.version!=version {return Err("Validated output cache edition differs from the shared source target".into());}
+    owned_source_context(state, project, build.clone()).map(|context|context.tags)
+}
+fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord) -> Reply<SourceContext> {
     let job = state.root.join("jobs").join(&build.id);
     let workspace = if job.join("working-tags-receipt.json").is_file() {
         let receipt: core::working_tags::WorkingTagsReceipt = serde_json::from_slice(

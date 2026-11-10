@@ -145,7 +145,7 @@ export async function nativeLiveRebuild({page,root,kit,invader,cache,call,receip
 }
 
 // Shared by the real Live Rebuild and MegaWorld native acceptance paths.
-export async function configureNativeCeTarget({page,kit,invader,sourceRoot,current,save,hash,expect}){
+export async function configureNativeCeTarget({page,kit,invader,sourceRoot,current,save,hash,expect,reviewSource=true}){
  const use=async(scope,role,name)=>{const item=scope.getByRole(role,{name,exact:typeof name==='string',includeHidden:true});await revealPagedControl(item);return item;};
  await openDrawer(page,'Project setup');const panel=page.getByRole('region',{name:'Project setup panel',exact:true}),mapTools=panel.locator('.gs-map-tools'),targets=panel.locator('.gs-build-targets');
  if(await mapTools.getAttribute('open')===null){const control=mapTools.locator(':scope>summary');await revealPagedControl(control);await control.click();}
@@ -154,9 +154,20 @@ export async function configureNativeCeTarget({page,kit,invader,sourceRoot,curre
  await(await use(targets,'combobox','Authoring kit generation')).selectOption('h1aEk');
  for(const [label,value]of [[/Map Builder folder/,kit],[/Editable Halo Tags folder/,sourceRoot],[/Invader folder/,invader]]){const field=await use(targets,'textbox',label);await field.fill(value);await field.press('Tab');}
  await(await use(targets,'checkbox',/I selected a CE base tagset/)).check();await(await use(targets,'button','Use this target')).click();await save();
- const recovery=await reviewNativeCeSource({page,targets,use,current,save,hash,expect,sourceRoot:sourceRoot});
- console.log('LIVE_REBUILD_NATIVE',JSON.stringify({phase:'reviewed-stock-ce-source-corrected',tags:recovery.corrections.length}));
+ const recovery=reviewSource?await reviewNativeCeSource({page,targets,use,current,save,hash,expect,sourceRoot:sourceRoot}):null;
+ console.log('LIVE_REBUILD_NATIVE',JSON.stringify({phase:recovery?'reviewed-stock-ce-source-corrected':'selected-existing-native-source',tags:recovery?.corrections.length??0}));
  await page.getByRole('button',{name:'Close Project setup',exact:true}).click();
+ const project=await current(),selected=project.buildTargets.find(target=>target.id===project.activeBuildTarget);
+ const build=page.locator('.forge-build-panel'),expanded=await build.locator('.forge-build-content').isVisible();
+ if(!expanded)await build.locator('.forge-build-summary').click();
+ const paths=build.getByRole('group',{name:'Build tool paths',exact:true});
+ for(const [label,key]of [['Halo Tool','hekDirectory'],['Source tag root','tagsDirectory'],['Invader','invaderDirectory']])await expect(paths).toContainText(label+': '+selected[key]);
+ await build.getByRole('button',{name:'Configure build tools',exact:true}).click();
+ await expect(panel).toBeVisible();await expect(mapTools).toHaveAttribute('open','');await expect(targets).toHaveAttribute('open','');
+ for(const [label,key]of [[/Map Builder folder/,'hekDirectory'],[/Editable Halo Tags folder/,'tagsDirectory'],[/Invader folder/,'invaderDirectory']])await expect(await use(targets,'textbox',label)).toHaveValue(selected[key]);
+ await page.getByRole('button',{name:'Close Project setup',exact:true}).click();
+ if(!expanded)await build.locator('.forge-build-summary').click();
+ console.log('LIVE_REBUILD_NATIVE',JSON.stringify({phase:'selected-map-build-tools-ui-verified',target:selected.id,sourceMatchesProfile:true,configureOpensProjectSetup:true}));
  return {targets,mapTools,summary,recovery};
 }
 

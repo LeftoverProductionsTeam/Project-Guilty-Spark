@@ -3922,3 +3922,26 @@ test('native window focus loss cancels a numeric scrub even when WebView focus s
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.find((brush:any)=>brush.id==='ramp').position[0])).toBe(.75);
  await page.keyboard.press('Control+z');await expect(input).toHaveValue(initial);await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.find((brush:any)=>brush.id==='ramp').position[0])).toBe(Number(initial));
 });
+
+
+for(const configured of [true,false])test(`QuickForge build paths and configure action use the selected map target (${configured?'configured':'missing source'})`,async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('spark-test-settings',JSON.stringify({hekDirectory:'C:/Global/Kit',hekTagsDirectory:'C:/Global/Tags',invaderDirectory:'C:/Global/Invader'})));
+ await mockDesktop(page);
+ await page.evaluate(configured=>{
+  const w=window as any,p=w.__sparkMock.projects.a.project;
+  p.quickForge={schemaVersion:1,name:p.title,template:'customBlank',runtimeId:'chupathingyCe',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]};
+  p.activeBuildTarget='map-ce';p.buildTargets=[{id:'map-ce',name:'Map CE source',runtimeId:'chupathingyCe',builder:'invader-ce',hekFlavor:'legacyHek',hekDirectory:'C:/Map/Kit',tagsDirectory:configured?'C:/Map/Tags':null,invaderDirectory:'C:/Map/Invader',ceCompatibleTagset:true,openSauce:false}];
+ },configured);
+ await openFixture(page);await chooseTool(page,'Level editor');
+ await page.locator('.forge-build-summary').click();
+ const paths=page.getByRole('group',{name:'Build tool paths',exact:true});
+ await expect(paths).toContainText('Halo Tool: C:/Map/Kit');await expect(paths).toContainText('Source tag root: '+(configured?'C:/Map/Tags':'not configured'));await expect(paths).toContainText('Invader: C:/Map/Invader');
+ await page.getByRole('button',{name:'Configure build tools',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Project setup panel',exact:true}),targets=panel.locator('.gs-build-targets');
+ await expect(panel).toBeVisible();await expect(panel.locator('.gs-map-tools')).toHaveAttribute('open','');await expect(targets).toHaveAttribute('open','');
+ const tags=targets.getByRole('textbox',{name:/Editable Halo Tags folder/,includeHidden:true});await revealPagedControl(tags);await expect(tags).toHaveValue(configured?'C:/Map/Tags':'');
+ await tags.fill('C:/Map/Updated Tags');await tags.press('Tab');await page.getByRole('button',{name:'Close Project setup',exact:true}).click();await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project.buildTargets[0].tagsDirectory)).toBe('C:/Map/Updated Tags');
+ await expect(paths).toContainText('Source tag root: C:/Map/Updated Tags');
+ await page.getByRole('button',{name:'Configure build tools',exact:true}).click();await revealPagedControl(tags);await expect(tags).toHaveValue('C:/Map/Updated Tags');
+});

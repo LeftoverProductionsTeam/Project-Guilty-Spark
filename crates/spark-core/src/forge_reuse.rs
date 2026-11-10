@@ -65,6 +65,27 @@ pub(crate) fn record(
     )?;
     Ok(())
 }
+/// The build caller must first verify the map/build identity and owned source
+/// context. Reuse the existing full compiled-source contract to admit only its
+/// inputs, excluding generated BSP/scenario/lightmap files from a fresh build.
+pub(crate) fn admission_inputs(job: &Path, tags: &Path) -> Result<BTreeMap<String, String>> {
+    let contract: Contract = load(&job.join("reuse-contract.json"))?;
+    if contract.schema_version != 3
+        || fs::canonicalize(tags)? != fs::canonicalize(job.join("workspace/tags"))?
+        || tool_transaction::inventory(tags)? != contract.compiled_tags
+        || tool_transaction::inventory(&job.join("workspace/data"))? != contract.authored_data
+        || maps::hash_file(&job.join("workspace/project.gsproject"))? != contract.project_sha256 {
+        return crate::invalid("Reconcile external native saves before admission. The retained tags or authored source differ from the validated build; no edits were discarded");
+    }
+    let mut selected = BTreeMap::new();
+    for path in contract.input_hashes.keys().chain(contract.imported_hashes.keys()) {
+        let hash = contract.compiled_tags.get(path).ok_or_else(||crate::SparkError::Invalid(format!("Validated build lost native input {path}")))?;
+        selected.insert(path.clone(), hash.clone());
+    }
+    if selected.is_empty() {return crate::invalid("Validated build has no native input inventory");}
+    crate::working_tag_changes::validate_baseline(&selected)?;
+    Ok(selected)
+}
 pub(crate) fn find(
     project: &Project,
     tools: &ForgeToolchain,
@@ -232,4 +253,25 @@ pub(crate) fn find(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+    #[test]
+    fn input_admission_excludes_generated_geometry_and_rejects_unreviewed_external_saves() {
+        let root=tempfile::tempdir().unwrap();let job=root.path().join("job");let workspace=job.join("workspace");let tags=workspace.join("tags");
+        fs::create_dir_all(&tags).unwrap();fs::create_dir(workspace.join("data")).unwrap();
+        fs::write(tags.join("input.weapon"),b"native source").unwrap();fs::write(tags.join("import.scenery"),b"validated import").unwrap();
+        fs::write(tags.join("generated.scenario_structure_bsp"),b"compiled geometry").unwrap();
+        fs::write(workspace.join("data/level.jms"),b"source geometry").unwrap();fs::write(workspace.join("project.gsproject"),b"saved project").unwrap();
+        let files=tool_transaction::inventory(&tags).unwrap();let inputs=BTreeMap::from([("input.weapon".into(),files["input.weapon"].clone())]);let imports=BTreeMap::from([("import.scenery".into(),files["import.scenery"].clone())]);
+        record(&job,&tags,&tags,&inputs,&imports,&ForgeToolchain::default()).unwrap();
+        let selected=admission_inputs(&job,&tags).unwrap();assert_eq!(selected.len(),2);assert!(!selected.contains_key("generated.scenario_structure_bsp"));
+        fs::write(tags.join("generated.scenario_structure_bsp"),b"unreviewed collision edit").unwrap();assert!(admission_inputs(&job,&tags).is_err());
+        fs::write(tags.join("generated.scenario_structure_bsp"),b"compiled geometry").unwrap();assert_eq!(admission_inputs(&job,&tags).unwrap(),selected);
+        fs::write(workspace.join("data/level.jms"),b"unreviewed source edit").unwrap();assert!(admission_inputs(&job,&tags).is_err());
+        fs::write(workspace.join("data/level.jms"),b"source geometry").unwrap();
+        fs::write(workspace.join("project.gsproject"),b"different saved source").unwrap();assert!(admission_inputs(&job,&tags).is_err());
+    }
 }

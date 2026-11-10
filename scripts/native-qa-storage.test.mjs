@@ -481,6 +481,30 @@ test('QA run records native source identity and outcome; removes only sealed scr
     await assert.rejects(fs.stat(scratch), { code: 'ENOENT' });
   }));
 
+test('QA cache retirement removes only complete CRX installers from a declared disposable profile', () =>
+  fixture(async parent => {
+    const root = await mkdir(path.join(parent, 'run')), finish = await beginQaStorage(root, options(parent));
+    const owned = await finish.createScratch('owner');
+    const profile = await mkdir(path.join(await mkdir(path.join(owned, 'webview')), 'EBWebView'));
+    const cache = await mkdir(path.join(profile, 'component_crx_cache'));
+    const installed = path.join(await mkdir(path.join(profile, 'WidevineCdm')), 'installed.dll');
+    await fs.writeFile(installed, 'installed component must remain');
+    const crx = Buffer.alloc(32); crx.write('Cr24'); crx.writeUInt32LE(3, 4); crx.writeUInt32LE(8, 8);
+    await fs.writeFile(path.join(cache, 'hash-named-installer'), crx);
+    await fs.writeFile(path.join(cache, 'metadata.json'), '{"installed":true}');
+    await fs.writeFile(path.join(cache, 'partial.crx'), crx.subarray(0, 15));
+    await assert.rejects(finish.retireWebviewInstallers('../outside'), /declared active QA/);
+    const result = await finish.retireWebviewInstallers('owner');
+    assert.equal(result.logicalBytes, 32); assert.equal(result.retired.length, 1);
+    assert.match(result.retired[0].sha256, /^[a-f0-9]{64}$/);
+    assert.equal(result.kept.length, 2);
+    await assert.rejects(fs.stat(path.join(cache, 'hash-named-installer')), { code: 'ENOENT' });
+    assert.equal(await fs.readFile(installed, 'utf8'), 'installed component must remain');
+    assert.equal(await fs.readFile(path.join(cache, 'metadata.json'), 'utf8'), '{"installed":true}');
+    assert.deepEqual(await fs.readFile(path.join(cache, 'partial.crx')), crx.subarray(0, 15));
+    await finish('passed');
+  }));
+
 test('changed, unrelated, replaced and linked scratch cannot be disposed', () =>
   fixture(async (parent) => {
     const root = await mkdir(path.join(parent, 'run')),

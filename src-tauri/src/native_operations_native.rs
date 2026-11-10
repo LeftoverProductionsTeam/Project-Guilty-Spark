@@ -180,9 +180,7 @@ pub(super) fn executable(state: &AppState, project: &Project, id: &str) -> Reply
     if tool.integration != "managedWorkflow" || tool.location != "invader" {
         return Err("This tool has no reviewed native operation".into());
     }
-    let directory = project_tools(state, project)?
-        .invader_directory
-        .ok_or("Choose the reviewed Invader folder in Dependencies & setup")?;
+    let directory = native_tag_parser::invader_directory(state, project)?;
     core::reject_links(&directory).map_err(error)?;
     let file = directory.join(
         tool.filename
