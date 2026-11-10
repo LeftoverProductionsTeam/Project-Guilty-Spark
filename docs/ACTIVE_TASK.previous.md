@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — vehicle native-material fidelity after accepted M2 R398
-Status: automated acceptance incomplete
+Task: Operation110 — vehicle source-material coverage diagnostics
+Status: accepted
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: local master7b01cea010ad30f2e1329d66f710bc6505db3cb9 commits accepted R398 current CE/Chupathingy crash recovery and scope guards. Earlier738027a MCC/native acceptance and3e34299 vehicle UV repair remain. Source manifests cd83dbf43084c58ed1886b6a67fd80479f672b2975ddcc195a60ee069bb9b770,2134files/50,920,339B. New vehicle shader source is uncommitted/unaccepted pending R401. No archive/push/publication.
-Next action: Run R406 Demo with the exact source-matched R401 app after class-aware fixture correction; rerun the strengthened material-reference check on MCC. R401 full source regressions and R402-404 native CE/Chupa/OpenCE passed. Review evidence and commit locally; no game-parity claim.
+Latest verified revision: 93d7a66a60fae7209d746dbad234e1b2b76e2ae2 committed native vehicle detail/reflection ordering, accepted R401-407. Clean source manifest297d0969806f69d492165a3d8c3e864a1eb6d969ea10478536deac39329d249d,2134files/50,941,357B. R408 native red reproduces false zero-gap reporting; R409-414 accept the coverage repair, strict original triangle/material partitions and visible source limitations. No push/publication.
+Next action: Commit the accepted coverage diagnostic after manifest/diff checks. Continue vehicle fidelity in the existing renderer: native dynamic smet dashboard support needs engine-function semantics and independent GPU/source tests; do not fake it with fallback colours. H29 matched actual-game lighting/reflection/glass/animation remains open. Full Operation110 and475requirements remain active; no push/publication.
 
 ## Acceptance
 
@@ -14,6 +14,10 @@ Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHA
 
 
 ## Verified milestones
+
+R409-414 coverage accepted:479frontend/272browser/TypeScript/contracts/offline/storage; freshWindows181.567s/nativeDemo25.587s. Native source-partition checks R410MCC23.192s/R411CE26.404s/R412Chupa24.453s/R413OpenCE22.740s/R414Demo26.190s pass with0UVmismatches/0errors/originalhashesunchanged/ownedscratchdisposed. Warthog+Rocket4smettriangles are explicitlyunsupported; Demo3179lightriangles unsupported; supported shader assignments and images remain strict. R409currentQA SHA2ecf88c4…/runtimeFPfc53edfd…; no liveprocess/operation. Full exact details NATIVE_ASSETS_AND_SHOWCASE.md.
+
+R406/R407 terminal/exit0: class-aware Demo and strengthened stock MCC original-material-reference checks pass. Demo25.706s/MCC23.972s; wrapper/childcomplete/0errors/originalhashesunchanged/ownedscratchdisposed. DemoWarthog5soso; rwarthog15lighreferences remain unsupported material rendering. R402CE26.176s/R403Chupa22.776s/R404OpenCE22.296s accepted. StockScorpions retain4after-reflectionslots. R401full909Rust/9ignored,476frontend/271browser/contracts/offline/storage/Windows/native accepted. No operation is active.
 
 R401 currentvehiclematerialsource accepted:909Rust/9explicitignored,476frontend,271browser, TypeScript/sourcecontracts/offline/storage; Windowsbuild183.305s/nativeMCC24.513s. CurrentQA E/qa-vehicle-order-r401/GuiltySpark.exe49,772,544B SHAc1a7feacee7096a3dd5a95d35d721b93f8f488d056bffe3a5a0335e7cecee2af, runtimeFPadae9e70c7c272c9303deb4b2a9a979bf9a6d2a325c1d423ee2696c12feb3316. Builtfrom7b01cea plus revieweddirtysource, not a release. Native5MCCmodels25302UVcoords0mismatch; actualshaderflags24referencesincluding4after-orderScorpionslots, largevehiclepreviews11/7texturesand4/1cubes0gaps; Worldrequiredmaterialsallload, originalsunchanged; wrapper/childcomplete/exit0 and ownedrun-1XA22udisposed. R399rednative-orderpixels→R401fullGPUexpectedgreens, PC/Xboxmasktests68/60pass.
 
@@ -51,9 +55,13 @@ Earlier R349scroll/axis/End,953CE609/MCC13source contracts/tool-profile fixes, R
 
 ## Failures and blockers
 
+Post-report continuity check initially failed the unchanged32KiB pending-document bound because two new vehicle summaries duplicated linked evidence. Only those duplicate summaries were compacted; full reports/requirement IDs remain. Re-run the existing5checks before commit; no limit/assertion is relaxed.
+
+R408 genuine current Windows red: original Demo rwarthog3179/3179 triangles lack supported materials but existingUIreports0gaps. Its otherWarthog4/2798triangles also lack source attribution. Sourceunchanged/ownedscratchdisposed; wrapperexit1. New coverage helper and visible compact status preserve geometry/lighting/source; 4focusedunit and1browserworkflow checks pass before full R409.
+
 R405 failed the new positive soso-count assertion on the original Demo rwarthog carrier. Independent original-byte inspection proves all15 native model references are ligh effects/lights/coop teleport; source hash unchanged, owned scratch disposed. The corrected fixture records this exact source limitation without claiming rendered fidelity or weakening stock MCC/CE/Xbox shader checks. No operation currently running.
 
-VehicleprobeR386failed on newtest originalHash scope, corrected explicitparameter. R387then genuinely reproduces wrongUVs inactualnativeapp; R392missingScorpion fixtureassumption onoriginalDemo was corrected to its exacttwoWarthog-derivedobjects inR393. Noassertionrelaxed forstockMCC/CE/Xboxsources. Allcurrentnativevehiclecheckscomplete; fullgame-lighting/reflection/animationcomparison remainsH29.
+VehicleprobeR386failed on newtest originalHash scope, corrected explicitparameter. R387then genuinely reproduces wrongUVs inactualnativeapp; R392missingScorpion fixtureassumption onoriginalDemo was corrected to its exacttwoWarthog-derivedobjects inR393. Noassertionrelaxed forstockMCC/CE/Xboxsources. Stockvehicle source checks complete; original Demo light-reference carrier remains unsupported material rendering; fullgame-lighting/reflection/animationcomparison remainsH29.
 
 R385 terminal/failed: fullRust908pass/9explicit ignores; currentWindowsQA export49,741,312B SHA48e98af33c3a7725be122995c21538f0907fd5562294130d93e7728c3480ee06/runtimeFP31edb2058f7f879a49aad8ec8c78c3ba3aca0a70e056727ce509912740d0ac19. All3MCC1779-file admissions, actualfield.35/632Bpublication/third-authorplacement/models/conflicts/authorUndo/recovery pass. Nativeeditor-C focus was obtained, but held numeric drag didnotchange0 (testline664); no owner-transfer/frozencompile/finalacceptance. No securityprompt action. Childguardfailed/activefalse,peak1,136,633,094B,terminal4,070,430B; parentdisposed5,210,231,351B,peak6,342,801,014B. ExactE/mcc-native-source-r385.json/log/screens. No currentnative/QA processes remain. Vehiclepriority follows ownersteering; source changes preserved.
 
@@ -70,6 +78,9 @@ R371 production recovery failure: sharedbackend282/offlineedits retained butRAM-
 R375 observed WindowsSecurity network-permission prompt. No permission/security setting changed or automated. Actualfocus and samePCnative tests continued/passed; no physicalnetworkapproval/twoPCdelivery inferred. HumanH19/H28interaction/traversal/combat/audio; physicalDPI/monitors/twoPC/headset/cleanVM/Mac/Linux; originalZombieautomaticrelease/AIcombat/sharedvictory/Extractionno-timerpersistence remain open. No WSL/Docker/secondcomputer/headsetavailable. P0repaired hostedCI remains owner-pushdependent, no remote success claimed. FullM2/M1-M6notcomplete.
 
 ## Operations and safe checkpoint
+
+R409 exec30696 terminal/exit0: full479frontend/272browser/offline/storage/contracts/TypeScript; freshWindows181.567s/nativeDemo25.587s; originalunchanged/wrapper+childcomplete/0errors/ownedscratchdisposed. Newapp E/qa-vehicle-coverage-r409/GuiltySpark.exe49,772,544B SHA2ecf88c436ec6801f080b941338e62b244ff790da04c8ba200125b659c21496a/runtimeFPfc53edfda41add69b27eda01980249deca5325cba4a6564301355be7825c70a3. Builtfrom93d7+reviewedcoverageUI, not a release. R410-414 terminal/exit0 sequentialexec45063 strengthens originalstrip/actualmaterialpartition/visiblecoverage checks, allusingexactR409app; no production source change.
+
 
 R402–R405 sequential exec16811 is terminal: R402–R404 passed; R405 failed its new stock-material fixture expectation. nativeCE609/ChupaXbox5/OpenCEXbox5/Demo6 with currentR401app. E/vehicle-order-ce-r402,vehicle-order-chupa-r403,vehicle-order-opence-r404,vehicle-order-demo-r405 .json/.log. Eachfirstverifiedsource/QAfullruntimefingerprintmatch anddisposesownedroot; no wholeSDK/nativecontentbuild/game is required for thisread-onlymaterialworkflow.
 

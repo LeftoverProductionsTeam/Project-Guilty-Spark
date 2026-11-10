@@ -595,6 +595,32 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
+test('model previews disclose unsupported source material coverage and preserve edits across contexts',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+    const mesh={label:'Synthetic unsupported-material geometry',source:'halo-model-untextured',positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],materialRanges:[]};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='preview_owned_object_model'){w.__sparkMock.calls.push({command,args});return{sourceSha256:args.sourceSha256,objectTagId:args.tagId,modelTagId:700,resourceSha256:null,mesh:structuredClone(mesh),tags:[]};}
+      if(command==='preview_owned_object_collision')return structuredClone(mesh);
+      return invoke(command,args);
+    };
+  });
+  await openFixture(page);
+  const preview=page.getByRole('region',{name:'Actual model preview',exact:true}).locator('.native-model-preview'),coverage=preview.getByRole('status',{name:'Model material coverage',exact:true});
+  await expect(preview).toHaveAttribute('data-model-ready','true');
+  await expect(preview).toHaveAttribute('data-model-material-gaps','1');
+  await expect(preview).toHaveAttribute('data-model-missing-shaders','0');
+  await expect(preview).toHaveAttribute('data-model-unassigned-triangles','1');
+  await expect(coverage).toHaveText('Source materials incomplete · 1 triangle uses inspection shading.');
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');await field.press('Tab');
+  const tabs=page.getByRole('tablist',{name:'Asset contexts',exact:true});await tabs.getByRole('tab',{name:'Collision',exact:true}).click();
+  await expect(preview).toHaveAttribute('data-collision-status','ready');await expect(coverage).toHaveCount(0);
+  await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(coverage).toBeVisible();await expect(field).toHaveValue('27');
+  await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='preview_owned_object_model').length)).toBe(1);
+});
+
 test('native tag animation is opt-in, reports missing clips and reuses the exact graph response',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(()=>{

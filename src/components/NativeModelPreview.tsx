@@ -26,7 +26,7 @@ import type { OwnedModelView } from '../useOwnedForgeModels';
 import type { EditorEnvironment } from '../environment';
 import { sourceSurfaceEnvironment } from '../environment';
 import {modelSourceAppearance} from '../modelSourceAppearance';
-import {glassWithoutDiffuse} from '../nativeShaderTextures';
+import {glassWithoutDiffuse,unassignedNativeTriangles} from '../nativeShaderTextures';
 import type {ModelSourceAppearance} from '../modelSourceAppearance';
 import HaloMesh from './HaloMesh';
 import AnimatedBiped from './AnimatedBiped';
@@ -238,6 +238,9 @@ export default function NativeModelPreview({
   const key = forgeModelKey(placement),
     view = models[key];
   const materialIds=useMemo(()=>view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])]:[],[view?.mesh]);
+  const unassignedTriangles=useMemo(()=>view?unassignedNativeTriangles(view.mesh):null,[view?.mesh]);
+  const missingShaderCount=view?materialIds.filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id])).length:0;
+  const incompleteAttribution=!!view&&(unassignedTriangles===null||unassignedTriangles>0);
   useEffect(()=>{if(view)onMaterials?.(materialIds);},[view?.mesh,materialIds,onMaterials]);
   const [collision, setCollision] = useState<{key:string;mesh:MeshData|null;error?:string}|null>(null);
   const [collisionRetry, setCollisionRetry] = useState(0);
@@ -300,7 +303,9 @@ export default function NativeModelPreview({
       data-model-lighting={environment?'custom':sourceLighting?.key===key&&sourceLighting.value?.environment?'source':'inspection'}
       data-model-lighting-ready={!!environment||sourceLighting?.key===key}
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
-      data-model-material-gaps={view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])].filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id])).length:0}
+      data-model-missing-shaders={missingShaderCount}
+      data-model-unassigned-triangles={view?(unassignedTriangles??'unknown'):undefined}
+      data-model-material-gaps={missingShaderCount+(incompleteAttribution?1:0)}
       data-model-reflections={
         view
           ? Object.values(view.extraTextures).filter((texture) => texture instanceof THREE.CubeTexture).length
@@ -350,6 +355,10 @@ export default function NativeModelPreview({
       {failures[key] && <small role="status">{failures[key]} <button type="button" onClick={()=>{setFirstFrame('');setRetry(n=>n+1);}}>Retry preview</button></small>}
       {surface==='collision'&&collisionValue&&<small className="model-collision-status" role="status">
         {collisionValue.error?<>Native collision rejected: {collisionValue.error} <button onClick={()=>setCollisionRetry(n=>n+1)}>Retry collision</button></>:collisionValue.mesh?`${collisionValue.mesh.indices.length/3} native collision triangles · default pose`:'No native collision geometry is attached to this object.'}
+      </small>}
+      {surface==='render'&&incompleteAttribution&&<small className="model-material-coverage" role="status" aria-label="Model material coverage">
+        {unassignedTriangles===null?'Source material coverage unavailable.':
+          `Source materials incomplete · ${unassignedTriangles} ${unassignedTriangles===1?'triangle uses':'triangles use'} inspection shading.`}
       </small>}
       {!showcase&&sourceLighting?.key===key&&!sourceLighting.value?.environment&&!environment&&<small className="model-lighting-status">Source lighting unavailable · inspection lighting</small>}
       {!showcase&&live&&<div className="native-model-view-controls" aria-label="Model preview controls">

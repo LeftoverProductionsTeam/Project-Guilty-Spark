@@ -202,3 +202,5 @@
     transition: none;
   }
 }
+
+.native-model-preview > .model-material-coverage {top:34px;bottom:auto;right:auto;max-width:calc(100% - 16px);}

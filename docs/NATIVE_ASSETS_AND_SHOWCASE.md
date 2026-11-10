@@ -34,6 +34,20 @@ Native screenshots: E/vehicle-after-r388-native-vehicle-scorpion.png before this
 
 This accepts the demonstrated UV/ordering defects and native editor checks. Matched actual-game reflection, local lighting, glass, geometry/LOD and animation comparison remains H29. No new game/native-compilation acceptance is inferred; the accepted native build/recovery pipeline remains protected.
 
+### Material coverage follow-through — 10 November
+
+R408 reproduces a second defect in the actual Windows application: unsupported geometry reported0material gaps. Independent original-cache triangle-strip readback identifies4Warthog dashboard triangles (2each for native smet meter engine and meter speedometer), and3179/3179triangles on the Demo light-referencing zombie carrier. The source is unchanged; this failure remains recorded.
+
+The existing nativeShaderTextures module now counts uncovered source-material triangles, merging overlap only once and reporting malformed attribution as unknown. NativeModelPreview displays a compact nonfatal status below its view controls, distinguishes missing supported shaders from unsupported geometry, and suppresses this render-material warning in Collision view. Source geometry, materials, lighting, native tags, exports and game files are unchanged. This diagnostic does not implement dynamic native meter rendering or replace the invalid carrier references.
+
+R409 passes479frontend tests,272browser tests, TypeScript,1071source contracts, offline and storage regressions; the focused browser journey preserves a27field edit, context navigation, one model read and Undo back to10. New coverage cases test absent, partial, overlapping and malformed ranges. The unchanged Rust source retains R401's909passes/9explicit opt-in ignores; full Rust was not repeated for this frontend-only follow-through. Fresh Windows build181.567s and actual Demo preview25.587s pass.
+
+Strengthened native checks independently rebuild original strip triangle counts and the exact supported per-shader partition, then compare actual mesh assignments and visible warnings. Unsupported attribution cannot excuse dropping any supported source material. R410MCC23.192s, R411CE26.404s, R412Chupa24.453s, R413OpenCE22.740s and R414Demo26.190s all complete with0UVmismatches,0JavaScript errors, unchanged original hashes and disposed owned scratch. Warthog and Rocket Warthog each have4unsupported meter triangles; checked Scorpion/Ghost/Banshee ranges are fully attributed. Demo carrier remains3179unsupported light-referencing triangles. Actual large Warthog/Scorpion previews have0missing supported shader images. Chupa/OpenCE original files are identical-format/hash installation checks.
+
+Current QA E/qa-vehicle-coverage-r409/GuiltySpark.exe49,772,544B, SHA2ecf88c436ec6801f080b941338e62b244ff790da04c8ba200125b659c21496a, runtime-source fingerprint fc53edfda41add69b27eda01980249deca5325cba4a6564301355be7825c70a3. Built from93d7a66 plus this reviewed UI diff; not an installer/release. E/vehicle-coverage-r409.json/log and vehicle-coverage-{mcc-r410,ce-r411,chupa-r412,opence-r413,demo-r414}.json/log retain the exact scope. R409 parent disposes1,872,441,440logical bytes after a1,937,234,348byte peak; no Spark test process remains. Actual native warning screenshots are E/vehicle-coverage-r409-native-vehicle-warthog.png and ...-rwarthog.png, plus R410stock screenshots. No game-source pixels/assets enter Git.
+
+**Still open:** native dynamic meter rendering, source-local lighting/reflection/glass/animation parity against matching game views (H29), and the broader native/game/peer/platform ledger. Warning correctness is not a rendered-fidelity pass for unsupported surfaces.
+
 ## 9 November vehicle texture-coordinate repair
 
 The owner reported vehicles still differed from the game. R387 reproduces a real shared-reader failure in the native Windows app: the Warthog has **7,380 wrong UV coordinates**, the Scorpion 4,768, rocket Warthog 8,544 and Banshee 2,098. The Ghost's unit-scale mapping already matches. All required Warthog/Scorpion images and their 4/1 reflection cubes were loaded, so decoding success alone did not detect this error.

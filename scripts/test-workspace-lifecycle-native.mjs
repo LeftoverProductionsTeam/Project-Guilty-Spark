@@ -258,11 +258,12 @@ async function nativeVehiclePreview(opened,originalHash){
       for(const offset of[72,70,68,66,64]){const index=bytes.readUInt16LE(permutations+offset);if(index<geometryCount){selected.add(index);break;}}
     }
     if(!selected.size&&geometryCount)selected.add(0);
-    const expected=[];
+    const expected=[],sourceParts=[];
     for(const index of[...selected].sort((a,b)=>a-b)){
       const [parts,count]=block(geometries+index*48+36,xbox?104:132,32);
       for(let part=0;part<count;part++){
-        const record=parts+part*(xbox?104:132),n=u32(record+88);if(!u32(record+72)||!n)continue;
+        const record=parts+part*(xbox?104:132),n=u32(record+88),stripTriangles=u32(record+72);if(!stripTriangles||!n)continue;
+        if(stripTriangles>1_000_000)throw Error('Vehicle source strip exceeds its readback bound');
         const offset=u32(record+100);if(n>65535||!xbox&&offset+n*68>rawSize)throw Error('Vehicle UVs escape native vertices');
         let vertexStart=rawStart+offset;
         if(xbox){
@@ -275,6 +276,15 @@ async function nativeVehiclePreview(opened,originalHash){
           else coordinate=f32(vertexStart+vertex*68+48+axis*4);
           expected.push(Math.fround(coordinate*scales[axis]));
         }
+        const stripBytes=(stripTriangles+2)*2,stripOffset=u32(record+76),stripStart=xbox?pointer(stripOffset,stripBytes):rawStart+rawSize+stripOffset;
+        if(stripStart<0||stripStart+stripBytes>bytes.length||!xbox&&rawSize+stripOffset+stripBytes>u32(tagStart+32))throw Error('Vehicle source strip escapes native model data');
+        let previous=[],triangleCount=0;
+        for(let sample=0;sample<stripTriangles+2;sample++){
+          const vertex=bytes.readUInt16LE(stripStart+sample*2);if(vertex===65535){previous=[];continue;}if(vertex>=n)throw Error('Vehicle source strip references an invalid vertex');
+          if(previous.length===2&&new Set([...previous,vertex]).size===3)triangleCount++;
+          previous.push(vertex);if(previous.length>2)previous.shift();
+        }
+        if(triangleCount)sourceParts.push({geometry:index,part,shaderSlot:bytes.readUInt16LE(record+4),triangles:triangleCount});
       }
     }
     const actual=await invoke(main,'preview_owned_object_model',{projectId:opened.project.id,tagId:vehicle.id,sourceSha256:originalHash});
@@ -286,6 +296,17 @@ async function nativeVehiclePreview(opened,originalHash){
       const sourceTag=opened.inspection.tags.find(tag=>tag.id===id);expect(sourceTag?.class,'Original vehicle material reference '+slot).toBe(nativeClass);
       sourceShaderReferences.push({slot,id,class:nativeClass,path:sourceTag.path});
     }
+    const expectedByShader=new Map(),actualByShader=new Map(),unsupportedSourceParts=[];
+    for(const part of sourceParts){
+      const reference=sourceShaderReferences[part.shaderSlot];if(!reference)throw Error('Vehicle source part has no shader slot');
+      if(['smet','ligh'].includes(reference.class))unsupportedSourceParts.push({...part,shaderClass:reference.class,shaderPath:reference.path});
+      else expectedByShader.set(reference.id,(expectedByShader.get(reference.id)??0)+part.triangles);
+    }
+    for(const range of actual.mesh.materialRanges)actualByShader.set(range.shaderTagId,(actualByShader.get(range.shaderTagId)??0)+range.indexCount/3);
+    expect([...actualByShader].sort((a,b)=>a[0]-b[0]),'Every supported native triangle retains its exact original shader').toEqual([...expectedByShader].sort((a,b)=>a[0]-b[0]));
+    expect(actual.mesh.indices.length/3,'Original triangle-strip topology').toBe(sourceParts.reduce((sum,part)=>sum+part.triangles,0));
+    const sourceUnassignedTriangles=unsupportedSourceParts.reduce((sum,part)=>sum+part.triangles,0);
+    expect((actual.mesh.indices.length-actual.mesh.materialRanges.reduce((sum,range)=>sum+range.indexCount,0))/3).toBe(sourceUnassignedTriangles);
     const materialOrder=[];
     for(const id of new Set(actual.mesh.materialRanges.map(range=>range.shaderTagId))){
       const shader=opened.inspection.tags.find(tag=>tag.id===id);expect(shader,'Actual vehicle shader identity').toBeTruthy();
@@ -307,7 +328,7 @@ async function nativeVehiclePreview(opened,originalHash){
       expect(actual.mesh.materialRanges).toHaveLength(0);expect(materialOrder).toHaveLength(0);
       materialAcceptance='unsupported-original-non-shader-references';
     }else expect(materialOrder.length).toBeGreaterThan(0);
-    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,sourceShaderReferences,materialAcceptance,materialOrder,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
+    results.push({vehicleId:vehicle.id,vehiclePath:vehicle.path,modelPath:model.path,baseMapUvScale:scales,coordinates:expected.length,mismatches,vertices:actual.mesh.positions.length/3,triangles:actual.mesh.indices.length/3,unassignedTriangles:sourceUnassignedTriangles,unsupportedSourceParts,sourceShaderReferences,materialAcceptance,materialOrder,expectedUvSha256:crypto.createHash('sha256').update(JSON.stringify(expected)).digest('hex')});
   }
   expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
   expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);
@@ -325,7 +346,11 @@ async function nativeVehiclePreview(opened,originalHash){
     await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
     row.preview=await preview.evaluate(element=>({...element.dataset}));
     await main.screenshot({path:path.join(root,'native-vehicle-'+name+'.png')});
-    expect(Number(row.preview.modelMaterialGaps)).toBe(0);
+    expect(Number(row.preview.modelMissingShaders),'All supported source materials are available').toBe(0);
+    expect(Number(row.preview.modelUnassignedTriangles),'Native source material coverage').toBe(row.unassignedTriangles);
+    expect(Number(row.preview.modelMaterialGaps)).toBe(row.unassignedTriangles>0?1:0);
+    if(row.unassignedTriangles>0)await expect(preview.getByRole('status',{name:'Model material coverage',exact:true})).toContainText(`${row.unassignedTriangles} triangles use inspection shading`);
+    if(row.materialAcceptance==='unsupported-original-non-shader-references')expect(row.unassignedTriangles).toBe(row.triangles);
   }
   for(const row of results)expect(row.mismatches,'Actual native UV coordinates for '+row.modelPath).toBe(0);
   expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
