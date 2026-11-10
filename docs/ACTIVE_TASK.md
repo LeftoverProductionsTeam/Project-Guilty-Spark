@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 74b273586bb6f19e7b4296b962a97de56ae928c0; accepted original-cube source/GPU increment. R532920Rust/9ignored,497frontend,277browser/TypeScript/contracts/offline/40storage/freshWindows167.818s; R532–R536 five native sources complete/0errors/normalclose/originalsunchanged/scratchdisposed. RuntimeFP9358963e… matches committed source/currentQA SHAc382b610…. R537 retires only verified supersededR520QA. H29game/shadows/poses and all M1–M6 remain open.
-Next action: resume H29 with comparable exact-owned Chupathingy game and current World camera views, native source lighting/contact-shadow and vehicle-pose investigation. Reuse existing documented camera/test workflow, protect originals; keep human game-parity open and avoid artificial brightness/material substitutions. Original reflection levels now accepted; no active operation. Full M1–M6 remain active.
+Latest verified revision: 931ec6cf9fb7e6bf3a46afbb411c1008bfe601c7 plus reviewed source-shadow changes; R546–R549/R551 five native sources complete/0errors/originals unchanged/disposed. R542920Rust/9ignored; R546500frontend/278browser/6GPU/TypeScript/contracts/offline/40storage/freshWindows168.552s. Exact QA fingerprint, captures and failures: NATIVE_ASSETS_AND_SHOWCASE.md; E/vehicle-shadow-acceptance-r552.json.
+Next action: Commit verified vehicle-shadow increment locally, then reproduce native illumination-range mismatch in real GPU pixels and repair only source-native lighting. R550 profiling false-positive repaired by request-start boundary; R551 passes unchanged zero-new-preview-read assertion. No active game/native process. H29 game appearance/pose and full M1–M6 remain open.
 
 ## Acceptance
 

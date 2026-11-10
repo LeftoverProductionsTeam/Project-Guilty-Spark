@@ -544,7 +544,7 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     // Optional illumination metadata cannot invalidate otherwise sound geometry.
     let radius=f32::from_bits(r.u32(at+4)?);let offset=[f32::from_bits(r.u32(at+8)?),f32::from_bits(r.u32(at+12)?),f32::from_bits(r.u32(at+16)?)];
     if radius.is_finite()&&(0.0..=1000.0).contains(&radius)&&offset.iter().all(|v|v.is_finite()&&v.abs()<=1000.0){
-        mesh.object_lighting=Some(crate::maps::ObjectLighting{tag_class:object.class.clone(),offset,radius,brighten:r.u16(at+2)?&4!=0});
+        mesh.object_lighting=Some(crate::maps::ObjectLighting{tag_class:object.class.clone(),offset,radius,brighten:r.u16(at+2)?&4!=0,casts_shadow:Some(r.u16(at+2)?&1==0)});
     }
     Ok((model_id,mesh))
 }
@@ -876,7 +876,8 @@ mod geometry_tests {
         let (_,model)=object_model_mesh(&b,&header,&tags,1,0).unwrap();assert!(model.rig.unwrap().nodes[0].rotation[2]<0.);
         let lighting=model.object_lighting.unwrap();assert_eq!(lighting.tag_class,"scen");
         let (startup,notes)=static_object_models(&b,&header,&tags,&[]);assert!(notes.is_empty(),"{notes:?}");let startup_lighting=startup.get(&1).unwrap().object_lighting.as_ref().unwrap();assert_eq!(startup_lighting.offset,lighting.offset);assert_eq!(startup_lighting.radius,lighting.radius);assert_eq!(startup_lighting.tag_class,"scen");
-        assert_eq!(lighting.offset,[1.,2.,3.]);assert_eq!(lighting.radius,2.75);assert!(lighting.brighten);
+        assert_eq!(lighting.offset,[1.,2.,3.]);assert_eq!(lighting.radius,2.75);assert!(lighting.brighten);assert_eq!(lighting.casts_shadow,Some(true));
+        put16(&mut b,0x102,5);assert_eq!(object_model_mesh(&b,&header,&tags,1,0).unwrap().1.object_lighting.unwrap().casts_shadow,Some(false));
         for bad in [f32::NAN,f32::INFINITY,-1.,1001.]{putf(&mut b,0x104,bad);assert!(object_model_mesh(&b,&header,&tags,1,0).unwrap().1.object_lighting.is_none());}
         putf(&mut b,0x104,2.75);putf(&mut b,0x108,f32::NAN);assert!(object_model_mesh(&b,&header,&tags,1,0).unwrap().1.object_lighting.is_none());
         let rotated=object_collision_mesh(&b,&header,&tags,1).unwrap().unwrap();

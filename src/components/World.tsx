@@ -1,3 +1,4 @@
+import NativeObjectShadows from './NativeObjectShadows';
 import {useAssemblyDonor} from '../useAssemblyDonor';
 import {assemblyBounds} from '../assemblyViewport';
 import type {AssemblyViewportSource} from '../assemblyViewport';
@@ -371,6 +372,7 @@ function Scene({
   return (
     <>
       <ViewportTelemetry/>
+      <NativeObjectShadows terrain={previewMesh} enabled={viewMode==='render'&&!greenScreen&&!joinedPreview&&!assembly}/>
       <SpatialAudioListener mapId={project.id}/>
       {!cinematic&&<SceneEffects settings={project.renderFeatures}/>}
       {ortho ? (

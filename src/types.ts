@@ -138,7 +138,7 @@ export interface SceneObject {
   sourceModel?: { projectId: string; sourceSha256: string; tagId: number; path: string; class: import('./forge').ForgePlacement['tagClass'] } | null;
 }
 export interface MeshData {
-  objectLighting?:{tagClass:string;offset:Vec3;radius:number;brighten:boolean}|null;
+  objectLighting?:{tagClass:string;offset:Vec3;radius:number;brighten:boolean;castsShadow?:boolean|null}|null;
   changeColors?:[number,number,number][]|null;
   rig?:ModelRig|null;
   positions: number[];

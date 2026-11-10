@@ -188,6 +188,8 @@ export function objectLightingPoint(mesh:MeshData|undefined,object:{position:Vec
 export interface SourceObjectLighting {
   point:Vec3;ambient:Vec3;primary:Vec3;primaryDirection:Vec3;
   bounce:Vec3;bounceDirection:Vec3;reflection:Vec3;reflectionBrightness:number;
+  /** Source-derived dynamic shadow; unavailable in older cached metadata. */
+  shadow?:{direction:Vec3;tint:Vec3};
 }
 /** Native integer texture sampling uses nearest-even at texel centres and
  * repeats at image boundaries. It does not sample generated GPU mipmaps. */
@@ -221,8 +223,11 @@ export function nativeDiffuseLightMip(nativeMipmaps:number|undefined,usableLevel
 export function sourceObjectLighting(sample:IncidentRadiositySample,diffuse:Vec3,light:Vec3,brighten=false):SourceObjectLighting|null {
   if(![...diffuse,...light,...sample.direction,...sample.surfaceNormal,...sample.point].every(Number.isFinite)||[...diffuse,...light].some(n=>n<0||n>1))return null;
   const clamp=(n:number)=>Math.min(1,Math.max(0,n)),brightness=light[0]*.299+light[1]*.587+light[2]*.114;
+  if(!Number.isFinite(sample.accuracy)||sample.accuracy<0||sample.accuracy>Math.sqrt(1.05))return null;
+  const accuracy=clamp(sample.accuracy),spread=Math.pow(accuracy,.25),sx=-sample.direction[0]*spread,sy=-sample.direction[1]*spread,horizontal=Math.hypot(sx,sy),factor=horizontal>.707?.707/horizontal:1;
+  const shadow={direction:[sx*factor,sy*factor,-Math.sqrt(1-Math.min(.707,horizontal)**2)] as Vec3,tint:light.map(n=>Math.min(1,Math.max(.03,1-1.3*n+(1-accuracy)*.5))) as Vec3};
   const boost=(rgb:Vec3,fraction:number):Vec3=>{if(!brighten)return rgb;const peak=Math.max(...rgb);return peak===0?rgb:rgb.map(n=>n*Math.min(1,Math.max(fraction,peak*(1+fraction)))/peak) as Vec3;};
-  return {point:sample.point,ambient:boost(light.map(n=>.03+.4*n) as Vec3,.2),primary:boost([...light],.3),primaryDirection:sample.direction,
+  return {point:sample.point,shadow,ambient:boost(light.map(n=>.03+.4*n) as Vec3,.2),primary:boost([...light],.3),primaryDirection:sample.direction,
     bounce:boost(diffuse.map(n=>n*brightness) as Vec3,.2),bounceDirection:sample.surfaceNormal.map(n=>-n) as Vec3,
     reflection:boost(diffuse.map((n,i)=>clamp(.5+3*n)*clamp(.25+2*light[i])) as Vec3,.5),reflectionBrightness:brighten?1:clamp(.25+1.5*brightness)};
 }

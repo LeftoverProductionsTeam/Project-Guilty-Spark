@@ -434,9 +434,9 @@ async function nativeVehiclePreview(opened,originalHash){
     const actual=await invoke(main,'preview_owned_object_model',{projectId:opened.project.id,tagId:vehicle.id,sourceSha256:originalHash});
     const objectAt=vehicle.dataOffset;
     if(!Number.isSafeInteger(objectAt)||objectAt<tagStart||objectAt+20>tagEnd)throw Error('Vehicle lighting header escapes source');
-    const objectLighting={tagClass:vehicle.class,radius:f32(objectAt+4),offset:[f32(objectAt+8),f32(objectAt+12),f32(objectAt+16)],brighten:!!(bytes.readUInt16LE(objectAt+2)&4)};
+    const objectLighting={tagClass:vehicle.class,radius:f32(objectAt+4),offset:[f32(objectAt+8),f32(objectAt+12),f32(objectAt+16)],brighten:!!(bytes.readUInt16LE(objectAt+2)&4),castsShadow:!(bytes.readUInt16LE(objectAt+2)&1)};
     expect(actual.mesh.objectLighting.tagClass).toBe(vehicle.class);expect(opened.inspection.modelMeshes[vehicle.id]?.objectLighting).toEqual(actual.mesh.objectLighting);expect(opened.inspection.modelMeshes[vehicle.id]?.changeColors).toEqual(actual.mesh.changeColors);
-    expect(actual.mesh.objectLighting.brighten).toBe(objectLighting.brighten);expect(Math.fround(actual.mesh.objectLighting.radius)).toBe(objectLighting.radius);expect(actual.mesh.objectLighting.offset.map(Math.fround)).toEqual(objectLighting.offset);
+    expect(actual.mesh.objectLighting.castsShadow).toBe(objectLighting.castsShadow);expect(actual.mesh.objectLighting.brighten).toBe(objectLighting.brighten);expect(Math.fround(actual.mesh.objectLighting.radius)).toBe(objectLighting.radius);expect(actual.mesh.objectLighting.offset.map(Math.fround)).toEqual(objectLighting.offset);
     expect(actual.sourceSha256).toBe(originalHash);expect(actual.mesh.uvs.length).toBe(expected.length);expect(expected.length).toBeGreaterThan(0);
     const mismatches=actual.mesh.uvs.reduce((sum,value,index)=>sum+(Math.abs(value-expected[index])>1e-6*Math.max(1,Math.abs(expected[index]))?1:0),0);
     const [sourceShaders,shaderCount]=block(at+220,32,256),sourceShaderReferences=[];
@@ -645,6 +645,9 @@ async function nativeVehiclePreview(opened,originalHash){
     report.vehiclePreview.placedVehicle.originalGpuCubeMips=worldCubes;
     const closeupCamera=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera));
     for(let axis=0;axis<3;axis++)expect(Math.abs(closeupCamera.target[axis]-framedViewport.camera.target[axis])).toBeLessThan(.001);
+    const shadows=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsObjectShadows??'null'));expect(shadows).toBeTruthy();expect(shadows.cached).toBeLessThanOrEqual(8);expect(shadows.textureBytes).toBeLessThanOrEqual(524288);
+    if(vehicleLighting&&warthog.objectLighting.castsShadow){expect(shadows.drawn,'Source-lit Warthog must have a native silhouette shadow').toBeGreaterThan(0);expect(shadows.refused).toBe(0);}
+    report.vehiclePreview.placedVehicle.nativeShadows=shadows;
     await main.screenshot({path:path.join(root,'native-vehicle-world-closeup.png')});
     report.vehiclePreview.placedVehicle.wheelZoom={beforeDistance,afterDistance:distance(closeupCamera),camera:closeupCamera,actualMouseWheel:true};
     if(expectedCacheVersion===13){
@@ -1367,7 +1370,7 @@ try{
 
     if(profilePreview){
       report.previewProfile.firstMapReadyMs=performance.now()-viewportStarted;
-      report.previewProfile.calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})));
+      report.previewProfile.calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration,startTime})=>({command:name.slice(10),ms:duration,startedAt:startTime})));
       expect(report.previewProfile.calls.some(call=>call.command==='preview_owned_cache_bitmap_batch')).toBe(true);
       report.previewProfile.gauges=await main.evaluate(()=>window.__GS_PROFILE_GAUGES__??{});
       report.previewProfile.viewport=nativeViewport;
@@ -1382,12 +1385,16 @@ try{
       report.previewProfile.performance=await main.locator('.world-layout canvas').evaluate(canvas=>JSON.parse(canvas.dataset.gsPerformance??'null'));
       report.previewProfile.process=JSON.parse((await promisify(execFile)('pwsh.exe',['-NoProfile','-File',path.resolve('scripts/profile-process-tree.ps1'),'-RootProcessId',String(child.pid)],{windowsHide:true,timeout:30000,maxBuffer:1024*1024})).stdout);
       const canvas=main.locator('.world-layout canvas');await canvas.evaluate(element=>window.c71WorldCanvas=element);
-      const requestsBefore=report.previewProfile.calls.length;await chooseTool(main,'Map library');
+      // Measures are sorted by request start, not completion. An earlier in-flight
+      // call can be inserted before captured entries; array-length slicing
+      // falsely labels it or an existing entry as a new resume request.
+      const requestBoundary=await main.evaluate(()=>performance.now());await chooseTool(main,'Map library');
       const resumeStarted=performance.now();await chooseTool(main,'Level editor');await expect(canvas).toBeVisible();
       await expect(main.locator('.world-layout')).toHaveAttribute('data-material-loading','false');
       report.previewProfile.resumeMs=performance.now()-resumeStarted;
       report.previewProfile.sameCanvas=await canvas.evaluate(element=>element===window.c71WorldCanvas);expect(report.previewProfile.sameCanvas).toBe(true);
-      report.previewProfile.resumeCalls=(await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})))).slice(requestsBefore);
+      report.previewProfile.resumeCalls=(await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration,startTime})=>({command:name.slice(10),ms:duration,startedAt:startTime})))).filter(row=>row.startedAt>=requestBoundary);
+      report.previewProfile.resumeRequestBoundary=requestBoundary;
       expect(report.previewProfile.resumeCalls.filter(row=>row.command.startsWith('preview_owned_'))).toEqual([]);
       if(profileSettle){
         report.previewProfile.settling={conditions:'Same retained viewport; no forced garbage collection; cumulative seconds after initial ready process sample',samples:[]};

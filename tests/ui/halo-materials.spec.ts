@@ -76,3 +76,11 @@ test('original reflection levels and zero-alpha RGB survive native cube GPU uplo
  await page.goto('/tests/ui/fixtures/haloMaterials.html');const result=await page.evaluate(async()=>{const {renderAuthoredCubeChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderAuthoredCubeChecks();});console.log('HALO_ORIGINAL_CUBE_MIPS',JSON.stringify(result));
  expect(result.errors).toEqual([]);expect(result.glError).toBe(0);expect(result.base).toEqual([240,16,32,255]);expect(result.authored).toEqual([24,208,56,255]);expect(result.last).toEqual(result.authored);expect(result.transparent).toEqual([80,160,224,255]);expect(result.generated).toBe(false);expect(result.levels).toBe(2);
 });
+
+test('native object silhouettes shadow original BSPs with cutouts and bounded retained GPU ownership',async({page})=>{
+ await page.goto('/tests/ui/fixtures/haloMaterials.html');const result=await page.evaluate(async()=>{const {renderNativeShadowChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderNativeShadowChecks();});console.log('HALO_NATIVE_SHADOWS',JSON.stringify(result));
+ expect(result.errors).toEqual([]);expect(result.glError).toBe(0);
+ for(const frame of[result.before,result.outside,result.oldPosition,result.hidden,result.disabled,result.oldMetadata,result.cutout,result.green])expect(frame.pixel).toEqual([200,150,100,255]);
+ for(const frame of[result.shadow,result.cached,result.moved,result.opaque]){for(const[i,value]of[40,60,60,255].entries())expect(Math.abs(frame.pixel[i]-value)).toBeLessThanOrEqual(1);expect(frame.drawn).toBe(1);expect(frame.textureBytes).toBe(128*128*4);expect(frame.targetRestored).toBe(true);}
+ expect(result.paused.cached).toBe(1);expect(result.paused.textureBytes).toBe(65536);expect(result.paused.updated).toBe(0);expect(result.shadow.updated).toBe(1);expect(result.cached.updated).toBe(0);expect(result.moved.updated).toBe(1);expect(result.disabled.drawn).toBe(0);expect(result.oldMetadata.drawn).toBe(0);expect(result.disposedReceivers).toBe(0);expect(result.bounded.visible).toBe(13);expect(result.bounded.drawn).toBe(8);expect(result.bounded.cached).toBe(8);expect(result.bounded.textureBytes).toBe(524288);expect(result.retained.cached).toBe(8);
+});

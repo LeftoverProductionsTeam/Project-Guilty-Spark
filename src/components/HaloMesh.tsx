@@ -131,6 +131,7 @@ export default function HaloMesh({
   useEffect(() => () => materials?.values.forEach((material) => material.dispose()), [materials]);
   return (
     <mesh
+      userData={{haloNativeShadow:sourceObject&&!greenScreen&&!wireframe?{data,localLighting}:null}}
       geometry={geometry}
       material={matte ?? materials?.values ?? undefined}
       frustumCulled={!sky}

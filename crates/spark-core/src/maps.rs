@@ -326,7 +326,7 @@ pub struct MeshData {
 }
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
-pub struct ObjectLighting{pub tag_class:String,pub offset:[f32;3],pub radius:f32,pub brighten:bool}
+pub struct ObjectLighting{pub tag_class:String,pub offset:[f32;3],pub radius:f32,pub brighten:bool,#[serde(default)]pub casts_shadow:Option<bool>}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ModelBone{pub name:String,pub parent:i16,pub position:[f32;3],pub rotation:[f32;4]}

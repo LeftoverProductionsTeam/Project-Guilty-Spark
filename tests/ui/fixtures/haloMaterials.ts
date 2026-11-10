@@ -159,7 +159,7 @@ export async function renderComponentGlassChecks(){
   const faces=Array.from({length:6},()=>{const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d')!;ctx.fillStyle='rgb(64,64,64)';ctx.fillRect(0,0,1,1);return c;});
   const cube=new THREE.CubeTexture(faces);cube.colorSpace=THREE.NoColorSpace;cube.needsUpdate=true;
   const metadata:ShaderPreview={kind:'glass',twoSided:false,alphaTest:false,alphaBlended:true,uvScale:[1,1],glassTint:[.5,.25,1],reflection:{bitmapTagId:8,perpendicularBrightness:1,parallelBrightness:1,perpendicularTint:[1,1,1],parallelTint:[1,1,1],falloff:0,cutoff:0}};
-  const data={source:'halo-model-untextured',label:'native glass component fixture',positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],materialRanges:[{shaderTagId:7,bspIndex:0,indexStart:0,indexCount:6}]};
+  const data={source:'halo-model-untextured',label:'native glass component fixture',positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],materialRanges:[{shaderTagId:7,bspIndex:0,lightmapIndex:-1,indexStart:0,indexCount:6}]};
   const target=new THREE.WebGLRenderTarget(32,32),pause=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
   const read=async(element:ReturnType<typeof createElement>)=>{
     root.render(element);await pause();if(!state)throw Error('Native component renderer did not initialize');
@@ -250,4 +250,34 @@ export async function renderAuthoredCubeChecks(){
  const sample=(cube:THREE.CubeTexture,level:number)=>{material.uniforms.source.value=cube;material.uniforms.level.value=level;renderer.render(scene,camera);const pixel=new Uint8Array(4);renderer.readRenderTargetPixels(target,4,4,1,1,pixel);return[...pixel];};
  const result={base:sample(texture,0),authored:sample(texture,1),last:sample(texture,8),transparent:sample(alpha,0),generated:texture.generateMipmaps,levels:texture.userData.originalMipLevels,glError:renderer.getContext().getError(),errors};
  texture.dispose();alpha.dispose();material.dispose();geometry.dispose();target.dispose();renderer.dispose();return result;
+}
+
+/** Real shared-component silhouette projection, texture cutouts and ownership. */
+export async function renderNativeShadowChecks(){
+ const {createElement,Fragment}=await import('react'),{createRoot,extend}=await import('@react-three/fiber');
+ const {default:HaloMesh}=await import('../../../src/components/HaloMesh'),{NativeShadowPass}=await import('../../../src/haloObjectShadows');extend(THREE);
+ const canvas=document.querySelector('canvas')!,root=createRoot(canvas),errors:string[]=[];let state:import('@react-three/fiber').RootState|undefined;
+ const camera=new THREE.OrthographicCamera(-2,2,2,-2,.1,20);camera.position.set(0,-5,5);camera.up.set(0,0,1);camera.lookAt(0,0,0);camera.updateMatrixWorld();(camera as THREE.OrthographicCamera&{manual:boolean}).manual=true;
+ await root.configure({size:{width:128,height:128,top:0,left:0},dpr:1,camera,frameloop:'never',gl:{antialias:false},onCreated:s=>{state=s;s.gl.debug.onShaderError=(gl,_p,vs,fs)=>errors.push(String(gl.getShaderInfoLog(vs)),String(gl.getShaderInfoLog(fs)));}});
+ const base=new THREE.DataTexture(new Uint8Array([200,150,100,255]),1,1);base.userData.sourceEncoded=true;base.needsUpdate=true;
+ const transparent=new THREE.DataTexture(new Uint8Array([200,150,100,0]),1,1);transparent.userData.sourceEncoded=true;transparent.needsUpdate=true;
+ const terrain:import('../../../src/types').MeshData={label:'original floor',source:'halo-bsp-render',positions:[-3,-3,0,3,-3,0,3,3,0,-3,3,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],materialRanges:[{shaderTagId:7,bspIndex:0,lightmapIndex:-1,indexStart:0,indexCount:6}]};
+ const object={...terrain,label:'source silhouette',positions:[-.35,-.35,1,.35,-.35,1,.35,.35,1,-.35,.35,1],rig:{checksum:1,nodes:[{name:'root',parent:-1,position:[0,0,0] as [number,number,number],rotation:[0,0,0,1] as [number,number,number,number]}],indices:[],weights:[]},objectLighting:{tagClass:'vehi',offset:[0,0,1] as [number,number,number],radius:2,brighten:false,castsShadow:true}};
+ const light:import('../../../src/haloLightmap').SourceObjectLighting={point:[0,0,0],ambient:[1,1,1],primary:[0,0,0],primaryDirection:[0,0,1],bounce:[0,0,0],bounceDirection:[0,0,-1],reflection:[1,1,1],reflectionBrightness:1,shadow:{direction:[.6,0,-.8],tint:[.2,.4,.6]}};
+ const target=new THREE.WebGLRenderTarget(128,128),pause=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+ async function mount(flags:{casts?:boolean|null;cutout?:boolean;clear?:boolean;green?:boolean}={}){
+  root.render(createElement(Fragment,null,createElement(HaloMesh,{data:terrain,shaderTextures:{7:base},shaderMetadata:{7:{kind:'environment',twoSided:true,alphaTest:false,uvScale:[1,1]}}}),createElement(HaloMesh,{data:{...object,objectLighting:{...object.objectLighting,castsShadow:flags.casts===null?undefined:flags.casts??true}},localLighting:light,sourceObject:true,greenScreen:flags.green,shaderTextures:{7:flags.clear?transparent:base},shaderMetadata:{7:{kind:'model',twoSided:true,alphaTest:!!flags.cutout,uvScale:[1,1]}}})));await pause();if(!state)throw Error('Shared shadow components did not initialize');const node=state.scene.children.find(o=>o.userData.haloNativeShadow);if(node){node.position.set(0,0,0);node.visible=true;}
+ }
+ await mount();const live=state!,pass=new NativeShadowPass(live.scene);
+ const read=(enabled=true,point:[number,number,number]=[.75,0,0])=>{live.gl.setRenderTarget(target);pass.update(live.gl,camera,terrain,enabled);live.gl.clear();live.gl.render(live.scene,camera);const p=new THREE.Vector3(...point).project(camera),pixel=new Uint8Array(4);live.gl.readRenderTargetPixels(target,Math.floor((p.x*.5+.5)*128),Math.floor((p.y*.5+.5)*128),1,1,pixel);const entry=[...(pass as unknown as {entries:Map<string,{target:THREE.WebGLRenderTarget;proxy:THREE.Mesh;camera:THREE.Camera;surface:THREE.Mesh}>}).entries.values()][0],mask=new Uint8Array(4);const uv=entry?new THREE.Vector4(...point,1).applyMatrix4((entry.surface.material as THREE.ShaderMaterial).uniforms.projection.value):null;if(entry&&uv)live.gl.readRenderTargetPixels(entry.target,Math.floor((uv.x*.5+.5)*128),Math.floor((uv.y*.5+.5)*128),1,1,mask);return {uv:uv?.toArray(),draws:live.gl.info.render.calls,receiverVisible:entry?.surface.visible,pixel:[...pixel],mask:[...mask],...pass.stats,targetRestored:live.gl.getRenderTarget()===target,groups:entry?.proxy.geometry.groups,castEnabled:entry&&((entry.proxy.material as THREE.ShaderMaterial[]).map(m=>m.uniforms.enabled.value))};};
+ const before=read(false),shadow=read(),cached=read(),paused=read(false),outside=read(true,[1.75,0,0]);
+ const mesh=live.scene.children.find(o=>o.userData.haloNativeShadow) as THREE.Mesh;mesh.position.x=1;
+ const moved=read(true,[1.75,0,0]),oldPosition=read(),hidden=(()=>{mesh.visible=false;return read();})();
+ mesh.visible=true;await mount({casts:false});const disabled=read();await mount({casts:null});const oldMetadata=read();
+ await mount({cutout:true,clear:true});const cutout=read();await mount({cutout:false,clear:true});const opaque=read();
+ await mount({green:true});const green=read();
+ await mount();const original=live.scene.children.find(o=>o.userData.haloNativeShadow) as THREE.Mesh,copies:THREE.Mesh[]=[];for(let i=0;i<12;i++){const copy=original.clone();copy.position.x=(i-6)*.05;copy.userData.haloNativeShadow=original.userData.haloNativeShadow;live.scene.add(copy);copies.push(copy);}const bounded=read();copies.forEach(copy=>live.scene.remove(copy));const retained=read();
+ pass.dispose();const disposedReceivers=live.scene.children.filter(o=>o.userData.haloShadowReceiver).length;
+ const glError=live.gl.getContext().getError();root.unmount();await new Promise(r=>setTimeout(r,600));target.dispose();base.dispose();transparent.dispose();
+ return {before,shadow,cached,paused,outside,moved,oldPosition,hidden,disabled,oldMetadata,cutout,opaque,green,bounded,retained,disposedReceivers,glError,errors};
 }
