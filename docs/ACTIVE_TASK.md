@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: c472ab3496289797de5413be74fc136046b07462 plus reviewed reflection increment. R532920Rust/9ignored,497frontend,277browser/TypeScript/contracts/offline/40storage and freshWindows167.818s pass; R532–R536five-source native cube-byte/GPU checks complete/0errors/normalclose/originalsunchanged/scratchdisposed. QA50021888B SHAc382b610…/runtimeFP9358963e…. No full game/shadow/pose or release acceptance.
-Next action: locally commit the accepted reflection increment/manifests; retire only hash/manifest-verified nonrunning superseded R520 QA executable, retain metadata/captures/protected releases. Then resume H29 matched native-game vehicle comparison/contact lighting/poses using existing pipeline; no artificial brightness/material substitutions. Full M1–M6 remain active, no native operation running.
+Latest verified revision: 74b273586bb6f19e7b4296b962a97de56ae928c0; accepted original-cube source/GPU increment. R532920Rust/9ignored,497frontend,277browser/TypeScript/contracts/offline/40storage/freshWindows167.818s; R532–R536 five native sources complete/0errors/normalclose/originalsunchanged/scratchdisposed. RuntimeFP9358963e… matches committed source/currentQA SHAc382b610…. R537 retires only verified supersededR520QA. H29game/shadows/poses and all M1–M6 remain open.
+Next action: resume H29 with comparable exact-owned Chupathingy game and current World camera views, native source lighting/contact-shadow and vehicle-pose investigation. Reuse existing documented camera/test workflow, protect originals; keep human game-parity open and avoid artificial brightness/material substitutions. Original reflection levels now accepted; no active operation. Full M1–M6 remain active.
 
 ## Acceptance
 

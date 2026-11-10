@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
 Task: Operation110 — native vehicle fidelity and game comparison
-Status: automated acceptance incomplete
+Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 662376c7e4e39bcd59517fc237486bdabe3df6a0, locally committed whole-chain increment. R509916Rust/9ignored; finalR520492frontend/276browser/TypeScript/contracts/offline/40storage and freshWindows161.614s; five native sourcesR520–R524 pass. CE materials19.233–22.999→9.116s,66→16bitmapIPC, identical scene/source coverage and byte-identical Chupa close-up. R525retired only3verified superseded QAexes; finalQA retained. No Halo game/parity/release acceptance.
-Next action: R532full920Rust/9ignored,497frontend,277browser/TypeScript/contracts/offline/40storage and freshWindows167.818s pass. ActualCE609R532 and Chupa5R533/MCC13R534 originalcube-byte/GPU checks complete/0errors/normalclose/originalsunchanged/scratchdisposed. CurrentQA qa-vehicle-cubes-r532 SHA c382b610e6dcbf9fe806e2099206d49a5aaa346bdecd8d4a15c2535160507117/runtimeFP9358963ee14eed3e43e4a3e31d9ec3323bca61f7067e556b886a769b5abe230f. R535OpenCE/R536Demo running; finalize evidence/cleanup/manifests/localcommit after acceptance. H29game/shadow/pose/fullM1–M6 gates open.
+Latest verified revision: c472ab3496289797de5413be74fc136046b07462 plus reviewed reflection increment. R532920Rust/9ignored,497frontend,277browser/TypeScript/contracts/offline/40storage and freshWindows167.818s pass; R532–R536five-source native cube-byte/GPU checks complete/0errors/normalclose/originalsunchanged/scratchdisposed. QA50021888B SHAc382b610…/runtimeFP9358963e…. No full game/shadow/pose or release acceptance.
+Next action: locally commit the accepted reflection increment/manifests; retire only hash/manifest-verified nonrunning superseded R520 QA executable, retain metadata/captures/protected releases. Then resume H29 matched native-game vehicle comparison/contact lighting/poses using existing pipeline; no artificial brightness/material substitutions. Full M1–M6 remain active, no native operation running.
 
 ## Acceptance
 
