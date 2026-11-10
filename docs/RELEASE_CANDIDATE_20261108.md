@@ -26,6 +26,8 @@ Owned compiler staging1,858,485,211logical bytes and verified duplicate build/ex
 
 Native screenshot receipts: R/portable-startup/startup.png and installed-startup/startup.png. Public GitHub proof: R/public-preview5.jpg. Installed/portable receipts do not establish human Firefight combat, waves, scoring, AI peers, MegaWorld traversal, physical multi-monitor/DPI, headset VR, clean Windows VM, upgrades or Linux/macOS. All475 requirement IDs and Operation110 M1–M6 remain open where their independent acceptance is missing.
 
+Homepage visibility: preview5 remains a truthful prerelease. GitHub excludes prereleases from Latest (the endpoint returns404); the homepage Releases setting was already enabled. The main-page About panel now links directly to preview5, and the published flagship-first README includes installer/portable links. Reloaded browser/API readback verifies the saved homepage URL. No release classification, asset, hash or tag changed for this visibility repair.
+
 ## Historical November 8 candidates
 
 ## Historical Windows candidate: dc4456e / preview4

@@ -4,7 +4,7 @@ Task: Operation110 — native fidelity, safe validation recovery and creator acc
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
 Latest verified revision: 0db531b24a95bb695d77829a1b32d5c4264e6cf8 — scoped flagship-first documentation and exact release evidence;32local links,5continuity tests and2143source-member manifests pass. Binary source remains d832af3; all9release gates and real Windows install/startup/uninstall plus anonymous public downloads pass. Operation110 remains incomplete.
-Next action: Owner synchronizes the reviewed local master through the permitted GitHub workflow. Automatic approval review refused a direct protected-master push; no push ran and no API/UI workaround was attempted. Remote About/topics and verified preview5 are updated; remote README awaits source sync. Then resume the existing native Firefight gameplay gates and independent M1–M6 work.
+Next action: Resume existing native solo Firefight human combat/score/waves/defeat/victory acceptance and safe independent M1–M6 work. Public preview5, flagship README at remote0db531b and About download link are verified. Local checkpoint-only follow-through remains for normal owner sync; do not retry the rejected direct master push or bypass rules. No new feature or full-product acceptance.
 
 ## Acceptance
 
@@ -65,7 +65,7 @@ M3R277 protected connected CE map E/connected-source-tags-r277-timberland.map77,
 
 ## Changed work
 
-Current scoped follow-through committed0db531b: flagship-first README, actual public Windows download links, verified About/topics and bounded release/continuity evidence. Source synchronization is owner-pending after automatic review refused the direct push. Application runtime source and475CSV remain unchanged. Notes below preserve historical repairs, not current dirty-file claims.
+Current scoped follow-through: flagship README is verified on remote0db531b and matches local blob1279bbc5fa830bd9790e7cb43ee0f95e51ab58e0. About has the direct public preview5 link; GitHub excludes prereleases from Latest. Agent push was refused before execution; remote advanced independently. Local checkpoint-only commits await normal owner sync. Application runtime source and475CSV remain unchanged. Notes below preserve historical repairs, not current dirty-file claims.
 
 R440 independent original-cache readback: Chupa5534/MCC5506/CE8619/Demo5506 nonzero incident-radiosity vectors; most differ from surface normals. At the documented diagnostic point above the Chupa Warthog, source vector[.61550,.11621,.67901], not its surface normal. Original4hashes unchanged; only E/vehicle-source-radiosity-r440.json retained. This is source evidence, not rendered or game acceptance. Native source schema uses published 20B PC/8B Xbox lightmap vertex layouts. Current mesh reader discards the first12/4bytes; preserve these within existing bounds and keep malformed/unavailable samples explicit.
 
