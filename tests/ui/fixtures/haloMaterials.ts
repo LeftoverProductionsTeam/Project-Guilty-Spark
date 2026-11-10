@@ -117,6 +117,18 @@ export function renderMaterialChecks() {
   const noReflectionDetail=[false,true].map(detailAfterReflection=>sample(createHaloMaterial(diffuse,half,{...metadata,kind:'model',detailFunction:0,detailScales:[1,1,1],detailAfterReflection},{primaryDetail:detail}),exterior));
   const pcMasks=texture([0,0,128,0]),xboxMasks=texture([128,0,0,0]);
   const maskedDetailOrder=[false,true].map(multipurposeXbox=>[false,true].map(detailAfterReflection=>sample(createHaloMaterial(diffuse,half,{...metadata,kind:'model',detailFunction:0,detailMask:2,detailScales:[1,1,1],reflection,detailAfterReflection,multipurposeXbox},{primaryDetail:detail,multipurpose:multipurposeXbox?xboxMasks:pcMasks,reflectionCube:cube}),exterior)));
+  // Native flat glass: view-axis cosine squared interpolates endpoint ARGB;
+  // reflection RGB interpolates the eighth-power cube and original cube.
+  // Keep source reflection energy separate from diffuse/lighting settings.
+  const angularFaces=Array.from({length:6},()=>{const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d')!;ctx.fillStyle='rgb(128,128,128)';ctx.fillRect(0,0,1,1);return c;});
+  const angularCube=new THREE.CubeTexture(angularFaces);angularCube.colorSpace=THREE.NoColorSpace;angularCube.needsUpdate=true;
+  const angularGeometry=exterior.clone();angularGeometry.setAttribute('normal',new THREE.Float32BufferAttribute(Array.from({length:3},()=>[Math.sqrt(.75),0,.5]).flat(),3));
+  renderer.setClearColor(0,1);
+  const angularReflection={...reflection,perpendicularBrightness:.5,parallelBrightness:1};
+  const glassNativeAngular=[[1,1,1],[0,.25,1]].map(tint=>sample(createHaloMaterial(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,reflection:{...angularReflection,perpendicularTint:tint as [number,number,number],parallelTint:tint as [number,number,number]}},{reflectionCube:angularCube}),angularGeometry));
+  camera.position.z=-2;camera.lookAt(0,0,0);
+  const glassNativeBack=sample(createHaloMaterial(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,twoSided:true,reflection:angularReflection},{reflectionCube:angularCube}),angularGeometry);
+  camera.position.z=2;camera.lookAt(0,0,0);renderer.setClearColor(new THREE.Color(.1,.2,.3),1);angularGeometry.dispose();angularCube.dispose();
   for(const t of[pcMasks,xboxMasks])t.dispose();
   for(const t of[cube,diffuse,detail,addDetail])t.dispose();
   camera.position.z = -2;
@@ -127,7 +139,7 @@ export function renderMaterialChecks() {
   for (const t of [black, green, red, half,emissiveMask,noEmissionMask,grey]) t.dispose();
   target.dispose();
   renderer.dispose();
-  return { neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse, errors };
+  return { neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack, errors };
 }
 
 /** Real shared React/Three components, not a second shader implementation. */

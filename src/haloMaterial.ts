@@ -118,12 +118,18 @@ void main(){
     // as an opaque additive mask. Tint is a separate source-controlled pass.
     float glassOpacity=kind==4?clamp(base.a,0.0,1.0):0.0;
     if(kind==4)base.rgb*=glassOpacity;
-    if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float grazing=1.0-clamp(dot(normalize(-haloView),n),0.0,1.0);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
+    if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float facing=kind==4?clamp(normalize(haloNormal).z,0.0,1.0):clamp(dot(normalize(-haloView),n),0.0,1.0);
+      // Native glass uses the camera axis and squared facing. Its authored
+      // reflection colour blends glossy and broad cube response; it is not
+      // the multiplicative tint used by opaque model/environment shaders.
+      float grazing=1.0-(kind==4?facing*facing:facing);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
       float mask=1.0;if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);mask=multipurposeXbox?masks.r:masks.b;}
       else if(bumpIsSpecular&&hasNormal)mask=texture2D(normalMap,haloUv*normalScale).a;
       else if(kind==0&&shaderType==2)mask=base.a;
       float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
-      base.rgb+=textureCube(reflectionCube,reflected).rgb*tint*brightness*mask*fade*(kind==4?1.0-glassOpacity:1.0);}
+      vec3 cubeColour=textureCube(reflectionCube,reflected).rgb;
+      vec3 reflectionColour=kind==4?mix(pow(cubeColour,vec3(8.0)),cubeColour,tint):cubeColour*tint;
+      base.rgb+=reflectionColour*brightness*mask*fade*(kind==4?1.0-glassOpacity:1.0);}
     // Preserve the model tag's authored combiner order. Reflection remains
     // source-coloured; detail can modulate it only when that flag is set.
     if(kind==1&&detailAfterReflection&&hasDetail)base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);

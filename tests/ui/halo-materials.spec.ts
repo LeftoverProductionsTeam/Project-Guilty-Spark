@@ -7,7 +7,7 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
     const { renderMaterialChecks } = await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);
     return renderMaterialChecks();
   });
-  console.log('HALO_MATERIAL_PIXELS',JSON.stringify({detailOrder:result.detailOrder,noReflectionDetail:result.noReflectionDetail,maskedDetailOrder:result.maskedDetailOrder,glassAlpha:result.glassAlpha,glassTintSamples:result.glassTintSamples,glassNoDiffuse:result.glassNoDiffuse,decal:result.decal,cutout:result.cutout}));
+  console.log('HALO_MATERIAL_PIXELS',JSON.stringify({detailOrder:result.detailOrder,noReflectionDetail:result.noReflectionDetail,maskedDetailOrder:result.maskedDetailOrder,glassAlpha:result.glassAlpha,glassTintSamples:result.glassTintSamples,glassNoDiffuse:result.glassNoDiffuse,glassNativeAngular:result.glassNativeAngular,glassNativeBack:result.glassNativeBack,decal:result.decal,cutout:result.cutout}));
   expect(result.errors).toEqual([]);
   for (const pixel of [result.neutral, result.alphaAdded, result.back]) {
     expect(Math.abs(pixel[0] - 26)).toBeLessThanOrEqual(1);
@@ -23,6 +23,8 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
     for(const channel of [0,1,2])expect(Math.abs(result.glassAlpha[index][channel]-expected[channel])).toBeLessThanOrEqual(1);
   for(const pixel of result.glassTintSamples)for(const [channel,expected] of [118,78,110,255].entries())expect(Math.abs(pixel[channel]-expected)).toBeLessThanOrEqual(1);
   for(const [channel,expected] of [77,77,141,255].entries())expect(Math.abs(result.glassNoDiffuse[channel]-expected)).toBeLessThanOrEqual(1);
+  for(const [sample,expected]of [[result.glassNativeAngular[0],[112,112,112,255]],[result.glassNativeAngular[1],[1,29,112,255]],[result.glassNativeBack,[128,128,128,255]]] as const)
+    for(const channel of [0,1,2,3])expect(Math.abs(sample[channel]-expected[channel])).toBeLessThanOrEqual(1);
   expect(result.nativeGlow).toEqual([128,64,32,255]);
   expect(result.advancedGlow).toEqual(result.nativeGlow);
   expect(result.unmasked).toEqual([0,0,0,255]);

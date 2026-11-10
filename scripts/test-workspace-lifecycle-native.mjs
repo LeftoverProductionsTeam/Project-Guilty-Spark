@@ -318,7 +318,13 @@ async function nativeVehiclePreview(opened,originalHash){
         const tintRef=shader.references.find(ref=>ref.label==='Background tint map');
         if(tintId===0xffffffff){expect(tintRef).toBeUndefined();expect(shader.shaderPreview?.glassTintScale??null).toBeNull();}
         else{expect(tintRef?.targetId).toBe(tintId);const scale=f32(body+0x60);expect(shader.shaderPreview?.glassTintScale).toBe(scale===0?1:scale);}
-        materialOrder.push({shaderPath:shader.path,shaderClass:'sgla',glassTint:tint,glassTintMapId:tintId===0xffffffff?null:tintId});
+        const nativeReflection=shader.shaderPreview.reflection;
+        if(nativeReflection){
+          expect(nativeReflection.perpendicularBrightness).toBe(f32(body+0x8c));expect(nativeReflection.parallelBrightness).toBe(f32(body+0x9c));
+          expect(nativeReflection.perpendicularTint).toEqual([0x90,0x94,0x98].map(offset=>f32(body+offset)));
+          expect(nativeReflection.parallelTint).toEqual([0xa0,0xa4,0xa8].map(offset=>f32(body+offset)));
+        }
+        materialOrder.push({shaderPath:shader.path,shaderClass:'sgla',glassTint:tint,glassTintMapId:tintId===0xffffffff?null:tintId,reflectionType:bytes.readUInt16LE(body+0x8a),nativeReflection});
       }
       if(shader.class!=='soso'){
         if(shader.shaderPreview)expect(shader.shaderPreview.detailAfterReflection,'Other shader flags are not model detail order').toBe(false);
@@ -356,6 +362,10 @@ async function nativeVehiclePreview(opened,originalHash){
     await expect(preview).toHaveAttribute('data-model-first-frame','true',{timeout:90000});
     await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
     row.preview=await preview.evaluate(element=>({...element.dataset}));
+    const camera=JSON.parse(await preview.locator('canvas').getAttribute('data-gs-preview-camera'));
+    expect(camera.sourceHash,'Camera belongs to this native map').toBe(originalHash);
+    for(const vector of[camera.position,camera.target]){expect(vector).toHaveLength(3);expect(vector.every(Number.isFinite)).toBe(true);}
+    row.previewCamera=camera;
     await main.screenshot({path:path.join(root,'native-vehicle-'+name+'.png')});
     expect(Number(row.preview.modelMissingShaders),'All supported source materials are available').toBe(0);
     expect(Number(row.preview.modelUnassignedTriangles),'Native source material coverage').toBe(row.unassignedTriangles);

@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 31af61a plus reviewed dirty glass/decal/geometry-reuse source, awaiting local commit. R416Rust911/9ignored; frozenR418 frontend480/browser273/TypeScript/contracts/offline/storage accepted. R417freshWindows and R419–R422 native source previews accepted; all originals unchanged and owned scratch disposed. R416 broad-browser failures remain failed evidence. No push/publication.
-Next action: Verify manifests, checkpoint and475-ID preservation, then commit the reviewed glass/decal/geometry-reuse changes locally. Continue stable source-matched game comparison and source-local lighting/engine-linked dashboard fidelity in the existing renderer. H29 full visual/gameplay parity remains open. Do not claim current QA as an installer/release or modify original maps.
+Latest verified revision: 418f07e0ed851768a01358eea320f648e2486fda; reviewed dirty native glass angular/gloss fix passes GPU red-to-green and fresh R425 Windows source/preview readback. R424 actual game camera capture completed; originals unchanged. Full appearance remains H29.
+Next action: Finish active R426 frontend/browser and R427-430 native source-family checks on the exact R425 app; inspect native material/camera comparison and repair only reproduced remaining vehicle defects. Record H29 lighting/dynamic/dashboard limits without claiming stock-game parity.
 
 ## Acceptance
 
@@ -14,6 +14,8 @@ Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHA
 
 
 ## Verified milestones
+
+R424 native Chupa0.9.0c/b506ba74 private BloodGulch session exits0, original17members+3maps+config unchanged, owned878547713logical/878768712allocatedB disposed; 95generated shaders442421B inventory8dd857ad… payloads disposed. Actual native console camera save/load and telemetry prove camera[32.2,-95.3,1.9]; unmodified native Warthog screenshot retained. Flat glass source endpoints and generated shader diagnostics independently establish squared camera-axis facing and cube eighth-power/gloss blend. No engine implementation imported. New real GPU regression fails97vs112 before repair; after112/29/128 expected cases pass with prior glass/decal/geometry checks. R425 freshWindows171.614s, nativeChupa23.001s,0errors/normalclose/originalunchanged; app49762816B SHAf031fa22…/runtimeFP868276a7… . No gameplay/visual parity accepted. Exact E/vehicle-game-camera-r424.json and vehicle-gloss-r425.json.
 
 R417–R422 accepted10Nov: new shared native glass alpha/tint passes, exact bounded tint-map metadata and decal flag suppression; geometry replacement red→retainedGPUidentity green. CurrentWindowsQA49,762,816B SHAbf3d601f…/runtimeFP0a326214…; build200.038s, nativeChupa26.847s/MCC24.569s/CE28.228s/OpenCE23.768s/Demo28.039s. All source UV/flags/tint/partitions and selected GPU previews pass,0errors/normalclose/originalhashesunchanged/owneddisposal. FrozenR418480frontend/273browser/TypeScript/contracts/offline/storage pass; R416911Rust/9ignored pass but broad270/272browser isfailed, not acceptance. No source edits during R417build; full details NATIVE_ASSETS_AND_SHOWCASE.md. No new Halo game/compilation/visual-parity acceptance.
 
@@ -84,6 +86,10 @@ R371 production recovery failure: sharedbackend282/offlineedits retained butRAM-
 R375 observed WindowsSecurity network-permission prompt. No permission/security setting changed or automated. Actualfocus and samePCnative tests continued/passed; no physicalnetworkapproval/twoPCdelivery inferred. HumanH19/H28interaction/traversal/combat/audio; physicalDPI/monitors/twoPC/headset/cleanVM/Mac/Linux; originalZombieautomaticrelease/AIcombat/sharedvictory/Extractionno-timerpersistence remain open. No WSL/Docker/secondcomputer/headsetavailable. P0repaired hostedCI remains owner-pushdependent, no remote success claimed. FullM2/M1-M6notcomplete.
 
 ## Operations and safe checkpoint
+
+Current R424/R425 wrappers terminal/exit0 and owned scratch disposed. R426 exec2096 full frontend/browser active; sequential R427–R430 exec31606 source-family native checks active using source-matched R425 QA app. No installed runtime, map, SDK or release was changed. Production source frozen during these checks.
+
+R423 exec2284 terminal/exit0. Original17runtime members+3maps+config hashes unchanged; 69generated shaders311062B/inventorySHA2f74d264c9c428daf2d6bde19d87f510a00dd7c0d9460cf6601609131a0ee373; payloads disposed. Source research read-only; no engine code imported. Windowed capture required F11 refresh; actual UI profile/New001/BloodGulch/Slayer then game observed. Native stdout empty; later collection must read owned logs/debug.txt. Camera entry expired; no matched vehicle/visual/human pass. Owned900198484logical/900384504allocatedB disposed, peak900202938B<1GiB. R424 planned exact-own private loopback console/autohost diagnostics, no public session or original mutation.
 
 Current: R416failed/R417passed/R418passed/R419–R422passed wrappers and children are finished; owned payloads disposed. R417 exports only the source-pinned49.8MB QA app/manifest under E. No live test process, new SDK tree, original edit, installer/publication or gameplay pass. Verify final status/manifests and commit locally; retain exact failed R416 evidence.
 
