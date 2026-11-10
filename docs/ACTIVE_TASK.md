@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 3467d238bac1c168666e80fa5617937466b808f0 plus accepted current vertex-reflection increment; runtimeFP6285e6aaf31f35b59787a19982a93b9b1f560120671474bae2a5bb4850c3d2eb and E/vehicle-vertex-acceptance-r590.json identify exact tested source. FullM1–M6/H29 remain open.
-Next action: Continue highest-impact H29 vehicle gaps using exact native evidence: four dashboard meter triangles, runtime pose/suspension and matched-game lighting/filtering. Preserve original assets and all475requirements; no fallback/exposure masking, push or release claim.
+Latest verified revision: 289cf118350e12690f0fbce9c6965d5fd43771f6, scoped native dashboard-meter implementation committed on master. R593–R597allfive source previews and full922Rust/9ignored,501frontend,279browser pass. QA SHAe75731d7359d20d75ee4ee9416c524b9b73bb6cf9931b2ee591e64bdc8fed0b2, runtimeFP8eb593744a013303437b5c94a0a6cdbd80b4bb6d834ed92b007feada1fc629b6. Exact source SHAs E/vehicle-meter-work-r593.json; full evidence E/vehicle-meter-acceptance-r598.json.
+Next action: Seal checkpoint/docs/source manifests after289cf11; final local HEAD/clean-tree/source-manifest hashes go to E/vehicle-meter-checkpoint-r599.json. Resume H29 matched native game dashboard/body comparison using the existing isolated Chupathingy game/camera workflow. Source preview is stationary, not live meter/physics simulation. Demo3179light-reference carrier triangles, dynamic poses/suspension and full visual/human acceptance remain open. All validations terminal/owned scratch disposed, no active app/game/compiler. FullOperation110/M1–M6 is NOT complete; no push/publication.
 
 ## Acceptance
 

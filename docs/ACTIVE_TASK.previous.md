@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 3467d238bac1c168666e80fa5617937466b808f0 plus accepted current vertex-reflection increment; runtimeFP6285e6aaf31f35b59787a19982a93b9b1f560120671474bae2a5bb4850c3d2eb and E/vehicle-vertex-acceptance-r590.json identify exact tested source. FullM1–M6/H29 remain open.
-Next action: Commit the accepted shared vertex-reflection increment and source manifests locally. Continue highest-impact H29 vehicle gaps using exact native evidence: four dashboard meter triangles, runtime pose/suspension and matched-game lighting/filtering. Preserve original assets and all475requirements; no fallback/exposure masking, push or release claim.
+Latest verified revision: 5d5da289f1fbc5d642a7a48fe0b8225df54126f8, clean master after accepted native vertex-reflection repair; R590 five-source receipt/runtimeFP6285e6aaf31f35b59787a19982a93b9b1f560120671474bae2a5bb4850c3d2eb. FullH29/M1–M6 remain open.
+Next action: R593 frozen dashboard-meter changes remain UNCOMMITTED until native acceptance. Full922Rust/9explicitignored,501frontend,279browser,TypeScript/contracts/offline pass. Fresh Windows/native Chupa validation is running (outer process57496; E/vehicle-meter-chupa-r593.json/.log); exact dirty source/test SHAs and incomplete gates are in E/vehicle-meter-work-r593.json. Finish it, then reuse only the matching app for CE/MCC/OpenCE/Demo, record results and commit verified scoped work. Keep unmatched-game dashboard/poses and fullOperation110/M1–M6 open; no push.
 
 ## Acceptance
 
@@ -101,7 +101,7 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-R580/R581–R590 are terminal. All5native runs close normally, originals unchanged and owned compiler/profile output disposed. Exact currentQA/sourceFP above is enforced before reuse; source edits invalidate it. NativegameR580two real peers exit0; camera input is not native-save/parity evidence. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Earlier accepted release binaries remain protected. No active app/game/compiler remains.
+R580/R581–R590 are terminal. All5native runs close normally, originals unchanged and owned compiler/profile output disposed. Exact currentQA/sourceFP above is enforced before reuse; source edits invalidate it. NativegameR580two real peers exit0; camera input is not native-save/parity evidence. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Earlier accepted release binaries remain protected. R591removed only superseded manifest/hash-verified nonrunning R572QA50458624logicalB after replacement5sourceacceptance; retained all metadata/screens/currentQA and protected releases. No active app/game/compiler remains.
 
 Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
 
