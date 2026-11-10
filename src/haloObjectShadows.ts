@@ -43,16 +43,22 @@ interface Candidate {mesh:THREE.Mesh;source:SourceShadow;center:THREE.Vector3;di
 interface Entry {mesh:THREE.Mesh;source:SourceShadow;geometry:THREE.BufferGeometry;materials:THREE.Material[];matrix:number[];target:THREE.WebGLRenderTarget;proxy:THREE.Mesh;surface:THREE.Mesh;camera:THREE.OrthographicCamera;triangles:number}
 export class NativeShadowPass {
   private entries=new Map<string,Entry>();private terrain:MeshData|null=null;private proxyScene=new THREE.Scene();
+  private renderer:THREE.WebGLRenderer|null=null;
+  private readonly contextLost=()=>this.clear();
   readonly stats={eligible:0,visible:0,drawn:0,cached:0,updated:0,receiverTriangles:0,textureBytes:0,refused:0};
   constructor(private scene:THREE.Scene){}
   private remove(id:string){const entry=this.entries.get(id);if(!entry)return;this.scene.remove(entry.surface);entry.surface.geometry.dispose();(entry.surface.material as THREE.Material).dispose();entry.materials.forEach(m=>m.dispose());entry.target.dispose();this.entries.delete(id);}
-  dispose(){for(const id of this.entries.keys())this.remove(id);this.terrain=null;}
+  private clear(){for(const id of this.entries.keys())this.remove(id);this.terrain=null;}
+  dispose(){this.clear();this.renderer?.domElement.removeEventListener('webglcontextlost',this.contextLost);this.renderer=null;}
   update(renderer:THREE.WebGLRenderer,camera:THREE.Camera,terrain:MeshData|null,enabled=true){
-    if(this.terrain!==terrain){this.dispose();this.terrain=terrain;}
+    // A retained target loses its contents with the driver context. Release
+    // owned silhouettes/receivers, then rebuild from the same native sources.
+    if(this.renderer!==renderer){this.dispose();this.renderer=renderer;renderer.domElement.addEventListener('webglcontextlost',this.contextLost);}
+    if(this.terrain!==terrain){this.clear();this.terrain=terrain;}
     Object.assign(this.stats,{eligible:0,visible:0,drawn:0,cached:0,updated:0,receiverTriangles:0,textureBytes:0,refused:0});
     for(const entry of this.entries.values())entry.surface.visible=false;
     this.stats.cached=this.entries.size;this.stats.textureBytes=this.entries.size*NATIVE_SHADOW_SIZE*NATIVE_SHADOW_SIZE*4;
-    if(!enabled||!terrain||this.scene.userData.gsEnvironment?.overrideLighting)return;
+    if(!enabled||!terrain||renderer.getContext().isContextLost()||this.scene.userData.gsEnvironment?.overrideLighting)return;
     this.scene.updateMatrixWorld(true);camera.updateMatrixWorld();
     const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)),candidates:Candidate[]=[];
     this.scene.traverse(node=>{

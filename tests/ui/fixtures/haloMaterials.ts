@@ -283,7 +283,11 @@ export async function renderNativeShadowChecks(){
  await mount({cutout:true,clear:true});const cutout=read();await mount({cutout:false,clear:true});const opaque=read();
  await mount({green:true});const green=read();
  await mount();const original=live.scene.children.find(o=>o.userData.haloNativeShadow) as THREE.Mesh,copies:THREE.Mesh[]=[];for(let i=0;i<12;i++){const copy=original.clone();copy.position.x=(i-6)*.05;copy.userData.haloNativeShadow=original.userData.haloNativeShadow;live.scene.add(copy);copies.push(copy);}const bounded=read();copies.forEach(copy=>live.scene.remove(copy));const retained=read();
+ // Recreate actual driver-owned targets after WebGL context restoration;
+ // retaining their JS objects cannot retain their lost GPU contents.
+ const lost=new Promise<void>(resolve=>canvas.addEventListener('webglcontextlost',()=>resolve(),{once:true}));live.gl.forceContextLoss();await lost;await pause();
+ const restored=new Promise<void>(resolve=>canvas.addEventListener('webglcontextrestored',()=>resolve(),{once:true}));live.gl.forceContextRestore();await restored;await pause();const contextRestored=read();
  pass.dispose();const disposedReceivers=live.scene.children.filter(o=>o.userData.haloShadowReceiver).length;
  const glError=live.gl.getContext().getError();root.unmount();await new Promise(r=>setTimeout(r,600));target.dispose();base.dispose();transparent.dispose();
- return {before,shadow,cached,paused,outside,moved,oldPosition,hidden,disabled,oldMetadata,cutout,opaque,green,bounded,retained,disposedReceivers,glError,errors};
+ return {before,shadow,cached,paused,outside,moved,oldPosition,hidden,disabled,oldMetadata,cutout,opaque,green,bounded,retained,contextRestored,disposedReceivers,glError,errors};
 }

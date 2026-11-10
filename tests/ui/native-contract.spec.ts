@@ -2366,6 +2366,29 @@ test('idle level views stop drawing and camera gestures resume without unloading
   const stopped = await page.evaluate(() => (window as any).__idleDraws);
   await page.waitForTimeout(400);
   expect(await page.evaluate(() => (window as any).__idleDraws)).toBe(stopped);
+  const beforeReset=JSON.parse((await canvas.getAttribute('data-gs-camera'))!);
+  // Actual demand-rendered contexts need a fresh frame after GPU restoration;
+  // retaining the canvas/camera is not enough to make its contents visible.
+  await canvas.evaluate(async(element:HTMLCanvasElement)=>{
+    const w=window as any;w.__idleCanvas=element;const gl=element.getContext('webgl2')!,extension=gl.getExtension('WEBGL_lose_context');if(!extension)throw Error('Context restoration unavailable');
+    const event=(name:string)=>new Promise<void>(resolve=>element.addEventListener(name,()=>resolve(),{once:true}));const lost=event('webglcontextlost');extension.loseContext();await lost;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const restored=event('webglcontextrestored');extension.restoreContext();await restored;
+  });
+  await expect.poll(()=>page.evaluate(()=>(window as any).__idleDraws)).toBeGreaterThan(stopped);
+  expect(await canvas.evaluate(element=>element===(window as any).__idleCanvas)).toBe(true);
+  expect(JSON.parse((await canvas.getAttribute('data-gs-camera'))!).position).toEqual(beforeReset.position);
+  await expect(canvas).toHaveAttribute('data-gs-editor-activity','idle');await page.waitForTimeout(700);
+  const recovered=await page.evaluate(()=>(window as any).__idleDraws);await page.waitForTimeout(400);expect(await page.evaluate(()=>(window as any).__idleDraws)).toBe(recovered);
+  await chooseTool(page,'Map library');await expect.poll(()=>page.evaluate(()=>(window as any).__idleCanvas.dataset.gsEditorActivity)).toBe('paused');
+  const paused=await page.evaluate(()=>(window as any).__idleDraws);
+  await page.evaluate(async()=>{
+    const element=(window as any).__idleCanvas as HTMLCanvasElement,extension=element.getContext('webgl2')!.getExtension('WEBGL_lose_context')!;
+    const event=(name:string)=>new Promise<void>(resolve=>element.addEventListener(name,()=>resolve(),{once:true}));const lost=event('webglcontextlost');extension.loseContext();await lost;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const restored=event('webglcontextrestored');extension.restoreContext();await restored;
+  });
+  await page.waitForTimeout(400);expect(await page.evaluate(()=>(window as any).__idleDraws)).toBe(paused);
+  await chooseTool(page,'Level editor');await expect.poll(()=>page.evaluate(()=>(window as any).__idleDraws)).toBeGreaterThan(paused);expect(await canvas.evaluate(element=>element===(window as any).__idleCanvas)).toBe(true);
+
+
 });
 
 test('maps retain independent tag views, tool profiles and last workspace; a late load respects navigation',async({page})=>{

@@ -6,6 +6,26 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## Retained vehicle rendering after graphics reset — 10 November
+
+R563 reproduces lost silhouette targets in the real GPU fixture: expected floor-shadow[40,60,60] becomes bare floor[200,150,100] after context restoration, despite stale cached-target metadata. NativeShadowPass now invalidates only its owned targets/receivers when its actual viewport loses GPU storage, retaining source geometry, images and dependencies. R564/R566 restore the expected pixel with0GLerrors and one rebuilt target.
+
+The actual Windows test then exposes a second defect: R568 restores the GPU context but the idle demand viewport never redraws. R569 independently reproduces40clears remaining40after reset. Existing ViewportActivity now pauses a lost context and invalidates eligible active views after restoration. R571 proves active redraw, exact settled camera retention, no drawing while the map is inactive and the same canvas resuming on return. R565 premature restoration-event timing and R570 pre-damping camera baseline remain recorded failed tests.
+
+Frozen R572 passes500frontend/278browser, TypeScript, contracts, offline and40storage checks, and builds Windows in169.575s. Its reset assertions pass, but the overall native result fails the unchanged8MiB evidence limit because an extra lossless screenshot exceeds it. The original close-up remains PNG; the additional post-reset overview is captured directly as JPEG90 and explicitly exported. No storage budget or assertion is relaxed. R573–R577 then all pass in the same fingerprint-verified Windows app:
+
+| Native source | Receipt | Native test | Post-reset source-lit shadows |
+|---|---|---:|---:|
+| Chupathingy Xbox5 | vehicle-context-chupa-r573.json |33.343s|8|
+| CE Timberland609 | vehicle-context-ce-r574.json |40.616s|8|
+| MCC Blood Gulch13 | vehicle-context-mcc-r575.json |42.385s|8|
+| OpenCE Xbox5 | vehicle-context-opence-r576.json |33.484s|8|
+| Original Zombie Demo6 | vehicle-context-demo-r577.json |38.667s|0; local light unavailable|
+
+All five pass actual WebView GPU reset, exact same canvas/camera, original2D/cube-level metadata,0new native preview reads,0JSerrors, normal app close and unchanged original map hashes. Owned scratch is disposed. Four source-lit fixtures retain at most524288shadow RGBA bytes; Demo does not invent a lighting fallback. Backend remains unchanged since R542920Rust/9explicit opt-in ignores. This is renderer recovery and source-fidelity acceptance, not native compiler/game/human parity acceptance.
+
+Current QA: E/qa-vehicle-context-r572/GuiltySpark.exe,50458624B,SHA c8c983f9ce2c1abe7a5054fbbd2e0f77f98d91a6af6186fecbc5e5ecb1a5be89; runtime fingerprint4c78d5cfcb69627df2beffe2b015aff7dfc69ec15f8b92e7cdea674757336b3a. It is compiled from30d92d0 plus reviewed recovery changes, not a release. Consolidated receipt vehicle-context-acceptance-r578.json includes per-source hashes and unmodified screenshot hashes. Actual restored view: E/vehicle-context-chupa-r573-native-vehicle-world-restored.jpg. H29 dynamic poses, remaining shader families, native interpolation/filtering and exact matching-game comparison remain open.
+
 ## Native vehicle diffuse-light range — 10 November follow-through
 
 Committed shadow repair35f5646 is extended within the same shared Halo material. R553 actual GPU pixels reproduce[186,122,211] where bounded native diffuse lighting plus the separate source reflection expects[160,122,160]. The ambient/primary/bounce sum could exceed native colour range before texture multiplication. The shader now saturates only verified source-local diffuse illumination; authored emission/reflection, textures/alpha/UVs, baked BSPs, native geometry and explicit user HDR lighting remain separate. This is source-compatible rendering math, not exposure adjustment or fallback material.
@@ -24,7 +44,7 @@ All five runs complete/0errors/normalclose with unchanged original hashes, same 
 
 Current QA E/qa-vehicle-light-range-r556/GuiltySpark.exe,50458624B,SHA5ebc280f9b80c26dbfa40e0ef8cf96e9f7e9fde83aa146d98003d533efeed067; runtime fingerprint5d4d439c1f3baf7625912c268dfb95938d7c493235e5e683fae8054f3521f67f. Built from35f5646 plus the reviewed range correction, not a release. Current frame E/vehicle-light-range-chupa-r556-native-vehicle-world-closeup.png. Superseded cube QA R532 was retired only after hash/normalclose/five-source replacement acceptance (vehicle-shadow-qa-retirement-r557.json); its source, manifests and screenshots remain.
 
-Read-only primary research: [Chupathingy9990568 model lighting](https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/port/linux/src/nv2a_psh.c#L537-L596). Its bounded diffuse-colour contract informs this independent equation; no engine implementation is imported. The research commit differs from installed0.9.0c/b506ba74; that exact commit is unavailable in the local pinned source history. No matching-build renderer parity is inferred.
+Read-only primary research was initially9990568; the installed0.9.0c exact revision is now independently resolved online as b506ba7439463d23f6e6d97192c68ece97adbab3. Its [model_lighting](https://github.com/ChupathingyCE/chupathingyce/blob/b506ba7439463d23f6e6d97192c68ece97adbab3/port/linux/src/nv2a_psh.c#L532-L578) also saturates the diffuse sum before texture modulation. No engine implementation is imported. Exact-build [camera setup](https://github.com/ChupathingyCE/chupathingyce/blob/b506ba7439463d23f6e6d97192c68ece97adbab3/source/main/main.c#L1242-L1259) and [projection adjustment](https://github.com/ChupathingyCE/chupathingyce/blob/b506ba7439463d23f6e6d97192c68ece97adbab3/source/render/render_cameras.c#L285-L288) identify the previous comparison projection mismatch for further testing; they do not establish matching-game visual acceptance. The exact revision is still absent from the local shallow research history; no fetch/clone was made.
 
 ## Vehicle shadows: real-game comparison and shared-renderer repair — 10 November
 

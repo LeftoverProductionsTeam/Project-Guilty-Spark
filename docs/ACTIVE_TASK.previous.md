@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 35f5646be857e3e2baeaf91da6752dc7c13ff630 native vehicle shadows committed locally. R546–R549/R551 five Windows sources complete/0errors/originals unchanged/disposed;920Rust/9ignored,500frontend/278browser/6GPU. Exact evidence/QA: NATIVE_ASSETS_AND_SHOWCASE.md and E/vehicle-shadow-acceptance-r552.json.
-Next action: R553 GPU red proves native-light saturation mismatch[186,122,211]vs[160,122,160]; R555 all6GPU green after shared shader repair, authored reflection/emission and artist HDR preserved. Build frozen Windows/native Chupa R556, verify other four sources, update evidence/manifests and commit. Three runtime/test files dirty; no game active. R554 patch-guard failure retained, not a green result. H29/full M1–M6 remain open.
+Latest verified revision: 30d92d00039a0b0b28a7128e07ac493124f5650d native diffuse range committed;35f5646 shadows. R556/R558–R561 five Windows source previews pass, four source-lit/Demo limited;500frontend/6GPU/types/contracts/offline/40storage. Prior278browser/920Rust9ignored remain distinct. Exact evidence NATIVE_ASSETS_AND_SHOWCASE.md, E/vehicle-light-range-acceptance-r562.json.
+Next action: Reuse source-pinned R572 Windows app for R573 Chupa GPU recovery, then CE/MCC/OpenCE/Demo. R572500frontend/278browser/build169.575s and actual reset samecanvas/camera/8shadows/0newreads passed, but overall native failed unchanged8MiB evidence limit. Extra direct JPEG recovery capture now replaces redundant PNG; no budget/assertion relaxed. Source remains frozen, no game active. H29/fullM1-M6 open.
 
 ## Acceptance
 

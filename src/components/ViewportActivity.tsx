@@ -12,7 +12,7 @@ export default function ViewportActivity({ continuous = false }: { continuous?: 
     let focused = !document.hidden, visible = !document.hidden, pressed = false;
     let settle: ReturnType<typeof setTimeout> | undefined;
     const refresh = (focused: boolean) => {
-      if (!active || !visible || document.hidden) {
+      if (!active || !visible || document.hidden || gl.getContext().isContextLost()) {
         setFrameloop('never');
         // R3F stops accepting invalidations in "never", but an already queued
         // demand frame survives. WebView2 can defer it until after minimization.
@@ -34,6 +34,11 @@ export default function ViewportActivity({ continuous = false }: { continuous?: 
     const down = () => { pressed = true; refresh(focused); };
     const up = () => { pressed = false; refresh(focused); };
     const pointerLock = () => refresh(focused);
+    // Restoring GPU storage does not invalidate a demand-rendered scene.
+    // Resume only eligible views; inactive editors keep their paused state.
+    const context = () => { pressed = false; refresh(focused); };
+    canvas.addEventListener('webglcontextlost', context);
+    canvas.addEventListener('webglcontextrestored', context);
     const focus = (value: boolean) => { focused = value; if (!value) pressed = false; refresh(value); };
     canvas.addEventListener('pointerdown', down, true);
     window.addEventListener('pointerup', up);
@@ -45,6 +50,8 @@ export default function ViewportActivity({ continuous = false }: { continuous?: 
       clearTimeout(settle);
       stopFocus();
       stopVisibility();
+      canvas.removeEventListener('webglcontextlost', context);
+      canvas.removeEventListener('webglcontextrestored', context);
       canvas.removeEventListener('pointerdown', down, true);
       window.removeEventListener('pointerup', up);
       canvas.removeEventListener('lostpointercapture', up);

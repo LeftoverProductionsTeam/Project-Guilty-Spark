@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 35f5646be857e3e2baeaf91da6752dc7c13ff630 plus reviewed diffuse-range shader repair. R556/R558–R561 five native Windows source previews pass, four verified source-lit/Demo limited;0errors/originals unchanged/disposed.500frontend/current6GPU/types/contracts/offline/40storage; prior278browser/920Rust9ignored remain distinct. Exact binary/hash/evidence: NATIVE_ASSETS_AND_SHOWCASE.md, E/vehicle-light-range-acceptance-r562.json.
-Next action: Commit verified native-light range repair and exact documentation locally. Then reproduce retained shadow GPU context-loss recovery before further H29 native shader/pose comparison. R553red/R555green and failedR554 preserved. All native wrappers terminal; no game active. Keep Demo missing local light, meter/light-reference parts and full game parity open; no source-map compile/release claim.
+Latest verified revision: 30d92d00039a0b0b28a7128e07ac493124f5650d plus reviewed GPU recovery. R572500frontend/278browser/types/contracts/offline/40storage/build169.575s pass; R573–R577five native resets pass samecanvas/camera/0newreads/originalsunchanged/normalclose. Four source-lit/Demo limited. Receipt E/vehicle-context-acceptance-r578.json. Local scoped commit pending; H29parity/fullM1–M6 open.
+Next action: Review/stage/manifest/checkpoint-test and commit accepted renderer recovery locally; retire only verified superseded QA binaries. Then continue H29 actual Chupa game comparison using exact b506ba7439463d23f6e6d97192c68ece97adbab3 camera/projection contract. R572overall native failed8MiB evidence, laterfive pass directJPEG without budget/assertion relaxation. No active game/compiler; fullM1–M6 remain open.
 
 ## Acceptance
 

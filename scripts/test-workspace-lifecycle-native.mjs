@@ -650,6 +650,30 @@ async function nativeVehiclePreview(opened,originalHash){
     report.vehiclePreview.placedVehicle.nativeShadows=shadows;
     await main.screenshot({path:path.join(root,'native-vehicle-world-closeup.png')});
     report.vehiclePreview.placedVehicle.wheelZoom={beforeDistance,afterDistance:distance(closeupCamera),camera:closeupCamera,actualMouseWheel:true};
+    if(process.env.SPARK_LIFECYCLE_CONTEXT_LOSS==='1'){
+      await main.waitForTimeout(400);
+      const beforeResetCamera=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera));
+      const boundary=await main.evaluate(()=>performance.now()),canvasHandle=await worldCanvas.elementHandle();if(!canvasHandle)throw Error('Native recovery canvas missing');
+      await worldCanvas.evaluate(async node=>{
+        const gl=node.getContext('webgl2'),extension=gl?.getExtension('WEBGL_lose_context');if(!gl||!extension)throw Error('Native WebGL context-loss test is unavailable');
+        const event=name=>new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error(name+' was not delivered')),5000);node.addEventListener(name,()=>{clearTimeout(timeout);resolve(true);},{once:true});});
+        const lost=event('webglcontextlost');extension.loseContext();await lost;
+        // Let the loss event finish dispatching before requesting restoration.
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const restored=event('webglcontextrestored');extension.restoreContext();await restored;
+        // Require a fresh frame's stats rather than accepting pre-reset data.
+        delete node.dataset.gsObjectShadows;
+      });
+      await expect.poll(()=>worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsObjectShadows??'null')?.drawn),{timeout:30000}).toBe(shadows.drawn);
+      expect(await canvasHandle.evaluate(node=>node.isConnected)).toBe(true);
+      const restored=await worldCanvas.evaluate(node=>({camera:JSON.parse(node.dataset.gsCamera),shadows:JSON.parse(node.dataset.gsObjectShadows),mips:JSON.parse(node.dataset.gsOriginalMips),cubes:JSON.parse(node.dataset.gsOriginalCubeMips),contextLost:node.getContext('webgl2')?.isContextLost()}));
+      expect(restored.contextLost).toBe(false);expect(restored.camera.target).toEqual(beforeResetCamera.target);expect(restored.camera.position).toEqual(beforeResetCamera.position);expect(restored.shadows.refused).toBe(0);expect(restored.shadows.textureBytes).toBeLessThanOrEqual(524288);
+      expect(restored.mips).toEqual(worldMips);expect(restored.cubes).toEqual(worldCubes);
+      const reads=await main.evaluate(start=>performance.getEntriesByType('measure').filter(entry=>entry.startTime>=start&&entry.name.startsWith('spark.ipc.preview_owned_')).map(entry=>entry.name),boundary);expect(reads).toEqual([]);
+      // The original close-up PNG remains lossless; the extra recovery overview uses
+      // a direct JPEG capture to keep the unchanged QA evidence budget bounded.
+      await main.screenshot({path:path.join(root,'native-vehicle-world-restored.jpg'),type:'jpeg',quality:90});report.vehiclePreview.placedVehicle.contextRecovery={...restored,beforeResetCamera,newNativePreviewReads:reads.length,sameCanvas:true,actualWebViewGpuReset:true};
+    }
     if(expectedCacheVersion===13){
       const canvasHandle=await worldCanvas.elementHandle();if(!canvasHandle)throw Error('Native World canvas missing');
       await openStudioMenu(main);const runtime=main.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);const original=await runtime.inputValue(),choices=[];
