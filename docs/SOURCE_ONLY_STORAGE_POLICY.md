@@ -1,5 +1,11 @@
 # Source-only storage contract
 
+## Failed validation writers — 10 November
+
+A thrown development-validation action now stops and awaits only the children explicitly registered with its existing storage owner before retiring generated output. The original validation error survives successful cleanup. Untracked processes, active unrelated jobs, changed ownership and original content retain their existing protection. A simultaneous budget/monitor failure still reports failure and retires only the completed owned receipt. No failure can be converted to a passed interruption.
+
+The new real-process regression fails before repair with `Active QA writer protects scratch` replacing the actual validation error. After repair it proves tracked-child exit, preservation of an untracked process and removal of the owned generated tree. R602 repeats the failure path with an actual isolated Chupathingy process after Blood Gulch loads: exact-owned forced stop is expected, not normal game-exit/gameplay acceptance. The original error, all22input pins including the previous-good connected cache, and cleanup of877,265,058logical bytes pass. Receipt: E/native-writer-failure-r602.json.
+
 Owner directive `defb4b8b-0dc4-45fe-a5b0-2a0774caa512`, 5 November 2026, supersedes earlier cleanup instructions and retained-cache policies. It does not waive native compatibility, source preservation, Git-history integrity or publication approval.
 
 The final owner correction `e2ad9798-f784-4f15-b92a-42d480643288` protects **all user-selected Halo runtimes, ISO files, maps, original tags, editing kits and user-created content**, wherever located. Never delete, move, compress, modify or reorganize them during cleanup. Treat them as external read-only resources and account for their allocation separately. Fifty MiB is an investigation threshold, not a deletion rule; required dependencies and source may exceed it.

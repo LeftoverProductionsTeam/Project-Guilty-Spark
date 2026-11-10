@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native vehicle fidelity and game comparison
+Task: Operation110 — native vehicle fidelity and failed-test writer recovery
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 289cf118350e12690f0fbce9c6965d5fd43771f6, scoped native dashboard-meter implementation committed on master. R593–R597allfive source previews and full922Rust/9ignored,501frontend,279browser pass. QA SHAe75731d7359d20d75ee4ee9416c524b9b73bb6cf9931b2ee591e64bdc8fed0b2, runtimeFP8eb593744a013303437b5c94a0a6cdbd80b4bb6d834ed92b007feada1fc629b6. Exact source SHAs E/vehicle-meter-work-r593.json; full evidence E/vehicle-meter-acceptance-r598.json.
-Next action: Seal checkpoint/docs/source manifests after289cf11; final local HEAD/clean-tree/source-manifest hashes go to E/vehicle-meter-checkpoint-r599.json. Resume H29 matched native game dashboard/body comparison using the existing isolated Chupathingy game/camera workflow. Source preview is stationary, not live meter/physics simulation. Demo3179light-reference carrier triangles, dynamic poses/suspension and full visual/human acceptance remain open. All validations terminal/owned scratch disposed, no active app/game/compiler. FullOperation110/M1–M6 is NOT complete; no push/publication.
+Latest verified revision: 289cf118350e12690f0fbce9c6965d5fd43771f6 runtime; scoped failed-action writer cleanup now passes R602 actual Chupathingy failure/original22pins/previous-good cache/disposal and R603 final50storage/repository/contracts/checkpoint tests plus offline gates. Local commit pending; runtime code and QA e75731d7 remain unchanged. R600/R601 failures and later native camera measurements are separately retained.
+Next action: Seal the scoped scripts/docs/source manifests and commit locally, then complete the existing H05 native guided-walkthrough acceptance through actual controls and restart. H29 matched vehicle poses/game appearance, human gameplay, physical peers/headset/platform and fullOperation110 remain open. No push/publication.
 
 ## Acceptance
 

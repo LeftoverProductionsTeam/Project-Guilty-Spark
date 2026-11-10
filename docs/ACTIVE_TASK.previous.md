@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native vehicle fidelity and game comparison
+Task: Operation110 — native vehicle fidelity and failed-test writer recovery
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 5d5da289f1fbc5d642a7a48fe0b8225df54126f8, clean master after accepted native vertex-reflection repair; R590 five-source receipt/runtimeFP6285e6aaf31f35b59787a19982a93b9b1f560120671474bae2a5bb4850c3d2eb. FullH29/M1–M6 remain open.
-Next action: R593 frozen dashboard-meter changes remain UNCOMMITTED until native acceptance. Full922Rust/9explicitignored,501frontend,279browser,TypeScript/contracts/offline pass. Fresh Windows/native Chupa validation is running (outer process57496; E/vehicle-meter-chupa-r593.json/.log); exact dirty source/test SHAs and incomplete gates are in E/vehicle-meter-work-r593.json. Finish it, then reuse only the matching app for CE/MCC/OpenCE/Demo, record results and commit verified scoped work. Keep unmatched-game dashboard/poses and fullOperation110/M1–M6 open; no push.
+Latest verified revision: 289cf118350e12690f0fbce9c6965d5fd43771f6, scoped native dashboard-meter implementation committed on master. R593–R597allfive source previews and full922Rust/9ignored,501frontend,279browser pass. QA SHAe75731d7359d20d75ee4ee9416c524b9b73bb6cf9931b2ee591e64bdc8fed0b2, runtimeFP8eb593744a013303437b5c94a0a6cdbd80b4bb6d834ed92b007feada1fc629b6. Exact source SHAs E/vehicle-meter-work-r593.json; full evidence E/vehicle-meter-acceptance-r598.json.
+Next action: Validate the reproduced failed-action writer leak repair with the full storage/offline checks and one exact-owned real Chupathingy process. R600 early wait failed; originals unchanged and1,697,612,352logicalB recovered through ownership guards. R601 game exits0/originals unchanged/disposed; initial camera mismatch stays failed, later native load/save is measured separately in E/vehicle-game-camera-r601-controls.json. Runtime code remains289cf11; scripts/native-qa-storage.mjs/.test.mjs contain scoped uncommitted repair. Then update evidence, manifests and commit locally. H29 game/pose/human parity and fullOperation110 remain open; no push/publication.
 
 ## Acceptance
 

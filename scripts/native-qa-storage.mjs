@@ -1278,9 +1278,11 @@ export async function beginQaStorage(
       qaOnly: true, installedComponentsAndProfilePreserved: true };
   };
   finish.sample = monitor.sample;
-  finish.interrupt = async () => {
+  finish.interrupt = async (status = 'interrupted') => {
+    if (!['interrupted', 'failed'].includes(status))
+      throw Error('Stopping owned QA writers requires a failed or interrupted outcome');
     await Promise.all([...writers].map(stopQaProcess));
-    return finish('interrupted');
+    return finish(status);
   };
   finish.registerDisposable = async (file) => {
     const target = await canonicalOutputPath(file);
@@ -1446,10 +1448,14 @@ export async function withDevelopmentWorkspace(
   } finally {
     process.off('SIGINT', stop);
     process.off('SIGTERM', stop);
-    if (interruption) await interruption;
-    const current = JSON.parse(await fs.readFile(path.join(run, 'storage-run.json'), 'utf8'));
+    // A failed action has relinquished its tracked generated-output writers.
+    // Stop and await only those children before retiring their scratch; keep
+    // the action's original error when this cleanup succeeds.
+    if (!ok && !interruption) interruption = finish.interrupt('failed');
     let result, completionError;
     try {
+      if (interruption) await interruption;
+      const current = JSON.parse(await fs.readFile(path.join(run, 'storage-run.json'), 'utf8'));
       result = current.active
         ? await finish(interrupted ? 'interrupted' : ok ? 'passed' : 'failed')
         : current;

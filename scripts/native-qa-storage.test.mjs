@@ -151,6 +151,37 @@ public static class NativeHeldDelete {
   });
 }, { reservationBytes: 8 * 1024 ** 2 }));
 
+
+test('a failed development action stops only its tracked writer and preserves the original error', () => {
+  const env={...process.env};
+  for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
+  const source=new URL('./native-qa-storage.mjs',import.meta.url).href;
+  const input=`import fs from 'node:fs/promises';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {withDevelopmentWorkspace,stopQaProcess} from ${JSON.stringify(source)};
+let tracked,untracked,root;const failedStep=Error('deliberate native validation failure');
+const start=async()=>{const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',windowsHide:true});await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});return child;};
+try{untracked=await start();await assert.rejects(withDevelopmentWorkspace('failed-action-regression',async context=>{root=context.env.SPARK_BUILD_WORKSPACE;await fs.writeFile(context.directory+'/generated.tag','owned disposable output');tracked=await start();await context.trackProcess(tracked);throw failedStep;},{reservationBytes:8*1024**2}),error=>error===failedStep);assert.ok(tracked.exitCode!==null||tracked.signalCode!==null,'The failed action must finish its own writer');assert.equal(untracked.exitCode,null);assert.equal(untracked.signalCode,null);process.kill(untracked.pid,0);await assert.rejects(fs.stat(root),{code:'ENOENT'});console.log('failed-action: original error and untracked process preserved');}
+finally{if(tracked)await stopQaProcess(tracked);if(untracked)await stopQaProcess(untracked);}
+`;
+  // A failed implementation may leave its monitor alive. Exit only this test
+  // owner after its explicitly spawned writers are stopped; the next normal
+  // admission recovers that owner's declared disposable scratch.
+  const run=spawnSync(process.execPath,['--input-type=module','-e',input+'\nprocess.exit(0);'],{env,encoding:'utf8',windowsHide:true,timeout:15000});
+  const cleanup=spawnSync(process.execPath,['--input-type=module','-e',`import {withDevelopmentWorkspace} from ${JSON.stringify(source)};await withDevelopmentWorkspace('failed-action-recovery',async()=>{}, {reservationBytes:8*1024**2});`],{env,encoding:'utf8',windowsHide:true,timeout:15000});
+  assert.equal(cleanup.status,0,cleanup.stderr);
+  assert.equal(run.status,0,run.stderr);
+  assert.match(run.stdout,/failed-action: original error and untracked process preserved/);
+});
+
+
+test('a failed action still retires its owned receipt when final measurement reports a budget failure', () => {
+  const env={...process.env};
+  for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
+  const source=new URL('./native-qa-storage.mjs',import.meta.url).href;
+  const input=`import fs from 'node:fs/promises';import assert from 'node:assert/strict';import {withDevelopmentWorkspace} from ${JSON.stringify(source)};let root;await assert.rejects(withDevelopmentWorkspace('failed-action-monitor-retirement',async context=>{root=context.env.SPARK_BUILD_WORKSPACE;await fs.writeFile(context.directory+'/generated.bin',Buffer.alloc(131072,7));throw Error('validation failed during growth');},{reservationBytes:65536}),/storage budget/);await assert.rejects(fs.stat(root),{code:'ENOENT'});`;
+  const run=spawnSync(process.execPath,['--input-type=module','-e',input],{env,encoding:'utf8',windowsHide:true,timeout:15000});
+  assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
+});
+
 test('a monitor failure retires its completed receipt without turning failure into success', () => {
   const env={...process.env};
   for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];

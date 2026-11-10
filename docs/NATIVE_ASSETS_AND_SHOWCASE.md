@@ -22,6 +22,12 @@ QA: E/qa-vehicle-meter-r593/GuiltySpark.exe,50052096B,SHA `e75731d7359d20d75ee4e
 
 Before: E/vehicle-vertex-chupa-r585-native-vehicle-world-restored.jpg. After: E/vehicle-meter-chupa-r593-native-vehicle-world-restored.jpg; large model view: E/vehicle-meter-chupa-r593-native-vehicle-warthog.png. No new game load, native map compilation, human driving or real-peer acceptance is claimed. H29 dynamic poses/suspension, moving meter/lighting state, unsupported carrier materials and full matched-game appearance remain open. Operation110 and all475requirements remain active/unchanged.
 
+## Native game comparison follow-through — 10 November
+
+R600 is failed, not acceptance: the trial incorrectly used the30-second process-exit helper during a deliberate240-second game session; its startup camera commands were not observed and its second client did not join. The early false input-preservation flag meant not yet measured. Later independent verification proves all21original pins unchanged; existing nonce/ownership recovery retires1,697,612,352logical bytes. E/vehicle-game-dashboard-r600-recovery.json preserves that distinction.
+
+R601 uses one real private Chupathingy0.9.0c/b506ba74 process and its documented loopback-only debug console. Native camera load/save responds and actual Warthog images are retained, but the initial startup readback drifts and the strict trial remains complete:false. The later repeat measures maximum position difference0.000032world units, settled across two native saves; this is independent command/readback evidence, not exact camera projection, driving, dashboard animation or visual-parity acceptance. Native process exits0, all21original pins remain unchanged and877,471,121logical bytes of owned output are disposed. Files: E/vehicle-game-camera-r601.json, -controls.json, -native.log, -warthog.png and -settled.png. Dummy audio was used. No compiled map or original installation was changed.
+
 ## Native model reflection interpolation — 10 November
 
 R580 compares the actual isolated Chupathingy0.9.0c/b506ba7439463d23f6e6d97192c68ece97adbab3 GPU programs. Model reflection direction and endpoint colour/brightness are evaluated at vertices, clamped there and interpolated across each triangle even when diffuse lighting uses the engine's per-pixel option. Spark previously recomputed those values per fragment. That changes reflection faces and highlights on coarse vehicle panels.

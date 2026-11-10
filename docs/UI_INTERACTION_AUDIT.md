@@ -1,5 +1,9 @@
 # UI interaction acceptance audit
 
+## H29 guide correction — 10 November
+
+The vehicle test guide still described the four Warthog dashboard triangles as unsupported after the native-meter implementation. Its prerequisite and material-coverage step now match the actual current controls: two meter materials,2798triangles/0unassigned, stationary source preview and no live-speed connection. The separate Demo carrier limitation remains explicit. Native UI evidence is R593–R597 in NATIVE_ASSETS_AND_SHOWCASE.md; this instruction repair adds no new human/game-parity acceptance.
+
 ## Current functional gate — verified checkpoint
 
 **Final UI/release acceptance remains OPEN.** Project selection, wrong-project Save and bounded Tools-menu audit repairs retain their native/browser evidence. Historical sealed candidate c035b68 has all nine then-current clean-source release groups and real installer/portable startup checks. The later dc4456e candidate and subsequent source have separate evidence; none automatically includes this current vehicle increment. See RELEASE_CANDIDATE_20261108.md and ACTIVE_TASK.md.
