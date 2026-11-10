@@ -50,6 +50,10 @@ test('shared model and BSP components preserve glass pass order, chroma mode and
   const result=await page.evaluate(async()=>{const {renderComponentGlassChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderComponentGlassChecks();});
   console.log('HALO_COMPONENT_GLASS',JSON.stringify(result));
   expect(result.errors).toEqual([]);
+  expect(result.meterState).toEqual({inputs:[1,1,1,1,1],scope:'source-preview',samplerOwned:true,nearest:true,originalUnchanged:true});
+  expect(result.disposedSampler).toBe(true);expect(result.unknownMaps).toBe(0);
+  expect(result.meterEmpty.pixel).toEqual([25,51,76,255]);
+  for(const [i,value]of[96,188,105,255].entries())expect(Math.abs(result.meterFilled.pixel[i]-value)).toBeLessThanOrEqual(1);
   for(const frame of [result.model,result.completed,result.bsp]){
     for(const [channel,expected]of[118,78,110,255].entries())expect(Math.abs(frame.pixel[channel]-expected)).toBeLessThanOrEqual(1);
     expect(frame.groups).toBe(2);expect(frame.draws).toBe(2);expect(frame.triangles).toBe(4);
@@ -94,4 +98,24 @@ test('native object silhouettes shadow original BSPs with cutouts and bounded re
  for(const[i,expected]of[40,60,60,255].entries())expect(Math.abs(result.contextRestored.pixel[i]-expected)).toBeLessThanOrEqual(1);
  expect(result.contextRestored.updated).toBe(1);expect(result.contextRestored.drawn).toBe(1);expect(result.contextRestored.cached).toBe(1);
  expect(result.paused.cached).toBe(1);expect(result.paused.textureBytes).toBe(65536);expect(result.paused.updated).toBe(0);expect(result.shadow.updated).toBe(1);expect(result.cached.updated).toBe(0);expect(result.moved.updated).toBe(1);expect(result.disabled.drawn).toBe(0);expect(result.oldMetadata.drawn).toBe(0);expect(result.disposedReceivers).toBe(0);expect(result.bounded.visible).toBe(13);expect(result.bounded.drawn).toBe(8);expect(result.bounded.cached).toBe(8);expect(result.bounded.textureBytes).toBe(524288);expect(result.retained.cached).toBe(8);
+});
+
+
+test('native vehicle meters interpret encoded channels, flash and both framebuffer tint modes',async({page})=>{
+ await page.goto('/tests/ui/fixtures/haloMaterials.html');
+ const r=await page.evaluate(async()=>{const {renderMaterialChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderMaterialChecks();});
+ // Independently evaluate the four saturated native register stages, including
+ // packed 8-bit constants and original blue/alpha channels. Never plain RGB.
+ const q=(v:number)=>{const x=v*255,n=Math.floor(x);return (x-n===.5?(n%2?n+1:n):Math.round(x))/255;};
+ const clamp=(v:number,lo=-1,hi=1)=>Math.max(lo,Math.min(hi,v));
+ const expected=r.meterCases.map(c=>{const b=c.blue/255,a=c.alpha/255,[brightness,flash,value,gradient,extension]=c.inputs,mode2=!!(c.flags&8);
+  if(!a)return[26,51,77,255];
+  const ramp=clamp(8*q(1/Math.max(gradient*8,1))*b),edge=clamp(1-2*Math.max(0,clamp(4*(q(extension)-b))));
+  const bg=clamp(b+.5-q(value))>=.5;
+  const tint=[.7,.8,.9].map(v=>q(v*(mode2?brightness:1)));
+  const color=[.2,.6,.1].map((v,i)=>{const mixed=clamp(q(v)*(1-clamp(ramp,0,1))+q([.8,.1,.2][i])*Math.max(0,ramp));return bg?q([.05,.1,.15][i]):clamp(mixed+Math.max(0,edge)*q([.1,.2,.3][i]*flash)*(c.flags&4?-1:1));});
+  const out=color.map((v,i)=>Math.round(clamp(Math.max(0,v)*a*(mode2?tint[i]:q(brightness))+[.1,.2,.3][i]*(mode2?q(bg?.75:.25):tint[i]),0,1)*255));return [...out,255];
+ });console.log('HALO_METER_PIXELS',JSON.stringify({actual:r.meters,expected}));
+ expect(r.errors).toEqual([]);expect(r.reflectionGlError).toBe(0);
+ for(const [i,pixel]of expected.entries())for(const[channel,v]of pixel.entries())expect(Math.abs(r.meters[i][channel]-v),'meter case '+i+' channel '+channel).toBeLessThanOrEqual(1);
 });

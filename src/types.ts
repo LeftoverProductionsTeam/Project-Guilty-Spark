@@ -86,6 +86,9 @@ export interface ShaderStage {flags:number;constant0Source:number;constant0Funct
   constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
   colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
 export interface ShaderPreview {
+  meter?:{flags:number;gradientMin:Vec3;gradientMax:Vec3;background:Vec3;flash:Vec3;tint:Vec3;meterTransparency:number;backgroundTransparency:number;sources:[number,number,number,number,number]};
+  /** Resolved source-preview inputs only, never live runtime telemetry. */
+  meterInputs?:[number,number,number,number,number];
   selfIllumination?:{source:number;function:number;period:number;lower:Vec3;upper:Vec3};
   glassDiffuseAbsent?:boolean;
   changeColorSource?:number;
@@ -138,6 +141,8 @@ export interface SceneObject {
   sourceModel?: { projectId: string; sourceSha256: string; tagId: number; path: string; class: import('./forge').ForgePlacement['tagClass'] } | null;
 }
 export interface MeshData {
+  /** Source-proven outputs for an explicitly stationary vehicle. Null means unknown. */
+  stationaryFunctionValues?:[number|null,number|null,number|null,number|null]|null;
   objectLighting?:{tagClass:string;offset:Vec3;radius:number;brighten:boolean;castsShadow?:boolean|null}|null;
   changeColors?:[number,number,number][]|null;
   rig?:ModelRig|null;

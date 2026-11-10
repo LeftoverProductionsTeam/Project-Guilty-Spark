@@ -26,7 +26,7 @@ import type { OwnedModelView } from '../useOwnedForgeModels';
 import type { EditorEnvironment } from '../environment';
 import { sourceSurfaceEnvironment } from '../environment';
 import {modelSourceAppearance} from '../modelSourceAppearance';
-import {glassWithoutDiffuse,unassignedNativeTriangles} from '../nativeShaderTextures';
+import {nativeMeterInputs,glassWithoutDiffuse,unassignedNativeTriangles} from '../nativeShaderTextures';
 import type {ModelSourceAppearance} from '../modelSourceAppearance';
 import HaloMesh from './HaloMesh';
 import AnimatedBiped from './AnimatedBiped';
@@ -239,7 +239,7 @@ export default function NativeModelPreview({
     view = models[key];
   const materialIds=useMemo(()=>view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])]:[],[view?.mesh]);
   const unassignedTriangles=useMemo(()=>view?unassignedNativeTriangles(view.mesh):null,[view?.mesh]);
-  const missingShaderCount=view?materialIds.filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id])).length:0;
+  const missingShaderCount=view?materialIds.filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id])||view.shaderMetadata[id]?.kind==='meter'&&!nativeMeterInputs(view.shaderMetadata[id],view.mesh.stationaryFunctionValues)).length:0;
   const incompleteAttribution=!!view&&(unassignedTriangles===null||unassignedTriangles>0);
   useEffect(()=>{if(view)onMaterials?.(materialIds);},[view?.mesh,materialIds,onMaterials]);
   const [collision, setCollision] = useState<{key:string;mesh:MeshData|null;error?:string}|null>(null);
@@ -305,6 +305,7 @@ export default function NativeModelPreview({
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
       data-model-original-mips={view?JSON.stringify(Object.entries(view.shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps}))):undefined}
       data-model-original-cube-mips={view?JSON.stringify(Object.entries(view.extraTextures).filter(([,texture])=>texture instanceof THREE.CubeTexture).map(([key,texture])=>({key,bitmapTagId:texture.userData.sourceTagId,levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps,rgbaBytes:texture.userData.rgbaBytes}))):undefined}
+      data-model-meter-inputs={view?JSON.stringify(materialIds.filter(id=>view.shaderMetadata[id]?.kind==='meter').map(id=>({shader:id,inputs:nativeMeterInputs(view.shaderMetadata[id],view.mesh.stationaryFunctionValues),scope:'stationary-source-preview'}))):undefined}
       data-model-missing-shaders={missingShaderCount}
       data-model-texture-warnings={view?.textureWarnings?.length??0}
       data-model-unassigned-triangles={view?(unassignedTriangles??'unknown'):undefined}
@@ -360,6 +361,7 @@ export default function NativeModelPreview({
       {surface==='collision'&&collisionValue&&<small className="model-collision-status" role="status">
         {collisionValue.error?<>Native collision rejected: {collisionValue.error} <button onClick={()=>setCollisionRetry(n=>n+1)}>Retry collision</button></>:collisionValue.mesh?`${collisionValue.mesh.indices.length/3} native collision triangles · default pose`:'No native collision geometry is attached to this object.'}
       </small>}
+      {!showcase&&surface==='render'&&materialIds.some(id=>view?.shaderMetadata[id]?.kind==='meter')&&<small className="model-lighting-status">Dashboard: stationary source preview · live speed is not connected</small>}
       {surface==='render'&&incompleteAttribution&&<small className="model-material-coverage" role="status" aria-label="Model material coverage">
         {unassignedTriangles===null?'Source material coverage unavailable.':
           `Source materials incomplete · ${unassignedTriangles} ${unassignedTriangles===1?'triangle uses':'triangles use'} inspection shading.`}

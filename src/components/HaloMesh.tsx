@@ -7,7 +7,7 @@ import { renderIndices } from '../haloGeometry';
 import { materialLightmapKey } from '../haloLightmap';
 import type {SourceObjectLighting} from '../haloLightmap';
 import { createHaloMaterialPasses, updateHaloMaterial } from '../haloMaterial';
-import {glassWithoutDiffuse} from '../nativeShaderTextures';
+import {glassWithoutDiffuse,nativeMeterInputs} from '../nativeShaderTextures';
 import {createChromaMaterial} from '../chromaKey';
 const EMPTY_SHADER_TEXTURES: Record<number, THREE.Texture> = {};
 const EMPTY_LIGHTMAP_TEXTURES: Record<string, THREE.Texture> = {};
@@ -69,21 +69,22 @@ export default function HaloMesh({
       const [tagText,lightPageKey]=key.split('|'),tag=Number(tagText);
       const entry=legend.find(item=>item.tagId===tag),lightMap=lightPageKey?(lightmapTextures[lightPageKey]??null):null;
       let passes:THREE.Material[];
-      if((shaderTextures[tag]||glassWithoutDiffuse(shaderMetadata[tag]))&&!materialLens&&!wireframe){
+      const metadata=shaderMetadata[tag],meterInputs=nativeMeterInputs(metadata,data.stationaryFunctionValues),meterUnavailable=metadata?.kind==='meter'&&!meterInputs;
+      if(!meterUnavailable&&(shaderTextures[tag]||glassWithoutDiffuse(metadata))&&!materialLens&&!wireframe){
         const extra:Record<string,THREE.Texture>={};
         for(const [key,texture] of Object.entries(extraTextures))if(key.startsWith(`${tag}:`))extra[key.slice(key.indexOf(':')+1)]=texture;
         const source=shaderMetadata[tag],change=source?.changeColorSource?data.changeColors?.[source.changeColorSource-1]:undefined;
-        passes=createHaloMaterialPasses(shaderTextures[tag]??null,lightMap,change?{...source,changeColor:change}:source,extra,sky);
+        passes=createHaloMaterialPasses(shaderTextures[tag]??null,lightMap,source?.kind==='meter'?{...source,meterInputs:meterInputs!}:change?{...source,changeColor:change}:source,extra,sky);
       }else passes=[new THREE.MeshStandardMaterial({
         color:shaderTextures[tag]||lightMap?'#ffffff':materialLens?(entry?.color??'#8c9292'):'#8c9292',
-        map:shaderTextures[tag]??null,lightMap,lightMapIntensity:1,
+        map:meterUnavailable?null:shaderTextures[tag]??null,lightMap,lightMapIntensity:1,
         alphaTest:shaderTextures[tag]?.userData.alphaTest?0.5:0,side:THREE.DoubleSide,roughness:0.85,
       })];
       for(const material of passes)material.userData.haloSourceObject=sourceObject;
       slots.set(key,passes.map((_,i)=>values.length+i));values.push(...passes);
     }
     return{values,slots};
-  },[legend,materialKeys,shaderTextures,lightmapTextures,materialLens,shaderMetadata,data.changeColors,extraTextures,sky,sourceObject,wireframe]);
+  },[legend,materialKeys,shaderTextures,lightmapTextures,materialLens,shaderMetadata,data.changeColors,data.stationaryFunctionValues,extraTextures,sky,sourceObject,wireframe]);
   useEffect(()=>{
     for(const material of materials?.values??[])material.userData.haloObjectLighting=localLighting??null;
     invalidate();

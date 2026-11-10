@@ -157,6 +157,17 @@ export function renderMaterialChecks() {
   angularCube.dispose();
   for(const t of[pcMasks,xboxMasks])t.dispose();
   for(const t of[cube,diffuse,detail,addDetail])t.dispose();
+  const meterMetadata:ShaderPreview={...metadata,kind:'meter',meter:{flags:16,gradientMin:[.2,.6,.1],gradientMax:[.8,.1,.2],background:[.05,.1,.15],flash:[.1,.2,.3],tint:[.7,.8,.9],meterTransparency:.25,backgroundTransparency:.75,sources:[0,0,0,0,0]}};
+  const meterCases=[
+    {blue:32,alpha:255,inputs:[1,0,1,1,1],flags:16},
+    {blue:192,alpha:255,inputs:[1,0,.5,1,.5],flags:16},
+    {blue:96,alpha:128,inputs:[.5,1,1,1,.4],flags:16},
+    {blue:96,alpha:128,inputs:[.5,1,1,1,.4],flags:20},
+    {blue:32,alpha:255,inputs:[.5,0,1,1,1],flags:24},
+    {blue:192,alpha:255,inputs:[.5,0,.5,1,.5],flags:24},
+    {blue:32,alpha:0,inputs:[1,1,1,1,1],flags:16},
+  ];
+  const meters=meterCases.map(c=>{const t=texture([0,0,c.blue,c.alpha]);const material=createHaloMaterial(t,null,{...meterMetadata,meter:{...meterMetadata.meter!,flags:c.flags},meterInputs:c.inputs as [number,number,number,number,number]},{});const pixel=sample(material);t.dispose();return pixel;});
   camera.position.z = -2;
   camera.lookAt(0, 0, 0);
   const back = sample(createHaloMaterial(green, null, { ...metadata, kind: 'model' }, {}), exterior);
@@ -165,7 +176,7 @@ export function renderMaterialChecks() {
   for (const t of [black, green, red, half,emissiveMask,noEmissionMask,grey]) t.dispose();
   target.dispose();
   const reflectionGlError=renderer.getContext().getError();renderer.dispose();
-  return { neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack,vertexTint,vertexTintExpected,vertexBack,vertexSaturated,vertexSaturatedExpected,vertexDirection,reflectionGlError, errors };
+  return { meters,meterCases, neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack,vertexTint,vertexTintExpected,vertexBack,vertexSaturated,vertexSaturatedExpected,vertexDirection,reflectionGlError, errors };
 }
 
 /** Real shared React/Three components, not a second shader implementation. */
@@ -202,8 +213,21 @@ export async function renderComponentGlassChecks(){
   const doc={schemaVersion:1,name:'glass regression',template:'fixture',runtimeId:'chupathingy',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[{id:'glass',name:'source glass',shaderPath:'fixture/glass',color:[1,1,1]}],placements:[],spawns:[],objectives:[]} as import('../../../src/forge').QuickForgeDocument;
   const bspProps={doc,mesh:{...data,parts:[{brushId:'surface',materialId:'glass',indexStart:0,indexCount:6}]},wire:false,textures:{},views:{glass:{base:texture,metadata,extra:{reflectionCube:cube}}}};
   const bsp=await read(createElement(BspSurfaces,bspProps)),bspGreen=await read(createElement(BspSurfaces,{...bspProps,greenScreen:true}));
-  root.unmount();await new Promise(resolve=>setTimeout(resolve,600));target.dispose();texture.dispose();cube.dispose();
-  return{model,completed,neutral,modelGreen,bsp,bspGreen,errors};
+  const dial=new THREE.DataTexture(new Uint8Array([0,0,32,255]),1,1);dial.userData.sourceEncoded=true;dial.magFilter=THREE.LinearFilter;dial.generateMipmaps=false;dial.needsUpdate=true;
+  const meter:ShaderPreview={kind:'meter',twoSided:false,alphaTest:false,uvScale:[1,1],meter:{flags:17,gradientMin:[.2,.6,.1],gradientMax:[.8,.1,.2],background:[0,0,0],flash:[0,0,0],tint:[1,1,1],meterTransparency:0,backgroundTransparency:0,sources:[0,0,3,0,3]}};
+  const meterData={...data,stationaryFunctionValues:[null,null,0,null] as [null,null,number|null,null]};
+  const meterProps={data:meterData,shaderTextures:{7:dial},shaderMetadata:{7:meter}};
+  const meterEmpty=await read(createElement(HaloMesh,meterProps));
+  const meterFilled=await read(createElement(HaloMesh,{...meterProps,data:{...meterData,stationaryFunctionValues:[null,null,1,null]}}));
+  const meterMesh=state!.scene.children.find(child=>child instanceof THREE.Mesh) as THREE.Mesh;
+  const mat=(meterMesh.material as THREE.Material[]).find(material=>material.userData.haloMeter) as THREE.ShaderMaterial;
+  const meterState={inputs:mat.userData.haloMeter.inputs,scope:mat.userData.haloMeter.scope,samplerOwned:mat.uniforms.baseMap.value!==dial,nearest:mat.uniforms.baseMap.value.magFilter===THREE.NearestFilter,originalUnchanged:dial.magFilter===THREE.LinearFilter&&!dial.generateMipmaps};
+  let disposedSampler=false;mat.uniforms.baseMap.value.addEventListener('dispose',()=>{disposedSampler=true;});
+  const meterUnknown=await read(createElement(HaloMesh,{...meterProps,data:{...meterData,stationaryFunctionValues:[null,null,null,null]}}));
+  const unknownMesh=state!.scene.children.find(child=>child instanceof THREE.Mesh) as THREE.Mesh;
+  const unknownMaps=(unknownMesh.material as THREE.MeshStandardMaterial[]).filter(material=>material.map===dial).length;
+  root.unmount();await new Promise(resolve=>setTimeout(resolve,600));target.dispose();texture.dispose();cube.dispose();dial.dispose();
+  return{model,completed,neutral,modelGreen,bsp,bspGreen,meterEmpty,meterFilled,meterUnknown,meterState,disposedSampler,unknownMaps,errors};
 }
 
 /** The World object and baked BSP must share material math without sharing light ownership. */

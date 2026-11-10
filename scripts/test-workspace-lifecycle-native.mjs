@@ -448,7 +448,7 @@ async function nativeVehiclePreview(opened,originalHash){
     const expectedByShader=new Map(),actualByShader=new Map(),unsupportedSourceParts=[];
     for(const part of sourceParts){
       const reference=sourceShaderReferences[part.shaderSlot];if(!reference)throw Error('Vehicle source part has no shader slot');
-      if(['smet','ligh'].includes(reference.class))unsupportedSourceParts.push({...part,shaderClass:reference.class,shaderPath:reference.path});
+      if(reference.class==='ligh')unsupportedSourceParts.push({...part,shaderClass:reference.class,shaderPath:reference.path});
       else expectedByShader.set(reference.id,(expectedByShader.get(reference.id)??0)+part.triangles);
     }
     for(const range of actual.mesh.materialRanges)actualByShader.set(range.shaderTagId,(actualByShader.get(range.shaderTagId)??0)+range.indexCount/3);
@@ -460,6 +460,29 @@ async function nativeVehiclePreview(opened,originalHash){
     for(const id of new Set(actual.mesh.materialRanges.map(range=>range.shaderTagId))){
       const shader=opened.inspection.tags.find(tag=>tag.id===id);expect(shader,'Actual vehicle shader identity').toBeTruthy();
       expect(sourceShaderReferences.some(ref=>ref.id===id&&ref.class===shader.class),'Actual material belongs to the original model').toBe(true);
+      if(shader.class==='smet'){
+        const body=shader.dataOffset;if(!Number.isSafeInteger(body)||body<tagStart||body+260>tagEnd)throw Error('Vehicle meter escapes native source');
+        const flags=bytes.readUInt16LE(body+40),bitmapId=u32(body+88),sources=[216,218,220,222,224].map(offset=>bytes.readUInt16LE(body+offset));
+        const meter={flags,gradientMin:[0,1,2].map(i=>f32(body+124+i*4)),gradientMax:[0,1,2].map(i=>f32(body+136+i*4)),background:[0,1,2].map(i=>f32(body+148+i*4)),flash:[0,1,2].map(i=>f32(body+160+i*4)),tint:[0,1,2].map(i=>f32(body+172+i*4)),meterTransparency:f32(body+184),backgroundTransparency:f32(body+188),sources};
+        expect(shader.shaderPreview?.kind).toBe('meter');
+        // Rust serializes shortest round-trippable f32 decimals. Compare the
+        // exact original 32-bit values, not their unequal JS double spellings.
+        const actualMeter=shader.shaderPreview?.meter;expect(actualMeter).toBeTruthy();
+        const normalized={...actualMeter};for(const key of['gradientMin','gradientMax','background','flash','tint'])normalized[key]=normalized[key].map(Math.fround);
+        for(const key of['meterTransparency','backgroundTransparency'])normalized[key]=Math.fround(normalized[key]);
+        expect(normalized).toEqual(meter);
+        expect(shader.references.find(ref=>ref.label==='Base map')?.targetId).toBe(bitmapId);
+        expect(shader.shaderPreview.twoSided).toBe(!!(flags&2));expect(shader.shaderPreview.decal).toBe(!!(flags&1));
+        const [functions,count]=block(objectAt+344,360,4),c=functions+720;
+        expect(count).toBe(4);expect([1,35]).toContain(bytes.readUInt16LE(objectAt+800));
+        expect(bytes.readUInt16LE(c+10)).toBe(0);expect(bytes.readUInt16LE(c+12)).toBe(3);
+        for(const offset of[20,24,56])expect(f32(c+offset)).toBe(0);
+        for(const offset of[28,30,32,34,36,38])expect(bytes.readUInt16LE(c+offset)).toBe(0);
+        expect(f32(c+40)).toBe(0);expect(f32(c+44)).toBe(1);
+        expect(actual.mesh.stationaryFunctionValues[2]).toBe(0);
+        expect(opened.inspection.modelMeshes[vehicle.id]?.stationaryFunctionValues).toEqual(actual.mesh.stationaryFunctionValues);
+        materialOrder.push({shaderPath:shader.path,shaderClass:'smet',meter,bitmapId,stationaryFunctionC:0,liveTelemetry:false});
+      }
       if(shader.class==='sgla'){
         const body=shader.dataOffset;if(!Number.isSafeInteger(body)||body<tagStart||body+480>tagEnd)throw Error('Vehicle glass escapes native source');
         const tint=[0,1,2].map(i=>f32(body+0x54+i*4)),tintId=u32(body+0x64+12);
@@ -580,6 +603,9 @@ async function nativeVehiclePreview(opened,originalHash){
     row.previewCamera=camera;
     await main.screenshot({path:path.join(root,'native-vehicle-'+name+'.png')});
     expect(Number(row.preview.modelMissingShaders),'All supported source materials are available').toBe(0);
+    const meters=JSON.parse(row.preview.modelMeterInputs);expect(meters).toHaveLength(row.materialOrder.filter(m=>m.shaderClass==='smet').length);
+    for(const meter of meters)expect(meter).toMatchObject({inputs:[1,1,0,1,0],scope:'stationary-source-preview'});
+    row.nativeMeterPreview=meters;
     expect(Number(row.preview.modelUnassignedTriangles),'Native source material coverage').toBe(row.unassignedTriangles);
     expect(Number(row.preview.modelMaterialGaps)).toBe(row.unassignedTriangles>0?1:0);
     if(row.unassignedTriangles>0)await expect(preview.getByRole('status',{name:'Model material coverage',exact:true})).toContainText(`${row.unassignedTriangles} triangles use inspection shading`);

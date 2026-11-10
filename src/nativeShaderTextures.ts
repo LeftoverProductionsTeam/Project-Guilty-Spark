@@ -28,3 +28,11 @@ export function unassignedNativeTriangles(mesh:Pick<MeshData,'indices'|'material
   }
   return (total-covered)/3;
 }
+
+/** No animation block uses Halo's default 1. An object with unknown source
+ * outputs must not silently acquire that default or fabricated live telemetry. */
+export function nativeMeterInputs(shader:ShaderPreview|undefined|null,values:MeshData['stationaryFunctionValues']):[number,number,number,number,number]|null{
+ if(shader?.kind!=='meter'||!shader.meter||shader.meter.sources.length!==5||shader.meter.sources.some(v=>!Number.isInteger(v)||v<0||v>4))return null;
+ const result=shader.meter.sources.map(source=>source===0||values===undefined?1:source>=1&&source<=4?values?.[source-1]:null);
+ return result.every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1)?result as [number,number,number,number,number]:null;
+}

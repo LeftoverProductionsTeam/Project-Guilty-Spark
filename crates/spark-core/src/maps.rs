@@ -187,6 +187,7 @@ pub struct Tag {
 #[derive(Clone,Debug,Default,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderPreview {
+    #[serde(default,skip_serializing_if="Option::is_none")] pub meter:Option<ShaderMeter>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub self_illumination:Option<ShaderSelfIllumination>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub glass_diffuse_absent:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub change_color_source:Option<u16>,
@@ -213,6 +214,9 @@ pub struct ShaderPreview {
     #[serde(default)] pub decal:bool,
     #[serde(default)] pub alpha_blended:bool,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ShaderMeter {pub flags:u16,pub gradient_min:[f32;3],pub gradient_max:[f32;3],pub background:[f32;3],pub flash:[f32;3],pub tint:[f32;3],pub meter_transparency:f32,pub background_transparency:f32,pub sources:[u16;5]}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderSelfIllumination {pub source:u16,pub function:u16,pub period:f32,pub lower:[f32;3],pub upper:[f32;3]}
@@ -297,6 +301,9 @@ pub struct MeshMaterialRange {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeshData {
+    /// Preview-only outputs for a stationary vehicle; unknown engine inputs stay null.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub stationary_function_values:Option<[Option<f32>;4]>,
     /// Read-only native object bounds used by static source-lighting previews.
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub object_lighting:Option<ObjectLighting>,
@@ -608,7 +615,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         } else {
             Some(space.pointer(r.u32(at + 20)?, 1)?)
         };
-        let shader_class = matches!(class.as_str(), "senv" | "soso" | "schi" | "scex" | "sotr");
+        let shader_class = matches!(class.as_str(), "senv" | "soso" | "schi" | "scex" | "sotr" | "sgla" | "smet");
         tags.push(Tag {
             id,
             index: i,
@@ -634,7 +641,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
             tag.references.clear();
             tag.shader_preview=None;
             // A failed tag read must NEVER enable basename shader guessing.
-            if matches!(tag.class.as_str(), "senv" | "soso" | "schi" | "scex" | "sotr") {
+            if matches!(tag.class.as_str(), "senv" | "soso" | "schi" | "scex" | "sotr" | "sgla" | "smet") {
                 tag.primary_bitmap_status = Some("invalid".into());
             }
         }
@@ -970,6 +977,7 @@ fn shader_bitmap_references(
             (0xDC, "Detail map"),
             (0x164, "Reflection cube map"),
         ]),
+        "smet" => (260, &[(76,"Base map")]),
         "sgla" => (480, &[(0x158,"Diffuse map"),(0x16c,"Detail map"),(0xc0,"Bump map"),(0xac,"Reflection cube map"),(0x64,"Background tint map")]),
         _ => return Ok(()),
     };
@@ -1005,6 +1013,14 @@ fn shader_bitmap_references(
     tag.primary_bitmap_status = Some(if glass_diffuse_absent{"not-required"}else{primary_status}.into());
     if primary_status!="resolved"&&!glass_diffuse_absent{tag.shader_preview=None;return Ok(());}
     let flags=r.u16(at+40)?;
+    if tag.class=="smet" {
+        if flags&!31!=0{return invalid("Unsupported native meter flags");}
+        let color=|offset:usize|->Result<[f32;3]>{let rgb=[r.f32(at+offset)?,r.f32(at+offset+4)?,r.f32(at+offset+8)?];if rgb.iter().any(|v|!v.is_finite()||!(0.0..=1.0).contains(v)){return invalid("Native meter color is invalid");}Ok(rgb)};
+        let meter_transparency=r.f32(at+184)?;let background_transparency=r.f32(at+188)?;
+        let sources=[r.u16(at+216)?,r.u16(at+218)?,r.u16(at+220)?,r.u16(at+222)?,r.u16(at+224)?];
+        if sources.iter().any(|v|*v>4)||[meter_transparency,background_transparency].iter().any(|v|!v.is_finite()||!(0.0..=1.0).contains(v)){return invalid("Native meter inputs are invalid");}
+        tag.shader_preview=Some(ShaderPreview{kind:"meter".into(),two_sided:flags&2!=0,decal:flags&1!=0,alpha_blended:true,uv_scale:[1.,1.],meter:Some(ShaderMeter{flags,gradient_min:color(124)?,gradient_max:color(136)?,background:color(148)?,flash:color(160)?,tint:color(172)?,meter_transparency,background_transparency,sources}),..Default::default()});return Ok(());
+    }
     let uv_scale=if tag.class=="soso" {
         let u=r.f32(at+0x9c)?;let v=r.f32(at+0xa0)?;
         if !u.is_finite() || !v.is_finite() || u.abs()>1024. || v.abs()>1024. {return invalid("Unsupported model shader UV scale");}
@@ -1087,7 +1103,7 @@ fn read_fields(
         let (shaders,count)=space.block(r,at+220,32,32)?;
         for index in 0..count {
             let reference_at=shaders+index*32;
-            if matches!(r.fourcc(reference_at)?.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla") {
+            if matches!(r.fourcc(reference_at)?.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla"|"smet") {
                 reference(r,tag,reference_at,&format!("Shader {}",index+1),None,ids)?;
             }
         }
@@ -1121,7 +1137,7 @@ fn read_fields(
         for index in 0..count {reference(r,tag,details+index*104,&format!("Detail sound {}",index+1),Some("snd!"),ids)?;}
     }
     // PC-derived layouts, including the verified MCC v13 classic shader bodies.
-    if matches!(tag.class.as_str(), "senv" | "soso" | "sgla") && matches!(version, 5 | 6 | 7 | 13 | 609) {
+    if matches!(tag.class.as_str(), "senv" | "soso" | "sgla" | "smet") && matches!(version, 5 | 6 | 7 | 13 | 609) {
         shader_bitmap_references(r, space, tag, ids, at)?;
         if version==5&&tag.class=="soso"{if let Some(preview)=tag.shader_preview.as_mut(){preview.multipurpose_xbox=true;}}
     }
@@ -1553,6 +1569,19 @@ pub(crate) fn validate_ui_layout(project:&crate::project::Project,inspection:&Ma
 #[cfg(test)]
 mod shader_dependency_tests {
     use super::*;
+    #[test]
+    fn native_meter_shader_is_bounded_exact_and_read_only(){
+        let at=64;let mut b=vec![0u8;512];b[at+40..at+42].copy_from_slice(&17u16.to_le_bytes());install_ref(&mut b,at+76,21,b"mtib");
+        for (i,v) in [0.45f32,0.9,0.07].iter().enumerate(){b[at+124+i*4..at+128+i*4].copy_from_slice(&v.to_le_bytes());}
+        b[at+220..at+222].copy_from_slice(&3u16.to_le_bytes());b[at+224..at+226].copy_from_slice(&3u16.to_le_bytes());
+        let ids=std::collections::HashMap::from([(21,"bitm".into())]);let region=Space{begin:0,end:b.len(),address:0};let original=b.clone();
+        for version in [5,6,7,13,609]{let mut tag=shader_fixture("smet");read_fields(&Reader(&b),&region,&mut tag,&ids,version).unwrap();assert!(tag.fields.is_empty());assert_eq!(tag.references.len(),1);assert_eq!(tag.references[0].target_id,21);let p=tag.shader_preview.unwrap();assert_eq!(p.kind,"meter");assert!(!p.two_sided);assert!(p.decal&&p.alpha_blended);let m=p.meter.unwrap();assert_eq!(m.flags,17);assert_eq!(m.sources,[0,0,3,0,3]);assert_eq!(m.gradient_min,[0.45,0.9,0.07]);}
+        assert_eq!(b,original);
+        let short=Space{end:at+259,..region};assert!(shader_bitmap_references(&Reader(&b),&short,&mut shader_fixture("smet"),&ids,at).is_err());
+        for (offset,value)in [(124,f32::NAN),(184,1.1),(188,-0.1)]{let mut corrupt=b.clone();corrupt[at+offset..at+offset+4].copy_from_slice(&value.to_le_bytes());assert!(shader_bitmap_references(&Reader(&corrupt),&region,&mut shader_fixture("smet"),&ids,at).is_err());}
+        b[at+220..at+222].copy_from_slice(&5u16.to_le_bytes());assert!(shader_bitmap_references(&Reader(&b),&region,&mut shader_fixture("smet"),&ids,at).is_err());
+        let mut bad=shader_fixture("smet");shader_bitmap_references(&Reader(&original),&region,&mut bad,&std::collections::HashMap::new(),at).unwrap();assert_eq!(bad.primary_bitmap_status.as_deref(),Some("invalid"));assert!(bad.shader_preview.is_none());
+    }
     #[test]
     fn native_model_shader_links_are_bounded_exact_and_read_only() {
         let mut bytes=vec![0u8;640];

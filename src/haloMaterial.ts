@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type {ShaderPreview} from './types';
 import {sunlightPosition} from './environment';
 import {applyHaloBlend,genericCombiner,haloWaveGlsl} from './haloTransparency';
-import {glassWithoutDiffuse} from './nativeShaderTextures';
+import {glassWithoutDiffuse,nativeMeterInputs} from './nativeShaderTextures';
 import type {SourceObjectLighting} from './haloLightmap';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
 const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
@@ -56,6 +56,8 @@ uniform sampler2D normalMap,multipurpose;uniform bool hasNormal,hasMultipurpose,
 uniform float normalScale,normalStrength,specularStrength,selfIllumStrength;
 uniform bool hasNativeSelfIllum;uniform vec3 selfIllumLower,selfIllumUpper;uniform vec2 selfIllumAnimation;
 uniform bool hasChangeColor,firstMapScreenspace,scaleFirstMapWithDistance;uniform vec3 changeColor;
+uniform vec3 meterMinimum,meterMaximum,meterBackground,meterFlash;
+uniform vec4 meterParameters;uniform vec2 meterTransparencies;uniform bool meterNegative,meterTintMode2;
 vec3 lightUnit(vec3 value){return value/max(length(value),.000001);}
 vec4 sourceColor(vec4 c){return baseEncoded?c:sRGBTransferOETF(c);}
 ${haloWaveGlsl}
@@ -88,6 +90,21 @@ void main(){
     gl_FragColor=linearOutput?sRGBTransferEOTF(vec4(tint,1.0)):vec4(tint,1.0);return;
   }
   vec4 base=hasBase?sourceColor(texture2D(baseMap,(kind==2||kind==3)?layerUv(0):haloUv*baseScale)):vec4(0.0,0.0,0.0,kind==4?0.0:1.0);
+  if(kind==5){
+    // Independently derived native meter pipeline: blue encodes fill position,
+    // alpha masks the dial. Saturate each combiner stage before the next.
+    if(base.a==0.0)discard;
+    float ramp=clamp(8.0*meterParameters.y*base.b,-1.0,1.0);
+    vec3 gauge=clamp(meterMinimum*(1.0-clamp(ramp,0.0,1.0))+meterMaximum*max(ramp,0.0),-1.0,1.0);
+    float edge=clamp(1.0-2.0*max(0.0,clamp(4.0*(meterParameters.z-base.b),-1.0,1.0)),-1.0,1.0);
+    gauge=clamp(gauge+max(edge,0.0)*meterFlash*(meterNegative?-1.0:1.0),-1.0,1.0);
+    bool background=clamp(base.b+0.5-meterParameters.x,-1.0,1.0)>=0.5;
+    vec4 result=vec4(max(background?meterBackground:gauge,vec3(0.0))*base.a,background?meterTransparencies.y:meterTransparencies.x);
+    // WebGL forbids CONSTANT_ALPHA paired with CONSTANT_COLOR. Move that
+    // scalar into the source RGB, retaining exactly the native destination tint.
+    if(!meterTintMode2)result.rgb*=meterParameters.w;
+    gl_FragColor=linearOutput?sRGBTransferEOTF(result):result;return;
+  }
   if(kind==2||kind==3){
     vec4 maps[4];maps[0]=stageSample(texture2D(baseMap,layerUv(0)),0);
     maps[1]=stageSample(texture2D(layer1,layerUv(1)),1);maps[2]=stageSample(texture2D(layer2,layerUv(2)),2);maps[3]=stageSample(texture2D(layer3,layerUv(3)),3);
@@ -175,7 +192,13 @@ export function createHaloMaterial(
   sky = false,
 ): THREE.ShaderMaterial {
   if(!base&&!glassWithoutDiffuse(metadata))throw Error('This native shader requires its actual diffuse image.');
-  const m=metadata,layerCount=Math.min(4,m?.layers?.length??1),kind=m?.kind==='glass'?4:m?.kind==='generic'?3:m?.kind==='chicago'?2:m?.kind==='model'?1:0;
+  const m=metadata,layerCount=Math.min(4,m?.layers?.length??1),kind=m?.kind==='meter'?5:m?.kind==='glass'?4:m?.kind==='generic'?3:m?.kind==='chicago'?2:m?.kind==='model'?1:0;
+  const meter=m?.meter,inputs=m?.meterInputs??nativeMeterInputs(m,undefined);
+  if(kind===5&&(!meter||!inputs||inputs.some(v=>!Number.isFinite(v)||v<0||v>1)))throw Error('Native meter inputs are unavailable for this source preview.');
+  // Native constants are packed ARGB8 with nearest-even rounding.
+  const packed=(value:number)=>{const x=value*255,n=Math.floor(x);return (x-n===.5?(n%2?n+1:n):Math.round(x))/255;};
+  const brightness=inputs?.[0]??1,mode2=!!(meter&&meter.flags&8);
+  const meterTint=(meter?.tint??[1,1,1]).map(v=>packed(v*(mode2?brightness:1)));
   const blend=m?.framebufferBlend??0;
   const fogCode=blend===1||blend===2?`base.rgb=mix(base.rgb,vec3(${blend===1?'1.0':'0.5'}),amount);`:
     blend>=3?'base.rgb*=1.0-amount;':'base.rgb=mix(base.rgb,fogColor,amount);';
@@ -185,6 +208,11 @@ export function createHaloMaterial(
   const stageTexture=(source:THREE.Texture|null,i:number)=>{
     if(!source)return null;
     const flags=m?.layers?.[i]?.flags??0;
+    if(kind===5&&i===0){
+      const texture=source.clone();texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+      if(meter!.flags&16){texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestMipmapNearestFilter;texture.anisotropy=1;}
+      texture.needsUpdate=true;samplers.push(texture);return texture;
+    }
     if(!(flags&13))return source;
     const texture=source.clone();
     texture.wrapS=flags&4?THREE.ClampToEdgeWrapping:THREE.RepeatWrapping;
@@ -206,6 +234,13 @@ export function createHaloMaterial(
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
     uniforms: {
+      meterMinimum:{value:new THREE.Vector3(...(meter?.gradientMin??[0,0,0]).map(packed))},
+      meterMaximum:{value:new THREE.Vector3(...(meter?.gradientMax??[0,0,0]).map(packed))},
+      meterBackground:{value:new THREE.Vector3(...(meter?.background??[0,0,0]).map(packed))},
+      meterFlash:{value:new THREE.Vector3(...(meter?.flash??[0,0,0]).map(v=>packed(v*(inputs?.[1]??1))))},
+      meterParameters:{value:new THREE.Vector4(packed(inputs?.[2]??1),packed(1/Math.max(8*(inputs?.[3]??1),1)),packed(inputs?.[4]??1),packed(brightness))},
+      meterTransparencies:{value:new THREE.Vector2(packed(mode2?meter!.meterTransparency:brightness),packed(mode2?meter!.backgroundTransparency:0))},
+      meterNegative:{value:!!(meter&&meter.flags&4)},meterTintMode2:{value:mode2},
       reflectionCube: { value: extra.reflectionCube ?? null },
       hasReflection: { value: !!extra.reflectionCube && !!reflection },
       viewToWorld: { value: new THREE.Matrix3() },
@@ -310,6 +345,15 @@ export function createHaloMaterial(
     material.blendSrc=THREE.OneFactor;material.blendDst=THREE.OneMinusSrcAlphaFactor;
     material.blendSrcAlpha=THREE.ZeroFactor;material.blendDstAlpha=THREE.OneFactor;
     material.depthWrite=false;
+  }
+  if(kind===5){
+    material.blending=THREE.CustomBlending;material.blendEquation=THREE.AddEquation;
+    material.blendSrc=mode2?THREE.ConstantColorFactor:THREE.OneFactor;
+    material.blendDst=mode2?THREE.SrcAlphaFactor:THREE.ConstantColorFactor;
+    material.blendColor=new THREE.Color().setRGB(...meterTint as [number,number,number],THREE.LinearSRGBColorSpace);
+    // Halo writes RGB only for meter surfaces.
+    material.blendSrcAlpha=THREE.ZeroFactor;material.blendDstAlpha=THREE.OneFactor;
+    material.userData.haloMeter={inputs,scope:'source-preview',unfiltered:!!(meter!.flags&16)};
   }
   return material;
 }

@@ -28,7 +28,7 @@ export interface MaterialAudit {
 }
 const primaryLabel = /^(?:base map|base texture|diffuse map|diffuse texture|primary map|albedo map|bitmap)$/i;
 function shaderState(tag:Tag|undefined, bitmap:Tag|undefined, primaryCount:number):MaterialBindingState {
-  if(!tag || !['senv','soso'].includes(tag.class)&&!(tag.class==='sgla'&&tag.shaderPreview?.kind==='glass')&&!(['schi','scex'].includes(tag.class)&&tag.shaderPreview?.kind==='chicago')&&!(tag.class==='sotr'&&tag.shaderPreview?.kind==='generic')) return 'invalid';
+  if(!tag || !['senv','soso'].includes(tag.class)&&!(tag.class==='sgla'&&tag.shaderPreview?.kind==='glass')&&!(['schi','scex'].includes(tag.class)&&tag.shaderPreview?.kind==='chicago')&&!(tag.class==='sotr'&&tag.shaderPreview?.kind==='generic')&&!(tag.class==='smet'&&tag.shaderPreview?.kind==='meter'&&!!tag.shaderPreview.meter)) return 'invalid';
   const status=tag.primaryBitmapStatus;
   if(status==='not-required'&&glassWithoutDiffuse(tag.shaderPreview)&&primaryCount===0)return 'not-required';
   if(status==='missing'||status==='unavailable'||status==='invalid')return status;

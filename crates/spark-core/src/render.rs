@@ -436,7 +436,7 @@ fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,
                     let reference=shaders+shader_index*32;
                     let class=r.fourcc(reference)?;
                     let datum=r.u32(reference+12)?;
-                    if datum!=u32::MAX && matches!(class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla") {
+                    if datum!=u32::MAX && matches!(class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla"|"smet") {
                         mesh.material_ranges.push(MeshMaterialRange{shader_permutation:0,shader_tag_id:datum,bsp_index:0,
                             lightmap_index:0,lightmap_page:-1,has_lightmap_uvs:false,has_incident_radiosity:false,lightmap_bitmap_tag_id:None,
                             index_start:first_index,index_count:mesh.indices.len()-first_index});
@@ -484,7 +484,7 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
         // native change colours, bounds and type must not disappear in World.
         match object_model_mesh(bytes,header,tags,object_id,0) {
             Ok((_,mut mesh))=>{mesh.material_ranges.retain(|m|tag_lookup.get(&m.shader_tag_id)
-                .is_some_and(|t|matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla")));
+                .is_some_and(|t|matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla"|"smet")));
                 models.insert(object_id,mesh);},
             Err(e)=>{if notes.len()<32 {notes.push(format!("Object #{object_id}: {e}"));}},
         }
@@ -513,7 +513,7 @@ fn cached_model_variant_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],model_id:
     let raw_start=r.u32(start+20)? as usize;let vertex_size=r.u32(start+28)? as usize;let total=r.u32(start+32)? as usize;
     if header.version!=5 && (vertex_size>total||raw_start.checked_add(total).is_none_or(|end|end>bytes.len())){return invalid("Sky model raw region escapes cache");}
     let mut mesh=if variant.is_some(){gbxmodel_variant_mesh(&r,region,at,raw_start,vertex_size,total,header.version==5,variant)?}else{gbxmodel_static_mesh(&r,region,at,raw_start,vertex_size,total,header.version==5)?};
-    mesh.material_ranges.retain(|m|tags.iter().any(|t|t.id==m.shader_tag_id&&matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla")));
+    mesh.material_ranges.retain(|m|tags.iter().any(|t|t.id==m.shader_tag_id&&matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla"|"smet")));
     Ok(mesh)
 }
 
@@ -541,12 +541,43 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     if r.fourcc(at+40)?!=if header.version==5{"mode"}else{"mod2"} {return invalid("Object does not reference a supported native world model");}
     let model_id=r.u32(at+52)?;let mut mesh=cached_model_mesh(bytes,header,tags,model_id)?;
     mesh.change_colors=object_colors(&r,region,at)?;
+    mesh.stationary_function_values=Some(stationary_object_functions(&r,region,at,object.class=="vehi").unwrap_or([None;4]));
     // Optional illumination metadata cannot invalidate otherwise sound geometry.
     let radius=f32::from_bits(r.u32(at+4)?);let offset=[f32::from_bits(r.u32(at+8)?),f32::from_bits(r.u32(at+12)?),f32::from_bits(r.u32(at+16)?)];
     if radius.is_finite()&&(0.0..=1000.0).contains(&radius)&&offset.iter().all(|v|v.is_finite()&&v.abs()<=1000.0){
         mesh.object_lighting=Some(crate::maps::ObjectLighting{tag_class:object.class.clone(),offset,radius,brighten:r.u16(at+2)?&4!=0,casts_shadow:Some(r.u16(at+2)?&1==0)});
     }
     Ok((model_id,mesh))
+}
+/// Conservative static preview, not a game simulator. Evaluate only constant,
+/// non-accumulating native functions with known stationary speed inputs. Time,
+/// random, light state, animation/physics state and forward dependencies stay unknown.
+fn stationary_object_functions(r:&Reader,region:Region,at:usize,vehicle:bool)->Result<[Option<f32>;4]>{
+    if at<region.begin||at.checked_add(if vehicle{804}else{380}).is_none_or(|end|end>region.end){return Ok([None;4]);}
+    let mut incoming=[None;4];
+    if vehicle {
+        let forward=r.f32(at+760)?.abs();let reverse=r.f32(at+764)?.abs();let maximum=forward.max(reverse);
+        for (i,input) in incoming.iter_mut().enumerate(){
+            let mode=r.u16(at+796+i*2)?;
+            // Speed blend (35) combines velocity and forward speed. Both are
+            // zero in this explicit stationary preview regardless of airborne blend.
+            if (mode==1||mode==35&&forward.is_finite()&&forward>0.)&&forward.is_finite()&&reverse.is_finite()&&maximum>0. {*input=Some(0.);}
+        }
+    }
+    let(table,count)=region.block(r,at+344,360,4)?;let mut outputs=[None;4];
+    for i in 0..count{let p=table+i*360;
+        let flags=r.u32(p)?;let wave=r.u16(p+10)?;
+        if flags&!5!=0||wave>1||r.f32(p+20)?!=0.||r.f32(p+24)?!=0.||r.u16(p+28)?>1||r.u16(p+30)?!=0||r.u16(p+32)?!=0||r.u16(p+34)?!=0||r.u16(p+36)?!=0{continue;}
+        let mut value=if wave==0{1.}else{0.};
+        let selected=r.u16(p+12)?;
+        if selected!=0{let input=if selected<=4{incoming[(selected-1)as usize]}else if selected<=8{outputs[(selected-5)as usize]}else{None};let Some(input)=input else{continue;};value*=input;}
+        if flags&1!=0{value=1.-value;}
+        let scale=r.f32(p+56)?;let lo=r.f32(p+40)?;let hi=r.f32(p+44)?;let mode=r.u16(p+38)?;
+        if !scale.is_finite()||!lo.is_finite()||!hi.is_finite()||lo>hi||mode>2{continue;}
+        if scale>0.{value*=scale;}
+        value=if mode==2{lo+value*(hi-lo)}else{let clipped=value.clamp(lo,hi);if mode==1{if hi<=lo{continue;} (clipped-lo)/(hi-lo)}else{clipped}};
+        if value.is_finite()&&(0.0..=1.0).contains(&value){outputs[i]=Some(value);}
+    }Ok(outputs)
 }
 fn object_colors(r:&Reader,region:Region,at:usize)->Result<Option<Vec<[f32;3]>>>{
     if at.checked_add(380).is_none_or(|end|end>region.end){return Ok(None);}
@@ -571,7 +602,7 @@ pub fn preview_owned_object_variant(path:&std::path::Path,expected:&str,inspecti
     let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Character variation source changed");}
     let (id,original)=object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)?;
-    let mut mesh=cached_model_variant_mesh(&bytes,&header,&inspection.tags,id,Some(variant))?;mesh.change_colors=original.change_colors;mesh.object_lighting=original.object_lighting;Ok((id,mesh))
+    let mut mesh=cached_model_variant_mesh(&bytes,&header,&inspection.tags,id,Some(variant))?;mesh.change_colors=original.change_colors;mesh.object_lighting=original.object_lighting;mesh.stationary_function_values=original.stationary_function_values;Ok((id,mesh))
 }
 pub fn owned_model_variants(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<Vec<String>>{
     let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
@@ -672,6 +703,20 @@ mod geometry_tests {
     fn put32(b:&mut [u8],at:usize,v:u32){b[at..at+4].copy_from_slice(&v.to_le_bytes());}
     fn put16(b:&mut [u8],at:usize,v:u16){b[at..at+2].copy_from_slice(&v.to_le_bytes());}
     fn putf(b:&mut [u8],at:usize,v:f32){b[at..at+4].copy_from_slice(&v.to_le_bytes());}
+    #[test]
+    fn stationary_functions_preserve_unknowns_and_only_resolve_source_provable_values(){
+        let mut b=vec![0u8;2600];let base=0x4044_0000;let region=Region{begin:0,end:b.len(),address:base};
+        put32(&mut b,344,4);put32(&mut b,348,base+900);putf(&mut b,760,0.255);putf(&mut b,764,0.1);put16(&mut b,800,35);
+        for i in 0..4{let p=900+i*360;put16(&mut b,p+12,(i+1)as u16);putf(&mut b,p+44,1.);}
+        let original=b.clone();let values=stationary_object_functions(&Reader(&b),region,0,true).unwrap();assert_eq!(values,[None,None,Some(0.),None]);assert_eq!(b,original);
+        assert_eq!(stationary_object_functions(&Reader(&b),region,0,false).unwrap(),[None;4]);
+        put16(&mut b,800,1);assert_eq!(stationary_object_functions(&Reader(&b),region,0,true).unwrap()[2],Some(0.));
+        put32(&mut b,900+720,1);assert_eq!(stationary_object_functions(&Reader(&b),region,0,true).unwrap()[2],Some(1.));
+        put32(&mut b,900+720,2);assert_eq!(stationary_object_functions(&Reader(&b),region,0,true).unwrap()[2],None);
+        put32(&mut b,900+720,0);put16(&mut b,900+720+12,8);assert_eq!(stationary_object_functions(&Reader(&b),region,0,true).unwrap()[2],None);
+        put32(&mut b,348,base+2500);assert!(stationary_object_functions(&Reader(&b),region,0,true).is_err());
+        put32(&mut b,344,5);assert!(stationary_object_functions(&Reader(&b),region,0,true).is_err());
+    }
     #[test]
     fn authored_change_colors_use_positive_permutations_and_reject_corrupt_source() {
         let mut b=vec![0u8;1024];let base=0x4044_0000;let region=Region{begin:0,end:b.len(),address:base};
