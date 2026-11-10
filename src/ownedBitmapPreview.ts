@@ -9,6 +9,9 @@ import { profileGauge } from './profiling.ts';
 export interface OwnedBitmapPreview {
   bitmapTagId: number;
   imageIndex: number;
+  /** Level in the original image, independent of its image-array index. */
+  mipLevel?: number;
+  mipLevels?: number;
   width: number;
   height: number;
   format: string;
@@ -25,6 +28,7 @@ export interface OwnedBitmapTarget {
   sourceSha256: string;
   /** Optional top-mip *image* index in a multi-page bitm (not a mip level). */
   imageIndex?: number;
+  mipLevel?: number;
   resourceSha256?: string | null;
 }
 const MAX_PREVIEW_BASE64 = 23 * 1024 * 1024; // 16 MiB top mip plus DDS header, base64 expansion
@@ -58,6 +62,12 @@ export function decodeOwnedBitmapPreview(
   )
     throw Error('Invalid reflection face cache identity');
   const imageIndex = target.imageIndex ?? 0;
+  const mipLevel = target.mipLevel ?? 0;
+  const mipLevels = preview.mipLevels ?? 1;
+  if (!Number.isInteger(mipLevel)||mipLevel<0||mipLevel>16||
+      (preview.mipLevel??0)!==mipLevel||!Number.isInteger(mipLevels)||
+      mipLevels<1||mipLevels>17||mipLevel>=mipLevels)
+    throw Error('Bitmap response refers to a different or invalid authored mip level');
   if (
     !Number.isSafeInteger(target.bitmapTagId) ||
     target.bitmapTagId < 0 ||
@@ -129,6 +139,8 @@ export function decodeOwnedBitmapPreview(
     target.sourceSha256,
     target.bitmapTagId,
     imageIndex,
+    mipLevel,
+    mipLevels,
     preview.sourceKind ?? 'internal-cache',
     preview.resourceSha256 ?? null,
     preview.imageCount ?? null,

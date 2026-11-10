@@ -8,10 +8,12 @@ test.beforeEach(async({page})=>{
       if(!['preview_owned_cache_bitmap','preview_owned_reflection_cube'].includes(command))throw Error('Unexpected command '+command);
       if(args.bitmapTagId===11)await new Promise(resolve=>{w.releaseImage=resolve;});
       if(w.holdFrame&&args.imageIndex===1)await new Promise(resolve=>{w.releaseFrame=resolve;});
-      const kind=args.bitmapTagId===8?'1555':'4444',buffer=new ArrayBuffer(130),v=new DataView(buffer);
+      if(w.holdMip&&args.mipLevel===1)await new Promise(resolve=>{w.releaseMip=resolve;});
+      const mip=args.mipLevel??0,edge=args.bitmapTagId===8?4>>mip:1;
+      const kind=args.bitmapTagId===8?'1555':'4444',buffer=new ArrayBuffer(128+edge*edge*2),v=new DataView(buffer);
       new Uint8Array(buffer).set([68,68,83,32]);
-      for(const [at,value]of [[4,124],[12,1],[16,1],[20,2],[76,32],[80,0x41],[88,16],[92,kind==='1555'?0x7c00:0x0f00],[96,kind==='1555'?0x03e0:0x00f0],[100,kind==='1555'?0x001f:0x000f],[104,kind==='1555'?0x8000:0xf000]])v.setUint32(at,value,true);
-      v.setUint16(128,kind==='1555'?(args.imageIndex?0x83e0:0xfc00):(args.imageIndex?0x8123:0xf123),true);
+      for(const [at,value]of [[4,124],[12,edge],[16,edge],[20,edge*2],[76,32],[80,0x41],[88,16],[92,kind==='1555'?0x7c00:0x0f00],[96,kind==='1555'?0x03e0:0x00f0],[100,kind==='1555'?0x001f:0x000f],[104,kind==='1555'?0x8000:0xf000]])v.setUint32(at,value,true);
+      for(let pixel=0;pixel<edge*edge;pixel++)v.setUint16(128+pixel*2,kind==='1555'?(mip?0x801f:args.imageIndex?0x83e0:0xfc00):(args.imageIndex?0x8123:0xf123),true);
       if(command==='preview_owned_reflection_cube'){
         w.cubeReads=(w.cubeReads??0)+1;
         return {sourceSha256:(args.projectId==='map-a'?'a':'c').repeat(64),resourceSha256:'b'.repeat(64),bitmapTagId:args.bitmapTagId,faces:Array.from({length:6},(_,face)=>{
@@ -19,7 +21,7 @@ test.beforeEach(async({page})=>{
           return {bitmapTagId:args.bitmapTagId,imageIndex:0,imageCount:1,width:1,height:1,format:'A4R4G4B4',sourceSha256:(args.projectId==='map-a'?'a':'c').repeat(64),sourceKind:'verified-resource',resourceSha256:'b'.repeat(64),ddsBase64:btoa(String.fromCharCode(...bytes))};
         })};
       }
-      return {bitmapTagId:args.bitmapTagId,imageIndex:args.imageIndex,imageCount:2,width:1,height:1,
+      return {bitmapTagId:args.bitmapTagId,imageIndex:args.imageIndex,mipLevel:mip,mipLevels:args.bitmapTagId===8?3:1,imageCount:2,width:edge,height:edge,
         format:kind==='1555'?'A1R5G5B5':'A4R4G4B4',sourceSha256:(args.projectId==='map-a'?'a':'c').repeat(64),sourceKind:'verified-resource',resourceSha256:(args.bitmapTagId===10?'d':'b').repeat(64),sharedNativeBitmapPath:args.bitmapTagId===8?'test/original':undefined,
         ddsBase64:btoa(String.fromCharCode(...new Uint8Array(buffer)))};
     }};
@@ -86,4 +88,20 @@ test('reflection inspection shares the validated six-face cache and retains its 
   await page.getByRole('button',{name:'1555 bitmap',exact:true}).click();await page.getByRole('button',{name:'Reflection cube',exact:true}).click();
   await expect(canvas).toHaveAttribute('data-cube-face','5');expect(await page.evaluate(()=>(window as any).cubeReads)).toBe(1);
   await expect(canvas).toHaveAttribute('data-source-sha256','a'.repeat(64));
+});
+
+test('original detail selection retains its image and clears stale pixels during a native request',async({page})=>{
+  const detail=page.getByRole('combobox',{name:'Original texture detail',exact:true}),canvas=page.getByLabel('Verified original bitmap pixels');
+  await expect(detail.locator('option')).toHaveCount(3);await expect(canvas).toHaveAttribute('width','4');
+  await page.evaluate(()=>{(window as any).holdMip=true;});await detail.selectOption('1');
+  await expect.poll(()=>page.evaluate(()=>typeof (window as any).releaseMip)).toBe('function');
+  await expect(canvas).toHaveCount(0);await expect(detail).toBeDisabled();
+  await page.evaluate(()=>{(window as any).holdMip=false;(window as any).releaseMip();});
+  await expect(canvas).toHaveAttribute('data-mip-level','1');await expect(canvas).toHaveAttribute('width','2');
+  expect(await canvas.evaluate((e:HTMLCanvasElement)=>[...e.getContext('2d')!.getImageData(0,0,1,1).data])).toEqual([0,0,255,255]);
+  await page.getByRole('button',{name:'4444 bitmap',exact:true}).click();await expect(detail).toHaveCount(0);
+  await page.getByRole('button',{name:'1555 bitmap',exact:true}).click();await expect(detail).toHaveValue('1');
+  await page.getByRole('button',{name:'Next bitmap image'}).click();await expect(canvas).toHaveAttribute('data-image-index','1');await expect(detail).toHaveValue('0');
+  await page.getByRole('button',{name:'Previous bitmap image'}).click();await expect(detail).toHaveValue('1');
+  await page.reload();await expect(detail).toHaveValue('1');await expect(canvas).toHaveAttribute('data-mip-level','1');
 });

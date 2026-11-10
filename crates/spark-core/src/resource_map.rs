@@ -277,10 +277,20 @@ pub(crate) fn read_external_top_mip_from_verified(
     generation: u32,
     image_index: usize,
 ) -> Result<Vec<u8>> {
-    prove_external_image_range(index, tag_path, raw_offset, declared_size, top_mip_size, generation, image_index)?;
-    let mut bytes = vec![0u8; top_mip_size];
-    read_exact_at(file, raw_offset, &mut bytes)?;
-    Ok(bytes)
+    read_external_mip_from_verified(file,index,tag_path,raw_offset,declared_size,top_mip_size,0,top_mip_size,generation,image_index)
+}
+/// Interior mip access never replaces the original image's exact provenance proof.
+pub(crate) fn read_external_mip_from_verified(
+    file:&mut File,index:&ResourceIndex,tag_path:&str,raw_offset:u64,declared_size:u64,
+    top_mip_size:usize,mip_offset:usize,mip_size:usize,generation:u32,image_index:usize,
+)->Result<Vec<u8>>{
+    prove_external_image_range(index,tag_path,raw_offset,declared_size,top_mip_size,generation,image_index)?;
+    if mip_size==0||mip_size>16*1024*1024||
+        mip_offset.checked_add(mip_size).is_none_or(|end|end as u64>declared_size){
+        return invalid("Selected mip escapes the exact bitmap resource image span");
+    }
+    let at=raw_offset.checked_add(mip_offset as u64).ok_or_else(||SparkError::Invalid("External mip offset overflow".into()))?;
+    let mut bytes=vec![0u8;mip_size];read_exact_at(file,at,&mut bytes)?;Ok(bytes)
 }
 
 pub(crate) fn prove_external_image_range(index: &ResourceIndex, tag_path: &str,

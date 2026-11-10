@@ -10,6 +10,9 @@ fn fixture() -> (
     tempfile::TempDir,
     std::collections::BTreeMap<String, String>,
 ) {
+    fixture_mips(1,8)
+}
+fn fixture_mips(mips:u32,pixel_size:u32)->(tempfile::TempDir,std::collections::BTreeMap<String,String>){
     let dir = tempfile::tempdir().unwrap();
     let mut logical = vec![0u8; 1100];
     put(&mut logical, 0, 1);
@@ -20,10 +23,10 @@ fn fixture() -> (
         (268, 4),
         (272, 4),
         (276, 1),
-        (280, 1),
+        (280, mips),
         (284, 1),
         (288, 70),
-        (308, 8),
+        (308, pixel_size),
         (312, 980),
     ] {
         put(&mut logical, at + off, n);
@@ -33,6 +36,7 @@ fn fixture() -> (
         put(&mut logical, 980 + off, n);
     }
     logical[1038..1046].copy_from_slice(&[0, 248, 0, 0, 0, 0, 0, 0]);
+    logical[1046..1054].fill(0x22);logical[1054..1062].fill(0x33);
     fs::write(dir.path().join("testmap.imeta"), &logical[..336]).unwrap();
     let chunks: Vec<_> = logical
         .chunks(512)
@@ -90,4 +94,15 @@ fn rejects_bad_chunk_offsets_before_decompressing_untrusted_data() {
         mcc_textures::bundle_id(&hashes).unwrap(),
     );
     assert!(TextureBundle::open(dir.path(), &hashes, "testmap").is_err());
+}
+
+#[test]
+fn original_mcc_mips_count_base_and_preserve_exact_pack_ranges(){
+    let(dir,pins)=fixture_mips(3,24);let mut bundle=TextureBundle::open(dir.path(),&pins,"testmap").unwrap();
+    assert_eq!(bundle.top_mip("hce_ltb_ground_0").unwrap().mip_levels,3);
+    let mip=bundle.mip("hce_ltb_ground_0",1).unwrap();assert_eq!((mip.width,mip.height,mip.mip_levels),(2,2,3));assert_eq!(mip.pixels,[0x22;8]);
+    assert_eq!(bundle.mip("hce_ltb_ground_0",2).unwrap().pixels,[0x33;8]);
+    assert!(bundle.mip("hce_ltb_ground_0",3).is_err());
+    let(dir,pins)=fixture_mips(3,23);let mut bundle=TextureBundle::open(dir.path(),&pins,"testmap").unwrap();
+    assert!(bundle.mip("hce_ltb_ground_0",1).is_err());
 }

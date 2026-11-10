@@ -350,6 +350,7 @@ pub struct TextureBundle {
     pub sha256: String,
 }
 pub struct TopMip {
+    pub mip_levels: usize,
     pub width: u16,
     pub height: u16,
     pub format: &'static str,
@@ -396,7 +397,8 @@ impl TextureBundle {
             sha256: sha,
         })
     }
-    pub fn top_mip(&mut self, key: &str) -> Result<TopMip> {
+    pub fn top_mip(&mut self, key: &str) -> Result<TopMip> {self.mip(key,0)}
+    pub fn mip(&mut self, key: &str, level:usize) -> Result<TopMip> {
         let mut found = self.entries.iter().filter(|e| e.name == key);
         let entry = found
             .next()
@@ -426,14 +428,9 @@ impl TextureBundle {
             22 => ("BGRX8", false, 4),
             _ => return invalid("MCC texture pixel format is not supported"),
         };
-        let size = if block {
-            entry.width.div_ceil(4) as usize * entry.height.div_ceil(4) as usize * stride
-        } else {
-            entry.width as usize * entry.height as usize * stride
-        };
-        if size > MAX_TOP || size > entry.size as usize {
-            return invalid("MCC texture top mip exceeds its bounded record");
-        }
+        // imeta counts include the base image; legacy zero-count records expose only base.
+        let span=crate::bitmap_preview::flat_mip_span(entry.width as u16,entry.height as u16,
+            block,stride,(entry.mips as usize).max(1),level,entry.size as usize,false)?;
         let mut matches = vec![];
         for p in &self.paks {
             let p = p
@@ -465,10 +462,11 @@ impl TextureBundle {
             {
                 return invalid("MCC texture chunk header differs from exact index metadata");
             }
-            let pixels = p.range(entry.address as u64 + 58, size)?;
+            let pixels = p.range(entry.address as u64 + 58 + span.offset as u64, span.size)?;
             return Ok(TopMip {
-                width: entry.width as u16,
-                height: entry.height as u16,
+                mip_levels:span.levels,
+                width:span.width,
+                height:span.height,
                 format,
                 pixels,
             });

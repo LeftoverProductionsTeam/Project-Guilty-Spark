@@ -11,7 +11,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
  let mut ordered:Vec<_>=inspection.tags.iter().filter(|tag|tag.primary_bitmap_status.is_some()).collect();ordered.sort_by_key(|tag|!bsp_ids.contains(&tag.id));
  for tag in ordered{
   shaders.push(serde_json::json!({"class":tag.class,"path":tag.path,"primary":tag.primary_bitmap_status,"references":tag.references}));
-  for reference in &tag.references{if reference.class=="bitm"&&!requests.iter().any(|r:&bitmap::OwnedBitmapRequest|r.bitmap_tag_id==reference.target_id)&&requests.len()<24{requests.push(bitmap::OwnedBitmapRequest{bitmap_tag_id:reference.target_id,image_index:0});}}
+  for reference in &tag.references{if reference.class=="bitm"&&!requests.iter().any(|r:&bitmap::OwnedBitmapRequest|r.bitmap_tag_id==reference.target_id)&&requests.len()<24{requests.push(bitmap::OwnedBitmapRequest {bitmap_tag_id:reference.target_id,image_index:0, mip_level:0});}}
  }
  let batch=bitmap::preview_owned_bitmap_batch_with_resources(&path,&original,&inspection,&requests,Some((&resource,&resource_hash)))?;
  let items:Vec<_>=batch.items.into_iter().map(|item|serde_json::json!({"id":item.bitmap_tag_id,"path":inspection.tags.iter().find(|tag|tag.id==item.bitmap_tag_id).map(|tag|&tag.path),"error":item.error,"code":item.error_code,"preview":item.preview.map(|p|serde_json::json!({"width":p.width,"height":p.height,"format":p.format,"source":p.source_kind}))})).collect();

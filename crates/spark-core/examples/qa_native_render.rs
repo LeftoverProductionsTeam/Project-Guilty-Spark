@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if range.has_lightmap_uvs&&range.lightmap_page>=0 {if let Some(id)=range.lightmap_bitmap_tag_id{wanted.insert((id,range.lightmap_page as usize));}}
         }
     }
-    let requests:Vec<_>=wanted.iter().map(|&(bitmap_tag_id,image_index)|bitmap::OwnedBitmapRequest{bitmap_tag_id,image_index}).collect();
+    let requests:Vec<_>=wanted.iter().map(|&(bitmap_tag_id,image_index)|bitmap::OwnedBitmapRequest {bitmap_tag_id,image_index, mip_level:0}).collect();
     let mut images=vec![];
     let decoded=Instant::now();
     // Match the application's bounded batched transport instead of hashing a

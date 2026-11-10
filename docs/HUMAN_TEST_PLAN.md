@@ -156,7 +156,7 @@ R398 current-source follow-through (10 November): the explicit server-crash/full
 
 ## H29 — Vehicle appearance against the same native game source
 
-R445–R449 additionally verify original BSP incident-radiosity coordinates in the actual Windows app and a bounded CPU source-floor probe. They do not yet apply local radiosity to rendered vehicles; original texture mip selection, local lighting/shadows and full visual acceptance remain unfinished. Do not substitute these data checks for the steps below.
+R445–R449 additionally verify original BSP incident-radiosity coordinates in the actual Windows app and a bounded CPU source-floor probe. They do not yet apply local radiosity to rendered vehicles; R454–R458 now verify original texture-level reading/selection in the bitmap inspector. Applying authored levels/local lighting to vehicle materials, shadows and full visual acceptance remain unfinished. Do not substitute these data checks for the steps below.
 
 R425/R427–R430 pass native Windows vehicle/source checks after the native glass angular/gloss repair. R432/R434/R436–R439 additionally pass placed-object source lighting and real UI framing across Chupathingy, MCC, CE, OpenCE and Demo source fixtures; original hashes remain unchanged. Source reflection endpoints and camera identity are independently checked. R433 passes the current480frontend/274browser suite, TypeScript, source contracts, offline and storage checks. R434 verifies the actual placed-Warthog selection/F-framing and full drawing buffer; R435 provides the matching native-camera observation. These are not new game-renderer parity or human acceptance. Four dashboard smet triangles remain unsupported; compare against a stable native game view rather than marking all materials complete.
 

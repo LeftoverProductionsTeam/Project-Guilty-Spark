@@ -276,6 +276,85 @@ async function nativeVehiclePreview(opened,originalHash){
   let incidentMismatches=0,nonzeroIncident=0;for(let k=0;k<expectedIncident.length;k++){if(Math.abs(actualIncident[k]-expectedIncident[k])>0.000001)incidentMismatches++;if(actualIncident[k]!==0)nonzeroIncident++;}
   expect(incidentMismatches).toBe(0);expect(nonzeroIncident).toBeGreaterThan(0);expect(sourceMesh.materialRanges.map(range=>!!range.hasIncidentRadiosity)).toEqual(expectedIncidentRanges);
   const incidentReadback={coordinates:expectedIncident.length,validatedRanges:expectedIncidentRanges.filter(Boolean).length,nonzeroCoordinates:nonzeroIncident,mismatches:incidentMismatches,originalMagnitudeRetained:true,lightingParityAccepted:false};
+  // Verify real authored levels from the original bytes, independently of the
+  // Rust span calculation. One vehicle bitmap keeps the transaction bounded.
+  const mipSource=(await invoke(main,'open_project',{id:opened.project.id})).project.source;
+  const bitmap=opened.inspection.tags.find(tag=>tag.class==='bitm'&&/^vehicles[\\/]warthog[\\/]bitmaps[\\/]warthog$/i.test(tag.path));
+  expect(bitmap,'Original Warthog diffuse bitmap').toBeTruthy();
+  const pinnedInputs=[],handles=[];
+  const sha=buffer=>crypto.createHash('sha256').update(buffer).digest('hex');
+  async function openPinned(file,pin){
+    const handle=await fs.open(file,'r');handles.push(handle);const size=(await handle.stat()).size;
+    const hash=async()=>{const digest=crypto.createHash('sha256');for await(const part of handle.createReadStream({start:0,autoClose:false}))digest.update(part);return digest.digest('hex');};
+    expect(await hash(),'Original resource pin').toBe(pin);pinnedInputs.push({hash,pin});
+    const range=async(at,length)=>{if(!Number.isSafeInteger(at)||!Number.isSafeInteger(length)||at<0||length<0||length>16*1024**2||at+length>size)throw Error('Independent texture read exceeds original span');const out=Buffer.alloc(length);let n=0;while(n<length){const read=await handle.read(out,n,length-n,at+n);if(!read.bytesRead)throw Error('Truncated original resource');n+=read.bytesRead;}return out;};
+    return{range,size};
+  }
+  let mipReadback;
+  try{
+    let width,height,format,levels,payload;
+    if(expectedCacheVersion===13){
+      const folder=mipSource.resourceDirectory,filename=opened.inspection.header.name+'.imeta';
+      const imetaFile=await openPinned(path.join(folder,filename),mipSource.resourceSha256[filename]);
+      if(imetaFile.size>8+8192*328)throw Error('Independent imeta exceeds bound');const imeta=await imetaFile.range(0,imetaFile.size);
+      const parts=bitmap.path.replaceAll('\\','/').toLowerCase().split('/'),key='hce_'+parts.slice(0,-1).map(p=>p[0]).join('')+'_'+parts.at(-1).replaceAll(' ','_')+'_0';
+      const entries=(data)=>{const n=data.readUInt32LE(0);if(n>8192||8+n*328>data.length)throw Error('Independent MCC index exceeds bound');return Array.from({length:n},(_,i)=>data.subarray(8+i*328,8+(i+1)*328));};
+      const rows=entries(imeta).filter(row=>row.toString('ascii',0,row.indexOf(0))===key);expect(rows).toHaveLength(1);const row=rows[0];
+      width=row.readUInt32LE(268);height=row.readUInt32LE(272);levels=row.readUInt32LE(280);const encoding=row.readUInt32LE(288),size=row.readUInt32LE(308),address=row.readUInt32LE(312);
+      expect(row.readUInt32LE(276)).toBe(1);expect(row.readUInt32LE(284)).toBe(1);expect([70,12,13]).toContain(encoding);format='DXT1';
+      let matches=0;
+      for(const file of ['common.ipak','inplace1.ipak','inplace2.ipak'].filter(file=>mipSource.resourceSha256[file])){
+        const pack=await openPinned(path.join(folder,file),mipSource.resourceSha256[file]),n=(await pack.range(0,4)).readUInt32LE(0);if(!n||n>65536)throw Error('Independent MCC chunk count exceeds bound');
+        const offsets=await pack.range(4,n*4),chunks=[];let logical=0;
+        for(let i=0;i<n;i++){const begin=offsets.readUInt32LE(i*4),end=i+1<n?offsets.readUInt32LE((i+1)*4):pack.size,length=(await pack.range(begin,4)).readUInt32LE(0);if(!length||length>8*1024**2||end<=begin+4||end-begin>8*1024**2)throw Error('Independent MCC chunk span invalid');chunks.push({begin:begin+4,packed:end-begin-4,length,logical});logical+=length;}
+        const read=async(at,length)=>{if(length>16*1024**2||at<0||at+length>logical)throw Error('Independent MCC logical span invalid');const out=Buffer.alloc(length);let copied=0;for(const chunk of chunks){const begin=Math.max(at,chunk.logical),end=Math.min(at+length,chunk.logical+chunk.length);if(end<=begin)continue;const raw=inflateSync(await pack.range(chunk.begin,chunk.packed),{maxOutputLength:chunk.length});expect(raw.length).toBe(chunk.length);raw.copy(out,begin-at,begin-chunk.logical,end-chunk.logical);copied+=end-begin;}expect(copied).toBe(length);return out;};
+        const count=(await read(0,8)).readUInt32LE(0);if(count>8192)throw Error('Independent pack index exceeds bound');const index=await read(0,8+count*328);
+        for(const candidate of entries(index).filter(candidate=>candidate.subarray(0,256).equals(row.subarray(0,256))&&[268,272,276,280,284,288,308,312].every(offset=>candidate.readUInt32LE(offset)===row.readUInt32LE(offset)))){matches++;const pict=await read(address,58);expect(pict.toString('ascii',6,10)).toBe('TCIP');expect(pict.readUInt32LE(16)).toBe(width);expect(pict.readUInt32LE(20)).toBe(height);payload=await read(address+58,size);}
+      }
+      expect(matches).toBe(1);
+    }else{
+      let record,bank,pixelsEntry;
+      if(bitmap.external||bytes.readUInt16LE(pointer(u32(bitmap.dataOffset+100),48)+14)&0x100){
+        bank=await openPinned(path.join(mipSource.resourceDirectory,'bitmaps.map'),mipSource.resourceSha256['bitmaps.map']);
+        const head=await bank.range(0,16),count=head.readUInt32LE(12),tableAt=head.readUInt32LE(8),paths=head.readUInt32LE(4);if(count>65536)throw Error('Independent resource index exceeds bound');
+        const table=await bank.range(tableAt,count*12),entries=[];
+        for(let i=0;i<count;i++){const row=i*12,name=await bank.range(paths+table.readUInt32LE(row),Math.min(1025,bank.size-paths-table.readUInt32LE(row))),nul=name.indexOf(0);if(nul<0)throw Error('Unterminated independent resource path');entries.push({name:name.toString('utf8',0,nul).replaceAll('\\','/').toLowerCase(),size:table.readUInt32LE(row+4),at:table.readUInt32LE(row+8)});}
+        const sourcePath=bitmap.path.replaceAll('\\','/').toLowerCase(),key=expectedCacheVersion===609?sourcePath+'__pixels':sourcePath+'_0';const found=entries.filter(entry=>entry.name===key);expect(found).toHaveLength(1);pixelsEntry=found[0];
+        if(bitmap.external){
+          const table=pointer(u32(tagStart),u32(tagStart+12)*32),index=u32(table+bitmap.index*32+20),entry=entries[index];expect(entry.name).toBe(sourcePath);
+          const body=await bank.range(entry.at,entry.size),images=body.readUInt32LE(100);expect(body.readUInt32LE(96)).toBeGreaterThan(0);if(images<108||images+48>body.length)throw Error('Indexed bitmap body invalid');record=body.subarray(images,images+48);
+        }
+      }
+      if(!record){const body=bitmap.dataOffset;record=bytes.subarray(pointer(u32(body+100),48),pointer(u32(body+100),48)+48);}
+      width=record.readUInt16LE(4);height=record.readUInt16LE(6);levels=record.readUInt16LE(20)+1;expect(record.readUInt16LE(10)).toBe(0);expect(record.readUInt16LE(12)).toBe(14);format='DXT1';
+      const at=record.readUInt32LE(24),size=record.readUInt32LE(28);if(size>16*1024**2)throw Error('Independent bitmap image exceeds bound');
+      if(bank){if(at<pixelsEntry.at||at+size>pixelsEntry.at+pixelsEntry.size)throw Error('Independent bitmap image escapes exact resource entry');payload=await bank.range(at,size);}
+      else{if(at<2048||at+size>bytes.length)throw Error('Independent internal image escapes original cache');payload=bytes.subarray(at,at+size);}
+    }
+    const expected=[];let offset=0,w=width,h=height;
+    if(width>4096||height>4096||levels<2||levels>17)throw Error('Original vehicle mip chain exceeds bounds');
+    for(let level=0;level<levels;level++){
+      if(xbox&&(w<4||h<4))break;const size=Math.ceil(w/4)*Math.ceil(h/4)*8;if(offset+size>payload.length)throw Error('Original vehicle mip bytes are truncated');
+      expected.push({level,width:w,height:h,pixels:payload.subarray(offset,offset+size)});offset+=size;w=Math.max(1,w>>1);h=Math.max(1,h>>1);
+    }
+    expect(expected.length).toBeGreaterThan(1);
+    const requests=expected.map(row=>({bitmapTagId:bitmap.id,imageIndex:0,mipLevel:row.level}));
+    const response=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests});expect(response.sourceSha256).toBe(originalHash);expect(response.items).toHaveLength(expected.length);
+    for(let k=0;k<expected.length;k++){const wanted=expected[k],item=response.items[k],preview=item.preview;expect(item.error).toBeNull();expect(item.mipLevel).toBe(k);expect(preview).toBeTruthy();expect(preview.mipLevel).toBe(k);expect(preview.mipLevels).toBe(expected.length);expect(preview.width).toBe(wanted.width);expect(preview.height).toBe(wanted.height);expect(preview.format).toBe(format);expect(preview.sourceSha256).toBe(originalHash);expect(Buffer.from(preview.ddsBase64,'base64').subarray(128).equals(wanted.pixels),'Original authored mip bytes '+k).toBe(true);}
+    const invalid=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[{bitmapTagId:bitmap.id,imageIndex:0,mipLevel:16}]});expect(invalid.items[0].preview).toBeNull();expect(invalid.items[0].error).toBeTruthy();
+    const badDuplicate=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[requests[0],requests[0]]}).then(()=>'',String);expect(badDuplicate).toContain('unique');
+    await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(bitmap.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bitm');await main.locator('.tag-row').filter({has:main.locator('strong').filter({hasText:/^warthog$/i})}).click();
+    const contexts=main.getByRole('tablist',{name:'Asset contexts',exact:true});await contexts.getByRole('tab',{name:'Materials',exact:true}).click();
+    const detail=main.getByRole('combobox',{name:'Original texture detail',exact:true}),pixels=main.getByLabel('Verified original bitmap pixels',{exact:true});await expect(detail.locator('option')).toHaveCount(expected.length);
+    const level=expected.length-2;await detail.selectOption(String(level));await expect(pixels).toHaveAttribute('data-mip-level',String(level));await expect(pixels).toHaveAttribute('data-source-sha256',originalHash);await expect(pixels).toHaveAttribute('width',String(expected[level].width));
+    const {decodeHaloDds}=await import('../src/haloDds.ts'),dds=Buffer.from(response.items[level].preview.ddsBase64,'base64'),rgba=decodeHaloDds(dds.buffer.slice(dds.byteOffset,dds.byteOffset+dds.byteLength));
+    const canvasHash=await pixels.evaluate(async canvas=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data)),v=>v.toString(16).padStart(2,'0')).join(''));expect(canvasHash).toBe(sha(rgba.pixels));
+    await main.screenshot({path:path.join(root,'native-vehicle-original-mip.png')});
+    await contexts.getByRole('tab',{name:'Properties',exact:true}).click();await contexts.getByRole('tab',{name:'Materials',exact:true}).click();await expect(detail).toHaveValue(String(level));
+    await detail.selectOption('0');await expect(pixels).toHaveAttribute('data-mip-level','0');
+    mipReadback={bitmapPath:bitmap.path,bitmapTagId:bitmap.id,format,sourceDeclaredLevels:levels,levels:expected.map(row=>({level:row.level,width:row.width,height:row.height,bytes:row.pixels.length,sha256:sha(row.pixels)})),originalMipBytesMatched:true,nativeControlSelection:level,canvasRgbaSha256:canvasHash,retainedAfterContextSwitch:true,generatedMipmapsUsed:false,gameParityAccepted:false};
+    for(const input of pinnedInputs)expect(await input.hash(),'Original resource unchanged after mip requests').toBe(input.pin);
+  }finally{for(const handle of handles)await handle.close();}
   const seen=new Set(),results=[];
   for(const vehicle of opened.inspection.tags.filter(tag=>tag.class==='vehi')){
     const reference=vehicle.references.find(ref=>ref.label==='Model'&&ref.class===(xbox?'mode':'mod2'));
@@ -380,7 +459,7 @@ async function nativeVehiclePreview(opened,originalHash){
   }
   expect(results.some(row=>/vehicles[\\/]warthog[\\/]warthog$/i.test(row.modelPath))).toBe(true);
   expect(results.filter(row=>row.baseMapUvScale.some(value=>Math.abs(value-1)>.001)).length).toBeGreaterThanOrEqual(2);
-  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,incidentReadback,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
+  report.vehiclePreview={sourceSha256:originalHash,cacheVersion:expectedCacheVersion,incidentReadback,mipReadback,models:results,independentCacheByteReadback:true,gameParityAccepted:false};
   await chooseTool(main,'Tag editor');
   // The recovered Demo mod retains two Warthog-derived carrier objects,
   // rather than a stock Scorpion. Inspect those exact original objects.

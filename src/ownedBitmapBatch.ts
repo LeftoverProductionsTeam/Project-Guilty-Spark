@@ -15,6 +15,7 @@ export const MAX_NATIVE_BATCH_RGBA_BYTES = 64 * 1024 * 1024;
 export interface OwnedBitmapBatchItem {
   bitmapTagId: number;
   imageIndex: number;
+  mipLevel?: number;
   preview?: OwnedBitmapPreview | null;
   error?: string | null;
   errorCode?: string | null;
@@ -31,29 +32,31 @@ export interface VerifiedBatchImage {
   compatibleBitmapTagId?: number;
   bitmapTagId: number;
   imageIndex: number;
+  mipLevel?: number;
   image: DdsImage | null;
   sourceKind: 'internal-cache' | 'verified-resource' | null;
   error: string | null;
   errorCode?: string | null;
 }
-export function bitmapImageKey(bitmapTagId: number, imageIndex: number) {
+export function bitmapImageKey(bitmapTagId: number, imageIndex: number, mipLevel=0) {
   if (
     !Number.isSafeInteger(bitmapTagId) ||
     bitmapTagId < 0 ||
     bitmapTagId > 0xffffffff ||
     !Number.isSafeInteger(imageIndex) ||
     imageIndex < 0 ||
-    imageIndex > 2047
+    imageIndex > 2047 ||
+    !Number.isInteger(mipLevel)||mipLevel<0||mipLevel>16
   )
     throw new Error('Invalid exact bitmap image key');
-  return `${bitmapTagId}:${imageIndex}`;
+  return `${bitmapTagId}:${imageIndex}${mipLevel===0?'':`:mip${mipLevel}`}`;
 }
 
 /** No path is involved. The client can request one native snapshot per click,
  * then associate its uniquely decoded image bytes with multiple shader slots.
  */
 export function uniqueBitmapTargets(
-  tasks: readonly { bitmapTagId: number; imageIndex: number }[],
+  tasks: readonly { bitmapTagId: number; imageIndex: number; mipLevel?: number }[],
   sourceSha256: string,
   resourceSha256: string | null = null,
 ): OwnedBitmapTarget[] {
@@ -61,12 +64,13 @@ export function uniqueBitmapTargets(
   const seen = new Set<string>();
   const requests: OwnedBitmapTarget[] = [];
   for (const task of tasks) {
-    const key = bitmapImageKey(task.bitmapTagId, task.imageIndex);
+    const key = bitmapImageKey(task.bitmapTagId, task.imageIndex,task.mipLevel);
     if (seen.has(key)) continue;
     seen.add(key);
     requests.push({
       bitmapTagId: task.bitmapTagId,
       imageIndex: task.imageIndex,
+      ...(task.mipLevel===undefined?{}:{mipLevel:task.mipLevel}),
       sourceSha256,
       resourceSha256,
     });
@@ -115,12 +119,12 @@ function decodeBatch(
   for (let i = 0; i < requests.length; i++) {
     const wanted = requests[i],
       actual = response.items[i];
-    const key = bitmapImageKey(wanted.bitmapTagId, wanted.imageIndex ?? 0);
+    const key = bitmapImageKey(wanted.bitmapTagId, wanted.imageIndex ?? 0,wanted.mipLevel);
     if (seen.has(key)) throw new Error('Duplicate requested bitmap image identity');
     seen.add(key);
     if (
       !actual ||
-      bitmapImageKey(actual.bitmapTagId, actual.imageIndex) !== key ||
+      bitmapImageKey(actual.bitmapTagId, actual.imageIndex,actual.mipLevel) !== key ||
       wanted.sourceSha256 !== expectedSource ||
       wanted.resourceSha256 !== requests[0].resourceSha256
     )
@@ -151,12 +155,13 @@ function decodeBatch(
   for (let i = 0; i < requests.length; i++) {
     const wanted = requests[i],
       actual = response.items[i];
-    const key = bitmapImageKey(wanted.bitmapTagId, wanted.imageIndex ?? 0);
+    const key = bitmapImageKey(wanted.bitmapTagId, wanted.imageIndex ?? 0,wanted.mipLevel);
     if (actual.preview) {
       const image = decodeOwnedBitmapPreview(actual.preview, wanted);
       result.set(key, {
         bitmapTagId: wanted.bitmapTagId,
         imageIndex: wanted.imageIndex ?? 0,
+        mipLevel:wanted.mipLevel??0,
         image,
         sourceKind: actual.preview.sourceKind ?? 'internal-cache',
         error: null,
@@ -165,6 +170,7 @@ function decodeBatch(
       result.set(key, {
         bitmapTagId: wanted.bitmapTagId,
         imageIndex: wanted.imageIndex ?? 0,
+        mipLevel:wanted.mipLevel??0,
         image: null,
         sourceKind: null,
         error: actual.error ?? 'Unsupported bitmap',

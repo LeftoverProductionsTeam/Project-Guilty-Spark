@@ -1,4 +1,4 @@
-//! Strictly read-only, bounded top-mip previews for native Halo bitmap
+//! Strictly read-only, bounded authored-mip previews for native Halo bitmap
 //! data. The source map is hashed as one immutable snapshot; no tag or pixel
 //! byte is ever modified. A narrowly verified bitmaps.map resource range can
 //! supply external raw pixels if its index proves exact provenance. Native CE
@@ -47,21 +47,21 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
     let mut shared:Option<(File,crate::resource_map::ResourceIndex,String)>=None;
     let r=Reader(&bytes);let start=header.tag_offset as usize;let end=start+header.tag_size as usize;let base=r.u32(start)?.checked_sub(40).ok_or_else(||SparkError::Invalid("Invalid MCC tag base".into()))?;
     let mut seen=HashSet::new();let mut spent=0;let mut items=vec![];
-    for request in requests{if request.image_index>=MAX_IMAGES_PER_TAG||!seen.insert((request.bitmap_tag_id,request.image_index)){return invalid("MCC bitmap requests must be unique and bounded");}
+    for request in requests{if request.image_index>=MAX_IMAGES_PER_TAG||request.mip_level>16||!seen.insert((request.bitmap_tag_id,request.image_index,request.mip_level)){return invalid("MCC bitmap requests must be unique and bounded");}
         let attempt=(||->Result<OwnedBitmapPreview>{let tag=inspection.tags.iter().find(|t|t.id==request.bitmap_tag_id&&t.class=="bitm"&&!t.external).ok_or_else(||SparkError::Invalid("MCC bitmap tag identity is unavailable".into()))?;
             let at=tag.data_offset.ok_or_else(||SparkError::Invalid("MCC bitmap body unavailable".into()))?;if at<start||at.checked_add(108).is_none_or(|e|e>end){return invalid("MCC bitmap body escapes source tag region");}let count=r.u32(at+96)? as usize;if count>MAX_IMAGES_PER_TAG||request.image_index>=count{return invalid("MCC bitmap image index exceeds source collection");}
             let pointer=r.u32(at+100)?.checked_sub(base).ok_or_else(||SparkError::Invalid("Invalid MCC bitmap collection pointer".into()))? as usize;let table=start+pointer;if table.checked_add(count*48).is_none_or(|e|e>end){return invalid("MCC bitmap collection escapes its source region");}
             if r.u16(table+request.image_index*48+14)?&0x100==0 {
-                let meta=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;if spent+meta.size>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}let(_,_,_,pixels)=checked_top_mip(&bytes,&header,at,request.image_index)?;spent+=meta.size;
-                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"internal-cache".into(),resource_sha256:None});
+                let original=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;let(meta,span)=select_mip(&original,request.mip_level)?;if spent+meta.size>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}if original.raw_offset<2048{return invalid("Bitmap offset overlaps the protected cache header");}Reader(&bytes).bytes(original.raw_offset,original.declared_size)?;let pixels=linear_top_mip(&meta,Reader(&bytes).bytes(meta.raw_offset,meta.size)?)?;spent+=meta.size;
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:span.levels,image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"internal-cache".into(),resource_sha256:None});
             }
             let key=crate::mcc_textures::texture_key(&tag.path,request.image_index)?;
             if inspection.tags.iter().filter(|t|t.class=="bitm"&&t.id!=tag.id).any(|t|crate::mcc_textures::texture_key(&t.path,request.image_index).ok().as_deref()==Some(&key)){return invalid("MCC canonical bitmap key has a source tag collision");}
             if bundle.is_none(){bundle=Some(crate::mcc_textures::TextureBundle::open(directory,hashes,&header.name)?);}
             let bundle=bundle.as_mut().ok_or_else(||SparkError::Invalid("MCC texture bundle unavailable".into()))?;
             if bundle.contains_key(&key)? {
-                let mip=bundle.top_mip(&key)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
-                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,image_count:count,shared_native_bitmap_path:None,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
+                let mip=bundle.mip(&key,request.mip_level)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:mip.mip_levels,image_count:count,shared_native_bitmap_path:None,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
             }
             let hash=hashes.get("mcc-shared-bitmaps.map").ok_or_else(||SparkError::Invalid("Exact MCC texture key is missing; reconnect Halo Textures to verify MCC's shared bitmaps.map".into()))?;
             if shared.is_none() {
@@ -69,13 +69,13 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
                 let (file,index)=crate::resource_map::open_verified(&path,hash)?;
                 shared=Some((file,index,hash.clone()));
             }
-            let meta=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;
+            let original=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;let(meta,span)=select_mip(&original,request.mip_level)?;
             if spent+meta.size>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}
             let (file,index,_)=shared.as_mut().ok_or_else(||SparkError::Invalid("MCC shared bitmaps unavailable".into()))?;
-            let pixels=crate::resource_map::read_external_top_mip_from_verified(file,index,&tag.path,meta.raw_offset as u64,meta.declared_size as u64,meta.size,13,request.image_index)?;
+            let pixels=crate::resource_map::read_external_mip_from_verified(file,index,&tag.path,original.raw_offset as u64,original.declared_size as u64,original.size,span.offset,span.size,13,request.image_index)?;
             spent+=pixels.len();
-            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
-        })();let(preview,error,error_code)=match attempt{Ok(p)=>(Some(p),None,None),Err(e)=>{let(code,reason)=bitmap_failure(&e);(None,Some(reason),Some(code.into()))}};items.push(OwnedBitmapBatchItem{bitmap_tag_id:request.bitmap_tag_id,image_index:request.image_index,preview,error,error_code});
+            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:span.levels,image_count:meta.image_count,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
+        })();let(preview,error,error_code)=match attempt{Ok(p)=>(Some(p),None,None),Err(e)=>{let(code,reason)=bitmap_failure(&e);(None,Some(reason),Some(code.into()))}};items.push(OwnedBitmapBatchItem{bitmap_tag_id:request.bitmap_tag_id,image_index:request.image_index,mip_level:request.mip_level,preview,error,error_code});
     }
     if let Some((file,_,hash))=&mut shared { crate::resource_map::verify_open_handle_hash(file,hash)?; }
     Ok(OwnedBitmapBatch{source_sha256:actual,resource_sha256:bundle.map(|b|b.sha256),items})
@@ -100,6 +100,9 @@ pub fn mcc_uses_external_bitmaps(path:&Path,expected:&str,inspection:&MapInspect
 pub struct OwnedBitmapPreview {
     pub bitmap_tag_id: u32,
     pub image_index: usize,
+    #[serde(default)] pub mip_level: usize,
+    /// Usable authored levels including level zero; never generated display mips.
+    #[serde(default="single_image")] pub mip_levels: usize,
     #[serde(default="single_image")] pub image_count: usize,
     #[serde(default,skip_serializing_if="Option::is_none")] pub shared_native_bitmap_path: Option<String>,
     pub width: u16,
@@ -107,7 +110,7 @@ pub struct OwnedBitmapPreview {
     pub format: String,
     /// The currently inspected source-cache SHA256; never a path or cache bytes.
     pub source_sha256: String,
-    /// Exact top-mipmap pixels framed in a standard 128-byte DDS header.
+    /// Exact selected authored-mipmap pixels framed in a standard 128-byte DDS header.
     /// No original tag or map data is included outside this selected mipmap.
     pub dds_base64: String,
     /// One of internal-cache or verified-resource; never an inferred resource.
@@ -126,6 +129,7 @@ fn single_image()->usize{1}
 pub struct OwnedBitmapRequest {
     pub bitmap_tag_id: u32,
     pub image_index: usize,
+    #[serde(default)] pub mip_level: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -148,6 +152,7 @@ pub fn compatible_runtime_targets(
     requests:&[OwnedBitmapRequest],
 ) -> Result<Vec<CompatibleBitmapTarget>> {
     if requests.is_empty() || requests.len()>MAX_BATCH_REQUESTS {return invalid("Compatibility preview requires 1 to 24 images");}
+    if requests.iter().any(|r|r.mip_level!=0) {return invalid("Cross-runtime substitutions currently verify only original top mips");}
     let (a,bytes,hash)=maps::read_cache_snapshot_shared(source_path)?;
     let (b,target_bytes,target_hash)=maps::read_cache_snapshot_shared(runtime_path)?;
     if hash!=source.sha256 || target_hash!=runtime.sha256 {return invalid("Compatibility source snapshot changed");}
@@ -179,6 +184,7 @@ pub fn compatible_runtime_targets(
 pub struct OwnedBitmapBatchItem {
     pub bitmap_tag_id: u32,
     pub image_index: usize,
+    #[serde(default)] pub mip_level: usize,
     pub preview: Option<OwnedBitmapPreview>,
     pub error: Option<String>,
     /// Stable category for friendly summaries; the exact bounded reason is retained.
@@ -335,6 +341,49 @@ struct TopMipMetadata {
     texel_stride: usize,
     mipmaps: u16,
     xbox: bool,
+}
+/// Bounded offsets inside one native 2D image, not a texture resampler.
+/// Classic counts exclude the base; callers normalize the count before entry.
+/// Xbox compressed sub-block levels are padding, unlike PC's valid tiny mips.
+pub(crate) struct BitmapMipSpan {
+    pub width: u16,
+    pub height: u16,
+    pub offset: usize,
+    pub size: usize,
+    pub levels: usize,
+}
+pub(crate) fn flat_mip_span(width:u16,height:u16,compressed:bool,stride:usize,
+    levels:usize,level:usize,declared_size:usize,xbox:bool)->Result<BitmapMipSpan>{
+    if width==0||height==0||width>MAX_IMAGE_EDGE||height>MAX_IMAGE_EDGE||
+        !(1..=17).contains(&levels)||level>=levels||![1,2,4,8,16].contains(&stride){
+        return invalid("Invalid native bitmap mip selection");
+    }
+    let(mut w,mut h,mut offset,mut usable)=(width,height,0usize,0usize);
+    let mut selected=None;
+    for n in 0..levels {
+        if xbox&&compressed&&(w<4||h<4)&&n>0 {break;}
+        let size=if compressed {usize::from(w).div_ceil(4)*usize::from(h).div_ceil(4)*stride}
+            else {usize::from(w)*usize::from(h)*stride};
+        let end=offset.checked_add(size).ok_or_else(||SparkError::Invalid("Bitmap mip span overflow".into()))?;
+        if size>MAX_TOP_MIP_BYTES||end>declared_size {return invalid("Authored bitmap mip chain exceeds its declared image span");}
+        if n==level {selected=Some((w,h,offset,size));}
+        usable+=1;offset=end;
+        if w==1&&h==1 {
+            if n+1<levels {return invalid("Bitmap mip count exceeds its image dimensions");}
+        }
+        w=(w/2).max(1);h=(h/2).max(1);
+    }
+    let (width,height,offset,size)=selected.ok_or_else(||SparkError::Invalid("Selected Xbox compressed mip is padding, not authored image data".into()))?;
+    Ok(BitmapMipSpan{width,height,offset,size,levels:usable})
+}
+fn select_mip(meta:&TopMipMetadata,level:usize)->Result<(TopMipMetadata,BitmapMipSpan)>{
+    if meta.kind!=0 {return invalid("Authored mip selection requires a 2D single-slice image");}
+    let span=flat_mip_span(meta.width,meta.height,matches!(meta.format,"DXT1"|"DXT3"|"DXT5"),
+        meta.texel_stride,usize::from(meta.mipmaps)+1,level,meta.declared_size,meta.xbox)?;
+    let mut selected=*meta;
+    selected.width=span.width;selected.height=span.height;selected.size=span.size;
+    selected.raw_offset=meta.raw_offset.checked_add(span.offset).ok_or_else(||SparkError::Invalid("Bitmap mip offset overflow".into()))?;
+    Ok((selected,span))
 }
 fn read_top_mip_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize) -> Result<TopMipMetadata> {
     read_image_metadata(bytes,header,tag_data,index,false)
@@ -566,11 +615,12 @@ fn cube_from_snapshot(header: &MapHeader, bytes: &[u8], actual: &str, inspection
         Reader(&bytes).bytes(meta.raw_offset,total)?.to_vec()
     };
     let mut faces=Vec::with_capacity(6);
-    for index in 0..6{let native_index=if meta.xbox {match index{1=>2,2=>1,_=>index}}else{index};let at=native_index*face_span;let face=linear_top_mip(&meta,&pixels[at..at+meta.size])?;faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
+    for index in 0..6{let native_index=if meta.xbox {match index{1=>2,2=>1,_=>index}}else{index};let at=native_index*face_span;let face=linear_top_mip(&meta,&pixels[at..at+meta.size])?;faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,mip_level:0,mip_levels:1,image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
     *raw_bytes += total;
     *rgba_bytes += rgba;
     Ok(OwnedCubePreview{source_sha256:actual.to_owned(),resource_sha256:resource_hash,bitmap_tag_id,faces})
 }
+#[cfg(test)]
 fn checked_top_mip(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize) -> Result<(u16, u16, &'static str, Vec<u8>)> {
     let m = read_top_mip_metadata(bytes, header, tag_data, index)?;
     if m.external { return invalid("External pixel data requires the exact pinned bitmaps.map resource and matching index entry"); }
@@ -645,43 +695,17 @@ pub fn preview_owned_bitmap_with_resources(
     bitmap_tag_id: u32, image_index: usize,
     resources: Option<(&Path, &str)>,
 ) -> Result<OwnedBitmapPreview> {
-    if expected_sha256.len() != 64 || inspection.sha256 != expected_sha256 {
-        return invalid("Source cache identity mismatch; reopen the inspected project");
-    }
-    let (header, bytes, actual_sha256) = maps::read_cache_snapshot_shared(path)?;
-    if actual_sha256 != expected_sha256 || inspection.header.version != header.version || inspection.header.tag_offset != header.tag_offset {
-        return invalid("The original cache changed after inspection; bitmap preview refused");
-    }
-    let tag = inspection.tags.iter().find(|t| t.id == bitmap_tag_id && t.class == "bitm")
-        .ok_or_else(|| SparkError::Invalid("Selected bitmap tag ID is not present in this source map".into()))?;
-    if tag.external {
-        let batch=preview_owned_bitmap_batch_with_resources(path,expected_sha256,inspection,&[OwnedBitmapRequest{bitmap_tag_id,image_index}],resources)?;
-        let item=batch.items.into_iter().next().unwrap();
-        return item.preview.ok_or_else(||SparkError::Invalid(item.error.unwrap_or_else(||"Indexed bitmap preview refused".into())));
-    }
-    let at = tag.data_offset.ok_or_else(|| SparkError::Invalid("Bitmap tag has no internal data pointer".into()))?;
-    let meta = read_top_mip_metadata(&bytes, &header, at, image_index)?;
-    let (pixels, source_kind, resource_sha256,shared_native_bitmap_path) = if meta.external {
-        let (resource_path, pinned_hash) = resources.ok_or_else(|| SparkError::Invalid(
-            "Choose and hash the original bitmaps.map resource folder for this project before previewing external pixels".into()))?;
-        let (mut file,index)=crate::resource_map::open_verified(resource_path,pinned_hash)?;
-        let resource_tag=BitmapAliases::default().resolve(&bytes,&header,inspection,&index,tag,image_index,&meta)?;
-        let pixels = crate::resource_map::read_external_top_mip_from_verified(
-            &mut file,&index,&resource_tag,
-            meta.raw_offset as u64, meta.declared_size as u64, meta.size, header.version, image_index,
-        )?;
-        crate::resource_map::verify_open_handle_hash(&mut file,pinned_hash)?;
-        (pixels, "verified-resource", Some(pinned_hash.to_ascii_lowercase()),(resource_tag!=tag.path).then_some(resource_tag))
-    } else {
-        let (_,_,_,pixels)=checked_top_mip(&bytes, &header, at, image_index)?;
-        (pixels, "internal-cache", None,None)
-    };
-    let dds = dds_top_mip(meta.width, meta.height, meta.format, &pixels)?;
-    Ok(OwnedBitmapPreview {
-        bitmap_tag_id, image_index, image_count:meta.image_count,shared_native_bitmap_path,width: meta.width, height: meta.height,
-        format: meta.format.into(), source_sha256:actual_sha256,
-        dds_base64:base64(&dds), source_kind:source_kind.into(), resource_sha256,
-    })
+    preview_owned_bitmap_mip_with_resources(path,expected_sha256,inspection,bitmap_tag_id,image_index,0,resources)
+}
+/// Select a real original level while retaining the same source/resource transaction.
+pub fn preview_owned_bitmap_mip_with_resources(
+    path:&Path,expected_sha256:&str,inspection:&MapInspection,
+    bitmap_tag_id:u32,image_index:usize,mip_level:usize,resources:Option<(&Path,&str)>,
+)->Result<OwnedBitmapPreview>{
+    let batch=preview_owned_bitmap_batch_with_resources(path,expected_sha256,inspection,
+        &[OwnedBitmapRequest{bitmap_tag_id,image_index,mip_level}],resources)?;
+    let item=batch.items.into_iter().next().ok_or_else(||SparkError::Invalid("Bitmap response missing".into()))?;
+    item.preview.ok_or_else(||SparkError::Invalid(item.error.unwrap_or_else(||"Bitmap preview refused".into())))
 }
 
 /// Preview many exact classic bitmap images against ONE preserved cache
@@ -705,7 +729,7 @@ pub fn preview_owned_bitmap_batch_with_resources(
     }
     let mut seen = HashSet::new();
     for request in requests {
-        if request.image_index >= MAX_IMAGES_PER_TAG || !seen.insert((request.bitmap_tag_id, request.image_index)) {
+        if request.image_index >= MAX_IMAGES_PER_TAG || request.mip_level>16 || !seen.insert((request.bitmap_tag_id, request.image_index,request.mip_level)) {
             return invalid("Batch bitmap image indices must be bounded and unique");
         }
     }
@@ -737,9 +761,10 @@ pub fn preview_owned_bitmap_batch_with_resources(
                 let at=tag.data_offset.ok_or_else(||SparkError::Invalid("No internal bitmap metadata".into()))?;
                 read_top_mip_metadata(&bytes,&header,at,request.image_index)?
             };
-            let next = spent.checked_add(meta.size).ok_or_else(|| SparkError::Invalid("Preview batch size overflow".into()))?;
+            let (selected,span)=select_mip(&meta,request.mip_level)?;
+            let next = spent.checked_add(selected.size).ok_or_else(|| SparkError::Invalid("Preview batch size overflow".into()))?;
             if next > MAX_BATCH_RAW_BYTES {
-                return invalid("Combined decoded bitmap top mips exceed the 16 MiB batch limit");
+                return invalid("Combined decoded bitmap mips exceed the 16 MiB batch limit");
             }
             let (pixels, source_kind, resource_sha256,shared_native_bitmap_path) = if meta.external {
                 let (resource_path, pinned) = resources.ok_or_else(|| SparkError::Invalid(
@@ -753,25 +778,27 @@ pub fn preview_owned_bitmap_batch_with_resources(
                 let (file, index) = resource_snapshot.as_mut().ok_or_else(|| SparkError::Invalid(
                     resource_failure.clone().unwrap_or_else(|| "Selected resource index could not be SHA-256 verified".into())))?;
                 let resource_tag=if tag.external {tag.path.clone()}else{aliases.resolve(&bytes,&header,inspection,index,tag,request.image_index,&meta)?};
-                let data = crate::resource_map::read_external_top_mip_from_verified(
+                let data = crate::resource_map::read_external_mip_from_verified(
                     file, index, &resource_tag, meta.raw_offset as u64,
-                    meta.declared_size as u64, meta.size, header.version, request.image_index,
+                    meta.declared_size as u64,meta.size,span.offset,span.size,header.version,request.image_index,
                 )?;
                 (data, "verified-resource", Some(pinned.to_ascii_lowercase()),(resource_tag!=tag.path).then_some(resource_tag))
             } else {
                 if meta.raw_offset < 2048 { return invalid("Bitmap offset overlaps the protected cache header"); }
-                let data = Reader(&bytes).bytes(meta.raw_offset, meta.size)?.to_vec();
+                Reader(&bytes).bytes(meta.raw_offset,meta.declared_size)?;
+                let data = Reader(&bytes).bytes(selected.raw_offset, selected.size)?.to_vec();
                 (data, "internal-cache", None,None)
             };
-            let pixels=linear_top_mip(&meta,&pixels)?;
-            let dds = dds_top_mip(meta.width, meta.height, meta.format, &pixels)?;
+            let pixels=linear_top_mip(&selected,&pixels)?;
+            let dds = dds_top_mip(selected.width, selected.height, meta.format, &pixels)?;
             spent = next;
             Ok(OwnedBitmapPreview {
                 bitmap_tag_id: request.bitmap_tag_id,
                 image_index: request.image_index,
+                mip_level:request.mip_level,mip_levels:span.levels,
                 image_count:meta.image_count,shared_native_bitmap_path,
-                width: meta.width,
-                height: meta.height,
+                width: selected.width,
+                height: selected.height,
                 format: meta.format.into(),
                 source_sha256: snapshot_hash.clone(),
                 dds_base64: base64(&dds),
@@ -786,6 +813,7 @@ pub fn preview_owned_bitmap_batch_with_resources(
         items.push(OwnedBitmapBatchItem {
             bitmap_tag_id: request.bitmap_tag_id,
             image_index: request.image_index,
+            mip_level:request.mip_level,
             preview,
             error,
             error_code,
@@ -817,6 +845,53 @@ mod tests {
         set32(&mut bytes,0x980+24,0x2000);set32(&mut bytes,0x980+28,16);
         bytes[0x2000..0x2010].copy_from_slice(&[1;16]);
         (bytes,MapHeader {version:7,engine:"Halo PC".into(),name:"fixture".into(),build:"synthetic".into(),scenario_type:1,file_size:0x2800,declared_size:0x2800,tag_offset:0x800,tag_size:0x400,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false})
+    }
+    #[test]
+    fn authored_mip_offsets_preserve_distinct_bytes_and_reject_truncation(){
+        let (source,mut inspection)=compatibility_fixture(7,0,0x1234);
+        let mut bytes=std::fs::read(source.path()).unwrap();
+        bytes[0x994..0x996].copy_from_slice(&2u16.to_le_bytes());
+        bytes[0x99c..0x9a0].copy_from_slice(&48u32.to_le_bytes());
+        bytes[0x2010..0x2020].fill(2);bytes[0x2020..0x2030].fill(3);
+        std::fs::write(source.path(),&bytes).unwrap();inspection.sha256=maps::hash_file(source.path()).unwrap();
+        let requests:Vec<_>=(0..3).map(|mip_level|OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0,mip_level}).collect();
+        let result=preview_owned_bitmap_batch_with_resources(source.path(),&inspection.sha256,&inspection,&requests,None).unwrap();
+        for (n,item) in result.items.iter().enumerate(){
+            let p=item.preview.as_ref().unwrap();let dimension=4>>n;
+            assert_eq!((item.mip_level,p.mip_level,p.mip_levels,p.width,p.height),(n,n,3,dimension,dimension));
+            assert_eq!(p.dds_base64,base64(&dds_top_mip(dimension,dimension,"DXT3",&[n as u8+1;16]).unwrap()));
+        }
+        assert!(preview_owned_bitmap_mip_with_resources(source.path(),&inspection.sha256,&inspection,0x1234,0,3,None).is_err());
+        assert!(preview_owned_bitmap_batch_with_resources(source.path(),&inspection.sha256,&inspection,&[requests[1],requests[1]],None).is_err());
+        bytes[0x99c..0x9a0].copy_from_slice(&47u32.to_le_bytes());
+        std::fs::write(source.path(),&bytes).unwrap();inspection.sha256=maps::hash_file(source.path()).unwrap();
+        assert!(preview_owned_bitmap_mip_with_resources(source.path(),&inspection.sha256,&inspection,0x1234,0,1,None).is_err());
+        // Declaring enough metadata does not authorize a truncated source file.
+        bytes[0x99c..0x9a0].copy_from_slice(&48u32.to_le_bytes());bytes.truncate(0x2020);
+        std::fs::write(source.path(),bytes).unwrap();inspection.sha256=maps::hash_file(source.path()).unwrap();
+        assert!(preview_owned_bitmap_mip_with_resources(source.path(),&inspection.sha256,&inspection,0x1234,0,0,None).is_err());
+        // Xbox compressed 2px/1px tails are padding, PC tails are real blocks.
+        assert_eq!(flat_mip_span(8,8,true,8,4,1,48,true).unwrap().levels,2);
+        assert!(flat_mip_span(8,8,true,8,4,2,48,true).is_err());
+        assert_eq!(flat_mip_span(8,8,true,8,4,3,56,false).unwrap().offset,48);
+        assert!(flat_mip_span(4,4,false,4,4,0,1000,false).is_err());
+        let old:OwnedBitmapRequest=serde_json::from_str(r#"{"bitmapTagId":1,"imageIndex":0}"#).unwrap();assert_eq!(old.mip_level,0);
+    }
+    #[test]
+    fn indexed_ce_mips_keep_full_original_resource_identity(){
+        let(source,inspection,directory,_)=ce_indexed_fixture();let resource=directory.path().join("bitmaps.map");
+        let mut bytes=std::fs::read(&resource).unwrap();
+        bytes[0x24..0x28].copy_from_slice(&48u32.to_le_bytes());
+        bytes[0x140+108+20..0x140+108+22].copy_from_slice(&2u16.to_le_bytes());
+        bytes[0x140+108+28..0x140+108+32].copy_from_slice(&48u32.to_le_bytes());
+        bytes[0x110..0x120].fill(2);bytes[0x120..0x130].fill(3);
+        std::fs::write(&resource,&bytes).unwrap();let pin=maps::hash_file(&resource).unwrap();
+        let result=preview_owned_bitmap_mip_with_resources(source.path(),&inspection.sha256,&inspection,0x1234,0,2,Some((&resource,&pin))).unwrap();
+        assert_eq!((result.mip_level,result.mip_levels,result.width,result.height),(2,3,1,1));
+        assert_eq!(result.dds_base64,base64(&dds_top_mip(1,1,"DXT3",&[3;16]).unwrap()));
+        // A valid selected mip must never authorize a forged original image span.
+        bytes[0x24..0x28].copy_from_slice(&47u32.to_le_bytes());std::fs::write(&resource,bytes).unwrap();let pin=maps::hash_file(&resource).unwrap();
+        assert!(preview_owned_bitmap_mip_with_resources(source.path(),&inspection.sha256,&inspection,0x1234,0,1,Some((&resource,&pin))).is_err());
     }
     #[test] fn bounded_internal_dxt3_and_dds_header() {
         let (bytes,header)=fixture(15,0);
@@ -861,7 +936,7 @@ mod tests {
     }
     #[test]
     fn ce_indexed_bitmap_body_requires_native_slot_exact_path_and_pinned_ranges(){
-        let (source,inspection,directory,hash)=ce_indexed_fixture();let resource=directory.path().join("bitmaps.map");let requests=[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0}];
+        let (source,inspection,directory,hash)=ce_indexed_fixture();let resource=directory.path().join("bitmaps.map");let requests=[OwnedBitmapRequest {bitmap_tag_id:0x1234,image_index:0, mip_level:0}];
         let run=|inspected:&MapInspection,pin:&str|preview_owned_bitmap_batch_with_resources(source.path(),&inspected.sha256,inspected,&requests,Some((&resource,pin)));
         let batch=run(&inspection,&hash).unwrap();let preview=batch.items[0].preview.as_ref().expect("CE's indexed resource body must decode");
         assert_eq!((preview.width,preview.height,preview.format.as_str()),(4,4,"DXT3"));assert_eq!(preview.source_kind,"verified-resource");assert_eq!(preview.resource_sha256.as_deref(),Some(hash.as_str()));
@@ -883,7 +958,7 @@ mod tests {
         std::fs::write(&path,&bytes).unwrap();let pin=maps::hash_file(&path).unwrap();
         let coverage=verify_resource_for_source(source.path(),&inspection.sha256,&inspection,&path,&pin).unwrap();
         assert_eq!((coverage.verified_images,coverage.volume_images,coverage.unsupported_images,coverage.missing_or_mismatched_images),(1,1,0,0));
-        let request=[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0}];
+        let request=[OwnedBitmapRequest {bitmap_tag_id:0x1234,image_index:0, mip_level:0}];
         let batch=preview_owned_bitmap_batch_with_resources(source.path(),&inspection.sha256,&inspection,&request,Some((&path,&pin))).unwrap();
         assert!(batch.items[0].preview.is_none());assert!(batch.items[0].error.is_some());
         // A valid top slice cannot authorize missing volume slices, even with
@@ -922,7 +997,7 @@ mod tests {
     #[test] fn compatible_previews_require_unique_native_paths_layouts_and_unchanged_snapshots(){
         let (a,source)=compatibility_fixture(7,0x100,1);let(b,mut runtime)=compatibility_fixture(13,0,9);
         runtime.tags[0].path="TEST\\BITMAP".into();
-        let request=OwnedBitmapRequest{bitmap_tag_id:1,image_index:0};
+        let request=OwnedBitmapRequest {bitmap_tag_id:1,image_index:0, mip_level:0};
         let matches=compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).unwrap();
         assert_eq!(matches.len(),1);assert_eq!((matches[0].source_bitmap_tag_id,matches[0].bitmap_tag_id,matches[0].width,matches[0].format.as_str()),(1,9,4,"DXT3"));
         let mut duplicate=runtime.clone();let mut tag=duplicate.tags[0].clone();tag.id=10;duplicate.tags.push(tag);
@@ -938,7 +1013,7 @@ mod tests {
     }
     #[test] fn compatible_previews_never_replace_embedded_images_or_guess_unsupported_layouts(){
         let (a,source)=compatibility_fixture(7,0,1);let (b,runtime)=compatibility_fixture(13,0,9);
-        let request=OwnedBitmapRequest{bitmap_tag_id:1,image_index:0};
+        let request=OwnedBitmapRequest {bitmap_tag_id:1,image_index:0, mip_level:0};
         assert!(compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).unwrap().is_empty());
         let (a,mut source)=compatibility_fixture(7,0x100,1);let mut bytes=std::fs::read(a.path()).unwrap();
         bytes[0x98a..0x98c].copy_from_slice(&2u16.to_le_bytes());std::fs::write(a.path(),&bytes).unwrap();source.sha256=maps::hash_file(a.path()).unwrap();
@@ -950,7 +1025,7 @@ mod tests {
         let put=|b:&mut[u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
         bytes[..4].copy_from_slice(b"daeh");bytes[0x7fc..0x800].copy_from_slice(b"toof");put(&mut bytes,4,13);let size=bytes.len()as u32;put(&mut bytes,8,size);put(&mut bytes,0x10,0x800);put(&mut bytes,0x14,0x400);put(&mut bytes,0x800,0x40440028);bytes[0x20..0x28].copy_from_slice(b"fixture\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
         let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),bytes).unwrap();let sha=maps::hash_file(file.path()).unwrap();let i=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
-        assert!(!mcc_uses_external_bitmaps(file.path(),&sha,&i).unwrap());let batch=preview_mcc_bitmap_batch(file.path(),&sha,&i,&[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0}],Path::new("no-installed-packs"),&Default::default()).unwrap();assert_eq!(batch.resource_sha256,None);assert_eq!(batch.items[0].preview.as_ref().unwrap().source_kind,"internal-cache");
+        assert!(!mcc_uses_external_bitmaps(file.path(),&sha,&i).unwrap());let batch=preview_mcc_bitmap_batch(file.path(),&sha,&i,&[OwnedBitmapRequest {bitmap_tag_id:0x1234,image_index:0, mip_level:0}],Path::new("no-installed-packs"),&Default::default()).unwrap();assert_eq!(batch.resource_sha256,None);assert_eq!(batch.items[0].preview.as_ref().unwrap().source_kind,"internal-cache");
     }
     #[test] fn alpha_and_luminance_dds_preserve_channel_layout() {
         for (format,name,stride,flags,red,alpha) in [(0,"A8",1,2,0,0xff),(1,"Y8",1,0x20000,0xff,0),(3,"A8Y8",2,0x20001,0xff,0xff00)] {
@@ -1147,8 +1222,8 @@ mod tests {
         resource[0x310..0x320].fill(0x62);
         std::fs::write(&path,&resource).unwrap();
         let resource_hash=crate::hex_bytes(Sha256::digest(&resource));
-        let requests=[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0},
-            OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:1}];
+        let requests=[OwnedBitmapRequest {bitmap_tag_id:0x1234,image_index:0, mip_level:0},
+            OwnedBitmapRequest {bitmap_tag_id:0x1234,image_index:1, mip_level:0}];
         let report=preview_owned_bitmap_batch_with_resources(
             map.path(),&expected,&inspected,&requests,Some((&path,&resource_hash)),
         ).unwrap();
@@ -1194,9 +1269,9 @@ mod tests {
             resources:vec![], diagnostics:vec![], scenario_path:"test".into(),
         };
         let req = [
-            OwnedBitmapRequest { bitmap_tag_id:0x1234, image_index:0 },
-            OwnedBitmapRequest { bitmap_tag_id:0x1234, image_index:1 },
-            OwnedBitmapRequest { bitmap_tag_id:0x4567, image_index:0 },
+            OwnedBitmapRequest { bitmap_tag_id:0x1234, image_index:0, mip_level:0},
+            OwnedBitmapRequest { bitmap_tag_id:0x1234, image_index:1, mip_level:0},
+            OwnedBitmapRequest { bitmap_tag_id:0x4567, image_index:0, mip_level:0},
         ];
         let batch = preview_owned_bitmap_batch_with_resources(
             file.path(), &expected, &inspected, &req, None,

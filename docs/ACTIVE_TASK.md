@@ -4,7 +4,7 @@ Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
 Latest verified revision: 5a646fb7d7f8a67cf7371480af44cebc9fd8e1e0 commits the native incident-data/source-probe increment. R442756core/7ignored, R444480frontend/contracts/offline/storage and R445–R449original-vector native readback pass; R443fresh Windows174.870s. Source manifest2134files/51,028,467B/SHA75be87b0afd24c4cfda0b58d492427887806ca18607eaf85e5489e6d676d4a35 verified before commit; working tree was clean. Earlier wrong filter/scope are not passes. No new applied local-lighting/parity/game acceptance.
-Next action: Recover and verify authored bitmap mip levels through the existing bitmap_preview/resource/MCC paths before connecting BSP lightmap/diffuse samples to model lighting. Keep exact source/resource/image/mip identity, bounded byte spans and cache invalidation. Current preview is top-mip-only; generated display mips must not impersonate authored native data. Then apply local vehicle lighting and compare with the real game. Continue H29 and wider M1–M6; no new renderer/source writer.
+Next action: Commit the accepted original-mip increment, then continue native vehicle lighting/material fidelity in the existing renderer. Use exact native lighting-point metadata and original lightmap/diffuse levels; generated display mips or source-only samples are not game-parity evidence. Keep H29 and full M1–M6 open.
 
 ## Acceptance
 
@@ -14,6 +14,8 @@ Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHA
 
 
 ## Verified milestones
+
+R454–R458 authored-mip increment accepted:914Rust/9explicitignored,480frontend,275browser/TypeScript/contracts/offline/40storage checks; freshWindows167.744s. Chupa27.067s/MCC30.190s/CE32.247s/OpenCE27.004s/Demo31.288s verify44levels/873832originalpackedB, exact UI selection/canvas/contextreturn/invalid requests,0errors/normalclose/originalhashesunchanged/ownedscratchdisposed. QA50,508,800B SHAb88d13c3…/runtimeFP765c498d…; R454disposes5,134,008,988logicalB, noSDK. Full details NATIVE_ASSETS_AND_SHOWCASE.md. No applied-local-lighting/GPU-authored-chain/game parity or release acceptance. R451/R452missingselector red, R4537focusedbrowser green. All operations terminal; current accepted dirty source based3a33a75, no push.
 
 R440–R449 source-data increment accepted: bounded BSP incident vectors and availability preserved; invalid lighting retains valid geometry/UVs. Existing haloLightmap source-floor probe refuses occlusion/ambiguousBSPs; no new global cache or applied lighting. R442756core/7ignored, R444480frontend/TypeScript/contracts/offline/40storage checks pass. R445Chupa24.009s/R446MCC24.831s/R447CE27.089s/R448OpenCE23.614s/R449Demo26.120s match17370/17286/26988/17370/17286source coordinates,0mismatches/0JSerrors/normalclose/originalsunchanged/ownedscratchdisposed. Measured diagnostic probes3–5ms; alteredDemo car has no floor sample. R443build174.870s/currentQA50,511,360B SHAb3176dd1…/runtimeFPd33d9247… . Initialworkspace scope refused, correctednative scope passes using exactapp. Full details NATIVE_ASSETS_AND_SHOWCASE.md; no new game/renderer-parity/human/release acceptance.
 
@@ -92,6 +94,8 @@ R371 production recovery failure: sharedbackend282/offlineedits retained butRAM-
 R375 observed WindowsSecurity network-permission prompt. No permission/security setting changed or automated. Actualfocus and samePCnative tests continued/passed; no physicalnetworkapproval/twoPCdelivery inferred. HumanH19/H28interaction/traversal/combat/audio; physicalDPI/monitors/twoPC/headset/cleanVM/Mac/Linux; originalZombieautomaticrelease/AIcombat/sharedvictory/Extractionno-timerpersistence remain open. No WSL/Docker/secondcomputer/headsetavailable. P0repaired hostedCI remains owner-pushdependent, no remote success claimed. FullM2/M1-M6notcomplete.
 
 ## Operations and safe checkpoint
+
+R450–R458 are terminal. Full source-matched R454 and all four reused-app native runs complete:true/exit0, originals unchanged and all owned scratch disposed. Existing sourceData/game-parity gates below remain separate. No native or compilation operation is active.
 
 R440–R449 are terminal. R441 used a wrong module filter and ran0tests; R442actualcore suite confirms the BSP geometry test runs/passes. R443Windows build succeeded but its incorrectly requested workspace scope was refused before app launch. R445correct native scope and R446–R449 allpass against exact same source-matched app; no guard/assertion relaxed and no SDK staged. R444frontend source/data regressions also pass. All owned compilation/native payloads disposed; actual original hashesunchanged. No source edits occurred during build; later fixture-only corrections do not change runtime fingerprint. No active owned test operation at this write.
 

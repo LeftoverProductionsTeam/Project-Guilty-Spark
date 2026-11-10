@@ -559,14 +559,16 @@ async fn preview_owned_cache_bitmap(
     project_id: String,
     bitmap_tag_id: u32,
     image_index: usize,
+    mip_level: Option<usize>,
 ) -> Reply<core::bitmap_preview::OwnedBitmapPreview> {
     tauri::async_runtime::spawn_blocking(move || {
+        let mip_level=mip_level.unwrap_or(0);
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
         let inspection = inspect(&state, &project)?;
         if inspection.header.version==13&&source.resource_sha256.contains_key("mcc-textures") {
-            let folder=source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?;let request=core::bitmap_preview::OwnedBitmapRequest{bitmap_tag_id,image_index};
+            let folder=source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?;let request=core::bitmap_preview::OwnedBitmapRequest {bitmap_tag_id,image_index,mip_level};
             let batch=core::bitmap_preview::preview_mcc_bitmap_batch(&source.preserved_path,&source.sha256,&inspection,&[request],folder,&source.resource_sha256).map_err(error)?;
             let item=batch.items.into_iter().next().ok_or("MCC bitmap response missing")?;return item.preview.ok_or_else(||item.error.unwrap_or_else(||"MCC bitmap unavailable".into()));
         }
@@ -578,9 +580,9 @@ async fn preview_owned_cache_bitmap(
                 .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
         });
         let resource_args = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
-        core::bitmap_preview::preview_owned_bitmap_with_resources(
+        core::bitmap_preview::preview_owned_bitmap_mip_with_resources(
             &source.preserved_path, &source.sha256, &inspection,
-            bitmap_tag_id, image_index, resource_args,
+            bitmap_tag_id, image_index, mip_level, resource_args,
         ).map_err(error)
     }).await.map_err(error)?
 }

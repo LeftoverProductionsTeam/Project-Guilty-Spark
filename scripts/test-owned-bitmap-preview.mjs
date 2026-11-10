@@ -26,3 +26,12 @@ assert.throws(()=>decodeOwnedBitmapPreview({...preview,height:2},target),/confli
 assert.throws(()=>decodeOwnedBitmapPreview({...preview,ddsBase64:'!garbage!'},target),/Malformed/);
 assert.throws(()=>decodeOwnedBitmapPreview({...preview,ddsBase64:'A'.repeat(23*1024*1024+4)},target),/Malformed/);
 console.log('Owned cache bitmap preview protocol: exact-source identity, top-mip pixels, format, dimensions and malformed payload tests passed');
+
+const mip={...preview,mipLevel:1,mipLevels:3};
+assert.deepEqual(decodeOwnedBitmapPreview(mip,{...target,mipLevel:1}).pixels,image.pixels);
+for(const bad of [undefined,-1,0,3,17,NaN])
+  assert.throws(()=>decodeOwnedBitmapPreview({...mip,mipLevel:bad},{...target,mipLevel:1}),/authored mip/);
+for(const count of [0,1,18,NaN])
+  assert.throws(()=>decodeOwnedBitmapPreview({...mip,mipLevels:count},{...target,mipLevel:1}),/authored mip/);
+assert.throws(()=>decodeOwnedBitmapPreview(preview,{...target,mipLevel:1}),/authored mip/);
+console.log('PASS: authored mip identity/count validated independently of bitmap image and decoded cache');

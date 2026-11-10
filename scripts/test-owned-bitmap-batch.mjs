@@ -35,3 +35,14 @@ assert.throws(()=>decodeOwnedBitmapBatch(good,[requests[0],requests[0]]),/Duplic
 assert.throws(()=>decodeOwnedBitmapBatch({...good,items:[{...good.items[0],preview:{...image,sourceKind:'verified-resource',resourceSha256:resource}},good.items[1]]},uniqueBitmapTargets([first,second],sha)),/resource/);
 assert.equal(decodeOwnedBitmapBatch({...good,resourceSha256:resource,items:[{...good.items[0],preview:{...image,sourceKind:'verified-resource',resourceSha256:resource}},good.items[1]]},requests).get('42:0').sourceKind,'verified-resource');
 console.log('PASS: pinned native bitmap batch protocol, bounded memory, exact order, per-image refusals, stale/hijacked resource protection');
+
+const levels=uniqueBitmapTargets([first,{...first,mipLevel:1},first],sha);
+assert.equal(levels.length,2);assert.equal(bitmapImageKey(42,0,1),'42:0:mip1');
+assert.throws(()=>bitmapImageKey(42,0,17),/key/);
+const mipBatch={sourceSha256:sha,items:[{...first,preview:image,error:null},
+  {...first,mipLevel:1,preview:{...image,mipLevel:1,mipLevels:2},error:null}]};
+const mipResult=decodeOwnedBitmapBatch(mipBatch,levels);
+assert.deepEqual([...mipResult.keys()],['42:0','42:0:mip1']);
+assert.throws(()=>decodeOwnedBitmapBatch({...mipBatch,items:[mipBatch.items[0],{...mipBatch.items[1],mipLevel:0}]},levels),/reordered/);
+assert.throws(()=>decodeOwnedBitmapBatch({...mipBatch,items:[mipBatch.items[0],{...mipBatch.items[1],preview:image}]},levels),/authored mip/);
+console.log('PASS: bounded authored-mip batch keys, order and provenance');

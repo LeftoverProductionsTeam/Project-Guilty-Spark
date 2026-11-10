@@ -40,8 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(
                 |(bitmap_tag_id, image_index)| spark_core::bitmap_preview::OwnedBitmapRequest {
                     bitmap_tag_id,
-                    image_index,
-                },
+                    image_index, mip_level:0},
             )
             .collect();
         for batch in requests.chunks(24) {
