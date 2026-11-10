@@ -162,3 +162,6 @@ For restart recovery, after all three creators see the placement, close/reopen t
 4. Return to Spark's Level Editor and inspect the placed vehicle. Record source SHA, app SHA, runtime/version, both screenshots and pass/fail separately for mapping, reflections, lighting, geometry/LOD and animation.
 
 No original map is edited. Do not prefill human/game parity from native preview tests.
+
+
+R398 current-source follow-through (10 November): the explicit server-crash/full three-editor CE609 → native build → private Chupathingy two-client Live Rebuild/recovery gate passes with original hashes and storage guards. Both clients are hidden with dummy audio; H28 human interaction, H29 matched in-game vehicle/material comparison and physical two-PC LAN/VPN remain pending. Exact hashes, stage results and boundaries are in CHUPATHINGY_DEDICATED_20261108.md#r398-accepted-current-source-crash-rollback--10-november.

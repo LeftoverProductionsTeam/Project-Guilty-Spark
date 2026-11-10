@@ -9,6 +9,8 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const runNative=promisify(execFile);
 const chupathingyTrial=process.env.SPARK_QA_SHARED_CHUPATHINGY==='1';
+const dedicatedFaults=process.env.SPARK_QA_DEDICATED_FAULTS==='1';
+if(dedicatedFaults&&(!chupathingyTrial||process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD!=='1'))throw Error('Dedicated crash acceptance requires the explicit private Chupathingy Live Rebuild workflow');
 const ceSource=process.env.SPARK_TEST_CE_SOURCE_MAP;
 if(chupathingyTrial&&(!ceSource||!process.env.SPARK_TEST_CHUPATHINGY_ROOT))throw Error('Select the owned native CE source map and Chupathingy package');
 const targetRuntime=chupathingyTrial?'chupathingyCe':'mccSteam';
@@ -53,6 +55,7 @@ const receipt = {
   crossComputerTested: false,
   steamRelayTested: false,
   complete: false,
+  acceptanceScope: {cacheVersion,nativeContent:sharedNativeContent,chupathingyGame:chupathingyTrial,liveRebuild:chupathingyTrial&&process.env.SPARK_QA_SHARED_CHUPATHINGY_REBUILD==='1',dedicatedCrashRollback:dedicatedFaults},
   stages: {},
   latencies: [],
   memory: [],
@@ -1119,7 +1122,7 @@ try {
       async restoreBuild(){await selectQaInvader(retainedInvader);await a.page.keyboard.press('Control+s');await expect.poll(async()=>(await a.call('read_workspace_history',{projectId:a.id})).history?.head.dirty).toBe(false);const project=(await a.call('open_project',{id:a.id})).project;expect(project.buildTargets.find(target=>target.id===project.activeBuildTarget).invaderDirectory).toBe(retainedInvader);return {actualUiToolPathRestored:true,missingPrerequisiteNotCompilerSuccess:true};},
     };
     if(sharedNativeContent)await mark('retiredQaWebviewInstallers',await Promise.all(actors.map(async actor=>({actor:actor.slug,...await finishStorage.retireWebviewInstallers(actor.slug)}))));
-    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,compilerFailureBeforeRebuild:sharedNativeContent,verifyLifecycleFaults:process.env.SPARK_QA_DEDICATED_FAULTS==='1',ownerProcessId:a.child.pid,checkpoint:async phase=>{
+    await nativeDedicatedServer({page:a.page,root,call:a.call,expect,receipt,compiled:ready,projectId:a.id,expectedSpawns:receipt.currentCeReadback.positions,liveRebuild,compilerFailureBeforeRebuild:sharedNativeContent,verifyLifecycleFaults:dedicatedFaults,ownerProcessId:a.child.pid,checkpoint:async phase=>{
       await qaFootprint(phase);
       const history=await a.call('read_workspace_history',{projectId:a.id});
       const saveState={phase,historyDirty:history?.history?.head?.dirty,historyHead:history?.history?.head?.current,visibleSaveChanges:await a.page.getByRole('button',{name:'Save changes',exact:true}).count()};
@@ -1314,6 +1317,11 @@ try {
   await mark('revokedParticipantCannotReconnect');
   for (const x of actors) await x.page.screenshot({ path: path.join(x.dir, 'final.png') });
   expect(errors).toEqual([]);
+  if(dedicatedFaults){
+    expect(receipt.nativeDedicated?.unexpectedServerExit).toMatchObject({onlyExactOwnedProcessTerminated:true,previousGoodMapUnchanged:true,existingPrivateProfilesRejoined:true});
+    expect(receipt.nativeDedicated.unexpectedServerExit.spawnReadback.agreed).toBe(true);
+    await mark('requestedDedicatedCrashRollbackAccepted',{realOwnedProcessExit:true,previousGoodMapAndTwoPeersRecovered:true});
+  }
   if(receipt.mccSource){receipt.mccSource.originalsUnchanged=(await Promise.all(receipt.mccSource.originals.map(async row=>await fileHash(row.file)===row.sha256))).every(Boolean);expect(receipt.mccSource.originalsUnchanged).toBe(true);await mark('mccOriginalSourcePreserved',{sourceSha256:receipt.mccSource.sourceSha256,originalsUnchanged:true});}
   receipt.pageErrors = errors;
   receipt.elapsedMs = performance.now() - receipt.begin;
