@@ -128,7 +128,33 @@ export function renderMaterialChecks() {
   const glassNativeAngular=[[1,1,1],[0,.25,1]].map(tint=>sample(createHaloMaterial(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,reflection:{...angularReflection,perpendicularTint:tint as [number,number,number],parallelTint:tint as [number,number,number]}},{reflectionCube:angularCube}),angularGeometry));
   camera.position.z=-2;camera.lookAt(0,0,0);
   const glassNativeBack=sample(createHaloMaterial(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,twoSided:true,reflection:angularReflection},{reflectionCube:angularCube}),angularGeometry);
-  camera.position.z=2;camera.lookAt(0,0,0);renderer.setClearColor(new THREE.Color(.1,.2,.3),1);angularGeometry.dispose();angularCube.dispose();
+  camera.position.z=2;camera.lookAt(0,0,0);renderer.setClearColor(new THREE.Color(.1,.2,.3),1);angularGeometry.dispose();
+  // Native GPU programs evaluate model reflection direction and endpoint ARGB
+  // at vertices. A coarse panel deliberately differs from fragment reflection.
+  const panel=exterior.clone();panel.setAttribute('normal',new THREE.Float32BufferAttribute(Array.from({length:3},()=>[Math.sqrt(.75),0,.5]).flat(),3));
+  const panelReflection={...reflection,perpendicularBrightness:.8,parallelBrightness:.2,perpendicularTint:[1,0,0] as [number,number,number],parallelTint:[0,0,1] as [number,number,number]};
+  const vertexTint=sample(createHaloMaterial(black,null,{...metadata,kind:'model',reflection:panelReflection},{reflectionCube:angularCube}),panel);
+  const pixelNdc=(16.5/32)*2-1,weights=[(1-pixelNdc)/4-pixelNdc/2,(1-pixelNdc)/4+pixelNdc/2,(1+pixelNdc)/2];
+  const eye=[[1,1,2],[-1,1,2],[0,-1,2]],normals=[[Math.sqrt(.75),0,.5],[Math.sqrt(.75),0,.5],[Math.sqrt(.75),0,.5]];
+  const facing=eye.map((e,k)=>e.reduce((n,x,i)=>n+x*normals[k][i],0)/Math.hypot(...e));
+  const interpolatedFacing=facing.reduce((n,x,k)=>n+x*weights[k],0);
+  const vertexTintExpected=[128*interpolatedFacing*(.2+.6*interpolatedFacing),0,128*(1-interpolatedFacing)*(.2+.6*interpolatedFacing),255].map(Math.round);
+  camera.position.z=-2;camera.lookAt(0,0,0);
+  const vertexBack=sample(createHaloMaterial(black,null,{...metadata,kind:'model',twoSided:true,reflection:panelReflection},{reflectionCube:angularCube}),panel);
+  camera.position.z=2;camera.lookAt(0,0,0);
+  const localReflection=createHaloMaterial(black,null,{...metadata,kind:'model',reflection:panelReflection},{reflectionCube:angularCube});
+  localReflection.uniforms.localObjectLighting.value=true;localReflection.uniforms.localReflectionTint.value.set(3,1,3);localReflection.uniforms.localReflectionBrightness.value=3;
+  const vertexSaturated=sample(localReflection,panel);
+  const saturate=(n:number)=>Math.min(1,Math.max(0,n));
+  const endpoint=facing.map(f=>[saturate(3*f),0,saturate(3*(1-f)),saturate(3*(.2+.6*f))]);
+  const interpolated=[0,1,2,3].map(i=>endpoint.reduce((sum,value,k)=>sum+value[i]*weights[k],0));
+  const vertexSaturatedExpected=[128*interpolated[0]*interpolated[3],0,128*interpolated[2]*interpolated[3],255].map(Math.round);
+  const directionalFaces=[[255,0,0],[0,255,0],[16,240,32],[240,16,32],[0,0,255],[255,255,0]].map(rgb=>{const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d')!;ctx.fillStyle='rgb('+rgb.join(',')+')';ctx.fillRect(0,0,1,1);return c;});
+  const directionalCube=new THREE.CubeTexture(directionalFaces);directionalCube.colorSpace=THREE.NoColorSpace;directionalCube.magFilter=THREE.NearestFilter;directionalCube.minFilter=THREE.NearestFilter;directionalCube.generateMipmaps=false;directionalCube.needsUpdate=true;
+  panel.setAttribute('normal',new THREE.Float32BufferAttribute([0,0,1,0,0,1,0,1,0],3));
+  const vertexDirection=sample(createHaloMaterial(black,null,{...metadata,kind:'model',reflection},{reflectionCube:directionalCube}),panel);
+  panel.dispose();directionalCube.dispose();
+  angularCube.dispose();
   for(const t of[pcMasks,xboxMasks])t.dispose();
   for(const t of[cube,diffuse,detail,addDetail])t.dispose();
   camera.position.z = -2;
@@ -138,8 +164,8 @@ export function renderMaterialChecks() {
   geometry.dispose();
   for (const t of [black, green, red, half,emissiveMask,noEmissionMask,grey]) t.dispose();
   target.dispose();
-  renderer.dispose();
-  return { neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack, errors };
+  const reflectionGlError=renderer.getContext().getError();renderer.dispose();
+  return { neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack,vertexTint,vertexTintExpected,vertexBack,vertexSaturated,vertexSaturatedExpected,vertexDirection,reflectionGlError, errors };
 }
 
 /** Real shared React/Three components, not a second shader implementation. */

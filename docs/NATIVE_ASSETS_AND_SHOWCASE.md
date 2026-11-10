@@ -6,6 +6,32 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## Native model reflection interpolation — 10 November
+
+R580 compares the actual isolated Chupathingy0.9.0c/b506ba7439463d23f6e6d97192c68ece97adbab3 GPU programs. Model reflection direction and endpoint colour/brightness are evaluated at vertices, clamped there and interpolated across each triangle even when diffuse lighting uses the engine's per-pixel option. Spark previously recomputed those values per fragment. That changes reflection faces and highlights on coarse vehicle panels.
+
+The independently implemented correction stays in the existing shared Halo material. It uses the original normal, view vector, source reflection endpoints and source-local factors; front/back factors retain native signed facing and per-vertex saturation. Glass, environment materials, original masks/cube levels, detail order, diffuse/emission, geometry and the explicitly selected enhanced-normal mode retain their existing paths. There is no new renderer, decoder, disk cache, native writer, substitute texture or artistic exposure adjustment.
+
+R582 first reproduces both defects on the real GPU: reflection tint[31,0,32] instead of independently expected[24,0,34], and the wrong cube face[16,240,32] instead of[240,16,32]. R583/R584 all6GPU checks pass after repair. Backside tint also matches[24,0,34], vertex-clamped bright-local factors produce[93,0,110], and GL error is0. Earlier R581's near-cube-edge directional fixture was ambiguous; R582 uses a nonboundary direction and nearest sampling before production repair. All failed logs remain identified as failures.
+
+Frozen R585 passes500frontend/278browser, TypeScript, source contracts, offline and40storage checks; fresh Windows build169.216s. The same source-fingerprint-verified executable then passes all five actual Windows source previews:
+
+| Native source | Receipt | Native check | Local source vehicle lighting / restored shadows |
+|---|---|---:|---|
+| Chupathingy Xbox5 | vehicle-vertex-chupa-r585.json |38.374s|verified /8|
+| CE Timberland609 | vehicle-vertex-ce-r586.json |40.786s|verified /8|
+| MCC Blood Gulch13 | vehicle-vertex-mcc-r587.json |41.808s|verified /8|
+| OpenCE Xbox5 | vehicle-vertex-opence-r588.json |33.020s|verified /8|
+| Original Zombie Demo6 | vehicle-vertex-demo-r589.json |36.950s|unavailable /0; source preview only|
+
+Each run opens actual vehicle tags and the placed vehicle, frames/zooms through native UI controls, checks original UVs/materials/authored2D and cube levels, loses/restores the actual WebView GPU context, resumes the same canvas/camera with0new preview reads, reports0JSerrors and closes normally. Original map hashes remain unchanged; owned scratch is disposed. Shadow storage remains bounded to524288RGBA bytes. Backend is unchanged since R542's920Rust/9explicit opt-in ignores; those are historical backend results, not newly run tests.
+
+Current QA: E/qa-vehicle-vertex-r585/GuiltySpark.exe,50458624B,SHA e85257cebf09920d12d2b1bb64325aa4a4b61314e3ffd20f960d303336c35562; runtime fingerprint6285e6aaf31f35b59787a19982a93b9b1f560120671474bae2a5bb4850c3d2eb. Built from3467d23 plus this reviewed increment; not a release. Exact consolidated acceptance and unmodified screenshot hashes: E/vehicle-vertex-acceptance-r590.json. Actual Windows view: E/vehicle-vertex-chupa-r585-native-vehicle-world-restored.jpg. R591 retires only the nonrunning, manifest/hash-verified superseded R572 QA executable after five-source replacement acceptance (50458624logical bytes); its metadata/screenshots and all protected releases remain. No physical free-space delta is claimed.
+
+R580 native game evidence is separate: two private real Chupathingy peers exit0,21original input pins remain unchanged and1,698,674,535logical bytes of owned scratch are disposed. Exact generated-program findings/hashes are in vehicle-game-match-r580-camera.json (vs010_0_lit.glsl8376B,SHA438d191f8f054454a5373d022d059a1dc1d7a4f233fe510e1a22fa344ae3796a; vs028_0_lit.glsl6212B,SHA6b1c6b4643aa69f122bb52c6389db11c8fecf689a876f3bb32d9ff6d916a5238). Raw program payloads were disposed and no engine code was imported. Exact [pinned vertex-program translator](https://github.com/ChupathingyCE/chupathingyce/blob/b506ba7439463d23f6e6d97192c68ece97adbab3/port/linux/src/nv2a_vsh.c) is read-only research. The calibrated game image has a different projection/physical vehicle pose; the staged camera file is explicitly not an engine-produced save because that final action lost focus. It is not visual-parity acceptance.
+
+H29 remains open for dynamic vehicle poses/suspension, four Warthog dynamic-meter triangles,3179original Demo carrier light-reference triangles, remaining lighting/filtering differences and fully matched-game visual acceptance. No new native map compilation, human driving/combat, physical peer or release acceptance is inferred. All475requirements remain byte-unchanged.
+
 ## Retained vehicle rendering after graphics reset — 10 November
 
 R563 reproduces lost silhouette targets in the real GPU fixture: expected floor-shadow[40,60,60] becomes bare floor[200,150,100] after context restoration, despite stale cached-target metadata. NativeShadowPass now invalidates only its owned targets/receivers when its actual viewport loses GPU storage, retaining source geometry, images and dependencies. R564/R566 restore the expected pixel with0GLerrors and one rebuilt target.
@@ -24,7 +50,7 @@ Frozen R572 passes500frontend/278browser, TypeScript, contracts, offline and40st
 
 All five pass actual WebView GPU reset, exact same canvas/camera, original2D/cube-level metadata,0new native preview reads,0JSerrors, normal app close and unchanged original map hashes. Owned scratch is disposed. Four source-lit fixtures retain at most524288shadow RGBA bytes; Demo does not invent a lighting fallback. Backend remains unchanged since R542920Rust/9explicit opt-in ignores. This is renderer recovery and source-fidelity acceptance, not native compiler/game/human parity acceptance.
 
-Current QA: E/qa-vehicle-context-r572/GuiltySpark.exe,50458624B,SHA c8c983f9ce2c1abe7a5054fbbd2e0f77f98d91a6af6186fecbc5e5ecb1a5be89; runtime fingerprint4c78d5cfcb69627df2beffe2b015aff7dfc69ec15f8b92e7cdea674757336b3a. It is compiled from30d92d0 plus reviewed recovery changes, not a release. Consolidated receipt vehicle-context-acceptance-r578.json includes per-source hashes and unmodified screenshot hashes. Actual restored view: E/vehicle-context-chupa-r573-native-vehicle-world-restored.jpg. H29 dynamic poses, remaining shader families, native interpolation/filtering and exact matching-game comparison remain open.
+At R572, QA: E/qa-vehicle-context-r572/GuiltySpark.exe,50458624B,SHA c8c983f9ce2c1abe7a5054fbbd2e0f77f98d91a6af6186fecbc5e5ecb1a5be89; runtime fingerprint4c78d5cfcb69627df2beffe2b015aff7dfc69ec15f8b92e7cdea674757336b3a. It is compiled from30d92d0 plus reviewed recovery changes, not a release. Consolidated receipt vehicle-context-acceptance-r578.json includes per-source hashes and unmodified screenshot hashes. Actual restored view: E/vehicle-context-chupa-r573-native-vehicle-world-restored.jpg. H29 dynamic poses, remaining shader families, native interpolation/filtering and exact matching-game comparison remain open.
 
 ## Native vehicle diffuse-light range — 10 November follow-through
 

@@ -10,6 +10,9 @@ import {glassWithoutDiffuse} from './nativeShaderTextures';
 import type {SourceObjectLighting} from './haloLightmap';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
 const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
+varying vec3 haloReflectionDirection;varying vec4 haloReflectionFront,haloReflectionBack;
+uniform int kind;uniform vec2 reflectionBrightness;uniform vec3 reflectionPerpTint,reflectionParallelTint;
+uniform bool localObjectLighting;uniform vec3 localReflectionTint;uniform float localReflectionBrightness;
 attribute vec2 uv1;
 #ifdef USE_COLOR
 varying vec3 haloVertexColor;
@@ -18,9 +21,23 @@ void main(){
 #ifdef USE_COLOR
 haloVertexColor=color;
 #endif
-haloUv=uv;haloLightUv=uv1;haloNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.0);haloView=view.xyz;haloDepth=-view.z;haloClip=projectionMatrix*view;gl_Position=haloClip;}`;
+haloUv=uv;haloLightUv=uv1;haloNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.0);haloView=view.xyz;haloDepth=-view.z;haloClip=projectionMatrix*view;gl_Position=haloClip;
+  haloReflectionDirection=vec3(0.0);haloReflectionFront=vec4(0.0);haloReflectionBack=vec4(0.0);
+  if(kind==1){
+    // Native model shaders interpolate reflected vectors and saturated endpoint
+    // ARGB from vertices. Per-pixel diffuse lighting does not change this path.
+    vec3 eye=-view.xyz;float facing=dot(eye,haloNormal)/max(length(eye),.000001);
+    haloReflectionDirection=2.0*dot(eye,haloNormal)*haloNormal-eye;
+    vec4 parallel=vec4(reflectionParallelTint,reflectionBrightness.y);
+    vec4 difference=vec4(reflectionPerpTint,reflectionBrightness.x)-parallel;
+    vec4 local=localObjectLighting?vec4(localReflectionTint,localReflectionBrightness):vec4(1.0);
+    haloReflectionFront=clamp((parallel+difference*facing)*local,0.0,1.0);
+    haloReflectionBack=clamp((parallel-difference*facing)*local,0.0,1.0);
+  }
+}`;
 const fragment = `
 varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
+varying vec3 haloReflectionDirection;varying vec4 haloReflectionFront,haloReflectionBack;
 #ifdef USE_COLOR
 varying vec3 haloVertexColor;
 #endif
@@ -124,18 +141,19 @@ void main(){
     // as an opaque additive mask. Tint is a separate source-controlled pass.
     float glassOpacity=kind==4?clamp(base.a,0.0,1.0):0.0;
     if(kind==4)base.rgb*=glassOpacity;
-    if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float facing=kind==4?clamp(normalize(haloNormal).z,0.0,1.0):clamp(dot(normalize(-haloView),n),0.0,1.0);
+    if(hasReflection){bool nativeModel=kind==1&&!(hasNormal&&enhancedNormal);vec3 reflected=viewToWorld*(nativeModel?haloReflectionDirection:reflect(normalize(haloView),n));float facing=kind==4?clamp(normalize(haloNormal).z,0.0,1.0):clamp(dot(normalize(-haloView),n),0.0,1.0);
       // Native glass uses the camera axis and squared facing. Its authored
       // reflection colour blends glossy and broad cube response; it is not
       // the multiplicative tint used by opaque model/environment shaders.
       float grazing=1.0-(kind==4?facing*facing:facing);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
+      if(nativeModel){vec4 endpoint=gl_FrontFacing?haloReflectionFront:haloReflectionBack;tint=endpoint.rgb;brightness=endpoint.a;}
       float mask=1.0;if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);mask=multipurposeXbox?masks.r:masks.b;}
       else if(bumpIsSpecular&&hasNormal)mask=texture2D(normalMap,haloUv*normalScale).a;
       else if(kind==0&&shaderType==2)mask=base.a;
       float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
       vec3 cubeColour=textureCube(reflectionCube,reflected).rgb;
       vec3 reflectionColour=kind==4?mix(pow(cubeColour,vec3(8.0)),cubeColour,tint):cubeColour*tint;
-      if(localObjectLighting&&kind<=1)reflectionColour*=localReflectionTint*localReflectionBrightness;
+      if(localObjectLighting&&kind<=1&&!nativeModel)reflectionColour*=localReflectionTint*localReflectionBrightness;
       base.rgb+=reflectionColour*brightness*mask*fade*(kind==4?1.0-glassOpacity:1.0);}
     // Preserve the model tag's authored combiner order. Reflection remains
     // source-coloured; detail can modulate it only when that flag is set.
