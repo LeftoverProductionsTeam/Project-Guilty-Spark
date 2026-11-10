@@ -22,6 +22,27 @@ async function admittedFiles(actor,hash) {
  return {...admission,files:ordered};
 }
 
+// Check the real persistent index/descriptor, not the current in-memory
+// bootstrap. A native admission must keep its exact preview origin on restart
+// without making a second copy of the user's map.
+export async function verifyRetainedNativePreviews({actors,hash,expect,mark}) {
+ const references=[];
+ for(const actor of actors) {
+  const preview=actor.preview;if(!preview)throw Error('Native preview identity is missing');
+  const db=new DatabaseSync(path.join(actor.data,'library.sqlite3'),{readOnly:true});let row;
+  try{row=db.prepare('SELECT summary FROM projects WHERE id=?').get(preview.project.id);}finally{db.close();}
+  expect(row,'Native admission must durably retain its preview origin before networking').toBeTruthy();
+  const entry=JSON.parse(row.summary);expect(entry.sha256).toBe(preview.inspection.sha256);
+  const directory=path.join(actor.data,'projects',preview.project.id);
+  const descriptor=JSON.parse(await fs.readFile(path.join(directory,'project.gsproject'),'utf8'));
+  expect(descriptor.id).toBe(preview.project.id);expect(descriptor.source.sha256).toBe(preview.inspection.sha256);
+  expect(await hash(descriptor.source.preservedPath)).toBe(preview.inspection.sha256);
+  expect((await fs.lstat(path.join(directory,'source.map')).catch(problem=>{if(problem.code==='ENOENT')return null;throw problem;}))).toBeNull();
+  references.push({actor:actor.slug,projectId:preview.project.id,sourceSha256:entry.sha256,descriptorSha256:await hash(path.join(directory,'project.gsproject')),metadataOnly:true,originalUnchanged:true});
+ }
+ await mark('durableNativePreviewSources',references);return references;
+}
+
 export async function prepareSharedNativeContent({actors,source,templateTags,kit,invader,expect,hash,panel,uiBuild,save,retire,mark}) {
  const owner=actors[0],original=(await owner.call('open_project',{id:owner.id})).project;
  const scenery=source.inspection.tags.find(tag=>tag.class==='scen'&&/scenery[\\/]rocks[\\/]boulder_granite_small[\\/]boulder_granite_small$/i.test(tag.path));
@@ -78,6 +99,7 @@ export async function prepareSharedNativeContent({actors,source,templateTags,kit
   await retire(actor,build);
   await mark('nativeAdmissionProgress',{actor:actor.slug,phase:'verified-and-saved',build:job,files:Object.keys(actual.files).length});
  }
+ await verifyRetainedNativePreviews({actors,hash,expect,mark});
  for(const admitted of admissions)expect(admitted).toEqual(admissions[0]);
  expect(await hash(path.join(templateTags,template))).toBe(templateHash);
  await mark('independentCeNativeAdmissions',{cacheVersion:609,processes:actors.map(actor=>({pid:actor.child.pid,projectId:actor.id,library:actor.data})),source:admissions[0],helperSha256:crypto.createHash('sha256').update(await fs.readFile(new URL(import.meta.url))).digest('hex'),generatedGeometryExcluded:true,separateNativeTrees:true,readOnlySharedSeedInputs:true});

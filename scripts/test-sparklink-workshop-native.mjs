@@ -3,7 +3,7 @@ import {openStudioMenu,chooseTool,openDrawer,revealPagedControl} from '../tests/
 import {auditPagedSurface} from '../tests/ui/helpers/compactSurfaces.ts';
 import {configureNativeCeTarget} from './native-live-rebuild.mjs';
 import {nativeDedicatedServer} from './native-dedicated-server.mjs';
-import {prepareSharedNativeContent,exerciseSharedNativeContent,readbackSharedNativeContent,retireNativeSeeds} from './native-shared-content.mjs';
+import {prepareSharedNativeContent,exerciseSharedNativeContent,readbackSharedNativeContent,retireNativeSeeds,verifyRetainedNativePreviews} from './native-shared-content.mjs';
 const sharedNativeContent=process.env.SPARK_QA_SHARED_NATIVE_CONTENT==='1';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -973,7 +973,7 @@ try {
   }
   if(chupathingyTrial){
     async function independentReadback(build,label){
-      const directory=path.join(root,'independent-ce-'+label);await fs.mkdir(directory);
+      const directory=await finishStorage.createScratch('independent-ce-'+label);
       const options={windowsHide:true,timeout:30000,maxBuffer:1024*1024};
       const inspected=await a.call('open_built_map',{projectId:a.id,buildId:build.id});const tag=inspected.inspection.tags.find(row=>row.class==='scnr');expect(tag).toBeTruthy();const nativePath=tag.path+'.scenario';
       const crc=(await runNative(path.join(invader,'invader-info.exe'),['-T','crc32_mismatched',build.output],options)).stdout.trim();expect(crc).toBe('0');
@@ -1161,6 +1161,18 @@ try {
   current = await view(a);
   expect(current.revision).toBe(beforeCrashRevision + 2);
   await converge(current);
+  if(sharedNativeContent){
+    await verifyRetainedNativePreviews({actors,hash:fileHash,expect,mark});
+    for(const editor of actors){
+      const close=editor.page.getByRole('button',{name:'Close SparkLink',exact:true});if(await close.isVisible())await close.click();
+      await editor.page.getByRole('button',{name:'Objects & gameplay',exact:true}).click();
+      await expect.poll(()=>editor.page.locator('.forge-model-evidence').getAttribute('data-placement-models')).toBe('1');
+      expect(Number(await editor.page.locator('.forge-model-evidence').getAttribute('data-model-triangles'))).toBeGreaterThan(0);
+      await editor.page.screenshot({path:path.join(root,'native-shared-recovered-'+editor.slug+'.png')});
+      await editor.page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await panel(editor);
+    }
+    await mark('nativePreviewAfterOwnerProcessRestart',{actualModelInAllThreeEditors:true,sourceIdentityRetained:true,sourceMapsNotCopied:true});
+  }
   await expect.poll(() => b.call('forge_studio_pending', { projectId: b.id })).toBe(null);
   const again = await b.call('forge_session_update', {
     projectId: b.id,
@@ -1290,6 +1302,18 @@ try {
     await a.browser?.close().catch(() => {});
     a.child?.kill();
     if (a.child) await waitForQaExit(a.child);
+  }
+  if(receipt.complete){
+    // The terminal receipt contains every progress stage. Keep one canonical
+    // diagnostic, rather than a second full copy of the finished checkpoint.
+    const terminal=path.join(root,'acceptance.json'),progress=path.join(root,'progress.json');
+    const final=JSON.parse(await fs.readFile(terminal,'utf8')),prior=JSON.parse(await fs.readFile(progress,'utf8'));
+    expect(final.complete).toBe(true);expect(final.appSha256).toBe(prior.appSha256);
+    expect(final.harnessSha256).toBe(prior.harnessSha256);expect(final.stages).toEqual(prior.stages);
+    for(const [key,value] of Object.entries(prior))if(!['begin','complete'].includes(key))expect(final[key]).toEqual(value);
+    const terminalSha256=await fileHash(terminal);
+    await disposeQaScratch(root,await sealQaScratch(root,progress),{ownerFinished:true});
+    expect(await fileHash(terminal)).toBe(terminalSha256);
   }
   await finishStorage(receipt.complete?'passed':'failed');
 }

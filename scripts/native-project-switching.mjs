@@ -43,7 +43,7 @@ report.projectSwitching.savedAfterSha256=crypto.createHash('sha256').update(save
  await openViewMenu(page);const layout=page.getByRole('button',{name:'Save workspace windows',exact:true,includeHidden:true});await revealPagedControl(layout);await layout.click();await expect(page.getByText(/Saved “Studio”/)).toBeVisible();await page.keyboard.press('Escape');
  const savedLayout=await invoke(page,'read_workspace_layout',{name:'Studio'});expect(savedLayout.windows.some(w=>w.main&&w.view.project===a.project.id&&w.view.documents.includes(b.project.id))).toBe(true);report.projectSwitching.restoreMode='Existing opt-in saved workspace layout, configured and saved through Settings/View controls';
  page=await restart();await expect(page.getByRole('tab',{name:a.project.title,exact:true})).toHaveAttribute('aria-selected','true');await expect(page.getByRole('tab',{name:b.project.title,exact:true})).toBeVisible();await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','level');await inspector(page);await expect(x(page)).toHaveValue('0.75');await page.getByRole('tab',{name:a.project.title,exact:true}).focus();await page.keyboard.press('Control+z');await expect(x(page)).toHaveValue(original);await page.keyboard.press('Control+Shift+z');await expect(x(page)).toHaveValue('0.75');
- await page.screenshot({path:path.join(root,'project-restart-after.png')});await projectPickerLayouts({page,root,invoke,report});if(process.env.SPARK_PROJECT_SWITCH_REVIEW==='1'){console.log('NATIVE_PROJECT_REVIEW_READY',JSON.stringify({root,url:page.url()}));await new Promise(resolve=>setTimeout(resolve,180000));await page.screenshot({path:path.join(root,'physical-input-after.png')});}
+ await page.screenshot({path:path.join(root,'project-restart-after.png')});await projectPickerLayouts({page,root,invoke,report});page=await nativeWorkspaceScrollRestart({page,root,invoke,report,step,restart,inspector,x});if(process.env.SPARK_PROJECT_SWITCH_REVIEW==='1'){console.log('NATIVE_PROJECT_REVIEW_READY',JSON.stringify({root,url:page.url()}));await new Promise(resolve=>setTimeout(resolve,180000));await page.screenshot({path:path.join(root,'physical-input-after.png')});}
  report.projectSwitching.restartRestored=true;report.projectSwitching.unsavedAndUndoPreserved=true;step('File/Maps saved-project picker, unsaved A/B isolation, independent view, ownership transfer/return, explicit Save and full native restart retain histories',report.projectSwitching);
 }
 
@@ -61,4 +61,49 @@ async function projectPickerLayouts({page,root,invoke,report}){
  }
  await invoke(page,'plugin:window|set_size',{label,value:{Logical:{width:1500,height:950}}});await page.keyboard.press('F11');await expect.poll(()=>invoke(page,'plugin:window|is_fullscreen',{label})).toBe(true);await page.getByLabel('Choose open map',{exact:true}).click();expect((await bounds(page.getByRole('menu',{name:'Open map switcher',exact:true}))).unreachable).toEqual([]);await page.keyboard.press('Escape');await page.keyboard.press('F11');await expect.poll(()=>invoke(page,'plugin:window|is_fullscreen',{label})).toBe(false);report.projectPickerFullscreen=true;
  const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('chupathingyCe');await studio.getByLabel('Studio options',{exact:true}).click();const host=page.getByRole('contentinfo',{name:'Runtime & Tools Dock',exact:true}).getByRole('button',{name:/^Host /});await expect(host).toHaveAttribute('data-state','setupRequired');await expect(host).toHaveAttribute('title',/Private Chupathingy dedicated server/);await host.click();await expect(page.getByRole('region',{name:'Private Chupathingy dedicated server',exact:true})).toBeVisible();report.chupathingyHostRoute={from:'Runtime dock Host',to:'Online > Host game > Private Chupathingy dedicated server',setupRequired:true,serverStarted:false};
+}
+
+// Extend the existing native close/restart journey; browser reload and
+// leave/return evidence do not prove a new application process restores scroll.
+async function nativeWorkspaceScrollRestart({page,root,invoke,report,step,restart,inspector,x}){
+ const label=await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
+ await invoke(page,'plugin:window|set_size',{label,value:{Logical:{width:800,height:600}}});
+ await expect.poll(()=>page.evaluate(()=>[innerWidth,innerHeight])).toEqual([800,600]);
+ await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+ let surface=page.locator('[data-surface="settings-interface"]'),view=surface.locator(':scope > .gs-page-viewport');
+ await expect(surface).toHaveAttribute('data-navigation','scroll');await expect(surface).toHaveAttribute('data-pages','1');
+ await expect(surface.locator('.gs-surface-pages')).toHaveCount(0);
+ await expect.poll(()=>view.evaluate(node=>node.scrollHeight-node.clientHeight)).toBeGreaterThan(100);
+ await view.focus();await page.keyboard.press('PageDown');await expect.poll(()=>view.evaluate(node=>node.scrollTop)).toBeGreaterThan(30);
+ await page.keyboard.press('End');await expect.poll(()=>view.evaluate(node=>Math.abs(node.scrollHeight-node.clientHeight-node.scrollTop))).toBeLessThan(2);
+ const before=await view.evaluate(node=>({top:node.scrollTop,maximum:node.scrollHeight-node.clientHeight}));
+ expect(before.top).toBeGreaterThan(100);await expect(surface.locator('[data-gs-offpage]')).toHaveCount(0);
+ await openViewMenu(page);const layout=page.getByRole('button',{name:'Save workspace windows',exact:true,includeHidden:true});await revealPagedControl(layout);await layout.click();
+ await expect(page.getByText(/Saved “Studio”/)).toBeVisible();await page.keyboard.press('Escape');
+ const saved=await invoke(page,'read_workspace_layout',{name:'Studio'});expect(saved.windows.some(row=>row.main&&row.view.workspace==='settings')).toBe(true);
+ await expect.poll(()=>view.evaluate((node,top)=>Math.abs(node.scrollTop-top),before.top)).toBeLessThan(2);
+ await page.screenshot({path:path.join(root,'native-workspace-scroll-before-restart.png')});
+ page=await restart();await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','settings');
+ await expect(page.getByRole('tab',{name:'Interface Studio',exact:true})).toHaveAttribute('aria-selected','true');
+ surface=page.locator('[data-surface="settings-interface"]');view=surface.locator(':scope > .gs-page-viewport');
+ await expect(surface).toHaveAttribute('data-navigation','scroll');await expect(surface).toHaveAttribute('data-pages','1');await expect(surface.locator('.gs-surface-pages')).toHaveCount(0);
+ await expect.poll(()=>view.evaluate((node,top)=>Math.abs(node.scrollTop-top),before.top)).toBeLessThan(2);
+ const after=await view.evaluate(node=>({top:node.scrollTop,maximum:node.scrollHeight-node.clientHeight,horizontalOverflow:node.scrollWidth-node.clientWidth}));
+ expect(after.horizontalOverflow).toBeLessThanOrEqual(1);await expect(surface.locator('[data-gs-offpage]')).toHaveCount(0);
+ await page.screenshot({path:path.join(root,'native-workspace-scroll-after-restart.png')});
+ await view.focus();await page.keyboard.press('Home');await expect.poll(()=>view.evaluate(node=>node.scrollTop)).toBe(0);
+ await surface.getByRole('searchbox',{name:'Find in Settings interface',exact:true}).fill('Reset glow colors');
+ const action=surface.getByRole('button',{name:'Reset glow colors',exact:true});await expect(action).toBeInViewport();await action.click();
+ await page.getByRole('tab',{name:'UI audit project A',exact:true}).click();
+ // Small windows collapse inactive tabs into the actual Maps menu. Prove the
+ // retained documents by switching to them, rather than requiring wide tabs.
+ const maps=page.getByRole('menu',{name:'Open map switcher',exact:true});
+ await page.getByLabel('Choose open map',{exact:true}).click();await maps.getByRole('menuitemradio',{name:'UI audit project B',exact:true}).click();
+ await inspector(page);await expect(x(page)).toHaveValue('1.25');
+ await page.getByLabel('Choose open map',{exact:true}).click();await maps.getByRole('menuitemradio',{name:'UI audit project A',exact:true}).click();
+ await inspector(page);await expect(x(page)).toHaveValue('0.75');await page.getByRole('tab',{name:'UI audit project A',exact:true}).focus();
+ await page.keyboard.press('Control+z');await expect(x(page)).toHaveValue('0');await page.keyboard.press('Control+Shift+z');await expect(x(page)).toHaveValue('0.75');
+ report.nativeWorkspaceScrollRestart={requested:{width:800,height:600},before,after,continuousPages:1,actualApplicationRestart:true,settingsWorkspaceRestored:true,findAndKeyboardAccessible:true,openMapsRetained:true,mapMenuValues:[.75,1.25],sourceUndoRedoRetained:true};
+ step('One continuous native Settings workspace restores its scroll after full application restart; keyboard and Find remain usable',report.nativeWorkspaceScrollRestart);
+ return page;
 }

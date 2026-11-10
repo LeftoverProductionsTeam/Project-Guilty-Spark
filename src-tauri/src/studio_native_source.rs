@@ -214,6 +214,7 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
             }
             if dependencies(&state,&p,&a.tags,&template_tag)?!=a.source.dependencies {return Err("Retained native dependencies changed".into());}
             let _=native_operations_native::fields(&state,&p,&a.tags,&a.source.field_tag)?;
+            asset_import_native::retain_source_reference(&state,&owner,&preview,&inspection)?;
             return Ok(native.clone());
         }
         let build=current_build(&state,&p)?;let base=runtime_workbench::collaboration_tags(&state,&p,&build)?;
@@ -254,6 +255,7 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
         project::atomic_write(&parent.join("base-inputs.json"),&inputs,false).map_err(error)?;
         let admission=Admission{project_id:project_id.clone(),tags,source,inputs_sha256:Some(content::digest(&inputs))};
         project::atomic_write(&parent.join("admission.json"),&serde_json::to_vec_pretty(&admission).map_err(error)?,false).map_err(error)?;
+        asset_import_native::retain_source_reference(&state,&owner,&preview,&inspection)?;
         lock(&state.library)?.set_setting(&key(&project_id),&Some(admission)).map_err(error)?;Ok(native)
     }).await.map_err(error)?
 }

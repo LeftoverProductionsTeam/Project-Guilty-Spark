@@ -44,6 +44,24 @@ pub(super) fn guard_import_sources(state:&AppState,project:&Project)->Reply<()> 
     Ok(())
 }
 
+/// Retain an explicitly selected native asset's origin as metadata, using the
+/// existing descriptor/history publication boundary. Never save another
+/// document's draft or copy its original map into the library.
+pub(super) fn retain_source_reference(state:&AppState,owner:&str,source:&Project,inspection:&maps::MapInspection)->Reply<()> {
+    if lock(&state.library)?.is_saved(&source.id).map_err(error)?{return Ok(());}
+    check_document_owner(state,&source.id,owner)?;
+    let mut history=lock(&state.window_history)?;let library=lock(&state.library)?;
+    if let Some(view)=history.read(&library.project_dir(&source.id).map_err(error)?.join("window-history"),source).map_err(error)? {
+        if let Some(current)=view.snapshots.iter().find(|item|item.key==view.head.current) {
+            let mut draft=current.project.clone();draft.source=source.source.clone();
+            if draft.fingerprint().map_err(error)?!=source.fingerprint().map_err(error)?{return Err("Save the source project's pending edits separately before importing; they were not saved or discarded by this asset operation".into());}
+        }
+    }
+    let dir=library.project_dir(&source.id).map_err(error)?.join("window-history");
+    history.save_with(&dir,source,||library.save_asset_source_reference(source,inspection)).map_err(error)?;
+    Ok(())
+}
+
 #[tauri::command]
 pub(super) async fn prepare_native_asset_import(
     app: tauri::AppHandle,
@@ -82,24 +100,7 @@ pub(super) async fn prepare_native_asset_import(
             let receipt=tag_exchange::extract_selected_tag(&source,&inspection,&tools,&state.root,&extraction,tag_id,cancel.clone(),|mut e|{e.project_id=project_id.clone();e.job_id=id.clone();event(&app,e);}).map_err(error)?;
             let binding=core::native_asset_imports::prepare(&target,&source,&inspection,&receipt,&tools,&state.root,&id,tag_id,&cancel,|e|event(&app,e)).map_err(error)?;
             core::native_asset_imports::require_native_source(&source_for_import(&state,&source_project_id)?).map_err(error)?;
-            if !lock(&state.library)?.is_saved(&source_project_id).map_err(error)? {
-                check_document_owner(&state,&source_project_id,&owner)?;
-                // An unsaved source may be open in this window. Its history is
-                // authoritative; retaining a native origin must not save or
-                // replace any authored changes in that independent document.
-                let mut history=lock(&state.window_history)?;let library=lock(&state.library)?;
-                if let Some(view)=history.read(&library.project_dir(&source_project_id).map_err(error)?.join("window-history"),&source).map_err(error)? {
-                    if let Some(current)=view.snapshots.iter().find(|item|item.key==view.head.current) {
-                        let mut draft=current.project.clone();draft.source=source.source.clone();
-                        if draft.fingerprint().map_err(error)?!=source.fingerprint().map_err(error)?{return Err("Save the source project's pending edits separately before importing; they were not saved or discarded by this asset operation".into());}
-                    }
-                }
-                // This is an owned publication, not an external change. The
-                // earlier provenance read may have attached an empty history;
-                // publish through its existing descriptor/history boundary.
-                let dir=library.project_dir(&source_project_id).map_err(error)?.join("window-history");
-                history.save_with(&dir,&source,||library.save_asset_source_reference(&source,&inspection)).map_err(error)?;
-            }
+            retain_source_reference(&state,&owner,&source,&inspection)?;
             check_document_owner(&state,&project_id,&owner)?;
             if lock(&state.forge_session)?.as_ref().is_some_and(|s|s.project_id==project_id){return Err("The project joined a shared session during extraction; no local placement was committed".into());}
             event(&app,JobEvent{job_id:id.clone(),project_id:project_id.clone(),phase:"asset-imported".into(),message:format!("{} real native tags copied, references updated and read back. Ready for placement and a native build.",binding.file_count),progress:100,severity:"success".into(),timestamp:chrono::Utc::now().to_rfc3339()});
