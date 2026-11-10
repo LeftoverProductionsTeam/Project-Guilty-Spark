@@ -1,5 +1,9 @@
 # UI interaction acceptance audit
 
+## Exact-source release follow-through — 10 November
+
+R633 repeats the full280browser suite and all nine required release groups on d832af3. R635/R636 launch the actual fresh portable and NSIS-installed application with real native bootstrap, matching embedded frontend/version and0pageerrors; installation and owned uninstall pass. The public preview5 downloads are independently hash-verified. This closes named release checks only; the earlier per-feature native evidence remains scoped, and physical DPI/monitors, gameplay, clean-machine and final UI/product acceptance remain OPEN. See RELEASE_CANDIDATE_20261108.md for exact binaries, receipts, failed R630/R631 precursors and cleanup. No new application code was changed by this presentation follow-through.
+
 ## Browser validation ownership — 10 November
 
 R625 adopted an unrelated existing Vite server on port1420; that server disappeared, causing ERR_CONNECTION_REFUSED in otherwise unrelated UI cases. This is failed harness evidence, not a product regression pass. The ordinary frontend browser runner now chooses a free loopback port unless explicitly supplied; Playwright never reuses an existing server. R626 and R628 run the real occupied-server refusal and verify owned staging is disposed. Both Windows/Linux CI and the existing release source-interface gate include this regression. R627 completes all280browser cases in9.8minutes with its own server and unchanged assertions;26,457,990logical bytes of owned output are disposed. R6289source/continuity/server checks and R62914Python+6draft-pipeline checks pass. No runtime source, renderer, gameplay, original Halo data or accepted binary changed. Logs: E/tests-r625-browser.log, tests-r626-server-ownership.log, tests-r627-browser.log, tests-r628-regressions.log and tests-r629-release-pipeline.log.

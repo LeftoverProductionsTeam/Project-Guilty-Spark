@@ -4,7 +4,7 @@ Task: Operation110 — native fidelity, safe validation recovery and creator acc
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
 Latest verified revision: 1858fc9b830140268161302be08ae81f8d3660d5 — explicit WIP native solo Firefight/verified Save checkpoint since702da54. R621926Rust/9ignored,508frontend/types/offline/42storage, real Windows UI/compiler/independent readback pass; R62010focusedbrowser pass. Full280browser deliberately interrupted at177started. Gameplay/HUD/peers and fullM1–M6 remain OPEN.
-Next action: Owner resumed bounded testing/failure repair. Finish the interrupted280browser suite on exact a987013 runtime source; reproduce and fix any real failure without weakening assertions. No new feature work or full Operation110 acceptance. R625 browser run starts; native R621 and startup R624 are prior verified evidence.
+Next action: Finish the bounded current-source Windows release. Commit verified browser-server ownership repair, then run existing release gates/build/stage/portable and installed startup/seal for fresh10November preview5. R627280browser, R6289contracts/continuity/ownership and R62914Python+6release checks pass. Owner will upload/push; no public release yet. No new features or Operation110 completion.
 
 ## Acceptance
 
@@ -105,9 +105,13 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-R621 complete/exit0: native Tool59.263s, cache13/solo0 SHA257cc1fc0d36296d2c5964577dcc777d0d1847c920c4feacb9bf0344bf16b4fe, independent Invader actor/count/position/script readback pass. Two normal app closes,0pageerrors, original SDK unchanged; owned5543231770logicalB disposed. R62010focusedbrowser pass. Full280browser intentionally stopped at started test177/280; its owner disposed26068848logicalB. R621 and the interrupted browser owner have exited; their owned output is disposed. Final scoped process check follows. E/firefight-native-r621.json and FIREFIGHT_ENGINE.md hold exact hashes/failures. No remote operation; fullM1–M6/475IDs remain.
+R621 native Firefight/Save/compile/independent Invader readback accepted; exact hashes and scope FIREFIGHT_ENGINE.md. R624 actual current QA startup: version0.4.1,1080ms,0pageerrors,normalclose/exit0; appSHA3f46fc03bc8c1288541b6772ee900158ea584c3f3d1a05e2a52b0b646ab10685, runtimeFP111e869f989111b467c6a6d7575f3dc967678b1b1bce7fb9b094f219564d9fbe. No runtime-source change in this bounded repair.
 
-Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
+R625 foreign-server run failed and its owned Playwright child was stopped; runner disposed1,923,570logicalB. R626 real refusal regression passes. R627 own-server full280browser pass9.8min, disposed26,457,990logicalB/26,593,416allocated-fileB. R6289source/continuity/ownership and R62914Python+6release-pipeline tests pass. These operations exited; no new native/game test. Logs E/tests-r625-browser.log through tests-r629-release-pipeline.log. UI_INTERACTION_AUDIT.md records source/CI repair.
+
+Fresh10November preview5 requested: commit source/manifests, run source-pinned release in E/release-20261110-preview5. Preview4 draft440963621 targets dc4456e and has0assets; do not publish old files as current. Browser uploads refused despite owner enablement. No push/workflow/publication. Owner can upload verified current files when ready.
+
+Commit procedure: stage explicit scoped files; use SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; refresh/stage two manifests, verify and localcommit only. Preserve475CSV SHA b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 and all original inputs/accepted builds.
 
 ## Deferred requests
 

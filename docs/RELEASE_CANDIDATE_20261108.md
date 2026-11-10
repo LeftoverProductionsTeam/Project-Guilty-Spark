@@ -1,10 +1,34 @@
-# Source-pinned Windows preview candidate — 8 November 2026
+# Windows preview release evidence — 8–10 November 2026
 
-## 10 November follow-through — current-source build pending
+## 10 November — verified public Windows preview5
 
-Owner requires fresh10November binaries, not relabeled8November files. The sealed dc4456e preview4 remains preserved and is not current master. Chrome authenticated the exact-source preview4 draft (GitHub release440963621), but its attachment count is0; nothing is public. Browser upload permission remains refused after the owner enabled it; no security bypass was attempted. Owner can upload, but has been told to hold the old files. Prepare a new source-pinned preview5 via the existing gates/build/stage/native-startup/install/seal process in E/release-20261110-preview5. Do not replace preview4, C49 or existing tags, and do not claim current files until all package checks pass. The owner retains Git push/publication control.
+Exact application source **d832af36cb55ecd55d6c0730c24c13f90594424c**, tree **9d8b283564aeb5513f75d516dda664a9abcf0925**, version0.4.1. Later presentation/checkpoint commits do not change these binary identities. The C49, c035b68 and dc4456e candidates remain separately preserved.
 
-## Latest verified Windows candidate: dc4456e / preview4
+**Public downloads:** [v0.4.1-preview.5](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/tag/v0.4.1-preview.5). The owner uploaded the fresh five-file set. It initially landed on public preview4 while preview5 was an empty draft. R637 correctly rejected the manifest/tag mismatch. Under the owner's GitHub-update instruction, the existing uploaded release was reassociated with the new preview5 tag and current source; its five assets were retained. The old preview4 Git tag still resolves to dc4456ed58d3bdc26889e210fdaf7d51dced1f92. Its empty historical draft remains private; no old tag or commit was rewritten. The new preview5 tag resolves to d832af36cb55ecd55d6c0730c24c13f90594424c.
+
+The existing anonymous public verifier now passes against preview5. It downloads all five files (including the checksum index), validates the source/tag/verification manifest, checks every payload size and SHA-256 and rejects unverified extras. Receipt: R/public-download-verification.json. Public release ID440963621; historical empty draft ID441012570. No credentials or private Halo data were uploaded.
+
+R = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf/release-20261110-preview5. Exactly five upload files in R/windows-x64, **63,721,022bytes**:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+|Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe|11976680|05229a2f46a4227aa1d28752c40a3a6bc4ea790086974d8914f28bc76f389a77|
+|Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip|16730229|d751e21b49bf9049af47cca13ebdf214928ac11c8a3ef80a70ade00de9316ccf|
+|Project_Guilty_Spark_0.4.1_d832af36cb55_Source.zip|35008148|7ae15ca026868ae50933b0ce6bd373440a47306c5a3d364cd7d93b0ddef2f8e7|
+|Project_Guilty_Spark_0.4.1_windows_x64_manifest.json|5496|9f5f15455b509fdf50091c11e36f28b96003193b9837832ae661190e1a529463|
+|SHA256SUMS-windows-x64.txt|469|c910ccb2312e520449bf8fc138c7d8db40472021da62b129d5f26a8564dcc68f|
+
+R633 all nine current-source gates pass: **926Rust/9explicit opt-in ignored,508frontend,280browser**, TypeScript, source/interface,42storage/repository checks,59offline programs,40native diagnostics and14Python+6Node release tests. The three original MCC manifest path/UTF-16 failures pass. Gates/log hashes: R/gates-windows-native-r633/gates.json. R630/R631 restricted-runner native allocation-helper failures remain failed evidence; the unchanged focused test passes under normal host access R632 and the full existing suite passes R633. No assertion, native validator, storage limit or system security setting was weakened.
+
+R634 genuine Tauri/NSIS release build exits0 in3m01s. Standalone executable50,606,592bytes, SHAd4db78b1756373e6951d1e35eeb693c5d0583f87966187c6c3573614f9bc6c94. R635 portable/native startup and R636 actual isolated installation/installed startup/owned uninstall pass, mockedIpc:false and0pageerrors. Workspace-ready samples1175.7526ms portable/1111.8867ms installed, one sample each on this host, not a performance-improvement or clean-machine claim. Installed SHA812d25476ba56f2433770caf112b477154ae37b0cf425997056a2b16a970167f; only the documented three-byte Tauri bundle marker differs. Uninstall confirms payload/registration removed with158ms final wait. Stage/seal/verify and all2145 source-ZIP members pass. Sealed test-receipt SHA35fd8f84019c6320d2145949ab6cdfeb60344601fb5b098d24c33e1925e9a114.
+
+Owned compiler staging1,858,485,211logical bytes and verified duplicate build/extracted/profile output133,378,303logical bytes were disposed. Original Halo assets/SDKs/runtimes and accepted releases were untouched. R/temporary-retirement.json retains the exact checks. No replacement archive or repository cache was created.
+
+Native screenshot receipts: R/portable-startup/startup.png and installed-startup/startup.png. Public GitHub proof: R/public-preview5.jpg. Installed/portable receipts do not establish human Firefight combat, waves, scoring, AI peers, MegaWorld traversal, physical multi-monitor/DPI, headset VR, clean Windows VM, upgrades or Linux/macOS. All475 requirement IDs and Operation110 M1–M6 remain open where their independent acceptance is missing.
+
+## Historical November 8 candidates
+
+## Historical Windows candidate: dc4456e / preview4
 
 This later candidate includes the native imported-scenery source-tag workflow and the release-blocking View focus repair. Exact binary/source commit **dc4456ed58d3bdc26889e210fdaf7d51dced1f92**, tree **aecc6a570db12000dc62a1fd706b977581235a2f**, application0.4.1. The previous c035b68 preview2 and C49 remain separate previous-good builds. Failed6d9bb4b preview3 was not sealed. This report's later documentation commit is not the binary source.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 Preview 5 — Windows, 10 November 2026
+
+- Publish the verified fresh d832af3 Windows installer, portable ZIP, matching source, manifest and checksums as actual GitHub Release downloads; independent anonymous size/hash verification passes. Earlier tags and accepted candidates are preserved.
+- Pass all nine release gates and real portable/installed startup, isolated installation and owned uninstall on the development host. Clean-machine, upgrades and other platforms remain open.
+- Prevent browser regressions from adopting an unrelated development server; CI and release checks exercise occupied-port refusal and owned cleanup.
+- Put MegaWorld, native Forge/BSP, AI, Firefight/Zombie Apocalypse, universal editing, Live Link, collaboration, Multiplayer Hub and campaign/machinima first on GitHub with accurate development boundaries. No new gameplay acceptance is claimed.
+
+
 ## Unreleased — Exact-source release preparation, 8 November2026
 
 - Generate the existing two source checksum lists from staged Git blobs without an archive or source copy; preserve normalized text, binary bytes and unstaged author work.

@@ -1,7 +1,6 @@
 # Release candidates and public downloads
 
-C60 re-verified the exact older C49 installer, portable, source and manifest without replacement, including fresh installed/portable startup. The owner chose the [prepared five-file upload bundle](C60_PUSH_NOTES.md). There is no confirmed remote draft or public asset yet. An older sealed candidate can be attached using `scripts/release/draft.mjs`; a new workflow build gets its own exact source identity and unused preview number. Do not attribute later master features to C49. `scripts/release/recheck-windows.mjs` can re-open an exact sealed portable/installed payload without comparing it to newer `dist` bytes.
-
+The current public Windows preview is [v0.4.1-preview.5](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/tag/v0.4.1-preview.5), built November10 from d832af36cb55ecd55d6c0730c24c13f90594424c. Installer, portable, source, manifest and checksums pass independent anonymous download verification. [Exact candidate evidence](RELEASE_CANDIDATE_20261108.md). C49 and earlier candidates remain separate; later master commits are not retroactively included. Clean-machine Windows, hosted-runner, upgrades and Linux/macOS acceptance remain open. Future releases continue through the owner-approved process below.
 
 Use [GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases) for public application downloads. Actions artifacts are temporary build outputs; they do not appear as Release assets automatically. Existing `alpha` and `Preview` history must remain unchanged.
 
