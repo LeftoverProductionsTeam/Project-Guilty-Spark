@@ -9,6 +9,7 @@ export function nativeShaderTextureRole(label: string): string | undefined {
     'Base map': 'base', 'Diffuse map': 'base', 'Primary detail map': 'primaryDetail',
     'Detail map': 'primaryDetail', 'Secondary detail map': 'secondaryDetail',
     'Micro detail map': 'microDetail', 'Bump map': 'normalMap', 'Multipurpose map': 'multipurpose',
+    'Background tint map': 'glassTintMap',
   };
   return role[label] ?? (/^(?:Chicago|Transparent) layer [1-3]$/.test(label) ? `layer${label.at(-1)}` : undefined);
 }

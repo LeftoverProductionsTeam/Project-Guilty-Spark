@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { applyHaloBlend, genericCombiner } from './haloTransparency';
-import { createHaloMaterial, updateHaloMaterial } from './haloMaterial';
+import { createHaloMaterial, createHaloMaterialPasses, updateHaloMaterial } from './haloMaterial';
 import { planOwnedMaterialPreviews } from './ownedMaterialBatch';
 import type { MapHeader, Tag } from './types';
 import type { ShaderPreview, ShaderStage } from './types';
@@ -29,9 +29,22 @@ const metadata: ShaderPreview = {
 };
 describe('source transparent materials', () => {
   it('renders explicitly absent glass diffuse as zero contribution while retaining the authored tint and reflection',()=>{
-    const cube=new THREE.CubeTexture(),material=createHaloMaterial(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,glassTint:[.4,.5,.6],reflection:{bitmapTagId:7,perpendicularBrightness:.1,parallelBrightness:.7,perpendicularTint:[1,1,1],parallelTint:[1,1,1],falloff:0,cutoff:0}},{reflectionCube:cube});
-    expect(material.uniforms.hasBase.value).toBe(false);expect(material.uniforms.baseMap.value).toBeNull();expect(material.uniforms.hasReflection.value).toBe(true);expect(material.blendColor.toArray()).toEqual([.4,.5,.6]);
-    expect(()=>createHaloMaterial(null,null,{...metadata,kind:'model'},{})).toThrow(/actual diffuse/);material.dispose();cube.dispose();
+    const cube=new THREE.CubeTexture(),passes=createHaloMaterialPasses(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,glassTint:[.4,.5,.6],reflection:{bitmapTagId:7,perpendicularBrightness:.1,parallelBrightness:.7,perpendicularTint:[1,1,1],parallelTint:[1,1,1],falloff:0,cutoff:0}},{reflectionCube:cube}),[tint,material]=passes;
+    expect(passes).toHaveLength(2);expect(tint.blendSrc).toBe(THREE.ZeroFactor);expect(tint.blendDst).toBe(THREE.SrcColorFactor);
+    expect(tint.uniforms.glassTint.value.toArray()).toEqual([.4,.5,.6]);expect(tint.uniforms.reflectionCube.value).toBe(cube);
+    expect(material.blendSrc).toBe(THREE.OneFactor);expect(material.blendDst).toBe(THREE.OneMinusSrcAlphaFactor);
+    expect(material.uniforms.hasBase.value).toBe(false);expect(material.uniforms.baseMap.value).toBeNull();expect(material.uniforms.hasReflection.value).toBe(true);expect(material.uniforms.alphaBlended.value).toBe(true);
+    expect(()=>createHaloMaterial(null,null,{...metadata,kind:'model'},{})).toThrow(/actual diffuse/);passes.forEach(pass=>pass.dispose());cube.dispose();
+  });
+  it('uses one neutral glass pass and shares source images with a non-neutral tint pass',()=>{
+    const base=new THREE.Texture(),map=new THREE.Texture();
+    const neutral=createHaloMaterialPasses(base,null,{...metadata,kind:'glass',glassTint:[1,1,1]},{});
+    expect(neutral).toHaveLength(1);expect(neutral[0].uniforms.alphaTest.value).toBe(false);
+    const textured=createHaloMaterialPasses(base,null,{...metadata,kind:'glass',glassTint:[1,1,1],glassTintScale:2},{glassTintMap:map});
+    expect(textured).toHaveLength(2);
+    expect(textured[0].uniforms.glassTintMap.value).toBe(map);expect(textured[1].uniforms.glassTintMap.value).toBe(map);
+    expect(textured[0].uniforms.baseMap.value).toBe(base);expect(textured[0].uniforms.glassTintScale.value).toBe(2);
+    for(const pass of [...neutral,...textured])pass.dispose();base.dispose();map.dispose();
   });
   it('continues visible native shader animation while static materials need no idle frames', () => {
     const base = new THREE.Texture(), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
@@ -119,12 +132,13 @@ describe('source transparent materials', () => {
       m = createHaloMaterial(
         t,
         null,
-        { ...metadata, kind: 'model', stages: [], alphaBlended: true, decal: true },
+        { ...metadata, kind: 'model', stages: [], alphaTest: true, alphaBlended: true, decal: true },
         {},
       );
     expect(m.depthWrite).toBe(false);
     expect(m.polygonOffset).toBe(true);
     expect(m.uniforms.alphaBlended.value).toBe(true);
+    expect(m.uniforms.alphaTest.value).toBe(false);
     m.dispose();
     t.dispose();
   });

@@ -5,6 +5,7 @@ it('loads every decoded generic and Chicago layer without accepting fabricated s
     expect(nativeShaderTextureRole(`${prefix} layer ${index}`)).toBe(`layer${index}`);
   expect(nativeShaderTextureRole('Multipurpose map')).toBe('multipurpose');
   expect(nativeShaderTextureRole('Diffuse map')).toBe('base');
+  expect(nativeShaderTextureRole('Background tint map')).toBe('glassTintMap');
   for(const label of ['Transparent layer 0','Transparent layer 4','Chicago layer 999','Reflection cube map','unknown'])
     expect(nativeShaderTextureRole(label)).toBeUndefined();
 });

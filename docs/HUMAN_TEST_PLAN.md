@@ -156,7 +156,9 @@ R398 current-source follow-through (10 November): the explicit server-crash/full
 
 ## H29 — Vehicle appearance against the same native game source
 
-**Prerequisites:** source-matched R409 QA app (SHA2ecf88c4…), an owned MCC/CE/Xbox/Demo map and matching playable runtime. R401–R404/R406/R407 pass native UVs, source detail/reflection order and supported materials with unchanged originals. Human game parity remains unaccepted. The original Demo Evolved Zombie Container references lights instead of shaders: record unsupported material rendering, not stock vehicle appearance.
+R417/R419–R422 now pass native Windows vehicle preview/source checks after glass-alpha, tint-map and decal repairs; R418 passes the frozen273-case browser suite. These are not new game-renderer parity or human acceptance. Four dashboard smet triangles remain unsupported; compare against a stable native game view rather than marking all materials complete.
+
+**Prerequisites:** source-matched R417 QA app (SHAbf3d601f…; exact manifest in NATIVE_ASSETS_AND_SHOWCASE.md), an owned MCC/CE/Xbox/Demo map and matching playable runtime. R401–R404/R406/R407 pass native UVs, source detail/reflection order and supported materials with unchanged originals. Human game parity remains unaccepted. The original Demo Evolved Zombie Container references lights instead of shaders: record unsupported material rendering, not stock vehicle appearance.
 
 1. Open that map in Spark. Use Work → Tag editor, Search tags, Vehicle class, then select Warthog or Scorpion. For the original Zombie mod use its actual Undead Demolisher or Evolved Zombie Container.
 2. Check the material coverage status first:4Warthog dashboard triangles use unsupported dynamic meters; the original Demo carrier has3179unsupported light-referencing triangles. R410–R414 prove the counts and correct supported material assignment, not game parity. Do not record those surfaces as visually accepted. Orbit with mouse drag and zoom with the wheel. Inspect tire tread, panels/decals, windshield, turret and tracks. Materials must identify the original shader and bitmap; record missing or misaligned areas.

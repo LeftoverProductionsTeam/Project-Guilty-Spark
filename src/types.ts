@@ -97,6 +97,7 @@ export interface ShaderPreview {
   detailVScale?:number;
   bumpIsSpecular?:boolean;
   glassTint?:Vec3|null;
+  glassTintScale?:number;
   reflection?: {
     bitmapTagId: number;
     perpendicularBrightness: number;

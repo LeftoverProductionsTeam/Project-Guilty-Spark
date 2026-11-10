@@ -5,7 +5,7 @@ import type { MeshData, ShaderPreview } from '../types';
 import { shaderLegend, shaderForTriangle } from '../renderView';
 import { renderIndices } from '../haloGeometry';
 import { materialLightmapKey } from '../haloLightmap';
-import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
+import { createHaloMaterialPasses, updateHaloMaterial } from '../haloMaterial';
 import {glassWithoutDiffuse} from '../nativeShaderTextures';
 import {createChromaMaterial} from '../chromaKey';
 const EMPTY_SHADER_TEXTURES: Record<number, THREE.Texture> = {};
@@ -42,13 +42,8 @@ export default function HaloMesh({
   const {invalidate}=useThree();
   const matte=useMemo(()=>greenScreen?createChromaMaterial():null,[greenScreen]);
   useEffect(()=>()=>matte?.dispose(),[matte]);
-  const legend = useMemo(
-    () =>
-      materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length || Object.values(shaderMetadata).some(glassWithoutDiffuse)
-        ? shaderLegend(data)
-        : [],
-    [data, materialLens, shaderTextures, lightmapTextures,shaderMetadata],
-  );
+  const needsMaterialLegend=materialLens||Object.keys(shaderTextures).length>0||Object.keys(lightmapTextures).length>0||Object.values(shaderMetadata).some(glassWithoutDiffuse);
+  const legend=useMemo(()=>needsMaterialLegend?shaderLegend(data):[],[data,needsMaterialLegend]);
   const hasSecondUvs =
     !!data.lightmapUvs &&
     data.lightmapUvs.length === (data.positions.length / 3) * 2 &&
@@ -61,53 +56,31 @@ export default function HaloMesh({
     () => [...new Set((data.materialRanges ?? []).map(materialKey))],
     [data, lightmapTextures, hasSecondUvs],
   );
-  const materials = useMemo(
-    () =>
-      legend.length
-        ? [
-            new THREE.MeshStandardMaterial({ color: '#526e79', side: THREE.DoubleSide, roughness: 0.85 }),
-            ...materialKeys.map((key) => {
-              const [tagText, lightPageKey] = key.split('|');
-              const tag = Number(tagText);
-              const entry = legend.find((item) => item.tagId === tag);
-              const lightMap = lightPageKey ? (lightmapTextures[lightPageKey] ?? null) : null;
-              if ((shaderTextures[tag]||glassWithoutDiffuse(shaderMetadata[tag])) && !materialLens && !wireframe) {
-                const extra: Record<string, THREE.Texture> = {};
-                for (const [key, texture] of Object.entries(extraTextures))
-                  if (key.startsWith(`${tag}:`)) extra[key.slice(key.indexOf(':') + 1)] = texture;
-                const source=shaderMetadata[tag],change=source?.changeColorSource?data.changeColors?.[source.changeColorSource-1]:undefined;
-                return createHaloMaterial(shaderTextures[tag]??null, lightMap, change?{...source,changeColor:change}:source, extra, sky);
-              }
-              return new THREE.MeshStandardMaterial({
-                color:
-                  shaderTextures[tag] || lightMap
-                    ? '#ffffff'
-                    : materialLens
-                      ? (entry?.color ?? '#8c9292')
-                      : '#8c9292',
-                map: shaderTextures[tag] ?? null,
-                lightMap,
-                lightMapIntensity: 1,
-                alphaTest: shaderTextures[tag]?.userData.alphaTest ? 0.5 : 0,
-                side: THREE.DoubleSide,
-                roughness: 0.85,
-              });
-            }),
-          ]
-        : null,
-    [
-      legend,
-      materialKeys,
-      shaderTextures,
-      lightmapTextures,
-      materialLens,
-      shaderMetadata,
-      data.changeColors,
-      extraTextures,
-      sky,
-      wireframe,
-    ],
-  );
+  const materials = useMemo(() => {
+    if(!legend.length)return null;
+    const values:THREE.Material[]=[new THREE.MeshStandardMaterial({color:'#526e79',side:THREE.DoubleSide,roughness:0.85})];
+    const slots=new Map<string,number[]>();
+    for(const key of materialKeys){
+      const [tagText,lightPageKey]=key.split('|'),tag=Number(tagText);
+      const entry=legend.find(item=>item.tagId===tag),lightMap=lightPageKey?(lightmapTextures[lightPageKey]??null):null;
+      let passes:THREE.Material[];
+      if((shaderTextures[tag]||glassWithoutDiffuse(shaderMetadata[tag]))&&!materialLens&&!wireframe){
+        const extra:Record<string,THREE.Texture>={};
+        for(const [key,texture] of Object.entries(extraTextures))if(key.startsWith(`${tag}:`))extra[key.slice(key.indexOf(':')+1)]=texture;
+        const source=shaderMetadata[tag],change=source?.changeColorSource?data.changeColors?.[source.changeColorSource-1]:undefined;
+        passes=createHaloMaterialPasses(shaderTextures[tag]??null,lightMap,change?{...source,changeColor:change}:source,extra,sky);
+      }else passes=[new THREE.MeshStandardMaterial({
+        color:shaderTextures[tag]||lightMap?'#ffffff':materialLens?(entry?.color??'#8c9292'):'#8c9292',
+        map:shaderTextures[tag]??null,lightMap,lightMapIntensity:1,
+        alphaTest:shaderTextures[tag]?.userData.alphaTest?0.5:0,side:THREE.DoubleSide,roughness:0.85,
+      })];
+      slots.set(key,passes.map((_,i)=>values.length+i));values.push(...passes);
+    }
+    return{values,slots};
+  },[legend,materialKeys,shaderTextures,lightmapTextures,materialLens,shaderMetadata,data.changeColors,extraTextures,sky,wireframe]);
+  // Texture completion may replace a material without rebuilding its geometry.
+  // Rebuild groups only if the ordered native pass layout actually changes.
+  const materialLayout=materials?[...materials.slots].map(([key,slots])=>key+':'+slots.join(',')).join(';'):'';
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
@@ -131,25 +104,25 @@ export default function HaloMesh({
         new THREE.Float32BufferAttribute(new Float32Array((data.positions.length / 3) * 2), 2),
       );
     if (legend.length && data.materialRanges?.length) {
-      const materialIndex = new Map(materialKeys.map((key, i) => [key, i + 1]));
+      const materialIndex = materials?.slots;
       let next = 0;
       for (const range of [...data.materialRanges].sort((a, b) => a.indexStart - b.indexStart)) {
         const start = Math.max(next, range.indexStart);
         const end = Math.min(data.indices.length, range.indexStart + range.indexCount);
         if (start > next) g.addGroup(next, start - next, 0);
-        if (end > start) g.addGroup(start, end - start, materialIndex.get(materialKey(range)) ?? 0);
+        if (end > start) for(const slot of materialIndex?.get(materialKey(range))??[0])g.addGroup(start,end-start,slot);
         next = Math.max(next, end);
       }
       if (next < data.indices.length) g.addGroup(next, data.indices.length - next, 0);
     }
     return g;
-  }, [data, legend, materialKeys, hasSecondUvs]);
+  }, [data, legend, materialLayout, hasSecondUvs]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  useEffect(() => () => materials?.forEach((material) => material.dispose()), [materials]);
+  useEffect(() => () => materials?.values.forEach((material) => material.dispose()), [materials]);
   return (
     <mesh
       geometry={geometry}
-      material={matte ?? materials ?? undefined}
+      material={matte ?? materials?.values ?? undefined}
       frustumCulled={!sky}
       onBeforeRender={(_renderer, scene, camera, _geometry, material) =>
         updateHaloMaterial(material, scene, camera, invalidate)

@@ -28,6 +28,7 @@ uniform sampler2D baseMap,lightMap,primaryDetail,secondaryDetail,microDetail,alp
 uniform bool hasBase,hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
 uniform int kind,shaderType,detailFunction,microFunction,layerCount,detailMask;
 uniform bool bumpIsSpecular,detailAfterReflection;uniform float detailVScale;
+uniform bool glassTintPass,hasGlassTintMap;uniform vec3 glassTint;uniform sampler2D glassTintMap;uniform float glassTintScale;
 uniform vec2 baseScale,layerScale[4],layerOffset[4];uniform float layerRotation[4];
 uniform vec2 rotationCenter[4];uniform vec4 motionU[4],motionV[4],motionRotation[4];uniform int layerFlags[4];uniform float time;
 uniform vec3 detailScales;uniform int colorFunction[4],alphaFunction[4];
@@ -63,7 +64,11 @@ vec4 combine(vec4 current,vec4 next,int c,int a){
   return clamp(vec4(rgb,alpha),0.0,1.0);
 }
 void main(){
-  vec4 base=hasBase?sourceColor(texture2D(baseMap,(kind==2||kind==3)?layerUv(0):haloUv*baseScale)):vec4(0.0,0.0,0.0,1.0);
+  if(kind==4&&glassTintPass){
+    vec3 tint=glassTint*(hasGlassTintMap?texture2D(glassTintMap,haloUv*glassTintScale).rgb:vec3(1.0));
+    gl_FragColor=linearOutput?sRGBTransferEOTF(vec4(tint,1.0)):vec4(tint,1.0);return;
+  }
+  vec4 base=hasBase?sourceColor(texture2D(baseMap,(kind==2||kind==3)?layerUv(0):haloUv*baseScale)):vec4(0.0,0.0,0.0,kind==4?0.0:1.0);
   if(kind==2||kind==3){
     vec4 maps[4];maps[0]=stageSample(texture2D(baseMap,layerUv(0)),0);
     maps[1]=stageSample(texture2D(layer1,layerUv(1)),1);maps[2]=stageSample(texture2D(layer2,layerUv(2)),2);maps[3]=stageSample(texture2D(layer3,layerUv(3)),3);
@@ -83,7 +88,10 @@ void main(){
       float specular=multipurposeXbox?masks.r:masks.b,change=multipurposeXbox?masks.b:masks.a,aux=multipurposeXbox?masks.a:masks.r;
       float selected=detailMask<=2?specular:detailMask<=4?masks.g:detailMask<=6?change:aux;
       detailAmount=mod(float(detailMask),2.0)>0.5?1.0-selected:selected;}
-    if(hasDetail&&!(kind==1&&detailAfterReflection))base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
+    if(hasDetail&&!(kind==1&&detailAfterReflection)){
+      base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
+      if(kind==4)base.a*=texture2D(primaryDetail,haloUv*detailScales.x).a;
+    }
     if(hasMicro)base.rgb=detailBlend(base.rgb,texture2D(microDetail,haloUv*detailScales.z).rgb,microFunction);
     if(kind==1&&hasMultipurpose&&hasChangeColor){vec4 masks=texture2D(multipurpose,haloUv*baseScale);float mask=multipurposeXbox?masks.b:masks.a;base.rgb*=mix(vec3(1.0),changeColor,mask);}
     if(alphaTest){float mask=hasMask?texture2D(alphaMask,haloUv).a:base.a;if(mask<0.5)discard;}
@@ -105,12 +113,17 @@ void main(){
     if(kind==1&&hasMultipurpose&&hasNativeSelfIllum){float mask=texture2D(multipurpose,haloUv*baseScale).g;
       vec3 emission=mix(selfIllumLower,selfIllumUpper,haloWave(selfIllumAnimation.x,time/max(selfIllumAnimation.y,.001)));
       base.rgb+=surface*emission*mask*(enhancedSelfIllum?selfIllumStrength:1.0);}
+    // Native glass is tint, additive reflection, then alpha-blended diffuse.
+    // Compose its latter two stages without treating transparent diffuse RGB
+    // as an opaque additive mask. Tint is a separate source-controlled pass.
+    float glassOpacity=kind==4?clamp(base.a,0.0,1.0):0.0;
+    if(kind==4)base.rgb*=glassOpacity;
     if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float grazing=1.0-clamp(dot(normalize(-haloView),n),0.0,1.0);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
       float mask=1.0;if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);mask=multipurposeXbox?masks.r:masks.b;}
       else if(bumpIsSpecular&&hasNormal)mask=texture2D(normalMap,haloUv*normalScale).a;
       else if(kind==0&&shaderType==2)mask=base.a;
       float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
-      base.rgb+=textureCube(reflectionCube,reflected).rgb*tint*brightness*mask*fade;}
+      base.rgb+=textureCube(reflectionCube,reflected).rgb*tint*brightness*mask*fade*(kind==4?1.0-glassOpacity:1.0);}
     // Preserve the model tag's authored combiner order. Reflection remains
     // source-coloured; detail can modulate it only when that flag is set.
     if(kind==1&&detailAfterReflection&&hasDetail)base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
@@ -176,6 +189,11 @@ export function createHaloMaterial(
       reflectionParallelTint: { value: new THREE.Vector3(...(reflection?.parallelTint ?? [1, 1, 1])) },
       baseMap: { value: kind >= 2 ? stageTexture(base, 0) : base },
       hasBase: { value: !!base },
+      glassTintPass: { value: false },
+      glassTint: { value: new THREE.Vector3(...(m?.glassTint??[1,1,1])) },
+      glassTintMap: { value: extra.glassTintMap??base },
+      hasGlassTintMap: { value: !!extra.glassTintMap },
+      glassTintScale: { value: m?.glassTintScale??1 },
       lightMap: { value: light ?? base },
       primaryDetail: { value: extra.primaryDetail ?? base },
       secondaryDetail: { value: extra.secondaryDetail ?? base },
@@ -189,8 +207,10 @@ export function createHaloMaterial(
       hasSecondary: { value: !!extra.secondaryDetail },
       hasMicro: { value: !!extra.microDetail },
       hasMask: { value: !!extra.alphaMask },
-      alphaTest: { value: !!m?.alphaTest },
-      alphaBlended: { value: !!m?.alphaBlended },
+      // Native model decals blend fractional alpha instead of applying the
+      // opaque model cutout rule, including older cached preview metadata.
+      alphaTest: { value: !!m?.alphaTest && kind !== 4 && !(kind === 1 && m?.alphaBlended) },
+      alphaBlended: { value: kind===4 || !!m?.alphaBlended },
       baseEncoded: { value: !!base?.userData.sourceEncoded },
       kind: { value: kind },
       shaderType: { value: m?.shaderType ?? 0 },
@@ -251,16 +271,33 @@ export function createHaloMaterial(
   material.addEventListener('dispose',()=>samplers.forEach(texture=>texture.dispose()));
   if(kind>=2||m?.alphaBlended)applyHaloBlend(material,blend);
   if(kind===4){
-    // Halo's constant glass background tint multiplies the existing scene;
-    // its diffuse/reflected contribution is then added. An opaque fallback
-    // used to cover the power-up's actual inner shader with a black shell.
+    // Diffuse alpha attenuates both the already tinted scene and reflection.
+    // Use createHaloMaterialPasses for the preceding authored tint stage.
     material.blending=THREE.CustomBlending;material.blendEquation=THREE.AddEquation;
-    material.blendSrc=THREE.OneFactor;material.blendDst=THREE.ConstantColorFactor;
-    material.blendColor.fromArray(m?.glassTint??[1,1,1]);
+    material.blendSrc=THREE.OneFactor;material.blendDst=THREE.OneMinusSrcAlphaFactor;
     material.blendSrcAlpha=THREE.ZeroFactor;material.blendDstAlpha=THREE.OneFactor;
     material.depthWrite=false;
   }
   return material;
+}
+/** Ordered passes for the one shared native renderer. Only glass needs a
+ * preceding tint operation, and neutral tint costs no additional draw call.
+ * Passes share immutable source textures; no copied images or GPU snapshots. */
+export function createHaloMaterialPasses(...args:Parameters<typeof createHaloMaterial>):THREE.ShaderMaterial[]{
+  const surface=createHaloMaterial(...args),metadata=args[2],extra=args[3];
+  if(metadata?.kind!=='glass'||(!extra.glassTintMap&&(metadata.glassTint??[1,1,1]).every(value=>value===1)))return[surface];
+  const tint=new THREE.ShaderMaterial({
+    vertexShader:surface.vertexShader,fragmentShader:surface.fragmentShader,
+    uniforms:{...surface.uniforms,glassTintPass:{value:true}},
+    side:surface.side,toneMapped:false,transparent:true,depthWrite:false,
+    polygonOffset:surface.polygonOffset,polygonOffsetFactor:surface.polygonOffsetFactor,polygonOffsetUnits:surface.polygonOffsetUnits,
+    blending:THREE.CustomBlending,blendEquation:THREE.AddEquation,
+    blendSrc:THREE.ZeroFactor,blendDst:THREE.SrcColorFactor,
+    blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,
+  });
+  tint.userData={...surface.userData,haloAnimated:false,haloGlassPass:'tint'};
+  surface.userData.haloGlassPass='surface';
+  return[tint,surface];
 }
 export function updateHaloMaterial(material: THREE.Material, scene: THREE.Scene, camera: THREE.Camera, redraw?:()=>void) {
   if(!material.userData.haloSource)return;

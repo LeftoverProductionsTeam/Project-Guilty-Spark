@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — vehicle source-material coverage diagnostics
-Status: accepted
+Task: Operation110 — native vehicle fidelity and game comparison
+Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 93d7a66a60fae7209d746dbad234e1b2b76e2ae2 committed native vehicle detail/reflection ordering, accepted R401-407. Clean source manifest297d0969806f69d492165a3d8c3e864a1eb6d969ea10478536deac39329d249d,2134files/50,941,357B. R408 native red reproduces false zero-gap reporting; R409-414 accept the coverage repair, strict original triangle/material partitions and visible source limitations. No push/publication.
-Next action: Commit the accepted coverage diagnostic after manifest/diff checks. Continue vehicle fidelity in the existing renderer: native dynamic smet dashboard support needs engine-function semantics and independent GPU/source tests; do not fake it with fallback colours. H29 matched actual-game lighting/reflection/glass/animation remains open. Full Operation110 and475requirements remain active; no push/publication.
+Latest verified revision: 31af61a plus reviewed dirty glass/decal/geometry-reuse source, awaiting local commit. R416Rust911/9ignored; frozenR418 frontend480/browser273/TypeScript/contracts/offline/storage accepted. R417freshWindows and R419–R422 native source previews accepted; all originals unchanged and owned scratch disposed. R416 broad-browser failures remain failed evidence. No push/publication.
+Next action: Verify manifests, checkpoint and475-ID preservation, then commit the reviewed glass/decal/geometry-reuse changes locally. Continue stable source-matched game comparison and source-local lighting/engine-linked dashboard fidelity in the existing renderer. H29 full visual/gameplay parity remains open. Do not claim current QA as an installer/release or modify original maps.
 
 ## Acceptance
 
@@ -14,6 +14,10 @@ Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHA
 
 
 ## Verified milestones
+
+R417–R422 accepted10Nov: new shared native glass alpha/tint passes, exact bounded tint-map metadata and decal flag suppression; geometry replacement red→retainedGPUidentity green. CurrentWindowsQA49,762,816B SHAbf3d601f…/runtimeFP0a326214…; build200.038s, nativeChupa26.847s/MCC24.569s/CE28.228s/OpenCE23.768s/Demo28.039s. All source UV/flags/tint/partitions and selected GPU previews pass,0errors/normalclose/originalhashesunchanged/owneddisposal. FrozenR418480frontend/273browser/TypeScript/contracts/offline/storage pass; R416911Rust/9ignored pass but broad270/272browser isfailed, not acceptance. No source edits during R417build; full details NATIVE_ASSETS_AND_SHOWCASE.md. No new Halo game/compilation/visual-parity acceptance.
+
+R415 actualWindowsChupa0.9.0c/b506ba74 one-player BloodGulch via Multiplayer/SplitScreen/profile/map/Slayer/Start UI; nativeWarthog rear/interior/highlights and seat transition observed. No stable matched-angle/lighting/drive/human/visual-parity acceptance. Requested local: debug mode didnotautoenter; actualUIused. Firstfixture carousel.map missing repaired in owned copy. WindowedF11 resolves stale capture. Exit0/original17members+3maps+config hashesunchanged; owned898522542logical/898590456allocatedB disposed, peak898526990B<1GiB. ExactE/vehicle-game-local-r415.json and NATIVE_ASSETS_AND_SHOWCASE.md. PriorGUIgame exits0/originalsunchanged/disposed; Sparkmanual session exits1/disposed, notSaveacceptance.
 
 R409-414 coverage accepted:479frontend/272browser/TypeScript/contracts/offline/storage; freshWindows181.567s/nativeDemo25.587s. Native source-partition checks R410MCC23.192s/R411CE26.404s/R412Chupa24.453s/R413OpenCE22.740s/R414Demo26.190s pass with0UVmismatches/0errors/originalhashesunchanged/ownedscratchdisposed. Warthog+Rocket4smettriangles are explicitlyunsupported; Demo3179lightriangles unsupported; supported shader assignments and images remain strict. R409currentQA SHA2ecf88c4…/runtimeFPfc53edfd…; no liveprocess/operation. Full exact details NATIVE_ASSETS_AND_SHOWCASE.md.
 
@@ -42,6 +46,8 @@ M1 protected exact dc4456ed58d3bdc26889e210fdaf7d51dced1f92 preview4 Windowscand
 M3R277 protected connected CE map E/connected-source-tags-r277-timberland.map77,782,140B SHAe048b11b1a50027307f60ae0a45222f9e2035e501a95319f8e89d9487d7528ce;287connector/32252source/15862render/16230collisiontris,524staticroutesamples,358original+42donorobjects. Humanverifiedphysicallytraversableconnections0. Source/native evidence does not close infantry/Warthog/ridge/cave/projectile/material/audio. First full walkthrough precedes19region expansion.
 
 ## Changed work
+
+Current10Nov dirty repair: native soso decal flag8 suppresses opaque alpha-test; old cached metadata is also guarded. Native sgla glass uses alpha-weighted diffuse over reflection/tint, with a neutral-tint one-pass fast path or ordered shared-texture tint/surface passes. HaloMesh/BSP/QuickForge use the same material builder. Exact native Background tint map and scale are read-only metadata. New red→green source/GPU tests preserve cutouts/glow/reflection order and image ownership; native app acceptance next.
 
 10Nov vehicle shader follow-through: independent originalMCC/CE sourceflags show Scorpion hull_double/hull_darkened/treads set native detail-after-reflection while Warthog hull does not. Existing parser/material omitted the flag. R399 actualWebGL red: toggledflag yields same88/76/145grey pixels for three detailfunctions; independent expectedafter56/28/177. R400 focusedGPUgreen respects order, sourcealbedo/normal/UV/lighting unchanged, reflection-free24grey unchanged. Current uncommitted parser adds read-only/defaultfalsemetadata; shared haloMaterial consumes it; focused native flag/environment-alpha/oldserde guards and real vehicle original-byte assertions added. No nativefield/tagwriter/copying ofengine implementation. PinnedpublishedInvader696830ff80af227e84e7237c2ef26eb2301ed110 shader_model.json is the formatreference; engine checkout899219cc0a14b03bc12f0517a1e9ee4c37158af8 reviewedread-only.
 
@@ -78,6 +84,10 @@ R371 production recovery failure: sharedbackend282/offlineedits retained butRAM-
 R375 observed WindowsSecurity network-permission prompt. No permission/security setting changed or automated. Actualfocus and samePCnative tests continued/passed; no physicalnetworkapproval/twoPCdelivery inferred. HumanH19/H28interaction/traversal/combat/audio; physicalDPI/monitors/twoPC/headset/cleanVM/Mac/Linux; originalZombieautomaticrelease/AIcombat/sharedvictory/Extractionno-timerpersistence remain open. No WSL/Docker/secondcomputer/headsetavailable. P0repaired hostedCI remains owner-pushdependent, no remote success claimed. FullM2/M1-M6notcomplete.
 
 ## Operations and safe checkpoint
+
+Current: R416failed/R417passed/R418passed/R419–R422passed wrappers and children are finished; owned payloads disposed. R417 exports only the source-pinned49.8MB QA app/manifest under E. No live test process, new SDK tree, original edit, installer/publication or gameplay pass. Verify final status/manifests and commit locally; retain exact failed R416 evidence.
+
+R415 exec46142 terminal/exit0, DEV/run-9vhmXU disposed; originalpins unchanged. Earliergame exec88465 terminal/exit0, DEV/run-jrnfyV disposed. Sparkmanual exec1883 terminal/exit1, DEV/run-MkzJs2 disposed. No owned game/Spark GUI process remains; currentproduction source is unchanged after R409QA. Failed first R415 staging used a wrong ephemeral context property, stopped before staging and disposed22016B; corrected directory property reused existing ownership API. No archive/new launcher/native engine mutation.
 
 R409 exec30696 terminal/exit0: full479frontend/272browser/offline/storage/contracts/TypeScript; freshWindows181.567s/nativeDemo25.587s; originalunchanged/wrapper+childcomplete/0errors/ownedscratchdisposed. Newapp E/qa-vehicle-coverage-r409/GuiltySpark.exe49,772,544B SHA2ecf88c436ec6801f080b941338e62b244ff790da04c8ba200125b659c21496a/runtimeFPfc53edfda41add69b27eda01980249deca5325cba4a6564301355be7825c70a3. Builtfrom93d7+reviewedcoverageUI, not a release. R410-414 terminal/exit0 sequentialexec45063 strengthens originalstrip/actualmaterialpartition/visiblecoverage checks, allusingexactR409app; no production source change.
 

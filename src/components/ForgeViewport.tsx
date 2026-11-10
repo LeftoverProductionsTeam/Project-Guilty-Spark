@@ -1,4 +1,4 @@
-import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
+import { createHaloMaterialPasses, updateHaloMaterial } from '../haloMaterial';
 import type { WorkshopMaterialView } from '../useWorkshopTextures';
 import Mesh from './HaloMesh';
 import {createChromaMaterial,isChromaSubject} from '../chromaKey';
@@ -178,11 +178,18 @@ function NodeVisual({
   const nativeMaterial = useMemo(
     () =>
       surfaceView && !wireframe && !error
-        ? createHaloMaterial(surfaceView.base, null, surfaceView.metadata, surfaceView.extra)
+        ? createHaloMaterialPasses(surfaceView.base, null, surfaceView.metadata, surfaceView.extra)
         : null,
     [surfaceView, wireframe, error],
   );
-  useEffect(() => () => nativeMaterial?.dispose(), [nativeMaterial]);
+  useEffect(() => () => nativeMaterial?.forEach(material=>material.dispose()), [nativeMaterial]);
+  const materialGeometry=useMemo(()=>{
+    if(!geometry||!nativeMaterial||nativeMaterial.length<2)return geometry;
+    const grouped=geometry.clone();grouped.clearGroups();
+    nativeMaterial.forEach((_,slot)=>grouped.addGroup(0,grouped.index?.count??grouped.getAttribute('position').count,slot));
+    return grouped;
+  },[geometry,nativeMaterial]);
+  useEffect(()=>()=>{if(materialGeometry!==geometry)materialGeometry?.dispose();},[materialGeometry,geometry]);
   if (node.type === 'brush') {
     if (!geometry || !original) return null;
     const material = document.materials.find((m) => m.id === node.value.materialId);
@@ -194,8 +201,8 @@ function NodeVisual({
     const ratio = node.value.dimensions.map((dimension, i) => dimension / original.dimensions[i]) as Vec3;
     return (
       <mesh
-        geometry={geometry}
-        material={matte??nativeMaterial ?? undefined}
+        geometry={materialGeometry??geometry}
+        material={matte??(nativeMaterial?.length===1?nativeMaterial[0]:nativeMaterial) ?? undefined}
         onBeforeRender={(_gl, scene, camera, _geo, material) => updateHaloMaterial(material, scene, camera, invalidate)}
         scale={ratio}
         userData={{ dropSurface: true, brushId: node.value.id }}

@@ -1,4 +1,4 @@
-import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
+import { createHaloMaterialPasses, updateHaloMaterial } from '../haloMaterial';
 import type { WorkshopMaterialView } from '../useWorkshopTextures';
 import { useEffect, useMemo } from 'react';
 import {createChromaMaterial} from '../chromaKey';
@@ -42,7 +42,7 @@ export default function BspSurfaces({
       'uv1',
       new THREE.Float32BufferAttribute(new Float32Array((mesh.positions.length / 3) * 2), 2),
     );
-    for (const [slot, m] of doc.materials.entries()) {
+    for (const m of doc.materials) {
       const first = indices.length;
       for (const part of mesh.parts.filter((p) => p.materialId === m.id)) {
         for (let i = part.indexStart; i < part.indexStart + part.indexCount; i += 3) {
@@ -58,13 +58,13 @@ export default function BspSurfaces({
           }
         }
       }
-      geometry.addGroup(first, indices.length - first, slot);
+      const materialStart=materials.length;
       const portal = m.name === '+portal' || m.name === '+exactportal';
       const view = views?.[m.id];
-      if (view && !wire && !portal) {
-        const material = createHaloMaterial(view.base, null, view.metadata, view.extra);
-        material.vertexColors = true;
-        materials.push(material);
+      if (view && !wire && !portal && !greenScreen) {
+        const passes=createHaloMaterialPasses(view.base,null,view.metadata,view.extra);
+        for(const material of passes)material.vertexColors=true;
+        materials.push(...passes);
       } else
         materials.push(
           new THREE.MeshStandardMaterial({
@@ -79,11 +79,12 @@ export default function BspSurfaces({
             depthWrite: !portal,
           }),
         );
+      for(let slot=materialStart;slot<materials.length;slot++)geometry.addGroup(first,indices.length-first,slot);
     }
     geometry.setIndex(indices);
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     return { geometry, materials, hits };
-  }, [mesh, doc.materials, selection, wire, textures, views]);
+  }, [mesh, doc.materials, selection, wire, textures, views, greenScreen]);
   useEffect(
     () => () => {
       surface.geometry.dispose();

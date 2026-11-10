@@ -7,7 +7,7 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
     const { renderMaterialChecks } = await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);
     return renderMaterialChecks();
   });
-  console.log('HALO_MATERIAL_PIXELS',JSON.stringify({detailOrder:result.detailOrder,noReflectionDetail:result.noReflectionDetail,maskedDetailOrder:result.maskedDetailOrder}));
+  console.log('HALO_MATERIAL_PIXELS',JSON.stringify({detailOrder:result.detailOrder,noReflectionDetail:result.noReflectionDetail,maskedDetailOrder:result.maskedDetailOrder,glassAlpha:result.glassAlpha,glassTintSamples:result.glassTintSamples,glassNoDiffuse:result.glassNoDiffuse,decal:result.decal,cutout:result.cutout}));
   expect(result.errors).toEqual([]);
   for (const pixel of [result.neutral, result.alphaAdded, result.back]) {
     expect(Math.abs(pixel[0] - 26)).toBeLessThanOrEqual(1);
@@ -17,6 +17,12 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
   expect(Math.abs(result.added[0] - 90)).toBeLessThanOrEqual(1);
   expect(Math.abs(result.combined[1] - 115)).toBeLessThanOrEqual(1);
   expect(result.model).toEqual([0, 128, 0, 255]);
+  for(const [index,expected] of [80,58,62,255].entries())expect(Math.abs(result.decal[index]-expected)).toBeLessThanOrEqual(1);
+  for(const [index,expected] of [26,51,77,255].entries())expect(Math.abs(result.cutout[index]-expected)).toBeLessThanOrEqual(1);
+  for(const [index,expected] of [[90,115,141],[128,106,110],[165,97,78],[240,80,16]].entries())
+    for(const channel of [0,1,2])expect(Math.abs(result.glassAlpha[index][channel]-expected[channel])).toBeLessThanOrEqual(1);
+  for(const pixel of result.glassTintSamples)for(const [channel,expected] of [118,78,110,255].entries())expect(Math.abs(pixel[channel]-expected)).toBeLessThanOrEqual(1);
+  for(const [channel,expected] of [77,77,141,255].entries())expect(Math.abs(result.glassNoDiffuse[channel]-expected)).toBeLessThanOrEqual(1);
   expect(result.nativeGlow).toEqual([128,64,32,255]);
   expect(result.advancedGlow).toEqual(result.nativeGlow);
   expect(result.unmasked).toEqual([0,0,0,255]);
@@ -29,4 +35,19 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
     for(const channel of channels[order].slice(0,3))expect(Math.abs(channel-[68,60][order])).toBeLessThanOrEqual(1);
     expect(channels[order][3]).toBe(255);
   }
+});
+
+test('shared model and BSP components preserve glass pass order, chroma mode and geometry reuse',async({page})=>{
+  await page.goto('/tests/ui/fixtures/haloMaterials.html');
+  const result=await page.evaluate(async()=>{const {renderComponentGlassChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderComponentGlassChecks();});
+  console.log('HALO_COMPONENT_GLASS',JSON.stringify(result));
+  expect(result.errors).toEqual([]);
+  for(const frame of [result.model,result.completed,result.bsp]){
+    for(const [channel,expected]of[118,78,110,255].entries())expect(Math.abs(frame.pixel[channel]-expected)).toBeLessThanOrEqual(1);
+    expect(frame.groups).toBe(2);expect(frame.draws).toBe(2);expect(frame.triangles).toBe(4);
+  }
+  expect(result.completed.geometry).toBe(result.model.geometry);
+  for(const [channel,expected]of[128,106,110,255].entries())expect(Math.abs(result.neutral.pixel[channel]-expected)).toBeLessThanOrEqual(1);
+  expect(result.neutral.groups).toBe(1);expect(result.neutral.draws).toBe(1);
+  for(const frame of[result.modelGreen,result.bspGreen]){expect(frame.pixel).toEqual([0,255,0,255]);expect(frame.draws).toBe(1);expect(frame.triangles).toBe(2);}
 });

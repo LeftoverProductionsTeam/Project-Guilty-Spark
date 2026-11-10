@@ -311,6 +311,15 @@ async function nativeVehiclePreview(opened,originalHash){
     for(const id of new Set(actual.mesh.materialRanges.map(range=>range.shaderTagId))){
       const shader=opened.inspection.tags.find(tag=>tag.id===id);expect(shader,'Actual vehicle shader identity').toBeTruthy();
       expect(sourceShaderReferences.some(ref=>ref.id===id&&ref.class===shader.class),'Actual material belongs to the original model').toBe(true);
+      if(shader.class==='sgla'){
+        const body=shader.dataOffset;if(!Number.isSafeInteger(body)||body<tagStart||body+480>tagEnd)throw Error('Vehicle glass escapes native source');
+        const tint=[0,1,2].map(i=>f32(body+0x54+i*4)),tintId=u32(body+0x64+12);
+        expect(shader.shaderPreview?.glassTint,'Native vehicle glass tint').toEqual(tint);
+        const tintRef=shader.references.find(ref=>ref.label==='Background tint map');
+        if(tintId===0xffffffff){expect(tintRef).toBeUndefined();expect(shader.shaderPreview?.glassTintScale??null).toBeNull();}
+        else{expect(tintRef?.targetId).toBe(tintId);const scale=f32(body+0x60);expect(shader.shaderPreview?.glassTintScale).toBe(scale===0?1:scale);}
+        materialOrder.push({shaderPath:shader.path,shaderClass:'sgla',glassTint:tint,glassTintMapId:tintId===0xffffffff?null:tintId});
+      }
       if(shader.class!=='soso'){
         if(shader.shaderPreview)expect(shader.shaderPreview.detailAfterReflection,'Other shader flags are not model detail order').toBe(false);
         continue;
@@ -318,7 +327,9 @@ async function nativeVehiclePreview(opened,originalHash){
       const body=shader.dataOffset;if(!Number.isSafeInteger(body)||body<tagStart||body+440>tagEnd)throw Error('Vehicle shader body escapes native source');
       const flags=bytes.readUInt16LE(body+40),detailAfterReflection=!!(flags&1);
       expect(shader.shaderPreview?.detailAfterReflection,'Native detail/reflection order for '+shader.path).toBe(detailAfterReflection);
-      materialOrder.push({shaderPath:shader.path,flags,detailAfterReflection});
+      expect(shader.shaderPreview?.alphaTest,'Native model cutout/decal rule for '+shader.path).toBe((flags&12)===0);
+      expect(shader.shaderPreview?.alphaBlended,'Native model fractional decal alpha for '+shader.path).toBe(!!(flags&8));
+      materialOrder.push({shaderPath:shader.path,flags,detailAfterReflection,alphaTest:shader.shaderPreview.alphaTest,alphaBlended:shader.shaderPreview.alphaBlended});
     }
     let materialAcceptance='native-shader-source-readback';
     if(expectedCacheVersion===6&&/^vehicles[\\/]rwarthog[\\/]rwarthog$/i.test(model.path)){

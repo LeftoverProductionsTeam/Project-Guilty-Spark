@@ -197,6 +197,7 @@ pub struct ShaderPreview {
     #[serde(default)] pub detail_v_scale:f32,
     #[serde(default)] pub bump_is_specular:bool,
     #[serde(default,skip_serializing_if="Option::is_none")] pub glass_tint:Option<[f32;3]>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub glass_tint_scale:Option<f32>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub reflection:Option<ShaderReflection>,
     #[serde(default)] pub multipurpose_xbox:bool,
     #[serde(default)] pub bump_scale:f32,
@@ -953,7 +954,7 @@ fn shader_bitmap_references(
             (0xDC, "Detail map"),
             (0x164, "Reflection cube map"),
         ]),
-        "sgla" => (480, &[(0x158,"Diffuse map"),(0x16c,"Detail map"),(0xc0,"Bump map"),(0xac,"Reflection cube map")]),
+        "sgla" => (480, &[(0x158,"Diffuse map"),(0x16c,"Detail map"),(0xc0,"Bump map"),(0xac,"Reflection cube map"),(0x64,"Background tint map")]),
         _ => return Ok(()),
     };
     // Check the entire known structure before reading any individual field.
@@ -1011,7 +1012,7 @@ fn shader_bitmap_references(
         if source>4||function>11||!period.is_finite()||!(0.0..=86400.).contains(&period)||lower.iter().chain(&upper).any(|v|!v.is_finite()||!(0.0..=1.0).contains(v)){return invalid("Model self-illumination metadata is invalid");}
         Some(ShaderSelfIllumination{source,function,period:if period==0.{1.}else{period},lower,upper})
     }else{None};
-    tag.shader_preview=Some(ShaderPreview{self_illumination,glass_diffuse_absent:glass_diffuse_absent.then_some(true),change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,detail_after_reflection:tag.class=="soso"&&flags&1!=0,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+    tag.shader_preview=Some(ShaderPreview{self_illumination,glass_diffuse_absent:glass_diffuse_absent.then_some(true),change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,glass_tint_scale:if glass&&tag.references.iter().any(|v|v.label=="Background tint map"){Some(shader_scale(r,at+0x60)?)}else{None},detail_after_reflection:tag.class=="soso"&&flags&1!=0,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&12==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
         two_sided:if glass{flags&4!=0}else{tag.class=="soso"&&flags&2!=0},uv_scale:if glass{[shader_scale(r,at+0x154)?;2]}else{uv_scale},
         alpha_blended:glass||tag.class=="soso"&&flags&8!=0,decal:if glass{flags&2!=0}else{tag.class=="soso"&&flags&8!=0},
@@ -1662,6 +1663,22 @@ mod shader_dependency_tests {
         let preview=environment.shader_preview.unwrap();assert!(preview.alpha_test);assert!(!preview.detail_after_reflection);
     }
     #[test]
+    fn native_model_decals_disable_cutout_without_changing_opaque_or_environment_flags(){
+        let mut bytes=vec![0u8;1200];let at=64;
+        install_ref(&mut bytes,at+0xa4,88,b"mtib");
+        let ids=std::collections::HashMap::from([(88,"bitm".into())]);
+        let region=Space{begin:0,end:bytes.len(),address:0};
+        for flags in [0u16,1,2,4,8,9,12,64,72] {
+            bytes[at+40..at+42].copy_from_slice(&flags.to_le_bytes());
+            let original=bytes.clone();let mut tag=shader_fixture("soso");
+            shader_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,at).unwrap();
+            let preview=tag.shader_preview.unwrap();
+            assert_eq!(preview.alpha_test,flags&12==0,"native model flags {flags:#x}");
+            assert_eq!(preview.alpha_blended,flags&8!=0);assert_eq!(preview.decal,flags&8!=0);
+            assert!(tag.fields.is_empty());assert_eq!(bytes,original);
+        }
+    }
+    #[test]
     fn native_glass_keeps_tint_reflection_and_transparency_instead_of_an_opaque_shell(){
         let mut bytes=vec![0u8;1200];let at=64;
         install_ref(&mut bytes,at+0x158,17,b"mtib");install_ref(&mut bytes,at+0xac,18,b"mtib");
@@ -1681,6 +1698,23 @@ mod shader_dependency_tests {
         install_ref(&mut bytes,at+0x158,999,b"mtib");let mut invalid=shader_fixture("sgla");shader_bitmap_references(&Reader(&bytes),&region,&mut invalid,&ids,at).unwrap();assert_eq!(invalid.primary_bitmap_status.as_deref(),Some("invalid"));assert!(invalid.shader_preview.is_none());
         install_ref(&mut bytes,at+0x158,17,b"mtib");
         let mut corrupt=shader_fixture("sgla");bytes[at+0x54..at+0x58].copy_from_slice(&f32::NAN.to_le_bytes());assert!(shader_bitmap_references(&Reader(&bytes),&region,&mut corrupt,&ids,at).is_err());
+    }
+    #[test]
+    fn glass_tint_map_has_its_own_exact_dependency_scale_and_bounds() {
+        let mut bytes=vec![0u8;1200];let at=64;
+        for offset in [0x158,0x16c,0xc0,0xac]{bytes[at+offset+12..at+offset+16].copy_from_slice(&u32::MAX.to_le_bytes());}
+        install_ref(&mut bytes,at+0x64,88,b"mtib");
+        bytes[at+0x60..at+0x64].copy_from_slice(&2f32.to_le_bytes());
+        let ids=std::collections::HashMap::from([(88,"bitm".into())]);let region=Space{begin:0,end:bytes.len(),address:0};
+        let original=bytes.clone();let mut tag=shader_fixture("sgla");
+        shader_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,at).unwrap();
+        assert_eq!(tag.references.len(),1);assert_eq!(tag.references[0].label,"Background tint map");assert_eq!(tag.references[0].target_id,88);
+        let preview=tag.shader_preview.unwrap();assert_eq!(preview.glass_tint_scale,Some(2.));assert_eq!(preview.glass_diffuse_absent,Some(true));
+        assert!(tag.fields.is_empty());assert_eq!(bytes,original);
+        bytes[at+0x60..at+0x64].copy_from_slice(&f32::NAN.to_le_bytes());
+        assert!(shader_bitmap_references(&Reader(&bytes),&region,&mut shader_fixture("sgla"),&ids,at).is_err());
+        let truncated=Space{begin:0,end:at+479,address:0};
+        assert!(shader_bitmap_references(&Reader(&original),&truncated,&mut shader_fixture("sgla"),&ids,at).is_err());
     }
     #[test]
     fn shader_bitmap_id_mismatch_is_not_resolved() {

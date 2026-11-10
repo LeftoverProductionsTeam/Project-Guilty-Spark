@@ -6,6 +6,32 @@ The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds support
 
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
+## 10 November glass, decals and retained model geometry
+
+The existing shared renderer had two reproduced native composition defects. Model flag8 (alpha-blended decal) must disable the opaque alpha-test rule even when flag4 is clear. Native glass tints the background, adds reflection, then blends diffuse by its alpha. Spark instead added the full diffuse RGB, and could discard faint glass/decal pixels. The native flag reader and cached-metadata guard now retain fractional decal alpha; glass uses its actual diffuse/detail alpha and exact tint dependencies. No brightness, exposure, fallback texture, UV, normal, rig, LOD or original game data was changed by this repair.
+
+For the tested static glass stages, the composition is D*a + (T*background + R)*(1-a). Non-neutral tint or a real background-tint map uses ordered tint/surface passes through the existing material builder; neutral tint remains one draw. Both passes share source images. HaloMesh, BSP Workshop and QuickForge use that same builder. The bounded read-only glass decoder now exposes Background tint map and its independent scale; corrupt floats or truncated bodies fail. Native fields do not become writable tag offsets.
+
+A real React/Three component test also reproduced unnecessary geometry replacement when a texture record completed. The material legend now depends on its actual need and source mesh; changing texture records without changing the native pass layout retains the same geometry. GPU proof: the before check returned different geometry IDs; after, model/completed IDs are identical. Colored glass uses2draws/4rasterized triangles for2source triangles; neutral glass and greenscreen each use1draw/2triangles. Source images are not cloned. This is a specific reuse result, not a measured cold-load or FPS claim.
+
+**Evidence:** intentional red native flag0x8, material and GPU tests precede the fixes. R416 passes911Rust/9explicit opt-in ignores,480frontend, TypeScript/contracts/offline/storage, but its broad browser run fails2navigation cases and is not acceptance. Both unchanged navigation tests pass focused replay. After source freeze, R418 passes480frontend and all273browser cases, including the actual shared model/BSP component, source transparency, reflection/detail order, glow, chroma mode and geometry reuse; TypeScript/contracts/offline/storage also pass. No assertion was relaxed. Earlier source/fixture edits overlapped R416; no precise failure cause is claimed from that timing alone.
+
+| Original source | Cache | Native Windows run | Duration | Original unchanged / errors |
+| --- | --- | --- | --- | --- |
+| Chupathingy Blood Gulch |5|R417|26.847s|yes /0|
+| MCC Blood Gulch |13|R419|24.569s|yes /0|
+| CE Timberland |609|R420|28.228s|yes /0|
+| OpenCE Blood Gulch |5|R421|23.768s|yes /0|
+| Original Zombie Demo |6|R422|28.039s|yes /0|
+
+Each native run independently verifies original model UVs, supported shader partitions, decal flags and glass tint/map metadata, then selects actual Warthog/Scorpion previews through the native Tag editor (Demo uses its two original Warthog-derived objects). All selected supported images load, JavaScript errors remain0, app close is normal and owned scratch is disposed. Other returned models receive source/mesh checks; they are not all selected GPU captures. Chupathingy/OpenCE use the same original map hash: two installation checks do not establish two formats or engine adapters. These are Spark Windows preview checks, not new Halo game playtests or native map compilations.
+
+QA: E/qa-vehicle-glass-r417/GuiltySpark.exe,49,762,816B, SHAbf3d601fd0c9331a93bb6d6e4ca0d6ed96832a0fecfa76a7e45ab18e65fc681d; runtime fingerprint0a326214db9771492fa7f45a649a72b4daed8ab1c477e55e58893758b3648f92. It was built from31af61a plus the reviewed production diff, not a clean-source release. Windows build200.038s; parent peak1,910,620,833logicalB, disposed1,845,940,221B. R418 disposes26,475,018B; later native runs dispose their bounded profiles/libraries. No SDK tree, original installation, accepted release or GitHub artifact was replaced.
+
+Exact receipts/logs: E/vehicle-glass-r416, vehicle-glass-r417, vehicle-glass-r418, vehicle-glass-mcc-r419, vehicle-glass-ce-r420, vehicle-glass-opence-r421 and vehicle-glass-demo-r422 (.json/.log). Actual native before/after captures: vehicle-coverage-chupa-r412-native-vehicle-warthog.png and vehicle-glass-r417-native-vehicle-warthog.png; MCC equivalents R410/R419. No Halo pixels are committed. Source research was read-only: OpenCE899219cc0a14b03bc12f0517a1e9ee4c37158af8 rasterizer_xbox_models.c decal state and rasterizer_xbox_transparent_geometry.c glass stages; Invadere8b58542fd1e0a239d0fbc689ac4e55b80e79442 glass schema. No engine implementation was imported.
+
+**User path:** open the owned map → Work → Tag editor → search its vehicle path and select Vehicle → choose the result; orbit/zoom and Materials remain available. World/Asset Library use the same repaired material path. H29 remains open for stable game-matched local lighting, reflection/glass details, animations and dashboard FunctionOut values. The four smet dashboard triangles and original Demo carrier's3179ligh triangles remain explicit unsupported coverage. These source fixes do not certify full game appearance or close the475-requirement/M1–M6 mandate.
+
 ## 10 November native vehicle detail and reflection order
 
 Original Scorpion shaders set shader_model's detail-after-reflection flag. Spark discarded it and always combined detail first. The shared parser now preserves the read-only flag, and the existing shared material renderer follows it. World, Asset Library and large tag previews retain one material path. UVs, normals, source colours, reflection cubes, lighting and alpha remain intact; no exposure adjustment, generic replacement material or native-tag mutation was introduced. Other shader classes do not reinterpret their first flag; old serialized previews default to false.
