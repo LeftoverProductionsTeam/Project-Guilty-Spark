@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: ee12b9ea26014d0c360ab53c7809d8737ba21f29 plus reviewed source-object lighting diff passes R432 fresh Windows, R433480frontend/274browser, R434 and R436–R439native source-family checks. R435 actual Chupathingy matched camera observed; no full game-parity/human acceptance. Local commit follows explicit staged-source manifests.
-Next action: Commit the accepted source-object lighting repair and exact evidence locally after staged-source manifest verification. Continue H29 source-local illumination/pose/dynamic-material fidelity using existing native reader/shared renderer; no brightness/fallback workaround. Human visual/driving and wider M1–M6 gates remain open.
+Latest verified revision: 99cb36466efd7608038e9576bc2363aebad8b7ee commits placed-object source lighting, R432 fresh Windows, R433480frontend/274browser, R434 and R436–R439native source-family checks; working tree clean after commit. R435actual Chupathingy matched camera observed. Source manifest2134files/51,010,498B/SHAe282033323a95c6ed15761a1a31dc36b490c5ee9c3fb491a967b089ba1cd1c80 verified before commit. No full game-parity/human acceptance.
+Next action: Continue H29 source-local illumination/pose/dynamic-material fidelity in the existing native reader/shared renderer. Pinned OpenCE object_lights.c::lights_distant_lighting_at_point samples BSP lightmap/diffuse and incident radiosity for local lighting/reflection tint; this is not yet implemented by source-sky lighting. Verify actual source data and native values before any change, no brightness/fallback workaround. Human visual/driving and wider M1–M6 gates remain open.
 
 ## Acceptance
 
@@ -93,7 +93,7 @@ R432/R433/R434/R435/R436–R439 are terminal; complete receipts verified, origin
 
 Current QA E/qa-vehicle-lighting-r432/GuiltySpark.exe49,762,816B SHA795ffce4eee20b643e57eb16eacae3ad1e54c27ac7b15f7b4dac2f25fae13332/runtimeFP0a1462e402aa7c0eca9ddbd222243b5852e6864fe7f3043959f88496aec729a5; built fromee12b9e plus reviewed current source, not a release. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Original R435 camera evidence and unmodifiedJPEG live in E/vehicle-matched-camera-r435.json and -warthog.jpg. Prior R375–R431 terminal/failure/storage details remain in existing evidence reports and ee12b9e:docs/ACTIVE_TASK.md; none is rerun or upgraded by this checkpoint.
 
-Commit procedure: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Recordresult through existing atomic checkpoint, no selfhash/amend/historyrewrite. ContinueGoalafter scopedcommit. No push/workflow/publication.
+Scoped source repair is locally committed99cb364; no push. Further changes must invalidate the QA fingerprint when production changes. Commit procedure for the next accepted increment: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Recordresult through existing atomic checkpoint, no selfhash/amend/historyrewrite. ContinueGoalafter scopedcommit. No push/workflow/publication.
 
 ## Deferred requests
 
