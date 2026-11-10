@@ -1,5 +1,11 @@
 # UI interaction acceptance audit
 
+## H05 native walkthrough acceptance — 10 November
+
+R605 uses the current source-matched Windows app (SHAe75731d7359d20d75ee4ee9416c524b9b73bb6cf9931b2ee591e64bdc8fed0b2), fresh owned library/WebView and no mocked IPC. File → New → Multiplayer Map creates the fixture, Ctrl+S saves it, and its Library card reopens it after a full process restart. Settings → Interface Studio enables the guide; enabled state survives restart. Mouse and Enter follow all17distinct existing guide destinations, waiting for visible workspace content. Turn off, manual Start/Finish and completion survive a second full process restart; manual restart remains available.0pageerrors, normal app close and owned disposal pass in19.594s.
+
+R604 proved navigation/state only; its screenshot still showed a loading destination. R605 strengthens that check and its finish image shows the actual Learning Center plus saved project. Exact receipt/screens: E/native-walkthrough-r605.json and native-walkthrough-r605-native-walkthrough-{enabled,start,finish}.png. The existing harness/verification entrypoint was extended; no new guide/navigation system or product renderer was added. This closes H05 automated native navigation/persistence only. Full per-feature instructions/actions, physical display/monitor tests and gameplay remain independent gates.
+
 ## H29 guide correction — 10 November
 
 The vehicle test guide still described the four Warthog dashboard triangles as unsupported after the native-meter implementation. Its prerequisite and material-coverage step now match the actual current controls: two meter materials,2798triangles/0unassigned, stationary source preview and no live-speed connection. The separate Demo carrier limitation remains explicit. Native UI evidence is R593–R597 in NATIVE_ASSETS_AND_SHOWCASE.md; this instruction repair adds no new human/game-parity acceptance.

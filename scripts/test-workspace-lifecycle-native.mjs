@@ -9,14 +9,15 @@ import {inflateSync} from 'node:zlib';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {chromium,expect as assertion} from '@playwright/test';
-import {chooseTool,openDrawer,openStudioMenu,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
+import {chooseTool,openDrawer,openStudioMenu,revealPagedControl,createMultiplayerMap} from '../tests/ui/helpers/navigation.ts';
 const [source,destination,nativeMap,invaderDirectory]=process.argv.slice(2);
 if(!source||!destination)throw Error('Use: test-workspace-lifecycle-native <embedded exe> <fresh evidence directory>');
 const root=path.resolve(destination),expect=assertion.configure({timeout:45000});
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
-const launchOnly=process.env.SPARK_LIFECYCLE_LAUNCH_ONLY==='1'||process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1';
+const walkthroughOnly=process.env.SPARK_LIFECYCLE_WALKTHROUGH==='1';
+const launchOnly=walkthroughOnly||process.env.SPARK_LIFECYCLE_LAUNCH_ONLY==='1'||process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1';
 const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
 const vehiclePreview=process.env.SPARK_LIFECYCLE_VEHICLES==='1';
 if(vehiclePreview&&(!nativeOnly||!previewOnly))throw Error('Vehicle source fidelity uses the existing read-only native preview workflow');
@@ -54,7 +55,7 @@ if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw 
 const reservationBytes=rebuildOnly?4*1024**3:previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1'?'native-project-switching':launchOnly?'native-layout-only':geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:walkthroughOnly?'native-guided-walkthrough':process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1'?'native-project-switching':launchOnly?'native-layout-only':geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
 const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?`native-${editCount}-edits`:nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 await finishStorage.createScratch('application');
 await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
@@ -853,6 +854,49 @@ try{
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(launchOnly){expect(path.resolve(boot.dataDirectory)).toBe(path.join(root,'library'));await expect(main.locator('#root')).not.toBeEmpty();step('Actual embedded app starts with its isolated library and no mocked IPC',{url:main.url()});}
+
+  if(walkthroughOnly){
+    await createMultiplayerMap(main,'H05 guided workflow','haloCustomEdition');
+    await main.keyboard.press('Control+s');
+    const workspaceReady=async()=>{
+      await main.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      await expect(main.locator('.loading').filter({hasText:/^Opening (workspace|level editor|your library)/})).toHaveCount(0);
+      const active=main.locator('.gs-retained-level-content[data-level-activity="active"]');
+      if(await active.count()){await expect(active.first()).toBeVisible();expect((await active.first().innerText()).trim().length).toBeGreaterThan(20);}
+    };
+    await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+    const guided=()=>main.getByRole('checkbox',{name:'Guided workspace walkthrough',exact:true,includeHidden:true});
+    await revealPagedControl(guided());await expect(guided()).not.toBeChecked();await guided().check();
+    await expect(main.locator('.gs-walkthrough')).toBeVisible();
+    await main.screenshot({path:path.join(root,'native-walkthrough-enabled.png')});
+    await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();
+    await expect(main.locator('.gs-walkthrough')).toBeVisible();
+    await openProject(main,'H05 guided workflow');
+    await main.locator('.gs-walkthrough').getByRole('button',{name:'Restart walkthrough',exact:true}).click();
+    await expect(main.locator('.gs-walkthrough')).toContainText('Welcome');
+    const firstNext=main.locator('.gs-walkthrough').getByRole('button',{name:/^Next:/});await firstNext.focus();await main.keyboard.press('Enter');
+    await expect(main.locator('.gs-walkthrough')).toContainText('Games & tools');
+    await main.locator('.gs-walkthrough').getByRole('button',{name:'Turn off walkthrough',exact:true}).click();
+    await expect(main.locator('.gs-walkthrough')).toHaveCount(0);
+    await main.getByRole('button',{name:'Close Help',exact:true}).click();await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+    await revealPagedControl(guided());await expect(guided()).not.toBeChecked();
+    await openDrawer(main,'Help');const start=main.getByRole('button',{name:'Start walkthrough',exact:true,includeHidden:true});await revealPagedControl(start);await start.click();
+    const seen=[];
+    for(let index=0;index<24;index++){
+      const tour=main.locator('.gs-walkthrough');await expect(tour).toBeVisible();await workspaceReady();const heading=await tour.locator('strong').innerText();expect(seen).not.toContain(heading);seen.push(heading);
+      if(index===0||index===16)await main.screenshot({path:path.join(root,index===0?'native-walkthrough-start.png':'native-walkthrough-finish.png')});
+      const finish=tour.getByRole('button',{name:'Finish walkthrough',exact:true,includeHidden:true});
+      if(await finish.count()){await revealPagedControl(finish);await finish.click();break;}
+      const next=tour.getByRole('button',{name:/^Next:/,includeHidden:true});await revealPagedControl(next);
+      if(index%2){await next.focus();await main.keyboard.press('Enter');}else await next.click();
+    }
+    expect(seen).toHaveLength(17);await expect(main.locator('.gs-walkthrough')).toHaveCount(0);
+    await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();
+    await expect(main.locator('.gs-walkthrough')).toHaveCount(0);await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Interface Studio',exact:true}).click();await revealPagedControl(guided());await expect(guided()).not.toBeChecked();
+    await openDrawer(main,'Help');const restart=main.getByRole('button',{name:'Start walkthrough',exact:true,includeHidden:true});await revealPagedControl(restart);await expect(restart).toBeVisible();
+    report.walkthrough={steps:seen,mouseAndKeyboard:true,enabledSurvivesFullRestart:true,completionSurvivesFullRestart:true,manualRestartAvailable:true,projectCreatedThroughFileMenu:true,projectSavedWithKeyboard:true,projectReopenedThroughLibrary:true,waitedForWorkspaceContent:true};
+    step('All17existing guide steps, actual Settings toggle and manual start/finish work through native mouse/keyboard and two full process restarts',report.walkthrough);
+  }
   if(process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1'){
     if(!launchOnly)throw Error('Project-switch acceptance uses the existing bounded launch-only fixture');
     const {nativeProjectSwitching}=await import('./native-project-switching.mjs');
