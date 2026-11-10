@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: ef5278c parent + reviewed original2D GPU mip increment. R501486frontend/TypeScript/contracts/offline/40storage/freshWindows158.695s; R501–R505all5native sources retain authored Warthog8/8/10/8/10levels, no generated replacement/detail warnings/0errors/normalclose/originals unchanged; R5064WebGL pixel cases pass. No new game/human/release acceptance.
-Next action: Check manifests and commit verified original2D GPU levels locally, retire only manifest/receipt-verified superseded owned QA apps. Then profile redundant texture IPC/cache reads (CEfixture51.229s versus earlier34.054s) before optimizing existing cache. Preserve quality/H29 and M1–M6 gates.
+Latest verified revision: 50ec0d8f424f2148536489a91fd9d8c45ba0b074 accepted original2D GPU mip increment; R501486frontend/TypeScript/contracts/offline/40storage/freshWindows158.695s, R501–R505five-source native, R5064WebGL cases pass. R507retains exactR501QA and retires only2superseded nonrunning manifest-verified QA executables101,029,888logicalB.475CSVunchanged; no game/human/release acceptance.
+Next action: Profile texture IPC/cache reuse through the existing native harness on the exactR501QA, especially CE fixture51.229s vs pre-mip34.054s. Record actual duplicate requests/timings before optimizing existing nativePreviewResources; do not drop original levels or create another cache/renderer. H29shadows/pose/game and M1–M6 remain open.
 
 ## Acceptance
 
@@ -13,7 +13,7 @@ Operation110 f3bd3ec0 full text: docs/Master Engineering Prompts/GS_2026-11-08_O
 Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHAa47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a; sortedIDsetSHAb990f65f7c1ccb092b776feab2065a1207926a0aca5aeee05cf5d63547736077. CSV remains byte-unchanged vs HEAD and has475rows/0duplicateIDs. Keep all later Master Engineering Prompts, research, source, Git/history/stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85, original Halo runtimes/ISOs/maps/mods/tags/SDKs, C49 and accepted c035/dc releases. No new branch/worktree/clone/archive/SDK warehouse or queue system. No push, remote workflow or publication: owner performs those.
 
 
-## Current uncommitted original2D GPU texture follow-through
+## Accepted original2D GPU texture follow-through
 
 R494WebGL red: authored lower24/208/56renders generated240/16/32. R495/R506green uses original levels, valid shortenedchain clamps,0GLerrors. Shared configureSourceTexture + small ownedBitmapMipmaps adapter reuse native reader/decoder/cache, source/hash/mip identities,24baseimages/24requests/chunk/64MiBtotalpixels and cancellation. World, largepreview/AssetLibrary/ownedplacements/Workshop share it; optionaldetailwarnings preserve validbase/readiness, corrupt/stalesource stillrefused. NativeWarthogmaincounts and World111/121/118/111/105primary2Dtexturemetadata checked in R501–R505. CurrentQA E/qa-vehicle-mips-r501/GuiltySpark.exe50,516,992B SHAa9ace215142deba5fdb24560e0c7227aa73d106f826f8866bf8fb23e28975496/runtimeFP9c49cf54068beeb4b664c88512af8ef4afe7874fcd3474a35008330fef418b30. Original2Dlevels accepted only; game/shadows/pose/cubechains/human/peer/platform remainopen. Exact complete evidence NATIVE_ASSETS_AND_SHOWCASE.md.
 
@@ -99,7 +99,7 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-R494–R506are terminal. Exact currentR501QA fingerprint above is enforced before binary reuse; source changes invalidate it, docs/tests-only changes do not. Earlier QA histories are in NATIVE_ASSETS_AND_SHOWCASE.md. R481/R493retired only manifest/receipt-verified nonrunning generated executables; retained all receipts/captures/protected releases. Current supersededR485/R496apps await scoped retirement after local commit; no original data/SDK/release is disposable by that label. No active app/game/compiler remains. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. R435nativegame observation is separate fromH29parity.
+R494–R506are terminal. Exact currentR501QA fingerprint above is enforced before binary reuse; source changes invalidate it, docs/tests-only changes do not. Earlier QA histories are in NATIVE_ASSETS_AND_SHOWCASE.md. R481/R493retired only manifest/receipt-verified nonrunning generated executables; retained all receipts/captures/protected releases. R507retires only2nonrunning manifest/receipt-verified supersededR485/R496executables101,029,888logicalB; currentR501and all evidence remain; no original data/SDK/release is disposable by that label. No active app/game/compiler remains. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. R435nativegame observation is separate fromH29parity.
 
 Commit procedure: stage explicit accepted files; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests/active-task tests/cached diff; localcommit only. Preserve475CSV byte identity b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Continue the full mandate after scoped commit; no push/workflow/publication.
 

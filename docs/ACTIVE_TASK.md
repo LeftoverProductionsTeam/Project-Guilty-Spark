@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 50ec0d8f424f2148536489a91fd9d8c45ba0b074 accepted original2D GPU mip increment; R501486frontend/TypeScript/contracts/offline/40storage/freshWindows158.695s, R501–R505five-source native, R5064WebGL cases pass. R507retains exactR501QA and retires only2superseded nonrunning manifest-verified QA executables101,029,888logicalB.475CSVunchanged; no game/human/release acceptance.
-Next action: Profile texture IPC/cache reuse through the existing native harness on the exactR501QA, especially CE fixture51.229s vs pre-mip34.054s. Record actual duplicate requests/timings before optimizing existing nativePreviewResources; do not drop original levels or create another cache/renderer. H29shadows/pose/game and M1–M6 remain open.
+Latest verified revision: 5cc02f3 clean checkpoint; source repair50ec0d8 passes486frontend/40storage/freshWindows/R501–R505five-source native/R5064WebGL. R508unchangedR501 CEprofile passes allsource assertions: firstready22.999s, samecanvasresume0.667s/0texture-model reloads;66bitmapIPCsum21.504s, decodedcache128entries/1128evictions. Alloriginalsunchanged/normalclose/disposal; no speedup/game acceptance claim.
+Next action: Investigate measured66bitmapIPC reads/21.504s sum on CE. Trace exact repeated requests; benchmark resource hashing vs decode, then amortize whole-chain extraction through the existing bounded batch path if justified. Preserve pre/post open-handle SHA checks,24-image/16MiBraw/64MiBRGBA bounds and malformed/stale/TOCTOU tests. Reuse currentR501 app until production changes; no new cache/renderer/SDK.
 
 ## Acceptance
 
