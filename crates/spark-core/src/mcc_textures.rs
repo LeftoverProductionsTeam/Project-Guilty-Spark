@@ -350,6 +350,9 @@ pub struct TextureBundle {
     pub sha256: String,
 }
 pub struct TopMip {
+    /// Original pack dimensions, independent of the selected lower level.
+    pub base_width: u16,
+    pub base_height: u16,
     pub mip_levels: usize,
     pub width: u16,
     pub height: u16,
@@ -464,6 +467,7 @@ impl TextureBundle {
             }
             let pixels = p.range(entry.address as u64 + 58 + span.offset as u64, span.size)?;
             return Ok(TopMip {
+                base_width:entry.width as u16,base_height:entry.height as u16,
                 mip_levels:span.levels,
                 width:span.width,
                 height:span.height,

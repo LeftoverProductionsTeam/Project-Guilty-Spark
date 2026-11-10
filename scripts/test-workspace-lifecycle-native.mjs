@@ -340,7 +340,10 @@ async function nativeVehiclePreview(opened,originalHash){
     expect(expected.length).toBeGreaterThan(1);
     const requests=expected.map(row=>({bitmapTagId:bitmap.id,imageIndex:0,mipLevel:row.level}));
     const response=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests});expect(response.sourceSha256).toBe(originalHash);expect(response.items).toHaveLength(expected.length);
-    for(let k=0;k<expected.length;k++){const wanted=expected[k],item=response.items[k],preview=item.preview;expect(item.error).toBeNull();expect(item.mipLevel).toBe(k);expect(preview).toBeTruthy();expect(preview.mipLevel).toBe(k);expect(preview.mipLevels).toBe(expected.length);if(expectedCacheVersion!==13)expect(preview.nativeMipmaps).toBe(levels-1);expect(preview.width).toBe(wanted.width);expect(preview.height).toBe(wanted.height);expect(preview.format).toBe(format);expect(preview.sourceSha256).toBe(originalHash);expect(Buffer.from(preview.ddsBase64,'base64').subarray(128).equals(wanted.pixels),'Original authored mip bytes '+k).toBe(true);}
+    for(let k=0;k<expected.length;k++){const wanted=expected[k],item=response.items[k],preview=item.preview;expect(item.error).toBeNull();expect(item.mipLevel).toBe(k);expect(preview).toBeTruthy();expect(preview.mipLevel).toBe(k);expect(preview.mipLevels).toBe(expected.length);if(expectedCacheVersion!==13)expect(preview.nativeMipmaps).toBe(levels-1);else{
+      const record=pointer(u32(bitmap.dataOffset+100),48),nativeLevels=bytes.readUInt16LE(record+20),agree=bytes.readUInt16LE(record+4)===width&&bytes.readUInt16LE(record+6)===height&&bytes.readUInt16LE(record+8)===1&&bytes.readUInt16LE(record+10)===0&&bytes.readUInt16LE(record+12)===14&&levels<=nativeLevels+1;
+      expect(agree,'Stock Warthog pack must match its native sampler metadata').toBe(true);expect(preview.nativeMipmaps).toBe(nativeLevels);
+    }expect(preview.width).toBe(wanted.width);expect(preview.height).toBe(wanted.height);expect(preview.format).toBe(format);expect(preview.sourceSha256).toBe(originalHash);expect(Buffer.from(preview.ddsBase64,'base64').subarray(128).equals(wanted.pixels),'Original authored mip bytes '+k).toBe(true);}
     const invalid=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[{bitmapTagId:bitmap.id,imageIndex:0,mipLevel:16}]});expect(invalid.items[0].preview).toBeNull();expect(invalid.items[0].error).toBeTruthy();
     const badDuplicate=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[requests[0],requests[0]]}).then(()=>'',String);expect(badDuplicate).toContain('unique');
     await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(bitmap.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bitm');await main.locator('.tag-row').filter({has:main.locator('strong').filter({hasText:/^warthog$/i})}).click();
@@ -353,6 +356,35 @@ async function nativeVehiclePreview(opened,originalHash){
     await contexts.getByRole('tab',{name:'Properties',exact:true}).click();await contexts.getByRole('tab',{name:'Materials',exact:true}).click();await expect(detail).toHaveValue(String(level));
     await detail.selectOption('0');await expect(pixels).toHaveAttribute('data-mip-level','0');
     mipReadback={bitmapPath:bitmap.path,bitmapTagId:bitmap.id,format,sourceDeclaredLevels:levels,levels:expected.map(row=>({level:row.level,width:row.width,height:row.height,bytes:row.pixels.length,sha256:sha(row.pixels)})),originalMipBytesMatched:true,nativeControlSelection:level,canvasRgbaSha256:canvasHash,retainedAfterContextSwitch:true,generatedMipmapsUsed:false,gameParityAccepted:false};
+    if(expectedCacheVersion===13){
+      const tag=opened.inspection.tags.find(t=>t.class==='bitm'&&/^ui[\\/]hud[\\/]bitmaps[\\/]combined[\\/]hud_unit_backgrounds$/i.test(t.path));
+      expect(tag,'Original MCC mismatched-size bitmap fixture').toBeTruthy();
+      const count=u32(tag.dataOffset+96);expect(count).toBeGreaterThan(8);const record=pointer(u32(tag.dataOffset+100),count*48)+8*48;
+      const nativeDimensions=[bytes.readUInt16LE(record+4),bytes.readUInt16LE(record+6)];expect(nativeDimensions).toEqual([512,128]);
+      const index=await openPinned(path.join(mipSource.resourceDirectory,'bloodgulch.imeta'),mipSource.resourceSha256['bloodgulch.imeta']);
+      if(index.size>8+8192*328)throw Error('Independent mismatched image index exceeds bound');const table=await index.range(0,index.size),entries=table.readUInt32LE(0),key='hce_uhbc_hud_unit_backgrounds_8',rows=[];
+      if(entries>8192||8+entries*328>table.length)throw Error('Independent mismatched index escapes its source');
+      for(let n=0;n<entries;n++){const at=8+n*328,z=table.indexOf(0,at);if(z<at||z>=at+256)throw Error('Independent MCC image name invalid');if(table.toString('ascii',at,z)===key)rows.push(table.subarray(at,at+328));}
+      expect(rows).toHaveLength(1);const packedDimensions=[rows[0].readUInt32LE(268),rows[0].readUInt32LE(272)];expect(packedDimensions).toEqual([256,64]);
+      const response=await invoke(main,'preview_owned_cache_bitmap_batch',{projectId:opened.project.id,requests:[{bitmapTagId:tag.id,imageIndex:8,mipLevel:0}]});
+      expect(response.items[0].error).toBeNull();const preview=response.items[0].preview;expect(preview).toBeTruthy();expect(preview.nativeMipmaps).toBeUndefined();expect([preview.width,preview.height]).toEqual(packedDimensions);expect(preview.sourceSha256).toBe(originalHash);
+      await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(tag.path);const exactRow=main.locator('.tag-row').filter({has:main.locator('strong').filter({hasText:/^hud_unit_backgrounds$/i})});await expect(exactRow).toHaveCount(1);await exactRow.click();
+      await main.getByRole('tablist',{name:'Asset contexts',exact:true}).getByRole('tab',{name:'Materials',exact:true}).click();
+      const image=main.getByLabel('Verified original bitmap pixels',{exact:true});await expect(image).toHaveAttribute('data-image-index','0');
+      for(let n=1;n<=8;n++){const next=main.getByRole('button',{name:'Next bitmap image',exact:true});await expect(next).toBeEnabled();await next.click();await expect(image).toHaveAttribute('data-image-index',String(n));}
+      await expect(image).toHaveAttribute('width','256');await expect(image).toHaveAttribute('height','64');await expect(image).toHaveAttribute('data-source-sha256',originalHash);
+      const raw=Buffer.from(preview.ddsBase64,'base64'),decoded=decodeHaloDds(raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.byteLength));
+      const presented=Uint8Array.from(await image.evaluate(canvas=>Array.from(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data)));
+      expect(presented.length).toBe(decoded.pixels.length);let maxAlphaError=0,maxPremultipliedRgbError=0,unassociatedRgbDifferences=0;
+      // Canvas stores premultiplied alpha. Invisible RGB and its rounding on
+      // readback are not source corruption; compare alpha and visible colour.
+      for(let at=0;at<presented.length;at+=4){const a=decoded.pixels[at+3],b=presented[at+3];maxAlphaError=Math.max(maxAlphaError,Math.abs(a-b));for(let k=0;k<3;k++){if(decoded.pixels[at+k]!==presented[at+k])unassociatedRgbDifferences++;maxPremultipliedRgbError=Math.max(maxPremultipliedRgbError,Math.abs(Math.round(decoded.pixels[at+k]*a/255)-Math.round(presented[at+k]*b/255)));}}
+      const displayed={sourceRgbaSha256:sha(decoded.pixels),canvasRgbaSha256:sha(presented),maxAlphaError,maxPremultipliedRgbError,unassociatedRgbDifferences};
+      mipReadback.mccMismatchedPack={tag:tag.path,imageIndex:8,nativeDimensions,packedDimensions,nativeSamplerCountUnavailable:true,actualNextImageClicks:8,...displayed,validPackedPreviewRetained:maxAlphaError===0&&maxPremultipliedRgbError<=1};
+      console.log('MCC_PACK_PRESENTATION',JSON.stringify(displayed));
+      expect(maxAlphaError).toBe(0);expect(maxPremultipliedRgbError).toBeLessThanOrEqual(1);
+      await main.screenshot({path:path.join(root,'native-mcc-unaligned-bitmap.png')});
+    }
     for(const input of pinnedInputs)expect(await input.hash(),'Original resource unchanged after mip requests').toBe(input.pin);
   }finally{for(const handle of handles)await handle.close();}
   const seen=new Set(),results=[];
@@ -522,7 +554,7 @@ async function nativeVehiclePreview(opened,originalHash){
     expect(appliedLighting.sourceSha256).toBe(originalHash);
     const vehicleLighting=appliedLighting.lights.find(light=>light.id===placed.id)??null;
     if(expectedCacheVersion===5||expectedCacheVersion===609){expect(appliedLighting.reason).toBeNull();expect(vehicleLighting,'Actual World Warthog must receive verified native lightmap/diffuse illumination').toBeTruthy();}
-    if(expectedCacheVersion===13){expect(appliedLighting.applied).toBe(0);expect(appliedLighting.reason).toContain('no verified');}
+    if(expectedCacheVersion===13){expect(appliedLighting.probed).toBeGreaterThan(0);expect(vehicleLighting,'Matching MCC pack/native source must supply placed-Warthog lighting').toBeTruthy();}
     if(vehicleLighting)for(const field of['ambient','primary','bounce','reflection','point'])expect(vehicleLighting[field].every(Number.isFinite)).toBe(true);
     report.vehiclePreview.appliedLighting={...appliedLighting,lights:undefined,vehicle:vehicleLighting,scope:'Actual native World component with source-pinned diffuse mip/lightmap samples; default-pose centre only, not game parity'};
     const framedViewport=await worldCanvas.evaluate(node=>{const r=node.getBoundingClientRect();return{width:r.width,height:r.height,bufferWidth:node.width,bufferHeight:node.height,camera:JSON.parse(node.dataset.gsCamera)};});
@@ -541,6 +573,18 @@ async function nativeVehiclePreview(opened,originalHash){
     for(let axis=0;axis<3;axis++)expect(Math.abs(closeupCamera.target[axis]-framedViewport.camera.target[axis])).toBeLessThan(.001);
     await main.screenshot({path:path.join(root,'native-vehicle-world-closeup.png')});
     report.vehiclePreview.placedVehicle.wheelZoom={beforeDistance,afterDistance:distance(closeupCamera),camera:closeupCamera,actualMouseWheel:true};
+    if(expectedCacheVersion===13){
+      const canvasHandle=await worldCanvas.elementHandle();if(!canvasHandle)throw Error('Native World canvas missing');
+      await openStudioMenu(main);const runtime=main.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);const original=await runtime.inputValue(),choices=[];
+      for(const value of['haloCustomEdition','chupathingyCe',original]){
+        await runtime.selectOption(value);await expect(runtime).toHaveValue(value);await main.keyboard.press('Escape');
+        expect(await canvasHandle.evaluate(node=>node.isConnected)).toBe(true);
+        const state=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsObjectLighting));expect(state.sourceSha256).toBe(originalHash);expect(state.applied).toBe(appliedLighting.applied);expect(state.pending).toBe(false);
+        const camera=await worldCanvas.evaluate(node=>JSON.parse(node.dataset.gsCamera));expect(camera.target).toEqual(closeupCamera.target);choices.push({runtime:value,sourceSha256:state.sourceSha256,applied:state.applied});
+        await openStudioMenu(main);await revealPagedControl(runtime);
+      }
+      await main.keyboard.press('Escape');report.vehiclePreview.placedVehicle.hostRuntimeSwitch={original,choices,sameCanvas:true,sourceLightingPreserved:true,noGameLaunched:true};
+    }
   }
   step('Actual native vehicle previews preserve authored model UV scales, source materials and original bytes',report.vehiclePreview);
 }

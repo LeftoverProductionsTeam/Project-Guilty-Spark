@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 9f36da7b1503e4cdeff8b732065b4b7d764637a0 locally commits the accepted vehicle increment.914Rust/9ignored R466,275browser R471, final480frontend/TypeScript/contracts/offline/40storage/freshWindows/native R480 and3GPU R474 pass. Five-source native matrix R475–R479 passes; originalsunchanged/0errors/normalclose/ownedscratchdisposed. CurrentQA SHAdb1e9b57…/runtimeFPb02da9ed… freshly matches committed source inR481.475CSV unchanged; no push.
-Next action: Continue H29 native game-matched vertex/reflection/shadow/pose and MCC pack-lighting validation using existing material/reader/runtime fixtures. Keep human game fidelity, four dashboard meter triangles, Demo light-reference carrier, scenery averaging and full M1–M6 gates open. Use currentR480 QA only while runtime fingerprint matches; no push/publication.
+Latest verified revision: e70dab2 parent + reviewed MCC increment: R48322bitmap/4pack Rust; R485481frontend/TypeScript/contracts/offline/40storage/freshWindows158.065s. R487–R491all5source-native checks pass, source/pack mismatch preserved, Studio choice cannot change source lighting; R4923real-GPU cases pass. Original hashes unchanged/0errors/normalclose/disposal.
+Next action: Verify manifests/checkpoint, commit this MCC source-lighting/resource repair locally, then address remaining source-native vehicle fidelity (authored3D GPU mip chains/lighting interpolation) in existing pipeline. H29game, shadows/poses and M1–M6 human/hardware gates remain open.
 
 ## Acceptance
 
@@ -13,9 +13,9 @@ Operation110 f3bd3ec0 full text: docs/Master Engineering Prompts/GS_2026-11-08_O
 Preserve475requirement IDs/wordings and25base prompt identities. First4columnSHAa47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a; sortedIDsetSHAb990f65f7c1ccb092b776feab2065a1207926a0aca5aeee05cf5d63547736077. CSV remains byte-unchanged vs HEAD and has475rows/0duplicateIDs. Keep all later Master Engineering Prompts, research, source, Git/history/stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85, original Halo runtimes/ISOs/maps/mods/tags/SDKs, C49 and accepted c035/dc releases. No new branch/worktree/clone/archive/SDK warehouse or queue system. No push, remote workflow or publication: owner performs those.
 
 
-## Current accepted increment
+## Current uncommitted MCC follow-through
 
-Shared startup/native object reader retains bounds/flags/change colours; exact classic mip/lightmap/incident samples reach existing World/HaloMesh illumination/reflection. Signed16 image-index, optional bad-bounds geometry retention and explicit budget status are verified. Real F/Escape/24wheel gestures zoom7.889867→2.303760, original close PNGs retained. CE/Chupa/OpenCE selectedWarthog has local sample; alteredDemo car lacksfloor, MCCpack sampler remainsunverified. R480112/112eligible World samples/2488msworker (not speedbenchmark). Final QA/source hash/screens/evidence in NATIVE_ASSETS_AND_SHOWCASE.md; H29/UI audit updated.475CSV unchanged. No newrenderer/nativewrites/SDK. Native GPUmips/shadows/pose/fullgame parity remainopen.
+R482 independently pairs667original-map/imeta images (5952Dshape matches); strict optional native sampler count requires matching2Dun-swizzled base dimensions/encoding/count. Pack count never becomes native count. Mismatched512x128native vs256x64packedHUD remains previewable without native sampler metadata. R487 actual8Next-image clicks and alpha/visibleRGB error0pass. Studio CE/Chupa selection retains sameMCCsourceSHA/canvas/135samples. Shared textureResourceScope helper uses recorded source edition across World/bitmap/Workshop/owned-model/compatible-donor views. R484exact-searchfixture,R485transparentRGBassertion,R486earlyreportwritefailures corrected in tests only, source-byte assertions intact. CurrentQA E/qa-vehicle-mcc-r485/GuiltySpark.exe50,512,896B SHA4c5305e2372e480aab7eedfc9e9916747603160efa7bd2b5c4f62c4ca78fb117/runtimeFPf7a713b0683c4f08aa7b4fe186393c613f07eae9c5b0901d16c49bb90d6a5ddb. NoSDK/nativewrites/game/release changes.
 
 ## Verified milestones
 

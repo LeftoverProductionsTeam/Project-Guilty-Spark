@@ -61,7 +61,9 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
             let bundle=bundle.as_mut().ok_or_else(||SparkError::Invalid("MCC texture bundle unavailable".into()))?;
             if bundle.contains_key(&key)? {
                 let mip=bundle.mip(&key,request.mip_level)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
-                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:mip.mip_levels,native_mipmaps:None,image_count:count,shared_native_bitmap_path:None,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
+                let native_mipmaps=read_top_mip_metadata(&bytes,&header,at,request.image_index).ok()
+                    .and_then(|original|mcc_pack_native_mipmaps(&original,&mip));
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,mip_level:request.mip_level,mip_levels:mip.mip_levels,native_mipmaps,image_count:count,shared_native_bitmap_path:None,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
             }
             let hash=hashes.get("mcc-shared-bitmaps.map").ok_or_else(||SparkError::Invalid("Exact MCC texture key is missing; reconnect Halo Textures to verify MCC's shared bitmaps.map".into()))?;
             if shared.is_none() {
@@ -101,7 +103,7 @@ pub struct OwnedBitmapPreview {
     pub bitmap_tag_id: u32,
     pub image_index: usize,
     /// Classic native mip count below the base, including Xbox padded tails.
-    /// MCC pack counts are a different contract and do not supply this value.
+    /// MCC supplies this only from a matching native tag, never its pack count.
     #[serde(default,skip_serializing_if="Option::is_none")] pub native_mipmaps: Option<u16>,
     #[serde(default)] pub mip_level: usize,
     /// Usable authored levels including level zero; never generated display mips.
@@ -344,6 +346,14 @@ struct TopMipMetadata {
     texel_stride: usize,
     mipmaps: u16,
     xbox: bool,
+}
+/// A pack count includes its base; it is never the native sampler count.
+/// Only matching native 2D dimensions/encoding can supply that separate count.
+/// A bad optional native record must not discard a valid packed preview.
+fn mcc_pack_native_mipmaps(original:&TopMipMetadata,packed:&crate::mcc_textures::TopMip)->Option<u16>{
+    (original.kind==0&&!original.swizzled&&original.width==packed.base_width&&original.height==packed.base_height&&
+        original.format==packed.format&&packed.mip_levels>0&&packed.mip_levels<=usize::from(original.mipmaps)+1)
+        .then_some(original.mipmaps)
 }
 /// Bounded offsets inside one native 2D image, not a texture resampler.
 /// Classic counts exclude the base; callers normalize the count before entry.
@@ -848,6 +858,21 @@ mod tests {
         set32(&mut bytes,0x980+24,0x2000);set32(&mut bytes,0x980+28,16);
         bytes[0x2000..0x2010].copy_from_slice(&[1;16]);
         (bytes,MapHeader {version:7,engine:"Halo PC".into(),name:"fixture".into(),build:"synthetic".into(),scenario_type:1,file_size:0x2800,declared_size:0x2800,tag_offset:0x800,tag_size:0x400,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false})
+    }
+    #[test]
+    fn mcc_sampler_count_requires_native_pack_agreement_without_relabelling_pixels(){
+        let (bytes,header)=fixture(14,0);
+        let mut native=read_top_mip_metadata(&bytes,&header,0x900,0).unwrap();native.mipmaps=2;
+        let mut packed=crate::mcc_textures::TopMip{base_width:4,base_height:4,width:1,height:1,mip_levels:3,format:"DXT1",pixels:vec![7;8]};
+        assert_eq!(mcc_pack_native_mipmaps(&native,&packed),Some(2));
+        // Even identical 1px lower levels cannot hide different original sizes.
+        packed.base_width=8;assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);packed.base_width=4;
+        packed.base_height=8;assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);packed.base_height=4;
+        packed.format="DXT5";assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);packed.format="DXT1";
+        packed.mip_levels=4;assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);packed.mip_levels=0;assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);packed.mip_levels=3;
+        native.kind=2;assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);native.kind=0;
+        native.swizzled=true;assert_eq!(mcc_pack_native_mipmaps(&native,&packed),None);
+        assert_eq!(packed.pixels,vec![7;8]);
     }
     #[test]
     fn authored_mip_offsets_preserve_distinct_bytes_and_reject_truncation(){

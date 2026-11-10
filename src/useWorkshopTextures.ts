@@ -6,7 +6,7 @@ import type { OwnedBitmapBatchResponse } from './ownedBitmapBatch';
 import { configureSourceTexture } from './sourceTexture';
 import { loadReflectionCube } from './ownedReflectionCube';
 import { nativeShaderTextureRole } from './nativeShaderTextures';
-import { textureResourceScope } from './textureResourceScope';
+import { textureResourceScope,bitmapResourceSha256 } from './textureResourceScope';
 import type { OpenProject, NativeAssetImport, ShaderPreview } from './types';
 import type { QuickForgeDocument } from './forge';
 export interface WorkshopMaterialView {
@@ -72,9 +72,7 @@ export function useWorkshopTextures(
           }),
         );
         const resource =
-          source.project.source?.resourceSha256?.['mcc-textures'] ??
-          source.project.source?.resourceSha256?.['bitmaps.map'] ??
-          null;
+          bitmapResourceSha256(source.project.source);
         const requests = uniqueBitmapTargets(tasks, inspection.sha256, resource),
           pool = new Map<number, THREE.Texture>();
         let bytes = 0;

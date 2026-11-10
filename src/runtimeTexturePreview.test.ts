@@ -16,7 +16,7 @@ const inspection = {
 } as MapInspection;
 const project = { id: 'source', source: { sha256: sourceHash, cacheVersion:6, resourceSha256: {},originalPath:'/owned/original.map',preservedPath:'/library/source.map',scenarioPath:'levels/test/source' } } as Project;
 const runtime = {
-  project: { id: 'runtime', source: { sha256: runtimeHash, resourceSha256: { 'mcc-textures': packHash } } },
+  project: { id: 'runtime', source: { sha256: runtimeHash, cacheVersion:13, resourceSha256: { 'mcc-textures': packHash } } },
   inspection: { sha256: runtimeHash, tags: [tag(9),tag(10,'textures/embedded')] },
 } as unknown as OpenProject;
 function preview() {

@@ -16,8 +16,8 @@ export function useNativeObjectLighting(projectId:string,sourceSha256:string|und
   useEffect(()=>{
     let live=true;const started=performance.now();
     // MCC's pack mip count is not the classic native bitmap sampling count.
-    // No source-local substitution is made until that separate contract passes.
-    if(!sourceSha256||![5,6,7,609].includes(cacheVersion??-1)||!probes.length||probes.length>1024)return;
+    // The reader exposes a native count only when exact pack/tag metadata agrees.
+    if(!sourceSha256||![5,6,7,13,609].includes(cacheVersion??-1)||!probes.length||probes.length>1024)return;
     const images=new Map<string,VerifiedBatchImage>();let decodedBytes=0;
     const read=async(requests:readonly {bitmapTagId:number;imageIndex:number;mipLevel?:number}[])=>{
       const unique=[...new Map(requests.map(r=>[bitmapImageKey(r.bitmapTagId,r.imageIndex,r.mipLevel),r])).values()].filter(r=>!images.has(bitmapImageKey(r.bitmapTagId,r.imageIndex,r.mipLevel)));
@@ -64,6 +64,6 @@ export function useNativeObjectLighting(projectId:string,sourceSha256:string|und
     return()=>{live=false;};
   },[scope,projectId,sourceSha256,resourceSha256,cacheVersion,probes]);
   const current=state?.scope===scope&&state.probes===probes?state:null;
-  const supported=!!sourceSha256&&[5,6,7,609].includes(cacheVersion??-1),overBudget=probes.length>1024;
+  const supported=!!sourceSha256&&[5,6,7,13,609].includes(cacheVersion??-1),overBudget=probes.length>1024;
   return {lights:current?.lights??null,pending:supported&&!overBudget&&probes.length>0&&!current,reason:current?.reason??(overBudget?'Native source-lighting probe limit exceeded.':!supported?'This source format has no verified local-lighting sampler.':null),milliseconds:current?.milliseconds??null};
 }

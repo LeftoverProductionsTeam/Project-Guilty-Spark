@@ -5,7 +5,7 @@ import type {OwnedBitmapPreview} from '../ownedBitmapPreview';
 import type {DdsImage} from '../haloDds';
 import type {Project} from '../types';
 import {useMapState} from '../mapSession';
-import {textureResourceScope} from '../textureResourceScope';
+import {textureResourceScope,bitmapResourceSha256} from '../textureResourceScope';
 import {decodeReflectionCube, readReflectionCube} from '../ownedReflectionCube';
 
 /** Original, source-checked pixels; no replacement art or project edits. */
@@ -34,7 +34,7 @@ export default function BitmapPreview({project,tagId,cube=false}:{project:Projec
       }
       const preview=await call<OwnedBitmapPreview>('preview_owned_cache_bitmap',{projectId:project.id,bitmapTagId:tagId,imageIndex:index,mipLevel:mip});
         const image=decodeOwnedBitmapPreview(preview,{bitmapTagId:tagId,imageIndex:index,mipLevel:mip,sourceSha256:source.sha256,
-          resourceSha256:source.resourceSha256?.['mcc-textures']??source.resourceSha256?.['bitmaps.map']??null});
+          resourceSha256:bitmapResourceSha256(source)});
         if(alive){setCount(preview.imageCount??1);setLevels(preview.mipLevels??1);setFrame({images:[image],previews:[preview],scope});}
     };
     void load().catch(reason=>{if(alive)setError(String(reason));}).finally(()=>{if(alive)setLoading(false);});

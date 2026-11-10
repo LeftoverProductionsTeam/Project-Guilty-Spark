@@ -4,7 +4,7 @@ import type {AssemblyViewportSource} from '../assemblyViewport';
 import { useReflectionTextures } from '../useReflectionTextures';
 import {texturePreviewBudget} from '../resourceBudgets';
 import {copySceneObject,readSceneObject,cloneSceneObject} from '../sceneClipboard';
-import { textureResourceScope } from '../textureResourceScope';
+import { textureResourceScope,bitmapResourceSha256 } from '../textureResourceScope';
 import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImportGuard } from '../nativeAssetImport';
@@ -337,7 +337,7 @@ function Scene({
   const shaderMetadata=useMemo(()=>Object.fromEntries((inspection?.tags??[]).filter(t=>t.shaderPreview).map(t=>[t.id,t.shaderPreview!])),[inspection]);
   const spartan=sourceSpartan(inspection),spawnModel=spartan?inspection?.modelMeshes?.[spartan.id]:undefined;
   const lightProbes=useMemo(()=>{
-    if(!inspection||![5,6,7,609].includes(inspection.header.version))return [];
+    if(!inspection||![5,6,7,13,609].includes(inspection.header.version))return [];
     const shaders=new Map(buildMaterialAudit(inspection,inspection.renderMesh).shaders.filter(s=>s.status==='resolved'&&s.bitmapTagId!==null).map(s=>[s.shaderTagId,s.bitmapTagId!]));
     const probes:ObjectLightProbe[]=[];
     for(const object of project.scene){
@@ -354,7 +354,7 @@ function Scene({
     }
     return probes;
   },[inspection,project.scene,ownedModels,spawnModel,assetMeshes]);
-  const localLightState=useNativeObjectLighting(project.id,project.source?.sha256===inspection?.sha256?inspection?.sha256:undefined,project.source?.resourceSha256?.['bitmaps.map']??null,inspection?.header.version,lightProbes);
+  const localLightState=useNativeObjectLighting(project.id,project.source?.sha256===inspection?.sha256?inspection?.sha256:undefined,bitmapResourceSha256(project.source),inspection?.header.version,lightProbes);
   const nativeLights=localLightState.lights;
   useEffect(()=>{gl.domElement.dataset.gsObjectLighting=JSON.stringify({probed:lightProbes.length,applied:nativeLights?.size??0,sourceSha256:inspection?.sha256??null,method:'native-default-pose-centre',runtimeCornerSampling:false,pending:localLightState.pending,reason:localLightState.reason,milliseconds:localLightState.milliseconds,lights:[...(nativeLights??[])].map(([id,value])=>({id,...value}))});},[gl,lightProbes,nativeLights,inspection?.sha256,localLightState.pending,localLightState.reason,localLightState.milliseconds]);
   const dropBody=(object:SceneObject):DropBody=>{
@@ -692,7 +692,7 @@ export default function World({
     residentTextures.current.add(texture);texture.addEventListener('dispose',()=>residentTextures.current.delete(texture));
   }
   useEffect(() => () => { Object.values(texturesRef.current).forEach(t => t.dispose()); }, []);
-  useEffect(() => { setResourceAudit(null); }, [project.id, inspection?.sha256, (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])]);
+  useEffect(() => { setResourceAudit(null); }, [project.id, inspection?.sha256, bitmapResourceSha256(project.source)]);
   /** Preview a matching classic bitmap using verified internal cache data or
    * strictly indexed external pixels from the user's explicitly pinned file. */
   async function previewInternalBitmap(shaderTagId: number, bitmapTagId: number) {
@@ -710,7 +710,7 @@ export default function World({
       });
       const image = decodeOwnedBitmapPreview(response, {
         bitmapTagId, sourceSha256,
-        resourceSha256: (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null,
+        resourceSha256: bitmapResourceSha256(project.source),
       });
       const texture = new THREE.DataTexture(image.pixels, image.width, image.height, THREE.RGBAFormat);
       configureSourceTexture(texture,'shader');
@@ -745,7 +745,7 @@ export default function World({
     const source = inspection.sha256;
     const projectAtStart = project.id;
     const resourceScopeAtStart = textureScope;
-    const recordedResource = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
+    const recordedResource = bitmapResourceSha256(project.source);
     let tasks: MaterialTask[];
     try {
       const plan = planWorldMaterialPreviews(inspection, materialModels,
@@ -895,7 +895,7 @@ export default function World({
     setResourceAudit(null);
     const expectedProject = project.id;
     const expectedMap = inspection?.sha256;
-    const expectedResource = (project.source.resourceSha256?.['mcc-textures']??project.source.resourceSha256?.['bitmaps.map']);
+    const expectedResource = bitmapResourceSha256(project.source);
     try {
       const report = await call<ResourceMapAudit>('audit_owned_bitmap_resources',{projectId:expectedProject});
       if (expectedProject !== currentProjectRef.current || expectedMap !== currentInspectionRef.current ||
@@ -1051,8 +1051,8 @@ export default function World({
   currentInspectionRef.current = inspection?.sha256;
   const currentProjectRef = useRef(project.id);
   currentProjectRef.current = project.id;
-  const currentResourceRef = useRef((project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null);
-  currentResourceRef.current = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
+  const currentResourceRef = useRef(bitmapResourceSha256(project.source));
+  currentResourceRef.current = bitmapResourceSha256(project.source);
   const textureScope=textureResourceScope(project.source);
   const currentTextureScopeRef=useRef(textureScope);
   currentTextureScopeRef.current=textureScope;
@@ -1928,8 +1928,7 @@ export default function World({
                     disabled={
                       auditingResources ||
                       !(
-                        project.source?.resourceSha256?.['mcc-textures'] ??
-                        project.source?.resourceSha256?.['bitmaps.map']
+                        bitmapResourceSha256(project.source)
                       )
                     }
                     title="Checks the original project-selected bitmaps.map hash, bounded header, index paths and resource offsets. Does not extract, copy, or alter textures. Select resources in Build first."
@@ -1940,8 +1939,7 @@ export default function World({
                       : 'Verify selected bitmaps.map index'}
                   </button>
                   {!(
-                    project.source?.resourceSha256?.['mcc-textures'] ??
-                    project.source?.resourceSha256?.['bitmaps.map']
+                    bitmapResourceSha256(project.source)
                   ) && (
                     <small>
                       Use Build → Choose source resources to select and hash the matching bitmaps.map first.
@@ -2071,8 +2069,7 @@ export default function World({
                           {
                             sourceSha256: inspection?.sha256,
                             resourceSha256:
-                              project.source?.resourceSha256?.['mcc-textures'] ??
-                              project.source?.resourceSha256?.['bitmaps.map'],
+                              bitmapResourceSha256(project.source),
                             failures: textureFailures,
                           },
                           null,

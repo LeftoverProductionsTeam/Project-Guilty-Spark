@@ -100,7 +100,7 @@ fn rejects_bad_chunk_offsets_before_decompressing_untrusted_data() {
 fn original_mcc_mips_count_base_and_preserve_exact_pack_ranges(){
     let(dir,pins)=fixture_mips(3,24);let mut bundle=TextureBundle::open(dir.path(),&pins,"testmap").unwrap();
     assert_eq!(bundle.top_mip("hce_ltb_ground_0").unwrap().mip_levels,3);
-    let mip=bundle.mip("hce_ltb_ground_0",1).unwrap();assert_eq!((mip.width,mip.height,mip.mip_levels),(2,2,3));assert_eq!(mip.pixels,[0x22;8]);
+    let mip=bundle.mip("hce_ltb_ground_0",1).unwrap();assert_eq!((mip.base_width,mip.base_height,mip.width,mip.height,mip.mip_levels),(4,4,2,2,3));assert_eq!(mip.pixels,[0x22;8]);
     assert_eq!(bundle.mip("hce_ltb_ground_0",2).unwrap().pixels,[0x33;8]);
     assert!(bundle.mip("hce_ltb_ground_0",3).is_err());
     let(dir,pins)=fixture_mips(3,23);let mut bundle=TextureBundle::open(dir.path(),&pins,"testmap").unwrap();

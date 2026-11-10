@@ -8,6 +8,12 @@ export function textureResourceScope(source: Project['source'] | undefined): str
     Object.entries(source.resourceSha256 ?? {}).sort(([a],[b])=>a.localeCompare(b)),
   ]) : '';
 }
+/** The recorded source edition selects its resource bank, never hosting settings
+ * or whichever optional bundle happens to be present. */
+export function bitmapResourceSha256(source:Project['source']|undefined):string|null {
+  const pins=source?.resourceSha256;
+  return source?.cacheVersion===13?(pins?.['mcc-textures']??pins?.['bitmaps.map']??null):(pins?.['bitmaps.map']??null);
+}
 const scopes = new Map<string,string>();
 export const textureResourceScopeForProject=(id:string)=>scopes.get(id)??'';
 const listeners = new Set<()=>void>();

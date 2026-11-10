@@ -4,7 +4,7 @@ import { bitmapImageKey, decodeOwnedBitmapBatch } from './ownedBitmapBatch';
 import type { OwnedBitmapBatchResponse, VerifiedBatchImage } from './ownedBitmapBatch';
 import type { OwnedBitmapTarget } from './ownedBitmapPreview';
 import type { ForgeMaterial } from './forge';
-import { publishTextureResources } from './textureResourceScope';
+import { publishTextureResources,bitmapResourceSha256 } from './textureResourceScope';
 import type { MapTextureSource } from './sourceIdentity';
 import {assertMapSourceIdentity,mapSourceIdentityKey} from './sourceIdentity';
 export { withPreviewDefaults } from './forgeDefaultMaterials';
@@ -142,8 +142,7 @@ export async function fillRuntimeTexturePreviews(
       seen.add(key);
     }
     if (!matches.length) return decoded;
-    const pins = open.project.source?.resourceSha256 ?? {};
-    const resource = pins['mcc-textures'] ?? pins['bitmaps.map'] ?? null;
+    const resource = bitmapResourceSha256(open.project.source);
     const requests = [
       ...new Map(
         matches.map((m) => [

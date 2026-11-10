@@ -9,7 +9,7 @@ import {decodeOwnedBitmapBatch,MAX_NATIVE_BATCH_RGBA_BYTES,bitmapImageKey} from 
 import type {OwnedBitmapBatchResponse} from './ownedBitmapBatch';
 import {configureSourceTexture} from './sourceTexture';
 import {extraTextureKey} from './haloMaterial';
-import {useTextureResourceScopes} from './textureResourceScope';
+import {useTextureResourceScopes,bitmapResourceSha256} from './textureResourceScope';
 import {nativeShaderTextureRole,glassWithoutDiffuse} from './nativeShaderTextures';
 import {nativePreviewResource} from './nativePreviewResources';
 import {planOwnedMaterialPreviews} from './ownedMaterialBatch';
@@ -65,7 +65,7 @@ export function useOwnedForgeModels(
           if(Object.keys(loaded).length>=128)throw new Error('The viewport model-type limit is full');
           const seed=seeded.get(key);
           if(seed?.project.source?.sha256!==undefined&&seed.project.source.sha256!==placement.sourceSha256)throw Error('Source geometry identity changed');
-          const result:ModelResponse=seed?{sourceSha256:seed.inspection.sha256,resourceSha256:seed.project.source?.resourceSha256?.['mcc-textures']??seed.project.source?.resourceSha256?.['bitmaps.map']??null,objectTagId:seed.tagId,modelTagId:seed.tagId,mesh:seed.mesh,tags:seed.inspection.tags,resourceHashes:seed.project.source?.resourceSha256}:await nativePreviewResource<ModelResponse>('preview_owned_object_model',{projectId:placement.sourceProjectId,tagId:placement.tagId,sourceSha256:placement.sourceSha256,...(placement.modelVariant?{modelVariant:placement.modelVariant}:{})},placement.sourceSha256);
+          const result:ModelResponse=seed?{sourceSha256:seed.inspection.sha256,resourceSha256:bitmapResourceSha256(seed.project.source),objectTagId:seed.tagId,modelTagId:seed.tagId,mesh:seed.mesh,tags:seed.inspection.tags,resourceHashes:seed.project.source?.resourceSha256}:await nativePreviewResource<ModelResponse>('preview_owned_object_model',{projectId:placement.sourceProjectId,tagId:placement.tagId,sourceSha256:placement.sourceSha256,...(placement.modelVariant?{modelVariant:placement.modelVariant}:{})},placement.sourceSha256);
           if(!live)return;
           if(result.sourceSha256!==placement.sourceSha256||result.objectTagId!==placement.tagId)throw new Error('Model source identity differs from its placement');
           const bytes=(result.mesh.positions.length+(result.mesh.normals?.length??0)+(result.mesh.uvs?.length??0)+(result.mesh.lightmapUvs?.length??0)+result.mesh.indices.length+(result.mesh.rig?.weights.length??0))*4+(result.mesh.rig?.indices.length??0)*2;
