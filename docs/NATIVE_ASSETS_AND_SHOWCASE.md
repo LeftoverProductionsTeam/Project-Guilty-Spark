@@ -44,6 +44,8 @@ The full1500x950Chupathingy vehicle close-up is byte-identical before/after this
 
 Final temporary QA: E/qa-vehicle-chains-r520/GuiltySpark.exe49991680B, SHAb92e30c4f44364924bfba8e15098f950ad27187a31c2dd0a69d5c707998713b3, runtime-source fingerprint7b7bb29f90e99dd2e8e45b5c94fa7fc69675fb8f9400c37816dbe15ab9c0d4a4; built from6cf00f4plus this reviewed increment, not a release. E is C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Exact metadata/logs: vehicle-chain-r509, vehicle-chain-baseline-r512, vehicle-chain-ce-r520, vehicle-chain-{chupa-r521,mcc-r522,opence-r523,demo-r524}, vehicle-chain-verification-r520 and vehicle-chain-checkpoint-r526. R525removes only the three nonrunning, manifest/hash-verified supersededR501/R510/R513QA executables (150500352logicalB); currentQA, metadata/captures, original inputs and protected releases stay. No physical free-space delta or new archive/SDK tree is claimed.
 
+Verified source increment committed locally 662376c7e4e39bcd59517fc237486bdabe3df6a0; source-only manifests checked, no archive generated and no push/publication.
+
 **Open:** H29actual-game appearance, contact shadows, native lighting/reflection interpolation and vehicle poses/animation/physics, scenery bounds averaging and original reflection-cube lower levels. Four Warthog dashboard meter triangles and3179Demo carrier light-reference triangles remain unsupported. No new Halo game launch, gameplay, native map compilation, human/peer/platform or release acceptance. All475requirement IDs/wordings remain unchanged.
 
 ## Original 2D texture levels on the GPU — 10 November

@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 6cf00f4 parent; R509916Rust/9ignored,490frontend/offline/storage, R510freshWindows+CE and4GPU pass. Wholechain bytes identical, first material-ready map23.0→12.4s/66→16bitmapIPC; same167465tris/294textures, but initial sampledRAM higher: memory follow-through pending. R511cache partial-refusal regression reproduced and repaired; final-source native verification pending.
-Next action: R519red→green: aggregate packed-budget refusals retry smaller verified level batches; permanent failures do not repeat. R512old/R513new matched profiles19.233→9.789s with unchanged coverage and lower settled sample, not peak claim. R514run didnotlaunch: reuse of already-owned qa/logic correctly refusedEEXIST. R520–R524 now verify frozen final source with separate owned workspaces, fullfrontend/browser, freshWindows and five native sources; retain original baselines until pass.
+Latest verified revision: 6cf00f4 plus reviewed whole-chain increment. R509916Rust/9ignored; finalR520492frontend/276browser/TypeScript/contracts/offline/40storage and freshWindows161.614s; five native sourcesR520–R524 pass. CE materials19.233–22.999→9.116s,66→16bitmapIPC, identical scene/source coverage and byte-identical Chupa close-up. R525retired only3verified superseded QAexes; finalQA retained. No Halo game/parity/release acceptance.
+Next action: Commit this verified increment and manifests locally; no active operations. Final app/fingerprint/evidence NATIVE_ASSETS_AND_SHOWCASE.md/E vehicle-chain-checkpoint-r526. Resume H29original reflection-cube levels and matched native-game comparison through existing shared readers/materials; preserve contact-shadow/pose/native-lighting gaps and full M1–M6/475-ID mandate. Do not repeat completed broad suites without a new change.
 
 ## Acceptance
 
