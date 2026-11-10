@@ -163,4 +163,6 @@ R398 current-source follow-through (10 November): the explicit server-crash/full
 3. In matching Halo gameplay, find that same vehicle on the same map. Compare comparable angle, distance and environment, including reflection direction, glass, lighting and detail level. Different source editions are not exact comparisons.
 4. Return to Spark's Level Editor and inspect the placed vehicle. Record source SHA, app SHA, runtime/version, both screenshots and pass/fail separately for mapping, reflections, lighting, geometry/LOD and animation.
 
+R415 now adds actual one-player Chupathingy0.9.0c/b506ba74 game loading through its own menus and a native Warthog observation. It does not supply matched angles, stable vehicle driving, game screenshot files or human acceptance. Compare the R412 Spark image against a new stable game view; H29 remains open. See NATIVE_ASSETS_AND_SHOWCASE.md#r415-actual-chupathingy-game-observation--10-november.
+
 No original map is edited. Do not prefill human/game parity from native preview tests.

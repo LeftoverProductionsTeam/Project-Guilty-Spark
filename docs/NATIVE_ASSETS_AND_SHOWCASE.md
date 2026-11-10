@@ -48,6 +48,16 @@ Current QA E/qa-vehicle-coverage-r409/GuiltySpark.exe49,772,544B, SHA2ecf88c436e
 
 **Still open:** native dynamic meter rendering, source-local lighting/reflection/glass/animation parity against matching game views (H29), and the broader native/game/peer/platform ledger. Warning correctness is not a rendered-fidelity pass for unsupported surfaces.
 
+### R415 actual Chupathingy game observation — 10 November
+
+After the source fixes in 3e34299/93d7a66 and coverage diagnostic a09f01c, Computer Use reached a real windowed Chupathingy0.9.0c/b506ba74 Blood Gulch match. Actual controls used: Multiplayer → Split Screen; create/select the isolated New001 profile; select Blood Gulch → Slayer → Start Game. The native UI reports one player. Game logs independently report the owned data root,1806map tags, all machines loaded, host ticks and the NVIDIA OpenGL renderer. This is a local game, not a two-player or public-server result.
+
+The engine's existing cheat_all_vehicles diagnostic was invoked only inside this disposable offline session, then E entered a nearby Warthog side seat. The real game visibly rendered its rear hull, turret, interior and highlights. Its third-person transition and subsequent first-person view were observed, but the densely spawned diagnostic vehicles moved; no stable matched-angle/lighting comparison, normal vehicle-driving acceptance or full visual-parity pass follows. Screenshots were displayed in the Computer Use conversation; no independent game screenshot file was exported. H29 remains open.
+
+The first manual fixture lacked the menu's carousel.map and correctly produced a native missing-map error naming levels/test/carousel/carousel. The corrected bounded fixture stages only17 pinned runtime members plus bloodgulch.map, ui.map and carousel.map. A requested local:bloodgulch:slayer debug startup did not automatically enter gameplay in this installed build; the actual entry was the mouse/keyboard UI above. Fullscreen capture returned stale frames; the documented F11 windowed switch restored current capture. Neither issue is relabeled a product rendering failure or a successful automatic launch.
+
+R415 exits0 at its declared600-second native limit. Its original runtime members, config.toml and all three original maps retain identical SHA256 hashes. Owned scratch is disposed:898,522,542logical bytes /898,590,456allocated file bytes, peak898,526,990logical bytes under the unchanged1GiB reservation. Exact bounded receipt: E/vehicle-game-local-r415.json. Earlier manual game trial also exits0 and verifies originals; its owned877,906,814logical bytes are disposed. The separate Spark manual session ended exit1 and disposed78,411,382logical bytes; it is not a normal-close/Save acceptance result. No runtime, original map, SDK, release package or production source was modified by these observations.
+
 ## 9 November vehicle texture-coordinate repair
 
 The owner reported vehicles still differed from the game. R387 reproduces a real shared-reader failure in the native Windows app: the Warthog has **7,380 wrong UV coordinates**, the Scorpion 4,768, rocket Warthog 8,544 and Banshee 2,098. The Ghost's unit-scale mapping already matches. All required Warthog/Scorpion images and their 4/1 reflection cubes were loaded, so decoding success alone did not detect this error.

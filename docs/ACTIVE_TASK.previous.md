@@ -55,7 +55,7 @@ Earlier R349scroll/axis/End,953CE609/MCC13source contracts/tool-profile fixes, R
 
 ## Failures and blockers
 
-Post-report continuity check initially failed the unchanged32KiB pending-document bound because two new vehicle summaries duplicated linked evidence. Only those duplicate summaries were compacted; full reports/requirement IDs remain. Re-run the existing5checks before commit; no limit/assertion is relaxed.
+Post-report continuity check initially failed the unchanged32KiB pending-document bound because two new vehicle summaries duplicated linked evidence. Only those duplicate summaries were compacted; full reports/requirement IDs remain. The existing5checks then pass; no limit/assertion is relaxed.
 
 R408 genuine current Windows red: original Demo rwarthog3179/3179 triangles lack supported materials but existingUIreports0gaps. Its otherWarthog4/2798triangles also lack source attribution. Sourceunchanged/ownedscratchdisposed; wrapperexit1. New coverage helper and visible compact status preserve geometry/lighting/source; 4focusedunit and1browserworkflow checks pass before full R409.
 
