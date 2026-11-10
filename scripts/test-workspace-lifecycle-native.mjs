@@ -375,6 +375,26 @@ async function nativeVehiclePreview(opened,originalHash){
   }
   for(const row of results)expect(row.mismatches,'Actual native UV coordinates for '+row.modelPath).toBe(0);
   expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
+
+  const warthog=results.find(row=>/vehicles[\\/]warthog[\\/]/i.test(row.modelPath));
+  const placed=warthog&&opened.project.scene.find(object=>object.visible&&object.tagId===warthog.vehicleId);
+  if(expectedCacheVersion!==6)expect(placed,'Stock source fixture must contain a placed Warthog').toBeTruthy();
+  if(placed){
+    await chooseTool(main,'Level editor');await openDrawer(main,'Objects');
+    await main.getByRole('textbox',{name:'Search scene objects',exact:true}).fill(placed.name);
+    await main.locator('.object-list .object-name').filter({hasText:placed.name}).first().click();
+    for(const label of['Objects','Object tags']){const close=main.getByRole('button',{name:'Close '+label,exact:true});if(await close.isVisible())await close.click();}
+    await main.keyboard.press('f');
+    const worldCanvas=main.locator('.world-layout canvas');
+    // Drawer close/resizing is asynchronous. A two-frame screenshot can still
+    // capture the old drawing buffer; require the real complete viewport.
+    await expect.poll(()=>worldCanvas.evaluate(node=>{const r=node.getBoundingClientRect(),v=node.closest('.viewport').getBoundingClientRect();return Math.abs(r.width-v.width)<2&&Math.abs(r.height-v.height)<2&&Math.abs(node.width/node.height-r.width/r.height)<.01;})).toBe(true);
+    const target=[placed.position[0],placed.position[1],placed.position[2]+.3];
+    await expect.poll(()=>worldCanvas.evaluate((node,target)=>{const camera=JSON.parse(node.dataset.gsCamera??'null');return camera?.target?.every((n,k)=>Math.abs(n-target[k])<.001)??false;},target)).toBe(true);
+    const framedViewport=await worldCanvas.evaluate(node=>{const r=node.getBoundingClientRect();return{width:r.width,height:r.height,bufferWidth:node.width,bufferHeight:node.height,camera:JSON.parse(node.dataset.gsCamera)};});
+    await main.screenshot({path:path.join(root,'native-vehicle-world-warthog.png')});
+    report.vehiclePreview.placedVehicle={id:placed.id,position:placed.position,rotation:placed.rotation,sourceSkyLightingChecked:true,framedThroughUi:true,framedViewport,gameParityAccepted:false};
+  }
   step('Actual native vehicle previews preserve authored model UV scales, source materials and original bytes',report.vehiclePreview);
 }
 
@@ -1070,6 +1090,15 @@ try{
     })),{timeout:90000}).toEqual({loading:'false',pending:'0',reflections:'false'});
     const nativeViewport=await main.locator('.world-layout').evaluate(element=>({...element.dataset}));
     const nativeGeometry=await main.locator('.viewport-status').innerText();
+    let nativeObjectLighting;
+    if(vehiclePreview){
+      const appearance=await invoke(main,'inspect_source_appearance',{projectId:opened.project.id});expect(appearance.sourceSha256).toBe(originalHash);
+      const canvas=main.locator('.world-layout canvas');
+      await expect.poll(()=>canvas.evaluate(node=>JSON.parse(node.dataset.gsEnvironment??'null')?.sourceObjectLighting)).toBe(!!appearance.environment);
+      nativeObjectLighting=await canvas.evaluate(node=>JSON.parse(node.dataset.gsEnvironment));
+      if(appearance.environment&&!opened.project.worldEnvironment)for(const key of['ambientColor','ambientIntensity','sunColor','sunIntensity'])expect(nativeObjectLighting[key]).toEqual(appearance.environment[key]);
+    }
+
     if(profilePreview){
       report.previewProfile.firstMapReadyMs=performance.now()-viewportStarted;
       report.previewProfile.calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})));
@@ -1105,7 +1134,7 @@ try{
       report.sourceResourceGuidance={required,pinned,promptVisible:required&&!pinned,sourceHash:originalHash,hostingRuntimeIgnored:true};
     }
     await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
-    step(`Owned native cache ${expectedCacheVersion} opens in actual BSP viewport with source materials`,{nativeViewport,nativeGeometry,engineParityClaimed:false});
+    step(`Owned native cache ${expectedCacheVersion} opens in actual BSP viewport with source materials`,{nativeViewport,nativeGeometry,nativeObjectLighting,engineParityClaimed:false});
     if(previewOnly||contextOnly){
       const actualSource=(await invoke(main,'open_project',{id:opened.project.id})).project.source;
       expect(actualSource.sha256).toBe(originalHash);expect(actualSource.cacheVersion).toBe(expectedCacheVersion);

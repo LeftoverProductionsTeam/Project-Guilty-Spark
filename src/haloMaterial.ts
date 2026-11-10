@@ -324,7 +324,11 @@ export function updateHaloMaterial(material: THREE.Material, scene: THREE.Scene,
   m.uniforms.normalStrength.value=features?.normalStrength??1;
   m.uniforms.specularStrength.value=features?.specularStrength??.35;
   m.uniforms.selfIllumStrength.value=features?.selfIllumStrength??1;
-  m.uniforms.overrideLighting.value=!!environment?.overrideLighting&&!!environment?.value?.previewEnabled&&!material.userData.sky;
+  // Placed native objects need the verified source sky just as tag previews do.
+  // Baked BSP pages keep their own illumination; an explicit user override
+  // retains its existing scope. Missing source lighting never invents a rig.
+  const sourceObjectLighting=material.userData.haloSourceObject&&environment?.sourceObjectLighting&&!m.uniforms.hasLight.value;
+  m.uniforms.overrideLighting.value=!!(environment?.overrideLighting||sourceObjectLighting)&&!!environment?.value?.previewEnabled&&!material.userData.sky;
   if(environment?.value){const v=environment.value;m.uniforms.lightDirection.value.fromArray(sunlightPosition(v)).transformDirection(camera.matrixWorldInverse);
     m.uniforms.ambientFill.value.fromArray(v.ambientColor).multiplyScalar(v.ambientIntensity);m.uniforms.sunFill.value.fromArray(v.sunColor).multiplyScalar(v.sunIntensity);}
 }

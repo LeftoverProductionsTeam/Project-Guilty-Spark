@@ -182,7 +182,7 @@ function ObjectVisual({
   shaderTextures?:Record<number,THREE.Texture>;
   shaderMetadata?:Record<number,ShaderPreview>;extraTextures?:Record<string,THREE.Texture>;
 }) {
-  if (asset) return <Mesh data={asset} greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
+  if (asset) return <Mesh data={asset} sourceObject greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
   return null;
 }
 function ViewportDropPoint({point,onReady}:{point:MutableRefObject<((x:number,y:number)=>Vec3|null)|null>;onReady:(ready:boolean)=>void}){
@@ -366,7 +366,7 @@ function Scene({
           fov={55}
         />
       )}
-      <SceneEnvironment greenScreen={greenScreen} value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment}/>
+      <SceneEnvironment greenScreen={greenScreen} value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment} sourceObjectLighting={!!sourceAppearance?.environment}/>
       {!greenScreen&&sourceAppearance?.skyMesh&&viewMode==='render'&&<SkyGeometry data={sourceAppearance.skyMesh} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>}
       {grid && !cinematic && (
         <gridHelper

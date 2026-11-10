@@ -53,3 +53,9 @@ test('shared model and BSP components preserve glass pass order, chroma mode and
   expect(result.neutral.groups).toBe(1);expect(result.neutral.draws).toBe(1);
   for(const frame of[result.modelGreen,result.bspGreen]){expect(frame.pixel).toEqual([0,255,0,255]);expect(frame.draws).toBe(1);expect(frame.triangles).toBe(2);}
 });
+
+test('source-sky lighting reaches placed objects without relighting baked BSPs or reflection',async({page})=>{
+  await page.goto('/tests/ui/fixtures/haloMaterials.html');const result=await page.evaluate(async()=>{const {renderObjectLightingChecks}=await import('/tests/ui/fixtures/haloMaterials.ts' /* @vite-ignore */);return renderObjectLightingChecks();});console.log('HALO_OBJECT_LIGHTING',JSON.stringify(result));
+  expect(result.errors).toEqual([]);for(const [frame,value]of[[result.object,64],[result.unavailable,160],[result.baked,96],[result.bakedObject,96],[result.override,48]] as const){for(const channel of[0,1,2])expect(Math.abs(frame.pixel[channel]-value)).toBeLessThanOrEqual(1);expect(frame.pixel[3]).toBe(255);expect(frame.draws).toBe(1);expect(frame.triangles).toBe(2);}
+  expect(result.object.geometry).toBe(result.unavailable.geometry);expect(result.green.pixel).toEqual([0,255,0,255]);
+});

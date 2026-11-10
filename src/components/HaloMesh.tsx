@@ -23,6 +23,7 @@ export default function HaloMesh({
   shaderMetadata = {},
   extraTextures = {},
   sky = false,
+  sourceObject = false,
   greenScreen = false,
 }: {
   data: MeshData;
@@ -37,6 +38,7 @@ export default function HaloMesh({
   shaderMetadata?: Record<number, ShaderPreview>;
   extraTextures?: Record<string, THREE.Texture>;
   sky?: boolean;
+  sourceObject?: boolean;
   greenScreen?: boolean;
 }) {
   const {invalidate}=useThree();
@@ -74,10 +76,11 @@ export default function HaloMesh({
         map:shaderTextures[tag]??null,lightMap,lightMapIntensity:1,
         alphaTest:shaderTextures[tag]?.userData.alphaTest?0.5:0,side:THREE.DoubleSide,roughness:0.85,
       })];
+      for(const material of passes)material.userData.haloSourceObject=sourceObject;
       slots.set(key,passes.map((_,i)=>values.length+i));values.push(...passes);
     }
     return{values,slots};
-  },[legend,materialKeys,shaderTextures,lightmapTextures,materialLens,shaderMetadata,data.changeColors,extraTextures,sky,wireframe]);
+  },[legend,materialKeys,shaderTextures,lightmapTextures,materialLens,shaderMetadata,data.changeColors,extraTextures,sky,sourceObject,wireframe]);
   // Texture completion may replace a material without rebuilding its geometry.
   // Rebuild groups only if the ordered native pass layout actually changes.
   const materialLayout=materials?[...materials.slots].map(([key,slots])=>key+':'+slots.join(',')).join(';'):'';

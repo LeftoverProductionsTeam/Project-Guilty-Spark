@@ -179,3 +179,29 @@ export async function renderComponentGlassChecks(){
   root.unmount();await new Promise(resolve=>setTimeout(resolve,600));target.dispose();texture.dispose();cube.dispose();
   return{model,completed,neutral,modelGreen,bsp,bspGreen,errors};
 }
+
+/** The World object and baked BSP must share material math without sharing light ownership. */
+export async function renderObjectLightingChecks(){
+  const {createElement,Fragment}=await import('react');const {createRoot,extend}=await import('@react-three/fiber');
+  const {default:HaloMesh}=await import('../../../src/components/HaloMesh');const {default:SceneEnvironment}=await import('../../../src/components/SceneEnvironment');
+  const {DEFAULT_ENVIRONMENT}=await import('../../../src/environment');extend(THREE);
+  const canvas=document.querySelector('canvas')!,root=createRoot(canvas),errors:string[]=[];let state:import('@react-three/fiber').RootState|undefined;
+  const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
+  await root.configure({size:{width:32,height:32,top:0,left:0},dpr:1,camera,frameloop:'never',gl:{antialias:false},onCreated:s=>{state=s;s.gl.debug.onShaderError=(gl,_p,vs,fs)=>errors.push(String(gl.getShaderInfoLog(vs)),String(gl.getShaderInfoLog(fs)));}});
+  const base=new THREE.DataTexture(new Uint8Array([128,128,128,255]),1,1);base.userData.sourceEncoded=true;base.needsUpdate=true;
+  const light=base.clone();light.needsUpdate=true;
+  const faces=Array.from({length:6},()=>{const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d')!;x.fillStyle='rgb(64,64,64)';x.fillRect(0,0,1,1);return c;});
+  const cube=new THREE.CubeTexture(faces);cube.colorSpace=THREE.NoColorSpace;cube.needsUpdate=true;
+  const data={source:'halo-model-untextured',label:'light ownership',positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],lightmapUvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],materialRanges:[{shaderTagId:7,bspIndex:0,lightmapPage:0,hasLightmapUvs:true,indexStart:0,indexCount:6}]};
+  const reflection={bitmapTagId:8,perpendicularBrightness:.5,parallelBrightness:.5,perpendicularTint:[1,1,1] as [number,number,number],parallelTint:[1,1,1] as [number,number,number],falloff:0,cutoff:0};
+  const metadata:ShaderPreview={kind:'model',twoSided:false,alphaTest:false,uvScale:[1,1],reflection};
+  const value={...DEFAULT_ENVIRONMENT,ambientColor:[1,1,1] as [number,number,number],ambientIntensity:.25,sunIntensity:0,fogEnabled:false};
+  const target=new THREE.WebGLRenderTarget(32,32),pause=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+  async function read(sourceObject:boolean,sourceObjectLighting:boolean,baked=false,overrideLighting=false,greenScreen=false){
+    root.render(createElement(Fragment,null,createElement(SceneEnvironment,{value,sourceObjectLighting,overrideLighting}),createElement(HaloMesh,{data,sourceObject,greenScreen,shaderTextures:{7:base},shaderMetadata:{7:baked?{...metadata,kind:'environment'}:metadata},lightmapTextures:baked?{'bsp0:page0':light}:{},extraTextures:{'7:reflectionCube':cube}})));await pause();if(!state)throw Error('Object-lighting renderer did not initialize');
+    state.gl.setRenderTarget(target);state.gl.clear();state.gl.render(state.scene,camera);const pixel=new Uint8Array(4);state.gl.readRenderTargetPixels(target,16,16,1,1,pixel);
+    const mesh=state.scene.children.find(o=>o instanceof THREE.Mesh) as THREE.Mesh;return{pixel:[...pixel],geometry:mesh.geometry.uuid,draws:state.gl.info.render.calls,triangles:state.gl.info.render.triangles};
+  }
+  const object=await read(true,true),unavailable=await read(true,false),baked=await read(false,true,true),bakedObject=await read(true,true,true),override=await read(false,false,true,true),green=await read(true,true,false,false,true);
+  root.unmount();await new Promise(r=>setTimeout(r,600));for(const t of[base,light,cube])t.dispose();target.dispose();return{object,unavailable,baked,bakedObject,override,green,errors};
+}

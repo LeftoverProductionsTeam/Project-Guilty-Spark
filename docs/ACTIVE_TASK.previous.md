@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 418f07e0ed851768a01358eea320f648e2486fda; reviewed dirty native glass angular/gloss fix passes GPU red-to-green and fresh R425 Windows source/preview readback. R424 actual game camera capture completed; originals unchanged. Full appearance remains H29.
-Next action: Finish active R426 frontend/browser and R427-430 native source-family checks on the exact R425 app; inspect native material/camera comparison and repair only reproduced remaining vehicle defects. Record H29 lighting/dynamic/dashboard limits without claiming stock-game parity.
+Latest verified revision: ee12b9ea26014d0c360ab53c7809d8737ba21f29 commits the accepted native glass fix, R425 Windows/R426480frontend+273browser and R427–R430source previews. New dirty source-object lighting repair passes TypeScript/3GPU cases; fresh native/full regression acceptance is next.
+Next action: Verify the reproduced World object-lighting omission in a new source-matched native app and full regressions. Native objects now opt into the existing verified source sky; baked BSP pages remain unchanged. Check native source identity/environment and frame a placed Warthog through actual UI. Full H29 local-lighting/parity/dynamic-meter gates remain open.
 
 ## Acceptance
 
@@ -21,7 +21,7 @@ R417–R422 accepted10Nov: new shared native glass alpha/tint passes, exact boun
 
 R415 actualWindowsChupa0.9.0c/b506ba74 one-player BloodGulch via Multiplayer/SplitScreen/profile/map/Slayer/Start UI; nativeWarthog rear/interior/highlights and seat transition observed. No stable matched-angle/lighting/drive/human/visual-parity acceptance. Requested local: debug mode didnotautoenter; actualUIused. Firstfixture carousel.map missing repaired in owned copy. WindowedF11 resolves stale capture. Exit0/original17members+3maps+config hashesunchanged; owned898522542logical/898590456allocatedB disposed, peak898526990B<1GiB. ExactE/vehicle-game-local-r415.json and NATIVE_ASSETS_AND_SHOWCASE.md. PriorGUIgame exits0/originalsunchanged/disposed; Sparkmanual session exits1/disposed, notSaveacceptance.
 
-R409-414 coverage accepted:479frontend/272browser/TypeScript/contracts/offline/storage; freshWindows181.567s/nativeDemo25.587s. Native source-partition checks R410MCC23.192s/R411CE26.404s/R412Chupa24.453s/R413OpenCE22.740s/R414Demo26.190s pass with0UVmismatches/0errors/originalhashesunchanged/ownedscratchdisposed. Warthog+Rocket4smettriangles are explicitlyunsupported; Demo3179lightriangles unsupported; supported shader assignments and images remain strict. R409currentQA SHA2ecf88c4…/runtimeFPfc53edfd…; no liveprocess/operation. Full exact details NATIVE_ASSETS_AND_SHOWCASE.md.
+R409–R414 native coverage accepted; exact source-family counts, hashes, current app and failed precursor evidence remain in NATIVE_ASSETS_AND_SHOWCASE.md and Git418f07e. No game-parity acceptance.
 
 R406/R407 terminal/exit0: class-aware Demo and strengthened stock MCC original-material-reference checks pass. Demo25.706s/MCC23.972s; wrapper/childcomplete/0errors/originalhashesunchanged/ownedscratchdisposed. DemoWarthog5soso; rwarthog15lighreferences remain unsupported material rendering. R402CE26.176s/R403Chupa22.776s/R404OpenCE22.296s accepted. StockScorpions retain4after-reflectionslots. R401full909Rust/9ignored,476frontend/271browser/contracts/offline/storage/Windows/native accepted. No operation is active.
 
@@ -87,7 +87,7 @@ R375 observed WindowsSecurity network-permission prompt. No permission/security 
 
 ## Operations and safe checkpoint
 
-Current R424/R425 wrappers terminal/exit0 and owned scratch disposed. R426 exec2096 full frontend/browser active; sequential R427–R430 exec31606 source-family native checks active using source-matched R425 QA app. No installed runtime, map, SDK or release was changed. Production source frozen during these checks.
+Current R424–R431 terminal/owned scratch disposed; no owned game/Spark GUI remains. ee12b9e committed. New real GPU source-object lighting test fails160vs64 before fix, passes64after; baked BSP96/explicitoverride48/greenscreen/geometry retention pass. First fixture lightmap assignment was wrong and corrected to actual validated page; no assertion relaxed. New native/full regressions about to run; no source edits during build.
 
 R423 exec2284 terminal/exit0. Original17runtime members+3maps+config hashes unchanged; 69generated shaders311062B/inventorySHA2f74d264c9c428daf2d6bde19d87f510a00dd7c0d9460cf6601609131a0ee373; payloads disposed. Source research read-only; no engine code imported. Windowed capture required F11 refresh; actual UI profile/New001/BloodGulch/Slayer then game observed. Native stdout empty; later collection must read owned logs/debug.txt. Camera entry expired; no matched vehicle/visual/human pass. Owned900198484logical/900384504allocatedB disposed, peak900202938B<1GiB. R424 planned exact-own private loopback console/autohost diagnostics, no public session or original mutation.
 
