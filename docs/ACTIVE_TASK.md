@@ -3,8 +3,8 @@
 Task: Operation110 — native vehicle fidelity and game comparison
 Status: implementation incomplete
 Starting revision: 9c9627c5e3a279a63434d9e01327fa302226a7e7, canonical D:/Project Guilty Spark, local master.
-Latest verified revision: 14b6b1eb4146230866d5d3eaeb280e4f4de44a4a preserves the accepted source-sky/glass fixes. Reviewed dirty native incident-data increment passes R442756core/7ignored, R444480frontend/contracts/offline/storage and R445–R449original-vector native readback. R443fresh Windows build174.870s; its first wrong test scope is failed evidence, corrected native scope passes against the exact same fingerprint. Not new applied local-lighting/parity/game acceptance.
-Next action: Commit the accepted native incident-data/source-probe increment after explicit staged-source verification. Then recover and verify authored bitmap mip levels through the existing bitmap reader before connecting BSP lightmap/diffuse samples to model lighting. Current preview is top-mip-only; generated display mips must not impersonate authored native data. Continue H29 and wider M1–M6, no new renderer or source writer.
+Latest verified revision: 5a646fb7d7f8a67cf7371480af44cebc9fd8e1e0 commits the native incident-data/source-probe increment. R442756core/7ignored, R444480frontend/contracts/offline/storage and R445–R449original-vector native readback pass; R443fresh Windows174.870s. Source manifest2134files/51,028,467B/SHA75be87b0afd24c4cfda0b58d492427887806ca18607eaf85e5489e6d676d4a35 verified before commit; working tree was clean. Earlier wrong filter/scope are not passes. No new applied local-lighting/parity/game acceptance.
+Next action: Recover and verify authored bitmap mip levels through the existing bitmap_preview/resource/MCC paths before connecting BSP lightmap/diffuse samples to model lighting. Keep exact source/resource/image/mip identity, bounded byte spans and cache invalidation. Current preview is top-mip-only; generated display mips must not impersonate authored native data. Then apply local vehicle lighting and compare with the real game. Continue H29 and wider M1–M6; no new renderer/source writer.
 
 ## Acceptance
 
@@ -97,7 +97,7 @@ R440–R449 are terminal. R441 used a wrong module filter and ran0tests; R442act
 
 Current QA E/qa-vehicle-radiosity-r443/GuiltySpark.exe50,511,360B SHAb3176dd1087fe3cad94edfb87957e9b30068fadec9923112d1d65f0de6479ca8/runtimeFPd33d924787fc4cc7adb1be7c23e7ee4dd814be82d9f343dbd9db82fac3980be9. Built from14b6b1e plus reviewed source; not a release. E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; DEV=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf. Previous R432visual source-sky app and R435nativecamera/image remain valid for their exact earlier source and scope; no new local-lighting visual pass inferred. Original R440diagnostic is read-only and preserved. Full prior terminal/failure/storage details remain in existing reports and Git14b6b1e:docs/ACTIVE_TASK.md.
 
-Commit procedure: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Preserve full475IDs. ContinueGoalafter scopedcommit. No push/workflow/publication.
+Native incident-data increment locally committed5a646fb; originals/475IDs unchanged; no push. Commit procedure for subsequent accepted increments: review/stage explicitacceptedfiles; SPARK_RELEASE_PYTHON=C:/Program Files/Blender Foundation/Blender 5.2/5.2/python/bin/python.exe; node scripts/package-source.mjs --manifests-only; stage2checksum manifests; --check-manifests and cached diff; localcommit only. Preserve full475IDs. ContinueGoalafter scopedcommit. No push/workflow/publication.
 
 ## Deferred requests
 
