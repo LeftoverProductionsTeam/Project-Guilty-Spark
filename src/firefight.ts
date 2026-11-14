@@ -61,7 +61,12 @@ export interface FirefightPreset {
   missingActorVariants: string[];
   detail: string;
 }
+export interface NativeEncounterCandidate {
+  name:string;actorVariantPaths:string[];normalCount:number|null;insaneCount:number|null;startingLocations:number|null;notInitiallyCreated:boolean|null;issue:string|null;
+}
 export interface FirefightCatalog {
+  sourceScenarioType?:number;
+  encounters?:NativeEncounterCandidate[];
   enemies: EnemyType[];
   weapons?: string[];
   presets: FirefightPreset[];

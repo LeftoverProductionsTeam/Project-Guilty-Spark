@@ -463,6 +463,84 @@ pub fn validate_assets(config: &FirefightConfig, inspection: &MapInspection) -> 
     }
 }
 /// Source-native weapon choices, not equipment or item-collection aliases.
+/// Decoded source encounters for explicit controller binding, not live AI state.
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeEncounterCandidate {
+    pub name:String,
+    pub actor_variant_paths:Vec<String>,
+    pub normal_count:Option<u16>,
+    pub insane_count:Option<u16>,
+    pub starting_locations:Option<usize>,
+    pub not_initially_created:Option<bool>,
+    pub issue:Option<String>,
+}
+pub fn native_encounter_candidates(inspection:&MapInspection)->Vec<NativeEncounterCandidate> {
+    let mut actor_paths=BTreeMap::<u32,Option<String>>::new();
+    for tag in inspection.tags.iter().filter(|tag|tag.class=="actv"&&!tag.external&&tag.data_offset.is_some()) {
+        actor_paths.entry(tag.id).and_modify(|path|*path=None).or_insert_with(||Some(tag.path.replace('\\',"/")));
+    }
+    inspection.encounters.iter().map(|encounter| {
+        let mut candidate=NativeEncounterCandidate{name:encounter.name.clone(),actor_variant_paths:vec![],normal_count:None,insane_count:None,starting_locations:None,not_initially_created:None,issue:None};
+        let Some(details)=&encounter.details else{candidate.issue=Some("Native encounter details are unreadable".into());return candidate;};
+        candidate.not_initially_created=Some(details.flags&1!=0);
+        let mut normal=0u16;let mut insane=0u16;let mut starts=0usize;let mut actors=std::collections::BTreeSet::new();
+        for squad in &details.squads {
+            if squad.normal_count<0||squad.insane_count<0 {candidate.issue=Some("Encounter uses non-explicit native spawn counts".into());return candidate;}
+            let Some(next_normal)=normal.checked_add(squad.normal_count as u16) else{candidate.issue=Some("Native spawn counts overflow".into());return candidate;};
+            let Some(next_insane)=insane.checked_add(squad.insane_count as u16) else{candidate.issue=Some("Native spawn counts overflow".into());return candidate;};
+            normal=next_normal;insane=next_insane;starts+=squad.starting_locations.len();
+            for start in &squad.starting_locations {
+                let Some(path)=start.actor_variant_tag_id.and_then(|id|actor_paths.get(&id)).and_then(Option::as_ref) else{candidate.issue=Some("Starting actor identity is missing or ambiguous".into());return candidate;};
+                actors.insert(path.clone());
+            }
+        }
+        candidate.normal_count=Some(normal);candidate.insane_count=Some(insane);candidate.starting_locations=Some(starts);candidate.actor_variant_paths=actors.into_iter().collect();
+        candidate.issue=if details.flags&1==0 {Some("Encounter is initially created; reserve a separate inactive encounter for this controller".into())}
+            else if normal==0||normal>32||insane!=normal||starts<normal as usize {Some("Controller needs matching explicit 1–32 normal/insane counts and enough starts".into())}
+            else if candidate.actor_variant_paths.len()!=1 {Some("Mixed or absent starting actors need separate reviewed encounter groups".into())}else{None};
+        candidate
+    }).collect()
+}
+/// Optional Spark HSC comment metadata. Native tags/maps remain standard.
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NativeControllerGroup { pub name:String,pub actor_variant_path:String,pub count:u16 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NativeControllerBinding {
+    pub schema_version:u16,pub source_sha256:String,pub encounters:Vec<Vec<String>>,pub groups:Vec<NativeControllerGroup>,pub activation:String,pub loadout:String,
+}
+impl NativeControllerBinding {
+    pub fn validate(&self)->Result<()> {
+        if self.schema_version!=1||self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_digit()||(b'a'..=b'f').contains(&c))||!matches!(self.activation.as_str(),"manual"|"startup")||self.loadout!="scenario"||self.groups.is_empty()||self.groups.len()>128||self.encounters.is_empty()||self.encounters.len()>32||self.encounters.iter().any(|wave|wave.is_empty()||wave.len()>8)||self.encounters.iter().map(Vec::len).sum::<usize>()!=self.groups.len() {
+            return invalid("Unsupported or incomplete native controller source binding");
+        }
+        let mut names=std::collections::BTreeSet::new();
+        for (name,group) in self.encounters.iter().flatten().zip(&self.groups) {
+            if name!=&group.name||name.is_empty()||name.len()>31||!name.bytes().next().is_some_and(|c|c.is_ascii_alphabetic()||c==b'_')||!name.bytes().all(|c|c.is_ascii_alphanumeric()||b"_/-".contains(&c))||!names.insert(name.to_ascii_lowercase())||group.count==0||group.count>32 {
+                return invalid("Native controller needs distinct safe encounter names and 1–32 actors per group");
+            }
+            crate::safe_relative(&group.actor_variant_path)?;
+            if group.actor_variant_path.is_empty()||group.actor_variant_path.len()>240||!group.actor_variant_path.is_ascii()||group.actor_variant_path.to_ascii_lowercase().ends_with(".actor_variant") {return invalid("Native controller actor identity is invalid");}
+        }
+        Ok(())
+    }
+    pub fn verify_map(&self,map:&MapInspection)->Result<()> {
+        self.validate()?;
+        if map.header.scenario_type!=0{return invalid("Bound native controller output must remain singleplayer");}
+        let candidates=native_encounter_candidates(map);
+        for group in &self.groups {
+            let found=candidates.iter().filter(|candidate|candidate.name.eq_ignore_ascii_case(&group.name)).collect::<Vec<_>>();
+            if found.len()!=1{return invalid(format!("Bound native encounter is missing or ambiguous: {}",group.name));}
+            let encounter=found[0];
+            if encounter.issue.is_some()||encounter.not_initially_created!=Some(true)||encounter.normal_count!=Some(group.count)||encounter.insane_count!=Some(group.count)||encounter.actor_variant_paths.len()!=1||!encounter.actor_variant_paths[0].replace('\\',"/").eq_ignore_ascii_case(&group.actor_variant_path.replace('\\',"/")) {
+                return invalid(format!("Native controller encounter actor/count/inactive state differs from reviewed source: {}",group.name));
+            }
+        }
+        Ok(())
+    }
+}
 pub fn available_weapons(inspection: &MapInspection) -> Vec<String> {
     inspection.tags.iter().filter(|tag| tag.class == "weap")
         .map(|tag| tag_key(&tag.path)).collect::<BTreeSet<_>>().into_iter().collect()

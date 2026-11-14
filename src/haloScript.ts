@@ -6,9 +6,9 @@
  */
 import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
-import { defaultNativePlayerProfile, type FirefightConfig } from './firefight';
+import { defaultNativePlayerProfile, type FirefightConfig, type NativeEncounterCandidate } from './firefight';
 import type { Project } from './types';
-export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true }
+export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; sourceBinding?:{schemaVersion:1;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
 const safeComment = (s: string): string => s.replace(/[\r\n\0]/g,' ').replace(/[^\x20-\x7e]/g,'?').slice(0,110);
@@ -98,13 +98,36 @@ export function exportHaloCeCinematic(studio:CreatorStudioDocument): ScriptExpor
  * All enemy groups become separately named scenario encounters (not actor_variant
  * spawns). Only campaign-compatible AI waves are modeled: not network AI or score.
  */
-export function exportHaloCeFirefight(config:FirefightConfig):ScriptExport {
+export interface NativeRoundBindings {
+  sourceSha256:string;sourceScenarioType:number;encounters:NativeEncounterCandidate[];
+  encounterNames:string[][];activation:'manual'|'startup';exclusiveOwnershipConfirmed:boolean;
+}
+function nativeEncounterRefs(config:FirefightConfig,binding?:NativeRoundBindings):string[][] {
+  if(!binding)return config.waves.map((wave,w)=>wave.groups.map((_,g)=>`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`));
+  if(binding.sourceScenarioType!==0||!config.sourceSha256||!/^[0-9a-f]{64}$/i.test(binding.sourceSha256)||binding.sourceSha256.toLowerCase()!==config.sourceSha256.toLowerCase())throw Error('Native encounter bindings require the exact singleplayer source used by these rules.');
+  if(!binding.exclusiveOwnershipConfirmed||!['manual','startup'].includes(binding.activation)||config.maxSpawnAttempts!==1)throw Error('Use solo native rules and explicitly confirm exclusive encounter ownership and activation before exporting.');
+  if(binding.encounterNames.length!==config.waves.length)throw Error('Review native encounter bindings after changing waves.');
+  const key=(path:string)=>path.replaceAll('\\','/').toLowerCase(),used=new Set<string>();
+  return config.waves.map((wave,w)=>{
+    const names=binding.encounterNames[w];if(!Array.isArray(names)||names.length!==wave.groups.length)throw Error('Review native encounter bindings after changing groups.');
+    return wave.groups.map((group,g)=>{
+      const name=ensureName(names[g],`Wave ${w+1} group ${g+1} encounter`,true);
+      if(used.has(name.toLowerCase()))throw Error('Each controller group must own a distinct native encounter; shared ownership is unsupported.');used.add(name.toLowerCase());
+      const found=binding.encounters.filter(encounter=>encounter.name.toLowerCase()===name.toLowerCase());
+      const actor=config.enemies.find(enemy=>enemy.id===group.enemyId)?.actorVariantPath;
+      if(found.length!==1||found[0].issue||found[0].notInitiallyCreated!==true||found[0].normalCount!==group.count||found[0].insaneCount!==group.count||found[0].startingLocations==null||found[0].startingLocations<group.count||!actor||found[0].actorVariantPaths.length!==1||key(found[0].actorVariantPaths[0])!==key(actor))throw Error(`Native encounter ${name} does not match the reviewed actor/count/inactive source. Build and reopen the intended source, then select it in Firefight.`);
+      return found[0].name;
+    });
+  });
+}
+export function exportHaloCeFirefight(config:FirefightConfig,binding?:NativeRoundBindings):ScriptExport {
   if(config.schemaVersion!==1 || !Array.isArray(config.waves) || !config.waves.length || config.waves.length>32 ||
     !Array.isArray(config.enemies) || !Number.isInteger(config.rounds) || config.rounds<1 || config.rounds>32 || config.endless)
     throw new Error('Finite waves (1-32), valid enemies and 1-32 rounds are required for the conservative CE exporter. Endless is unsupported.');
   if(!Number.isInteger(config.maxAlive) || config.maxAlive<1 || config.maxAlive>32 || !Number.isInteger(config.intermissionMs) || config.intermissionMs<0 || config.intermissionMs>600000)
     throw new Error('Invalid max-alive/intermission configuration for HaloScript.');
   const enemyIds=new Set(config.enemies.map(e=>e.id));
+  const references=nativeEncounterRefs(config,binding);
   const deps:string[]=[],lines=heading('Firefight · authored AI encounters (single-player preview only)');
   for(let i=0;i<config.waves.length;i++) {
     const wave=config.waves[i], total=wave.groups.reduce((sum,g)=>sum+g.count,0);
@@ -113,7 +136,7 @@ export function exportHaloCeFirefight(config:FirefightConfig):ScriptExport {
     const encounters=wave.groups.map((g,j)=>{
       if(!enemyIds.has(g.enemyId)||!Number.isInteger(g.count)||g.count<1||g.count>32)
         throw new Error(`Wave ${i+1} group ${j+1} has an invalid enemy reference/count.`);
-      const ref=`gs_w${String(i+1).padStart(2,'0')}_g${String(j+1).padStart(2,'0')}`;
+      const ref=references[i][j];
       deps.push(`ai_encounter:${ref}:expectedActors=${g.count}:enemy=${g.enemyId}`);return ref;
     });
     lines.push(`(script static void gs_wave_${String(i+1).padStart(2,'0')}`);
@@ -140,13 +163,14 @@ export function exportHaloCeFirefight(config:FirefightConfig):ScriptExport {
  * only its named encounters. The engine runs waves; Spark does not send kills
  * or commands to a game. Encounter construction and human combat remain gates.
  */
-export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport {
+export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:NativeRoundBindings):ScriptExport {
   for(const wave of config.waves)for(const group of wave.groups){
     if(group.spawnZoneId!=null && !config.spawnZones.some(zone=>zone.id===group.spawnZoneId&&zone.enabled))
       throw Error(`Wave ${wave.name} references a missing or disabled spawn zone. Select another zone or Automatic; its assignment was retained.`);
   }
-  const conservative=exportHaloCeFirefight(config);
-  const player=config.nativePlayerProfile;
+  const conservative=exportHaloCeFirefight(config,binding);
+  const references=nativeEncounterRefs(config,binding);
+  const player=binding?undefined:config.nativePlayerProfile;
   if(player){
     for(const weapon of [player.primaryWeapon,...(player.secondaryWeapon?[player.secondaryWeapon]:[])]){
       if(typeof weapon!=='string'||!weapon.length||weapon.length>240||/[^\x20-\x7e]/.test(weapon)||/\.weapon$/i.test(weapon)||/^(?:[\/]|[A-Za-z]:)/.test(weapon)||weapon.replaceAll('\\','/').split('/').some(part=>!part||part==='.'||part==='..'))throw Error('Choose native player weapon tag paths without extensions.');
@@ -175,42 +199,42 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
     const groups=wave.groups.map((group,g)=>{
       const points=enemies.get(group.enemyId)?.points;
       if(typeof points!=='number'||!Number.isSafeInteger(points)||points<0||points>100000)throw Error('Native round enemy points must be 0-100000.');
-      return {ref:`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`,count:group.count,
+      return {ref:references[w][g],slot:`w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`,count:group.count,
         points:Math.floor(group.count*points*wave.scoreMultiplierMilli/1000)};
     });
     return {groups,count:groups.reduce((n,g)=>n+g.count,0),score:groups.reduce((n,g)=>n+g.points,0)};
   });
   if(waves.reduce((n,w)=>n+w.score,0)*config.rounds>2147483647)throw Error('Native round score exceeds Halo long range.');
-  const owned=(ref:string)=>`gs_ff_units_${ref.slice(3)}`;
-  const clean=(ref:string)=>`gs_ff_clean_${ref.slice(3)}`;
+  const owned=(group:{slot:string})=>`gs_ff_units_${group.slot}`;
+  const clean=(group:{slot:string})=>`gs_ff_clean_${group.slot}`;
   const lines=heading('Firefight native round candidate · solo encounter controller');
   lines.push('; State: 0 idle, 1 preparing, 2 active, 3 intermission, 4 complete, 5 refused/defeated.',
     '; Score is team wave-clear points, not player kill attribution or a native HUD/medal implementation.',
     '(global boolean gs_ff_start false)','(global short gs_ff_state 0)','(global short gs_ff_round 0)',
     '(global short gs_ff_wave 0)','(global long gs_ff_score 0)','(global long gs_ff_cleared 0)','(global unit gs_ff_player none)','');
   for(const wave of waves)for(const group of wave.groups)
-    lines.push(`(global object_list ${owned(group.ref)} (ai_actors ${group.ref}))`);
+    lines.push(`(global object_list ${owned(group)} (ai_actors ${group.ref}))`);
   lines.push('');
   for(const wave of waves)for(const group of wave.groups){
-    lines.push(`(script static void ${clean(group.ref)}`,`  (ai_force_active ${group.ref} false)`);
+    lines.push(`(script static void ${clean(group)}`,`  (ai_force_active ${group.ref} false)`);
     // Native ai_erase no longer owns a unit after its actor dies. Retain the
     // exact encounter's salted unit references before combat, then delete its
     // captured corpses too. Descending slots also tolerate list compaction.
     // The existing 32-actor/group bound keeps this finite without a shared loop
     // counter or arbitrary object-name/definition-wide deletion.
     for(let slot=group.count-1;slot>=0;slot--)
-      lines.push(`  (object_destroy (list_get ${owned(group.ref)} ${slot}))`);
-    lines.push(`  (ai_erase ${group.ref})`,`  (set ${owned(group.ref)} (ai_actors ${group.ref}))`,')','');
+      lines.push(`  (object_destroy (list_get ${owned(group)} ${slot}))`);
+    lines.push(`  (ai_erase ${group.ref})`,`  (set ${owned(group)} (ai_actors ${group.ref}))`,')','');
   }
   lines.push('(script static void gs_ff_reset');
-  for(const wave of waves)for(const group of wave.groups)lines.push(`  (${clean(group.ref)})`);
+  for(const wave of waves)for(const group of wave.groups)lines.push(`  (${clean(group)})`);
   lines.push('  (set gs_ff_score 0)','  (set gs_ff_cleared 0)','  (set gs_ff_round 0)','  (set gs_ff_wave 0)',')','');
   waves.forEach((wave,w)=>{
     const counts=wave.groups.map(g=>`(ai_living_count ${g.ref})`), living=counts.length===1?counts[0]:`(+ ${counts.join(' ')})`;
     lines.push(`(script static void gs_wave_${String(w+1).padStart(2,'0')}`, '  (if (!= gs_ff_state 5) (begin',
       '    (set gs_ff_state 2)',`    (set gs_ff_wave ${w+1})`);
     for(const group of wave.groups)lines.push(`    (ai_place ${group.ref})`,
-      `    (set ${owned(group.ref)} (ai_actors ${group.ref}))`,`    (ai_force_active ${group.ref} true)`);
+      `    (set ${owned(group)} (ai_actors ${group.ref}))`,`    (ai_force_active ${group.ref} true)`);
     const exact=wave.groups.map(g=>`(= (ai_living_count ${g.ref}) ${g.count})`), ready=exact.length===1?exact[0]:`(and ${exact.join(' ')})`;
     lines.push(`    (sleep_until ${ready} 1 ${ticks(config.spawnTimeoutMs)})`,
       `    (if (not ${ready}) (set gs_ff_state 5))`,
@@ -222,7 +246,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
       '          (set gs_ff_state 3)',
       '        )','        (set gs_ff_state 5)', '      )','    ))',
       '    (if (= gs_ff_state 3) (sleep 60))');
-    for(const group of wave.groups)lines.push(`    (${clean(group.ref)})`);
+    for(const group of wave.groups)lines.push(`    (${clean(group)})`);
     lines.push('  ))',')','');
   });
   lines.push('(script continuous gs_firefight','  (sleep_until gs_ff_start 1)','  (set gs_ff_start false)',
@@ -239,7 +263,10 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
   }
   lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
   lines.push(')','');
-  return {...conservative,content:lines.join('\r\n'),activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
+  const sourceBinding=binding?{schemaVersion:1 as const,sourceSha256:binding.sourceSha256.toLowerCase(),encounters:references,groups:config.waves.flatMap((wave,w)=>wave.groups.map((group,g)=>({name:references[w][g],actorVariantPath:config.enemies.find(enemy=>enemy.id===group.enemyId)!.actorVariantPath,count:group.count}))),activation:binding.activation,loadout:'scenario' as const}:undefined;
+  const content=(sourceBinding?'; Spark source encounter bindings: '+JSON.stringify(sourceBinding)+'\r\n':'')+lines.join('\r\n')+(binding?.activation==='startup'?nativeRoundBootstrap:'');
+  return {...conservative,...(sourceBinding?{sourceBinding}:{}),content,activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
+    ...(binding?['Bound encounters come from the exact source cache inventory. Their ownership, navigation and gameplay still require review; original scripts may also manipulate them.','Keep this scenario’s existing player equipment. No generated starting profile or weapon override is applied.','Activation: '+(binding.activation==='startup'?'an explicit gs_ff_bootstrap startup script is included.':'manual; a reviewed scenario script must set gs_ff_start true.')]:[]),
     ...(player?['Create gs_firefight_start as a standard scenario player starting profile using the exported player-loadout authoring metadata; include its exact weapon dependencies.']:[]),
     'Experimental native solo round source. Build only into a separate reviewed singleplayer/campaign scenario with these exact encounters/counts and safe spawn/navigation data.',
     'Start or request another round with (set gs_ff_start true). The continuous controller resets only its own encounters and score, then waits for actual living counts to reach zero.',
@@ -252,7 +279,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
 /** Plain JSON contract for creator tool integration. No secrets or local source paths. */
 export function scriptManifest(out:ScriptExport):string {
   return JSON.stringify({schemaVersion:1,kind:'guilty-spark-h1-script-source',file:out.filename,
-    status:'exportedNotCompiled',gameplayVerified:false,scenarioType:out.scenarioType??null,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings},null,2);
+    status:'exportedNotCompiled',gameplayVerified:false,scenarioType:out.scenarioType??null,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings,...(out.sourceBinding?{sourceBinding:out.sourceBinding}:{})},null,2);
 }
 
 /** Attach the existing solo controller to an editable level. Configuration is

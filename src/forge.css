@@ -241,3 +241,5 @@
 .forge-logic-visual:disabled { opacity: .65; }
 .forge-handwritten-sources > :not(summary) { margin-top: 6px; }
 .forge-handwritten-sources label { display: grid; gap: 3px; }
+
+.firefight-native-binding{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:6px;align-items:center}.firefight-native-binding select{min-width:0;max-width:100%}

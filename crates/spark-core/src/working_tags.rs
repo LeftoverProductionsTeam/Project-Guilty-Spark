@@ -17,6 +17,7 @@ use sha2::{Digest,Sha256};
 use std::{
     collections::BTreeMap,
     fs,
+    io::Read,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -33,7 +34,13 @@ pub struct ScriptAttachment { pub filename:String, pub content:String, pub sha25
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScriptAttachmentIdentity { pub filename:String, pub sha256:String }
+fn parse_controller_binding(content:&str)->Result<Option<crate::firefight::NativeControllerBinding>> {
+        let line=content.lines().next().unwrap_or("").trim_start_matches('\u{feff}');
+        let Some(json)=line.strip_prefix("; Spark source encounter bindings: ") else{return Ok(None);};
+        let binding:crate::firefight::NativeControllerBinding=serde_json::from_str(json)?;binding.validate()?;Ok(Some(binding))
+}
 impl ScriptAttachment {
+    fn controller_binding(&self)->Result<Option<crate::firefight::NativeControllerBinding>> {parse_controller_binding(&self.content)}
     fn relative_path(&self,scenario:&str)->Result<PathBuf> {
         let stem=self.filename.strip_suffix(".hsc").ok_or_else(||SparkError::Invalid("Attach a canonical .hsc module".into()))?;
         if stem.is_empty()||stem.len()>31||stem.eq_ignore_ascii_case("global_scripts")||!stem.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c)) {
@@ -72,6 +79,8 @@ pub struct WorkingTagsInput {
 pub struct WorkingTagsReceipt {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub attached_script:Option<ScriptAttachmentIdentity>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub controller_binding:Option<crate::firefight::NativeControllerBinding>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub expected_encounter:Option<crate::native_operations::Operation>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
@@ -148,6 +157,7 @@ fn verify_hash_manifest(parent: &Path, manifest: &Option<TagHashManifest>) -> Re
 struct Prepared {
     tags: PathBuf,
     source_data: Option<PathBuf>,
+    parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
     parent_output: PathBuf,
     parent_inspection: maps::MapInspection,
     tools: BTreeMap<String, String>,
@@ -221,7 +231,8 @@ fn parent_native_identity(
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<Option<PathBuf>> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>)> {
+    let mut controller_binding=None;
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -245,6 +256,7 @@ fn parent_native_identity(
         if receipt.input_script_hashes.is_some() {
             verify_hash_manifest(parent, &receipt.input_script_hashes)?;
         }
+        controller_binding=receipt.controller_binding;
         receipt.workspace
     } else if forge_receipt.exists() {
         let receipt: forge_build::QuickForgeBuildReceipt = read_receipt(&forge_receipt)?;
@@ -291,9 +303,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok(Some(data))
+        Ok((Some(data),controller_binding))
     } else {
-        Ok(None)
+        Ok((None,controller_binding))
     }
 }
 
@@ -339,6 +351,7 @@ fn prepare(
     if let Some(attachment)=&input.script_attachment {
         if !input.compile_scripts{return invalid("Attaching source requires explicit script compilation; a tag-only rebuild cannot attach it");}
         let _=attachment.relative_path(&scenario)?;
+        let _=attachment.controller_binding()?;
     }
     if !scenario.eq_ignore_ascii_case(&normalize_scenario(&project.scenario_path()?)?) {
         return invalid("Working-tag scenario differs from the current project");
@@ -417,7 +430,8 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let source_data = parent_native_identity(project, input, &parent, &tools["haloTool"])?;
+    let (source_data,parent_controller_binding) = parent_native_identity(project, input, &parent, &tools["haloTool"])?;
+    if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     if input.compile_scripts {
         if source_data.is_none()&&input.script_attachment.is_none(){return invalid("This working source has no recovered HaloScript directory. Recover/review the original source modules first; compiled script bytecode is retained");}
         for (key,name) in [("invaderEdit","invader-edit"),("invaderScript","invader-script")] {
@@ -430,6 +444,7 @@ fn prepare(
     Ok(Prepared {
         tags,
         source_data,
+        parent_controller_binding,
         parent_output,
         parent_inspection,
         tools,
@@ -675,6 +690,7 @@ fn run_with(
     };
     let mut receipt = WorkingTagsReceipt {
         attached_script:None,
+        controller_binding:prepared.parent_controller_binding.clone(),
         expected_encounter:input.expected_encounter.clone(),
         compiled_script_modules:vec![],
         reviewed_tag_identity:input.expected_tag_identity.clone(),
@@ -759,9 +775,34 @@ fn run_with(
             project::atomic_write(&target,attachment.content.as_bytes(),false)?;
             if maps::hash_file(&target)?!=attachment.sha256{return invalid("Attached script bytes differ from the reviewed source");}
             staged_scripts.insert(key,attachment.sha256.clone());
+            // The complete selected-scenario source set is reconciled below.
             receipt.attached_script=Some(ScriptAttachmentIdentity{filename:attachment.filename.clone(),sha256:attachment.sha256.clone()});
         }
         if script_hashes(Some(&workspace.join("data")),&cancel)?!=staged_scripts{return invalid("Staged script inventory differs from the original modules and reviewed attachment");}
+        if input.compile_scripts {
+            let script_directory=Path::new(&receipt.scenario_path).parent().unwrap_or(Path::new("")).join("scripts");
+            let prefix=format!("{}/",script_directory.to_string_lossy().replace('\\',"/"));
+            let mut controller=None;
+            for (relative,hash) in staged_scripts.iter().filter(|(path,_)|path.starts_with(&prefix)&&!path[prefix.len()..].contains('/')) {
+                let path=checked_file(&workspace.join("data").join(safe_relative(relative)?))?;
+                let mut bytes=vec![];fs::File::open(path)?.take(8*1024*1024+1).read_to_end(&mut bytes)?;
+                if bytes.len()>8*1024*1024{return invalid("Controller source exceeded the existing script-file bound");}
+                let beginning=bytes.strip_prefix(&[0xef,0xbb,0xbf]).unwrap_or(&bytes);
+                if !beginning.starts_with(b"; Spark source encounter bindings: "){continue;}
+                if crate::hex_bytes(Sha256::digest(&bytes))!=*hash{return invalid("Controller module changed after staging");}
+                let source=std::str::from_utf8(&bytes).map_err(|_|SparkError::Invalid("Bound controller metadata needs valid UTF8 source".into()))?;
+                let binding=parse_controller_binding(source)?.ok_or_else(||SparkError::Invalid("Controller metadata disappeared".into()))?;
+                let known_parent=prepared.parent_controller_binding.as_ref().is_some_and(|parent|parent.source_sha256==binding.source_sha256);
+                if input.scenario_type!=0||(!known_parent&&!project.source.as_ref().is_some_and(|source|source.sha256==binding.source_sha256)&&input.parent_build.sha256.as_deref()!=Some(binding.source_sha256.as_str())) {
+                    return invalid("Controller source identity differs from the reviewed map/native lineage; no compiler ran");
+                }
+                if controller.is_some(){return invalid("Multiple bound controller modules need explicit source reconciliation; no compiler ran");}
+                controller=Some(binding);
+            }
+            // A tag-only rebuild, or a removed authoring comment, cannot silently
+            // drop an accepted native actor/count readback requirement.
+            if controller.is_some(){receipt.controller_binding=controller;}
+        }
         if !staged_scripts.is_empty() {
             receipt.input_script_hashes = Some(save_hash_manifest(
                 &directory,
@@ -825,6 +866,7 @@ fn run_with(
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
         if let Some(expected)=&input.expected_encounter{expected.verify_compiled_encounter(&inspected)?;}
+        if let Some(binding)=&receipt.controller_binding{binding.verify_map(&inspected)?;}
         if input.compile_scripts {
             for script in &prepared.parent_inspection.scripts {
                 let expected=prepared.parent_inspection.scripts.iter().filter(|other|other.name==script.name&&other.script_type==script.script_type&&other.return_type==script.return_type).count();

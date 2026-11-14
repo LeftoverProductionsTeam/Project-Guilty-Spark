@@ -6,6 +6,7 @@ import { beginProjectMutation } from '../projectMutation';
 import { attachAssetImport, prepareFirefightImports } from '../nativeAssetImport';
 import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
+import {useMapState} from '../mapSession';
 import { call, native } from '../api';
 import type { QuickForgeBuildReceipt } from '../forge';
 import type {
@@ -50,6 +51,12 @@ export default function Firefight({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const config = project.firefight;
+  const bindingKey=JSON.stringify(config??null);
+  const [bindingDraft,setBindingDraft]=useMapState<{configKey:string;names:string[][];activation:'manual'|'startup'}>(project.id,'firefight.nativeEncounterBindings',{configKey:'',names:[],activation:'manual'});
+  const nativeBinding=bindingDraft?.configKey===bindingKey&&Array.isArray(bindingDraft.names)&&bindingDraft.names.length===(config?.waves.length??0)&&bindingDraft.names.every((names,w)=>Array.isArray(names)&&names.length===config?.waves[w]?.groups.length&&names.every(name=>typeof name==='string'&&name.length<=31))&&['manual','startup'].includes(bindingDraft.activation)?bindingDraft:{configKey:bindingKey,names:config?.waves.map(wave=>wave.groups.map(()=>''))??[],activation:'manual' as const};
+  const [ownershipReviewed,setOwnershipReviewed]=useState(false);
+  useEffect(()=>setOwnershipReviewed(false),[bindingKey,bindingDraft,sourceId,catalog]);
+  const updateBinding=(wave:number,group:number,name:string)=>{setOwnershipReviewed(false);setBindingDraft({...nativeBinding,names:nativeBinding.names.map((names,w)=>w===wave?names.map((value,g)=>g===group?name:value):names)});};
   const tagKey=(path:string)=>path.replaceAll('\\','/').toLowerCase();
   const sourceMatches=!!catalog&&(!config||config.sourceSha256===catalog.defaultConfig.sourceSha256);
   const boundSource=sources.find(entry=>entry.sha256===config?.sourceSha256);
@@ -225,6 +232,17 @@ export default function Firefight({
         setError(receipt.blockers.join(' | ')||'Source export did not finish. Inspect its job diagnostics; no compiled map was created.');
     } catch(problem){setError(String(problem));}finally{setBusy(false);}
   }
+  function downloadSource(contents:BlobPart,name:string,type:string) {
+    const url=URL.createObjectURL(new Blob([contents],{type}));const link=document.createElement('a');link.href=url;link.download=name;
+    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }
+  function exportBoundController() {
+    if(!config||!catalog||!sourceMatches||!ownershipReviewed)return;
+    try {
+      const source=exportHaloCeFirefightRound(config,{sourceSha256:catalog.defaultConfig.sourceSha256??'',sourceScenarioType:catalog.sourceScenarioType??-1,encounters:catalog.encounters??[],encounterNames:nativeBinding.names,activation:nativeBinding.activation,exclusiveOwnershipConfirmed:ownershipReviewed});
+      downloadSource(source.content,source.filename,'text/plain;charset=utf-8');setError('');
+    }catch(problem){setError(String(problem));}
+  }
   function exportRound() {
     if(!config)return;
     try {
@@ -233,9 +251,7 @@ export default function Firefight({
         {name:'native-round.json',contents:scriptManifest(source)},
         {name:'encounter-plan.json',contents:JSON.stringify({scenarioType:'singleplayer',sourceSha256:config.sourceSha256,enemies:config.enemies,
           spawnZones:config.spawnZones,waves:config.waves,nativePlayerProfile:config.nativePlayerProfile??null,dependencies:source.dependencies,compiled:false,gameplayVerified:false},null,2)}]);
-      const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/zip'}));
-      const link=document.createElement('a');link.href=url;link.download='spark-firefight-script-plan.zip';
-      document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setError('');
+      downloadSource(new Uint8Array(bytes),'spark-firefight-script-plan.zip','application/zip');setError('');
     }catch(error){setError(String(error));}
   }
   return (
@@ -689,6 +705,30 @@ export default function Firefight({
           <details><summary>Advanced script export</summary>
             <p className="subtle">The script and encounter-plan ZIP describes authoring intent. It does not contain a generated native scenario or a playable map.</p>
             <button disabled={busy} onClick={exportRound}><Download size={14} />Export script &amp; encounter plan</button>
+            <details><summary>Bind controller to native source encounters</summary>
+              <p className="subtle">Choose the exact compiled singleplayer map as the rules source. If you appended encounters, build and open that output first. This reads source inventory; it does not modify encounters or prove navigation. Bound controllers keep the scenario’s existing player equipment.</p>
+              {(!sourceMatches||catalog?.sourceScenarioType!==0)&&<Notice>Select the matching singleplayer rules source and use solo native rules before binding a controller.</Notice>}
+              {!catalog?.encounters?.length&&<p className="subtle">No decoded native encounters in this source. Create inactive source encounters in AI &amp; scenario or a compatible native editor, then build and reopen the result.</p>}
+              {config.waves.map((wave,w)=>wave.groups.map((group,g)=>{
+                const enemy=config.enemies.find(enemy=>enemy.id===group.enemyId),value=nativeBinding.names[w]?.[g]??'';
+                return <label key={wave.id+':'+g} className="firefight-native-binding">{wave.name} · {enemy?.name??group.enemyId} · {group.count} actors
+                  <select aria-label={'Native encounter for '+wave.name+' group '+(g+1)} value={value} disabled={busy||!sourceMatches||catalog?.sourceScenarioType!==0} onChange={event=>updateBinding(w,g,event.target.value)}>
+                    <option value="">Choose an inactive matching encounter…</option>
+                    {(catalog?.encounters??[]).map((encounter,index)=>{
+                      const mismatch=!/^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/.test(encounter.name)||!!encounter.issue||encounter.normalCount!==group.count||encounter.insaneCount!==group.count||encounter.actorVariantPaths.length!==1||!enemy||tagKey(encounter.actorVariantPaths[0])!==tagKey(enemy.actorVariantPath);
+                      const alreadyUsed=nativeBinding.names.flat().includes(encounter.name)&&value!==encounter.name;
+                      return <option key={encounter.name+':'+index} value={encounter.name} disabled={mismatch||alreadyUsed}>{encounter.name} · {encounter.normalCount??'?'} actors{encounter.issue?' · '+encounter.issue:mismatch?' · actor/count mismatch':alreadyUsed?' · already assigned':''}</option>;
+                    })}
+                  </select>
+                </label>;
+              }))}
+              <label>Activation<select aria-label="Bound controller activation" value={nativeBinding.activation} disabled={busy} onChange={event=>{setOwnershipReviewed(false);setBindingDraft({...nativeBinding,activation:event.target.value as 'manual'|'startup'});}}>
+                <option value="manual">Manual · set gs_ff_start true in reviewed HaloScript</option><option value="startup">Start automatically · add a startup script</option>
+              </select></label>
+              <label><input type="checkbox" checked={ownershipReviewed} disabled={busy||!sourceMatches||catalog?.sourceScenarioType!==0} onChange={event=>setOwnershipReviewed(event.target.checked)}/>I reviewed the original scripts; only this controller will manipulate these encounters.</label>
+              <button disabled={busy||!sourceMatches||catalog?.sourceScenarioType!==0||!ownershipReviewed||config.waves.some((wave,w)=>wave.groups.some((_,g)=>!nativeBinding.names[w]?.[g]))} onClick={exportBoundController}><Download size={14}/>Download bound controller .hsc</button>
+              <p className="subtle">Review this module, then Runtime Dock → Attach new controller/script source → Attach source &amp; compile. Existing source modules are retained; matching names may need manual reconciliation. This is solo source authoring, not runtime configuration import, Live Link, multiplayer AI or gameplay acceptance.</p>
+            </details>
           </details>
           {sourceExport&&<details open><summary>{staleExport?'Previous source export · changed since export':sourceExport.receipt.status!=='exported'?'Source export · did not finish':sourceExport.receipt.blockers.length?'Source export · resolve blockers':'Source export · not compiled'}</summary>
             {sourceExport.receipt.sources&&<>
