@@ -29,6 +29,9 @@ const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
+    /// Explicit source compilation; the default rebuild keeps existing compiled scripts.
+    #[serde(default)]
+    pub compile_scripts:bool,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub expected_tag_identity:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -44,6 +47,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub compiled_script_modules:Vec<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub reviewed_tag_identity:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -378,6 +383,14 @@ fn prepare(
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
     let source_data = parent_native_identity(project, input, &parent, &tools["haloTool"])?;
+    if input.compile_scripts {
+        if source_data.is_none(){return invalid("This working source has no recovered HaloScript directory. Recover/review the original source modules first; compiled script bytecode is retained");}
+        for (key,name) in [("invaderEdit","invader-edit"),("invaderScript","invader-script")] {
+            let path=checked_file(&input.invader_info.with_file_name(if cfg!(windows){format!("{name}.exe")}else{name.into()}))?;
+            if fs::metadata(&path)?.len()>256*1024*1024{return invalid("Native script tool exceeds its identity-check limit");}
+            tools.insert(key.into(),maps::hash_file(&path)?);
+        }
+    }
     preserved_source(project)?;
     Ok(Prepared {
         tags,
@@ -447,6 +460,81 @@ fn script_hashes(root: Option<&Path>, cancel: &AtomicBool) -> Result<BTreeMap<St
     Ok(hashes)
 }
 
+/// Compile only this scenario's reviewed modules, preserving its original native
+/// script/global names. This does not execute game scripts or claim semantic parity.
+fn compile_script_sources(
+    input:&WorkingTagsInput, prepared:&Prepared, tags:&Path, workspace:&Path,
+    sources:&BTreeMap<String,String>, runner:&Runner<'_>,
+    invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>,
+)->Result<Vec<String>> {
+    let scenario=normalize_scenario(&input.scenario_path)?;
+    let tag=format!("{scenario}.scenario");
+    let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+    let compiler=input.invader_info.with_file_name(if cfg!(windows){"invader-script.exe"}else{"invader-script"});
+    let read_names=|field:&str,limit:usize|->Result<Vec<String>> {
+        recheck_tools(input,&prepared.tools)?;
+        let count=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),field.into(),tag.clone()],workspace,"script-readback",42)?
+            .trim().parse::<usize>().map_err(|_|SparkError::Invalid(format!("Native {field} count unavailable")))?;
+        if count>limit{return invalid(format!("Native {field} exceeds the selected scenario capacity"));}
+        if count==0{return Ok(vec![]);}
+        let output=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-G".into(),format!("{field}[*].name"),tag.clone()],workspace,"script-readback",42)?;
+        let names=output.lines().map(str::to_owned).collect::<Vec<_>>();
+        if names.len()!=count||names.iter().any(|name|name.is_empty()||name.chars().any(char::is_control)) {return invalid(format!("Native {field} names do not match their source array"));}
+        Ok(names)
+    };
+    let scripts=read_names("scripts",1024)?;
+    let globals=read_names("globals",512)?;
+    let original_modules=read_names("source_files",16)?;
+    crate::source_recovery::validate_output_names(&original_modules.join("\n"))?;
+    let mut original_keys=std::collections::BTreeSet::new();
+    if original_modules.iter().any(|name|!original_keys.insert(name.to_ascii_lowercase())) {return invalid("Original HaloScript module names collide; recover/reconcile them before compilation");}
+    // Preserve native script signatures as well as names in the final cache check.
+    let mut original_names=scripts.clone();original_names.sort();
+    let mut cache_names=prepared.parent_inspection.scripts.iter().map(|script|script.name.clone()).collect::<Vec<_>>();cache_names.sort();
+    if original_names!=cache_names{return invalid("Working scenario script names differ from its accepted parent cache; reconcile the native source before recompiling HaloScript");}
+    let directory=Path::new(&scenario).parent().unwrap_or(Path::new("")).join("scripts");
+    let prefix=format!("{}/",directory.to_string_lossy().replace('\\',"/"));
+    let mut modules=vec![];
+    let mut module_keys=std::collections::BTreeSet::new();
+    for path in sources.keys().filter(|path|path.starts_with(&prefix)) {
+        let relative=path.strip_prefix(&prefix).unwrap();
+        if relative.contains('/') {return invalid("Scenario HaloScript modules must be direct files in its scripts directory");}
+        let Some(name)=relative.strip_suffix(".hsc") else {return invalid("Use canonical .hsc filenames before compiling scenario scripts");};
+        crate::source_recovery::validate_output_names(name)?;
+        if name.len()>31 || !name.is_ascii() || name.chars().any(char::is_control) || name.eq_ignore_ascii_case("global_scripts") || !module_keys.insert(name.to_ascii_lowercase()) {
+            return invalid("Scenario script module names must be unique safe ASCII names of at most31bytes; global_scripts belongs at the data root");
+        }
+        modules.push(name.to_owned());
+    }
+    let has_global=original_modules.iter().any(|name|name=="global_scripts");
+    if has_global&&!sources.contains_key("global_scripts.hsc") {return invalid("Original global_scripts.hsc is missing; no script compilation was attempted");}
+    for name in original_modules.iter().filter(|name|name.as_str()!="global_scripts") {
+        if !modules.contains(name){return invalid(format!("Original script module {name}.hsc is missing; recover/review it before recompiling"));}
+    }
+    if modules.is_empty() || modules.len()+usize::from(has_global)>16 {return invalid("Script compilation needs1–16complete source modules within the native scenario limit");}
+    let mut args=vec!["-g".into(),"mcc-cea".into(),"-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),workspace.join("data").to_string_lossy().into_owned()];
+    // Never adopt an unrelated global_scripts.hsc implicitly.
+    if !has_global{args.push("-E".into());}
+    for name in &modules {args.extend(["-x".into(),name.clone()]);}
+    args.push(scenario);
+    recheck_tools(input,&prepared.tools)?;
+    let output=invoke(runner,&compiler,&args,workspace,"scripts",46)?;
+    if output.lines().any(|line|line.trim().to_ascii_lowercase().starts_with("error:")){return invalid("Native HaloScript compiler reported errors; the candidate and previous-good cache remain separate");}
+    recheck_tools(input,&prepared.tools)?;
+    let final_scripts=read_names("scripts",1024)?;
+    let final_globals=read_names("globals",512)?;
+    let mut expected_modules=modules.clone();if has_global{expected_modules.push("global_scripts".into());}
+    let mut final_modules=read_names("source_files",16)?;expected_modules.sort();final_modules.sort();
+    let retained=|before:&[String],after:&[String]| {
+        before.iter().all(|name|after.iter().filter(|other|*other==name).count()>=before.iter().filter(|other|*other==name).count())
+    };
+    if expected_modules!=final_modules || !retained(&scripts,&final_scripts) || !retained(&globals,&final_globals) {
+        return invalid("Script compilation lost original native scripts/globals or changed the selected module inventory; no new cache was adopted");
+    }
+    if script_hashes(Some(&workspace.join("data")),runner.cancel)?!=*sources {return invalid("Staged HaloScript sources changed during compilation");}
+    Ok(expected_modules)
+}
+
 /// Rehash the whole bounded tree, so additions/removals during staging/compile
 /// are rejected as well as changes to files that happened to be enumerated first.
 pub(crate) fn tree_hashes(root: &Path, cancel: &AtomicBool) -> Result<BTreeMap<String, String>> {
@@ -505,6 +593,12 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
             return invalid("Selected tool executable changed during the working-tag build");
         }
     }
+    for (key,name) in [("invaderEdit","invader-edit"),("invaderScript","invader-script")] {
+        if let Some(hash)=expected.get(key) {
+            let path=input.invader_info.with_file_name(if cfg!(windows){format!("{name}.exe")}else{name.into()});
+            if hash!=&maps::hash_file(&checked_file(&path)?)?{return invalid("Selected native script/audio tool changed during the working-tag build");}
+        }
+    }
     Ok(())
 }
 
@@ -544,6 +638,7 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        compiled_script_modules:vec![],
         reviewed_tag_identity:input.expected_tag_identity.clone(),
         bsp_audio: input.bsp_audio.clone(),
         schema_version: 1,
@@ -631,6 +726,10 @@ fn run_with(
             crate::bsp_audio::apply(request, &metadata, &tags, &edit, &runner, &workspace)?;
             if maps::hash_file(&edit)? != prepared.tools["invaderEdit"] { return invalid("Invader edit changed during audio editing"); }
         }
+        if input.compile_scripts {
+            receipt.compiled_script_modules=compile_script_sources(input,&prepared,&tags,&workspace,&input_scripts,&runner,&invoke)?;
+            project::atomic_write(&directory.join("working-tags-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
+        }
         let args = native_arguments(&receipt.scenario_path)?;
         // Use Runner's existing protected write phase: cancellation/timeout is
         // observed after native Tool exits, never by forcefully killing it.
@@ -668,6 +767,14 @@ fn run_with(
             .any(|script| !inspected.scripts.iter().any(|s| s.name == script.name))
         {
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
+        }
+        if input.compile_scripts {
+            for script in &prepared.parent_inspection.scripts {
+                let expected=prepared.parent_inspection.scripts.iter().filter(|other|other.name==script.name&&other.script_type==script.script_type&&other.return_type==script.return_type).count();
+                let actual=inspected.scripts.iter().filter(|other|other.name==script.name&&other.script_type==script.script_type&&other.return_type==script.return_type).count();
+                if actual<expected{return invalid(format!("Compiled cache lost an original HaloScript signature: {}",script.name));}
+            }
+            if script_hashes(Some(&workspace.join("data")),&cancel)?!=input_scripts{return invalid("Staged HaloScript source changed before cache adoption");}
         }
         if let Some(request) = &input.bsp_audio {
             let before = crate::bsp_audio::inspect(&prepared.parent_output, &receipt.parent_output_sha256)?;
@@ -724,7 +831,11 @@ fn run_with(
         Ok(output) => BuildRecord {
             id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(), target: "mcc-cea".into(),
             sha256: Some(maps::hash_file(&output)?), output: Some(output), project_fingerprint: fingerprint,
-            message: "Current working tags compiled without re-extraction; source identities, scenario type, index/CRC/protection/stubs and original script names verified. Game loading, gameplay and peers remain untested.".into(),
+            message: if input.compile_scripts {
+                "Reviewed scenario HaloScript and current working tags compiled in separate staging; source/tool identities, original script signatures and native cache checks passed. Game behavior and peers remain untested."
+            } else {
+                "Current working tags compiled without re-extraction; source identities and native cache checks passed. Existing compiled scripts are retained; edited .hsc files require Compile scripts & build. Gameplay and peers remain untested."
+            }.into(),
         },
         Err(e) => BuildRecord {
             id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: if cancel.load(Ordering::Relaxed) { "cancelled" } else { "failed" }.into(), target: "mcc-cea".into(),
@@ -868,6 +979,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            compile_scripts:false,
             expected_tag_identity:None,
             bsp_audio: None,
             parent_build: record,

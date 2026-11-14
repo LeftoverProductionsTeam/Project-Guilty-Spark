@@ -318,7 +318,7 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }
-  async function buildWorkingTags(bspAudio?: BspAudioRequest) {
+  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false) {
     if (
       !project ||
       dirty ||
@@ -332,11 +332,11 @@ export default function RuntimeDock({
     setBusy(true);
     setError('');
     try {
-      await call<string>('build_working_tags', { projectId: project.id, ...(bspAudio ? { bspAudio } : {}) });
+      await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
-          'Compiling a separate map from the saved working tag edits. Open the completed working-tag build from dock details.',
+          compileScripts?'Compiling reviewed scenario HaloScript, then a separate native map. Missing original modules or compiler/readback failures leave the previous-good cache unchanged.':'Compiling a separate map from saved working tags, retaining their existing compiled scripts. To apply edited .hsc source, use Compile scripts & build.',
         );
         onNavigate('build');
       }
@@ -556,6 +556,14 @@ export default function RuntimeDock({
                 <Hammer size={13} />
                 Build working tag edits
               </button>
+              <button
+                disabled={busy||working||dirty||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report?.sourceIssue||!!report?.toolsIssue||report?.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                title="Compile this scenario's reviewed .hsc modules before building its native map. Requires complete original modules and matching Invader-script; other scenarios and unrelated global scripts are excluded."
+                onClick={()=>void buildWorkingTags(undefined,true)}
+              >Compile scripts &amp; build</button>
+              <button disabled={busy||working||!native} title="Open this native build's data folder. Edit the selected scenario's scripts directory; unrelated scenario/global source is not adopted. Save and close external editors before compiling."
+                onClick={()=>void call('reveal_folder',{kind:'workingScripts',id:project.id+':'+report.workingSource!.buildId}).catch(problem=>setError(String(problem)))}
+              >Open script source folder</button>
               {report?.workingBuild && (
                 <button
                   disabled={busy || working || dirty}

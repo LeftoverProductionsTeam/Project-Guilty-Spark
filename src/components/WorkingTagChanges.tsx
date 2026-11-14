@@ -98,7 +98,7 @@ export default function WorkingTagChanges({
             : 'Changes are compared with the files present when monitoring connected.'}{' '}
         Save notifications are checked every 3 seconds. A bounded background hash sweep also catches missed
         notifications and preserved timestamps; its detection delay depends on library size. Build working tag
-        edits to compile a separate map, then open its result. The current cache and Spark draft are retained.
+        edits to compile a separate map, then open its result. Edited .hsc files need the explicit Compile scripts & build action; this monitor watches tags, not script source. The current cache and Spark draft are retained.
       </p>
       {report?.contentAudit && (
         <details>

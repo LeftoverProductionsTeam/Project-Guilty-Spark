@@ -356,3 +356,7 @@ The existing mapSession store retains scenario.query/scenario.selection per proj
 ### AI & Scenario native player loadouts — source only, 14 November 2026
 
 Native player loadouts expands stored scenario equipment, with primary/secondary source weapon navigation through the same map-bound Tag editor route. Health/shields/ammunition/grenades are read from native data; unreadable/older inspections show Unavailable instead of a fake empty loadout. The text explicitly separates this from engine profiles/saves and says scripts/game mode select usage. How To native-ai-research references the controls. No native UI, mouse/keyboard, Save/restart or game test ran; acceptance remains pending.
+
+### Apply edited recovered HaloScript — source only, 14 November 2026
+
+Issue: Build working tag edits copied .hsc files but did not recompile them, so using that action alone could not apply a handwritten source edit. Repair: retain the tag-only action and add explicit Compile scripts & build in the same dock, with Open script source folder bound to the current owned native build. Labels, notices, monitoring text and working-tag-build How To distinguish the actions and current MCC/H1A scope. The compiler rejects missing originals and unselected/unrelated global modules rather than adopting a partial source set. Actual controls, focus, disabled state, failures, Save/reopen and native output remain untested. Source locations: working_tags.rs, runtime_workbench.rs, app.rs, RuntimeDock.tsx, WorkingTagChanges.tsx, featureCatalog.ts.

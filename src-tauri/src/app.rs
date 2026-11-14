@@ -1993,6 +1993,12 @@ fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Re
         "project" => lock(&state.library)?
             .project_dir(&id.ok_or("Missing project ID")?)
             .map_err(error)?,
+        "workingScripts" => {
+            let ids=id.ok_or("Missing source project and native build IDs")?;
+            let(project_id,build_id)=ids.split_once(':').ok_or("Expected source project and native build IDs")?;
+            uuid::Uuid::parse_str(project_id).map_err(error)?;uuid::Uuid::parse_str(build_id).map_err(error)?;
+            runtime_workbench::script_source_directory(&state,project_id,build_id)?
+        },
         "quickforgeSources" => {
             let ids=id.ok_or("Missing source project and export job IDs")?;
             let (project_id,job_id)=ids.split_once(':').ok_or("Expected source project and export job IDs")?;
