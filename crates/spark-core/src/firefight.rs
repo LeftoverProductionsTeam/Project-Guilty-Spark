@@ -30,6 +30,9 @@ pub struct SpawnZone {
 pub struct EnemyGroup {
     pub enemy_id: String,
     pub count: u16,
+    /// Optional authoring-only zone binding; legacy groups retain automatic placement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawn_zone_id: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -341,15 +344,11 @@ pub fn validate_document(config: &FirefightConfig) -> Result<()> {
             return invalid("Invalid wave identity, score multiplier or group count");
         }
         let mut total = 0u32;
-        let mut groups = BTreeSet::new();
         for group in &wave.groups {
-            if group.count == 0
-                || !identifier(&group.enemy_id)
-                || !groups.insert(group.enemy_id.as_str())
+            if group.count == 0 || !identifier(&group.enemy_id)
+                || group.spawn_zone_id.as_ref().is_some_and(|id| !identifier(id))
             {
-                return invalid(
-                    "Wave group references an invalid/duplicate enemy ID or has zero count",
-                );
+                return invalid("Wave group references an invalid enemy/zone ID or has zero count");
             }
             total += group.count as u32;
         }
@@ -393,6 +392,13 @@ pub fn validate(config: &FirefightConfig) -> Result<()> {
                 .any(|g| !ids.contains(g.enemy_id.as_str()))
         {
             return invalid("Each runnable wave needs groups referencing available enemy IDs");
+        }
+        for group in &wave.groups {
+            if let Some(id) = &group.spawn_zone_id {
+                if !config.spawn_zones.iter().any(|zone| &zone.id == id && zone.enabled) {
+                    return invalid(format!("Wave {} references a missing or disabled spawn zone: {id}. Select another zone or Automatic; the assignment was not changed.", wave.name));
+                }
+            }
         }
     }
     Ok(())
@@ -488,8 +494,8 @@ pub fn presets(inspection: &MapInspection) -> Vec<FirefightPreset> {
         let config=if missing_actor_variants.is_empty() {
             let mut c=default_config();c.title=format!("Fonzie's Zombie Apocalypse — {name}");c.source_sha256=Some(inspection.sha256.clone());c.endless=endless;
             c.enemies=paths.iter().filter_map(|p|available.iter().find(|e|tag_key(&e.actor_variant_path)==tag_key(p)).cloned()).collect();
-            c.waves.push(WaveDefinition{id:"wave-1".into(),name:"Opening wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![EnemyGroup{enemy_id:c.enemies[0].id.clone(),count:8}]});
-            c.waves.push(WaveDefinition{id:"wave-2".into(),name:if boss{"Boss wave"}else{"Escalation"}.into(),boss,score_multiplier_milli:if boss{2000}else{1250},groups:c.enemies.iter().enumerate().map(|(i,e)|EnemyGroup{enemy_id:e.id.clone(),count:if i==0{8}else{2}}).collect()});
+            c.waves.push(WaveDefinition{id:"wave-1".into(),name:"Opening wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![EnemyGroup{enemy_id:c.enemies[0].id.clone(),count:8,spawn_zone_id:None}]});
+            c.waves.push(WaveDefinition{id:"wave-2".into(),name:if boss{"Boss wave"}else{"Escalation"}.into(),boss,score_multiplier_milli:if boss{2000}else{1250},groups:c.enemies.iter().enumerate().map(|(i,e)|EnemyGroup{enemy_id:e.id.clone(),count:if i==0{8}else{2},spawn_zone_id:None}).collect()});
             Some(c)
         } else {None};
         FirefightPreset{id:id.into(),name:name.into(),config,missing_actor_variants,detail:"Authored Firefight derivative using actual imported actor-variant paths. Original credits remain Patrick Davis/Fonzie/AnonDavis and collaborators. Draft spawn zone needs placement/pathfinding review; legacy spawner mechanics are not automatically converted. No gameplay/runtime integration.".into()}
@@ -500,6 +506,7 @@ pub fn presets(inspection: &MapInspection) -> Vec<FirefightPreset> {
 struct Ticket {
     enemy_id: String,
     attempt: u8,
+    spawn_zone_id: Option<String>,
 }
 struct Director<'a> {
     config: &'a FirefightConfig,
@@ -620,6 +627,7 @@ impl<'a> Director<'a> {
                 self.queue.push_back(Ticket {
                     enemy_id: group.enemy_id.clone(),
                     attempt: 1,
+                    spawn_zone_id: group.spawn_zone_id.clone(),
                 });
             }
         }
@@ -665,7 +673,12 @@ impl<'a> Director<'a> {
             .iter()
             .filter(|z| z.enabled)
             .collect::<Vec<_>>();
-        let zone = zones[(self.random() as usize) % zones.len()];
+        let zone = if let Some(id) = &ticket.spawn_zone_id {
+            zones.iter().copied().find(|zone| &zone.id == id)
+                .ok_or_else(|| SparkError::Invalid("Assigned spawn zone is no longer enabled".into()))?
+        } else {
+            zones[(self.random() as usize) % zones.len()]
+        };
         // Integer pseudo-random offsets avoid platform-dependent trigonometry. A square
         // inscribed in the circle keeps every proposed point inside the authored radius.
         let x = (self.random() % 2001) as f32 / 1000.0 - 1.0;
@@ -725,6 +738,7 @@ impl<'a> Director<'a> {
         self.queue.push_back(Ticket {
             enemy_id: actor.enemy_id.clone(),
             attempt: actor.attempt + 1,
+            spawn_zone_id: Some(actor.zone_id.clone()),
         });
         self.event(
             "spawnRetry",
@@ -1156,9 +1170,16 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
             for (key,value) in [(format!("{e}.name"),name),(format!("{e}.flags.not_initially_created"),"1".into()),(format!("{e}.team_index"),"default_by_unit".into()),(format!("{e}.manual_bsp_index"),"-1".into()),
                 (format!("{s}.name"),"round_squad".into()),(format!("{s}.actor_type"),index.to_string()),(format!("{s}.platoon"),"-1".into()),(format!("{s}.initial_state"),"alert".into()),(format!("{s}.return_state"),"alert".into()),(format!("{s}.maneuver_to_squad"),"-1".into()),
                 (format!("{s}.normal_diff_count"),group.count.to_string()),(format!("{s}.insane_diff_count"),group.count.to_string()),(format!("{s}.major_upgrade"),"none".into())] {set(&mut args,key,value);}
-            let zone=zones[(w+g)%zones.len()];
-            let zone_index=(w+g)%zones.len();
-            let same_zone=|j:usize|(w+j)%zones.len()==zone_index;
+            // Use the same group binding for layout, capacity and command emission.
+            // Validation above rejects missing/disabled IDs; never silently relocate a squad.
+            let zone_for = |j: usize| -> usize {
+                wave.groups[j].spawn_zone_id.as_ref()
+                    .map(|id| zones.iter().position(|zone| &zone.id == id).unwrap())
+                    .unwrap_or((w + j) % zones.len())
+            };
+            let zone_index=zone_for(g);
+            let zone=zones[zone_index];
+            let same_zone=|j:usize|zone_for(j)==zone_index;
             let total:usize=wave.groups.iter().enumerate().filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
             let offset:usize=wave.groups.iter().enumerate().take(g).filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
             let side=(total as f32).sqrt().ceil() as usize;

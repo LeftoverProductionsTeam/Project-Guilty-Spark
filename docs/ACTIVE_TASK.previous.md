@@ -25,7 +25,7 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 
 ## Changed work
 
-Current untested source increment: existing Firefight Player loadout suggests actual source weap tags; validate_assets includes both starting weapon slots instead of checking only supplies. verify_native_round requires singleplayer output, exact embedded planned actor/weapon tag bodies and unique encounter/squad/controller names. The existing build/readback/adoption path consumes this check. No new native writer or source/schema/engine guard is introduced. Detail and deferred validation: FIREFIGHT_ENGINE.md and UI_INTERACTION_AUDIT.md. No tests/compiler/game/query were run.
+Current untested source increment (preserved in affd6165554a5a85bf586522abae4f747e42c870): existing Firefight Player loadout suggests actual source weap tags; validate_assets includes both starting weapon slots instead of checking only supplies. verify_native_round requires singleplayer output, exact embedded planned actor/weapon tag bodies and unique encounter/squad/controller names. The existing build/readback/adoption path consumes this check. No new native writer or source/schema/engine guard is introduced. Detail and deferred validation: FIREFIGHT_ENGINE.md and UI_INTERACTION_AUDIT.md. No tests/compiler/game/query were run.
 
 Prior source5001025 is also an untested WIP, including already-written native harness coverage retained for later:
 
@@ -46,7 +46,7 @@ Forerunner read-only source reached c8196f81df7eabd28dd5e31fb1353fb4d00c657d. It
 
 ## Operations and safe checkpoint
 
-Current increment has changed only Spark source/docs. Stage and commit explicitly as WIP/testing deferred, refresh source-only manifests without producing an archive, then record its exact source commit. No Forerunner file or original Halo content was written.
+Current source checkpoint: affd6165554a5a85bf586522abae4f747e42c870, local master WIP/testing deferred. All loadout/dependency source changes are committed. Source manifest76b809da1645de364cb9f32923eb7c1f9edbbf7de385f4c5ac469c2843e84b75 covers2148files/51,546,846B; no archive created. firefight.rs SHA256 cf66c9ab86b8c3342c2de7e25147c0008c28f24470bcf38f1518f7cc187caa9d; Firefight.tsx SHA256 19db041531b08a9e7bfc8884a034cd08faeb84dcab9cd249c9419e8336110d4c. No current-source executable exists, because no compiler/test/runtime was run. This follow-up only records the exact checkpoint and refreshes source manifests. No Forerunner file or original Halo content was written.
 
 No tests/builds/game queries started after the code-only instruction. R691session66802 and R692session16945 ended; R692 is NOT active. Their owned run outputs were disposed by existing wrappers. No process was stopped in this increment. Evidence root E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; receipts/logs in E/resume-20261114.
 

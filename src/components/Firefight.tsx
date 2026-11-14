@@ -411,6 +411,15 @@ export default function Firefight({
                   >
                     <Trash2 size={12} />
                   </button>
+                  <label className="forge-wave-zone">Spawn zone
+                    <select aria-label={`Wave ${index + 1} enemy ${gi + 1} spawn zone`} value={group.spawnZoneId??''}
+                      onChange={event=>change({...config,waves:config.waves.map(w=>w.id===wave.id?{...w,groups:w.groups.map((g,i)=>i===gi?{...g,spawnZoneId:event.target.value||undefined}:g)}:w)},'Assign wave enemy spawn zone')}>
+                      <option value="">Automatic · enabled zones</option>
+                      {group.spawnZoneId&&!config.spawnZones.some(zone=>zone.id===group.spawnZoneId)&&<option value={group.spawnZoneId} disabled>Missing zone · choose another</option>}
+                      {config.spawnZones.map((zone,zoneIndex)=><option key={zone.id} value={zone.id} disabled={!zone.enabled}>Zone {zoneIndex+1}{zone.enabled?'':' · disabled'}</option>)}
+                    </select>
+                    {onSelectZone&&group.spawnZoneId&&config.spawnZones.some(zone=>zone.id===group.spawnZoneId)&&<button className="text-button" onClick={()=>onSelectZone(group.spawnZoneId!)}>Select zone in editor</button>}
+                  </label>
                 </div>
               ))}
               <div className="forge-wave-footer">
@@ -475,6 +484,7 @@ export default function Firefight({
               Zone
             </button>
           </div>
+          <p className="subtle">Assign each enemy group to a zone in its wave row, or keep Automatic. Removing or disabling an assigned zone blocks native preparation until you choose a replacement.</p>
           {config.spawnZones.map((zone, index) => (
             <div className={`forge-zone ${zone.id === selectedZone ? 'selected' : ''}`} key={zone.id}>
               <div className="forge-panel-heading">

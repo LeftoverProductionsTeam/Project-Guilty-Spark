@@ -141,6 +141,10 @@ export function exportHaloCeFirefight(config:FirefightConfig):ScriptExport {
  * or commands to a game. Encounter construction and human combat remain gates.
  */
 export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport {
+  for(const wave of config.waves)for(const group of wave.groups){
+    if(group.spawnZoneId!=null && !config.spawnZones.some(zone=>zone.id===group.spawnZoneId&&zone.enabled))
+      throw Error(`Wave ${wave.name} references a missing or disabled spawn zone. Select another zone or Automatic; its assignment was retained.`);
+  }
   const conservative=exportHaloCeFirefight(config);
   const player=config.nativePlayerProfile;
   if(player){

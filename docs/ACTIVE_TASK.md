@@ -1,8 +1,8 @@
 # Active engineering checkpoint
 
-Task: Operation110 — source-backed Firefight loadout and compiled dependency integrity
+Task: Operation110 — explicit Firefight squad spawn-zone authoring
 Status: implementation incomplete
-Starting revision: 5523595443228819c2d692ca51e79c4210cda7d3, canonical D:/Project Guilty Spark local master.
+Starting revision: c09d72e32513b4ade42fa831f4e3ef5aff8752a2, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
 Next action: Continue code-only work in existing creator/runtime components. Inspect the existing source-recovery/native_round_plan boundary for a legitimate original-Zombie derived encounter; preserve its fresh-source guard until a supported path is implemented. Do not invent a Forerunner rules-import API. When the owner resumes tests, first compile this WIP and validate actual Library Create a map → textures → Undo/Save/full restart, then saved Forerunner registration/help/discovery and independent windows.
 
@@ -25,7 +25,9 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 
 ## Changed work
 
-Current untested source increment (preserved in affd6165554a5a85bf586522abae4f747e42c870): existing Firefight Player loadout suggests actual source weap tags; validate_assets includes both starting weapon slots instead of checking only supplies. verify_native_round requires singleplayer output, exact embedded planned actor/weapon tag bodies and unique encounter/squad/controller names. The existing build/readback/adoption path consumes this check. No new native writer or source/schema/engine guard is introduced. Detail and deferred validation: FIREFIGHT_ENGINE.md and UI_INTERACTION_AUDIT.md. No tests/compiler/game/query were run.
+Current untested increment: Firefight wave rows bind groups to explicit enabled zones or Automatic via optional spawnZoneId in existing authoring metadata. Select zone in editor uses the existing viewport selection path. Existing native builder uses that exact zone for placement, shared-group grid offsets and radius/player clearance. Missing/disabled assigned zones remain in saveable drafts but block runnable/native preparation; no silent reassignment. Same-enemy split squads use distinct existing native encounter names/palette reuse. Offline preview only mirrors the assignment; it is not gameplay. Existing Rust fixture literals supply None for the additive field; no new tests run. See FIREFIGHT_ENGINE.md/UI_INTERACTION_AUDIT.md.
+
+Prior untested source increment (preserved in affd6165554a5a85bf586522abae4f747e42c870): existing Firefight Player loadout suggests actual source weap tags; validate_assets includes both starting weapon slots instead of checking only supplies. verify_native_round requires singleplayer output, exact embedded planned actor/weapon tag bodies and unique encounter/squad/controller names. The existing build/readback/adoption path consumes this check. No new native writer or source/schema/engine guard is introduced. Detail and deferred validation: FIREFIGHT_ENGINE.md and UI_INTERACTION_AUDIT.md. No tests/compiler/game/query were run.
 
 Prior source5001025 is also an untested WIP, including already-written native harness coverage retained for later:
 
@@ -46,7 +48,9 @@ Forerunner read-only source reached c8196f81df7eabd28dd5e31fb1353fb4d00c657d. It
 
 ## Operations and safe checkpoint
 
-Current source checkpoint: affd6165554a5a85bf586522abae4f747e42c870, local master WIP/testing deferred. All loadout/dependency source changes are committed. Source manifest76b809da1645de364cb9f32923eb7c1f9edbbf7de385f4c5ac469c2843e84b75 covers2148files/51,546,846B; no archive created. firefight.rs SHA256 cf66c9ab86b8c3342c2de7e25147c0008c28f24470bcf38f1518f7cc187caa9d; Firefight.tsx SHA256 19db041531b08a9e7bfc8884a034cd08faeb84dcab9cd249c9419e8336110d4c. No current-source executable exists, because no compiler/test/runtime was run. This follow-up only records the exact checkpoint and refreshes source manifests. No Forerunner file or original Halo content was written.
+Current source edits are untested. Commit squad-zone authoring as WIP, refresh existing staged-source manifests without an archive, then record exact commit/hash. No compiler, test, engine query or game input has run, and no process was started or stopped in this increment.
+
+Prior source checkpoint: affd6165554a5a85bf586522abae4f747e42c870, local master WIP/testing deferred. All prior loadout/dependency source changes are committed; they do not include the current squad-zone increment. Source manifest76b809da1645de364cb9f32923eb7c1f9edbbf7de385f4c5ac469c2843e84b75 covers2148files/51,546,846B; no archive created. firefight.rs SHA256 cf66c9ab86b8c3342c2de7e25147c0008c28f24470bcf38f1518f7cc187caa9d; Firefight.tsx SHA256 19db041531b08a9e7bfc8884a034cd08faeb84dcab9cd249c9419e8336110d4c. No current-source executable exists, because no compiler/test/runtime was run. This follow-up only records the exact checkpoint and refreshes source manifests. No Forerunner file or original Halo content was written.
 
 No tests/builds/game queries started after the code-only instruction. R691session66802 and R692session16945 ended; R692 is NOT active. Their owned run outputs were disposed by existing wrappers. No process was stopped in this increment. Evidence root E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; receipts/logs in E/resume-20261114.
 

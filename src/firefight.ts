@@ -16,7 +16,7 @@ export interface WaveDefinition {
   name: string;
   boss: boolean;
   scoreMultiplierMilli: number;
-  groups: { enemyId: string; count: number }[];
+  groups: { enemyId: string; count: number; spawnZoneId?: string | null }[];
 }
 export interface NativePlayerProfile {
   primaryWeapon:string; primaryLoaded:number; primaryReserved:number;

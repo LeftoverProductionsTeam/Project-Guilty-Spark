@@ -26,6 +26,7 @@ fn config() -> FirefightConfig {
         groups: vec![EnemyGroup {
             enemy_id: "zombie".into(),
             count: 2,
+            spawn_zone_id: None,
         }],
     }];
     c
@@ -320,7 +321,7 @@ fn native_project() -> spark_core::project::Project {
     c.native_player_profile=Some(NativePlayerProfile{primary_weapon:"weapons/pistol/pistol".into(),primary_loaded:12,primary_reserved:60,secondary_weapon:None,secondary_loaded:0,secondary_reserved:0,health:1.0,shields:1.0,fragmentation_grenades:2,plasma_grenades:0});
     c.enemies=vec![EnemyType{id:"grunt".into(),name:"Grunt".into(),actor_variant_path:"characters/grunt/grunt minor plasma pistol".into(),points:100}];
     c.spawn_zones=vec![SpawnZone{id:"enemy-zone".into(),position:[6.0,0.0,0.2],radius:2.0,enabled:true}];
-    c.waves=vec![WaveDefinition{id:"wave".into(),name:"Wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![EnemyGroup{enemy_id:"grunt".into(),count:2}]}];
+    c.waves=vec![WaveDefinition{id:"wave".into(),name:"Wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![EnemyGroup{enemy_id:"grunt".into(),count:2,spawn_zone_id:None}]}];
     let mut doc=spark_core::quickforge::create_arena("Native round test","firefightArena").unwrap();
     doc.spawns.truncate(1);doc.spawns[0].position=[-6.0,0.0,0.2];
     doc.logic=Some(spark_core::native_logic::Document {schema_version:1,triggers:vec![],devices:vec![],rules:vec![],manual_source:None,handwritten_sources:vec![spark_core::native_logic::HandwrittenSource{filename:"gs_firefight.hsc".into(),content:format!("{}{}\r\n; source compiled separately\r\n",NATIVE_ROUND_BINDING,serde_json::to_string(&c).unwrap())}]});
@@ -353,7 +354,7 @@ fn native_round_refuses_stale_rules_unsupported_options_and_unsafe_spawns_before
 #[test]
 fn native_round_groups_in_one_zone_have_distinct_starting_locations() {
     let mut p=native_project();p.firefight.as_mut().unwrap().enemies.push(EnemyType{id:"elite".into(),name:"Elite".into(),actor_variant_path:"characters/elite/elite minor/elite minor plasma rifle".into(),points:200});
-    p.firefight.as_mut().unwrap().waves[0].groups.push(EnemyGroup{enemy_id:"elite".into(),count:2});rebind(&mut p);
+    p.firefight.as_mut().unwrap().waves[0].groups.push(EnemyGroup{enemy_id:"elite".into(),count:2,spawn_zone_id:None});rebind(&mut p);
     let plan=native_round_plan(&p).unwrap().unwrap();let mut positions=std::collections::BTreeSet::new();
     for command in plan.commands {for window in command.args.windows(3) {if window[0]=="-S" && window[1].contains("starting_locations[") && window[1].ends_with(".position") {assert!(positions.insert(window[2].clone()));}}}
     assert_eq!(positions.len(),4);
