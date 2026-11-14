@@ -5,7 +5,8 @@
  *  and never evaluated as arbitrary HaloScript by this application.
  */
 import type { CreatorStudioDocument } from './creatorStudio';
-import { validateCreatorStudio } from './creatorStudio.ts';
+import { emptyCreatorStudio, validateCreatorStudio } from './creatorStudio.ts';
+import { inspectScenarioBindings } from './scenarioBindings';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
 import type { Project } from './types';
 import type { NativeOperation } from './nativeOperations';
@@ -27,13 +28,13 @@ const heading=(title:string):string[]=>[
   '',
 ];
 /** Ordered mission flow; manual beats are callable stubs, not automatically executed. */
-export function exportHaloCeMission(studio:CreatorStudioDocument): ScriptExport {
+export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitForLogic?:boolean}={}): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.missions.length)throw new Error('Add at least one mission beat.');
   const deps:string[]=[], lines=heading('Mission Director');
   const globals:string[]=[];
   const manualSetters:string[]=[];
-  const scripted:string[]=['(script dormant gs_mission', '  (sleep 1)'];
+  const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
   studio.missions.forEach((beat,i)=>{
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
     switch(beat.trigger){
@@ -73,6 +74,84 @@ export function exportHaloCeMission(studio:CreatorStudioDocument): ScriptExport 
     'HUD objective text, checkpoints and scripting compile/gameplay remain unverified.',
   ],generatedOnly:true};
 }
+
+/** Binding comments remain source metadata; engines execute ordinary HaloScript. */
+export const nativeMissionBinding = '; Spark native mission configuration: ';
+interface NativeMissionBinding {
+  schemaVersion:1;
+  missions:import('./creatorStudio').MissionBeat[];
+  activation:'manual'|'startup';
+  sourceSha256:string;
+}
+function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation']):string {
+  const output=exportHaloCeMission({...emptyCreatorStudio(),missions},{waitForLogic:true});
+  return output.content+(activation==='startup'?[
+    '', '(script startup gs_mission_bootstrap',
+    '  (sleep_until gs_logic_ready 1)', '  (wake gs_mission)', ')', '',
+  ].join('\r\n'):'');
+}
+async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation']):Promise<string> {
+  if(!['manual','startup'].includes(activation))throw Error('Choose manual or startup mission activation.');
+  const body=nativeMissionBody(missions,activation);
+  const sourceSha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
+    .map(value=>value.toString(16).padStart(2,'0')).join('');
+  const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256};
+  const header=JSON.stringify(binding).replace(/[\u007f-\uffff]/g,character=>
+    '\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'));
+  return nativeMissionBinding+header+'\r\n'+body;
+}
+/** Explicit source preparation. Refuse overwriting handwritten/older-generator
+ * text; caller owns the existing project mutation/history transaction. */
+export async function attachNativeCampaignMission(project:Project,activation:'manual'|'startup'):Promise<Project> {
+  const doc=project.quickForge;
+  if(!doc||doc.gameMode!=='campaign'||doc.native||
+    !['mccSteam','haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))
+    throw Error('Open editable Campaign / scripted solo source with a supported native build target first.');
+  if(!doc.startingProfile)throw Error('Review Campaign starting loadout in Map properties before preparing the mission.');
+  if(doc.logic?.manualSource!=null)throw Error('Generated startup logic is overridden. Preserve handwritten source before returning Native HaloScript to generated logic.');
+  const missions=project.studio?.missions;
+  if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
+  const output=exportHaloCeMission({...emptyCreatorStudio(),missions});
+  const bindings=inspectScenarioBindings([output],null,doc);
+  const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource');
+  if(missing.length)throw Error(missing.map(binding=>binding.dependency+': '+binding.detail).join('\n'));
+  for(const beat of missions)if(beat.trigger==='encounterCleared') {
+    const name=beat.encounterName.split('/')[0];
+    if(doc.campaignEncounters?.find(group=>group.name===name)?.startActive)
+      throw Error('Mission owns ai_place for '+name+'. Disable initial actor creation before preparing its source.');
+  }
+  const logic=structuredClone(doc.logic??{schemaVersion:1 as const,triggers:[],devices:[],rules:[]});
+  const sources=logic.handwrittenSources??[];
+  if(sources.some(source=>source.filename.toLowerCase()==='gs_firefight.hsc'))
+    throw Error('This campaign still has a survival controller. Review it in Logic / Events before explicitly removing it from this build.');
+  const existing=sources.find(source=>source.filename.toLowerCase()==='gs_mission.hsc');
+  if(sources.some(source=>source.content.startsWith(nativeMissionBinding)&&source!==existing))
+    throw Error('A renamed mission binding is still present. Preserve and reconcile source modules in Logic / Events.');
+  if(existing) {
+    const end=existing.content.indexOf('\n');
+    if(!existing.content.startsWith(nativeMissionBinding)||end<0)
+      throw Error('gs_mission.hsc is handwritten. Export and explicitly remove it from this build before replacing it.');
+    let old:NativeMissionBinding;
+    try {old=JSON.parse(existing.content.slice(nativeMissionBinding.length,end).trimEnd());}
+    catch {throw Error('The existing mission binding is invalid. Preserve it in Logic / Events before replacing it.');}
+    let original:string;
+    try {
+      if(old.schemaVersion!==1||!['manual','startup'].includes(old.activation)||!Array.isArray(old.missions))throw Error('Invalid binding');
+      original=await nativeMissionModule(old.missions,old.activation);
+    } catch {throw Error('The existing mission binding cannot be regenerated safely. Preserve/export it before explicitly removing it from the build.');}
+    if(existing.content!==original)
+      throw Error('Mission source contains edits or uses a different generator. Preserve/export it before explicitly removing and regenerating it.');
+  }
+  const module={filename:'gs_mission.hsc',content:await nativeMissionModule(missions,activation)};
+  const isMcc=doc.runtimeId==='mccSteam';
+  if(module.content.length>(isMcc?1024*1024:256*1024))
+    throw Error('Mission source exceeds the selected native target file budget. No text was truncated or replaced.');
+  if(sources.length-(existing?1:0)+1+1+(isMcc?1:0)>(isMcc?16:8))
+    throw Error('Mission exceeds the target script-file budget including generated logic/global source. Preserve all modules and reduce the selected build explicitly.');
+  logic.handwrittenSources=[...sources.filter(source=>source!==existing),module];
+  return {...project,quickForge:{...doc,logic}};
+}
+
 /** Actual H1 camera_set/cinematic_start syntax. Position/FOV authoring is metadata. */
 export function exportHaloCeCinematic(studio:CreatorStudioDocument): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));

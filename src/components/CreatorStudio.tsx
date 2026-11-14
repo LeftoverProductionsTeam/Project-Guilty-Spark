@@ -1,5 +1,6 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { beginProjectMutation } from '../projectMutation';
 import CampaignEncounters from './CampaignEncounters';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
@@ -8,7 +9,7 @@ import {
 } from '../creatorStudio';
 import type { CameraShot, CreatorStudioDocument, MissionBeat, PlaytestRecord } from '../creatorStudio';
 import { Notice, NumberField, PageTitle, Pill } from './ui';
-import { exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../haloScript';
+import { attachNativeCampaignMission, nativeMissionBinding, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../haloScript';
 import type { ScriptExport } from '../haloScript';
 import { sourceZip } from '../sourceZip';
 import { assembleHceekSourcePack } from '../hceekSourcePack';
@@ -60,11 +61,17 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
 }) {
   const [pane, setPane] = useMapState<Pane>(project.id,'creator-studio-pane','mission');
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
+  const [missionActivation,setMissionActivation]=useMapState<'manual'|'startup'>(project.id,'native-mission-startup','manual');
+  const [preparingMission,setPreparingMission]=useState(false);
+  const latestProject=useRef(project);latestProject.current=project;
+  const activeProject=useRef<string|null>(project.id);
+  useEffect(()=>{activeProject.current=project.id;return()=>{activeProject.current=null;};},[project.id]);
   const [error, setError] = useState('');
   const studio = project.studio ?? emptyCreatorStudio();
   const encounterChoices=useId(), volumeChoices=useId();
   const sourceInspection=inspection?.sha256&&inspection.sha256===project.source?.sha256?inspection:null;
   useWorkspaceFileActions('creator:'+project.id,[
+    {id:'prepare-native-mission',label:'Prepare campaign mission source…',run:()=>prepareNativeMission()},
     {id:'script-pack',label:'Export CE script sources…',run:()=>exportSourcePack()},
     {id:'creator-evidence',label:'Export creator evidence…',run:()=>report()},
     {id:'native-source-tree',label:'Export HCEEK source tree…',run:()=>exportHceekTree()},
@@ -130,6 +137,20 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
       setError('');notify('HCEEK data-tree source ZIP exported for review; it has not compiled or modified a scenario.', 'success');
     } catch(error) {setError(String(error));}
+  }
+  async function prepareNativeMission() {
+    if(preparingMission)return;
+    const input=latestProject.current,activation=missionActivation;
+    const release=beginProjectMutation(input.id);setPreparingMission(true);setError('');
+    try {
+      const candidate=await attachNativeCampaignMission(input,activation);
+      if(activeProject.current!==input.id||latestProject.current.id!==input.id||
+        latestProject.current.quickForge!==input.quickForge||latestProject.current.studio!==input.studio)
+        throw Error('The map or mission changed during preparation. Review again; no older source was reapplied.');
+      edit({...latestProject.current,quickForge:candidate.quickForge},'Prepare native campaign mission source');
+      notify('Mission HaloScript attached to source. Save, then use Build & playtest; compilation and gameplay remain unverified.','success');
+    } catch(problem) {if(activeProject.current===input.id)setError(String(problem));}
+    finally {release();setPreparingMission(false);}
   }
   function updateBeat(id: string, patch: Partial<MissionBeat>) {
     change({ ...studio, missions: studio.missions.map(m => m.id === id ? { ...m, ...patch } : m) }, 'Update mission beat');
@@ -207,6 +228,26 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <button className="primary" type="button" disabled={studio.missions.length >= 128} onClick={() => change({ ...studio,
           missions: [...studio.missions, { id: freshId(), title: `Beat ${studio.missions.length + 1}`, objective: '', trigger: 'manual', encounterName: '' }] }, 'Add mission beat')}><Plus size={15}/> Add beat</button></div>
       <div className="analysis-actions"><button type="button" onClick={()=>exportScript('mission')}><Download size={15}/> Export mission .hsc</button><button type="button" onClick={()=>exportScript('mission',true)}>Export required tags list</button></div>
+      <details className="studio-handoff">
+        <summary>Native mission build</summary>
+        <p className="studio-hint">Attach generated mission source to this editable campaign.
+          Existing handmade or edited modules are preserved. Choose startup deliberately; manual activation
+          needs another script to call <code>(wake gs_mission)</code>. Activation changes apply when you prepare the source.</p>
+        <label>Activation for next preparation<select aria-label="Native mission activation" value={missionActivation}
+          disabled={preparingMission} onChange={event=>setMissionActivation(event.target.value as 'manual'|'startup')}>
+          <option value="manual">Manual — another script starts the mission</option>
+          <option value="startup">Startup — after native logic and loadout initialization</option>
+        </select></label>
+        <button type="button" disabled={preparingMission||!studio.missions.length}
+          onClick={()=>void prepareNativeMission()}> {preparingMission?'Preparing source…':'Prepare mission for native build'} </button>
+        <p className="studio-hint">{project.quickForge?.logic?.handwrittenSources?.some(source=>
+          source.filename.toLowerCase()==='gs_mission.hsc'&&source.content.startsWith(nativeMissionBinding))
+          ?'A mission binding is attached. Changed mission data requires preparation again; edited source is preserved and blocks automatic replacement.'
+          :'No generated mission binding is attached. Separate exported script packs are not attached automatically.'}</p>
+        <p className="studio-hint">Save before Build &amp; playtest. The build checks the saved mission binding,
+          module hash, encounter/volume names and compiled script identities. Native execution, HUD objectives,
+          checkpoints and a playable mission ending remain separate work and acceptance.</p>
+      </details>
       <CampaignEncounters project={project} edit={edit}/>
       <datalist id={encounterChoices}>{[...new Set([
         ...(project.quickForge?.gameMode==='campaign'?project.quickForge.campaignEncounters??[]:[]).map(entry=>entry.name),

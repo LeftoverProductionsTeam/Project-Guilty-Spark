@@ -340,9 +340,10 @@ pub fn run_prepared_job(
     let generated=custom.generated();
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Job ID is not a UUID".into()))?;
     let document=&custom.document;
+    let mission=crate::creative::native_mission_binding(project,document);
     let started=Instant::now();
     let jobs_root=future_jobs_root(jobs_root)?;
-    if !export_only&&prepared.is_none()&&extra_blockers.is_empty(){
+    if !export_only&&prepared.is_none()&&extra_blockers.is_empty()&&mission.is_ok(){
         if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root).filter(|receipt|reuse_has_scene_sources(tools,receipt,document)){
             let readback=(|| -> Result<()> {
                 let round=crate::firefight::native_round_plan(project)?;
@@ -354,6 +355,7 @@ pub fn run_prepared_job(
                 crate::quickforge::verify_starting_profile(document,&inspected)?;
                 crate::quickforge::verify_campaign_encounters(document,&inspected)?;
                 crate::native_logic::verify_compiled(document,&inspected)?;
+                if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected)?;}
                 Ok(())
             })();
             match readback {
@@ -366,6 +368,7 @@ pub fn run_prepared_job(
     let selected_tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
     let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
     let (mut requirements,mut source_blockers)=quickforge::source_requirements(document)?;
+    if let Err(error)=&mission {source_blockers.push(error.to_string());}
     let native_round=match crate::firefight::native_round_plan(project) {Ok(plan)=>plan,Err(error)=>{source_blockers.push(error.to_string());None}};
     if let Some(plan)=&native_round {requirements.extend(plan.dependencies.clone());}
     let native_inputs=if !export_only && extra_blockers.is_empty() && source_blockers.is_empty() && !cancel.load(Ordering::Relaxed) {
@@ -580,6 +583,7 @@ pub fn run_prepared_job(
         crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::quickforge::verify_campaign_encounters(document,&inspected)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
+        if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected)?;}
         if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;
         if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}

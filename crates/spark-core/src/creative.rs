@@ -24,7 +24,7 @@ pub struct CreatorStudio {
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EngineMachinima{pub enabled:bool,pub playback:String,#[serde(default)]pub camera_id:Option<String>,#[serde(default)]pub auto_start:bool}
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MissionBeat {
     pub id: String,
@@ -122,6 +122,90 @@ pub struct PlaytestRecord {
     pub notes: String,
     /// This is manually reported evidence, never automatic gameplay proof.
     pub manually_reported: bool,
+}
+
+
+pub const NATIVE_MISSION_BINDING:&str="; Spark native mission configuration: ";
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NativeMissionBinding {
+    pub schema_version:u32,
+    pub missions:Vec<MissionBeat>,
+    pub activation:String,
+    pub source_sha256:String,
+}
+/// Validate the generated module's intent and bytes, not a second HSC writer.
+/// Editable mission drafts may be saved while stale; native builds must stop.
+pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quickforge::QuickForgeDocument)->Result<Option<NativeMissionBinding>> {
+    let owned=doc.logic.iter().flat_map(|logic|&logic.handwritten_sources)
+        .filter(|source|source.content.starts_with(NATIVE_MISSION_BINDING)).collect::<Vec<_>>();
+    if owned.is_empty(){return Ok(None);}
+    if owned.len()!=1 || !owned[0].filename.eq_ignore_ascii_case("gs_mission.hsc") {
+        return invalid("Generated mission binding is duplicated or renamed. Preserve the modules and reconcile them in Logic / Events before building");
+    }
+    if doc.game_mode!="campaign" || doc.native.is_some() ||
+        !matches!(doc.runtime_id,crate::runtime::RuntimeId::MccSteam|crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe) {
+        return invalid("Prepared mission source requires an editable Campaign / scripted solo target. Preserve or explicitly remove the mission module before changing its build workflow");
+    }
+    let (header,body)=owned[0].content.split_once('\n').ok_or_else(||crate::SparkError::Invalid("Prepared mission has no source body; preserve it before preparing again".into()))?;
+    let binding:NativeMissionBinding=serde_json::from_str(header.trim_end_matches('\r').strip_prefix(NATIVE_MISSION_BINDING).unwrap())
+        .map_err(|_|crate::SparkError::Invalid("Prepared mission binding is invalid; preserve the source module before preparing again".into()))?;
+    if binding.schema_version!=1 || !["manual","startup"].contains(&binding.activation.as_str()) ||
+        binding.source_sha256.len()!=64 || !binding.source_sha256.bytes().all(|value|value.is_ascii_hexdigit()) {
+        return invalid("Unsupported prepared mission binding or source hash");
+    }
+    let current=&project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?.missions;
+    if binding.missions.is_empty() || &binding.missions!=current {
+        return invalid("Mission beats changed after preparing native source. In Creator Studio, prepare the mission again; the old module and previous-good build remain intact");
+    }
+    if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
+        return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
+    }
+    for beat in &binding.missions {
+        match beat.trigger.as_str() {
+            "triggerVolume"=>{
+                let name=beat.trigger_ref.as_deref().unwrap_or("");
+                if !doc.logic.as_ref().is_some_and(|logic|logic.triggers.iter().any(|trigger|crate::native_logic::trigger_name(trigger)==name)) {
+                    return invalid(format!("Mission '{}' references missing source volume '{}'. Name or select a volume in Logic / Events",beat.title,name));
+                }
+            },
+            "encounterCleared"=>{
+                let mut parts=beat.encounter_name.split('/');
+                let name=parts.next().unwrap_or("");
+                let squad=parts.next();
+                let group=doc.campaign_encounters.iter().find(|entry|entry.name==name);
+                if parts.next().is_some() || squad.is_some_and(|name|name!="source_squad") || group.is_none() {
+                    return invalid(format!("Mission '{}' references missing campaign encounter/squad '{}'",beat.title,beat.encounter_name));
+                }
+                if group.unwrap().start_active {
+                    return invalid(format!("Mission '{}' owns ai_place for '{}'; disable initial actor creation before building this mission",beat.title,name));
+                }
+            },
+            "timer" if !beat.timer_seconds.is_some_and(|seconds|(1..=600).contains(&seconds))=>{
+                return invalid("Prepared mission delay must be between 1 and 600 seconds");
+            },
+            "manual"|"timer"=>(),
+            _=>return invalid("Prepared mission trigger is unsupported"),
+        }
+    }
+    Ok(Some(binding))
+}
+/// Native ScriptType values follow the existing Invader scenario definition.
+/// Presence/type checks are independent readback, not gameplay acceptance.
+pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection)->Result<()> {
+    if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
+    let mut expected=vec![("gs_mission".to_string(),1u16)];
+    if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
+    for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.trigger=="manual"{expected.push((format!("gs_complete_{}",index+1),3));}
+    }
+    for (name,kind) in expected {
+        let scripts=map.scripts.iter().filter(|script|script.name==name).collect::<Vec<_>>();
+        if scripts.len()!=1 || scripts[0].script_type!=kind {
+            return invalid(format!("Compiled mission script is missing, ambiguous or has the wrong native type: {name}"));
+        }
+    }
+    Ok(())
 }
 
 fn bounded(s: &str, max: usize) -> bool {

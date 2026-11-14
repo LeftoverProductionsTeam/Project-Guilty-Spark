@@ -124,7 +124,7 @@ fn authored_name(value: &Option<String>) -> bool {
             && name.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
     })
 }
-fn trigger_name(trigger: &Trigger) -> String {
+pub(crate) fn trigger_name(trigger: &Trigger) -> String {
     trigger.native_name.clone().unwrap_or_else(|| native_name("tv", &trigger.id))
 }
 fn device_name(logic: &Document, id: &str) -> String {
