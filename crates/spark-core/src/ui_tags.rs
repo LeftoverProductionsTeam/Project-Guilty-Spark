@@ -374,3 +374,26 @@ pub fn verify_hud_edits(project:&crate::project::Project,before:&MapInspection,a
         source_version:before.header.version,output_version:after.header.version,tags,
         scope:"Saved HUD scalar/reference edits and other admitted fields in those tags, matched by native class/path across rebuild. Target-only fields and opaque/unsupported cells are outside this comparison. Native rendering and game behavior require separate acceptance."}))
 }
+
+
+/// Native root reflexives from the same factual descriptor as the HUD reader.
+/// Names are command keys only after exact membership validation by the recipe.
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct HudRootArray {pub name:String,pub label:String,pub maximum:usize}
+pub fn hud_root_arrays(class:&str)->Result<Vec<HudRootArray>> {
+    let schema=hud_schema()?;
+    let Some(root)=schema.roots.get(class)else{return Ok(vec![]);};
+    let definition=schema.structs.get(root).ok_or_else(||SparkError::Invalid("Native HUD root is absent from its descriptor".into()))?;
+    let mut arrays=vec![];
+    for field in &definition.fields {
+        if field.kind!="TagReflexive"{continue;}
+        let maximum=field.maximum.ok_or_else(||SparkError::Invalid("Native HUD array capacity is unavailable".into()))?;
+        if !maximum.is_finite()||maximum.fract()!=0.||!(1.0..=4096.0).contains(&maximum)||
+            field.name.is_empty()||!field.name.bytes().all(|b|b.is_ascii_lowercase()||b==b'_') {
+            return invalid("Native HUD array descriptor cannot address a bounded tool operation");
+        }
+        arrays.push(HudRootArray{name:field.name.clone(),label:field.label.clone(),maximum:maximum as usize});
+    }
+    Ok(arrays)
+}

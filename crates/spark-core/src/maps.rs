@@ -13,7 +13,7 @@ use std::{
 mod decals;
 #[path = "ui_tags.rs"]
 mod ui_tags;
-pub use ui_tags::{verify_hud_edits,HudEditReadback,HudTagReadback};
+pub use ui_tags::{verify_hud_edits,HudEditReadback,HudTagReadback,hud_root_arrays,HudRootArray};
 #[path = "shader_transparent.rs"]
 mod shader_transparent;
 pub use shader_transparent::{ShaderAnimation, ShaderStage};

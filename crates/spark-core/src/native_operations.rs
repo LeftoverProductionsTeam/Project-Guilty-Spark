@@ -13,6 +13,7 @@ pub enum Operation {
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32 },
     AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     BoundingRadius { value: f64 },
+    HudDuplicate { array:String,index:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     LensFlareScaleRepair,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -50,20 +51,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -93,6 +94,11 @@ impl Operation {
                 }
                 if total>128{return invalid("One reviewed encounter group operation supports at most 128 starting locations");}
             }
+            Self::HudDuplicate{array,index,source_sha256}=>{
+                if source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Refresh the current native HUD source identity before copying an element");}
+                let maximum=hud_array_limit(class,array)?;
+                if usize::from(*index)>=maximum{return invalid("Selected HUD element exceeds the native array capacity");}
+            }
             Self::BoundingRadius { value } => {
                 if ![
                     "weap", "scen", "bipd", "vehi", "eqip", "garb", "proj", "mach", "ctrl", "lifi",
@@ -120,6 +126,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
+            Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
                 args.extend(["-S".into(), "bounding_radius".into(), value.to_string()])
@@ -248,6 +255,11 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
+        if let Self::HudDuplicate{array,index,..}=self {
+            let listing=array_listing(before,array)?;let _=hud_array_items(&listing,array)?;
+            if usize::from(*index)>=listing.count||listing.count>=hud_array_limit(class,array)? {return invalid("Native HUD element is missing or the array has no remaining capacity");}
+            return Ok(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-c".into(),format!("{array}[{index}]"),"end".into(),tag.into()]);
+        }
         if !self.is_encounter_append(){return self.arguments(tags,class,tag);}
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
         for (entry,index,actor,add_palette) in encounter_append_layouts(before,self)? {
@@ -472,6 +484,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
+    if matches!(operation,Operation::HudDuplicate{..}) {return reviewed_hud_duplicate(before,after,operation);}
     if matches!(operation,Operation::AppendEncounters{..}) {return reviewed_encounter_group_append(before,after,operation);}
     if matches!(operation,Operation::AppendEncounter{..}) {return reviewed_encounter_append(before,after,operation);}
     let field = operation.field().ok_or_else(|| {
@@ -550,6 +563,59 @@ pub fn dependency_lines(output: &str) -> Result<Vec<Dependency>> {
     }
     Ok(rows)
 }
+
+
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct HudArrayChoice {
+    pub name:String,pub label:String,pub maximum:usize,pub count:Option<usize>,pub issue:Option<String>,
+}
+/// Inventory from the current loose tag's actual native-tool listing.
+pub fn hud_array_choices(class:&str,fields:&str)->Result<Vec<HudArrayChoice>> {
+    crate::maps::hud_root_arrays(class)?.into_iter().map(|array|{
+        let (count,issue)=match array_listing(fields,&array.name) {
+            Ok(listing) if listing.count<=array.maximum=>(Some(listing.count),None),
+            Ok(_)=>(None,Some("Native array exceeds its admitted capacity".into())),
+            Err(problem)=>(None,Some(problem.to_string())),
+        };
+        Ok(HudArrayChoice{name:array.name,label:array.label,maximum:array.maximum,count,issue})
+    }).collect()
+}
+fn hud_array_limit(class:&str,name:&str)->Result<usize> {
+    crate::maps::hud_root_arrays(class)?.into_iter().find(|array|array.name==name).map(|array|array.maximum)
+        .ok_or_else(||crate::SparkError::Invalid("Choose an admitted native HUD root array, not an arbitrary tool key".into()))
+}
+fn hud_array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>> {
+    let mut starts=vec![];
+    for(index,line)in listing.body.iter().enumerate() {
+        if !line.starts_with("    ")||line.starts_with("        "){continue;}
+        let tail=line.strip_prefix(&format!("    {name}[")).and_then(|tail|tail.split_once(']'))
+            .ok_or_else(||crate::SparkError::Invalid("Unknown native HUD array element boundary".into()))?;
+        if tail.1.trim()!="struct"||tail.0.parse::<usize>().ok()!=Some(starts.len()){return invalid("Native HUD elements are not a complete ordered inventory");}
+        starts.push(index);
+    }
+    if starts.len()!=listing.count||(!starts.is_empty()&&starts[0]!=0)||starts.is_empty()&&!listing.body.is_empty(){return invalid("Native HUD element count differs from its field inventory");}
+    Ok(starts.iter().enumerate().map(|(index,start)|&listing.body[*start..starts.get(index+1).copied().unwrap_or(listing.body.len())]).collect())
+}
+fn reviewed_hud_duplicate(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
+    let Operation::HudDuplicate{array,index,..}=operation else{return invalid("Not a HUD duplication");};
+    let old=before.replace("\r\n","\n");let new=after.replace("\r\n","\n");
+    let original=array_listing(&old,array)?;let result=array_listing(&new,array)?;
+    let old_items=hud_array_items(&original,array)?;let new_items=hud_array_items(&result,array)?;
+    let copied=old_items.get(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Selected native HUD element no longer exists".into()))?;
+    if result.count!=original.count+1||!result.body.starts_with(&original.body) {
+        return invalid("HUD duplication changed an original element or unexpected array count");
+    }
+    let appended=new_items.last().ok_or_else(||crate::SparkError::Invalid("Native HUD copy was not appended".into()))?;
+    // Root indices necessarily differ. Every exposed descendant value, nested
+    // array/enum/flag and dependency must remain exactly the selected element.
+    if copied.len()<2||copied.get(1..)!=appended.get(1..) {return invalid("Native HUD duplicate differs from its selected source element");}
+    let rest=|text:&str,list:&ArrayListing|text.lines().enumerate().filter(|(index,_)|*index<list.start||*index>=list.end).map(|(_,line)|line.to_string()).collect::<Vec<_>>();
+    if rest(&old,&original)!=rest(&new,&result){return invalid("HUD duplication changed fields outside the selected native array");}
+    Ok(vec![FieldDifference{before:format!("{array}[{}] · element {index} retained",original.count),
+        after:format!("{array}[{}] · exact exposed copy appended at {}",result.count,original.count)}])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

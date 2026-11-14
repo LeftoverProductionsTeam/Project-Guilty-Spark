@@ -38,6 +38,9 @@ export default function NativeTagOperations({
   const [encounterName,setEncounterName]=useState('gs_source_actor'),[actorPath,setActorPath]=useState(''),
     [actorPosition,setActorPosition]=useState<[string,string,string]>(['0','0','0']),[startActive,setStartActive]=useState(false),
     [actorCount,setActorCount]=useState('1'),[actorSpacing,setActorSpacing]=useState('0.75');
+  const [hudArray,setHudArray]=useState(''),[hudIndex,setHudIndex]=useState('0');
+  const hudGroup=context?.hudArrays?.find(array=>array.name===hudArray);
+  const canDuplicateHudDraft=!!context?.canDuplicateHud&&/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&hudIndex.trim()!==''&&!!hudGroup&&hudGroup.count!=null&&hudGroup.count>0&&hudGroup.count<hudGroup.maximum&&Number.isInteger(Number(hudIndex))&&Number(hudIndex)>=0&&Number(hudIndex)<hudGroup.count;
   const [encounterQueue,setEncounterQueue]=useState<NativeEncounterAppend[]>([]);
   const queuedActors=encounterQueue.reduce((sum,entry)=>sum+(entry.count??1),0);
   const validEncounterDraft=!!context?.canAppendEncounter&&context.actorVariants?.includes(actorPath)&&/^[A-Za-z0-9_]{1,31}$/.test(encounterName)&&Number.isInteger(Number(actorCount))&&Number(actorCount)>=1&&Number(actorCount)<=32&&actorSpacing.trim()!==''&&Number.isFinite(Number(actorSpacing))&&Number(actorSpacing)>=0.25&&Number(actorSpacing)<=16&&actorPosition.every(v=>v.trim()!==''&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=2048);
@@ -74,6 +77,8 @@ export default function NativeTagOperations({
       if (current !== generation.current) return;
       setContext(result);
       setRadius(result.boundingRadius?.toString() ?? '');
+      setHudArray(previous=>result.hudArrays?.some(array=>array.name===previous)?previous:result.hudArrays?.find(array=>array.count!=null&&array.count>0&&array.count<array.maximum)?.name??result.hudArrays?.[0]?.name??'');
+      setHudIndex('0');
     } catch (e) {
       if (current === generation.current) {
         setContext(null);
@@ -89,7 +94,7 @@ export default function NativeTagOperations({
     setDependencies(null);
     setError('');
     setBusy(false);
-    setEncounterQueue([]);
+    setEncounterQueue([]);setHudArray('');setHudIndex('0');
     setEncounterName('gs_source_actor');setActorPath('');setActorPosition(['0','0','0']);setStartActive(false);setActorCount('1');setActorSpacing('0.75');
     return () => {
       generation.current++;
@@ -215,6 +220,22 @@ export default function NativeTagOperations({
               Refresh source
             </button>
           </div>
+          {!!context.hudArrays?.length&&<details className="native-hud-structure">
+            <summary>Duplicate native HUD element</summary>
+            <p className="subtle">Append a copy of an existing element without moving original indices. Preview checks the copied fields and current dependencies. Accept the source revision, use Build working tag edits, then open the compiled HUD to edit its new layout. Your original tags stay unchanged.</p>
+            <div className="native-field-edit">
+              <label>Element group<select aria-label="Native HUD element group" value={hudArray} disabled={busy||dirty} onChange={event=>{setHudArray(event.target.value);setHudIndex('0');if(!accepted)setPreview(null);}}>
+                <option value="">Choose a native group…</option>{context.hudArrays.map(array=><option key={array.name} value={array.name} disabled={array.count==null}>{array.label} · {array.count??'unavailable'} / {array.maximum}</option>)}
+              </select></label>
+              <label>Copy element<select aria-label="Native HUD source element" value={hudIndex} disabled={busy||dirty||!hudGroup?.count} onChange={event=>{setHudIndex(event.target.value);if(!accepted)setPreview(null);}}>
+                {hudGroup?.count?Array.from({length:hudGroup.count},(_,index)=><option key={index} value={index}>Element {index+1}</option>):<option value="0">No source element</option>}
+              </select></label>
+              <button type="button" disabled={busy||dirty||!canDuplicateHudDraft} onClick={()=>makePreview({kind:'hudDuplicate',array:hudArray,index:Number(hudIndex),sourceSha256:context.tagSha256!})}>Preview HUD duplicate</button>
+            </div>
+            {hudGroup?.issue&&<p className="subtle">{hudGroup.issue}</p>}
+            {hudGroup&&hudGroup.count!=null&&hudGroup.count===hudGroup.maximum&&<p className="subtle">This native group is full.</p>}
+            {context.hudStructureIssue&&<Notice tone="info">{context.hudStructureIssue}</Notice>}
+          </details>}
           {context.class==='scnr'&&<details className="native-encounter-authoring">
             <summary>Append native AI encounter</summary>
             <p className="subtle">Add one source-backed squad, or queue up to 16 named groups / 128 total starts for one reviewed source revision. Each squad has up to 32 starting and firing positions. Existing encounters stay in place. Accept, then Build working tag edits; collision and navigation still need native review.</p>

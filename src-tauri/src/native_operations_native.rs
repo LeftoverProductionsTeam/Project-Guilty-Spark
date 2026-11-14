@@ -81,10 +81,14 @@ pub(super) struct Context {
     tag: String,
     class: String,
     tags_directory: PathBuf,
+    tag_sha256:String,
     bounding_radius: Option<f64>,
     lens_flare_scale: Option<f64>,
     actor_variants:Vec<String>,
     can_append_encounter:bool,
+    hud_arrays:Vec<recipes::HudArrayChoice>,
+    can_duplicate_hud:bool,
+    hud_structure_issue:Option<String>,
     firefight_plan:Option<recipes::Operation>,
     firefight_plan_issue:Option<String>,
     can_edit: bool,
@@ -306,11 +310,33 @@ fn check_dependency_pins(tags:&Path,pins:&BTreeMap<String,String>)->Reply<()> {
     if pins.len()>2048{return Err("Encounter dependency inventory exceeds2048tags".into());}
     for(path,expected)in pins {
         let file=tags.join(core::safe_relative(path).map_err(error)?);core::reject_links(&file).map_err(error)?;
-        if expected.len()!=64||!expected.bytes().all(|c|c.is_ascii_hexdigit())||maps::hash_file(&file).map_err(error)?!=*expected{return Err("An actor dependency changed after review; preserve the source and preview again".into());}
+        if expected.len()!=64||!expected.bytes().all(|c|c.is_ascii_hexdigit())||maps::hash_file(&file).map_err(error)?!=*expected{return Err("A native dependency changed after review; preserve the source and preview again".into());}
     }
     Ok(())
 }
-fn encounter_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path)->Reply<BTreeMap<String,String>> {
+fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path)->Reply<BTreeMap<String,String>> {
+    if matches!(operation,recipes::Operation::HudDuplicate{..}) {
+        studio_native_source::require_unshared(state,&source.project.id)?;
+        let dependency=executable(state,&source.project,"invaderDependency")?;
+        let identity=maps::hash_file(&dependency).map_err(error)?;
+        let(ok,output,stderr)=run(&dependency,&recipes::Operation::Dependencies.arguments(&source.tags,&source.class,&source.tag).map_err(error)?)?;
+        if !ok||output.lines().chain(stderr.lines()).any(|line|line.trim_start().to_ascii_lowercase().starts_with("error:")) {
+            return Err(format!("HUD dependency traversal failed: {}",stderr.chars().take(600).collect::<String>()));
+        }
+        let rows=recipes::dependency_lines(&output).map_err(error)?;
+        if rows.len()>2048{return Err("HUD closure exceeds2048checked native tags".into());}
+        let mut pins=BTreeMap::new();
+        for row in rows {
+            if row.reported_broken{return Err(format!("HUD dependency is broken: {}",row.path));}
+            // A self-reference is covered by the operation's original/candidate
+            // hashes. Other dependencies must remain unchanged after acceptance.
+            if row.path.replace('\\',"/").eq_ignore_ascii_case(&source.tag.replace('\\',"/")){continue;}
+            let path=source.tags.join(core::safe_relative(&row.path).map_err(error)?);core::reject_links(&path).map_err(error)?;
+            pins.insert(row.path,maps::hash_file(&path).map_err(error)?);
+        }
+        if maps::hash_file(&dependency).map_err(error)?!=identity{return Err("HUD dependency reader changed during review".into());}
+        check_dependency_pins(&source.tags,&pins)?;return Ok(pins);
+    }
     if !operation.is_encounter_append(){return Ok(BTreeMap::new());}
     let entries=operation.encounter_appends().map_err(error)?;
     studio_native_source::require_unshared(state,&source.project.id)?;
@@ -361,7 +387,7 @@ pub(super) fn review_encounter_dependencies(state:&AppState,project:&Project,bui
     let source=Source{project:project.clone(),build:build.clone(),tags:tags.to_path_buf(),tag:format!("{}.scenario",project.scenario_path().map_err(error)?),class:"scnr".into()};
     operation.validate(&source.class,&source.tag).map_err(error)?;
     let edit=executable(state,project,"invaderNative")?;
-    encounter_dependencies(state,&source,operation,&edit).map(|_|())
+    operation_dependencies(state,&source,operation,&edit).map(|_|())
 }
 fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply<Receipt> {
     let file = root(state, id)?.join("operation.json");
@@ -381,6 +407,7 @@ fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply
         .operation
         .validate(&receipt.class, &receipt.tag)
         .map_err(error)?;
+    if let recipes::Operation::HudDuplicate{source_sha256,..}=&receipt.operation {if !source_sha256.eq_ignore_ascii_case(&receipt.before_sha256){return Err("Retained HUD copy source identity differs from its original revision".into());}}
     if receipt.tool_id != receipt.operation.tool_id() {
         return Err("The native recipe identity changed".into());
     }
@@ -396,7 +423,10 @@ pub(super) async fn native_tag_context(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let source = source(&state, &project_id, tag_id)?;
+        let context_file=source.tags.join(core::safe_relative(&source.tag).map_err(error)?);
+        let context_sha256=maps::hash_file(&context_file).map_err(error)?;
         let values = fields(&state, &source.project, &source.tags, &source.tag)?;
+        if maps::hash_file(&context_file).map_err(error)?!=context_sha256{return Err("Native source changed during inspection; refresh before editing".into());}
         let mut actor_variants=vec![];
         let can_append_encounter=source.class=="scnr"&&maps::inspect_header(source.build.output.as_ref().ok_or("Validated output is missing")?).map_err(error)?.scenario_type==0;
         if can_append_encounter {
@@ -412,6 +442,13 @@ pub(super) async fn native_tag_context(
         let flare = recipes::number(&values, "rotation_function_scale").ok();
         let edit_issue = executable(&state, &source.project, "invaderNative").err();
         let repair_issue = executable(&state, &source.project, "invaderRepair").err();
+        let hud_arrays=recipes::hud_array_choices(&source.class,&values).map_err(error)?;
+        let hud_structure_issue=if hud_arrays.is_empty(){None}else{
+            edit_issue.clone().or_else(||executable(&state,&source.project,"invaderDependency").err())
+                .or_else(||studio_native_source::require_unshared(&state,&source.project.id).err())
+                .or_else(||(!hud_arrays.iter().any(|array|array.count.is_some_and(|count|count>0&&count<array.maximum))).then(||"No admitted HUD array has an existing element and spare native capacity.".into()))
+        };
+        let can_duplicate_hud=!hud_arrays.is_empty()&&hud_structure_issue.is_none();
         let ids: Vec<String> = lock(&state.library)?
             .setting(&history_key(&project_id))
             .map_err(error)?;
@@ -424,6 +461,7 @@ pub(super) async fn native_tag_context(
                 .join(core::safe_relative(&source.tag).map_err(error)?),
         )
         .map_err(error)?;
+        if hash!=context_sha256{return Err("Native source changed during context preparation; refresh before editing".into());}
         let mut history = Vec::new();
         for id in ids.iter().rev() {
             if let Ok(receipt) = read_receipt(&state, id, window.label(), &project_id) {
@@ -437,13 +475,14 @@ pub(super) async fn native_tag_context(
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
         Ok(Context {
-            firefight_plan,firefight_plan_issue,
+            firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,
             tag: source.tag,
             class: source.class,
             tags_directory: source.tags,
+            tag_sha256:hash,
             actor_variants,
             can_append_encounter,
             bounding_radius: radius,
@@ -507,7 +546,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
-    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -527,11 +566,13 @@ pub(super) async fn native_operation_preview(
     let exe=executable(&state,&source.project,operation.tool_id())?;let executable_sha256=maps::hash_file(&exe).map_err(error)?;
     let before_fields=fields(&state,&source.project,&source.tags,&source.tag)?;
     verify_firefight_plan(&source.project,&source.build,&before_fields,&operation)?;
-    let source_dependencies=encounter_dependencies(&state,&source,&operation,&exe)?;
+    let source_dependencies=operation_dependencies(&state,&source,&operation,&exe)?;
     if let Some(field)=operation.field(){if recipes::number(&before_fields,field).map_err(error)?==operation.target().unwrap(){return Err("This native value already matches. No serialization or repair was performed.".into());}}
     if matches!(operation,recipes::Operation::LensFlareScaleRepair)&&!recipes::broken_lens_scale(recipes::number(&before_fields,"rotation_function_scale").map_err(error)?){return Err("This lens flare does not have the reviewed 360-to-zero repair precondition. No repair ran.".into());}
     let relative=core::safe_relative(&source.tag).map_err(error)?;let before=bounded_read(&source.tags.join(&relative),MAX_TAG)?;
-    let before_sha256=hash_bytes(&before);let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
+    let before_sha256=hash_bytes(&before);
+    if let recipes::Operation::HudDuplicate{source_sha256,..}=&operation {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native HUD changed after selection; refresh the source before duplicating. No writer ran.".into());}}
+    let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
     let candidate=directory.join("candidate/tags");fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;
     let failed=|ok:bool,out:&str,err:&str|!ok||out.lines().chain(err.lines()).any(|line|line.trim().to_ascii_lowercase().starts_with("error:"));
