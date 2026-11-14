@@ -1,5 +1,6 @@
+export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' }
-  | {kind:'appendEncounter';name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number};
+  | ({kind:'appendEncounter'}&NativeEncounterAppend) | {kind:'appendEncounters';encounters:NativeEncounterAppend[]};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;

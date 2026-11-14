@@ -4,6 +4,7 @@ import type { Project } from '../types';
 import {
   notifyNativeSource,
   type NativeOperation,
+  type NativeEncounterAppend,
   type NativeTagContext,
   type NativePreview,
   type NativeAccepted,
@@ -37,6 +38,10 @@ export default function NativeTagOperations({
   const [encounterName,setEncounterName]=useState('gs_source_actor'),[actorPath,setActorPath]=useState(''),
     [actorPosition,setActorPosition]=useState<[string,string,string]>(['0','0','0']),[startActive,setStartActive]=useState(false),
     [actorCount,setActorCount]=useState('1'),[actorSpacing,setActorSpacing]=useState('0.75');
+  const [encounterQueue,setEncounterQueue]=useState<NativeEncounterAppend[]>([]);
+  const queuedActors=encounterQueue.reduce((sum,entry)=>sum+(entry.count??1),0);
+  const validEncounterDraft=!!context?.canAppendEncounter&&context.actorVariants?.includes(actorPath)&&/^[A-Za-z0-9_]{1,31}$/.test(encounterName)&&Number.isInteger(Number(actorCount))&&Number(actorCount)>=1&&Number(actorCount)<=32&&actorSpacing.trim()!==''&&Number.isFinite(Number(actorSpacing))&&Number(actorSpacing)>=0.25&&Number(actorSpacing)<=16&&actorPosition.every(v=>v.trim()!==''&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=2048);
+  const encounterDraft=():NativeEncounterAppend=>({name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive,count:Number(actorCount),spacing:Number(actorSpacing)});
   const generation = useRef(0);
   const projectId = project.id;
   const ceSource=context?.sourceTarget==='gbx-custom'||project.buildTargets?.some(target=>target.id===project.activeBuildTarget&&['haloCustomEdition','chupathingyCe'].includes(target.runtimeId));
@@ -84,6 +89,7 @@ export default function NativeTagOperations({
     setDependencies(null);
     setError('');
     setBusy(false);
+    setEncounterQueue([]);
     setEncounterName('gs_source_actor');setActorPath('');setActorPosition(['0','0','0']);setStartActive(false);setActorCount('1');setActorSpacing('0.75');
     return () => {
       generation.current++;
@@ -211,7 +217,7 @@ export default function NativeTagOperations({
           </div>
           {context.class==='scnr'&&<details className="native-encounter-authoring">
             <summary>Append native AI encounter</summary>
-            <p className="subtle">Adds one source-backed squad with up to 32 starting and firing positions without replacing existing encounters. Accept the preview, then Build working tag edits. Review coordinates, collision and native navigation before gameplay.</p>
+            <p className="subtle">Add one source-backed squad, or queue up to 16 named groups / 128 total starts for one reviewed source revision. Each squad has up to 32 starting and firing positions. Existing encounters stay in place. Accept, then Build working tag edits; collision and navigation still need native review.</p>
             {!context.canAppendEncounter&&<Notice tone="info">Requires unshared singleplayer CE/H1A working source with its matching reviewed native writer and build target. Multiplayer AI uses its runtime-specific path.</Notice>}
             <label>Encounter name<input aria-label="Native encounter name" maxLength={31} value={encounterName} disabled={busy||dirty} onChange={e=>{setEncounterName(e.target.value);if(!accepted)setPreview(null);}}/></label>
             <label>Actor variant<select aria-label="Native encounter actor" value={actorPath} disabled={busy||dirty} onChange={e=>{setActorPath(e.target.value);if(!accepted)setPreview(null);}}>
@@ -226,8 +232,20 @@ export default function NativeTagOperations({
             <fieldset><legend>Native spawn grid center</legend><div className="native-encounter-position">{(['X','Y','Z'] as const).map((axis,index)=><label key={axis}>{axis}<input aria-label={'Native actor '+axis} type="number" step="0.25" min={-2048} max={2048} disabled={busy||dirty} value={actorPosition[index]} onChange={e=>{setActorPosition(old=>old.map((v,i)=>i===index?e.target.value:v) as [string,string,string]);if(!accepted)setPreview(null);}}/></label>)}</div></fieldset>
             <label><input type="checkbox" checked={startActive} disabled={busy||dirty} onChange={e=>{setStartActive(e.target.checked);if(!accepted)setPreview(null);}}/>Allow initial creation</label>
             <p className="subtle">Unchecked keeps the new encounter not initially created. Activate its name through reviewed scenario HaloScript; this does not attach a Firefight controller or prove spawning.</p>
-            <button disabled={busy||dirty||!context.canAppendEncounter||!context.actorVariants?.includes(actorPath)||!/^[A-Za-z0-9_]{1,31}$/.test(encounterName)||!Number.isInteger(Number(actorCount))||Number(actorCount)<1||Number(actorCount)>32||actorSpacing.trim()===''||!Number.isFinite(Number(actorSpacing))||Number(actorSpacing)<0.25||Number(actorSpacing)>16||actorPosition.some(v=>v.trim()===''||!Number.isFinite(Number(v))||Math.abs(Number(v))>2048)}
-              onClick={()=>makePreview({kind:'appendEncounter',name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive,count:Number(actorCount),spacing:Number(actorSpacing)})}>Preview encounter append</button>
+            <div className="native-encounter-actions">
+              <button disabled={busy||dirty||!validEncounterDraft} onClick={()=>makePreview({kind:'appendEncounter',...encounterDraft()})}>Preview encounter append</button>
+              <button disabled={busy||dirty||!validEncounterDraft||encounterQueue.length>=16||queuedActors+Number(actorCount)>128||encounterQueue.some(entry=>entry.name.toLowerCase()===encounterName.toLowerCase())}
+                onClick={()=>{setEncounterQueue(rows=>[...rows,encounterDraft()]);setEncounterName('');setPreview(null);setAccepted(null);}}>Queue this encounter</button>
+            </div>
+            {!!encounterQueue.length&&<section aria-label="Reviewed encounter group list">
+              <p className="subtle">{encounterQueue.length} groups · {queuedActors} starts. This is a temporary review list; Accept retains the resulting native source. Each name can then be bound to a Firefight wave through source-backed controller export after native build/readback.</p>
+              <ol className="native-encounter-queue">{encounterQueue.map((entry,index)=><li key={entry.name}>
+                <span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>{entry.position.join(' / ')} · spacing {entry.spacing} · {entry.startActive?'initially active':'script activation'}</small></span>
+                <button aria-label={'Remove queued encounter '+entry.name} disabled={busy||dirty} onClick={()=>{setEncounterQueue(rows=>rows.filter((_,i)=>i!==index));setPreview(null);setAccepted(null);}}>Remove</button>
+              </li>)}</ol>
+              <button disabled={busy||dirty||!context.canAppendEncounter||encounterQueue.some(entry=>!context.actorVariants?.includes(entry.actorPath))} onClick={()=>makePreview({kind:'appendEncounters',encounters:encounterQueue})}>Preview all queued encounters</button>
+              <button disabled={busy||dirty} onClick={()=>{setEncounterQueue([]);setPreview(null);setAccepted(null);}}>Clear review list</button>
+            </section>}
           </details>}
           {context.boundingRadius !== null && (
             <div className="native-field-edit">

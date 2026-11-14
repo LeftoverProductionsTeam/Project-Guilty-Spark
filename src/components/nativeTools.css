@@ -79,3 +79,5 @@
 .native-encounter-authoring label{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.native-encounter-authoring select{max-width:100%;min-width:0}.native-encounter-position{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.native-encounter-position input{width:100%;min-width:0}.native-encounter-authoring fieldset{min-width:0;margin:6px 0}
 
 .native-encounter-squad{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.native-encounter-squad input{min-width:0;width:100%}.native-encounter-readback code{overflow-wrap:anywhere}
+
+.native-encounter-actions{display:flex;gap:6px;flex-wrap:wrap}.native-encounter-queue{margin:6px 0;padding-left:20px}.native-encounter-queue li{display:flex;gap:6px;align-items:center;margin:4px 0}.native-encounter-queue li>span{min-width:0;flex:1;overflow-wrap:anywhere}.native-encounter-queue small{display:block}

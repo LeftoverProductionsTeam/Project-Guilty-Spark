@@ -10,29 +10,51 @@ pub enum Operation {
     Dependencies,
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32 },
+    AppendEncounters { encounters:Vec<EncounterAppend> },
     BoundingRadius { value: f64 },
     LensFlareScaleRepair,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EncounterAppend {
+    pub name:String,pub actor_path:String,pub position:[f32;3],pub start_active:bool,
+    #[serde(default="single_actor")] pub count:u16,
+    #[serde(default="actor_spacing")] pub spacing:f32,
+}
+impl EncounterAppend {
+    pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing}}
 }
 fn single_actor()->u16{1}
 fn actor_spacing()->f32{0.75}
 impl Operation {
+    pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
+    pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
+        match self {
+            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing}]),
+            Self::AppendEncounters{encounters}=>{
+                if encounters.is_empty()||encounters.len()>16{return invalid("Review 1–16 native encounter groups in one operation");}
+                Ok(encounters.clone())
+            },
+            _=>Ok(vec![]),
+        }
+    }
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::BoundingRadius { .. } | Self::AppendEncounter { .. } => "invaderNative",
+            Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::AppendEncounter { .. } => None,
+            Self::Dependencies | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::AppendEncounter { .. } => None,
+            Self::Dependencies | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -50,6 +72,15 @@ impl Operation {
                 if actor_path.is_empty()||actor_path.len()>240||actor_path.starts_with('-')||actor_path.ends_with(".actor_variant")||!actor_path.bytes().all(|c|c.is_ascii_alphanumeric()||b"_/\\ .-".contains(&c)) {return invalid("Choose a safe native actor-variant path without its extension");}
                 if *count==0||*count>32{return invalid("A native encounter squad supports 1–32 authored starting locations");}
                 let _=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
+            }
+            Self::AppendEncounters{..}=>{
+                let entries=self.encounter_appends()?;let mut names=std::collections::BTreeSet::new();let mut total=0usize;
+                for entry in entries {
+                    entry.operation().validate(class,tag)?;
+                    if !names.insert(entry.name.to_ascii_lowercase()){return invalid("Each appended encounter needs a distinct native name");}
+                    total+=usize::from(entry.count);
+                }
+                if total>128{return invalid("One reviewed encounter group operation supports at most 128 starting locations");}
             }
             Self::BoundingRadius { value } => {
                 if ![
@@ -78,7 +109,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::AppendEncounter { .. } => return invalid("Encounter append needs the original scenario array inventory"),
+            Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
                 args.extend(["-S".into(), "bounding_radius".into(), value.to_string()])
             }
@@ -133,15 +164,35 @@ fn encounter_append_layout(fields:&str,name:&str,actor:&str)->Result<(ArrayListi
     if actor_index>=64{return invalid("Actor palette is full; the selected variant has no existing entry");}
     Ok((encounters,palette,actor_index))
 }
+// Allocate appended indices from the actual original inventory. Existing entries
+// never move; groups sharing a new actor reuse its first appended palette row.
+fn encounter_append_layouts(fields:&str,operation:&Operation)->Result<Vec<(EncounterAppend,usize,usize,bool)>> {
+    let entries=operation.encounter_appends()?;
+    let old_encounters=array_listing(fields,"encounters")?;let old_palette=array_listing(fields,"actor_palette")?;
+    if old_encounters.count+entries.len()>128{return invalid("The scenario has no checked capacity for all encounter groups");}
+    let mut palette_count=old_palette.count;let mut appended=std::collections::BTreeMap::new();let mut result=vec![];
+    for (offset,entry) in entries.into_iter().enumerate() {
+        let (_,_,existing)=encounter_append_layout(fields,&entry.name,&entry.actor_path)?;
+        let key=entry.actor_path.replace('\\',"/").to_ascii_lowercase();
+        let actor=if existing<old_palette.count{existing}else if let Some(index)=appended.get(&key){*index}else{
+            if palette_count>=64{return invalid("All encounter groups do not fit the native actor palette");}
+            let index=palette_count;palette_count+=1;appended.insert(key,index);index
+        };
+        let add=actor>=old_palette.count&&!result.iter().any(|row:&(EncounterAppend,usize,usize,bool)|row.2==actor);
+        result.push((entry,old_encounters.count+offset,actor,add));
+    }
+    Ok(result)
+}
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
-        let Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=self else{return self.arguments(tags,class,tag);};
-        let (encounters,palette,actor)=encounter_append_layout(before,name,actor_path)?;
-        let e=format!("encounters[{}]",encounters.count);let squad=format!("{e}.squads[0]");
-        let positions=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
+        if !self.is_encounter_append(){return self.arguments(tags,class,tag);}
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
-        if actor==palette.count {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
+        for (entry,index,actor,add_palette) in encounter_append_layouts(before,self)? {
+        let EncounterAppend{name,actor_path,position,start_active,count,spacing}=&entry;
+        let e=format!("encounters[{index}]");let squad=format!("{e}.squads[0]");
+        let positions=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
+        if add_palette {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
         args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),count.to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
             (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),count.to_string()),(format!("{squad}.insane_diff_count"),count.to_string()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into())] {args.extend(["-S".into(),key,value]);}
@@ -149,16 +200,19 @@ impl Operation {
             let start=format!("{squad}.starting_locations[{index}]");let firing=format!("{e}.firing_positions[{index}]");let vector=position.map(|value|value.to_string()).join(",");
             for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),"0".into()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),"alert".into()),(format!("{start}.return_state"),"alert".into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
         }
+        }
         args.push(tag.into());Ok(args)
     }
     pub fn actor_start_positions(&self)->Result<Option<Vec<[f32;3]>>> {
-        let Self::AppendEncounter{position,count,spacing,..}=self else{return Ok(None);};
-        Ok(Some(crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?.into_iter().map(|value|value.0).collect()))
+        if !self.is_encounter_append(){return Ok(None);}
+        let mut positions=vec![];
+        for entry in self.encounter_appends()? {positions.extend(crate::firefight::native_actor_start_grid(entry.position,entry.count as usize,0,entry.count as usize,entry.spacing)?.into_iter().map(|value|value.0));}
+        Ok(Some(positions))
     }
     /// Keep reviewed command actions intact while respecting Windows argument
     /// length. All batches edit the same isolated candidate; acceptance is atomic.
     pub fn argument_batches(&self,args:Vec<String>,readback:bool)->Result<Vec<Vec<String>>> {
-        if !matches!(self,Self::AppendEncounter{..}){return Ok(vec![args]);}
+        if !self.is_encounter_append(){return Ok(vec![args]);}
         if args.len()<3||args[0]!="-t"{return invalid("Malformed native argument envelope");}
         let cost=|value:&str|value.encode_utf16().count()+value.chars().filter(|c|*c=='\\'||*c=='"').count()+3;
         let end=args.len()-1;let tag=args[end].clone();let base=args[..2].to_vec();
@@ -180,7 +234,7 @@ impl Operation {
     }
     /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
-        if !matches!(self,Self::AppendEncounter{..}) {return Ok(None);}
+        if !self.is_encounter_append() {return Ok(None);}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut i=2;
         while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{args.extend(["-G".into(),written[i+1].clone()]);i+=3;},_=>return invalid("Unexpected native append recipe")}}
@@ -219,9 +273,38 @@ fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Resul
     Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")}])
 }
 
+fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
+    operation.validate("scnr","review.scenario")?;
+    let plans=encounter_append_layouts(before,operation)?;
+    let old=array_listing(before,"encounters")?;let palette=array_listing(before,"actor_palette")?;
+    let new=array_listing(after,"encounters")?;let new_palette=array_listing(after,"actor_palette")?;
+    let added=plans.iter().filter(|row|row.3).count();
+    if new.count!=old.count+plans.len()||new_palette.count!=palette.count+added||!new.body.starts_with(&old.body)||!new_palette.body.starts_with(&palette.body)||(added==0&&new_palette.body!=palette.body){return invalid("Native encounter group append changed original rows or unexpected counts");}
+    let remaining=|text:&str,arrays:[&ArrayListing;2]|text.lines().enumerate().filter(|(index,_)|arrays.iter().all(|a|*index<a.start||*index>=a.end)).map(|(_,line)|line).collect::<Vec<_>>().join("\n");
+    if remaining(before,[&old,&palette])!=remaining(after,[&new,&new_palette]){return invalid("Native encounter group append changed other scenario fields");}
+    let mut differences=vec![];
+    for (entry,index,_,_) in plans {
+        let row=format!("    encounters[{index}] struct");
+        let start=new.body.iter().position(|line|line==&row).ok_or_else(||crate::SparkError::Invalid("Appended encounter row is missing".into()))?;
+        let end=(start+1..new.body.len()).find(|i|new.body[*i].starts_with("    encounters[")).unwrap_or(new.body.len());
+        let body=&new.body[start+1..end];
+        if body.iter().filter_map(|line|line.strip_prefix("        name (")).filter_map(|tail|tail.split_once(')').map(|pair|pair.0)).filter(|name|*name==entry.name.as_str()).count()!=1{return invalid("Appended encounter group name differs from the reviewed source");}
+        for expected in ["squads[1] array".to_string(),format!("starting_locations[{}] array",entry.count),format!("firing_positions[{}] array",entry.count)] {
+            if body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native encounter group has unexpected squad/start/firing counts");}
+        }
+        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)});
+    }
+    Ok(differences)
+}
+
 /// Independently inspected cache, not the source writer's success status.
 impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
+        if matches!(self,Self::AppendEncounters{..}) {
+            self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
+            for entry in self.encounter_appends()?{entry.operation().verify_compiled_encounter(map)?;}
+            return Ok(());
+        }
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
         let Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=self else{return invalid("Unsupported encounter readback expectation");};
         let found=map.encounters.iter().filter(|encounter|encounter.name==*name).collect::<Vec<_>>();
@@ -282,6 +365,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
+    if matches!(operation,Operation::AppendEncounters{..}) {return reviewed_encounter_group_append(before,after,operation);}
     if matches!(operation,Operation::AppendEncounter{..}) {return reviewed_encounter_append(before,after,operation);}
     let field = operation.field().ok_or_else(|| {
         crate::SparkError::Invalid("Dependency analysis does not edit a field".into())

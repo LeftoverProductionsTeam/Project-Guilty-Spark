@@ -63,7 +63,7 @@ pub(super) fn encounter_expectation(state:&AppState,project:&Project,build:&Buil
     let selection=native_source_revisions::current(state,&project.id)?.ok_or("Native source selection disappeared")?;
     let receipt:Receipt=serde_json::from_slice(&bounded_read(&root(state,&selection.job_id)?.join("operation.json"),4*1024*1024)?).map_err(error)?;
     if receipt.schema_version!=1||receipt.id!=selection.job_id||receipt.project_id!=project.id||receipt.fingerprint!=project.fingerprint().map_err(error)? {return Err("Selected encounter receipt differs from its map/build revision".into());}
-    if !matches!(receipt.operation,recipes::Operation::AppendEncounter{..}){return Ok(None);}
+    if !receipt.operation.is_encounter_append(){return Ok(None);}
     receipt.operation.validate(&receipt.class,&receipt.tag).map_err(error)?;
     let file=tags.join(core::safe_relative(&receipt.tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
     let hash=maps::hash_file(&file).map_err(error)?;
@@ -309,27 +309,39 @@ fn check_dependency_pins(tags:&Path,pins:&BTreeMap<String,String>)->Reply<()> {
     Ok(())
 }
 fn encounter_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path)->Reply<BTreeMap<String,String>> {
-    let recipes::Operation::AppendEncounter{actor_path,..}=operation else{return Ok(BTreeMap::new());};
+    if !operation.is_encounter_append(){return Ok(BTreeMap::new());}
+    let entries=operation.encounter_appends().map_err(error)?;
     studio_native_source::require_unshared(state,&source.project.id)?;
     let output=source.build.output.as_ref().ok_or("Validated parent output is missing")?;
     if maps::inspect_header(output).map_err(error)?.scenario_type!=0{return Err("Native encounter append currently requires a reviewed singleplayer scenario. Multiplayer AI needs its engine-specific adapter.".into());}
     let(ok,value,stderr)=run(edit,&["-t".into(),source.tags.to_string_lossy().into_owned(),"-G".into(),"type".into(),source.tag.clone()])?;
     if !ok||value.trim()!="singleplayer"{return Err(format!("Working scenario is not a readable singleplayer source: {stderr}"));}
-    let actor=format!("{}.actor_variant",actor_path.replace('\\',"/"));
-    let file=source.tags.join(core::safe_relative(&actor).map_err(error)?);core::reject_links(&file).map_err(error)?;
-    let hash=maps::hash_file(&file).map_err(error)?;verify_bytes(&source.tags,&actor,&hash)?;
-    let _=fields(state,&source.project,&source.tags,&actor)?;
     let dependency=executable(state,&source.project,"invaderDependency")?;
     let dependency_hash=maps::hash_file(&dependency).map_err(error)?;
-    let(ok,stdout,stderr)=run(&dependency,&recipes::Operation::Dependencies.arguments(&source.tags,"actv",&actor).map_err(error)?)?;
-    if !ok{return Err(format!("Native actor dependency traversal failed: {stderr}"));}
-    let rows=recipes::dependency_lines(&stdout).map_err(error)?;
-    if rows.len()>2047{return Err("Actor closure exceeds2048checked native tags".into());}
-    let mut pins=BTreeMap::from([(actor,hash)]);
-    for row in rows {
-        if row.reported_broken{return Err(format!("Actor dependency is broken: {}",row.path));}
-        let path=source.tags.join(core::safe_relative(&row.path).map_err(error)?);core::reject_links(&path).map_err(error)?;
-        pins.insert(row.path,maps::hash_file(&path).map_err(error)?);
+    let mut pins=BTreeMap::new();let mut actors=std::collections::BTreeSet::new();
+    for entry in entries {
+        let actor=format!("{}.actor_variant",entry.actor_path.replace('\\',"/"));
+        if !actors.insert(actor.to_ascii_lowercase()){continue;}
+        let file=source.tags.join(core::safe_relative(&actor).map_err(error)?);core::reject_links(&file).map_err(error)?;
+        let hash=maps::hash_file(&file).map_err(error)?;verify_bytes(&source.tags,&actor,&hash)?;
+        let _=fields(state,&source.project,&source.tags,&actor)?;
+        let(ok,stdout,stderr)=run(&dependency,&recipes::Operation::Dependencies.arguments(&source.tags,"actv",&actor).map_err(error)?)?;
+        if !ok{return Err(format!("Native actor dependency traversal failed: {stderr}"));}
+        let rows=recipes::dependency_lines(&stdout).map_err(error)?;
+        if rows.len()>2047{return Err("Actor closure exceeds2048checked native tags".into());}
+        let mut current=BTreeMap::from([(actor,hash)]);
+        for row in rows {
+            if row.reported_broken{return Err(format!("Actor dependency is broken: {}",row.path));}
+            let path=source.tags.join(core::safe_relative(&row.path).map_err(error)?);core::reject_links(&path).map_err(error)?;
+            let hash=maps::hash_file(&path).map_err(error)?;
+            if current.get(&row.path).is_some_and(|before|before!=&hash){return Err("An actor dependency changed during group review".into());}
+            current.insert(row.path,hash);
+        }
+        for (path,hash) in current {
+            if pins.get(&path).is_some_and(|before|before!=&hash){return Err("An encounter dependency changed between group reviews".into());}
+            pins.insert(path,hash);
+            if pins.len()>2048{return Err("Combined encounter groups exceed2048checked native tags".into());}
+        }
     }
     if maps::hash_file(&dependency).map_err(error)?!=dependency_hash{return Err("The dependency reader changed during review".into());}
     check_dependency_pins(&source.tags,&pins)?;Ok(pins)
@@ -474,7 +486,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
-    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::AppendEncounter{..}){"One native encounter is appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(

@@ -435,7 +435,7 @@ fn prepare(
     }
     if let Some(expected)=&input.expected_encounter {
         expected.validate("scnr",&format!("{scenario}.scenario"))?;
-        if !matches!(expected,crate::native_operations::Operation::AppendEncounter{..}){return invalid("Working-tag encounter expectation is not a reviewed append");}
+        if !expected.is_encounter_append(){return invalid("Working-tag encounter expectation is not a reviewed append");}
     }
     let scenario_file = checked_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?;
     let globals = checked_file(&tags.join("globals/globals.globals"))?;
