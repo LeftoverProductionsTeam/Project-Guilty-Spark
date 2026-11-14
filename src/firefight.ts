@@ -67,6 +67,34 @@ export interface FirefightCatalog {
   presets: FirefightPreset[];
   defaultConfig: FirefightConfig;
 }
+/** Explicit authoring reconciliation, not native conversion or tag extraction.
+ * Keep authored IDs, scores, waves and zones. Every replacement must be selected
+ * from this exact source catalog; source changes are never inferred from tag IDs. */
+export function reconcileFirefightSource(
+  config: FirefightConfig,
+  catalog: FirefightCatalog,
+  actors: Record<string,string> = {},
+  weapons: Record<string,string> = {},
+): FirefightConfig {
+  const hash=catalog.defaultConfig.sourceSha256;
+  if(!hash||!/^[0-9a-f]{64}$/i.test(hash))throw Error('The selected source has no verified map identity. Reopen its catalog.');
+  const key=(path:string)=>path.replaceAll('\\','/').toLowerCase();
+  const actorPaths=new Map(catalog.enemies.map(enemy=>[key(enemy.actorVariantPath),enemy.actorVariantPath]));
+  const weaponPaths=new Map((catalog.weapons??[]).map(path=>[key(path),path]));
+  const enemies=config.enemies.map(enemy=>{
+    const path=actorPaths.get(key(actors[enemy.id]??enemy.actorVariantPath));
+    if(!path)throw Error(`Choose a replacement in the selected source for ${enemy.name}. Its original definition was retained.`);
+    return {...enemy,actorVariantPath:path};
+  });
+  const weapon=(path:string)=>{
+    const replacement=weaponPaths.get(key(weapons[key(path)]??path));
+    if(!replacement)throw Error(`Choose a starting weapon from the selected source for ${path}. The loadout was retained.`);
+    return replacement;
+  };
+  const profile=config.nativePlayerProfile;
+  return {...config,sourceSha256:hash,enemies,...(profile?{nativePlayerProfile:{...profile,
+    primaryWeapon:weapon(profile.primaryWeapon),secondaryWeapon:profile.secondaryWeapon?weapon(profile.secondaryWeapon):null}}:{})};
+}
 export interface FirefightValidation {
   valid: boolean;
   sourceMatches: boolean;

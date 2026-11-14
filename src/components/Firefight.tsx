@@ -1,7 +1,8 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
-import { defaultNativePlayerProfile, type NativePlayerProfile } from '../firefight';
+import { defaultNativePlayerProfile, reconcileFirefightSource, type NativePlayerProfile } from '../firefight';
+import { beginProjectMutation } from '../projectMutation';
 import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
 import { call, native } from '../api';
@@ -39,14 +40,26 @@ export default function Firefight({
       (project.source ? project.id : sources[0]?.id) ??
       '',
   );
-  const [catalog, setCatalog] = useState<FirefightCatalog | null>(null);
+  const [loadedCatalog,setLoadedCatalog]=useState<{id:string;value:FirefightCatalog}|null>(null);
+  const catalog=loadedCatalog?.id===sourceId?loadedCatalog.value:null;
+  const [actorRemap,setActorRemap]=useState<Record<string,string>>({});
+  const [weaponRemap,setWeaponRemap]=useState<Record<string,string>>({});
   const [validation, setValidation] = useState<FirefightValidation | null>(null);
   const [simulation, setSimulation] = useState<FirefightSimulation | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const config = project.firefight;
+  const tagKey=(path:string)=>path.replaceAll('\\','/').toLowerCase();
+  const sourceMatches=!!catalog&&(!config||config.sourceSha256===catalog.defaultConfig.sourceSha256);
+  const boundSource=sources.find(entry=>entry.sha256===config?.sourceSha256);
+  const eligibleEnemies=sourceMatches?(catalog?.enemies??[]).filter(candidate=>!config?.enemies.some(enemy=>tagKey(enemy.actorVariantPath)===tagKey(candidate.actorVariantPath))):[];
+  const missingActors=config?.enemies.filter(enemy=>catalog&&!catalog.enemies.some(candidate=>tagKey(candidate.actorVariantPath)===tagKey(enemy.actorVariantPath)))??[];
+  const missingWeapons=[...new Set(config?.nativePlayerProfile?[config.nativePlayerProfile.primaryWeapon,...(config.nativePlayerProfile.secondaryWeapon?[config.nativePlayerProfile.secondaryWeapon]:[])].map(tagKey):[])]
+    .filter(path=>catalog&&!(catalog.weapons??[]).some(candidate=>tagKey(candidate)===path));
   const weaponChoicesId = useId();
   const latestProject=useRef(project);latestProject.current=project;
+  const activeProject=useRef<string|null>(project.id);
+  useEffect(()=>{activeProject.current=project.id;return()=>{activeProject.current=null;};},[project.id]);
   const [sourceExport,setSourceExport]=useState<{receipt:QuickForgeBuildReceipt;input:Project}|null>(null);
   const prepared=!!project.quickForge&&!project.quickForge.native&&project.quickForge.gameMode==='firefight'&&
     !!project.quickForge.logic?.handwrittenSources?.some(source=>source.filename==='gs_firefight.hsc');
@@ -66,12 +79,12 @@ export default function Firefight({
   },[project.id]);
   useEffect(() => {
     let alive = true;
-    setCatalog(null);
+    setLoadedCatalog(null);
     setError('');
     if (!sourceId) return;
     call<FirefightCatalog>('firefight_catalog', { sourceProjectId: sourceId })
       .then((result) => {
-        if (alive) setCatalog(result);
+        if (alive) setLoadedCatalog({id:sourceId,value:result});
       })
       .catch((e) => {
         if (alive) setError(String(e));
@@ -83,7 +96,8 @@ export default function Firefight({
   useEffect(() => {
     setValidation(null);
     setSimulation(null);
-  }, [config]);
+  }, [config,sourceId]);
+  useEffect(()=>{setActorRemap({});setWeaponRemap({});},[sourceId,config?.sourceSha256]);
   function change(next: FirefightConfig, description: string) {
     edit({ ...project, firefight: next }, description);
   }
@@ -91,18 +105,23 @@ export default function Firefight({
     if(config?.nativePlayerProfile)change({...config,nativePlayerProfile:{...config.nativePlayerProfile,...patch}},'Edit native player loadout');
   }
   function begin(next?: FirefightConfig) {
-    if (!catalog) return;
-    const first = catalog.enemies[0];
-    if (!next && !first) {
+    if (!catalog || busy) return;
+    if (next) {
+      change(next, 'Create Firefight authoring rules');
+      return;
+    }
+    const sourceActor = catalog.enemies[0];
+    if (!sourceActor) {
       setError('This source contains no audited actor-variant tags. Import a map with actual actv content.');
       return;
     }
+    const first = {...sourceActor,id:crypto.randomUUID()};
     const spawn = project.quickForge?.spawns[0]?.position ?? [0, 0, 0.2];
     change(
-      next ?? {
+      {
         ...catalog.defaultConfig,
         title: `${project.title} · Firefight`,
-        sourceSha256: sources.find((e) => e.id === sourceId)?.sha256 ?? null,
+        sourceSha256: catalog.defaultConfig.sourceSha256,
         enemies: [first],
         waves: [
           {
@@ -133,19 +152,37 @@ export default function Firefight({
     setBusy(true);
     setError('');
     try {
-      if (kind === 'validate')
-        setValidation(
-          await call<FirefightValidation>('firefight_validate', {
-            config,
-            sourceProjectId: sourceId || undefined,
-          }),
-        );
-      else setSimulation(await call<FirefightSimulation>('firefight_preview', { config, completedWaves: 1 }));
+      if (kind === 'validate') {
+        const result=await call<FirefightValidation>('firefight_validate',{config,sourceProjectId:sourceId||undefined});
+        if(latestProject.current.firefight!==config)throw Error('Rules changed during validation. Validate the current rules again.');
+        setValidation(result);
+      } else {
+        const result=await call<FirefightSimulation>('firefight_preview',{config,completedWaves:1});
+        if(latestProject.current.firefight!==config)throw Error('Rules changed during preview. Preview the current rules again.');
+        setSimulation(result);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
+  }
+  async function adoptSource() {
+    if(!config||!catalog||busy)return;
+    if(native&&!onSave){setError('Use the owning editable window and wait for the current build before changing the rules source.');return;}
+    let candidate:FirefightConfig;
+    try{candidate=reconcileFirefightSource(config,catalog,actorRemap,weaponRemap);}
+    catch(problem){setError(String(problem));return;}
+    const release=beginProjectMutation(project.id);
+    setBusy(true);setError('');
+    try {
+      const review=await call<FirefightValidation>('firefight_validate',{config:candidate,sourceProjectId:sourceId});
+      if(activeProject.current!==project.id||latestProject.current.id!==project.id||latestProject.current.firefight!==config)
+        throw Error('The project closed or its rules changed during source review. Review again; no old rules were reapplied.');
+      if(!review.valid||!review.sourceMatches||review.missingActorVariants.length||review.missingEquipment.length)
+        throw Error(['Source review blocked. Keep the existing rules until the selected assets and rules validate.',...review.diagnostics,...review.missingActorVariants,...review.missingEquipment].join(' '));
+      edit({...latestProject.current,firefight:candidate},'Reconcile Firefight actor and loadout source');
+    } catch(problem){setError(String(problem));}finally{release();setBusy(false);}
   }
   function prepareNativeRound() {
     try {
@@ -198,6 +235,7 @@ export default function Firefight({
         Actor source map
         <select
           aria-label="Firefight actor source"
+          disabled={busy}
           value={sourceId}
           onChange={(e) => setSourceId(e.target.value)}
         >
@@ -209,6 +247,25 @@ export default function Firefight({
           ))}
         </select>
       </label>
+      {config&&<p className="subtle">Rules source: {boundSource?.title??(config.sourceSha256?config.sourceSha256.slice(0,12)+'…':'not bound')}. Browsing another map does not change these rules.</p>}
+      {config&&catalog&&!sourceMatches&&<details open className="forge-details">
+        <summary>Review a different actor source</summary>
+        <p className="subtle">Keep your waves, zones, counts, scores and authored IDs. Choose replacements for missing assets below, then explicitly apply this source. Native dependencies still need their own extraction/build path.</p>
+        {boundSource&&<button disabled={busy} onClick={()=>setSourceId(boundSource.id)}>Return to rules source</button>}
+        {missingActors.map(enemy=><label className="forge-field" key={enemy.id}>Replace {enemy.name}<code className="wrap-code">{enemy.actorVariantPath}</code>
+          <select aria-label={'Source replacement for '+enemy.name} disabled={busy} value={actorRemap[enemy.id]??''} onChange={event=>setActorRemap(old=>({...old,[enemy.id]:event.target.value}))}>
+            <option value="" disabled>Choose an actor from this source</option>
+            {catalog.enemies.map(candidate=><option key={candidate.id} value={candidate.actorVariantPath}>{candidate.name} · {candidate.actorVariantPath}</option>)}
+          </select>
+        </label>)}
+        {missingWeapons.map(path=><label className="forge-field" key={path}>Replace starting weapon<code className="wrap-code">{path}</code>
+          <select aria-label={'Source replacement weapon '+path} disabled={busy} value={weaponRemap[path]??''} onChange={event=>setWeaponRemap(old=>({...old,[path]:event.target.value}))}>
+            <option value="" disabled>Choose a weapon from this source</option>
+            {(catalog.weapons??[]).map(candidate=><option key={candidate} value={candidate}>{candidate}</option>)}
+          </select>
+        </label>)}
+        <button disabled={busy||native&&!onSave} onClick={()=>void adoptSource()} title="Checks the selected map's actual actor and weapon paths, then changes the rules source as one Undo step. Scripts are not regenerated and no tags are converted.">Use this source for existing rules</button>
+      </details>}
       {error && <Notice>{error}</Notice>}
       {catalog && (
         <>
@@ -228,7 +285,7 @@ export default function Firefight({
               <div className="firefight-preset-grid">
               {catalog.presets.map((preset) => (
                 <div className="forge-preset" key={preset.id}>
-                  <button title={`${preset.detail}${preset.missingActorVariants.length ? ` Missing: ${preset.missingActorVariants.join(', ')}` : ''}`} disabled={!preset.config} onClick={() => begin(preset.config!)}>
+                  <button title={`${config?'Replaces current rules; Undo restores them. ':''}${preset.detail}${preset.missingActorVariants.length ? ` Missing: ${preset.missingActorVariants.join(', ')}` : ''}`} disabled={busy||!preset.config} onClick={() => begin(preset.config!)}>
                     {preset.name}
                   </button>
                   {preset.missingActorVariants.length > 0 && (
@@ -368,9 +425,9 @@ export default function Firefight({
                     aria-label={`Wave ${index + 1} enemy ${gi + 1}`}
                     value={group.enemyId}
                     onChange={(e) => {
-                      const enemy = [...config.enemies, ...(catalog?.enemies ?? [])].find(
-                        (entry) => entry.id === e.target.value,
-                      );
+                      const key=e.target.value;
+                      const candidate=key.startsWith('catalog:')?eligibleEnemies.find(entry=>'catalog:'+entry.id===key):undefined;
+                      const enemy=candidate?{...candidate,id:crypto.randomUUID()}:config.enemies.find(entry=>entry.id===key);
                       if (!enemy) return;
                       const enemies = config.enemies.some((entry) => entry.id === enemy.id)
                         ? config.enemies
@@ -394,15 +451,8 @@ export default function Firefight({
                       );
                     }}
                   >
-                    {[
-                      ...new Map(
-                        [...config.enemies, ...(catalog?.enemies ?? [])].map((enemy) => [enemy.id, enemy]),
-                      ).values(),
-                    ].map((enemy) => (
-                      <option key={enemy.id} value={enemy.id}>
-                        {enemy.name}
-                      </option>
-                    ))}
+                    {config.enemies.map(enemy=><option key={enemy.id} value={enemy.id}>{enemy.name}</option>)}
+                    {eligibleEnemies.length>0&&<optgroup label="Add from rules source">{eligibleEnemies.map(enemy=><option key={'catalog:'+enemy.id} value={'catalog:'+enemy.id}>{enemy.name}</option>)}</optgroup>}
                   </select>
                   <NumberField
                     label={`Wave ${index + 1} enemy ${gi + 1} count`}
@@ -580,7 +630,7 @@ export default function Firefight({
           <details>
             <summary>Player loadout</summary>
             <p className="subtle">Starting gear for the native solo round. Choose a weapon from the selected actor source, or enter its exact tag path without an extension. Validate rules &amp; actors checks these paths; the native build also needs their matching source tags. These are normal weapon slots, not dual wielding.</p>
-            <datalist id={weaponChoicesId}>{(catalog?.weapons??[]).map(path=><option key={path} value={path}/>)}</datalist>
+            <datalist id={weaponChoicesId}>{(sourceMatches?catalog?.weapons??[]:[]).map(path=><option key={path} value={path}/>)}</datalist>
             <button disabled={busy} onClick={()=>config&&change({...config,nativePlayerProfile:defaultNativePlayerProfile()},'Set pistol starting profile')}>Use pistol loadout</button>
             {config.nativePlayerProfile&&<div className="forge-rule-grid">
               <label>Primary weapon tag<input aria-label="Primary weapon tag" list={weaponChoicesId} key={'primary:'+config.nativePlayerProfile.primaryWeapon} defaultValue={config.nativePlayerProfile.primaryWeapon} maxLength={240} onBlur={event=>{if(event.target.value!==config.nativePlayerProfile?.primaryWeapon)playerProfile({primaryWeapon:event.target.value});}}/></label>
