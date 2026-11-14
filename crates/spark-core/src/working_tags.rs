@@ -1,6 +1,6 @@
 //! Compile the current job-owned editable tags without re-extracting source.
 //!
-//! Native callers must inspect the selected official H1A Tool/Invader generation
+//! Native callers must inspect the selected H1A Tool or reviewed CE Invader build
 //! and bind paths to the user's project before calling this module. This module
 //! pins/rechecks the files, validates the parent native receipt/cache, copies tags
 //! into a fresh owned job, and retains provenance. It never writes source tags,
@@ -70,6 +70,8 @@ pub struct WorkingTagsInput {
     pub tags_directory: PathBuf,
     pub scenario_path: String,
     pub scenario_type: u16,
+    /// Exact parent-pinned H1A Tool (mcc-cea) or Invader build (gbx-custom).
+    /// Callers must admit the corresponding native source/profile first.
     pub tool: PathBuf,
     pub invader_info: PathBuf,
 }
@@ -198,6 +200,16 @@ fn normalize_scenario(value: &str) -> Result<String> {
     Ok(normalized)
 }
 
+// The parent receipt/cache, never the selected hosting runtime, chooses the
+// native compiler contract. Keep the existing H1A default and standard CE route.
+fn native_profile(target: &str) -> Result<(&'static str, u32, &'static str)> {
+    match target {
+        "mcc-cea" => Ok(("mcc-cea", 13, "haloTool")),
+        "gbx-custom" => Ok(("gbx-custom", 609, "invaderBuild")),
+        _ => invalid("Working-tag builds require a validated H1A or standard Custom Edition native parent"),
+    }
+}
+
 fn native_arguments(scenario: &str) -> Result<Vec<String>> {
     // H1A's tag index rejects '/' even when Windows accepts that spelling for
     // filesystem paths. Keep normalized identities separate from native tags.
@@ -229,7 +241,8 @@ fn same_record(a: &BuildRecord, b: &BuildRecord) -> bool {
 /// compiled for newer authoring rules. Only recovered Firefight metadata may differ.
 pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: &Path) -> Result<Project> {
     project.validate()?;
-    if build.status != "validated" || build.target != "mcc-cea"
+    let _ = native_profile(&build.target)?;
+    if build.status != "validated"
         || !project.builds.iter().any(|record| same_record(record, build))
     {
         return invalid("Native source parent is not in this project's validated history");
@@ -280,6 +293,7 @@ fn parent_native_identity(
     parent: &Path,
     tool_hash: &str,
 ) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>)> {
+    let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
     let mut controller_binding=None;
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
@@ -295,7 +309,7 @@ fn parent_native_identity(
                 .build
                 .as_ref()
                 .is_none_or(|b| !same_record(b, &input.parent_build))
-            || receipt.tool_identities.get("haloTool").map(String::as_str) != Some(tool_hash)
+            || receipt.tool_identities.get(compiler_key).map(String::as_str) != Some(tool_hash)
         {
             return invalid("Parent working-tag native identity/receipt no longer matches");
         }
@@ -317,7 +331,7 @@ fn parent_native_identity(
                 .build
                 .as_ref()
                 .is_none_or(|b| !same_record(b, &input.parent_build))
-            || receipt.tool_identities.get("haloTool").map(String::as_str) != Some(tool_hash)
+            || receipt.tool_identities.get(compiler_key).map(String::as_str) != Some(tool_hash)
         {
             return invalid("Parent QuickForge native identity/receipt no longer matches");
         }
@@ -326,6 +340,9 @@ fn parent_native_identity(
             .ok_or_else(|| SparkError::Invalid("Parent native source workspace is missing".into()))?
             .directory
     } else if conversion_receipt.exists() {
+        if input.parent_build.target != "mcc-cea" {
+            return invalid("This conversion receipt describes H1A compiler provenance, not a standard CE native source build");
+        }
         let receipt: serde_json::Value = read_receipt(&conversion_receipt)?;
         let source = project.source.as_ref().ok_or_else(|| {
             SparkError::Invalid("Native conversion parent has no preserved source".into())
@@ -339,7 +356,7 @@ fn parent_native_identity(
         }
         parent.to_path_buf()
     } else {
-        return invalid("Parent has no validated native H1A compiler provenance; an mcc-cea target label alone is insufficient");
+        return invalid("Parent has no matching validated native compiler provenance; a target label alone is insufficient");
     };
     let workspace = checked_directory(&workspace)?;
     if !workspace.starts_with(parent) {
@@ -380,11 +397,11 @@ fn prepare(
     if job_id == input.parent_build.id {
         return invalid("Working-tag build needs a fresh job");
     }
+    let (_, cache_version, compiler_key) = native_profile(&input.parent_build.target)?;
     let source_project=source_parent_project(project,&input.parent_build,jobs_root)?;
     let authoring_pending=source_project.fingerprint()?!=project.fingerprint()?;
     if authoring_pending&&!input.compile_scripts{return invalid("Firefight authoring rules changed. Attach/review the matching controller and explicitly compile scripts; a tag-only rebuild cannot apply them");}
     if input.parent_build.status != "validated"
-        || input.parent_build.target != "mcc-cea"
         || input.parent_build.project_fingerprint != source_project.fingerprint()?
         || !project
             .builds
@@ -447,7 +464,7 @@ fn prepare(
         .ok_or_else(|| SparkError::Invalid("Parent cache hash is missing or invalid".into()))?;
     let parent_inspection = maps::inspect_map(&parent_output, None)?;
     if parent_inspection.sha256 != expected
-        || parent_inspection.header.version != 13
+        || parent_inspection.header.version != cache_version
         || parent_inspection.header.scenario_type != input.scenario_type
         || parent_inspection.header.extended
         || parent_inspection
@@ -466,7 +483,7 @@ fn prepare(
     }
     let mut tools = BTreeMap::new();
     for (key, file) in [
-        ("haloTool", &input.tool),
+        (compiler_key, &input.tool),
         ("invaderInfo", &input.invader_info),
     ] {
         let path = checked_file(file)?;
@@ -481,7 +498,7 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding) = parent_native_identity(&source_project, input, &parent, &tools["haloTool"])?;
+    let (source_data,parent_controller_binding) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     if input.compile_scripts {
         if source_data.is_none()&&input.script_attachment.is_none(){return invalid("This working source has no recovered HaloScript directory. Recover/review the original source modules first; compiled script bytecode is retained");}
@@ -615,7 +632,7 @@ fn compile_script_sources(
         if !modules.contains(name){return invalid(format!("Original script module {name}.hsc is missing; recover/review it before recompiling"));}
     }
     if modules.is_empty() || modules.len()+usize::from(has_global)>16 {return invalid("Script compilation needs1–16complete source modules within the native scenario limit");}
-    let mut args=vec!["-g".into(),"mcc-cea".into(),"-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),workspace.join("data").to_string_lossy().into_owned()];
+    let mut args=vec!["-g".into(),native_profile(&input.parent_build.target)?.0.into(),"-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),workspace.join("data").to_string_lossy().into_owned()];
     // Never adopt an unrelated global_scripts.hsc implicitly.
     if !has_global{args.push("-E".into());}
     for name in &modules {args.extend(["-x".into(),name.clone()]);}
@@ -688,8 +705,9 @@ pub(crate) fn tree_hashes(root: &Path, cancel: &AtomicBool) -> Result<BTreeMap<S
 }
 
 fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) -> Result<()> {
+    let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
     for (key, path) in [
-        ("haloTool", &input.tool),
+        (compiler_key, &input.tool),
         ("invaderInfo", &input.invader_info),
     ] {
         if expected.get(key) != Some(&maps::hash_file(&checked_file(path)?)?) {
@@ -884,27 +902,42 @@ fn run_with(
             receipt.compiled_script_modules=compile_script_sources(input,&prepared,&tags,&workspace,&staged_scripts,&runner,&invoke)?;
             project::atomic_write(&directory.join("working-tags-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
         }
-        let args = native_arguments(&receipt.scenario_path)?;
+        let (engine, cache_version, _) = native_profile(&input.parent_build.target)?;
+        let args = if cache_version == 13 {
+            native_arguments(&receipt.scenario_path)?
+        } else {
+            // Same CE compiler interface as QuickForge. All resources are
+            // embedded from reviewed native tags; no shared-bank guessing.
+            vec!["-g".into(),engine.into(),"-t".into(),tags.to_string_lossy().into_owned(),
+                "-m".into(),output_dir.to_string_lossy().into_owned(),"--resource-usage".into(),
+                "none".into(),receipt.scenario_path.clone()]
+        };
         // Use Runner's existing protected write phase: cancellation/timeout is
         // observed after native Tool exits, never by forcefully killing it.
         let log = invoke(&runner, &input.tool, &args, &workspace, "scenario", 50)?;
-        if !crate::conversion::native_compile_succeeded(&log) {
+        if cache_version == 13 && !crate::conversion::native_compile_succeeded(&log) {
             return invalid("H1A Tool did not confirm successful cache compilation; zero exit status is insufficient");
+        }
+        if cache_version == 609 && log.lines().any(|line| {
+            let line=line.trim_start().to_ascii_lowercase();
+            line.starts_with("error:") || line.starts_with("error ") || line.contains("### error") || line.contains("exception halt")
+        }) {
+            return invalid("CE native compiler reported an error; no output was adopted");
         }
         if cancel.load(Ordering::Relaxed) {
             return invalid("Build cancelled after native Tool completed");
         }
         recheck_tools(input, &prepared.tools)?;
         let name = crate::mcc::package_map_name(&receipt.scenario_path)?;
-        let compiled = checked_file(&workspace.join("maps").join(&name))?;
+        let compiled = checked_file(&if cache_version == 13 { workspace.join("maps").join(&name) } else { output_dir.join(&name) })?;
         let compiled_hash = maps::hash_file(&compiled)?;
         let output = output_dir.join(&name);
-        fs::copy(&compiled, &output)?;
+        if cache_version == 13 { fs::copy(&compiled, &output)?; }
         let inspected = maps::inspect_map(&output, None)?;
         let sound_classes=crate::audio_rules::verify(&output,&inspected)?;
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         if inspected.sha256 != compiled_hash
-            || inspected.header.version != 13
+            || inspected.header.version != cache_version
             || inspected.header.extended
             || inspected.header.scenario_type != input.scenario_type
             || !normalize_scenario(&inspected.scenario_path)?
@@ -985,7 +1018,7 @@ fn run_with(
     })();
     let record = match result {
         Ok(output) => BuildRecord {
-            id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(), target: "mcc-cea".into(),
+            id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(), target: input.parent_build.target.clone(),
             sha256: Some(maps::hash_file(&output)?), output: Some(output), project_fingerprint: fingerprint,
             message: if let Some(attachment)=&receipt.attached_script {
                 format!("Added reviewed module {} (SHA256 {}) in separate native source; original modules and script signatures retained. Native compilation/readback passed, gameplay remains untested.",attachment.filename,attachment.sha256)
@@ -996,7 +1029,7 @@ fn run_with(
             },
         },
         Err(e) => BuildRecord {
-            id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: if cancel.load(Ordering::Relaxed) { "cancelled" } else { "failed" }.into(), target: "mcc-cea".into(),
+            id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: if cancel.load(Ordering::Relaxed) { "cancelled" } else { "failed" }.into(), target: input.parent_build.target.clone(),
             sha256: None, output: None, project_fingerprint: fingerprint, message: e.to_string(),
         },
     };
