@@ -1397,6 +1397,7 @@ export default function App() {
       case 'tags':
         return (
           <Tags key={current.id} project={current} inspection={inspection} entries={data.entries} hasUnsavedChanges={history.dirty} onSave={()=>save(false,current.id)}
+            onBuild={()=>setWorkspace('build')}
             onLevelEditor={()=>setWorkspace('quickforge')}
             onNativeEditor={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:current.id,actionId:'editTags'}}))}
             onSelectMap={(id) => { void openProject(id, 'tags'); }} edit={edit} notify={notice}

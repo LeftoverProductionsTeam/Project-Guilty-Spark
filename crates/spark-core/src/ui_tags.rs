@@ -272,3 +272,105 @@ pub(super) fn validate_layout(
     }
     Ok(())
 }
+
+
+/// Semantic readback of the admitted native HUD fields carried through the
+/// existing extraction/rebuild path. Source and output datum IDs may differ.
+/// This neither writes tags nor certifies pixels, fonts, gameplay or unknown cells.
+#[derive(Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct HudTagReadback {
+    pub source_tag_id:u32,
+    pub output_tag_id:u32,
+    pub class:String,
+    pub path:String,
+    pub fields_compared:usize,
+    pub edited_fields:usize,
+}
+#[derive(Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct HudEditReadback {
+    pub source_sha256:String,
+    pub output_sha256:String,
+    pub source_version:u32,
+    pub output_version:u32,
+    pub tags:Vec<HudTagReadback>,
+    pub scope:&'static str,
+}
+fn hud_path(path:&str)->String {path.replace('\\',"/").to_ascii_lowercase()}
+fn output_hud_path(project:&crate::project::Project,tag:&Tag)->String {
+    hud_path(project.tag_renames.iter().find(|rename|rename.source_tag_id==tag.id).map_or(tag.path.as_str(),|rename|rename.path.as_str()))
+}
+pub fn verify_hud_edits(project:&crate::project::Project,before:&MapInspection,after:&MapInspection)->Result<Option<HudEditReadback>> {
+    let requested=project.tag_edits.iter().filter(|edit|edit.field_key.starts_with("hud:")).collect::<Vec<_>>();
+    if requested.is_empty(){return Ok(None);}
+    let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("HUD readback requires the preserved source identity".into()))?;
+    if source.sha256!=before.sha256||source.cache_version!=before.header.version {
+        return invalid("HUD readback source differs from the inspected project");
+    }
+    if ![6,7,13,609].contains(&before.header.version)||![6,7,13,609].contains(&after.header.version) {
+        return invalid("This native HUD source/output layout has not been admitted");
+    }
+    crate::project::validate_edits(project,before)?;
+    let schema=hud_schema()?;
+    let by_source_id=before.tags.iter().map(|tag|(tag.id,tag)).collect::<std::collections::HashMap<_,_>>();
+    let by_output_id=after.tags.iter().map(|tag|(tag.id,tag)).collect::<std::collections::HashMap<_,_>>();
+    if by_source_id.len()!=before.tags.len()||by_output_id.len()!=after.tags.len(){return invalid("Ambiguous native tag IDs during HUD readback");}
+    let mut by_output_path=std::collections::HashMap::<(String,String),Vec<&Tag>>::new();
+    for tag in &after.tags {by_output_path.entry((tag.class.clone(),hud_path(&tag.path))).or_default().push(tag);}
+    let mut edits=std::collections::BTreeMap::new();
+    let mut ids=std::collections::BTreeSet::new();
+    for edit in requested {
+        let tag=by_source_id.get(&edit.tag_id).ok_or_else(||SparkError::Invalid("Edited HUD tag is no longer indexed".into()))?;
+        if !schema.roots.contains_key(&tag.class)||!tag.fields.iter().any(|field|field.key==edit.field_key) {
+            return invalid(format!("Edited native HUD field {} has no admitted source layout",edit.field_key));
+        }
+        if edits.insert((edit.tag_id,edit.field_key.as_str()),&edit.value).is_some(){return invalid("Duplicate HUD field edits cannot establish one expected native value");}
+        ids.insert(edit.tag_id);
+    }
+    let mut tags=vec![];
+    for id in ids {
+        let tag=by_source_id[&id];
+        let path=output_hud_path(project,tag);
+        if before.tags.iter().filter(|other|other.class==tag.class&&hud_path(&other.path)==hud_path(&tag.path)).count()!=1 {
+            return invalid("Edited HUD source class/path is ambiguous");
+        }
+        let candidates=by_output_path.get(&(tag.class.clone(),path.clone()));
+        let target=match candidates.map(Vec::as_slice) {
+            Some([target])=>*target,
+            _=>return invalid(format!("Compiled HUD {} ({}) is missing or ambiguous",path,tag.class)),
+        };
+        let fields=target.fields.iter().filter(|field|field.key.starts_with("hud:")).map(|field|(field.key.as_str(),field)).collect::<std::collections::HashMap<_,_>>();
+        if fields.len()!=target.fields.iter().filter(|field|field.key.starts_with("hud:")).count(){return invalid("Compiled HUD field identities are ambiguous");}
+        let mut compared=0usize;let mut edited=0usize;let mut keys=std::collections::BTreeSet::new();
+        for field in tag.fields.iter().filter(|field|field.key.starts_with("hud:")) {
+            if !keys.insert(field.key.as_str()){return invalid("Source HUD field identities are ambiguous");}
+            let actual=fields.get(field.key.as_str()).ok_or_else(||SparkError::Invalid(format!("Compiled HUD lost admitted field {} in {}",field.key,path)))?;
+            if actual.kind!=field.kind||actual.unit!=field.unit||actual.target_class!=field.target_class {
+                return invalid(format!("Compiled HUD field type changed: {} in {}",field.key,path));
+            }
+            let edit=edits.get(&(id,field.key.as_str())).copied();
+            let expected=edit.unwrap_or(&field.value);
+            let matched=if field.kind=="reference" {
+                let expected_id=expected.as_u64().and_then(|id|u32::try_from(id).ok()).ok_or_else(||SparkError::Invalid("Expected HUD reference is not a native uint32 ID".into()))?;
+                let actual_id=actual.value.as_u64().and_then(|id|u32::try_from(id).ok()).ok_or_else(||SparkError::Invalid("Compiled HUD reference is not a native uint32 ID".into()))?;
+                let original=by_source_id.get(&expected_id).ok_or_else(||SparkError::Invalid("Expected HUD dependency is no longer indexed".into()))?;
+                let dependency=by_output_id.get(&actual_id).ok_or_else(||SparkError::Invalid("Compiled HUD dependency is not indexed".into()))?;
+                let expected_path=output_hud_path(project,original);
+                original.class==dependency.class&&expected_path==hud_path(&dependency.path)&&
+                    by_output_path.get(&(original.class.clone(),expected_path)).is_some_and(|tags|tags.len()==1)
+            }else{
+                let expected=expected.as_f64().filter(|n|n.is_finite()).ok_or_else(||SparkError::Invalid("Expected HUD scalar is not finite".into()))?;
+                let actual=actual.value.as_f64().filter(|n|n.is_finite()).ok_or_else(||SparkError::Invalid("Compiled HUD scalar is not finite".into()))?;
+                if field.kind=="f32" {actual as f32==expected as f32}else{actual==expected}
+            };
+            if !matched {return invalid(format!("Compiled HUD value/reference differs from saved source: {} in {}",field.key,path));}
+            compared+=1;if edit.is_some(){edited+=1;}
+        }
+        if compared==0||edited==0{return invalid("Edited HUD has no provable native field readback");}
+        tags.push(HudTagReadback{source_tag_id:id,output_tag_id:target.id,class:tag.class.clone(),path,fields_compared:compared,edited_fields:edited});
+    }
+    Ok(Some(HudEditReadback{source_sha256:before.sha256.clone(),output_sha256:after.sha256.clone(),
+        source_version:before.header.version,output_version:after.header.version,tags,
+        scope:"Saved HUD scalar/reference edits and other admitted fields in those tags, matched by native class/path across rebuild. Target-only fields and opaque/unsupported cells are outside this comparison. Native rendering and game behavior require separate acceptance."}))
+}

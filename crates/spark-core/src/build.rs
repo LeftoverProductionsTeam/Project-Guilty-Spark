@@ -832,7 +832,7 @@ pub fn run_build(
         5,
         "info",
     );
-    let result = (|| -> Result<PathBuf> {
+    let result = (|| -> Result<(PathBuf,String)> {
         let info = tool_path(tools, "invader-info").unwrap();
         let extract = tool_path(tools, "invader-extract").unwrap();
         let native=crate::conversion::native_tool(tools);
@@ -976,6 +976,10 @@ pub fn run_build(
         if !project.native_asset_imports.is_empty(){let _=crate::native_asset_imports::available_files(jobs_root.parent().unwrap(),project)?;}
         crate::tag_duplicates::verify_compiled(project,inspection,&validated)?;
         crate::tag_renames::verify_compiled(project,inspection,&validated)?;
+        if let Some(hud)=maps::verify_hud_edits(project,inspection,&validated)? {
+            project::atomic_write(&dir.join("native-hud-readback.json"),&serde_json::to_vec_pretty(&hud)?,false)?;
+            runner.emit("hud-readback",format!("{} HUD tags: {} admitted native fields matched saved source, including {} staged edits. Rendering/game acceptance is separate.",hud.tags.len(),hud.tags.iter().map(|tag|tag.fields_compared).sum::<usize>(),hud.tags.iter().map(|tag|tag.edited_fields).sum::<usize>()),89,"info");
+        }
         crate::native_lighting::verify_cache(project,&output,&validated)?;
         crate::powerups::verify_compiled(project,&validated,&dir)?;
         if let Some(assembly)=&project.bsp_assembly{
@@ -1025,15 +1029,16 @@ pub fn run_build(
         let semantic=crate::portability::compare(inspection,&validated)?;
         project::atomic_write(&dir.join("semantic-changes.json"),&serde_json::to_vec_pretty(&semantic)?,false)?;
         project::atomic_write(&dir.join("semantic-changes.md"),crate::portability::diff_markdown(&semantic).as_bytes(),false)?;
-        Ok(output)
+        if maps::hash_file(&output)?!=validated.sha256 {return invalid("Compiled output changed after native readback; no output was adopted");}
+        Ok((output,validated.sha256))
     })();
     let record = match result {
-        Ok(output) => BuildRecord {
+        Ok((output,verified_sha256)) => BuildRecord {
             id: job_id.into(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             status: "validated".into(),
             target: "mcc-cea".into(),
-            sha256: Some(maps::hash_file(&output)?),
+            sha256: Some(verified_sha256),
             output: Some(output),
             message: if project.conversion_profile.as_deref()==Some("zombie-recovery"){"Zombie Apocalypse recovery edition compiled as MCC cache 13. Two custom audio cues are unavailable and one corrupt placement is disabled; valid placements and vehicle spawners remain. Game load and behavior require testing."}else{"MCC cache rebuilt and structurally validated. In-game load test pending."}.into(),
             project_fingerprint: project.fingerprint()?,

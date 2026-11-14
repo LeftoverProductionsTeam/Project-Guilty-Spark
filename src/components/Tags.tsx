@@ -47,6 +47,7 @@ export default function Tags({
   onResources,
   onNativeEditor,
   onLevelEditor,
+  onBuild,
   hasUnsavedChanges = false,
   onSave,
 }: {
@@ -62,6 +63,7 @@ export default function Tags({
   onResources?: () => void;
   onNativeEditor?: () => void;
   onLevelEditor?: () => void;
+  onBuild?: () => void;
   hasUnsavedChanges?: boolean;
   onSave?: () => Promise<void>;
 }) {
@@ -116,6 +118,7 @@ export default function Tags({
   }, [focusTagId, inspection?.sha256]);
   const tags = inspection?.tags ?? [];
   const selectedTag = tags.find((t) => t.id === selected);
+  const hasHudEdits=project.tagEdits.some(change=>change.fieldKey.startsWith('hud:'));
   async function extractSelectedTag() {
     if (!selectedTag) return;
     setExtractingTag(selectedTag.id);
@@ -436,11 +439,13 @@ export default function Tags({
             )}
             </div>
             <div className="tag-context-panel" role="tabpanel" id="tag-panel-Native-Output" aria-labelledby="tag-context-Native-Output" hidden={context!=='Native Output'}>
-              <button type="button" className="small-button" disabled={!project.source || !onSave}
-                title="Review the current tag edits and save a validated native map copy. Your original map stays unchanged."
+              {hasHudEdits?<><button type="button" className="small-button" disabled={!project.source||!onBuild}
+                title="Open Build & playtest to rebuild the edited HUD into a separate map using compatible source and tools." onClick={onBuild}>Build edited HUD…</button>
+                <p className="subtle">Save the project draft, then rebuild through Build &amp; playtest. HUD layout changes require the native build route; direct map-copy edits are unavailable. Target and tool requirements are checked there. Your original map stays unchanged.</p></>:<button type="button" className="small-button" disabled={!project.source || !onSave}
+                title="Review supported edits and save a validated native map copy. Your original map stays unchanged."
                 onClick={() => {writeMapSession(project.id,'smart-edit.open',true);chooseContext('Properties');}}>
                 Save edited map copy…
-              </button>
+              </button>}
               <details className="tag-secondary-actions">
                 <summary>Extract, export or transfer tags</summary>
                 <div className="tag-exchange-actions">
