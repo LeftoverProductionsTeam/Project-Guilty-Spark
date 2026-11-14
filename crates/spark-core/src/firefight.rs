@@ -1203,6 +1203,7 @@ pub struct NativeRoundPlan {
     pub encounter_layouts: Vec<NativeRoundEncounter>,
     pub player_profile: NativePlayerProfile,
     pub hud_messages: Vec<NativeRoundHudMessage>,
+    pub hud_source: Option<NativeHudAppendPlan>,
     pub hud_tag_path: Option<String>,
 }
 #[derive(Clone,Debug,Serialize)]
@@ -1234,6 +1235,79 @@ pub fn native_hud_messages(config:&FirefightConfig)->Result<Vec<NativeRoundHudMe
 }
 pub fn native_hud_source(messages:&[NativeRoundHudMessage])->Vec<u8>{
     let mut bytes=vec![0xff,0xfe];for message in messages{for unit in format!("{}={}\r\n",message.name,message.text).encode_utf16(){bytes.extend_from_slice(&unit.to_le_bytes());}}bytes
+}
+/// An HMT authoring plan only. Original messages retain their positions and
+/// panels; the native string tool remains the sole tag writer. This is not an
+/// authorization to alter a source scenario or replace an existing HUD tag.
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeHudAppendPlan {
+    pub original_tag_sha256:Option<String>,
+    pub original_count:usize,
+    pub messages:Vec<crate::maps::NativeHudMessage>,
+    pub source_sha256:String,
+    #[serde(skip)]
+    pub source:Vec<u8>,
+}
+/// Exact button tokens from the pinned standard HMT source format, in native
+/// enum order. These are format names, not engine implementation or controls.
+const HUD_BUTTON_TOKENS:[&str;40]=[
+    "a-button","b-button","x-button","y-button","black-button","white-button",
+    "left-trigger","right-trigger","dpad-up","dpad-down","dpad-left","dpad-right",
+    "start-button","back-button","left-thumb","right-thumb","left-stick","right-stick",
+    "action","throw-grenade","primary-trigger","integrated-light","jump","use-equipment",
+    "rotate-weapons","rotate-grenades","zoom","crouch","accept","back","move","look",
+    "custom-1","custom-2","custom-3","custom-4","custom-5","custom-6","custom-7","custom-8",
+];
+pub fn preserving_native_hud_source(config:&FirefightConfig,original:Option<&crate::maps::HudSourceTag>)->Result<Option<NativeHudAppendPlan>> {
+    let generated=native_hud_messages(config)?;
+    if generated.is_empty(){return Ok(None);}
+    let original_count=original.map_or(0,|tag|tag.messages.len());
+    let mut messages=original.map_or_else(Vec::new,|tag|tag.messages.clone());
+    messages.extend(generated.into_iter().map(|message|crate::maps::NativeHudMessage{name:message.name,panels:vec![crate::maps::NativeHudPanel::Text(message.text)]}));
+    if messages.len()>1024 {return invalid("Original and generated HUD messages exceed the native1024-message capacity");}
+    let mut names=BTreeSet::new();let mut text_units=0usize;let mut elements=0usize;let mut source=String::new();
+    for message in &messages {
+        if message.name.is_empty()||message.name.len()>31||!message.name.is_ascii()||message.name.chars().any(|c|c.is_control()||c=='=')||!names.insert(message.name.to_ascii_lowercase()) {
+            return invalid("HUD names collide or cannot be preserved by standard HMT source; reconcile the native source without replacing original messages");
+        }
+        if message.panels.len()>255 {return invalid("A native HUD message exceeds its255-panel capacity");}
+        source.push_str(&message.name);source.push('=');
+        let mut previous_text=false;
+        for panel in &message.panels {
+            elements+=1;
+            match panel {
+                crate::maps::NativeHudPanel::Text(text)=>{
+                    let units=text.encode_utf16().count();
+                    // The existing tool has no literal-percent/line-break escape;
+                    // adjacent or255-unit text panels would be resegmented/wrapped.
+                    // Refuse instead of discarding control semantics or unknown data.
+                    if previous_text||units==0||units>254||text.contains('%')||text.chars().any(char::is_control) {
+                        return invalid("An original HUD text panel cannot round-trip losslessly through the selected HMT source format; use a preserving native editor");
+                    }
+                    text_units+=units+1;source.push_str(text);previous_text=true;
+                },
+                crate::maps::NativeHudPanel::Button(index)=>{
+                    let token=HUD_BUTTON_TOKENS.get(*index as usize).ok_or_else(||SparkError::Invalid("Unknown native HUD button icon; no approximation was exported".into()))?;
+                    if HUD_BUTTON_TOKENS.iter().any(|other|other.len()<token.len()&&token.starts_with(*other)) {
+                        return invalid("This button token is ambiguous in the selected HMT source parser; preserve it in a native editor instead");
+                    }
+                    source.push('%');source.push_str(token);previous_text=false;
+                },
+            }
+        }
+        source.push_str("\r\n");
+    }
+    if text_units*2>65536||elements>8192 {return invalid("Original and generated HUD payload exceeds native text/element capacity");}
+    let mut bytes=vec![0xff,0xfe];for unit in source.encode_utf16(){bytes.extend_from_slice(&unit.to_le_bytes());}
+    if bytes.len()>1024*1024{return invalid("Preserving HUD authoring source exceeds1MiB");}
+    Ok(Some(NativeHudAppendPlan{original_tag_sha256:original.map(|tag|tag.sha256.clone()),original_count,messages,source_sha256:crate::hex_bytes(Sha256::digest(&bytes)),source:bytes}))
+}
+/// Compare ordered native messages and exact panels after native compilation.
+/// The caller must independently verify the expected derived scenario reference.
+pub fn verify_preserving_hud(plan:&NativeHudAppendPlan,actual:&crate::maps::ScenarioHudMessages)->Result<()> {
+    if actual.messages!=plan.messages {return invalid("Compiled HUD messages changed original indices/panels or differ from the reviewed append");}
+    Ok(())
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
@@ -1335,7 +1409,7 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let mut player_profile=player.clone();
     player_profile.primary_weapon=primary.tag_path.clone();
     player_profile.secondary_weapon=secondary.as_ref().map(|weapon|weapon.tag_path.clone());
-    let mut plan=NativeRoundPlan {dependencies:vec![],commands:vec![],encounter_names:vec![],encounter_layouts:vec![],player_profile,hud_messages:native_hud_messages(config)?,hud_tag_path:None};
+    let mut plan=NativeRoundPlan {dependencies:vec![],commands:vec![],encounter_names:vec![],encounter_layouts:vec![],player_profile,hud_messages:native_hud_messages(config)?,hud_source:preserving_native_hud_source(config,None)?,hud_tag_path:None};
     if !plan.hud_messages.is_empty(){
         let hud=format!("{scenario}/gs_firefight_messages");
         plan.commands.push(crate::quickforge::ForgeCommand{phase:"firefight-hud-messages".into(),tool:"invaderString".into(),args:vec!["-T".into(),"hud_message_text".into(),hud.clone()],expected_outputs:vec![format!("tags/{hud}.hud_message_text")]});
@@ -1415,16 +1489,9 @@ pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection
         if tags.len()!=1 || tags[0].external || tags[0].data_offset.is_none(){return invalid("Compiled native Firefight HUD-message tag is missing, ambiguous or external");}
         let hud=crate::maps::scenario_hud_messages(cache,map)?.ok_or_else(||SparkError::Invalid("Compiled Firefight scenario has no HUD-message dependency".into()))?;
         if hud.tag_id!=tags[0].id||tag_key(&hud.tag_path)!=tag_key(path)||hud.messages.len()!=plan.hud_messages.len(){return invalid("Compiled Firefight HUD reference or message count differs from authored source");}
-        for (index,(actual,expected)) in hud.messages.iter().zip(&plan.hud_messages).enumerate(){
-            let mut text=String::new();
-            for panel in &actual.panels {
-                match panel {
-                    crate::maps::NativeHudPanel::Text(part)=>text.push_str(part),
-                    crate::maps::NativeHudPanel::Button(_)=>return invalid(format!("Compiled Firefight HUD message {index} unexpectedly contains a button icon")),
-                }
-            }
-            if actual.name!=expected.name||text!=expected.text {return invalid(format!("Compiled Firefight HUD message {index} name/text differs from authored source"));}
-        }
+        let source=plan.hud_source.as_ref().ok_or_else(||SparkError::Invalid("Native Firefight HUD source plan is missing".into()))?;
+        if source.original_count!=0 {return invalid("Fresh Firefight source cannot replace an existing HUD table");}
+        verify_preserving_hud(source,&hud)?;
     }else if !plan.hud_messages.is_empty(){return invalid("Authored Firefight HUD messages have no native tag path");}
     for dependency in &plan.dependencies {
         let class = match dependency.tag_class.as_str() {

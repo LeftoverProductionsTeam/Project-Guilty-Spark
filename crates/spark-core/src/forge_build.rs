@@ -403,7 +403,8 @@ pub fn run_prepared_job(
         if let Some(plan)=&native_round {
             if let Some(path)=&plan.hud_tag_path{
                 let file=sources.directory.join("data").join(safe_relative(&format!("{path}.hmt"))?);
-                project::atomic_write(&file,&crate::firefight::native_hud_source(&plan.hud_messages),false)?;
+                let hud=plan.hud_source.as_ref().ok_or_else(||SparkError::Invalid("Native Firefight HUD source plan is missing".into()))?;
+                project::atomic_write(&file,&hud.source,false)?;
             }
             sources.commands.extend(plan.commands.clone());sources.dependencies.extend(plan.dependencies.clone());
             project::atomic_write(&sources.scenario_plan_path,&serde_json::to_vec_pretty(&sources.commands)?,false)?;

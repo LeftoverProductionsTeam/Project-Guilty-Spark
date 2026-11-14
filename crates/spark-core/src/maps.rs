@@ -593,13 +593,13 @@ pub struct ScenarioHudMessages {
     pub tag_path: String,
     pub messages: Vec<NativeHudMessage>,
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct NativeHudMessage {
     pub name: String,
     pub panels: Vec<NativeHudPanel>,
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag="kind",content="value",rename_all="camelCase")]
 pub enum NativeHudPanel { Text(String), Button(u8) }
 
@@ -653,6 +653,14 @@ pub fn scenario_hud_messages(path:&Path,inspection:&MapInspection)->Result<Optio
     let units=text.chunks_exact(2).map(|pair|u16::from_le_bytes([pair[0],pair[1]])).collect::<Vec<_>>();
     let (elements,element_count)=space.block(&r,at+20,2,8192)?;
     let (rows,count)=space.block(&r,at+32,64,1024)?;
+    let messages=decode_hud_messages(&r,&units,elements,element_count,rows,count,false)?;
+    Ok(Some(ScenarioHudMessages{tag_id:id,tag_path:tags[0].path.clone(),messages}))
+}
+
+// Shared semantic decoder: cache indices are little-endian, HEK source indices
+// big-endian. UTF-16 text blobs remain little-endian in both formats.
+fn decode_hud_messages(r:&Reader,units:&[u16],elements:usize,element_count:usize,rows:usize,count:usize,big_endian:bool)->Result<Vec<NativeHudMessage>> {
+    let index_at=|at|->Result<usize>{let bytes=r.bytes(at,2)?;let value=if big_endian {u16::from_be_bytes([bytes[0],bytes[1]])}else{u16::from_le_bytes([bytes[0],bytes[1]])};Ok(value as usize)};
     let mut messages=Vec::with_capacity(count);
     let mut names=std::collections::HashSet::new();
     let mut decoded_units=0usize;
@@ -661,8 +669,8 @@ pub fn scenario_hud_messages(path:&Path,inspection:&MapInspection)->Result<Optio
         let row=rows+index*64;
         let name=r.string(row,32)?;
         if name.is_empty()||!names.insert(name.clone()){return invalid("Native HUD message names are empty or duplicated");}
-        let mut cursor=r.u16(row+32)? as usize;
-        let first=r.u16(row+34)? as usize;
+        let mut cursor=index_at(row+32)?;
+        let first=index_at(row+34)?;
         let panels=r.bytes(row+36,1)?[0] as usize;
         if first.checked_add(panels).is_none_or(|end|end>element_count)||cursor>units.len(){return invalid("Native HUD message indices escape their declared data");}
         decoded_panels+=panels;
@@ -687,7 +695,36 @@ pub fn scenario_hud_messages(path:&Path,inspection:&MapInspection)->Result<Optio
         }
         messages.push(NativeHudMessage{name,panels:decoded});
     }
-    Ok(Some(ScenarioHudMessages{tag_id:id,tag_path:tags[0].path.clone(),messages}))
+    Ok(messages)
+}
+
+/// Read-only native HEK HMT source, with a hash over the exact bytes decoded.
+/// Serialization provenance is the pinned Invader HEK reader/generator. This
+/// never writes a native tag and does not establish compiler acceptance.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct HudSourceTag { pub sha256:String, pub messages:Vec<NativeHudMessage> }
+pub fn read_hud_source_tag(path:&Path)->Result<HudSourceTag> {
+    const MAX:usize=64+128+65536+8192*2+1024*64;
+    crate::reject_links(path)?;
+    let file=File::open(path)?;
+    if file.metadata()?.len()>MAX as u64 {return invalid("Native HUD source exceeds its format capacity");}
+    let mut bytes=vec![];file.take(MAX as u64+1).read_to_end(&mut bytes)?;
+    if bytes.len()>MAX {return invalid("Native HUD source grew beyond its format capacity");}
+    let r=Reader(&bytes);r.bytes(0,192)?;
+    let be32=|at|->Result<usize>{Ok(u32::from_be_bytes(r.bytes(at,4)?.try_into().unwrap())as usize)};
+    if r.bytes(36,4)?!=b"hmt "||r.bytes(60,4)?!=b"blam"||be32(44)?!=64||r.bytes(56,2)?!=[0,1] {
+        return invalid("Expected a standard version1 big-endian HEK hud_message_text tag");
+    }
+    let text_bytes=be32(64)?;let element_count=be32(64+20)?;let count=be32(64+32)?;
+    if text_bytes>65536||text_bytes%2!=0||element_count>8192||count>1024 {return invalid("Native HUD source counts exceed format capacity");}
+    // This root has no dependencies/nested arrays: serialized children follow
+    // the128-byte body as text blob, element records, then message records.
+    let elements=192+text_bytes;let rows=elements+element_count*2;
+    if rows+count*64!=bytes.len(){return invalid("Native HUD source is truncated or contains unrecognized trailing data");}
+    let units=r.bytes(192,text_bytes)?.chunks_exact(2).map(|pair|u16::from_le_bytes([pair[0],pair[1]])).collect::<Vec<_>>();
+    let messages=decode_hud_messages(&r,&units,elements,element_count,rows,count,true)?;
+    Ok(HudSourceTag{sha256:crate::hex_bytes(Sha256::digest(&bytes)),messages})
 }
 
 pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<MapInspection> {
