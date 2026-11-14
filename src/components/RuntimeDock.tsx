@@ -396,7 +396,7 @@ export default function RuntimeDock({
     try {
       const plan=await call<FirefightSourcePlan>('prepare_firefight_source',{projectId:project.id});
       if(plan.projectId!==project.id||plan.buildId!==report.workingSource.buildId||plan.tagsDirectory!==report.workingSource.tagsDirectory)throw Error('Native source selection changed; refresh and prepare again.');
-      const source=exportPlannedFirefightRound(plan.request.operation,firefightActivation);
+      const source=exportPlannedFirefightRound(plan.request.operation,firefightActivation,plan.previousController?.content.includes('(script startup gs_ff_bootstrap')??false);
       const bytes=new TextEncoder().encode(source.content);if(!bytes.length||bytes.length>1048576)throw Error('Generated controller exceeds the reviewed1MiB bound.');
       const digest=await crypto.subtle.digest('SHA-256',bytes);
       const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
@@ -416,7 +416,7 @@ export default function RuntimeDock({
     )
       return;
     if(!report?.workingSource||!workingSourceAvailable)return;
-    if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new groups, review Build new Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
+    if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new groups or an unchanged-group controller revision, review Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
     if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
     const request = generation.current;
@@ -691,19 +691,20 @@ export default function RuntimeDock({
             </div>
           )}
           {project?.firefight&&report?.workingSource&&workingSourceAvailable&&<details className="native-script-attachment">
-            <summary>Build new Firefight groups &amp; controller</summary>
-            <p className="subtle">Prepare new inactive encounters and a controller from saved solo rules and zones in one separate native build. Review source, locations and exclusive script ownership. Existing encounters/scripts and player equipment stay; saved loadout settings are not applied by this preserving operation. Existing generated names need separate reconciliation. Failure preserves previous-good source/cache and never restarts a game.</p>
+            <summary>Firefight groups &amp; controller</summary>
+            <p className="subtle">Prepare new inactive encounters with a controller, or revise the exact recorded generated controller while keeping native groups unchanged. Review source, locations and exclusive script ownership. Original encounters/scripts and player equipment stay; saved loadout settings are not applied. Changing group actors, counts or locations needs separate native reconciliation. Failure preserves previous-good source/cache and never restarts a game.</p>
             <label>Controller activation<select aria-label="New Firefight controller activation" value={firefightActivation} disabled={busy||working||dirty} onChange={event=>{scriptSelection.current++;setFirefightSource(null);setFirefightActivation(event.target.value as 'manual'|'startup');}}><option value="manual">Manual · set gs_ff_start true in reviewed source</option><option value="startup">Start automatically after map load</option></select></label>
             <button disabled={busy||working||dirty||!native||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void prepareFirefightSource()}>Prepare groups &amp; controller</button>
             {selectedFirefightSource&&<>
-              <p>{selectedFirefightSource.plan.request.operation.encounters.length} new groups · source <code className="wrap-code">{selectedFirefightSource.plan.tagIdentity}</code></p>
+              <p>{selectedFirefightSource.plan.request.operation.encounters.length} {selectedFirefightSource.plan.previousController?'retained groups':'new groups'} · source <code className="wrap-code">{selectedFirefightSource.plan.tagIdentity}</code></p>
               <small>Original script inventory <code className="wrap-code">{selectedFirefightSource.plan.request.scriptsSha256}</code></small>
               <ol className="native-encounter-queue">{selectedFirefightSource.plan.request.operation.encounters.map(entry=><li key={entry.name}><span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>Zone center {entry.position.join(' / ')} · grid {entry.grid?.offset??0} / {entry.grid?.total??entry.count}</small></span></li>)}</ol>
               <details><summary>Review {selectedFirefightSource.plan.groups.reduce((sum,group)=>sum+group.positions.length,0)} planned starting/firing positions</summary><ol className="native-encounter-readback">{selectedFirefightSource.plan.groups.map(group=><li key={group.name}><strong>{group.name}</strong><ol>{group.positions.map((position,index)=><li key={index}><code>{position.map(value=>value.toFixed(4)).join(' · ')}</code></li>)}</ol></li>)}</ol></details>
               <p>{selectedFirefightSource.script.filename} · <code className="wrap-code">{selectedFirefightSource.script.sha256}</code></p>
+              {selectedFirefightSource.plan.previousController&&<details><summary>Review recorded controller being revised · {selectedFirefightSource.plan.previousController.filename}</summary><code className="wrap-code">{selectedFirefightSource.plan.previousController.sha256}</code><label>Previous generated source<textarea readOnly rows={6} spellCheck={false} style={{width:'100%',boxSizing:'border-box'}} value={selectedFirefightSource.plan.previousController.content}/></label></details>}
               <label>Review generated controller<textarea readOnly rows={6} spellCheck={false} style={{width:'100%',boxSizing:'border-box'}} value={selectedFirefightSource.script.content}/></label>
-              <label><input type="checkbox" checked={selectedFirefightSource.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setFirefightSource(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed original scripts, new encounter locations, controller source and exclusive wave ownership.</label>
-              <div className="button-row"><button disabled={busy||working||dirty||!selectedFirefightSource.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void buildWorkingTags(undefined,true,selectedFirefightSource.script,selectedFirefightSource)}>Build new groups &amp; controller</button><button disabled={busy||working} onClick={()=>{scriptSelection.current++;setFirefightSource(null);}}>Clear prepared source</button></div>
+              <label><input type="checkbox" checked={selectedFirefightSource.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setFirefightSource(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed original scripts, encounter locations, the exact generated module being revised (if shown), new controller source and exclusive wave ownership.</label>
+              <div className="button-row"><button disabled={busy||working||dirty||!selectedFirefightSource.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void buildWorkingTags(undefined,true,selectedFirefightSource.script,selectedFirefightSource)}>{selectedFirefightSource.plan.previousController?'Build controller revision':'Build new groups & controller'}</button><button disabled={busy||working} onClick={()=>{scriptSelection.current++;setFirefightSource(null);}}>Clear prepared source</button></div>
               <p className="subtle">Temporary planned source, not compiled readback or gameplay proof. Forerunner’s separate finite encounter director must stay off for these scripted waves.</p>
             </>}
           </details>}

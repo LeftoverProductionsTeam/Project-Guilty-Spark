@@ -288,7 +288,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
 /** Planned source specifications, never a decoded native inventory. The caller
  * must review and build this controller with the exact append operation in the
  * atomic source build; ordinary script attachment cannot create encounters. */
-export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup'):ScriptExport {
+export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup',retainBootstrap=false):ScriptExport {
   const config=operation.sourceRules;
   if(!config?.sourceSha256||!operation.encounters.length||operation.encounters.length>16)throw Error('Review a source-bound native group plan first.');
   const groups=config.waves.flatMap(wave=>wave.groups);
@@ -298,7 +298,10 @@ export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{k
   const output=exportHaloCeFirefightRound(config,{sourceSha256:config.sourceSha256,sourceScenarioType:0,encounterNames:names,
     encounters:operation.encounters.map(entry=>({name:entry.name,actorVariantPaths:[entry.actorPath],normalCount:entry.count??1,insaneCount:entry.count??1,startingLocations:entry.count??1,notInitiallyCreated:!entry.startActive,issue:null})),
     activation,exclusiveOwnershipConfirmed:true});
-  return {...output,warnings:['Planned new encounters are not native readback. Apply the exact groups and reviewed controller together through the atomic source build.',...output.warnings]};
+  // Keep the owned startup signature when disabling automatic activation.
+  // It becomes a no-op; original native signature preservation stays enabled.
+  const content=output.content+(retainBootstrap&&activation==='manual'?'\r\n(script startup gs_ff_bootstrap\r\n  (sleep 1)\r\n)\r\n':'');
+  return {...output,content,warnings:['Planned source is not native readback. Build the exact groups and reviewed controller through the atomic source path; recorded existing groups must stay unchanged.',...output.warnings]};
 }
 
 /** Plain JSON contract for creator tool integration. No secrets or local source paths. */

@@ -310,6 +310,19 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
 /// Prepare current saved wave groups only; no native writer or source selection.
 /// The desktop must rederive this against the same saved source before writing.
 pub fn saved_firefight_encounters(project:&crate::project::Project,parent_sha:&str,fields:&str)->Result<Operation> {
+    let operation=saved_firefight_group_plan(project,parent_sha,fields)?;
+    let _=encounter_append_layouts(fields,&operation)?;
+    Ok(operation)
+}
+/// Revise controller rules only when every native group specification stays
+/// identical to the owned source. This grants no arbitrary overwrite/resize.
+pub fn saved_firefight_controller_groups(project:&crate::project::Project,parent_sha:&str,fields:&str,existing:&Operation)->Result<Operation> {
+    existing.validate("scnr","review.scenario")?;
+    let operation=saved_firefight_group_plan(project,parent_sha,fields)?;
+    if operation.encounter_appends()?!=existing.encounter_appends()?{return invalid("Saved rules change native group actors, counts or positions. Controller-only revision preserves those groups; review their native source separately");}
+    Ok(operation)
+}
+fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,fields:&str)->Result<Operation> {
     let config=project.firefight.as_ref().ok_or_else(||crate::SparkError::Invalid("Save source-bound Firefight rules before preparing native groups".into()))?;
     crate::firefight::validate_native_round_rules(config)?;
     let source=project.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Fresh levels use Prepare native solo round; this append preserves recovered source".into()))?;
@@ -332,7 +345,6 @@ pub fn saved_firefight_encounters(project:&crate::project::Project,parent_sha:&s
     }}
     let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
     operation.validate("scnr","planned.scenario")?;
-    let _=encounter_append_layouts(fields,&operation)?;
     Ok(operation)
 }
 

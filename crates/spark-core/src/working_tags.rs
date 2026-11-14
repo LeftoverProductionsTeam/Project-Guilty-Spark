@@ -32,6 +32,8 @@ const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterAppendRequest {
     pub operation:crate::native_operations::Operation,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub existing_controller:Option<ScriptAttachmentIdentity>,
     pub fields_sha256:String,pub scripts_sha256:String,pub writer_sha256:String,pub project_fingerprint:String,
 }
 pub fn encounter_fields_identity(fields:&str)->String {crate::hex_bytes(Sha256::digest(fields.replace("\r\n","\n").as_bytes()))}
@@ -40,9 +42,17 @@ pub fn encounter_fields_identity(fields:&str)->String {crate::hex_bytes(Sha256::
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScriptAttachment { pub filename:String, pub content:String, pub sha256:String }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScriptAttachmentIdentity { pub filename:String, pub sha256:String }
+/// Optional authoring provenance, never a native tag or permission to replace
+/// handwritten source. The exact last-generated module must still be present.
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct GeneratedFirefightSource {
+    pub operation:crate::native_operations::Operation,
+    pub controller:ScriptAttachmentIdentity,
+}
 fn parse_controller_binding(content:&str)->Result<Option<crate::firefight::NativeControllerBinding>> {
         let line=content.lines().next().unwrap_or("").trim_start_matches('\u{feff}');
         let Some(json)=line.strip_prefix("; Spark source encounter bindings: ") else{return Ok(None);};
@@ -90,6 +100,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub generated_firefight:Option<GeneratedFirefightSource>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub encounter_expectations:Vec<crate::native_operations::Operation>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -177,6 +189,7 @@ struct Prepared {
     tags: PathBuf,
     source_data: Option<PathBuf>,
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
+    parent_generated_firefight:Option<GeneratedFirefightSource>,
     encounter_expectations:Vec<crate::native_operations::Operation>,
     source_project:Project,
     parent_output: PathBuf,
@@ -308,9 +321,9 @@ fn parent_native_identity(
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>)> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>)> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
-    let mut controller_binding=None;let mut encounter_expectations=vec![];
+    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -335,6 +348,7 @@ fn parent_native_identity(
             verify_hash_manifest(parent, &receipt.input_script_hashes)?;
         }
         controller_binding=receipt.controller_binding;
+        generated_firefight=receipt.generated_firefight;
         for expectation in receipt.encounter_expectations.into_iter().chain(receipt.expected_encounter){retain_encounter_expectation(&mut encounter_expectations,expectation)?;}
         receipt.workspace
     } else if forge_receipt.exists() {
@@ -385,9 +399,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok((Some(data),controller_binding,encounter_expectations))
+        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight))
     } else {
-        Ok((None,controller_binding,encounter_expectations))
+        Ok((None,controller_binding,encounter_expectations,generated_firefight))
     }
 }
 
@@ -515,9 +529,10 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding,mut encounter_expectations) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
+    if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;}
     if let Some(expected)=&input.expected_encounter{retain_encounter_expectation(&mut encounter_expectations,expected.clone())?;}
     if let Some(append)=&input.encounter_append {
         if input.scenario_type!=0||!input.compile_scripts||input.script_attachment.is_none()||input.bsp_audio.is_some()||input.expected_tag_identity.is_none(){return invalid("New Firefight groups require a solo source, reviewed new controller, explicit script compilation and exact source inventory; audio editing is separate");}
@@ -525,6 +540,15 @@ fn prepare(
         let crate::native_operations::Operation::AppendEncounters{source_rules:Some(rules),..}=&append.operation else{return invalid("Atomic Firefight source preparation requires saved-rule encounter groups");};
         if Some(rules)!=project.firefight.as_ref(){return invalid("The reviewed groups were prepared for different Firefight rules");}
         append.operation.validate("scnr",&format!("{scenario}.scenario"))?;
+        if let Some(previous)=&append.existing_controller {
+            let generated=parent_generated_firefight.as_ref().ok_or_else(||SparkError::Invalid("This build has no owned generated controller; preserve/review its source manually".into()))?;
+            let attachment=input.script_attachment.as_ref().unwrap();
+            if previous!=&generated.controller||attachment.filename!=previous.filename||append.operation.encounter_appends()?!=generated.operation.encounter_appends()? {
+                return invalid("Controller revision must retain the exact owned native groups and module identity; changed groups need separate native reconciliation");
+            }
+            let relative=attachment.relative_path(&scenario)?.to_string_lossy().replace(char::from(92u8),"/");
+            if script_hashes(source_data.as_deref(),&AtomicBool::new(false))?.get(&relative)!=Some(&previous.sha256){return invalid("Generated controller was changed or removed; handwritten source is never replaced automatically");}
+        }
         retain_encounter_expectation(&mut encounter_expectations,append.operation.clone())?;
     }
     if input.compile_scripts {
@@ -541,6 +565,7 @@ fn prepare(
         tags,
         source_data,
         parent_controller_binding,
+        parent_generated_firefight,
         encounter_expectations,
         source_project,
         parent_output,
@@ -781,8 +806,13 @@ fn apply_encounter_append(
     let read=||->Result<String>{recheck_tools(input,&prepared.tools)?;let fields=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()],workspace,"encounter-readback",41)?;if fields.len()>1024*1024{return invalid("Native scenario fields exceed the reviewed1MiB bound");}Ok(fields.replace("\r\n","\n"))};
     let before=read()?;
     if encounter_fields_identity(&before)!=request.fields_sha256{return invalid("Native scenario fields changed after group review; no writer ran");}
-    let planned=crate::native_operations::saved_firefight_encounters(project,input.parent_build.sha256.as_deref().ok_or_else(||SparkError::Invalid("Native parent has no cache hash".into()))?,&before)?;
+    let parent_sha=input.parent_build.sha256.as_deref().ok_or_else(||SparkError::Invalid("Native parent has no cache hash".into()))?;
+    let planned=if request.existing_controller.is_some() {
+        let generated=prepared.parent_generated_firefight.as_ref().ok_or_else(||SparkError::Invalid("Generated controller ownership is unavailable".into()))?;
+        crate::native_operations::saved_firefight_controller_groups(project,parent_sha,&before,&generated.operation)?
+    }else{crate::native_operations::saved_firefight_encounters(project,parent_sha,&before)?};
     if planned!=request.operation{return invalid("Staged Firefight source no longer matches the reviewed saved-rule plan");}
+    if request.existing_controller.is_some(){return Ok(());}// Existing native groups remain independently checked after compilation.
     let mut written=0usize;
     for args in planned.argument_batches(planned.arguments_with_fields(tags,"scnr",&tag,&before)?,false)? {
         recheck_tools(input,&prepared.tools)?;
@@ -840,6 +870,7 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        generated_firefight:prepared.parent_generated_firefight.clone(),
         encounter_expectations:prepared.encounter_expectations.clone(),
         attached_script:None,
         controller_binding:prepared.parent_controller_binding.clone(),
@@ -922,12 +953,15 @@ fn run_with(
         if let Some(attachment)=&input.script_attachment {
             let relative=attachment.relative_path(&receipt.scenario_path)?;
             let key=relative.to_string_lossy().replace('\\',"/");
-            if staged_scripts.keys().any(|path|path.eq_ignore_ascii_case(&key)) {
-                return invalid("A source module with this name already exists. Edit/review its original source through Open script source folder; attachment never replaces it");
+            let previous=input.encounter_append.as_ref().and_then(|request|request.existing_controller.as_ref());
+            let replacing=previous.is_some_and(|previous|previous.filename==attachment.filename&&staged_scripts.get(&key)==Some(&previous.sha256));
+            if staged_scripts.keys().any(|path|path.eq_ignore_ascii_case(&key))&&!replacing {
+                return invalid("A source module with this name already exists. Only the exact reviewed generated controller may be revised; handwritten modules are preserved");
             }
+            if previous.is_some()&&!replacing{return invalid("Reviewed generated controller changed during source staging; no module was replaced");}
             let target=workspace.join("data").join(&relative);
             crate::reject_links(&target)?;
-            if target.exists(){return invalid("Script attachment would replace an existing staged file");}
+            if target.exists()&&!replacing{return invalid("Script attachment would replace an existing staged file");}
             fs::create_dir_all(target.parent().unwrap())?;
             project::atomic_write(&target,attachment.content.as_bytes(),false)?;
             if maps::hash_file(&target)?!=attachment.sha256{return invalid("Attached script bytes differ from the reviewed source");}
@@ -989,6 +1023,7 @@ fn run_with(
             let entries=append.operation.encounter_appends()?;
             if binding.rules.as_ref()!=project.firefight.as_ref()||binding.groups.len()!=entries.len()||binding.groups.iter().zip(&entries).any(|(group,entry)|group.name!=entry.name||group.count!=entry.count||!group.actor_variant_path.replace('\\',"/").eq_ignore_ascii_case(&entry.actor_path.replace('\\',"/"))){return invalid("Reviewed controller and newly prepared native groups differ");}
             apply_encounter_append(project,input,&prepared,append,&tags,&workspace,&runner,&invoke)?;
+            receipt.generated_firefight=Some(GeneratedFirefightSource{operation:append.operation.clone(),controller:receipt.attached_script.clone().ok_or_else(||SparkError::Invalid("Generated controller source identity disappeared".into()))?});
         }
         if input.compile_scripts {
             receipt.compiled_script_modules=compile_script_sources(input,&prepared,&tags,&workspace,&staged_scripts,&runner,&invoke)?;
@@ -1113,7 +1148,7 @@ fn run_with(
             id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(), target: input.parent_build.target.clone(),
             sha256: Some(maps::hash_file(&output)?), output: Some(output), project_fingerprint: fingerprint,
             message: if let Some(attachment)=&receipt.attached_script {
-                format!("Added reviewed module {} (SHA256 {}) in separate native source; original modules and script signatures retained. Native compilation/readback passed, gameplay remains untested.",attachment.filename,attachment.sha256)
+                format!("{} reviewed module {} (SHA256 {}) in separate native source; original modules and script signatures retained. Native compilation/readback passed, gameplay remains untested.",if input.encounter_append.as_ref().is_some_and(|request|request.existing_controller.is_some()){"Revised exact generated"}else{"Added"},attachment.filename,attachment.sha256)
             } else if input.compile_scripts {
                 "Reviewed scenario HaloScript and current working tags compiled in separate staging; source/tool identities, original script signatures and native cache checks passed. Game behavior and peers remain untested.".into()
             } else {

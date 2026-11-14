@@ -172,6 +172,7 @@ struct WorkingSource { target:String, build_id:String, tags_directory:PathBuf, a
 #[derive(Clone)]
 struct SourceContext {
     source_project: Project,
+    generated_firefight:Option<core::working_tags::GeneratedFirefightSource>,
     authoring_pending: bool,
     build: BuildRecord,
     workspace: PathBuf,
@@ -366,6 +367,7 @@ pub(super) fn collaboration_tags(state: &AppState, project: &Project, build: &Bu
 }
 fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord) -> Reply<SourceContext> {
     let job = state.root.join("jobs").join(&build.id);
+    let mut generated_firefight=None;
     let workspace = if job.join("working-tags-receipt.json").is_file() {
         let receipt: core::working_tags::WorkingTagsReceipt = serde_json::from_slice(
             &bounded_read(&job.join("working-tags-receipt.json"), 4 * 1024 * 1024)?,
@@ -393,6 +395,7 @@ fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord)
         {
             return Err("Working-tag source folder changed".into());
         }
+        generated_firefight=receipt.generated_firefight;
         workspace
     } else if project.quick_forge.is_some() {
         let receipt: forge_build::QuickForgeBuildReceipt = serde_json::from_slice(&bounded_read(
@@ -441,6 +444,7 @@ fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord)
     let scenario_sha256 = maps::hash_file(&scenario).map_err(error)?;
     Ok(SourceContext {
         source_project: project.clone(),
+        generated_firefight,
         authoring_pending: false,
         build,
         workspace,
@@ -927,6 +931,7 @@ pub(super) struct FirefightSourcePlan {
     project_id:String,build_id:String,tags_directory:PathBuf,tag_identity:String,
     request:core::working_tags::EncounterAppendRequest,
     groups:Vec<core::firefight::NativeRoundEncounter>,
+    previous_controller:Option<core::working_tags::ScriptAttachment>,
 }
 fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext)->Reply<FirefightSourcePlan> {
     if source_scenario_type(state,project)?!=0{return Err("New Firefight groups require a native singleplayer source".into());}
@@ -938,14 +943,25 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
     let scripts_sha256=core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?;
     let fields=native_operations_native::fields(state,project,&context.tags,&format!("{}.scenario",context.scenario_path))?;
     if fields.len()>1024*1024{return Err("Native scenario fields exceed the reviewed1MiB bound; use a separately reviewed native editor".into());}
-    let operation=core::native_operations::saved_firefight_encounters(project,context.build.sha256.as_deref().ok_or("Native parent output has no identity")?,&fields).map_err(error)?;
+    let parent_sha=context.build.sha256.as_deref().ok_or("Native parent output has no identity")?;
+    let (operation,previous_controller)=if let Some(generated)=&context.generated_firefight {
+        let operation=core::native_operations::saved_firefight_controller_groups(project,parent_sha,&fields,&generated.operation).map_err(error)?;
+        let data=data.as_ref().ok_or("Generated controller source is unavailable; preserve/reconcile its original module manually")?;
+        let relative=core::safe_relative(&context.scenario_path).map_err(error)?;
+        let script=data.join(relative.parent().unwrap_or(Path::new(""))).join("scripts").join(core::safe_relative(&generated.controller.filename).map_err(error)?);
+        let script=owned_child(data,&script)?;
+        let bytes=bounded_read(&script,1024*1024)?;
+        if core::hex_bytes(sha2::Sha256::digest(&bytes))!=generated.controller.sha256{return Err("Generated controller was edited or removed. Preserve/reconcile handwritten changes; automatic replacement was refused".into());}
+        let content=String::from_utf8(bytes).map_err(error)?;
+        (operation,Some(core::working_tags::ScriptAttachment{filename:generated.controller.filename.clone(),sha256:generated.controller.sha256.clone(),content}))
+    }else{(core::native_operations::saved_firefight_encounters(project,parent_sha,&fields).map_err(error)?,None)};
     let writer=native_operations_native::executable(state,project,"invaderNative")?;
     let writer_sha256=maps::hash_file(&writer).map_err(error)?;
     native_operations_native::review_encounter_dependencies(state,project,&context.build,&context.tags,&operation)?;
     if core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?!=identity||core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?!=scripts_sha256{return Err("Native tags or original scripts changed while preparing Firefight groups; review them again".into());}
     let groups=operation.encounter_appends().map_err(error)?.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>().map_err(error)?;
-    Ok(FirefightSourcePlan{groups,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
-        request:core::working_tags::EncounterAppendRequest{operation,fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
+    Ok(FirefightSourcePlan{groups,previous_controller,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
+        request:core::working_tags::EncounterAppendRequest{operation,existing_controller:context.generated_firefight.as_ref().map(|generated|generated.controller.clone()),fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
 }
 #[tauri::command]
 pub(super) async fn prepare_firefight_source(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<FirefightSourcePlan> {
