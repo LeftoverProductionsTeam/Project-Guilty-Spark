@@ -955,7 +955,7 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
         let bytes=bounded_read(&script,1024*1024)?;
         if core::hex_bytes(sha2::Sha256::digest(&bytes))!=generated.controller.sha256{return Err("Generated controller was edited or removed. Preserve/reconcile handwritten changes; automatic replacement was refused".into());}
         let content=String::from_utf8(bytes).map_err(error)?;
-        (operation,Some(core::working_tags::ScriptAttachment{filename:generated.controller.filename.clone(),sha256:generated.controller.sha256.clone(),content}))
+        (operation,Some(core::working_tags::ScriptAttachment{filename:generated.controller.filename.clone(),sha256:generated.controller.sha256.clone(),content,replaces_sha256:None}))
     }else{(core::native_operations::saved_firefight_encounters(project,parent_sha,&fields).map_err(error)?,None)};
     let writer=native_operations_native::executable(state,project,"invaderNative")?;
     let writer_sha256=maps::hash_file(&writer).map_err(error)?;

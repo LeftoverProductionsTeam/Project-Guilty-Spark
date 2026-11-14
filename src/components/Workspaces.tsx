@@ -299,6 +299,10 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
           </button>
         }
       />
+      {project&&<button type="button" title="Open this map’s source recovery, HaloScript editing and native rebuild controls. Editable source must be recovered first."
+        onClick={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:project.id,actionId:'workingScripts'}}))}>
+        Campaign source &amp; scripts…
+      </button>}
       <Notice tone="info">
         Inspect stored encounter and script definitions here. Use Wave rules for this project's Firefight plan; playable encounters require a supported native source build. Live AI and multiplayer behavior need their runtime's own verification.
         {onFirefight&&<button onClick={onFirefight} title="Open Firefight authoring for this project. Native builds require a supported editable source level.">Wave rules</button>}

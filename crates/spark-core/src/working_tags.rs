@@ -42,10 +42,13 @@ pub struct EncounterAppendRequest {
 }
 pub fn encounter_fields_identity(fields:&str)->String {crate::hex_bytes(Sha256::digest(fields.replace("\r\n","\n").as_bytes()))}
 
-/// One explicitly reviewed new module, never a replacement for recovered source.
+/// One reviewed source module; replacement requires the exact original hash.
+/// Writes occur only inside the new owned native build candidate.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct ScriptAttachment { pub filename:String, pub content:String, pub sha256:String }
+pub struct ScriptAttachment { pub filename:String, pub content:String, pub sha256:String,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub replaces_sha256:Option<String>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScriptAttachmentIdentity { pub filename:String, pub sha256:String }
@@ -121,6 +124,9 @@ fn parse_controller_binding(content:&str)->Result<Option<crate::firefight::Nativ
 impl ScriptAttachment {
     fn controller_binding(&self)->Result<Option<crate::firefight::NativeControllerBinding>> {parse_controller_binding(&self.content)}
     fn relative_path(&self,scenario:&str)->Result<PathBuf> {
+        if self.replaces_sha256.as_ref().is_some_and(|hash|!valid_hash(hash)||hash==&self.sha256) {
+            return invalid("A script revision needs the exact original SHA256 and changed source bytes");
+        }
         let stem=self.filename.strip_suffix(".hsc").ok_or_else(||SparkError::Invalid("Attach a canonical .hsc module".into()))?;
         if stem.is_empty()||stem.len()>31||stem.eq_ignore_ascii_case("global_scripts")||!stem.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c)) {
             return invalid("New script module needs a safe unique name of 1–31ASCII letters, digits, underscores or hyphens; global_scripts cannot be attached");
@@ -170,6 +176,8 @@ pub struct WorkingTagsReceipt {
     pub encounter_expectations:Vec<crate::native_operations::Operation>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub attached_script:Option<ScriptAttachmentIdentity>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub replaced_script:Option<ScriptAttachmentIdentity>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub controller_binding:Option<crate::firefight::NativeControllerBinding>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -526,6 +534,7 @@ fn prepare(
     if let Some(attachment)=&input.script_attachment {
         if !input.compile_scripts{return invalid("Attaching source requires explicit script compilation; a tag-only rebuild cannot attach it");}
         let _=attachment.relative_path(&scenario)?;
+        if attachment.replaces_sha256.is_some()&&input.encounter_append.is_some(){return invalid("Manual script revision cannot be combined with generated encounter/controller replacement");}
         if attachment.controller_binding()?.and_then(|binding|binding.rules).is_some_and(|rules|rules.native_hud_messages==Some(true))&&input.encounter_append.as_ref().and_then(|request|request.hud.as_ref()).is_none(){return invalid("HUD-enabled bound source requires the reviewed groups/controller/HUD transaction");}
     }
     if !scenario.eq_ignore_ascii_case(&normalize_scenario(&project.scenario_path()?)?) {
@@ -618,6 +627,9 @@ fn prepare(
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
     if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(profile)=&generated.player_profile{profile.verify_map(&parent_inspection)?;}if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
     if let Some(expected)=&input.expected_encounter{retain_encounter_expectation(&mut encounter_expectations,expected.clone())?;}
+    if input.script_attachment.as_ref().is_some_and(|attachment|attachment.replaces_sha256.is_some()&&parent_generated_firefight.as_ref().is_some_and(|generated|generated.controller.filename.eq_ignore_ascii_case(&attachment.filename))) {
+        return invalid("This module is an owned generated Firefight controller. Use its existing reviewed controller-revision workflow instead of manual replacement");
+    }
     if let Some(append)=&input.encounter_append {
         if input.scenario_type!=0||!input.compile_scripts||input.script_attachment.is_none()||input.bsp_audio.is_some()||input.expected_tag_identity.is_none(){return invalid("New Firefight groups require a solo source, reviewed new controller, explicit script compilation and exact source inventory; audio editing is separate");}
         if append.project_fingerprint!=project.fingerprint()?||!valid_hash(&append.fields_sha256)||!valid_hash(&append.scripts_sha256)||!valid_hash(&append.writer_sha256){return invalid("The reviewed Firefight source plan no longer matches this saved revision");}
@@ -1146,6 +1158,7 @@ fn run_with(
         hud_readback_targets:prepared.hud_readback_targets.clone(),
         encounter_expectations:prepared.encounter_expectations.clone(),
         attached_script:None,
+        replaced_script:None,
         controller_binding:prepared.parent_controller_binding.clone(),
         expected_encounter:input.expected_encounter.clone(),
         compiled_script_modules:vec![],
@@ -1227,9 +1240,12 @@ fn run_with(
             let relative=attachment.relative_path(&receipt.scenario_path)?;
             let key=relative.to_string_lossy().replace('\\',"/");
             let previous=input.encounter_append.as_ref().and_then(|request|request.existing_controller.as_ref());
-            let replacing=previous.is_some_and(|previous|previous.filename==attachment.filename&&staged_scripts.get(&key)==Some(&previous.sha256));
+            let generated_replacing=previous.is_some_and(|previous|previous.filename==attachment.filename&&staged_scripts.get(&key)==Some(&previous.sha256));
+            let manual_replacing=attachment.replaces_sha256.as_ref().is_some_and(|expected|staged_scripts.get(&key)==Some(expected));
+            if attachment.replaces_sha256.is_some()&&!manual_replacing{return invalid("The reviewed original script is missing or changed in the selected source; no existing module was replaced");}
+            let replacing=generated_replacing||manual_replacing;
             if staged_scripts.keys().any(|path|path.eq_ignore_ascii_case(&key))&&!replacing {
-                return invalid("A source module with this name already exists. Only the exact reviewed generated controller may be revised; handwritten modules are preserved");
+                return invalid("A source module with this name already exists. Review its exact original SHA256 for a script revision, or choose a new module name; existing source is preserved");
             }
             if previous.is_some()&&!replacing{return invalid("Reviewed generated controller changed during source staging; no module was replaced");}
             let target=workspace.join("data").join(&relative);
@@ -1241,6 +1257,7 @@ fn run_with(
             staged_scripts.insert(key,attachment.sha256.clone());
             // The complete selected-scenario source set is reconciled below.
             receipt.attached_script=Some(ScriptAttachmentIdentity{filename:attachment.filename.clone(),sha256:attachment.sha256.clone()});
+            if manual_replacing {receipt.replaced_script=Some(ScriptAttachmentIdentity{filename:attachment.filename.clone(),sha256:attachment.replaces_sha256.clone().unwrap()});}
         }
         if script_hashes(Some(&workspace.join("data")),&cancel)?!=staged_scripts{return invalid("Staged script inventory differs from the original modules and reviewed attachment");}
         if input.compile_scripts {
@@ -1457,7 +1474,7 @@ fn run_with(
             id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(), target: input.parent_build.target.clone(),
             sha256: Some(verified_sha256), output: Some(output), project_fingerprint: fingerprint,
             message: if let Some(attachment)=&receipt.attached_script {
-                format!("{} reviewed module {} (SHA256 {}) in separate native source; original modules and script signatures retained. Native compilation/readback passed, gameplay remains untested.",if input.encounter_append.as_ref().is_some_and(|request|request.existing_controller.is_some()){"Revised exact generated"}else{"Added"},attachment.filename,attachment.sha256)
+                format!("{} reviewed module {} (SHA256 {}) in separate native source; parent source, other modules and original script signatures retained. Native compilation/readback passed, gameplay remains untested.",if receipt.replaced_script.is_some(){"Revised exact reviewed"}else if input.encounter_append.as_ref().is_some_and(|request|request.existing_controller.is_some()){"Revised exact generated"}else{"Added"},attachment.filename,attachment.sha256)
             } else if input.compile_scripts {
                 "Reviewed scenario HaloScript and current working tags compiled in separate staging; source/tool identities, original script signatures and native cache checks passed. Game behavior and peers remain untested.".into()
             } else {

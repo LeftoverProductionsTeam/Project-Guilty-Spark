@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { call, native } from '../api';
 import { exportPlannedFirefightRound } from '../haloScript';
+import { downloadLocalText } from '../exportHelpers';
 import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
 import type {
@@ -147,7 +148,9 @@ export default function RuntimeDock({
     handoffIntegrity?.projectId === project?.id ? (handoffIntegrity?.integrity?.invalidFiles ?? 0) : 0;
   const generation = useRef(0);
   const scriptSelection = useRef(0);
-  const [scriptAttachment,setScriptAttachment]=useState<(NativeScriptAttachment&{sourceKey:string;reviewed:boolean})|null>(null);
+  const scriptEditor=useRef<HTMLDetailsElement>(null);
+  const [scriptsOpen,setScriptsOpen]=useState(false);
+  const [scriptAttachment,setScriptAttachment]=useState<(NativeScriptAttachment&{sourceKey:string;reviewed:boolean;fileSha256:string})|null>(null);
   const [applyFirefightLoadout,setApplyFirefightLoadout]=useMapState<boolean>(id,'firefight.applyNativeLoadout',false);
   const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,workingTarget,project?.firefight,applyFirefightLoadout]);
   const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
@@ -200,6 +203,11 @@ export default function RuntimeDock({
       if (prior?.isConnected) prior.focus();
     };
   }, [details, !!plan]);
+  useEffect(()=>{
+    if(!details||!scriptsOpen)return;
+    const frame=requestAnimationFrame(()=>scriptEditor.current?.querySelector<HTMLInputElement>('input[type="file"]')?.focus());
+    return()=>cancelAnimationFrame(frame);
+  },[details,scriptsOpen,report?.workingSource?.buildId]);
   const refresh = useCallback(async () => {
     const request = ++generation.current;
     if (!native) return;
@@ -271,10 +279,11 @@ export default function RuntimeDock({
         .detail;
       if (
         detail?.projectId !== project?.id ||
-        !['editTags', 'editLevel', 'testScene', 'workingTags'].includes(detail.actionId)
+        !['editTags', 'editLevel', 'testScene', 'workingTags', 'workingScripts'].includes(detail.actionId)
       )
         return;
       setDetails(true);
+      if(detail.actionId==='workingScripts'){setScriptsOpen(true);return;}
       if (detail.runtimeId && detail.runtimeId !== runtime) {
         setRuntime(detail.runtimeId);
         return;
@@ -376,19 +385,35 @@ export default function RuntimeDock({
   }
   async function selectScript(file:File|undefined) {
     const selection=++scriptSelection.current,request=generation.current,key=scriptSourceKey;
-    setScriptAttachment(null);setError('');
+    setError('');
     if(!file)return;
+    if(scriptAttachment&&scriptAttachment.sha256!==scriptAttachment.fileSha256&&!window.confirm('Replace the edited script draft? Export it first if you want to retain a separate copy.'))return;
     try {
-      if(!/^[A-Za-z0-9_-]{1,31}\.hsc$/.test(file.name)||file.name.toLowerCase()==='global_scripts.hsc')throw Error('Choose a new .hsc module with a safe name of 1–31characters. Existing global source is preserved separately.');
-      if(!file.size||file.size>1048576)throw Error('New HaloScript source must be nonempty and at most 1 MiB.');
+      if(!/^[A-Za-z0-9_-]{1,31}\.hsc$/.test(file.name)||file.name.toLowerCase()==='global_scripts.hsc')throw Error('Choose a scenario .hsc module with a safe name of 1–31characters. Existing global source is preserved separately.');
+      if(!file.size||file.size>1048576)throw Error('HaloScript source must be nonempty and at most 1 MiB.');
       const bytes=await file.arrayBuffer();
       const content=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
       if(!content.trim()||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(content))throw Error('Choose valid UTF8 HaloScript text without binary control characters.');
       const digest=await crypto.subtle.digest('SHA-256',bytes);
       const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
       if(request!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
-      setScriptAttachment({filename:file.name,content,sha256,sourceKey:key,reviewed:false});
+      setScriptAttachment({filename:file.name,content,sha256,fileSha256:sha256,sourceKey:key,reviewed:false});
     }catch(problem){if(request===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+  }
+  async function reviewScriptSource() {
+    const input=selectedScript;if(!input)return;
+    const selection=++scriptSelection.current,request=generation.current,key=scriptSourceKey;
+    setScriptAttachment(old=>old?.sourceKey===key?{...old,reviewed:false}:old);setError('');
+    try {
+      const bytes=new TextEncoder().encode(input.content);
+      if(!input.content.trim()||bytes.length>1048576||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(input.content))
+        throw Error('Review requires nonempty UTF8 HaloScript within 1 MiB without binary control characters.');
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
+      if(request!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
+      setScriptAttachment(old=>old?.sourceKey===key&&old.content===input.content&&old.replacesSha256===input.replacesSha256
+        ?{...old,sha256,reviewed:true}:old);
+    } catch(problem){if(request===generation.current&&selection===scriptSelection.current)setError(String(problem));}
   }
   async function prepareFirefightSource(){
     if(!native||!project||dirty||working||busy||!workingSourceAvailable||!report?.workingSource)return;
@@ -419,14 +444,14 @@ export default function RuntimeDock({
     if(!report?.workingSource||!workingSourceAvailable)return;
     if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new or recorded generated groups and their controller, review Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
-    if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
+    if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||selectedScript.replacesSha256!==attachment.replacesSha256||!report?.workingSource))return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
-        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256}}:{}),
+        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256,...(attachment.replacesSha256?{replacesSha256:attachment.replacesSha256}:{})}}:{}),
         ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:{}) });
       if (request === generation.current) {
         setDetails(false);
@@ -719,20 +744,35 @@ export default function RuntimeDock({
               <p className="subtle">Temporary planned source, not compiled readback or gameplay proof. Forerunner’s separate finite encounter director must stay off for these scripted waves.</p>
             </>}
           </details>}
-          {project&&report?.workingSource&&workingSourceAvailable&&<details className="native-script-attachment">
-            <summary>Attach new controller/script source</summary>
-            <p className="subtle">Choose a reviewed UTF8 .hsc module, up to 1 MiB. It is added only to a separate build candidate; an existing module with the same name is never replaced. Original scripts must be fully recovered. The selected file is not saved in the project draft; successful output retains it in the new native source. Project Undo does not remove a compiled source module.</p>
-            <label>New HaloScript module<input type="file" accept=".hsc" style={{maxWidth:'100%',minWidth:0}} disabled={busy||working||dirty} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void selectScript(file);}}/></label>
+          {project&&report?.workingSource&&workingSourceAvailable&&<details ref={scriptEditor} open={scriptsOpen} onToggle={event=>setScriptsOpen(event.currentTarget.open)} className="native-script-attachment">
+            <summary>Edit or attach scenario HaloScript</summary>
+            <p className="subtle">Choose a recovered scenario module or new UTF8 .hsc file, up to 1 MiB. You can edit AI and cutscene script bodies here. Revising an existing module requires its exact original file and explicit revision selection; writes occur only in a separate build candidate. Original source must be fully recovered, and existing native script/global identities remain protected. This control retains original native script/global identities; global-source files and structural identity changes need further native editing support. This editor draft is not stored by project Save: export it before closing. Successful builds retain the revised module; Project Undo does not reverse a compiled source revision.</p>
+            <label>Recovered or new HaloScript module<input type="file" accept=".hsc" style={{maxWidth:'100%',minWidth:0}} disabled={busy||working||dirty} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void selectScript(file);}}/></label>
+            {scriptAttachment&&!selectedScript&&<Notice tone="info">Your draft belongs to an earlier source selection and was not applied.
+              <button onClick={()=>downloadLocalText(scriptAttachment.filename,scriptAttachment.content,'text/plain;charset=utf-8')}>Export retained script draft</button>
+            </Notice>}
             {selectedScript&&<>
-              <p><strong>{selectedScript.filename}</strong> · <code className="wrap-code">{selectedScript.sha256}</code></p>
-              <label>Review source<textarea readOnly rows={6} spellCheck={false} style={{width:'100%',boxSizing:'border-box'}} value={selectedScript.content}/></label>
-              <label><input type="checkbox" checked={selectedScript.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setScriptAttachment(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed this source and its native scenario references.</label>
+              <p><strong>{selectedScript.filename}</strong> · <code className="wrap-code">{selectedScript.sha256||'Edited draft — review to calculate its hash'}</code></p>
+              <label>Edit source<textarea rows={10} spellCheck={false} disabled={busy||working||dirty}
+                style={{width:'100%',boxSizing:'border-box'}} value={selectedScript.content} onChange={event=>{
+                  const content=event.target.value;scriptSelection.current++;
+                  setScriptAttachment(old=>old?.sourceKey===scriptSourceKey?{...old,content,sha256:'',reviewed:false}:old);
+                }}/></label>
+              <label><input type="checkbox" checked={!!selectedScript.replacesSha256} disabled={busy||working||dirty}
+                onChange={event=>{const revise=event.target.checked;scriptSelection.current++;
+                  setScriptAttachment(old=>old?.sourceKey===scriptSourceKey?{...old,replacesSha256:revise?old.fileSha256:undefined,reviewed:false}:old);}}/>
+                Revise the existing scenario module from this exact original file
+              </label>
+              {selectedScript.replacesSha256&&<p className="subtle">Original SHA256: <code className="wrap-code">{selectedScript.replacesSha256}</code>.
+                Changed/missing source is refused. Edit the text, then review it before compiling.</p>}
+              <button onClick={()=>downloadLocalText(selectedScript.filename,selectedScript.content,'text/plain;charset=utf-8')}>Export script draft</button>
+              <label><input type="checkbox" checked={selectedScript.reviewed} disabled={busy||working||dirty} onChange={event=>{if(event.target.checked){void reviewScriptSource();}else{scriptSelection.current++;setScriptAttachment(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed:false}:old);}}}/>I reviewed this source and its native scenario references.</label>
               <div className="button-row">
-                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
-                  onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>Attach source &amp; compile</button>
+                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                  onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>{selectedScript.replacesSha256?'Build reviewed script revision':'Attach source & compile'}</button>
                 <button disabled={busy||working} onClick={()=>{scriptSelection.current++;setScriptAttachment(null);}}>Clear selection</button>
               </div>
-              <p className="subtle">Compilation checks references and preserves original module/script inventories. It does not prove actor spawning, gameplay, wave rules or Forerunner compatibility. Missing encounters, loadout profiles or navigation must be authored separately.</p>
+              <p className="subtle">Compilation checks references and preserves other modules and original native script identities. It does not prove actor spawning, gameplay, wave rules or Forerunner compatibility. Missing encounters, loadout profiles or navigation must be authored separately.</p>
             </>}
           </details>}
           {report && (
