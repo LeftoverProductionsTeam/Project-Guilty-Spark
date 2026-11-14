@@ -1,0 +1,540 @@
+# PROJECT GUILTY SPARK — UPDATED COMPLETE PRODUCT GOAL
+## ALL THE TOOLS, AND THEN SOME.
+### November 14, 2026
+
+## THE MISSION
+
+Finish Project Guilty Spark as the most complete, accessible, and capable Halo 1 modding, map-making, and game-creation suite possible.
+
+Spark must combine the capabilities of classic Halo modding tools, modern editing software, community engines, and original innovations into one cohesive creator experience.
+
+The ultimate workflow:
+
+**Open Halo → Create or import content → Edit visually → Configure gameplay → Save → Build → Launch → Play → Revise → Share.**
+
+Creators should be able to accomplish ordinary tasks without understanding Halo's underlying file formats, while advanced users retain access to the engine's full technical capabilities.
+
+Spark must be an actual creation tool, not merely an attractive launcher or a collection of disconnected utilities.
+
+Preserve the full original product vision, the historical requirements, and every functioning implementation.
+
+**This is a completion goal. It is not permission to restart the project, create more planning infrastructure, or endlessly investigate possibilities.**
+
+---
+
+## 1. CONTINUE THE EXISTING PROJECT
+
+The canonical Spark repository is `D:\Project Guilty Spark`, using its established local master workflow.
+
+Start by checking actual HEAD, uncommitted edits, existing work, and current instructions.
+
+Read and respect:
+
+- `AGENTS.md`
+- `docs/ACTIVE_TASK.md`
+- `docs/PENDING_REQUESTS.md`
+- `docs/ENGINEERING_CONTRACT.md`
+- `docs/MASTER_FEATURE_LEDGER.md`
+- `docs/DIRECTIVE_LEDGER.md`
+- Existing roadmap, source audits, active milestones, and relevant native evidence.
+
+Preserve the original 25 engineering prompts, the existing 475 historical requirement records, earlier feature crosswalks, and the full M1–M6 completion objectives.
+
+Historical requirement counts represent accumulated records, not proof of implementation or a request to create duplicate tracking systems.
+
+Do not lose smaller requests while completing flagship features.
+
+Do not create new branches, worktrees, nested repositories, source archives, test warehouses, or redundant development systems.
+
+Respect all current repository preservation rules.
+
+The existing November 10 Windows Preview 5 is a historical accepted release. Newer source changes must not be advertised as already included in that download.
+
+## 2. FINISH THE COMPLETE 3D HALO EDITOR
+
+Users must be able to open a real Halo map and interact with the actual environment.
+
+Finish:
+
+- Fully textured BSP rendering, including correct shaders, lightmaps, detail textures, skies, reflections, decals, foliage, scenery, and atmospheric effects.
+- Accurate models, vehicles, characters, scenery, collision boundaries, and environment placement.
+- Reliable Unreal-style mouse look, WASD flight, orbiting, panning, zooming, and camera bookmarks.
+- Native object selection with visible, consistent XYZ movement, rotation, and scaling handles.
+- Configurable grid and geometry snapping, surface alignment, duplication, grouping, visibility, and locking.
+- Select, drag, rotate, copy, paste, duplicate, delete, and inspect supported objects.
+- Drag visual asset previews directly into a map, including content from another open map.
+- Import native dependencies automatically when the conversion is valid.
+- Clear explanations when an asset or operation cannot work in the selected format.
+- Complete Undo/Redo, including multiple windows, imported assets, external-tool changes, and application restart.
+- Genuine Save, Close, Reopen, Build, and independent verification.
+
+The rendered map must look and behave like the corresponding Halo world wherever the selected renderer supports that content.
+
+Do not represent unknown objects as permanent placeholder diamonds or wireframes when their real assets can be reconstructed.
+
+Verify actual UI interactions, not just backend tests.
+
+## 3. COMPLETE BSP, TERRAIN, AND WORLD CONSTRUCTION
+
+Make Spark a practical environment and level creation tool.
+
+Required authoring capabilities:
+
+- Blank maps and reusable scenario templates.
+- Rooms, corridors, ramps, stairs, bridges, platforms, doors, and structures.
+- Terrain height editing, sculpting, shaping, and material painting.
+- Caves, tunnels, cliffs, mountains, canyons, roads, and seamless-looking terrain transitions.
+- Vertex, edge, face, volume, extrusion, Boolean, and source geometry editing.
+- OBJ/JMS import and export, with supported Blender round trips.
+- Correct UV mapping, shader assignment, collision, and material flags.
+- Halo-specific sealed-world validation, BSP errors, open edges, and collision diagnostics.
+- Portals, visibility/PVS, sky boundaries, AI navigation, and safe player traversal.
+- Native rebuilds through compatible Halo editing toolchains.
+- Retention of non-JMS source metadata and other data that traditional tools may destroy during rebuilds.
+
+Apply verified Halo-specific collision behavior, including the distinct `*` and `@` material conventions, only in their appropriate native contexts.
+
+Do not treat visually joined BSPs as proof of a functioning connected map.
+
+## 4. COMPLETE MEGAWORLD
+
+The long-term target remains one connected Halo world assembled from 19 planned regions.
+
+Continue the existing Timberland–Sidewinder work instead of starting another prototype.
+
+Immediate physical acceptance:
+
+- Find the actual connected entrances.
+- Walk between both maps in both directions.
+- Drive a Warthog through the connection in both directions.
+- Verify caves, high-ground routes, canyon transitions, and mountain roads.
+- Verify correct collision, player clearance, vehicle clearance, projectile behavior, and sniper visibility.
+- Verify lighting, sky, fog, materials, and terrain transitions.
+- Confirm independent native compilation, readback, and actual player traversal.
+
+Once the first connection genuinely works, apply the validated approach to the remaining region connections.
+
+Support MegaWorld objectives, AI patrols, vehicles, multiplayer regions, Extraction, Firefight, and PvPvE.
+
+Coordinate with Forerunner on runtime streaming, world-state persistence, AI navigation, and network transitions.
+
+**A map loading, an Atlas diagram, or a teleport does not establish seamless MegaWorld acceptance.**
+
+Measure genuine engine limits and use explicit compatibility alternatives when necessary.
+
+## 5. COMPLETE NATIVE TAG AND ASSET EDITING
+
+Spark must combine the useful editing capabilities traditionally associated with Eschaton, HMT, Guerilla, Assembly, Invader, Refinery, and related tools.
+
+Provide complete supported workflows for:
+
+- Tag class browsing and searching.
+- Field editing with correct native types and references.
+- Weapon damage, projectiles, magazines, ammunition, and behavior.
+- Vehicle physics, seats, models, and mounted weapons.
+- Character properties, shields, health, and animations.
+- AI encounters, squads, behavior, and navigation.
+- Scenery, machines, devices, triggers, and interactive objects.
+- Sounds, animations, effects, particles, shaders, and bitmaps.
+- Source extraction, dependency resolution, replacement, and reconstruction.
+- Native script, scenario, and object-placement editing.
+- Safe handling of reflexives, arrays, resource references, and runtime-specific fields.
+- Native validation without silently altering unsupported data.
+
+A tag editor must actually save modifications into a valid native output.
+
+Preserve independent source identity, dependency correctness, and user-owned originals.
+
+## 6. COMPLETE ASSET CREATION AND BLENDER INTEGRATION
+
+Finish the entire asset pipeline:
+
+- Supported OBJ/JMS and compatible model interchange.
+- Mesh modification and optimization.
+- Collision model generation and validation.
+- UVs, textures, material mapping, and shaders.
+- Rigging, skeletons, animation, and supported export paths.
+- Native bitmap extraction and reconstruction.
+- Sound extraction, supported conversion, and reintegration.
+- Dependency-aware import from other maps and runtime families.
+- Blender edit → save → Spark refresh → review → native build → in-game verification.
+
+Preserve the current successful Blender handoff.
+
+Expand supported formats only when their native implementation is verified.
+
+Do not silently replace a complete asset with a visual-only approximation.
+
+## 7. NATIVE LIGHTING AND ENVIRONMENT EDITOR
+
+Finish the previously requested GPU lightmapper and real-time lighting experience.
+
+Creators must be able to:
+
+- Place, move, rotate, duplicate, and remove supported lighting sources.
+- Modify light color, intensity, radius, falloff, and appropriate shadow settings.
+- Change ambient lighting, sunlight, fog, sky, weather, and atmosphere.
+- Preview supported lighting and material changes while editing.
+- Inspect lightmaps and compare native and editor rendering.
+- Press **Bake Lighting** to invoke Spark's supported native lightmapping workflow.
+- Optionally launch the matching Halo Tool, H1A Tool, OpenTool, or another reviewed external baker when appropriate.
+- Automatically refresh Spark's source state after a successful external bake.
+- Save, compile, reopen, and verify actual native lighting output.
+
+Use compatible native toolchains and supported source formats.
+
+Do not modify original tags or maps during destructive bakes.
+
+Avoid creating a second unnecessary rendering or asset management framework.
+
+## 8. COMPLETE GAMEPLAY AUTHORING
+
+Spark must let creators define an actual playable Halo experience without manually editing every native tag or script.
+
+### Traditional Halo game types
+
+Support editing and placement of applicable:
+
+- Slayer and Team Slayer spawn points.
+- Capture the Flag bases, flags, and return points.
+- King of the Hill hill regions and movement sequences.
+- Oddball and Race markers.
+- Territories, Assault, Infection, and compatible community modes.
+- Team assignments, vehicles, equipment, weapons, spawn weighting, and rule settings.
+
+Only advertise support for a game type when the selected runtime actually implements it.
+
+### Firefight Designer
+
+Provide visual authoring for:
+
+- Enemy factions, squads, and AI types.
+- Spawn zones, reinforcement paths, and dropships.
+- Waves, rounds, sets, boss encounters, and difficulty.
+- Friendly AI, supplies, weapons, and vehicles.
+- Generator defense, survival, objectives, and mission variants.
+- Skull modifiers, scoring, shared lives, victory, and defeat.
+- AI navigation, behavior, triggers, and safe despawning.
+
+Keep existing native Halo Firefight authoring functional while integrating Forerunner's enhanced Firefight capabilities.
+
+The current standard-map actor encounters, scripts, saved loadouts, and independent native readback are not yet proof of successful player-led combat. Finish that acceptance.
+
+### Extraction Designer
+
+Provide visual editing for:
+
+- Player insertion and extraction zones.
+- Loot containers and item spawn tables.
+- Collectibles, valuable objects, and inventories.
+- Contracts, objectives, mission terminals, and interactions.
+- AI patrols, guards, reinforcement zones, and dynamic events.
+- PvE, PvP, and PvPvE settings.
+- Extraction activation rules, evacuation behavior, and optional timers.
+- Persistent inventory and progression configuration.
+- Death, respawn, recovery, and loss-of-loot rules.
+- Map and cross-region mission progression.
+
+The default experience must not impose a mandatory raid timer.
+
+Spark creates and exports the configuration. Forerunner executes authoritative game logic and persistence.
+
+### Zombie Apocalypse and Infection
+
+Preserve the original Mac Demo Zombie Apocalypse concept and its mechanisms.
+
+Restore:
+
+- Original carrier, vehicle, weapon, and zombie dependencies.
+- Correct automatic carrier release and actor transitions.
+- Zombie behavior, attack logic, damage, animations, and sounds.
+- Survival waves, objectives, player respawns, and mission endings.
+- Traditional multiplayer Infection and AI-driven Zombie Apocalypse as distinct modes.
+- Native compatibility and conversion on supported MCC, CE, OpenCE, Chupathingy, and Forerunner targets.
+
+Do not silently replace missing original custom audio or other unique assets.
+
+### Campaign and First Contact
+
+Finish campaign creation, including:
+
+- AI encounters and scripted events.
+- Triggers, objectives, checkpoints, and mission progression.
+- Doors, machines, switches, and interactive scenarios.
+- Cutscenes, cinematics, camera events, and audio.
+- Friendly units, vehicles, and cooperative behavior.
+- Full original First Contact mission acceptance, including a working ending.
+
+A campaign must be playable from insertion to completion, not just compilable.
+
+## 9. COMPLETE SPARKLINK, LIVE LINK, AND LIVE REBUILD
+
+Preserve and improve the existing architecture.
+
+**SparkLink** must support genuine multiuser creator collaboration:
+
+- Two separate physical computers, not only local processes.
+- Shared source edits and asset placements.
+- Multiwindow Undo ownership and revision retention.
+- Conflicts, disconnects, reconnection, and safe recovery.
+- LAN and appropriately secured remote collaboration.
+- Authenticated, bounded operations without arbitrary remote execution.
+
+**Live Link** must connect to supported actual game engines:
+
+- Live object movement, spawning, removal, and supported properties.
+- Lighting, fog, camera, scenario, and gameplay parameter changes where supported.
+- Runtime state readback and conflict detection.
+- Stable reconnect and runtime/map identity verification.
+- Specific capability support for MCC, Chupathingy, OpenCE, and Forerunner.
+
+**Live Rebuild** must preserve its tested source-freeze, compile, staged-reload, and previous-good recovery behavior.
+
+Expand it only when native runtime support permits.
+
+Do not confuse shared editor source, live engine memory edits, map reloads, and synchronized gameplay. Each requires independent acceptance.
+
+## 10. SUPPORT THE COMPLETE HALO ECOSYSTEM
+
+Maintain accurate support for all intended targets:
+
+- Original Xbox Halo.
+- Gearbox Halo PC retail.
+- Halo Custom Edition.
+- Halo Trial / Demo and HaloMD.
+- Original Mac Halo and legacy Mac modding workflows.
+- MCC Halo: Combat Evolved Anniversary.
+- OpenCE and relevant community forks.
+- ChupathingyCE.
+- OpenH1.
+- OpenCE Mantle.
+- OpenSauce and compatible community extensions.
+- Forerunner.
+
+Preserve original native formats and platform distinctions.
+
+Support source-aware adaptation and automated conversion when demonstrably valid.
+
+**Xbox export must attempt safe native adaptation of unsupported features where feasible**, with a clear explanation of each conversion, fallback, or omission.
+
+Never claim an incompatible map will automatically become fully functional on Xbox, MCC, or another runtime.
+
+Explore Stubbs the Zombie's related engine formats as a separate compatibility initiative, with the objective of providing equivalent visual editing wherever its formats and legal constraints permit.
+
+Do not pretend Stubbs files are identical to Halo files without verification.
+
+## 11. INTEGRATE THE CLASSIC MODDING TOOLS
+
+Bring supported external software into a consistent experience:
+
+- Halo Tool, H1A Tool, Guerilla, Sapien, Standalone, and the HEK/HCEEK.
+- Invader and Baboon.
+- Blender and compatible Halo asset add-ons.
+- OpenTool.
+- Assembly, MEK, Mozzarilla, Refinery, Reclaimer, and Foundry.
+- Mantle and relevant legacy Mac utilities.
+- Other verified community tools that fill real capability gaps.
+
+Creators should be able to discover compatible tools, configure them, and launch them from Spark.
+
+Offer optional reviewed downloads and setup for eligible community tools when authorized, while recognizing tools that require the user to provide an installed copy.
+
+After an external editor or compiler finishes, detect relevant changes, reconcile them safely, refresh the visible source, and permit native rebuilding.
+
+Do not bundle or fetch unauthorized proprietary tools or game assets.
+
+Do not create redundant internal replacements for tools whose existing functionality can be integrated effectively.
+
+## 12. COMPLETE RUNTIME MANAGEMENT AND COMMUNITY PLAY
+
+Finish the optional runtime manager without forcing users to relocate their games.
+
+Support:
+
+- Existing runtime discovery and explicit user-selected profiles.
+- Reviewed runtime download and installation when authorized.
+- Separate engine support files, saves, settings, and logs.
+- Supported shared content libraries and presentation packs.
+- Host, Join, server browser, and map compatibility information.
+- Compatible map downloading and verified package identities.
+- Multiplayer game voting, server administration, and game-mode selection.
+- Clear differences between real protocol compatibility and mere shared map support.
+- Updates to Spark's state when external tools or runtimes change.
+
+Preserve existing Chupathingy private server and two-client acceptance.
+
+Do not claim MCC, Xbox, OpenCE, Chupathingy, and Forerunner can all join the same game unless their actual protocols and gameplay have been verified.
+
+## 13. COMPLETE VR CREATION WORKFLOWS
+
+VR authoring remains a flagship requirement.
+
+Target the owner's:
+
+- HTC Vive headset with Valve Index Knuckles controllers.
+- Meta Quest 2 through a supported PCVR connection.
+
+The desired experience:
+
+Enter the Halo world in VR, fly through the environment, select objects with motion controllers, place assets, move structures, edit supported tags, adjust lights and fog, configure spawn points, and test the experience from inside the headset.
+
+Support useful controller bindings, hand interactions, spatial gizmos, UI panels, Undo/Redo, and comfortable navigation.
+
+Coordinate the runtime/editor interface with Forerunner and OpenH1 instead of independently duplicating their entire VR rendering systems.
+
+Actual headset testing is mandatory before declaring VR support complete.
+
+## 14. MACHINIMA, CINEMATICS, AND CREATIVE TOOLS
+
+Finish the Recording Director and related workflows:
+
+- Free cameras, fly-throughs, and camera-key timelines.
+- Character, vehicle, and object positioning.
+- Animation inspection and playback.
+- Scene lighting, fog, and environment controls.
+- Reversible greenscreen and chroma-key options.
+- Replay/theater integration where supported.
+- Multi-camera capture and export.
+- Cinematic sound and effects.
+- Live editing during supported filming sessions.
+- Campaign cutscene authoring and preview.
+
+Reuse Forerunner's eventual Theater and replay capabilities where suitable.
+
+## 15. FINISH THE USER EXPERIENCE
+
+Spark must be friendly to newcomers without limiting experienced modders.
+
+Complete:
+
+- Logical navigation and consistent terminology.
+- Maps and projects that remain easy to find.
+- Compact tool panels and useful inspector views.
+- Windows, tabs, detachable editors, and multiple-monitor support.
+- Persistent workspaces and tool layouts.
+- Discoverable features, icons, tooltips, and meaningful error messages.
+- Keyboard shortcuts and accessibility.
+- Accurate drag/drop visual feedback.
+- No dead buttons, duplicated actions, misleading labels, or hidden essential controls.
+- A native-feeling Halo/Forerunner visual identity using legitimately usable assets.
+- Searchable Learning Center, tutorials, glossary, and real walkthroughs.
+
+Audit the actual existing feature catalog and creator workflows. Do not invent a second Help Center or duplicate UI architecture.
+
+Every feature must have a discoverable user-facing route and honest supported-scope information.
+
+## 16. COMPLETE INSTALLERS AND CROSS-PLATFORM SUPPORT
+
+Deliver credible native support for:
+
+- Windows 10/11.
+- Linux.
+- Modern macOS, including Apple Silicon.
+- Legacy Mac workflows and Mac Demo preservation, with compatible older-platform delivery investigated separately.
+
+Complete the Windows installer/portable release, clean-machine startup, upgrades, uninstall, safe settings migration, and native tool setup.
+
+Keep Linux and macOS packaging independently verified instead of equating Rust/CI compilation with a working desktop release.
+
+Provide properly licensed source-only downloads, useful release notes, checksums, documentation, and honest known limitations.
+
+Make update behavior understandable and safe. No silent replacement of existing Halo installations.
+
+Preserve current GitHub release history and obtain approval before public publication.
+
+## 17. SAFETY, COMPATIBILITY, AND PERFORMANCE
+
+User files are sacred.
+
+Never modify, delete, move, overwrite, or repurpose a user's map, ISO, asset, runtime installation, editing kit, or personal file without authorization.
+
+This applies even inside `D:\Project Guilty Spark` and regardless of file size.
+
+Do not create unnecessary caches, source clones, warehouses, generated backups, SDK copies, or retained test outputs.
+
+Use existing source protection and bounded staging systems rather than introducing new defensive frameworks.
+
+Preserve working histories and previous-good outputs.
+
+Protect against malformed files, corrupted inputs, path traversal, incompatible external revisions, and genuinely unsafe operations.
+
+Measure actual memory consumption, loading time, responsiveness, and native build performance. Optimize verified bottlenecks rather than speculative ones.
+
+No anti-cheat bypasses, unauthorized downloads, destructive cleanup, or unapproved publication.
+
+## 18. PRODUCT ACCEPTANCE
+
+A claimed creator feature must pass the relevant parts of:
+
+**Open → Inspect → Edit → Undo/Redo → Save → Restart → Compile → Independent readback → Launch Halo → Verify actual behavior → Collaborate/share where applicable.**
+
+Test supported runtimes separately.
+
+Distinguish source implementation, automated tests, native validation, game loading, human gameplay, real peers, and clean-platform release acceptance.
+
+Do not close requirements merely because related automated tests pass.
+
+The ultimate demonstration should include:
+
+1. Build or edit a genuine Halo environment.
+2. Import a real asset from another map.
+3. Edit tags and lighting.
+4. Configure Firefight, Extraction, and game-type markers.
+5. Save, restart, and recover the exact scene.
+6. Compile and open it in a compatible Halo runtime.
+7. Launch it in Forerunner and play with another person.
+8. Modify the experience through the supported live workflow.
+9. Export a compatible edition-specific map with honest adaptation results.
+10. Verify original user content remains unchanged.
+
+## 19. IMMEDIATE EXECUTION PRIORITIES
+
+Continue from the current active engineering checkpoint.
+
+**Priority A — Finish existing native gameplay acceptance.**
+Complete the controllable-player, weapon-loadout, actual combat, wave-clear, scoring, and HUD checks for the already built Firefight source. The recent game-control interruption must not be bypassed; obtain renewed authorization before performing physical desktop/game input. Independent source engineering may continue safely.
+
+**Priority B — Close working creator loops.**
+Finish the highest-value incomplete native edit/save/build/play workflows, including actual visual object placement, real asset conversions, lighting, and accepted external-tool handoffs.
+
+**Priority C — Finish the first physical MegaWorld seam.**
+Prove human and vehicle traversal before expansion.
+
+**Priority D — Complete runtime-linked authoring.**
+Provide actual Spark controls for Forerunner's Firefight, Extraction, Forge, and VR systems as they become available.
+
+**Priority E — Close the product.**
+Finish remaining ledger requirements, native gameplay proof, UI defects, platform acceptance, packaging, and documentation.
+
+Independent safe tasks may proceed while human-operated tests or upstream work are blocked.
+
+## 20. ANTI-OVERENGINEERING RULE
+
+Preserve all approved features. Do not try to implement all of them in one giant change.
+
+For each work cycle:
+
+1. Identify one real unfinished creator workflow.
+2. Inspect its existing implementation.
+3. Make the smallest coherent improvement.
+4. Run focused tests and required native acceptance.
+5. Fix regressions, commit, and record the actual result.
+6. Move to the next meaningful requirement.
+
+After two failed approaches to the same blocker, reassess the root cause. Do not pile on compatibility wrappers, test harnesses, ledgers, or speculative safeguards.
+
+Do not create more work after acceptance criteria have passed.
+
+Keep updates short and concrete. Never substitute test counts, code volume, or execution time for working functionality.
+
+Leave a recoverable checkpoint whenever execution ends. Do not pretend work continues after the session stops.
+
+### FINAL SUCCESS CONDITION
+
+Guilty Spark is complete when the accepted requirements are genuinely implemented and the intended creator workflows work reliably across their supported targets.
+
+A user can create a Halo experience, edit its world and gameplay, compile it, test it, share it, and play it—without needing fifteen disconnected programs or risking their original content.
+
+**FINISH THE PRODUCT. PROVE THE WORKFLOWS.**
+
+**ALL THE TOOLS, AND THEN SOME.**

@@ -86,6 +86,10 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    report.savedRestart=true;report.savedProjectReopenedThroughLibrary=true;
    await chooseTool(page,'Level editor');
    const button=page.getByRole('button',{name:'Build & check playtest',exact:true});await expect(button).toBeEnabled();await button.click();
+   const toolbar=page.locator('.forge-build-toolbar');await expect(toolbar).toBeVisible();
+   report.buildPanelLayout=await toolbar.evaluate(element=>{const box=element.getBoundingClientRect(),panel=element.closest('.forge-build-panel').getBoundingClientRect();return {viewport:[innerWidth,innerHeight],toolbarHeight:box.height,panelHeight:panel.height,horizontalOverflow:element.scrollWidth>element.clientWidth+1,pathsCollapsed:!document.querySelector('.forge-build-details').open};});
+   expect(report.buildPanelLayout.toolbarHeight).toBeLessThan(120);expect(report.buildPanelLayout.horizontalOverflow).toBe(false);expect(report.buildPanelLayout.pathsCollapsed).toBe(true);
+   await page.screenshot({path:path.join(output,'firefight-build-controls.png')});
    let compiled;await expect.poll(async()=>{compiled=await call('quickforge_build_report',{projectId:id});if(compiled)report.nativeBuild=compiled;if(compiled&&['failed','blocked'].includes(compiled.status))throw Error('Native round rejected: '+JSON.stringify(compiled.blockers));return compiled?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');
    report.nativeBuild=compiled;
    const map=compiled.build.output;expect(await hash(map)).toBe(compiled.build.sha256);

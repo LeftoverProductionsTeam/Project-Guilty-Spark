@@ -289,3 +289,14 @@ Expected: a real held numeric drag changes the draft, then losing the actual nat
 ### Original bitmap detail control — R454–R458
 
 Expected: Tag editor → Bitmap → Materials → Original texture detail selects a level actually stored in that exact original image, retains its context position and never shows stale pixels. The first new browser test exposed omitted selector markup (R451/R452); repaired and verified in R4537browser tests and frozen R454275browser tests. Five actual Windows fixtures verify all44source mip byte ranges, selected canvas RGBA, Properties/Materials return, full-resolution return, invalid/duplicate refusals and unchanged original resource hashes. Evidence and source locations: NATIVE_ASSETS_AND_SHOWCASE.md#authored-bitmap-levels--10-november; src/components/BitmapPreview.tsx, ownedBitmapPreview.ts, ownedBitmapBatch.ts, native bitmap_preview/resource_map/mcc_textures paths. Browser reload retains the choice; this scoped native test does not add a full process-restart or game-parity claim.
+
+
+## QuickForge build-panel compaction — 14 November 2026
+
+Owner screenshot38d333be showed a stretched empty target card and paths consuming editor space. QuickForge now uses one wrapping row for existing engine targets, runtime, quality, setup, runtime/host and cancellation controls. Paths and source explanations are under keyboard-operable Build details; Build checks & diagnostics opens automatically for errors/blockers. No compiler, Save, target ownership or native validation behavior changed. No new workspace/pager/controller.
+
+R688 TypeScript and both configured/missing-source browser workflows pass: map-specific path update, Save and configuration return; eight sizes800x600,1280x720,1366x768,1500x950,1920x1080,2560x1080,3440x1440,5120x1440 keep essential toolbar controls horizontally reachable and toolbar height below120px. Browser evidence is not native eight-resolution acceptance.
+
+R689 actual Windows1500x950: toolbar48px, total expanded panel194px, no toolbar horizontal overflow, paths initially collapsed. Real source preparation/Undo/Redo/Save/two normal restarts/native build/independent readback pass, zero page errors. Changed rules refuse compilation and retain previous-good map. Screenshot E/resume-20261114/r689-firefight-build-controls.png; receipt/log r689-native-firefight.json/log. Human combat and physical display/DPI/multi-monitor gates remain open.
+
+User path: Level editor → build summary → choose target/quality or Configure build tools. Open Build details for actual resolved paths; open Build checks & diagnostics for source/Tool findings. Build/Cancel remain directly available.

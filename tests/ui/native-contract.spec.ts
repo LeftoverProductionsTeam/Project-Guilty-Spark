@@ -4015,6 +4015,17 @@ for(const configured of [true,false])test(`QuickForge build paths and configure 
  },configured);
  await openFixture(page);await chooseTool(page,'Level editor');
  await page.locator('.forge-build-summary').click();
+ const details=page.locator('.forge-build-details');await expect(details).not.toHaveAttribute('open','');
+ if(configured)for(const [width,height] of [[800,600],[1280,720],[1366,768],[1500,950],[1920,1080],[2560,1080],[3440,1440],[5120,1440]]){
+  await page.setViewportSize({width,height});
+  const toolbar=page.locator('.forge-build-toolbar');await expect(toolbar).toBeVisible();
+  for(const control of [page.getByRole('combobox',{name:'Build runtime target',exact:true}),page.getByRole('button',{name:'Configure build tools',exact:true}),page.getByRole('button',{name:'Runtime & host options',exact:true})]){
+   await expect(control).toBeVisible();const box=await control.boundingBox();expect(box).not.toBeNull();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(width+1);
+  }
+  expect((await toolbar.boundingBox())!.height).toBeLessThan(120);
+ }
+ await page.setViewportSize({width:1500,height:950});
+ await details.locator('summary').focus();await page.keyboard.press('Enter');
  const paths=page.getByRole('group',{name:'Build tool paths',exact:true});
  await expect(paths).toContainText('Halo Tool: C:/Map/Kit');await expect(paths).toContainText('Source tag root: '+(configured?'C:/Map/Tags':'not configured'));await expect(paths).toContainText('Invader: C:/Map/Invader');
  await page.getByRole('button',{name:'Configure build tools',exact:true}).click();

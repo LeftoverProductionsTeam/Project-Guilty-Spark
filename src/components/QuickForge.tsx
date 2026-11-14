@@ -2694,7 +2694,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       </div>
       <section className={`forge-build-panel ${expandedBuild ? 'expanded' : ''}`}>
         <div className="forge-build-heading">
-          <button className="forge-build-summary" onClick={() => setExpandedBuild(!expandedBuild)}>
+          <button className="forge-build-summary" aria-expanded={expandedBuild} onClick={() => setExpandedBuild(!expandedBuild)}>
             <Hammer size={17} />
             <strong>{project.title}</strong>
             <Pill tone={receipt?.status === 'validated' && !staleReceipt ? 'green' : 'muted'}>
@@ -2764,6 +2764,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         )}
         {(expandedBuild || !!geometryError || !!buildError || !!receiptError) && (
           <div className="forge-build-content">
+            <div className="forge-build-toolbar">
             {project && (
               <BuildTargets
                 project={project}
@@ -2772,7 +2773,6 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 onChange={(p) => props.edit(p, 'Configure engine build targets')}
               />
             )}
-            <div>
               <div className="forge-build-config">
                 <label>
                   Runtime target
@@ -2810,13 +2810,6 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   </select>
                 </label>
               </div>
-              <div className="forge-hint" role="group" aria-label="Build tool paths">
-                Halo Tool: {(activeBuildTarget ? activeBuildTarget.hekDirectory : data.settings.hekDirectory) || 'not configured'}
-                <br />
-                Source tag root: {(activeBuildTarget ? activeBuildTarget.tagsDirectory : data.settings.hekTagsDirectory) || 'not configured'}
-                <br />
-                Invader: {(activeBuildTarget ? activeBuildTarget.invaderDirectory : data.settings.invaderDirectory) || 'not configured'}
-              </div>
               <div className="analysis-actions">
                 <button className="small-button" onClick={() => {
                   if (!activeBuildTarget) { props.onSettings(); return; }
@@ -2841,6 +2834,16 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                     Cancel build
                   </button>
                 )}
+              </div>
+            </div>
+            <details className="forge-build-details">
+              <summary>Build details</summary>
+              <div className="forge-hint" role="group" aria-label="Build tool paths">
+                Halo Tool: {(activeBuildTarget ? activeBuildTarget.hekDirectory : data.settings.hekDirectory) || 'not configured'}
+                <br />
+                Source tag root: {(activeBuildTarget ? activeBuildTarget.tagsDirectory : data.settings.hekTagsDirectory) || 'not configured'}
+                <br />
+                Invader: {(activeBuildTarget ? activeBuildTarget.invaderDirectory : data.settings.invaderDirectory) || 'not configured'}
               </div>
               {caveReview.ports.length > 0 && (
                 <Notice tone="info">
@@ -2911,8 +2914,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 Source export is not a compiled BSP or playable map. Packaging and launch require a validated
                 target output. No host or lobby is simulated.
               </p>
-            </div>
-            <div className="forge-build-diagnostics">
+            </details>
+            <details className="forge-build-diagnostics" open={!!geometryError || !!buildError || !!receiptError || !preflight.ready || scenarioRiskErrors || receipt?.status === 'failed' || receipt?.status === 'blocked'}>
+              <summary>Build checks &amp; diagnostics</summary>
               <Notice tone={preflight.ready ? 'info' : 'warning'}>
                 Source integrity preflight:{' '}
                 {preflight.ready
@@ -3300,7 +3304,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   ))}
                 </div>
               )}
-            </div>
+            </details>
           </div>
         )}
       </section>
