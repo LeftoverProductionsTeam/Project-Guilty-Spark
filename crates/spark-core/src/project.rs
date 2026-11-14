@@ -437,13 +437,25 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         .ok_or_else(|| crate::SparkError::Invalid("Output has no parent".into()))?;
     fs::create_dir_all(parent)?;
     let temp = parent.join(format!(".spark-write-{}.tmp", Uuid::new_v4()));
+    let mut staged_revision = None;
     let result = (|| -> Result<Option<PathBuf>> {
-        let mut f = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&temp)?;
-        f.write_all(bytes)?;
-        f.sync_all()?;
+        let mut options = OpenOptions::new();
+        options.create_new(true).write(true);
+        #[cfg(windows)] {
+            use std::os::windows::fs::OpenOptionsExt;
+            // Keep our create-new handle exclusive against writers/deleters
+            // while staging. DELETE permits exact-handle failed-write cleanup.
+            options.access_mode(0x40000000 | 0x00010000).share_mode(1);
+        }
+        let mut f = options.open(&temp)?;
+        let identity = crate::storage::unique_file_handle_identity(&f)
+            .ok_or_else(|| crate::SparkError::Invalid("Staged output ownership unavailable; retained".into()))?;
+        if let Err(error) = f.write_all(bytes).and_then(|_| f.sync_all()) {
+            #[cfg(windows)] let _ = dispose_staged_handle(&f);
+            return Err(error.into());
+        }
+        use sha2::{Digest, Sha256};
+        staged_revision = Some(StagedRevision { file: FileRevision { identity: Some(identity), sha256: Some(crate::hex_bytes(Sha256::digest(bytes))) }, len: bytes.len() as u64 });
         drop(f);
         let bak = if !create_only && backup && path.is_file() {
             let bak = parent.join(format!(
@@ -459,43 +471,121 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         if let Some(expected)=expected{expected.verify(path)?;}
         #[cfg(test)]
         atomic_publication_tests::run_publication_hook();
-        if create_only { publish_new_file(&temp, path)?; }
-        else { fs::rename(&temp, path)?; }
+        publish_staged_file(&temp, path, create_only, staged_revision.as_ref().unwrap())?;
         Ok(bak)
     })();
-    if temp.exists() {
-        let _ = fs::remove_file(temp);
+    if let Some(revision) = &staged_revision {
+        // Never retire a different file that now occupies our temporary name.
+        let _ = dispose_staged_file(&temp, revision);
     }
     result
 }
+struct StagedRevision { file: FileRevision, len: u64 }
+fn verify_staged_handle(file: &mut fs::File, revision: &StagedRevision) -> Result<()> {
+    use std::io::Read;
+    use sha2::{Digest, Sha256};
+    let metadata = file.metadata()?;
+    #[cfg(windows)] {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes() & 0x400 != 0 { return invalid("Linked staging output retained"); }
+    }
+    if !metadata.is_file() || metadata.len() != revision.len || crate::storage::unique_file_handle_identity(file) != revision.file.identity {
+        return invalid("Staged output changed ownership; replacement retained");
+    }
+    let mut hash = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    // Even on a platform without mandatory sharing locks, an external writer
+    // cannot turn validation into an unbounded read by continuously appending.
+    let mut bounded = file.take(revision.len.saturating_add(1));
+    loop {
+        let count = bounded.read(&mut buffer)?;
+        if count == 0 { break; }
+        hash.update(&buffer[..count]);
+    }
+    if revision.file.sha256.as_deref() != Some(crate::hex_bytes(hash.finalize()).as_str()) {
+        return invalid("Staged output changed bytes; replacement retained");
+    }
+    Ok(())
+}
+fn open_staged_file(path: &Path, revision: &StagedRevision) -> Result<fs::File> {
+    reject_links(path)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)] {
+        use std::os::windows::fs::OpenOptionsExt;
+        // No write/delete sharing; OPEN_REPARSE_POINT refuses following a
+        // last-moment link. Identity and hash refer to this opened handle.
+        options.access_mode(0x80000000 | 0x00010000).share_mode(1).custom_flags(0x00200000);
+    }
+    let mut file = options.open(path)?;
+    verify_staged_handle(&mut file, revision)?;
+    Ok(file)
+}
+fn dispose_staged_file(path: &Path, revision: &StagedRevision) -> Result<()> {
+    let file = open_staged_file(path, revision)?;
+    #[cfg(windows)] { dispose_staged_handle(&file)?; }
+    #[cfg(not(windows))] {
+        // Preserve the pathname guard on other targets. Descriptor-relative
+        // unlink race closure needs separate native platform acceptance.
+        if crate::storage::unique_file_identity(path) != revision.file.identity { return invalid("Staged cleanup ownership changed; retained"); }
+        fs::remove_file(path)?;
+    }
+    drop(file);
+    Ok(())
+}
+#[cfg(windows)]
+fn set_staged_information(file: &fs::File, class: u32, information: *const std::ffi::c_void, size: u32) -> Result<()> {
+    use std::os::windows::io::AsRawHandle;
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetFileInformationByHandle(handle: *mut std::ffi::c_void, class: u32, information: *const std::ffi::c_void, size: u32) -> i32;
+    }
+    if unsafe { SetFileInformationByHandle(file.as_raw_handle(), class, information, size) } == 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(())
+}
+#[cfg(windows)]
+fn dispose_staged_handle(file: &fs::File) -> Result<()> {
+    // FILE_DISPOSITION_INFO: delete this verified handle on close, never a
+    // newly resolved pathname. No read-only/security bypass flags are used.
+    let delete_file = 1u8;
+    set_staged_information(file, 4, (&delete_file as *const u8).cast(), 1)
+}
 // Part of the existing sibling-temp writer: publish a previously absent name
 // without any replacing fallback. Only our completed temporary bytes are moved.
-fn publish_new_file(temp: &Path, path: &Path) -> Result<()> {
-    #[cfg(windows)]
-    {
+fn publish_staged_file(temp: &Path, path: &Path, create_only: bool, revision: &StagedRevision) -> Result<()> {
+    let file = open_staged_file(temp, revision)?;
+    #[cfg(test)] atomic_publication_tests::run_staged_handle_hook();
+    #[cfg(windows)] {
         use std::os::windows::ffi::OsStrExt;
-        #[link(name = "kernel32")]
-        extern "system" { fn MoveFileExW(source: *const u16, destination: *const u16, flags: u32) -> i32; }
-        // canonicalize supplies Windows' extended absolute prefix, including
-        // UNC and long Unicode paths. Both names stay in the same directory.
-        let source = crate::native_staging::canonical_destination(temp)?;
+        #[repr(C)]
+        struct RenameInformation { flags: u32, root: *mut std::ffi::c_void, length: u32, name: [u16; 1] }
         let destination = crate::native_staging::canonical_destination(path)?;
-        let source = source.as_os_str().encode_wide().collect::<Vec<_>>();
-        let destination = destination.as_os_str().encode_wide().collect::<Vec<_>>();
-        if source.contains(&0) || destination.contains(&0) { return invalid("Output path contains a null character"); }
-        let source = source.into_iter().chain([0]).collect::<Vec<_>>();
-        let destination = destination.into_iter().chain([0]).collect::<Vec<_>>();
-        // No REPLACE_EXISTING, COPY_ALLOWED or delayed/reboot operation.
-        if unsafe { MoveFileExW(source.as_ptr(), destination.as_ptr(), 0) } == 0 {
-            return Err(std::io::Error::last_os_error().into());
+        let name = destination.as_os_str().encode_wide().collect::<Vec<_>>();
+        if name.contains(&0) { return invalid("Output path contains a null character"); }
+        let offset = std::mem::offset_of!(RenameInformation, name);
+        let size = (offset + (name.len() + 1) * 2).max(std::mem::size_of::<RenameInformation>());
+        let mut aligned = vec![0u64; size.div_ceil(8)];
+        let information = aligned.as_mut_ptr().cast::<RenameInformation>();
+        // FILE_RENAME_INFO, ReplaceIfExists is false for first publication.
+        // The source is the exact verified handle, not its mutable pathname.
+        unsafe {
+            (*information).flags = u32::from(!create_only);
+            (*information).root = std::ptr::null_mut();
+            (*information).length = u32::try_from(name.len() * 2).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?;
+            std::ptr::copy_nonoverlapping(name.as_ptr(), aligned.as_mut_ptr().cast::<u8>().add(offset).cast::<u16>(), name.len());
         }
+        set_staged_information(&file, 3, aligned.as_ptr().cast(), u32::try_from(size).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?)?;
     }
-    #[cfg(not(windows))]
-    {
-        // linkat refuses an existing destination atomically. The short-lived
-        // second name references our own temp, never a protected user input.
-        fs::hard_link(temp, path)?;
-        fs::remove_file(temp)?;
+    #[cfg(not(windows))] {
+        // This target still requires separate descriptor-relative publication
+        // acceptance. No replacing fallback is allowed for a new filename.
+        if crate::storage::unique_file_identity(temp) != revision.file.identity { return invalid("Staged publication ownership changed; retained"); }
+        if create_only {
+            fs::hard_link(temp, path)?;
+            fs::remove_file(temp)?;
+        } else { fs::rename(temp, path)?; }
     }
     Ok(())
 }
@@ -819,10 +909,31 @@ mod atomic_publication_tests {
     use super::*;
     std::thread_local! {
         static PUBLICATION_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        static STAGED_HANDLE_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
     }
     pub(super) fn run_publication_hook() {
         let hook = PUBLICATION_HOOK.with(|slot| slot.borrow_mut().take());
         if let Some(hook) = hook { hook(); }
+    }
+    pub(super) fn run_staged_handle_hook() {
+        let hook = STAGED_HANDLE_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[cfg(windows)]
+    #[test]
+    fn verified_staging_handle_denies_external_writes_and_renames() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().to_path_buf();
+        STAGED_HANDLE_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let staged = fs::read_dir(&directory).unwrap().map(|e| e.unwrap().path())
+                .find(|p| p.file_name().unwrap().to_string_lossy().starts_with(".spark-write-")).unwrap();
+            assert!(fs::write(&staged, b"foreign writer").is_err());
+            assert!(fs::rename(&staged, directory.join("foreign-rename")).is_err());
+        })));
+        let target = root.path().join("project.gsproject");
+        atomic_write(&target, b"verified staged source", false).unwrap();
+        assert_eq!(fs::read(target).unwrap(), b"verified staged source");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
     }
     fn arriving_file_is_preserved(checked: bool) {
         let root = tempfile::tempdir().unwrap();
@@ -837,6 +948,51 @@ mod atomic_publication_tests {
         assert_eq!(fs::read(&target).unwrap(), b"independently saved user project");
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1, "only our unused temporary file may be retired");
     }
+    #[test]
+    fn staging_content_changes_with_the_same_file_identity_are_retained() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().to_path_buf();
+        PUBLICATION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let staged = fs::read_dir(&directory).unwrap().map(|e| e.unwrap().path())
+                .find(|p| p.file_name().unwrap().to_string_lossy().starts_with(".spark-write-")).unwrap();
+            let before = crate::storage::unique_file_identity(&staged);
+            fs::write(&staged, b"bad reviewed project").unwrap();
+            assert_eq!(crate::storage::unique_file_identity(&staged), before);
+        })));
+        let target = root.path().join("project.gsproject");
+        assert!(atomic_write(&target, b"our reviewed project", false).is_err());
+        assert!(!target.exists());
+        let staged = fs::read_dir(root.path()).unwrap().next().unwrap().unwrap().path();
+        assert_eq!(fs::read(staged).unwrap(), b"bad reviewed project");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+    fn replaced_stage_is_preserved(destination_arrives: bool) {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        let directory = root.path().to_path_buf();
+        let foreign_target = target.clone();
+        PUBLICATION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let staged = fs::read_dir(&directory).unwrap().map(|e| e.unwrap().path())
+                .find(|p| p.file_name().unwrap().to_string_lossy().starts_with(".spark-write-")).unwrap();
+            // Keep the original inode alive to exclude accidental file-ID reuse.
+            fs::rename(&staged, directory.join("our-detached-stage")).unwrap();
+            fs::write(&staged, b"another owner's temporary source").unwrap();
+            if destination_arrives { fs::write(foreign_target, b"another owner's project").unwrap(); }
+        })));
+        let result = atomic_write(&target, b"our reviewed project", false);
+        assert!(result.is_err(), "a replaced staging file must never be published");
+        let staged = fs::read_dir(root.path()).unwrap().map(|e| e.unwrap().path())
+            .find(|p| p.file_name().unwrap().to_string_lossy().starts_with(".spark-write-"))
+            .expect("foreign replacement must not be deleted by error cleanup");
+        assert_eq!(fs::read(staged).unwrap(), b"another owner's temporary source");
+        assert_eq!(fs::read(root.path().join("our-detached-stage")).unwrap(), b"our reviewed project");
+        if destination_arrives { assert_eq!(fs::read(target).unwrap(), b"another owner's project"); }
+        else { assert!(!target.exists()); }
+    }
+    #[test]
+    fn new_file_publication_refuses_a_replaced_staging_file() { replaced_stage_is_preserved(false); }
+    #[test]
+    fn failed_publication_preserves_foreign_staging_replacement() { replaced_stage_is_preserved(true); }
     #[test]
     fn new_file_publication_supports_relative_filename() {
         const CHILD_ROOT: &str = "SPARK_ATOMIC_RELATIVE_TEST_ROOT";
