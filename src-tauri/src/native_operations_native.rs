@@ -72,6 +72,29 @@ pub(super) fn encounter_expectation(state:&AppState,project:&Project,build:&Buil
     check_dependency_pins(&tags,&receipt.source_dependencies)?;
     Ok(Some(receipt.operation))
 }
+
+/// Build evidence follows the current selected source, not only its most recent
+/// operation. Reviews are bounded by the existing native history; they never
+/// authorize replaying an operation or launching a caller-selected executable.
+pub(super) fn hud_readback_targets(state:&AppState,project:&Project,build:&BuildRecord)->Reply<Vec<recipes::HudSourceTarget>> {
+    let ids:Vec<String>=lock(&state.library)?.setting(&history_key(&project.id)).map_err(error)?;
+    if ids.len()>32{return Err("Native HUD review history exceeds its existing bound".into());}
+    let fingerprint=project.fingerprint().map_err(error)?;
+    let mut targets:Vec<recipes::HudSourceTarget>=vec![];
+    for id in ids {
+        let path=root(state,&id)?.join("operation.json");
+        let Ok(bytes)=bounded_read(&path,4*1024*1024)else{continue;};
+        let Ok(receipt)=serde_json::from_slice::<Receipt>(&bytes)else{continue;};
+        if receipt.schema_version!=1||receipt.id!=id||receipt.project_id!=project.id||
+            receipt.fingerprint!=fingerprint||receipt.parent_build_id!=build.id||
+            !matches!(receipt.operation,recipes::Operation::HudDuplicate{..}) {continue;}
+        receipt.operation.validate(&receipt.class,&receipt.tag).map_err(error)?;
+        let target=recipes::HudSourceTarget{class:receipt.class,tag:receipt.tag};target.validate().map_err(error)?;
+        if !targets.iter().any(|known|known.class==target.class&&known.tag.replace('\\',"/").eq_ignore_ascii_case(&target.tag.replace('\\',"/"))){targets.push(target);}
+    }
+    Ok(targets)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Context {

@@ -130,6 +130,8 @@ impl ScriptAttachment {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub encounter_append:Option<EncounterAppendRequest>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -156,6 +158,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub generated_firefight:Option<GeneratedFirefightSource>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
@@ -246,6 +250,7 @@ struct Prepared {
     source_data: Option<PathBuf>,
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
     parent_generated_firefight:Option<GeneratedFirefightSource>,
+    hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     encounter_expectations:Vec<crate::native_operations::Operation>,
     source_project:Project,
     parent_output: PathBuf,
@@ -372,14 +377,24 @@ fn valid_hash(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|c| c.is_ascii_hexdigit())
 }
 
+fn retain_hud_targets(values:&mut Vec<crate::native_operations::HudSourceTarget>,targets:impl IntoIterator<Item=crate::native_operations::HudSourceTarget>)->Result<()> {
+    for target in targets {
+        target.validate()?;
+        if values.iter().any(|existing|existing.class==target.class&&existing.tag.replace('\\',"/").eq_ignore_ascii_case(&target.tag.replace('\\',"/"))){continue;}
+        if values.len()>=64{return invalid("One working-tag build supports at most 64 reviewed HUD source tags");}
+        values.push(target);
+    }
+    Ok(())
+}
+
 fn parent_native_identity(
     project: &Project,
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>)> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>)> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
-    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;
+    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut hud_readback_targets=vec![];
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -403,6 +418,7 @@ fn parent_native_identity(
         if receipt.input_script_hashes.is_some() {
             verify_hash_manifest(parent, &receipt.input_script_hashes)?;
         }
+        retain_hud_targets(&mut hud_readback_targets,receipt.hud_readback_targets)?;
         controller_binding=receipt.controller_binding;
         generated_firefight=receipt.generated_firefight;
         for expectation in receipt.encounter_expectations.into_iter().chain(receipt.expected_encounter){retain_encounter_expectation(&mut encounter_expectations,expectation)?;}
@@ -455,9 +471,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight))
+        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets))
     } else {
-        Ok((None,controller_binding,encounter_expectations,generated_firefight))
+        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets))
     }
 }
 
@@ -585,7 +601,15 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    retain_hud_targets(&mut hud_readback_targets,input.hud_readback_targets.clone())?;
+    if !hud_readback_targets.is_empty(){
+        for (key,name) in [("invaderEdit","invader-edit"),("invaderExtract","invader-extract")] {
+            let path=checked_file(&input.invader_info.with_file_name(if cfg!(windows){format!("{name}.exe")}else{name.into()}))?;
+            if fs::metadata(&path)?.len()>256*1024*1024{return invalid("Native HUD readback tool exceeds its identity limit");}
+            tools.insert(key.into(),maps::hash_file(&path)?);
+        }
+    }
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
     if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
@@ -634,6 +658,7 @@ fn prepare(
         source_data,
         parent_controller_binding,
         parent_generated_firefight,
+        hud_readback_targets,
         encounter_expectations,
         source_project,
         parent_output,
@@ -872,6 +897,99 @@ fn apply_hud_append(project:&Project,input:&WorkingTagsInput,prepared:&Prepared,
     for message in crate::firefight::native_hud_messages(rules)?{if !owned_names.contains(&message.name){owned_names.push(message.name);}}
     Ok(GeneratedHudSource{tag_path:review.output_tag_path.clone(),tag_sha256:generated.sha256,messages:generated.messages,owned_names})
 }
+
+struct HudSourceSnapshot {
+    target:crate::native_operations::HudSourceTarget,
+    source_sha256:String,
+    fields:String,
+}
+fn read_hud_fields(input:&WorkingTagsInput,prepared:&Prepared,tags:&Path,tag:&str,workspace:&Path,runner:&Runner<'_>,
+    invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>,progress:u8)->Result<String> {
+    recheck_tools(input,&prepared.tools)?;
+    let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+    // Reuse the existing native alias/readback phase, including Windows paths.
+    let fields=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.into()],workspace,"asset-native-readback",progress)?;
+    if fields.len()>1024*1024||fields.lines().any(|line|line.trim_start().to_ascii_lowercase().starts_with("error:")) {
+        return invalid("Native HUD fields are incomplete or exceed the 1 MiB readback bound");
+    }
+    recheck_tools(input,&prepared.tools)?;Ok(fields)
+}
+fn snapshot_hud_sources(input:&WorkingTagsInput,prepared:&Prepared,tags:&Path,workspace:&Path,runner:&Runner<'_>,
+    invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)->Result<Vec<HudSourceSnapshot>> {
+    let root=checked_directory(tags)?;let mut snapshots=vec![];let mut bytes=0u64;let mut field_bytes=0usize;
+    for target in &prepared.hud_readback_targets {
+        target.validate()?;
+        let file=checked_file(&root.join(safe_relative(&target.tag)?))?;
+        if !file.starts_with(&root){return invalid("HUD source escaped staged working tags");}
+        bytes=bytes.checked_add(fs::metadata(&file)?.len()).ok_or_else(||SparkError::Invalid("HUD source size overflow".into()))?;
+        if bytes>32*1024*1024{return invalid("Reviewed HUD source exceeds the 32 MiB native readback bound");}
+        let hash=maps::hash_file(&file)?;
+        let fields=read_hud_fields(input,prepared,&root,&target.tag,workspace,runner,invoke,48)?;
+        // Also require a complete, bounded source inventory before the compiler.
+        let _=crate::native_operations::compare_hud_arrays(&target.class,&fields,&fields)?;
+        field_bytes=field_bytes.saturating_add(fields.len());
+        if field_bytes>8*1024*1024{return invalid("Combined HUD native field inventory exceeds 8 MiB");}
+        if maps::hash_file(&file)?!=hash{return invalid("Staged HUD changed during source readback; no compiler ran");}
+        snapshots.push(HudSourceSnapshot{target:target.clone(),source_sha256:hash,fields});
+    }
+    Ok(snapshots)
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct HudCompiledReadback {
+    target:crate::native_operations::HudSourceTarget,
+    source_tag_sha256:String,
+    recovered_tag_sha256:String,
+    arrays:Vec<crate::native_operations::HudArrayReadback>,
+}
+fn verify_hud_native_output(input:&WorkingTagsInput,prepared:&Prepared,snapshots:&[HudSourceSnapshot],tags:&Path,workspace:&Path,
+    output:&Path,inspection:&maps::MapInspection,runner:&Runner<'_>,
+    invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)->Result<Vec<HudCompiledReadback>> {
+    if snapshots.is_empty(){return Ok(vec![]);}
+    recheck_tools(input,&prepared.tools)?;
+    let recovered=workspace.join("hud-readback-tags");crate::reject_links(&recovered)?;
+    if recovered.try_exists()?{return invalid("HUD readback output is already occupied; no files were replaced");}
+    fs::create_dir(&recovered)?;
+    let mut args=vec!["--tags".into(),recovered.to_string_lossy().into_owned(),"--maps".into(),
+        output.parent().ok_or_else(||SparkError::Invalid("Compiled HUD cache directory is missing".into()))?.to_string_lossy().into_owned()];
+    for snapshot in snapshots {
+        snapshot.target.validate()?;
+        let suffix=format!(".{}",crate::tag_exchange::extension(&snapshot.target.class)?);
+        let path=snapshot.target.tag.strip_suffix(&suffix).ok_or_else(||SparkError::Invalid("HUD tag extension changed".into()))?.replace('\\',"/");
+        let indexed=inspection.tags.iter().filter(|tag|tag.class==snapshot.target.class&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&path)).collect::<Vec<_>>();
+        if indexed.len()!=1 {
+            return invalid(format!("Compiled map does not contain the source HUD tag {}. Bind it through the matching native scenario/player/weapon HUD before rebuilding.",snapshot.target.tag));
+        }
+        args.extend(["--search".into(),format!("{}{}",indexed[0].path,suffix)]);
+    }
+    args.push(output.to_string_lossy().into_owned());
+    // Exact selectors only, no recursive dependency extraction or SDK staging.
+    let extract=input.invader_info.with_file_name(if cfg!(windows){"invader-extract.exe"}else{"invader-extract"});
+    let log=invoke(runner,&extract,&args,workspace,"extract",80)?;
+    if log.lines().any(|line|line.trim_start().to_ascii_lowercase().starts_with("error:")) {return invalid("Compiled HUD extraction reported incomplete output");}
+    recheck_tools(input,&prepared.tools)?;
+    let inventory=crate::tool_transaction::inventory(&recovered)?;
+    if inventory.len()!=snapshots.len(){return invalid("Compiled HUD extraction did not emit exactly the reviewed tag set");}
+    let mut bytes=0u64;let mut readback=vec![];
+    for snapshot in snapshots {
+        let source=checked_file(&tags.join(safe_relative(&snapshot.target.tag)?))?;
+        if maps::hash_file(&source)?!=snapshot.source_sha256{return invalid("Staged HUD changed during native compilation; output was not adopted");}
+        let names=inventory.keys().filter(|name|name.replace('\\',"/").eq_ignore_ascii_case(&snapshot.target.tag.replace('\\',"/"))).collect::<Vec<_>>();
+        if names.len()!=1{return invalid("Recovered HUD class/path is missing or ambiguous");}
+        let recovered_name=names[0];
+        let file=checked_file(&recovered.join(safe_relative(recovered_name)?))?;
+        bytes=bytes.checked_add(fs::metadata(&file)?.len()).ok_or_else(||SparkError::Invalid("Compiled HUD size overflow".into()))?;
+        if bytes>64*1024*1024{return invalid("Compiled HUD readback exceeds 64 MiB");}
+        let hash=maps::hash_file(&file)?;
+        let fields=read_hud_fields(input,prepared,&recovered,recovered_name,workspace,runner,invoke,82)?;
+        let arrays=crate::native_operations::compare_hud_arrays(&snapshot.target.class,&snapshot.fields,&fields)?;
+        if maps::hash_file(&file)?!=hash{return invalid("Recovered native HUD changed during field readback");}
+        readback.push(HudCompiledReadback{target:snapshot.target.clone(),source_tag_sha256:snapshot.source_sha256.clone(),recovered_tag_sha256:hash,arrays});
+    }
+    if maps::hash_file(output)?!=inspection.sha256{return invalid("Compiled map changed during HUD readback");}
+    Ok(readback)
+}
+
 fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) -> Result<()> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
     for (key, path) in [
@@ -882,10 +1000,10 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
             return invalid("Selected tool executable changed during the working-tag build");
         }
     }
-    for (key,name) in [("invaderEdit","invader-edit"),("invaderScript","invader-script"),("invaderString","invader-string")] {
+    for (key,name) in [("invaderEdit","invader-edit"),("invaderScript","invader-script"),("invaderString","invader-string"),("invaderExtract","invader-extract")] {
         if let Some(hash)=expected.get(key) {
             let path=input.invader_info.with_file_name(if cfg!(windows){format!("{name}.exe")}else{name.into()});
-            if hash!=&maps::hash_file(&checked_file(&path)?)?{return invalid("Selected native script/audio tool changed during the working-tag build");}
+            if hash!=&maps::hash_file(&checked_file(&path)?)?{return invalid("Selected native readback/script/audio tool changed during the working-tag build");}
         }
     }
     Ok(())
@@ -991,6 +1109,7 @@ fn run_with(
     };
     let mut receipt = WorkingTagsReceipt {
         generated_firefight:prepared.parent_generated_firefight.clone(),
+        hud_readback_targets:prepared.hud_readback_targets.clone(),
         encounter_expectations:prepared.encounter_expectations.clone(),
         attached_script:None,
         controller_binding:prepared.parent_controller_binding.clone(),
@@ -1021,7 +1140,7 @@ fn run_with(
     let mut input_hashes = BTreeMap::new();
     let input_scripts = script_hashes(prepared.source_data.as_deref(), &cancel)?;
     let mut staged_scripts=input_scripts.clone();
-    let result = (|| -> Result<PathBuf> {
+    let result = (|| -> Result<(PathBuf,String)> {
         if let Some(append)=&input.encounter_append {
             if inventory_identity(&input_scripts)?!=append.scripts_sha256{return invalid("Original script sources changed after Firefight review; prepare the groups and controller again. No native writer or compiler ran");}
         }
@@ -1167,6 +1286,7 @@ fn run_with(
         };
         // Use Runner's existing protected write phase: cancellation/timeout is
         // observed after native Tool exits, never by forcefully killing it.
+        let hud_sources=snapshot_hud_sources(input,&prepared,&tags,&workspace,&runner,&invoke)?;
         let log = invoke(&runner, &input.tool, &args, &workspace, "scenario", 50)?;
         if cache_version == 13 && !crate::conversion::native_compile_succeeded(&log) {
             return invalid("H1A Tool did not confirm successful cache compilation; zero exit status is insufficient");
@@ -1209,6 +1329,10 @@ fn run_with(
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
+        let hud_readback=verify_hud_native_output(input,&prepared,&hud_sources,&tags,&workspace,&output,&inspected,&runner,&invoke)?;
+        if !hud_readback.is_empty(){
+            project::atomic_write(&directory.join("native-hud-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({"sourceParentSha256":receipt.parent_output_sha256,"outputSha256":inspected.sha256,"tags":hud_readback,"scope":"Current staged HUD root reflexive inventories and exposed descendants, independently recovered from compiled output. Root scalars, opaque cells and gameplay are not certified."}))?,false)?;
+        }
         if let Some(binding)=&receipt.controller_binding{binding.verify_map(&inspected)?;}
         if let Some(hud)=receipt.generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref()){
             verify_generated_hud(hud,&output,&inspected)?;
@@ -1286,12 +1410,13 @@ fn run_with(
             "working-tags-final.json",
             &final_hashes,
         )?);
-        Ok(output)
+        if maps::hash_file(&output)?!=inspected.sha256{return invalid("Compiled cache changed after native readback; no output was adopted");}
+        Ok((output,inspected.sha256))
     })();
     let record = match result {
-        Ok(output) => BuildRecord {
+        Ok((output,verified_sha256)) => BuildRecord {
             id: job_id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(), target: input.parent_build.target.clone(),
-            sha256: Some(maps::hash_file(&output)?), output: Some(output), project_fingerprint: fingerprint,
+            sha256: Some(verified_sha256), output: Some(output), project_fingerprint: fingerprint,
             message: if let Some(attachment)=&receipt.attached_script {
                 format!("{} reviewed module {} (SHA256 {}) in separate native source; original modules and script signatures retained. Native compilation/readback passed, gameplay remains untested.",if input.encounter_append.as_ref().is_some_and(|request|request.existing_controller.is_some()){"Revised exact generated"}else{"Added"},attachment.filename,attachment.sha256)
             } else if input.compile_scripts {
@@ -1442,6 +1567,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            hud_readback_targets:vec![],
             encounter_append:None,
             script_attachment:None,
             expected_encounter:None,

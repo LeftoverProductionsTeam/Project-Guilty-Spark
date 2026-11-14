@@ -616,6 +616,41 @@ fn reviewed_hud_duplicate(before:&str,after:&str,operation:&Operation)->Result<V
         after:format!("{array}[{}] · exact exposed copy appended at {}",result.count,original.count)}])
 }
 
+
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct HudSourceTarget {pub class:String,pub tag:String}
+impl HudSourceTarget {
+    pub fn validate(&self)->Result<()> {
+        safe_relative(&self.tag)?;
+        if crate::maps::hud_root_arrays(&self.class)?.is_empty()||self.tag.len()>240||self.tag.starts_with('-')||
+            self.tag.bytes().any(|b|b"*?[]".contains(&b))||
+            !self.tag.ends_with(&format!(".{}",crate::tag_exchange::extension(&self.class)?)) {
+            return invalid("HUD readback needs an exact admitted native tag path/class, not a wildcard");
+        }
+        Ok(())
+    }
+}
+#[derive(Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct HudArrayReadback {pub name:String,pub elements:usize,pub exposed_rows:usize}
+/// Compare current native source with a separately recovered compiled HUD tag.
+/// Root scalars, opaque cells and target-game behavior are outside this contract.
+pub fn compare_hud_arrays(class:&str,source:&str,compiled:&str)->Result<Vec<HudArrayReadback>> {
+    let definitions=crate::maps::hud_root_arrays(class)?;
+    if definitions.is_empty(){return invalid("This is not an admitted native HUD tag class");}
+    let mut result=vec![];
+    for definition in definitions {
+        let before=array_listing(source,&definition.name)?;let after=array_listing(compiled,&definition.name)?;
+        let _=hud_array_items(&before,&definition.name)?;let _=hud_array_items(&after,&definition.name)?;
+        if before.count>definition.maximum||after.count!=before.count||after.body!=before.body {
+            return invalid(format!("Compiled native HUD array differs from staged source: {}",definition.name));
+        }
+        result.push(HudArrayReadback{name:definition.name,elements:before.count,exposed_rows:before.body.len()});
+    }
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
