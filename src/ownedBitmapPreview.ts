@@ -1,3 +1,6 @@
+import type {Project} from './types';
+import {nativePreviewResource} from './nativePreviewResources';
+import {bitmapResourceSha256,textureResourceScope} from './textureResourceScope';
 /** Read-only classic-map bitmap preview response validation.
  * No game assets are bundled, cached on disk, or saved into project JSON.
  */
@@ -171,4 +174,14 @@ export function decodeOwnedBitmapPreview(
   decodedPixels.put(key, preview.ddsBase64, decoded);
   profileGauge('bitmap-decode', () => decodedPixels.stats());
   return decoded;
+}
+
+/** Shared checked read/decode path for inspection and HUD composition. No new cache. */
+export async function readOwnedBitmapImage(project:Project,bitmapTagId:number,imageIndex:number,mipLevel=0){
+  const source=project.source;if(!source)throw Error("Open a preserved source map first.");
+  const preview=await nativePreviewResource<OwnedBitmapPreview>("preview_owned_cache_bitmap",
+    {projectId:project.id,bitmapTagId,imageIndex,mipLevel},source.sha256,textureResourceScope(source));
+  const image=decodeOwnedBitmapPreview(preview,{bitmapTagId,imageIndex,mipLevel,
+    sourceSha256:source.sha256,resourceSha256:bitmapResourceSha256(source)});
+  return {preview,image};
 }

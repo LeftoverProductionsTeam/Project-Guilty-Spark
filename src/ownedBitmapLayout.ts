@@ -1,3 +1,6 @@
+import type {Project} from './types';
+import {nativePreviewResource} from './nativePreviewResources';
+import {textureResourceScope} from './textureResourceScope';
 /** Native sequence/atlas metadata. Pixels still use the existing bitmap decoder. */
 export interface BitmapLayoutImage {width:number;height:number;kind:number;registration:[number,number]}
 export interface BitmapLayoutSprite {imageIndex:number;left:number;right:number;top:number;bottom:number;registration:[number,number]}
@@ -36,4 +39,13 @@ export function bitmapSequenceFrame(layout:OwnedBitmapLayout,sequenceIndex:numbe
   const crop:[number,number,number,number]=sprite?[sprite.left,sprite.top,sprite.right-sprite.left,sprite.bottom-sprite.top]:[0,0,1,1];
   return {imageIndex,frameCount:count,crop,width:image.width*crop[2],height:image.height*crop[3],
     registration:sprite?[sprite.registration[0]*image.width,sprite.registration[1]*image.height]:image.registration,sprite:!!sprite};
+}
+
+/** Share bounded native reads; resource selection belongs to the project source. */
+export async function readOwnedBitmapLayout(project:Project,bitmapTagId:number):Promise<OwnedBitmapLayout>{
+  const source=project.source;if(!source)throw Error("Open a preserved source map first.");
+  const response=await nativePreviewResource<OwnedBitmapLayout>("inspect_owned_cache_bitmap_layout",
+    {projectId:project.id,bitmapTagId},source.sha256,textureResourceScope(source));
+  return validateOwnedBitmapLayout(response,{bitmapTagId,sourceSha256:source.sha256,
+    resourceSha256:source.resourceSha256?.["bitmaps.map"]??null});
 }

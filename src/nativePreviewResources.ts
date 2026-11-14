@@ -2,7 +2,7 @@ import {call} from './api';
 import {textureResourceScopeForProject} from './textureResourceScope';
 import {nativePreviewBudget} from './resourceBudgets';
 
-type Command = 'preview_owned_object_model' | 'preview_owned_cache_bitmap_batch' | 'preview_owned_reflection_cube';
+type Command = 'preview_owned_object_model' | 'preview_owned_cache_bitmap_batch' | 'preview_owned_cache_bitmap' | 'inspect_owned_cache_bitmap_layout' | 'preview_owned_reflection_cube';
 type Entry = {promise:Promise<unknown>;bytes:number;project:string};
 const entries=new Map<string,Entry>();
 const MAX_ENTRIES=128,MAX_PENDING=32;
@@ -10,9 +10,9 @@ let bytes=0,hits=0,misses=0;
 function remove(key:string,entry:Entry){if(entries.get(key)!==entry)return;entries.delete(key);bytes-=entry.bytes;}
 /** Shared native reads for immutable source revisions. Each consumer still uses
  * the existing identity/bitmap/shader decoder and owns its GPU resources. */
-export async function nativePreviewResource<T>(command:Command,args:Record<string,unknown>,sourceHash:string):Promise<T>{
+export async function nativePreviewResource<T>(command:Command,args:Record<string,unknown>,sourceHash:string,sourceResourceScope?:string):Promise<T>{
   if(!/^[a-f0-9]{64}$/i.test(sourceHash))throw Error('A verified native source identity is required.');
-  const scope=textureResourceScopeForProject(String(args.projectId??''));
+  const scope=sourceResourceScope??textureResourceScopeForProject(String(args.projectId??''));
   const key=JSON.stringify([command,sourceHash,scope,args]);
   const known=entries.get(key);
   if(known){
@@ -26,6 +26,8 @@ export async function nativePreviewResource<T>(command:Command,args:Record<strin
     if(value.sourceSha256!==sourceHash)throw Error('Native preview source identity changed.');
     if(command==='preview_owned_object_model'&&value.objectTagId!==args.tagId)throw Error('Native model tag identity changed.');
     if(command==='preview_owned_reflection_cube'&&value.bitmapTagId!==args.bitmapTagId)throw Error('Native reflection tag identity changed.');
+    if((command==='inspect_owned_cache_bitmap_layout'||command==='preview_owned_cache_bitmap')&&value.bitmapTagId!==args.bitmapTagId)throw Error('Native bitmap tag identity changed.');
+    if(command==='preview_owned_cache_bitmap'&&(value.imageIndex!==args.imageIndex||(value.mipLevel??0)!==(args.mipLevel??0)))throw Error('Native bitmap image identity changed.');
     // Refusals/missing resources are retryable, never retained as valid images.
     const incomplete=[value.items,value.mipItems].some(items=>Array.isArray(items)&&items.some((item:any)=>!item.preview||item.error));
     const size=JSON.stringify(value).length*2;

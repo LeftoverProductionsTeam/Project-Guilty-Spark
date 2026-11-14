@@ -1,13 +1,13 @@
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {call,native} from '../api';
-import {decodeOwnedBitmapPreview} from '../ownedBitmapPreview';
+import {native} from '../api';
+import {readOwnedBitmapImage} from '../ownedBitmapPreview';
 import type {OwnedBitmapPreview} from '../ownedBitmapPreview';
-import {bitmapSequenceFrame,validateOwnedBitmapLayout} from '../ownedBitmapLayout';
+import {bitmapSequenceFrame,readOwnedBitmapLayout} from '../ownedBitmapLayout';
 import type {OwnedBitmapLayout,BitmapSequenceFrame} from '../ownedBitmapLayout';
 import type {DdsImage} from '../haloDds';
 import type {Project} from '../types';
 import {useMapState} from '../mapSession';
-import {textureResourceScope,bitmapResourceSha256} from '../textureResourceScope';
+import {textureResourceScope} from '../textureResourceScope';
 import {decodeReflectionCube, readReflectionCube} from '../ownedReflectionCube';
 
 /** A borrowed live canvas; never retained in project/session data or copied into another asset cache. */
@@ -50,9 +50,7 @@ export default function BitmapPreview({project,tagId,cube=false,hudSequence,onHu
     let alive=true;setLayout(null);setLayoutError('');setLayoutLoading(hudMode);
     if(!hudMode)return;
     if(!native||!project.source){setLayoutError('Open a preserved map in the desktop app to inspect its original HUD sequences.');setLayoutLoading(false);return;}
-    const source=project.source;
-    void call<OwnedBitmapLayout>('inspect_owned_cache_bitmap_layout',{projectId:project.id,bitmapTagId:tagId})
-      .then(value=>validateOwnedBitmapLayout(value,{bitmapTagId:tagId,sourceSha256:source.sha256,resourceSha256:source.resourceSha256?.['bitmaps.map']??null}))
+    void readOwnedBitmapLayout(project,tagId)
       .then(value=>{if(alive)setLayout({scope:layoutScope,value});})
       .catch(reason=>{if(alive)setLayoutError(String(reason));}).finally(()=>{if(alive)setLayoutLoading(false);});
     return()=>{alive=false;};
@@ -69,8 +67,7 @@ export default function BitmapPreview({project,tagId,cube=false,hudSequence,onHu
         if(alive){setCount(1);setFrame({images:decoded.faces,previews:response.faces,scope});}
         return;
       }
-      const preview=await call<OwnedBitmapPreview>('preview_owned_cache_bitmap',{projectId:project.id,bitmapTagId:tagId,imageIndex:index,mipLevel:mip});
-      const image=decodeOwnedBitmapPreview(preview,{bitmapTagId:tagId,imageIndex:index,mipLevel:mip,sourceSha256:source.sha256,resourceSha256:bitmapResourceSha256(source)});
+      const {preview,image}=await readOwnedBitmapImage(project,tagId,index,mip);
       if(alive){setCount(preview.imageCount??1);setLevels(preview.mipLevels??1);setFrame({images:[image],previews:[preview],scope});}
     };
     void load().catch(reason=>{if(alive)setError(String(reason));}).finally(()=>{if(alive)setLoading(false);});
