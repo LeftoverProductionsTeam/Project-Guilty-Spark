@@ -427,6 +427,11 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
 pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:Option<&FileRevision>)->Result<Option<PathBuf>> {
     reject_links(path)?;
     if let Some(expected)=expected{expected.verify(path)?;}
+    #[cfg(windows)]
+    let destination_guard = hold_saved_destination(path, expected)?;
+    #[cfg(windows)]
+    let create_only = destination_guard.is_none();
+    #[cfg(not(windows))]
     let create_only = match fs::symlink_metadata(path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
         Err(error) => return Err(error.into()),
@@ -471,6 +476,14 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         if let Some(expected)=expected{expected.verify(path)?;}
         #[cfg(test)]
         atomic_publication_tests::run_publication_hook();
+        #[cfg(windows)]
+        if let Some(guard) = &destination_guard {
+            let identity = crate::storage::unique_file_handle_identity(guard)
+                .ok_or_else(|| crate::SparkError::Invalid("Saved file acquired aliases or lost ownership during Save; retained".into()))?;
+            if crate::storage::unique_file_identity(path) != Some(identity) {
+                return invalid("Saved file was replaced outside Spark during Save; external revision retained");
+            }
+        }
         publish_staged_file(&temp, path, create_only, staged_revision.as_ref().unwrap())?;
         Ok(bak)
     })();
@@ -479,6 +492,33 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         let _ = dispose_staged_file(&temp, revision);
     }
     result
+}
+// Retain the reviewed destination's file object throughout staging/publication.
+// Readers and rename-based editors remain compatible; in-place writers do not.
+// A final pathname substitution race still needs an independent conditional
+// replacement protocol; this guard does not claim to make rename a CAS.
+#[cfg(windows)]
+fn hold_saved_destination(path: &Path, expected: Option<&FileRevision>) -> Result<Option<fs::File>> {
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+    let file = match OpenOptions::new().read(true).share_mode(1 | 4).custom_flags(0x00200000).open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.raw_os_error() == Some(32) => return invalid("This saved file is open for writing in another program. Finish that edit and retry Save; the current file was retained"),
+        Err(error) => return Err(error.into()),
+    };
+    let metadata = file.metadata()?;
+    if !metadata.is_file() || metadata.file_attributes() & 0x400 != 0 {
+        return invalid("Saved destination is not a regular, unlinked file; retained");
+    }
+    let identity = crate::storage::unique_file_handle_identity(&file)
+        .ok_or_else(|| crate::SparkError::Invalid("Saved destination has aliases or unavailable ownership; retained".into()))?;
+    if let Some(expected) = expected {
+        if expected.identity != Some(identity) {
+            return invalid("Saved destination changed ownership before Save; external revision retained");
+        }
+        expected.verify(path)?;
+    }
+    Ok(Some(file))
 }
 struct StagedRevision { file: FileRevision, len: u64 }
 fn verify_staged_handle(file: &mut fs::File, revision: &StagedRevision) -> Result<()> {
@@ -568,15 +608,18 @@ fn publish_staged_file(temp: &Path, path: &Path, create_only: bool, revision: &S
         let size = (offset + (name.len() + 1) * 2).max(std::mem::size_of::<RenameInformation>());
         let mut aligned = vec![0u64; size.div_ceil(8)];
         let information = aligned.as_mut_ptr().cast::<RenameInformation>();
-        // FILE_RENAME_INFO, ReplaceIfExists is false for first publication.
+        // First publication uses FileRenameInfo with no replacement. Updates
+        // use FileRenameInfoEx/POSIX_SEMANTICS to retain our read-only target
+        // guard during atomic replacement. No IGNORE_READONLY/security flags.
+        // Unsupported filesystems fail; never drop the guard and retry unsafely.
         // The source is the exact verified handle, not its mutable pathname.
         unsafe {
-            (*information).flags = u32::from(!create_only);
+            (*information).flags = if create_only { 0 } else { 1 | 2 };
             (*information).root = std::ptr::null_mut();
             (*information).length = u32::try_from(name.len() * 2).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?;
             std::ptr::copy_nonoverlapping(name.as_ptr(), aligned.as_mut_ptr().cast::<u8>().add(offset).cast::<u16>(), name.len());
         }
-        set_staged_information(&file, 3, aligned.as_ptr().cast(), u32::try_from(size).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?)?;
+        set_staged_information(&file, if create_only { 3 } else { 22 }, aligned.as_ptr().cast(), u32::try_from(size).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?)?;
     }
     #[cfg(not(windows))] {
         // This target still requires separate descriptor-relative publication
@@ -587,6 +630,7 @@ fn publish_staged_file(temp: &Path, path: &Path, create_only: bool, revision: &S
             fs::remove_file(temp)?;
         } else { fs::rename(temp, path)?; }
     }
+    drop(file);
     Ok(())
 }
 pub(crate) fn encoded_project(path:&Path,project:&Project)->Result<Vec<u8>> {
@@ -934,6 +978,84 @@ mod atomic_publication_tests {
         atomic_write(&target, b"verified staged source", false).unwrap();
         assert_eq!(fs::read(target).unwrap(), b"verified staged source");
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+    #[cfg(windows)]
+    fn existing_in_place_writer_cannot_be_lost(checked: bool) {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        fs::write(&target, b"reviewed source").unwrap();
+        let reviewed = FileRevision::capture(&target).unwrap();
+        let foreign = target.clone();
+        let accepted = std::rc::Rc::new(std::cell::Cell::new(false));
+        let observed = accepted.clone();
+        PUBLICATION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let result = fs::write(foreign, b"external editor's new revision");
+            if let Err(error) = &result { assert_eq!(error.raw_os_error(), Some(32), "refusal must be native sharing enforcement"); }
+            observed.set(result.is_ok());
+        })));
+        let result = atomic_write_checked(&target, b"our saved revision", false, checked.then_some(&reviewed));
+        if accepted.get() {
+            assert!(result.is_err(), "an external write accepted during Save must never be overwritten");
+            assert_eq!(fs::read(&target).unwrap(), b"external editor's new revision");
+        } else {
+            result.unwrap();
+            assert_eq!(fs::read(&target).unwrap(), b"our saved revision");
+        }
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+    #[cfg(windows)]
+    #[test]
+    fn checked_existing_save_preserves_a_late_in_place_editor_write() { existing_in_place_writer_cannot_be_lost(true); }
+    #[cfg(windows)]
+    #[test]
+    fn unchecked_existing_save_preserves_a_late_in_place_editor_write() { existing_in_place_writer_cannot_be_lost(false); }
+    #[cfg(windows)]
+    #[test]
+    fn checked_existing_save_preserves_a_late_atomic_editor_replacement() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        fs::write(&target, b"reviewed source").unwrap();
+        let reviewed = FileRevision::capture(&target).unwrap();
+        let foreign = target.clone();
+        PUBLICATION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let staged = foreign.with_extension("external-editor");
+            fs::write(&staged, b"external editor's atomic revision").unwrap();
+            fs::rename(staged, foreign).unwrap();
+        })));
+        assert!(atomic_write_checked(&target, b"our saved revision", false, Some(&reviewed)).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"external editor's atomic revision");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+    #[cfg(windows)]
+    #[test]
+    fn an_already_open_external_writer_prevents_save_without_closing_that_writer() {
+        use std::io::{Seek, SeekFrom};
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        fs::write(&target, b"reviewed source").unwrap();
+        let mut external = OpenOptions::new().write(true).open(&target).unwrap();
+        let error = atomic_write(&target, b"our saved revision", false).unwrap_err();
+        assert!(error.to_string().contains("Finish that edit and retry Save"));
+        assert_eq!(fs::read(&target).unwrap(), b"reviewed source");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+        external.seek(SeekFrom::Start(0)).unwrap();
+        external.write_all(b"external source").unwrap();
+        drop(external);
+        atomic_write(&target, b"our saved revision", false).unwrap();
+        assert_eq!(fs::read(target).unwrap(), b"our saved revision");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn guarded_save_preserves_existing_reader_snapshot_and_publishes_new_revision() {
+        use std::io::Read;
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        fs::write(&target, b"reviewed source").unwrap();
+        let mut reader = fs::File::open(&target).unwrap();
+        atomic_write(&target, b"our saved revision", false).unwrap();
+        let mut original = Vec::new();reader.read_to_end(&mut original).unwrap();
+        assert_eq!(original, b"reviewed source");
+        assert_eq!(fs::read(target).unwrap(), b"our saved revision");
     }
     fn arriving_file_is_preserved(checked: bool) {
         let root = tempfile::tempdir().unwrap();
