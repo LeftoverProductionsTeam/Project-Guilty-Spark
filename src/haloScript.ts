@@ -252,16 +252,16 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
   waves.forEach((wave,w)=>{
     const counts=wave.groups.map(g=>`(ai_living_count ${g.ref})`), living=counts.length===1?counts[0]:`(+ ${counts.join(' ')})`;
     lines.push(`(script static void gs_wave_${String(w+1).padStart(2,'0')}`);
-    if(feedback)lines.push('  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))');
+    lines.push(feedback?'  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))':'  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (set gs_ff_state 5))');
     lines.push('  (if (!= gs_ff_state 5) (begin',
       '    (set gs_ff_state 2)',`    (set gs_ff_wave ${w+1})`);
     if(feedback)lines.push(`    (hud_set_help_text gs_ff_wave_${w+1})`);
     for(const group of wave.groups)lines.push(`    (ai_place ${group.ref})`,
       `    (set ${owned(group)} (ai_actors ${group.ref}))`,`    (ai_force_active ${group.ref} true)`);
     const exact=wave.groups.map(g=>`(= (ai_living_count ${g.ref}) ${g.count})`), ready=exact.length===1?exact[0]:`(and ${exact.join(' ')})`;
-    lines.push(`    (sleep_until ${feedback?`(or ${ready} (<= (unit_get_health gs_ff_player) 0))`:ready} 1 ${ticks(config.spawnTimeoutMs)})`,
+    lines.push(`    (sleep_until (or ${ready} (<= (unit_get_health gs_ff_player) 0)) 1 ${ticks(config.spawnTimeoutMs)})`,
       `    (if (not ${ready}) ${feedback?'(begin (set gs_ff_failure 2) (set gs_ff_state 5))':'(set gs_ff_state 5)'})`,
-      ...(feedback?['    (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))']:[]),
+      feedback?'    (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))':'    (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))',
       '    (if (!= gs_ff_state 5) (begin',
       `      (sleep_until (or (= ${living} 0) (<= (unit_get_health gs_ff_player) 0)) 1 ${ticks(config.stuckTimeoutMs)})`,
       `      (if (and (= ${living} 0) (> (unit_get_health gs_ff_player) 0))`,
@@ -280,16 +280,16 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
     feedback?'  (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 1) (set gs_ff_state 5)))':'  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))');
   if(feedback)lines.push('  (show_hud_help_text true)','  (if (!= gs_ff_state 5) (hud_set_help_text gs_ff_ready))','  (gs_ff_show_score)');
   if(player)lines.push('  (if (!= gs_ff_state 5) (player_add_equipment gs_ff_player gs_firefight_start true))');
-  if(feedback)lines.push(`  (if (!= gs_ff_state 5) (begin (sleep_until (<= (unit_get_health gs_ff_player) 0) 1 ${ticks(config.preparationMs+config.countdownMs)}) (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))))`);
-  else lines.push(`  (sleep ${ticks(config.preparationMs+config.countdownMs)})`);
+  // HUD feedback is presentation only; death and round transitions must not depend on it.
+  lines.push(`  (if (!= gs_ff_state 5) (begin (sleep_until (<= (unit_get_health gs_ff_player) 0) 1 ${ticks(config.preparationMs+config.countdownMs)}) (if (<= (unit_get_health gs_ff_player) 0) ${feedback?'(begin (set gs_ff_failure 3) (set gs_ff_state 5))':'(set gs_ff_state 5)'})))`);
   for(let r=0;r<config.rounds;r++){
-    lines.push(feedback?`  (if (!= gs_ff_state 5) (set gs_ff_round ${r+1}))`:`  (set gs_ff_round ${r+1})`);
+    lines.push(`  (if (!= gs_ff_state 5) (set gs_ff_round ${r+1}))`);
     if(feedback)lines.push(`  (if (!= gs_ff_state 5) (hud_set_objective_text gs_ff_round_${r+1}))`);
     for(let w=0;w<waves.length;w++){lines.push(`  (gs_wave_${String(w+1).padStart(2,'0')})`);
-      if(!feedback||r!==config.rounds-1||w!==waves.length-1)lines.push(`  (if (!= gs_ff_state 5) (sleep ${ticks(config.intermissionMs)}))`);
+      if(r!==config.rounds-1||w!==waves.length-1)lines.push(`  (if (!= gs_ff_state 5) (sleep ${ticks(config.intermissionMs)}))`);
     }
   }
-  if(feedback)lines.push('  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))');
+  lines.push(feedback?'  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))':'  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (set gs_ff_state 5))');
   lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
   if(feedback){
     lines.push('  (if (= gs_ff_state 4) (hud_set_help_text gs_ff_victory))');
