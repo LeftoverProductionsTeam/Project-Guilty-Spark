@@ -811,6 +811,7 @@ pub fn run_build(
     crate::reject_links(&dir)?;
     fs::create_dir_all(&dir)?;
     storage_lease.mark_owned()?;
+    project::save_project(&dir.join("project.gsproject"),project)?;
     let input_workspace = TransientInput::create(jobs_root, &source.preserved_path, &source.sha256,
         fs::metadata(&source.preserved_path)?.len().max(inspection.header.declared_size as u64))?;
     let input_dir = input_workspace.directory.clone();

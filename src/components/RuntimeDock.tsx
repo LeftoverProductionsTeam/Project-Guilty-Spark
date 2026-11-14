@@ -78,9 +78,10 @@ export default function RuntimeDock({
   const [plan, setPlan] = useState<ToolLaunchPlan | null>(null),
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
+  const authoringPending=report?.workingSource?.authoringPending===true;
   const toolTags = useWorkingTagChanges(
     project?.id ?? null,
-    runtime === 'mccSteam' ? (report?.workingSource?.buildId ?? null) : null,
+    runtime === 'mccSteam' && !authoringPending ? (report?.workingSource?.buildId ?? null) : null,
     report?.workingSource?.tagsDirectory ?? null,
   );
   const [handoffIntegrity, setHandoffIntegrity] = useState<{
@@ -102,7 +103,7 @@ export default function RuntimeDock({
   const generation = useRef(0);
   const scriptSelection = useRef(0);
   const [scriptAttachment,setScriptAttachment]=useState<(NativeScriptAttachment&{sourceKey:string;reviewed:boolean})|null>(null);
-  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory]);
+  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,project?.firefight]);
   const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
   const selectedScript=scriptAttachment?.sourceKey===scriptSourceKey?scriptAttachment:null;
   const currentReport = useRef(report);
@@ -350,13 +351,16 @@ export default function RuntimeDock({
       integrityBlocks(toolTags.report?.integrity)
     )
       return;
+    if(!report?.workingSource||runtime!=='mccSteam')return;
+    if(authoringPending&&!compileScripts){setError('Firefight rules changed. Review their bound controller and choose Attach source & compile or Compile scripts & build.');return;}
     if(attachment&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),
-        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256},expectedBuildId:report!.workingSource!.buildId,expectedSourceDirectory:report!.workingSource!.tagsDirectory}:{}) });
+        ...(compileScripts?{expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory}:{}),
+        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256}}:{}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
@@ -462,7 +466,7 @@ export default function RuntimeDock({
           </div>
         )}
       </footer>
-      {runtime === 'mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch} monitorOnly />}
+      {runtime === 'mccSteam' && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} monitorOnly />}
       {details && (
       <div className="modal-backdrop">
         <section
@@ -538,12 +542,16 @@ export default function RuntimeDock({
               Play &amp; servers
             </button>
           </div>
-          {project && report?.workingSource && <WorkingTagChanges {...toolTags} />}
-          {runtime === 'mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch} />}
-          {runtime === 'mccSteam' && project && report?.workingSource && (
+          {authoringPending && report?.workingSource && <Notice>
+            Firefight rules are saved but not compiled. The retained source belongs to the earlier build; it is available for a reviewed controller rebuild only. Export the current bound controller in Firefight rules → Advanced script export, then attach it below. For an existing controller, edit/review its original module through Open script source folder and choose Compile scripts &amp; build. A tag-only build cannot apply these rules.
+            <details><summary>Source and authored revisions</summary><p className="wrap-code">Compiled source: {report.workingSource.sourceProjectFingerprint}<br/>Saved authoring: {report.workingSource.projectFingerprint}</p></details>
+          </Notice>}
+          {project && report?.workingSource && !authoringPending && <WorkingTagChanges {...toolTags} />}
+          {runtime === 'mccSteam' && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} />}
+          {runtime === 'mccSteam' && project && report?.workingSource && !authoringPending && (
             <NativeTagOperations project={project} dirty={dirty} epoch={epoch} />
           )}
-          {project && report?.workingSource && runtime === 'mccSteam' && (
+          {project && report?.workingSource && runtime === 'mccSteam' && !authoringPending && (
             <BspAudioEditor
               key={project.id + report.workingSource.buildId}
               projectId={project.id}
@@ -560,10 +568,11 @@ export default function RuntimeDock({
               onBuild={buildWorkingTags}
             />
           )}
-          {project && (
+          {project && report?.workingSource && runtime === 'mccSteam' && (
             <div className="button-row">
               <button
                 disabled={
+                  authoringPending ||
                   !native ||
                   !report ||
                   busy ||
@@ -585,7 +594,7 @@ export default function RuntimeDock({
                 title="Compile this scenario's reviewed .hsc modules before building its native map. Requires complete original modules and matching Invader-script; other scenarios and unrelated global scripts are excluded."
                 onClick={()=>void buildWorkingTags(undefined,true)}
               >Compile scripts &amp; build</button>
-              <button disabled={busy||working||!native} title="Open this native build's data folder. Edit the selected scenario's scripts directory; unrelated scenario/global source is not adopted. Save and close external editors before compiling."
+              <button disabled={busy||working||!native||!report?.workingSource} title="Open this native build's data folder. Edit the selected scenario's scripts directory; unrelated scenario/global source is not adopted. Save and close external editors before compiling."
                 onClick={()=>void call('reveal_folder',{kind:'workingScripts',id:project.id+':'+report.workingSource!.buildId}).catch(problem=>setError(String(problem)))}
               >Open script source folder</button>
               {report?.workingBuild && (

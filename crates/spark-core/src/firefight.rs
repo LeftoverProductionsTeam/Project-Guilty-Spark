@@ -509,12 +509,27 @@ pub struct NativeControllerGroup { pub name:String,pub actor_variant_path:String
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct NativeControllerBinding {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub rules:Option<FirefightConfig>,
     pub schema_version:u16,pub source_sha256:String,pub encounters:Vec<Vec<String>>,pub groups:Vec<NativeControllerGroup>,pub activation:String,pub loadout:String,
 }
 impl NativeControllerBinding {
     pub fn validate(&self)->Result<()> {
         if self.schema_version!=1||self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_digit()||(b'a'..=b'f').contains(&c))||!matches!(self.activation.as_str(),"manual"|"startup")||self.loadout!="scenario"||self.groups.is_empty()||self.groups.len()>128||self.encounters.is_empty()||self.encounters.len()>32||self.encounters.iter().any(|wave|wave.is_empty()||wave.len()>8)||self.encounters.iter().map(Vec::len).sum::<usize>()!=self.groups.len() {
             return invalid("Unsupported or incomplete native controller source binding");
+        }
+        if let Some(rules)=&self.rules {
+            validate(rules)?;
+            if !rules.source_sha256.as_deref().is_some_and(|hash|hash.eq_ignore_ascii_case(&self.source_sha256)){return invalid("Controller rules and native binding use different source maps");}
+            if rules.waves.len()!=self.encounters.len()||rules.waves.iter().zip(&self.encounters).any(|(wave,names)|wave.groups.len()!=names.len()) {
+                return invalid("Controller rule waves differ from their native encounter bindings");
+            }
+            for (group,native) in rules.waves.iter().flat_map(|wave|&wave.groups).zip(&self.groups) {
+                let enemy=rules.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||SparkError::Invalid("Controller rule actor is unavailable".into()))?;
+                if group.count!=native.count||!enemy.actor_variant_path.replace('\\',"/").eq_ignore_ascii_case(&native.actor_variant_path.replace('\\',"/")) {
+                    return invalid("Controller rules and native actor/count bindings disagree");
+                }
+            }
         }
         let mut names=std::collections::BTreeSet::new();
         for (name,group) in self.encounters.iter().flatten().zip(&self.groups) {

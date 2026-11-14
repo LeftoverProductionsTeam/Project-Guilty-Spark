@@ -167,10 +167,12 @@ pub(super) struct WorkbenchReport {
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct WorkingSource { build_id:String, tags_directory:PathBuf }
+struct WorkingSource { build_id:String, tags_directory:PathBuf, authoring_pending:bool, source_project_fingerprint:String, project_fingerprint:String }
 
 #[derive(Clone)]
 struct SourceContext {
+    source_project: Project,
+    authoring_pending: bool,
     build: BuildRecord,
     workspace: PathBuf,
     tags: PathBuf,
@@ -227,8 +229,22 @@ fn source_scenario_type(state:&AppState,project:&Project)->Reply<u16> {
 }
 
 fn source_context(state: &AppState, project: &Project) -> Reply<SourceContext> {
-    let build = current_native_build(state, project)?;
-    source_context_for_build(state, project, build)
+    match current_native_build(state, project) {
+        Ok(build) => source_context_for_build(state, project, build),
+        Err(current_issue) => {
+            // Source access for an explicit controller rebuild only. The old
+            // cache never becomes a current compiled/playable revision.
+            // Never skip a missing/changed latest source to silently revive an
+            // older native tree that could discard later external tag edits.
+            let build=project.builds.iter().rev().find(|build|build.status=="validated"&&build.target=="mcc-cea").ok_or(current_issue)?;
+            let parent=core::working_tags::source_parent_project(project,build,&state.root.join("jobs"))
+                .map_err(|issue|format!("Retained Firefight source is unavailable: {issue}. Use the normal source build for other edits; do not replace the saved native source."))?;
+            let verified=verified_build(state,&parent,&build.id)?;
+            let mut context=source_context_for_build(state,&parent,verified)?;
+            context.authoring_pending=build.project_fingerprint!=project.fingerprint().map_err(error)?;
+            Ok(context)
+        }
+    }
 }
 
 /// Existing folder shortcut, bound to the current accepted build rather than a
@@ -348,6 +364,8 @@ fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord)
     }
     let scenario_sha256 = maps::hash_file(&scenario).map_err(error)?;
     Ok(SourceContext {
+        source_project: project.clone(),
+        authoring_pending: false,
         build,
         workspace,
         tags,
@@ -585,7 +603,7 @@ pub(super) async fn runtime_workbench_report(
                         architectures.insert(architecture);
                     }
                 }
-                observation.project.source_complete = true;
+                observation.project.source_complete = !context.authoring_pending;
                 if baboon_native::installation(&state).is_ok() {kinds.push(adapters::ToolKind::Baboon);}
                 observation.toolchains.push(adapters::ToolchainEvidence {
                     generation: "h1a-ek".into(),
@@ -607,6 +625,15 @@ pub(super) async fn runtime_workbench_report(
                 }
             }
         }
+        if context.as_ref().ok().and_then(|context|context.as_ref()).is_some_and(|context|context.authoring_pending) {
+            for capability in &mut report.capabilities {
+                if matches!(capability.operation,adapters::RuntimeOperation::TestScene|adapters::RuntimeOperation::EditLevel|adapters::RuntimeOperation::EditTags) {
+                    capability.availability=adapters::ActionAvailability::SetupRequired;
+                    capability.detail="Firefight rules changed after this source cache was compiled. The retained source is available only for a reviewed controller rebuild.".into();
+                    capability.next_action="Save the rules, export/review their bound controller, then use dock details to attach or compile the matching source. Native tools resume after successful build/readback.".into();
+                }
+            }
+        }
         let mut actions = adapters::dock_actions(&report);
         let observed = processes(&state)?;
         for action in &mut actions {
@@ -625,7 +652,7 @@ pub(super) async fn runtime_workbench_report(
             .ok()
             .and_then(|context| context.as_ref())
             .filter(|context| {
-                state
+                !context.authoring_pending && state
                     .root
                     .join("jobs")
                     .join(&context.build.id)
@@ -633,7 +660,10 @@ pub(super) async fn runtime_workbench_report(
                     .is_file()
             })
             .map(|context| context.build.clone());
-        let working_source=context.as_ref().ok().and_then(|c|c.as_ref()).map(|c|WorkingSource{build_id:c.build.id.clone(),tags_directory:c.tags.clone()});
+        let working_source=match context.as_ref().ok().and_then(|context|context.as_ref()) {
+            Some(context)=>Some(WorkingSource{build_id:context.build.id.clone(),tags_directory:context.tags.clone(),authoring_pending:context.authoring_pending,source_project_fingerprint:context.build.project_fingerprint.clone(),project_fingerprint:project.as_ref().ok_or("Source project is unavailable")?.fingerprint().map_err(error)?}),
+            None=>None,
+        };
         Ok(WorkbenchReport {
             report,
             profiles: adapters::registry(),
@@ -683,6 +713,7 @@ pub(super) async fn prepare_runtime_tool(
         if runtime_id!=runtime::RuntimeId::MccSteam {return Err("This source-aware tool route currently implements the H1A kit. Other runtimes retain their separate setup/build workflows.".into());}
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
+        if context.authoring_pending{return Err("Compile the matching Firefight controller before opening native scene/tag tools; the retained cache is not the current authored revision".into());}
         let settings=tool_settings(&state,Some(&project))?;let kit=official_h1a_kit(&state,&settings)?;
         let tool_id=match action_id.as_str(){"editLevel"=>"sapien","editTags"=>"guerilla","testScene"=>"tagTest",_=>return Err("Choose an integrated scene or tag editor action".into())};
         let (executable,executable_sha256,executable_architecture)=inspect_tool_file(&settings,tool_id)?;
@@ -730,6 +761,7 @@ pub(super) async fn launch_runtime_tool(
         check_document_owner(&state,&plan.view.project_id,&owner)?;
         let project=lock(&state.library)?.get(&plan.view.project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
+        if context.authoring_pending{return Err("Firefight rules changed after the launch preview. Compile their controller before launching native tools".into());}
         let settings=tool_settings(&state,Some(&project))?;let kit=official_h1a_kit(&state,&settings)?;
         let tool_id=match plan.view.action_id.as_str(){"editLevel"=>"sapien","editTags"=>"guerilla","testScene"=>"tagTest",_=>return Err("Unknown tool launch plan".into())};
         let (executable,hash,_)=inspect_tool_file(&settings,tool_id)?;
@@ -770,6 +802,7 @@ pub(super) async fn inspect_bsp_audio_workspace(app:tauri::AppHandle,project_id:
         let state=app.state::<AppState>();
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
+        if context.authoring_pending{return Err("Compile the matching Firefight controller before editing BSP audio for this revision".into());}
         let cache=context.build.output.as_ref().ok_or("Validated parent cache is missing")?;
         let sha=context.build.sha256.as_deref().ok_or("Validated parent cache identity is missing")?;
         core::bsp_audio::inspect_workspace(&context.build.id,cache,sha,&context.tags).map_err(error)
@@ -794,6 +827,9 @@ pub(super) async fn build_working_tags(
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;studio_native_source::require_unshared(&state,&project_id)?;
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
+        if context.authoring_pending&&(!compile_scripts.unwrap_or(false)||expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
+            return Err("Changed Firefight rules require an explicit script build against the reviewed retained source. Refresh/review its source and controller; no build was started.".into());
+        }
         if script_attachment.is_some()&&(expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
             return Err("The native build/source selection changed after script review. Select and review the module again; no build was started.".into());
         }
@@ -804,7 +840,8 @@ pub(super) async fn build_working_tags(
         let invader_info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
         verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
         let scenario_type=source_scenario_type(&state,&project)?;
-        let expected_encounter=native_operations_native::encounter_expectation(&state,&project,&context.build)?;
+        let expected_encounter=native_operations_native::encounter_expectation(&state,&context.source_project,&context.build)?;
+        let source_project=context.source_project;
         let mut input=core::working_tags::WorkingTagsInput{script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
@@ -812,7 +849,7 @@ pub(super) async fn build_working_tags(
         let jobs_root=state.root.join("jobs");let returned=job_id.clone();let worker_app=app.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let state=worker_app.state::<AppState>();
-            let result=baboon_native::compilation_source(&state,&project,&input.parent_build,&input.tags_directory,cancel.clone()).and_then(|tags|{
+            let result=baboon_native::compilation_source(&state,&source_project,&input.parent_build,&input.tags_directory,cancel.clone()).and_then(|tags|{
                 input.tags_directory=tags;
                 core::working_tags::run_build_from_tags(&project,&input,&jobs_root,&job_id,cancel,|e|event(&worker_app,e)).map_err(error)
             });

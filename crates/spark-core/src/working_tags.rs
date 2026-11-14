@@ -93,6 +93,8 @@ pub struct WorkingTagsReceipt {
     pub job_id: String,
     pub project_id: String,
     pub project_fingerprint: String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub source_parent_fingerprint:Option<String>,
     pub parent_build_id: String,
     pub parent_output_sha256: String,
     pub scenario_path: String,
@@ -158,6 +160,7 @@ struct Prepared {
     tags: PathBuf,
     source_data: Option<PathBuf>,
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
+    source_project:Project,
     parent_output: PathBuf,
     parent_inspection: maps::MapInspection,
     tools: BTreeMap<String, String>,
@@ -220,6 +223,51 @@ fn same_record(a: &BuildRecord, b: &BuildRecord) -> bool {
         && a.sha256 == b.sha256
         && a.project_fingerprint == b.project_fingerprint
         && a.output == b.output
+}
+
+/// Resolve an immutable native input snapshot without declaring its cache
+/// compiled for newer authoring rules. Only recovered Firefight metadata may differ.
+pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: &Path) -> Result<Project> {
+    project.validate()?;
+    if build.status != "validated" || build.target != "mcc-cea"
+        || !project.builds.iter().any(|record| same_record(record, build))
+    {
+        return invalid("Native source parent is not in this project's validated history");
+    }
+    if build.project_fingerprint == project.fingerprint()? {
+        return Ok(project.clone());
+    }
+    if project.source.is_none() || project.quick_forge.is_some() {
+        return invalid("Only recovered source can retain a native parent across Firefight authoring edits; editable geometry must use its normal build");
+    }
+    uuid::Uuid::parse_str(&build.id)
+        .map_err(|_| SparkError::Invalid("Native source parent ID is invalid".into()))?;
+    let root = checked_directory(jobs_root)?;
+    let directory = checked_directory(&root.join(&build.id))?;
+    if directory == root || !directory.starts_with(&root) {
+        return invalid("Native parent escaped its owned job root");
+    }
+    let snapshot = checked_file(&directory.join("project.gsproject"))?;
+    if !snapshot.starts_with(&directory) {
+        return invalid("Native project snapshot escaped its job");
+    }
+    let mut parent = project::load_project(&snapshot)?;
+    if parent.id != project.id || parent.fingerprint()? != build.project_fingerprint {
+        return invalid("Native project snapshot does not match its original compiled revision");
+    }
+    let mut before = serde_json::to_value(&parent)?;
+    let mut after = serde_json::to_value(project)?;
+    for key in ["firefight", "history", "builds", "modifiedAt"] {
+        // Project's serialized representation is a struct/object. Only these
+        // authoring and bookkeeping fields may differ, including on Undo.
+        before.as_object_mut().ok_or_else(|| SparkError::Invalid("Invalid native project snapshot".into()))?.remove(key);
+        after.as_object_mut().ok_or_else(|| SparkError::Invalid("Invalid current project snapshot".into()))?.remove(key);
+    }
+    if before != after {
+        return invalid("Geometry, tags, assets, paths or other source inputs changed; Firefight-only parent reuse was refused");
+    }
+    parent.builds = project.builds.clone();
+    Ok(parent)
 }
 
 fn valid_hash(value: &str) -> bool {
@@ -332,9 +380,12 @@ fn prepare(
     if job_id == input.parent_build.id {
         return invalid("Working-tag build needs a fresh job");
     }
+    let source_project=source_parent_project(project,&input.parent_build,jobs_root)?;
+    let authoring_pending=source_project.fingerprint()?!=project.fingerprint()?;
+    if authoring_pending&&!input.compile_scripts{return invalid("Firefight authoring rules changed. Attach/review the matching controller and explicitly compile scripts; a tag-only rebuild cannot apply them");}
     if input.parent_build.status != "validated"
         || input.parent_build.target != "mcc-cea"
-        || input.parent_build.project_fingerprint != project.fingerprint()?
+        || input.parent_build.project_fingerprint != source_project.fingerprint()?
         || !project
             .builds
             .iter()
@@ -430,7 +481,7 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding) = parent_native_identity(project, input, &parent, &tools["haloTool"])?;
+    let (source_data,parent_controller_binding) = parent_native_identity(&source_project, input, &parent, &tools["haloTool"])?;
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     if input.compile_scripts {
         if source_data.is_none()&&input.script_attachment.is_none(){return invalid("This working source has no recovered HaloScript directory. Recover/review the original source modules first; compiled script bytecode is retained");}
@@ -445,6 +496,7 @@ fn prepare(
         tags,
         source_data,
         parent_controller_binding,
+        source_project,
         parent_output,
         parent_inspection,
         tools,
@@ -699,6 +751,7 @@ fn run_with(
         job_id: job_id.into(),
         project_id: project.id.clone(),
         project_fingerprint: fingerprint.clone(),
+        source_parent_fingerprint:if prepared.source_project.fingerprint()?!=fingerprint{Some(prepared.source_project.fingerprint()?)}else{None},
         parent_build_id: input.parent_build.id.clone(),
         parent_output_sha256: prepared.parent_inspection.sha256.clone(),
         scenario_path: normalize_scenario(&input.scenario_path)?,
@@ -802,6 +855,10 @@ fn run_with(
             // A tag-only rebuild, or a removed authoring comment, cannot silently
             // drop an accepted native actor/count readback requirement.
             if controller.is_some(){receipt.controller_binding=controller;}
+        }
+        if prepared.source_project.fingerprint()?!=fingerprint {
+            let binding=receipt.controller_binding.as_ref().ok_or_else(||SparkError::Invalid("Changed Firefight authoring needs a reviewed bound controller; no compiler ran".into()))?;
+            if binding.rules.as_ref()!=project.firefight.as_ref()||binding.rules.is_none(){return invalid("Controller source was generated for different Firefight rules. Export/review the current controller before compiling");}
         }
         if !staged_scripts.is_empty() {
             receipt.input_script_hashes = Some(save_hash_manifest(

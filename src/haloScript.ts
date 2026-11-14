@@ -8,7 +8,7 @@ import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
 import { defaultNativePlayerProfile, type FirefightConfig, type NativeEncounterCandidate } from './firefight';
 import type { Project } from './types';
-export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; sourceBinding?:{schemaVersion:1;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
+export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
 const safeComment = (s: string): string => s.replace(/[\r\n\0]/g,' ').replace(/[^\x20-\x7e]/g,'?').slice(0,110);
@@ -263,7 +263,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
   }
   lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
   lines.push(')','');
-  const sourceBinding=binding?{schemaVersion:1 as const,sourceSha256:binding.sourceSha256.toLowerCase(),encounters:references,groups:config.waves.flatMap((wave,w)=>wave.groups.map((group,g)=>({name:references[w][g],actorVariantPath:config.enemies.find(enemy=>enemy.id===group.enemyId)!.actorVariantPath,count:group.count}))),activation:binding.activation,loadout:'scenario' as const}:undefined;
+  const sourceBinding=binding?{schemaVersion:1 as const,rules:config,sourceSha256:binding.sourceSha256.toLowerCase(),encounters:references,groups:config.waves.flatMap((wave,w)=>wave.groups.map((group,g)=>({name:references[w][g],actorVariantPath:config.enemies.find(enemy=>enemy.id===group.enemyId)!.actorVariantPath,count:group.count}))),activation:binding.activation,loadout:'scenario' as const}:undefined;
   const content=(sourceBinding?'; Spark source encounter bindings: '+JSON.stringify(sourceBinding)+'\r\n':'')+lines.join('\r\n')+(binding?.activation==='startup'?nativeRoundBootstrap:'');
   return {...conservative,...(sourceBinding?{sourceBinding}:{}),content,activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
     ...(binding?['Bound encounters come from the exact source cache inventory. Their ownership, navigation and gameplay still require review; original scripts may also manipulate them.','Keep this scenario’s existing player equipment. No generated starting profile or weapon override is applied.','Activation: '+(binding.activation==='startup'?'an explicit gs_ff_bootstrap startup script is included.':'manual; a reviewed scenario script must set gs_ff_start true.')]:[]),

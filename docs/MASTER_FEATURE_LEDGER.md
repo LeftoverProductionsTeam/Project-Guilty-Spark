@@ -1,5 +1,9 @@
 # Canonical cumulative feature and evidence ledger
 
+## 14 November 2026 — Recovered Firefight source revision WIP
+
+Saved Firefight-only edits now have source code for snapshot-bound native-parent reuse and explicit matching-controller rebuild in the existing dock. Old compiled fingerprints stay immutable; native edit/test actions remain pending until the new output passes compilation/readback. This is untested MCC/H1A source, not recovered CE/Forerunner or gameplay acceptance. See FIREFIGHT_ENGINE.md, CONTINUATION_67_SOURCE_GUARDIAN.md and H13. All475CSV records and M1–M6 remain unchanged/open.
+
 ## 14 November 2026 — Native AI readback/inspector WIP
 
 The existing reader/AI workspace now have untested source for native actor/start details, source-tag and wave-authoring routes, and map/window-local context. Native Firefight readback now compares its emitted actor/coordinate layouts and is reapplied to retained builds. This is not recovered-scenario writing, navigation/gameplay or peer acceptance. See FIREFIGHT_ENGINE.md and H12 in HUMAN_TEST_PLAN.md. All475CSV records and M1–M6 remain unchanged.
