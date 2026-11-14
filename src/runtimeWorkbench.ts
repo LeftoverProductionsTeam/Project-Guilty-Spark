@@ -235,5 +235,8 @@ export interface CompanionRuntimeDiscovery {
  registrationId:string; executableSha256:string;
  capabilities:{schema:'spark-forerunner.runtime-capabilities';contract_version:1;engine:'Forerunner';
  build:{upstream_version:string;commit:string;platform:string;architecture:string};simulation_hz:number;
- network:{advertised_version:number;native_layout_version:number};operations:string[];process_entrypoints:string[];upstream_projects:string[]};
+ network:{advertised_version:number;native_layout_version:number};operations:string[];process_entrypoints:string[];
+ /** Inspection only; does not admit an executable or enable automatic map startup. */
+ startup_map?:{setting:string;environment:string;selector:string;cache_version:number;scenario_type:string;
+ profile:string;fresh_start:boolean;network_host:boolean};upstream_projects:string[]};
 }

@@ -330,7 +330,22 @@ pub(super) struct CompanionCapabilities {
     network: CompanionNetwork,
     operations: Vec<String>,
     process_entrypoints: Vec<String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    startup_map: Option<CompanionStartupMap>,
     upstream_projects: Vec<String>,
+}
+// Advertised metadata is retained for inspection, never used as launch permission.
+// Old admitted binaries omit it; unknown additive JSON fields stay ignorable.
+#[derive(Serialize, Deserialize)]
+struct CompanionStartupMap {
+    setting: String,
+    environment: String,
+    selector: String,
+    cache_version: u32,
+    scenario_type: String,
+    profile: String,
+    fresh_start: bool,
+    network_host: bool,
 }
 #[derive(Serialize, Deserialize)]
 struct CompanionBuild { upstream_version: String, commit: String, platform: String, architecture: String }
@@ -403,11 +418,23 @@ pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_
             [&capabilities.build.upstream_version,&capabilities.build.commit,&capabilities.build.platform,&capabilities.build.architecture].iter().any(|value|!text(value)) ||
             capabilities.operations.is_empty()||capabilities.operations.len()>64||!capabilities.operations.iter().any(|value|value=="runtime.discover")||
             capabilities.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
+            capabilities.startup_map.as_ref().is_some_and(|startup|
+                startup.cache_version==0 ||
+                [&startup.setting,&startup.environment,&startup.selector,&startup.scenario_type,&startup.profile]
+                    .iter().any(|value|!text(value))) ||
             capabilities.process_entrypoints.len()>16||capabilities.process_entrypoints.iter().any(|value|!text(value))||
             capabilities.upstream_projects.len()>16||capabilities.upstream_projects.iter().any(|value|!text(value)) {
             return Err("Companion discovery fields exceed the version-1 contract bounds".into());
         }
-        let current=runtime::inspect_registration(&registration).map_err(error)?;
+        // Same executable bytes are insufficient if the user replaced this saved
+        // profile's paths or identity while the bounded query was running.
+        let current_registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        let current_registration=current_registrations.iter().find(|row|row.id==registration_id)
+            .ok_or("Runtime profile was removed during discovery; response discarded")?;
+        if serde_json::to_value(current_registration).map_err(error)?!=serde_json::to_value(&registration).map_err(error)? {
+            return Err("Runtime profile changed during discovery; inspect and save the selected profile again".into());
+        }
+        let current=runtime::inspect_registration(current_registration).map_err(error)?;
         if current.executable_sha256!=installation.executable_sha256 {return Err("Runtime executable changed during capability discovery; response discarded".into());}
         Ok(CompanionDiscovery{registration_id,executable_sha256:expected_executable_sha256,capabilities})
     }).await.map_err(error)?
