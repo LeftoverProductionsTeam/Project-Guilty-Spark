@@ -4,7 +4,7 @@ Task: Operation110 — restore current CI, protect user files, then native Firef
 Status: implementation incomplete
 Starting revision: 116145dc6ad61f26049631fe652eb615783f65e8, canonical D:/Project Guilty Spark local master.
 Latest verified revision: 817a4e8ce1e230a6a9e8b11775bb62c5031030ef - reviewed Windows cleanup handles/directory IDs; R6805red failures, R6819focused passes and final R682955fullRust/9explicit skips. Prior9668094 Save/419c1c1 staged-file/0745420 QA lifetime/33fafd49 native loadout evidence remain scoped.
-Next action: Repair empty lease-record retirement without deleting a replacement or another active owner after lease release, within the existing storage lock/cleanup functions. Preserve verified Windows object cleanup; final Save namespace CAS and non-Windows recursive deletion remain independent open gates. Native Windows10/network filesystems, Linux packages/startup and human Firefight/peer/platform acceptance remain unverified. Do not touch legacy run-8Ak6hz, control stopped games, push or publish.
+Next action: Collect R686 full Rust validation of native lease retirement and actual-handle lock admission. R6832real retirement failures and R6841lock admission failure reproduced; R68539focused storage checks pass. Current storage.rs is WIP pending full validation. Final Save namespace CAS/non-Windows removal and native platform/game gates remain open. No stopped-game control, legacy run recovery, push or publication.
 
 ## Acceptance
 
@@ -58,6 +58,8 @@ R659/R660 handles disappeared after goal pause; logs end before results. Owners 
 R664 new-file adversarial tests both fail on the old replacing rename: a foreign project arrives after the last existence/revision check and is overwritten. Committed2e97ccd project.rs remembers initial absence, uses MoveFileExW(flags0) on Windows and sibling-temp link/unlink off Windows, and refuses replacing fallback. Native Windows paths are canonical extended absolute paths. New normal-save/backup and long-Unicode-path tests accompany the two red cases. R665 full Rust passed937tests/9skips before final resolver reuse; R66613project tests pass on final source. No existing-file replacement, recursive cleanup or process-lifetime race is declared closed.
 
 ## Changed work
+
+Uncommitted lease-retirement repair: R6832real active-record removals fail; R684actual opened-object/name substitution fails. R68539focused passes with handle-derived lock identity/post-admission recheck and Windows ReOpenFile/verified-handle deletion before original lock release. Foreign/changed records are retained; no new tracking system. R686fullRust is next. Tests use distinct native handles on one computer, not real peers.
 
 Committed817a4e8 reuses the native disposition wrapper as dispose_verified_handle and pins Windows cleanup objects/owner marker transiently, before final review. Same-handle deletion replaces the recursive pathname sweep; current names are rechecked, and later unreviewed children are never deleted. Directory IDs bind existing content receipts; legacy digests remain unchanged/protected. R682955/9skips passes final source. No second ledger/cache, permissive fallback, original asset/permission change or unqualified cleanup claim.
 
