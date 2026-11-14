@@ -2473,6 +2473,9 @@ async fn choose_runtime_path(kind: String) -> Reply<Option<PathBuf>> {
     }
 }
 fn registered_runtime_command(state:&AppState,registration:&runtime::RuntimeRegistration,plan:&runtime::LaunchPlan)->Reply<std::process::Command>{
+    registered_runtime_command_at(state,registration,plan,None)
+}
+fn registered_runtime_command_at(state:&AppState,registration:&runtime::RuntimeRegistration,plan:&runtime::LaunchPlan,owned_profile:Option<&Path>)->Reply<std::process::Command>{
     let executable=runtime::process_path(&plan.executable).map_err(error)?;
     if plan.runtime_id != registration.runtime_id || maps::hash_file(&executable).map_err(error)? != plan.executable_sha256 {
         return Err("Runtime executable changed after inspection; prepare the launch again".into());
@@ -2491,7 +2494,7 @@ fn registered_runtime_command(state:&AppState,registration:&runtime::RuntimeRegi
         // Shared content never implies shared writable profile state.
         core::safe_relative(&registration.id).map_err(error)?;
         if std::path::Path::new(&registration.id).components().count()!=1 { return Err("Invalid runtime profile identifier".into()); }
-        let private=state.root.join("runtime-state").join(&registration.id);
+        let private=owned_profile.map(Path::to_path_buf).unwrap_or_else(||state.root.join("runtime-state").join(&registration.id));
         core::reject_links(&private).map_err(error)?;
         for (key,folder) in [("HALO_SAVE_ROOT","saves"),("HALO_LOG_ROOT","logs"),("HALO_CACHE_ROOT","cache")] {
             let directory=private.join(folder); core::reject_links(&directory).map_err(error)?;

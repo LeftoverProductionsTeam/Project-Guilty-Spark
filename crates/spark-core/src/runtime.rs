@@ -335,6 +335,7 @@ pub struct LaunchPlan {
     pub runtime_id: RuntimeId,
     pub executable: PathBuf,
     pub executable_sha256: String,
+    pub profile_interface: Option<String>,
     pub cwd: PathBuf,
     pub args: Vec<String>,
     pub direct_map_launch: bool,
@@ -1004,5 +1005,5 @@ pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> 
     if interface == Some("forerunner") {
         warnings.push("This exact Forerunner profile uses separate Spark-managed settings, saves, logs and caches. Inherited HALO overrides, automatic map downloads, old-map migration and update checks are disabled for this launch. Its menu remains the map-selection route; automatic authored-cache deployment, Live Rebuild and live editing are not enabled. Spark adapter launch acceptance is pending.".into());
     }
-    Ok(LaunchPlan { runtime_id: registration.runtime_id, executable, executable_sha256, cwd, args: vec![], direct_map_launch: false, environment, warnings })
+    Ok(LaunchPlan { runtime_id: registration.runtime_id, executable, executable_sha256, profile_interface: interface.map(str::to_owned), cwd, args: vec![], direct_map_launch: false, environment, warnings })
 }

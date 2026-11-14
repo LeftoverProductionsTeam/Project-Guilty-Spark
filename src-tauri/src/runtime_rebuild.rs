@@ -25,6 +25,9 @@ fn prepare_runtime_roots(root: &Path) -> Reply<()> {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct View {
     id: String,
+    runtime_id: runtime::RuntimeId,
+    staged_map: String,
+    engine_sha256: std::collections::BTreeMap<String,String>,
     project_id: String,
     phase: String,
     source_fingerprint: String,
@@ -55,6 +58,8 @@ struct Stage {
     build: BuildRecord,
     map: String,
     ce_resource_sha256: std::collections::BTreeMap<String,String>,
+    executable_name: String,
+    staged_sha256: std::collections::BTreeMap<String,String>,
 }
 impl Drop for Stage {
     fn drop(&mut self) {
@@ -105,15 +110,18 @@ fn registration(state: &AppState) -> Reply<runtime::RuntimeRegistration> {
     Ok(registration)
 }
 pub(crate) fn checked_build(state: &AppState, project: &Project, build_id: Option<&str>) -> Reply<BuildRecord> {
+    checked_build_for(state,project,build_id,1)
+}
+fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>, scenario_type:u16) -> Reply<BuildRecord> {
     let build = if let Some(id) = build_id { verified_build(state, project, id)? } else { current_build(state, project)? };
-    if build.target != "gbx-custom" { return Err("Build the saved project as standard Custom Edition content for Chupathingy first".into()); }
+    if build.target != "gbx-custom" { return Err(if scenario_type==0{"Build the saved project as standard Custom Edition solo content for Forerunner first"}else{"Build the saved project as standard Custom Edition content for Chupathingy first"}.into()); }
     let output = build.output.as_ref().ok_or("Validated native output is missing")?;
     let inspection = maps::inspect_map(output, None).map_err(error)?;
     let header = &inspection.header;
-    if header.version != 609 || header.scenario_type != 1 || header.extended
+    if header.version != 609 || header.scenario_type != scenario_type || header.extended
         || !core::ce_host::map_selector(&header.name)
         || output.file_stem().and_then(|n|n.to_str()) != Some(header.name.as_str()) {
-        return Err("Live Rebuild needs a standard version-609 multiplayer cache with its native filename; no header rewriting is performed".into());
+        return Err(format!("This private playtest needs a standard version-609 {} cache with its native filename; no header rewriting is performed",if scenario_type==0{"solo"}else{"multiplayer"}));
     }
     if inspection.resources.iter().any(|r|r.required) || inspection.tags.iter().any(|t|t.external) {
         return Err("This playtest needs a self-contained CE build. Rebuild with native embedded resources; no unrelated bitmap/sound bank is substituted".into());
@@ -141,7 +149,77 @@ pub(crate) fn copy_pin_bounded(source: &Path, target: &Path, expected: &str, tot
     }
     Ok(())
 }
+fn forerunner_registration(state:&AppState,expected:Option<&runtime::RuntimeRegistration>,expected_sha256:Option<&str>)->Reply<runtime::RuntimeRegistration>{
+    if !cfg!(all(windows,target_arch="x86_64")){return Err("The Forerunner solo playtest source currently targets Windows x64 Spark with the recorded x86 engine".into());}
+    let reg=runtime_registration(state,runtime::RuntimeId::OpenCe)?;
+    let plan=runtime::prepare_launch(&reg).map_err(error)?;
+    let expected=expected.ok_or("Inspect the selected Forerunner profile before starting its playtest")?;
+    if serde_json::to_value(expected).map_err(error)?!=serde_json::to_value(&reg).map_err(error)? || expected_sha256!=Some(plan.executable_sha256.as_str()) || plan.profile_interface.as_deref()!=Some("forerunner") {
+        return Err("Select and inspect the recorded Forerunner profile before starting this solo playtest; a newer filename or changed profile is not admitted".into());
+    }
+    Ok(reg)
+}
+fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:BuildRecord)->Reply<Stage>{
+    let installed=runtime::inspect_registration(reg).map_err(error)?;
+    if installed.executable_sha256.as_deref()!=Some(runtime::FORERUNNER_WINDOWS_X86_SHA256){return Err("Forerunner changed before staging".into());}
+    let executable=installed.executable.as_deref().ok_or("Forerunner executable is missing")?;
+    let package=executable.parent().ok_or("Forerunner package folder is missing")?;
+    let library=package.join("SDL3.dll");core::reject_links(&library).map_err(error)?;
+    // The reviewed Windows source links one adjacent SDL3 library. Pin the
+    // installed x86 member; never borrow another runtime's DLLs.
+    let bytes=bounded_read(&library,64*1024*1024)?;
+    if bytes.len()<64 || &bytes[..2]!=b"MZ"{return Err("Forerunner needs its own installed x86 SDL3.dll".into());}
+    let pe=u32::from_le_bytes(bytes[60..64].try_into().map_err(error)?) as usize;
+    let dll_header=bytes.get(pe..pe.saturating_add(24)).ok_or("SDL3.dll has an invalid PE header")?;
+    if &dll_header[..4]!=b"PE\0\0" || dll_header[4..6]!=[0x4c,0x01] || u16::from_le_bytes([dll_header[22],dll_header[23]])&0x2000==0{return Err("Forerunner's SDL3.dll must match the admitted x86 executable".into());}
+    let library_sha=core::hex_bytes(sha2::Sha256::digest(&bytes));drop(bytes);
+    let output=build.output.as_ref().ok_or("Build output is missing")?;
+    let header=maps::inspect_header(output).map_err(error)?;
+    if header.version!=609 || header.scenario_type!=0{return Err("Forerunner authored playtests require validated standard CE solo output".into());}
+    let root=state.root.join("runtime-playtests").join(uuid::Uuid::new_v4().to_string());
+    let store=core::storage::Store::for_output(&root).map_err(error)?;
+    let lease=store.reserve(&root,Some(&installed.data_root),RESERVATION,core::storage::Category::Staging,"Bounded Forerunner authored solo playtest").map_err(error)?;
+    fs::create_dir_all(&root).map_err(error)?;lease.mark_owned().map_err(error)?;
+    let budget=store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
+    let name=executable.file_name().and_then(|n|n.to_str()).ok_or("Invalid Forerunner executable name")?.to_owned();
+    let mut result=Stage{root,lease:Some(lease),budget,build:build.clone(),map:header.name.clone(),ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
+    prepare_runtime_roots(&result.root)?;let mut total=0;
+    for(source,relative,sha)in[(executable.to_path_buf(),format!("engine/{name}"),runtime::FORERUNNER_WINDOWS_X86_SHA256.to_owned()),(library,"engine/SDL3.dll".into(),library_sha)]{
+        copy_pin(&source,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
+    }
+    for name in ["ui.map","carousel.map"]{
+        let ui=installed.data_root.join("maps").join(name);core::reject_links(&ui).map_err(error)?;
+        if name=="carousel.map"&&!ui.try_exists().map_err(error)?{continue;}
+        if maps::inspect_header(&ui).map_err(error)?.version!=5{return Err("Forerunner needs matching original Xbox UI data; CE/MCC UI is not a substitute".into());}
+        let sha=maps::hash_file(&ui).map_err(error)?;let relative=format!("data/maps/{name}");
+        copy_pin(&ui,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
+    }
+    let relative=format!("data/maps_ce/{}.map",header.name);let sha=build.sha256.clone().ok_or("Build has no SHA-256")?;
+    copy_pin(output,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
+    let ce=runtime_connections::ce_resource_source(state)?;
+    for name in ["bitmaps.map","sounds.map","loc.map"]{total=total.checked_add(fs::metadata(ce.join("maps").join(name)).map_err(error)?.len()).ok_or("Playtest resource size overflow")?;}
+    if total>COPY_LIMIT{return Err("Private playtest inputs exceed 512 MiB; no original resource was changed".into());}
+    result.ce_resource_sha256=core::runtime_content::prepare_ce_resources(&result.root.join("data"),&ce).map_err(error)?.resource_sha256;
+    for(name,sha)in &result.ce_resource_sha256{result.staged_sha256.insert(format!("data/maps_ce/{name}"),sha.clone());}
+    result.budget.check().map_err(error)?;Ok(result)
+}
+fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&Stage)->Reply<Command>{
+    let original=runtime::prepare_launch(reg).map_err(error)?;
+    if original.profile_interface.as_deref()!=Some("forerunner"){return Err("Forerunner identity changed; no playtest was started".into());}
+    for(relative,sha)in &stage.staged_sha256{
+        let file=stage.root.join(relative);core::reject_links(&file).map_err(error)?;
+        if maps::hash_file(&file).map_err(error)?!=*sha{return Err(format!("Private playtest member {relative} changed before launch"));}
+    }
+    let mut isolated=reg.clone();isolated.root=stage.root.join("engine");isolated.executable=isolated.root.join(&stage.executable_name);isolated.data_root=Some(stage.root.join("data"));
+    let plan=runtime::prepare_launch(&isolated).map_err(error)?;
+    let mut command=registered_runtime_command_at(state,&isolated,&plan,Some(&stage.root.join("profile")))?;
+    // Native HaloScript owns these waves. No debug/test startup or unbuilt
+    // HALO_START_MAP request is inherited or invented here.
+    for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_RENDERER","gl"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
+    command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());Ok(command)
+}
 fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecord) -> Reply<Stage> {
+    if reg.runtime_id==runtime::RuntimeId::OpenCe{return stage_forerunner(state,reg,build);}
     let installed = runtime::inspect_registration(reg).map_err(error)?;
     let output = build.output.as_ref().ok_or("Build output is missing")?;
     let header = maps::inspect_header(output).map_err(error)?;
@@ -151,7 +229,7 @@ fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecor
     fs::create_dir_all(&root).map_err(error)?;
     lease.mark_owned().map_err(error)?;
     let budget = store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
-    let mut result = Stage { root, lease: Some(lease), budget, build: build.clone(), map: header.name.clone(), ce_resource_sha256: Default::default() };
+    let mut result = Stage { root, lease: Some(lease), budget, build: build.clone(), map: header.name.clone(), ce_resource_sha256: Default::default(), executable_name: String::new(), staged_sha256: Default::default() };
     prepare_runtime_roots(&result.root)?;
     let mut total = 0;
     let engine_source=installed.executable.as_deref().and_then(Path::parent).ok_or("Runtime executable has no package folder")?;
@@ -183,7 +261,8 @@ fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecor
     result.budget.check().map_err(error)?;
     Ok(result)
 }
-fn play_command(reg: &runtime::RuntimeRegistration, stage: &Stage) -> Reply<Command> {
+fn play_command(state:&AppState, reg: &runtime::RuntimeRegistration, stage: &Stage) -> Reply<Command> {
+    if reg.runtime_id==runtime::RuntimeId::OpenCe{return forerunner_command(state,reg,stage);}
     let installed = runtime::prepare_launch(reg).map_err(error)?;
     let pin = core::runtime_packages::package("chupathingy").map_err(error)?;
     if maps::hash_file(&installed.executable).map_err(error)? != pin.executable_sha256 { return Err("Chupathingy changed before launch; no process was restarted".into()); }
@@ -228,8 +307,8 @@ fn launch_command(mut command: Command, stage: Stage) -> Reply<Running> {
     if let Some(pipe)=process.child.stderr.take(){capture(pipe,tail.clone());}
     Ok(Running{process,stage,tail,started:Instant::now()})
 }
-fn launch(reg: &runtime::RuntimeRegistration, stage: Stage) -> Reply<Running> {
-    launch_command(play_command(reg,&stage)?,stage)
+fn launch(state:&AppState, reg: &runtime::RuntimeRegistration, stage: Stage) -> Reply<Running> {
+    launch_command(play_command(state,reg,&stage)?,stage)
 }
 fn owned_session(workbench: &WorkbenchState, owner: &str, id: &str) -> Reply<Arc<Session>> {
     workbench.rebuilds.get(owner).filter(|s|s.view.lock().is_ok_and(|v|v.id==id)).cloned().ok_or("This playtest belongs to another window or has ended".into())
@@ -241,6 +320,8 @@ fn publish(session: &Session, run: &Running) -> Reply<()> {
     let mut view=lock(&session.view)?;
     view.process_id=Some(run.process.child.id()); view.compiled_build_id=run.stage.build.id.clone(); view.compiled_sha256=run.stage.build.sha256.clone().ok_or("Missing map hash")?;
     view.ce_resource_sha256=run.stage.ce_resource_sha256.clone();
+    view.staged_map=run.stage.map.clone();view.engine_sha256=run.stage.staged_sha256.iter().filter(|(name,_)|name.starts_with("engine/")).map(|(name,sha)|(name.clone(),sha.clone())).collect();
+    if view.runtime_id==runtime::RuntimeId::OpenCe{view.game_build_id=None;view.game_sha256=None;view.phase="awaitingMapSelection".into();view.detail=format!("Forerunner opened with an isolated CE solo cache: {}. Use its native custom campaign chooser and create a temporary player profile if prompted. Spark cannot confirm the loaded map or restart it automatically; no gameplay acceptance is inferred. Stop disposes this test profile and scratch.",run.stage.map);return Ok(());}
     view.game_build_id=None; view.game_sha256=None; view.phase="loading".into();
     view.detail="Private native playtest started; waiting for an actual engine gameplay tick. Rebuild restarts this round and does not replace live geometry.".into();
     Ok(())
@@ -250,15 +331,15 @@ fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration
     loop {
         if session.stopping.load(Ordering::Relaxed) || app.get_webview_window(&owner).is_none() { return Ok(()); }
         if began.elapsed()>Duration::from_secs(8*60*60) { return Err("Private playtest reached its eight-hour lifetime; source and builds stay saved".into()); }
-        if let Some(exit)=run.process.child.try_wait().map_err(error)? { return Err(format!("Private playtest exited ({exit}); source and previous-good native builds remain available")); }
+        if let Some(exit)=run.process.child.try_wait().map_err(error)? { if reg.runtime_id==runtime::RuntimeId::OpenCe&&exit.success(){return Ok(());} return Err(format!("Private playtest exited ({exit}); source and previous-good native builds remain available")); }
         if checked.elapsed()>Duration::from_secs(2) { run.stage.budget.check().map_err(error)?; checked=Instant::now(); }
-        if run.started.elapsed()>Duration::from_secs(180) && lock(&session.view)?.game_build_id.is_none() {
+        if reg.runtime_id==runtime::RuntimeId::ChupathingyCe && run.started.elapsed()>Duration::from_secs(180) && lock(&session.view)?.game_build_id.is_none() {
             return Err("Chupathingy did not report gameplay ticks within three minutes. Review its native log; the compiled source and prior builds remain intact".into());
         }
         let tail=String::from_utf8_lossy(&lock(&run.tail)?).to_string();
         {
             let mut view=lock(&session.view)?; view.console_tail=tail.clone();
-            if tail.lines().any(|line|line.contains("network test: tick ") && line.contains(" player ")) {
+            if reg.runtime_id==runtime::RuntimeId::ChupathingyCe && tail.lines().any(|line|line.contains("network test: tick ") && line.contains(" player ")) {
                 view.game_build_id=Some(run.stage.build.id.clone()); view.game_sha256=run.stage.build.sha256.clone();
                 if view.pending_job_id.is_none() { view.phase="running".into(); view.detail="Native engine gameplay ticks observed for this staged revision. Human traversal and multiplayer acceptance remain separate.".into(); }
             }
@@ -274,14 +355,14 @@ fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration
                 if current.id!=reg.id || current.executable!=reg.executable || current.root!=reg.root || current.data_root!=reg.data_root { return Err("Runtime profile changed while building; the original playtest was kept".into()); }
                 let build=checked_build(&state,&project,Some(&pending.job_id))?;
                 let candidate=stage(&state,&reg,build)?;
-                let command=play_command(&reg,&candidate)?; // Validate everything before closing the old child.
+                let command=play_command(&state,&reg,&candidate)?; // Validate everything before closing the old child.
                 if session.stopping.load(Ordering::Relaxed) { return Err("Playtest stopped before restart".into()); }
                 run.close();
                 match launch_command(command,candidate) {
                     Ok(next)=>{run=next;publish(&session,&run)?;}
                     Err(problem)=>{
                         // The previous isolated map still exists. Restart only its owned process.
-                        if let Ok(mut process)=ce_host_native::OwnedProcess::spawn(&mut play_command(&reg,&run.stage)?) {
+                        if let Ok(mut process)=ce_host_native::OwnedProcess::spawn(&mut play_command(&state,&reg,&run.stage)?) {
                             let tail=Arc::new(Mutex::new(Vec::new()));
                             if let Some(pipe)=process.child.stdout.take(){capture(pipe,tail.clone());}
                             if let Some(pipe)=process.child.stderr.take(){capture(pipe,tail.clone());}
@@ -300,19 +381,22 @@ fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration
 }
 
 #[tauri::command]
-pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::WebviewWindow, project_id: String, confirmed_restart: bool) -> Reply<View> {
+pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::WebviewWindow, project_id: String, confirmed_restart: bool, runtime_id:Option<runtime::RuntimeId>, expected_registration:Option<runtime::RuntimeRegistration>, expected_executable_sha256:Option<String>) -> Reply<View> {
     let owner=window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move||{
-        if !confirmed_restart { return Err("Confirm that Live Rebuild restarts only its private playtest round".into()); }
+        if !confirmed_restart { return Err("Confirm the window-owned private playtest; stopping it disposes its temporary profile and scratch".into()); }
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
-        let reg=registration(&state)?;let project=lock(&state.library)?.get(&project_id).map_err(error)?;let build=checked_build(&state,&project,None)?;
-        // Reserve the single loopback host before staging; another window cannot race it.
+        let runtime_id=runtime_id.unwrap_or(runtime::RuntimeId::ChupathingyCe);
+        let reg=match runtime_id{runtime::RuntimeId::ChupathingyCe=>registration(&state)?,runtime::RuntimeId::OpenCe=>forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?,_=>return Err("No owned playtest adapter is admitted for this runtime".into())};
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let build=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{checked_build(&state,&project,None)?};
+        // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
         let mut workbench=lock(&state.runtime_workbench)?;
         if workbench.rebuilds.values().any(|s|s.view.lock().is_ok_and(|v|!matches!(v.phase.as_str(),"stopped"|"failed"))) { return Err("Stop the existing Live Rebuild playtest before starting another; other windows keep their own work".into()); }
-        let view=View{id:uuid::Uuid::new_v4().to_string(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
+        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
-        let result=(||{let staged=stage(&state,&reg,build)?;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}let run=launch(&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
+        let result=(||{let staged=stage(&state,&reg,build)?;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
         match result {
             Ok(run)=>{let answer=lock(&session.view)?.clone();std::thread::spawn(move||{let result=drive(app,owner,reg,session.clone(),run);if let Ok(mut view)=session.view.lock(){view.process_id=None;view.game_build_id=None;view.game_sha256=None;view.pending_job_id=None;view.phase=if result.is_ok(){"stopped"}else{"failed"}.into();view.detail=result.err().unwrap_or_else(||"Private playtest stopped; generated runtime scratch disposed. Source and build history remain.".into());}});Ok(answer)}
             Err(problem)=>{let mut view=lock(&session.view)?;view.phase="failed".into();view.error=Some(problem.clone());Err(problem)}
@@ -339,6 +423,7 @@ pub(crate) async fn runtime_rebuild_begin(app: tauri::AppHandle, window: tauri::
     let owner=window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let session=owned(&state,&owner,&session_id)?;
+        if lock(&session.view)?.runtime_id!=runtime::RuntimeId::ChupathingyCe{return Err("Forerunner has no admitted Live Rebuild restart interface. Stop this owned test, rebuild saved source and start a fresh menu-selected test; game revision remains unconfirmed".into());}
         let project_id=lock(&session.view)?.project_id.clone();
         let mut pending=lock(&session.pending)?;
         if pending.is_some()||session.stopping.load(Ordering::Relaxed)||matches!(lock(&session.view)?.phase.as_str(),"failed"|"stopped") {
@@ -370,7 +455,7 @@ pub(crate) fn runtime_rebuild_stop(state: State<AppState>, window: tauri::Webvie
 mod tests {
     use super::*;
     fn session(id: &str, project: &str) -> Arc<Session> {
-        Arc::new(Session { view:Mutex::new(View{id:id.into(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
+        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
     }
     #[test]
     fn fresh_playtest_roots_exist_before_windows_process_path_validation() {
