@@ -8,8 +8,8 @@ import crypto from 'node:crypto';
 import {createReadStream} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
-import {chooseTool} from '../tests/ui/helpers/navigation.ts';
-import {assertQaOutputPath,withDevelopmentWorkspace,waitForQaExit} from './native-qa-storage.mjs';
+import {chooseTool,openStudioMenu,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
+import {assertQaOutputPath,withDevelopmentWorkspace,waitForQaExit,stopQaProcess} from './native-qa-storage.mjs';
 import {nativeStandaloneBaseline} from './native-standalone-baseline.mjs';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
@@ -42,6 +42,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const state=async id=>{const status=await call('read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(snapshot=>snapshot.key===status.history.head.current)?.project};};
    const save=async id=>{await page.keyboard.press('Control+s');await expect.poll(async()=>(await state(id)).history?.head.dirty).toBe(false);};
    const open=async title=>{await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();};
+   try{
    await start();
    const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,walkthroughEnabled:false,autoBuild:false,hekDirectory:kit,hekTagsDirectory:tags,invaderDirectory:invader,hekFlavor:'h1aEk'}});
    // A fresh project from the existing creator API, then the actual Workshop
@@ -66,6 +67,12 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const prepare=()=>page.getByRole('button',{name:'Prepare native solo round',exact:true});
    await page.getByRole('button',{name:'Use solo native rules',exact:true}).click();
    await expect.poll(async()=>(await state(id)).project.firefight.maxSpawnAttempts).toBe(1);
+   await page.getByText('Player loadout',{exact:true}).click();
+   const reserve=page.getByRole('spinbutton',{name:'Primary rounds reserved',exact:true});
+   await reserve.fill('72');await reserve.press('Tab');
+   await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(72);
+   await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(60);
+   await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(72);
    await prepare().click();await expect(page.getByRole('status').filter({hasText:'Native solo source attached'})).toBeVisible();
    const source=async()=>(await state(id)).project?.quickForge.logic?.handwrittenSources?.find(source=>source.filename==='gs_firefight.hsc')?.content;
    await expect.poll(source).toContain('(script startup gs_ff_bootstrap');
@@ -102,6 +109,9 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      secondaryReserved:Number(await field(prefix+'.secondary_rounds_reserved'))});
    }
    report.playerLoadout={nativeReadback:true,profileCount,profiles:playerProfiles,gameplayVerified:false};
+   expect(profileCount).toBe(1);expect(playerProfiles[0]).toMatchObject({name:'gs_firefight_start',primaryWeapon:'weapons\\pistol\\pistol.weapon',primaryLoaded:12,primaryReserved:72,secondaryLoaded:0,secondaryReserved:0});
+   expect(Number(await field('player_starting_profile[0].starting_health_modifier'))).toBe(1);
+   expect(Number(await field('player_starting_profile[0].starting_shield_modifier'))).toBe(1);
    const nativeCounts=[],nativePositions=[];
    for(let i=0;i<2;i++){
     const prefix='encounters['+i+']';
@@ -130,10 +140,59 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    await chooseTool(page,'Firefight rules');await page.keyboard.press('Control+z');await save(id);
    expect((await state(id)).project.firefight.title).toBe(p.firefight.title);
    await page.screenshot({path:path.join(output,'firefight-built.png')});
+   if(process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'){
+    await chooseTool(page,'Level editor');await openStudioMenu(page);
+    const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('mccSteam');await page.keyboard.press('Escape');
+    const testScene=page.locator('.runtime-dock').getByRole('button',{name:/^Test Scene/});await expect(testScene).toContainText('Ready');await testScene.click();
+    const dialog=page.getByRole('dialog',{name:'Open Standalone scene test',exact:true});await expect(dialog).toBeVisible();
+    const tagsPath=(await dialog.locator('dt').filter({hasText:/^Working tags$/}).locator('+dd').innerText()).trim();
+    const realTags=(await fs.realpath(tagsPath)).toLowerCase(),realRoot=(await fs.realpath(context.directory)).toLowerCase();
+    expect(realTags.startsWith(realRoot+path.sep)).toBe(true);
+    await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Open tool',exact:true}).click();
+    let game;await expect.poll(async()=>{game=(await call('runtime_tool_processes')).find(p=>p.projectId===id&&p.actionId==='testScene');return !!game;}).toBe(true);
+    report.nativeGame={projectId:id,processId:game.processId,executable:game.executable,executableSha256:game.executableSha256,tagsDirectory:game.tagsDirectory,startedAt:new Date().toISOString(),gameLoaded:null,gameplayVerified:false};
+    console.log('FIREFIGHT_NATIVE_GAME_REVIEW',JSON.stringify(report.nativeGame));
+    const reviewSeconds=Number(process.env.SPARK_FIREFIGHT_REVIEW_SECONDS??180);
+    if(!Number.isSafeInteger(reviewSeconds)||reviewSeconds<10||reviewSeconds>900)throw Error('Native review requires a bounded10-900second window');
+    report.nativeGame.reviewSeconds=reviewSeconds;
+    try{await expect.poll(async()=>{game=(await call('runtime_tool_processes')).find(p=>p.processId===report.nativeGame.processId);return game?.status;},{timeout:reviewSeconds*1000,intervals:[1000,2000]}).not.toBe('running');}
+    finally{
+     report.nativeGame.status=game?.status??'unknown';report.nativeGame.exitCode=game?.exitCode??null;report.nativeGame.diagnostics=[];
+     for(const name of ['debug.txt','reports/debug.txt','exception.txt','reports/exception.txt']){
+      const file=path.join(path.dirname(tagsPath),name),info=await fs.lstat(file).catch(()=>null);
+      if(info?.isFile()&&!info.isSymbolicLink()&&info.size<4*1024**2){const bytes=await fs.readFile(file);report.nativeGame.diagnostics.push({file:name,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),tail:bytes.subarray(-65536).toString('utf8')});}
+     }
+    }
+    expect(report.nativeGame.exitCode).toBe(0);
+   }
    expect(report.errors).toEqual([]);await close();
+   }catch(error){
+    report.error=String(error);report.stack=error.stack;
+    await page?.screenshot({path:path.join(output,'firefight-failure.png')}).catch(()=>{});
+    throw error;
+   }finally{
+    // Close the owned app BEFORE the source/storage callbacks unwind. Its
+    // normal window shutdown releases the exact Standalone child and alias.
+    // Killing only the app here would orphan its game and leave active writers
+    // behind while the parent attempts to dispose the native tag workspace.
+    if(child&&child.exitCode===null&&child.signalCode===null){
+     try{await close();report.shutdown={normal:true,ownedPreviewClosedWithApp:true};}
+     catch(error){report.shutdown={normal:false,error:String(error),ownedProcessTreeStopped:true};await stopQaProcess(child);child=null;}
+    }
+    if(report.nativeGame){
+     const reports=path.join(path.dirname(report.nativeGame.tagsDirectory),'reports');
+     const dirs=await fs.readdir(reports,{withFileTypes:true}).catch(error=>{if(error.code==='ENOENT')return [];throw error;});
+     if(dirs.length>128)throw Error('Native report directory exceeds its diagnostic bound');
+     for(const dir of dirs.filter(row=>row.isDirectory()&&!row.isSymbolicLink()&&/^reports_[0-9]{2}$/.test(row.name))){
+      const file=path.join(reports,dir.name,'debug_primary.txt'),info=await fs.lstat(file).catch(()=>null);
+      if(info?.isFile()&&!info.isSymbolicLink()&&info.size<4*1024**2){const bytes=await fs.readFile(file);(report.nativeGame.diagnostics??=[]).push({file:'reports/'+dir.name+'/debug_primary.txt',bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),tail:bytes.subarray(-65536).toString('utf8')});}
+     }
+    }
+    await browser?.close().catch(()=>{});browser=null;
+   }
   }});
  report.complete=true;
 });}catch(error){report.error=String(error);report.stack=error.stack;if(call){const boot=await call('bootstrap').catch(()=>null);report.failedSaveDocuments=boot?.entries?.map(entry=>({id:entry.id,title:entry.title}));}
  if(call&&report.nativeBuild?.jobId){const boot=await call('bootstrap').catch(()=>null);report.nativeCompilerEvents=boot?.logs?.filter(row=>row.jobId===report.nativeBuild.jobId).slice(-300);}
  await page?.screenshot({path:path.join(output,'firefight-failure.png')}).catch(()=>{});throw error;}
-finally{if(child&&child.exitCode===null&&child.signalCode===null){child.kill();await waitForQaExit(child).catch(()=>{});}await browser?.close().catch(()=>{});await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(report,null,2));}
+finally{if(child&&child.exitCode===null&&child.signalCode===null){await stopQaProcess(child);}await browser?.close().catch(()=>{});await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(report,null,2));}

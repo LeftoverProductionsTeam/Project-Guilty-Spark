@@ -182,3 +182,8 @@ In game verify a usable starting weapon, hostile spawn/navigation/attacks, norma
 ### H12 readiness correction — 14 November
 
 R648 repeats the real Windows preparation/Undo/Save/restart/native compilation and independent readback, but finds zero native player starting profiles. Human combat is **not ready** until a source-owned weapon/profile is configured, compiled and read back. Do not substitute encounter compilation, simulation, an older installer or an artificial kill command for player-led combat. Exact source/app/cache hashes and next repair: [Firefight evidence](FIREFIGHT_ENGINE.md#r648--current-windows-native-replay-and-missing-player-profile-14-november).
+
+
+### H12 update — native loadout readback,14November
+
+Player loadout now exists in Firefight rules. The verified UI path is Use solo native rules → Player loadout → edit ammunition → Prepare native solo round → Save → close/reopen → Build. R651/R656 independently read back pistol12loaded/72reserved and health/shields1. This closes the missing deliberate starting-profile source gate, not the playable-round gate. The actual Standalone review remains interrupted/unaccepted: R651 timed out; R656 was stopped after the owner's physical Escape. Before presenting H12 as ready, inspect a controllable equipped player, hostile AI, actual combat, two wave clears and defeat/victory. Retain screenshots/native debug logs and record observed behavior; do not kill actors through debug commands to manufacture a pass. Fresh game control requires the owner's return/authorization. All original content remains protected.

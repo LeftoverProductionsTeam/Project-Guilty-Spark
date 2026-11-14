@@ -40,6 +40,39 @@ pub struct WaveDefinition {
     pub score_multiplier_milli: u32,
     pub groups: Vec<EnemyGroup>,
 }
+/// Optional Spark authoring data; exported as standard scenario starting-profile fields.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativePlayerProfile {
+    pub primary_weapon: String,
+    pub primary_loaded: u16,
+    pub primary_reserved: u16,
+    pub secondary_weapon: Option<String>,
+    pub secondary_loaded: u16,
+    pub secondary_reserved: u16,
+    pub health: f32,
+    pub shields: f32,
+    pub fragmentation_grenades: u8,
+    pub plasma_grenades: u8,
+}
+fn validate_native_profile(profile:&NativePlayerProfile)->Result<()> {
+    for path in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
+        crate::safe_relative(path)?;
+        if path.is_empty()||path.len()>240||!path.is_ascii()||path.chars().any(char::is_control)||path.to_ascii_lowercase().ends_with(".weapon") {
+            return invalid("Choose a native player weapon tag path without its extension (1–240 ASCII characters)");
+        }
+    }
+    if !profile.health.is_finite()||!(0.01..=1.0).contains(&profile.health)||!profile.shields.is_finite()||!(0.0..=3.0).contains(&profile.shields)
+        ||profile.fragmentation_grenades>4||profile.plasma_grenades>4
+        ||[profile.primary_loaded,profile.primary_reserved,profile.secondary_loaded,profile.secondary_reserved].iter().any(|value|*value>32767) {
+        return invalid("Native player profile exceeds Halo health, shield, grenade or ammunition limits");
+    }
+    if profile.secondary_weapon.as_ref().is_some_and(|path|path.replace('\\',"/").eq_ignore_ascii_case(&profile.primary_weapon.replace('\\',"/"))) {
+        return invalid("Choose distinct native primary and secondary weapons; dual wielding is a separate engine capability");
+    }
+    if profile.secondary_weapon.is_none()&&(profile.secondary_loaded!=0||profile.secondary_reserved!=0){return invalid("Secondary ammunition needs a secondary weapon");}
+    Ok(())
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FirefightConfig {
@@ -69,6 +102,8 @@ pub struct FirefightConfig {
     pub starting_equipment: Vec<String>,
     pub replenish_ammo_each_wave: bool,
     pub supply_drop_tags: Vec<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub native_player_profile: Option<NativePlayerProfile>,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -216,6 +251,7 @@ pub fn default_config() -> FirefightConfig {
         starting_equipment: vec![],
         replenish_ammo_each_wave: false,
         supply_drop_tags: vec![],
+        native_player_profile: None,
     }
 }
 fn identifier(value: &str) -> bool {
@@ -321,6 +357,7 @@ pub fn validate_document(config: &FirefightConfig) -> Result<()> {
             return invalid("Authored wave count exceeds maxTotalPerWave");
         }
     }
+    if let Some(profile)=&config.native_player_profile {validate_native_profile(profile)?;}
     if config.starting_equipment.len() > 16 || config.supply_drop_tags.len() > 16 {
         return invalid("At most 16 equipment or supply references are allowed");
     }
@@ -1061,12 +1098,28 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let scenario = crate::quickforge::scenario_path(doc)?;
     let tag = format!("{scenario}.scenario");
     let mut plan = NativeRoundPlan { dependencies:vec![],commands:vec![],encounter_names:vec![] };
+    let player=config.native_player_profile.as_ref().ok_or_else(||SparkError::Invalid("Native solo round needs a player loadout. Use solo native rules, review Player loadout and prepare the source again".into()))?;
+    validate_native_profile(player)?;
     let mut palette = BTreeMap::<String,usize>::new();
     let add = |plan:&mut NativeRoundPlan,args:Vec<String>| plan.commands.push(crate::quickforge::ForgeCommand {
         phase:"firefight-scenario".into(),tool:"invaderEdit".into(),args,expected_outputs:vec![format!("tags/{}",tag.replace('\\',"/"))],
     });
     let set = |args:&mut Vec<String>,key:String,value:String|args.extend(["-S".into(),key,value]);
     let vector = |position:[f32;3]|position.map(|value|value.to_string()).join(",");
+    let p="player_starting_profile[0]";
+    let mut loadout=vec!["-I".into(),"player_starting_profile".into(),"1".into(),"end".into()];
+    for (key,value) in [("name","gs_firefight_start".into()),("starting_health_modifier",player.health.to_string()),("starting_shield_modifier",player.shields.to_string()),
+        ("primary_weapon",format!("{}.weapon",player.primary_weapon)),("primary_rounds_loaded",player.primary_loaded.to_string()),("primary_rounds_reserved",player.primary_reserved.to_string()),
+        ("starting_fragmentation_grenade_count",player.fragmentation_grenades.to_string()),("starting_plasma_grenade_count",player.plasma_grenades.to_string())] {
+        set(&mut loadout,format!("{p}.{key}"),value);
+    }
+    for weapon in std::iter::once(&player.primary_weapon).chain(player.secondary_weapon.iter()) {
+        plan.dependencies.push(crate::quickforge::ForgeDependency{kind:"firefightPlayerWeapon".into(),tag_path:weapon.replace('\\',"/"),tag_class:"weapon".into(),source_project_id:None,source_sha256:None});
+    }
+    if let Some(weapon)=&player.secondary_weapon {
+        for(key,value)in[("secondary_weapon",format!("{weapon}.weapon")),("secondary_rounds_loaded",player.secondary_loaded.to_string()),("secondary_rounds_reserved",player.secondary_reserved.to_string())] {set(&mut loadout,format!("{p}.{key}"),value);}
+    }
+    loadout.push(tag.clone());add(&mut plan,loadout);
     for (w,wave) in config.waves.iter().enumerate() {
         let actors:u32=wave.groups.iter().map(|group|group.count as u32).sum();
         if wave.groups.len()>8 || actors>config.max_alive as u32 || wave.score_multiplier_milli>10000 {return invalid("Native wave must fit 1–8 groups, maxAlive and the native score multiplier bound");}

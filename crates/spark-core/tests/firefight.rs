@@ -317,6 +317,7 @@ fn native_project() -> spark_core::project::Project {
     let mut p=spark_core::project::Project::new("Native round test");
     let mut c=default_config();c.player_count=1;c.team_lives=1;c.allow_revives=false;c.rounds=1;c.endless=false;c.max_spawn_attempts=1;c.difficulty_step_percent=0;c.extra_player_count_percent=0;c.starting_equipment.clear();c.supply_drop_tags.clear();c.replenish_ammo_each_wave=false;
     c.max_alive=4;c.max_total_per_wave=4;c.stuck_timeout_ms=60000;
+    c.native_player_profile=Some(NativePlayerProfile{primary_weapon:"weapons/pistol/pistol".into(),primary_loaded:12,primary_reserved:60,secondary_weapon:None,secondary_loaded:0,secondary_reserved:0,health:1.0,shields:1.0,fragmentation_grenades:2,plasma_grenades:0});
     c.enemies=vec![EnemyType{id:"grunt".into(),name:"Grunt".into(),actor_variant_path:"characters/grunt/grunt minor plasma pistol".into(),points:100}];
     c.spawn_zones=vec![SpawnZone{id:"enemy-zone".into(),position:[6.0,0.0,0.2],radius:2.0,enabled:true}];
     c.waves=vec![WaveDefinition{id:"wave".into(),name:"Wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![EnemyGroup{enemy_id:"grunt".into(),count:2}]}];
@@ -331,8 +332,9 @@ fn rebind(p:&mut spark_core::project::Project) {
 #[test]
 fn native_round_uses_standard_scenario_fields_and_preserves_unrelated_source() {
     let p=native_project();let before=serde_json::to_vec(&p).unwrap();let plan=native_round_plan(&p).unwrap().unwrap();
-    assert_eq!(plan.encounter_names,["gs_w01_g01"]);assert_eq!(plan.dependencies.len(),1);
-    assert_eq!(plan.dependencies[0].tag_class,"actor_variant");
+    assert_eq!(plan.encounter_names,["gs_w01_g01"]);assert_eq!(plan.dependencies.len(),2);
+    assert!(plan.dependencies.iter().any(|dep|dep.tag_class=="actor_variant"));
+    assert!(plan.dependencies.iter().any(|dep|dep.tag_class=="weapon"&&dep.tag_path=="weapons/pistol/pistol"));
     let args=plan.commands.iter().flat_map(|command|command.args.iter()).cloned().collect::<Vec<_>>().join("|");
     for field in ["actor_palette[0].reference","encounters[0].flags.not_initially_created","encounters[0].squads[0].normal_diff_count","encounters[0].squads[0].starting_locations[1].position","encounters[0].firing_positions[1].position"] {assert!(args.contains(field),"{field}");}
     assert!(!args.contains(".one|"),"cache-only scenario fields belong to the native compiler");assert!(!args.contains("-n|"));assert!(!args.contains("-E|"));assert_eq!(serde_json::to_vec(&p).unwrap(),before);
@@ -365,4 +367,15 @@ fn native_solo_spawn_minimum_does_not_lower_multiplayer_or_clearance_checks() {
     assert!(spark_core::quickforge::validate(doc).unwrap().issues.iter().any(|issue|issue.code=="SPAWN_MINIMUM"));
     doc.game_mode="firefight".into();doc.spawns.clear();
     assert!(spark_core::quickforge::validate(doc).unwrap().issues.iter().any(|issue|issue.code=="SPAWN_MINIMUM"));
+}
+
+#[test]fn native_player_loadout_is_standard_bounded_and_not_silently_invented_for_old_source(){
+ let original=default_config();let bytes=serde_json::to_value(&original).unwrap();assert!(bytes.get("nativePlayerProfile").is_none());
+ let mut p=native_project();p.firefight.as_mut().unwrap().native_player_profile=None;rebind(&mut p);
+ assert!(native_round_plan(&p).unwrap_err().to_string().contains("player loadout"));
+ let p=native_project();let plan=native_round_plan(&p).unwrap().unwrap();let args=plan.commands.iter().flat_map(|command|command.args.iter()).cloned().collect::<Vec<_>>().join("|");
+ for field in ["player_starting_profile[0].name|gs_firefight_start","player_starting_profile[0].primary_weapon|weapons/pistol/pistol.weapon","player_starting_profile[0].primary_rounds_loaded|12","player_starting_profile[0].primary_rounds_reserved|60","player_starting_profile[0].starting_health_modifier|1","player_starting_profile[0].starting_shield_modifier|1"]{assert!(args.contains(field),"{field}");}
+ let mut bad=p.clone();bad.firefight.as_mut().unwrap().native_player_profile.as_mut().unwrap().primary_reserved=32768;rebind(&mut bad);assert!(native_round_plan(&bad).is_err());
+ let mut bad=p.clone();bad.firefight.as_mut().unwrap().native_player_profile.as_mut().unwrap().primary_weapon="../protected".into();rebind(&mut bad);assert!(native_round_plan(&bad).is_err());
+ let mut bad=p;bad.firefight.as_mut().unwrap().native_player_profile.as_mut().unwrap().secondary_weapon=Some("weapons\\pistol\\pistol".into());rebind(&mut bad);assert!(native_round_plan(&bad).is_err());
 }

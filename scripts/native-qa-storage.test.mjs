@@ -173,6 +173,35 @@ finally{if(tracked)await stopQaProcess(tracked);if(untracked)await stopQaProcess
 });
 
 
+test('an owned Windows preview tree stops before disposable native source is retired', {
+  skip: process.platform !== 'win32',
+}, () => withDevelopmentWorkspace('preview-tree-shutdown-regression', async context => {
+  const ready = path.join(context.directory, 'preview-process.json');
+  // The parent represents the launched QA app; its descendant represents the
+  // exact private native preview. Do not discover or terminate by image name.
+  const parent = spawn(process.execPath, ['-e', `
+    const fs=require('node:fs'),{spawn}=require('node:child_process');
+    const preview=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',windowsHide:true});
+    preview.once('spawn',()=>fs.writeFileSync(process.argv[1],JSON.stringify({pid:preview.pid})));
+    setInterval(()=>{},1000);
+  `, ready], {stdio:'ignore',windowsHide:true});
+  await context.trackProcess(parent);
+  try {
+    let preview;
+    const deadline=Date.now()+10000;
+    while(!preview&&Date.now()<deadline){
+      preview=await fs.readFile(ready,'utf8').then(JSON.parse).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+      if(!preview)await new Promise(resolve=>setTimeout(resolve,20));
+    }
+    assert.ok(Number.isSafeInteger(preview?.pid)&&preview.pid>0,'The exact descendant identity is observed before shutdown');
+    process.kill(preview.pid,0);
+    await stopQaProcess(parent);
+    assert.ok(parent.exitCode!==null||parent.signalCode!==null);
+    assert.throws(()=>process.kill(preview.pid,0),{code:'ESRCH'},'The preview must not survive its owner and write during scratch cleanup');
+    assert.equal(JSON.parse(await fs.readFile(ready,'utf8')).pid,preview.pid,'Native source remains available until writers have exited');
+  } finally {await stopQaProcess(parent);}
+}, {reservationBytes:8*1024**2}));
+
 test('a failed action still retires its owned receipt when final measurement reports a budget failure', () => {
   const env={...process.env};
   for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];

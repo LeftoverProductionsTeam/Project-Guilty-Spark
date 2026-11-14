@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { attachNativeFirefightRound, exportHaloCeFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
 import type { Project } from './types';
-import type { FirefightConfig } from './firefight';
+import { defaultNativePlayerProfile, type FirefightConfig } from './firefight';
 export function nativeRoundFixture():FirefightConfig {
   return {schemaVersion:1,title:'Native round',sourceSha256:null,seed:1,playerCount:1,teamLives:1,allowRevives:false,
     rounds:1,endless:false,preparationMs:1000,countdownMs:1000,intermissionMs:1000,spawnIntervalMs:500,
     spawnTimeoutMs:5000,stuckTimeoutMs:60000,maxSpawnAttempts:1,maxAlive:4,maxTotalPerWave:4,
-    difficultyStepPercent:0,extraPlayerCountPercent:0,startingEquipment:[],replenishAmmoEachWave:false,supplyDropTags:[],
+    difficultyStepPercent:0,extraPlayerCountPercent:0,startingEquipment:[],replenishAmmoEachWave:false,supplyDropTags:[],nativePlayerProfile:defaultNativePlayerProfile(),
     enemies:[{id:'elite',name:'Elite',actorVariantPath:'characters/elite/elite',points:125}],
     spawnZones:[{id:'first',position:[94,-155,0.2],radius:1,enabled:true}],
     waves:[{id:'first',name:'First wave',boss:false,scoreMultiplierMilli:1000,groups:[{enemyId:'elite',count:2}]},
@@ -30,7 +30,8 @@ describe('opt-in native Firefight round source',()=>{
     expect(out.content.slice(out.content.indexOf('(script static void gs_wave_01'),out.content.indexOf('(script continuous gs_firefight'))).not.toContain('(players)');
     expect(out.content).toContain('(set gs_ff_state 5)');
     expect(out.content).not.toMatch(/unit_kill|ai_kill|damage_object|ai_erase_all|cheat/);
-    expect(out.dependencies).toHaveLength(2);
+    expect(out.dependencies).toContain('starting_profile:gs_firefight_start');
+    expect(out.dependencies).toContain('weapon:weapons/pistol/pistol');
     expect(out.generatedOnly).toBe(true);
   });
   it('captures encounter units before combat and cleans their corpses without deleting players or unrelated objects',()=>{
@@ -100,4 +101,20 @@ it('native solo preset keeps encounters/zones and leaves the prior authoring rul
   expect(next.waves).toEqual(original.waves);expect(next.spawnZones).toEqual(original.spawnZones);
   expect(original.playerCount).toBe(2);expect(next.playerCount).toBe(1);expect(next.teamLives).toBe(1);expect(next.maxSpawnAttempts).toBe(1);
   expect(()=>exportHaloCeFirefightRound(next)).not.toThrow();
+});
+
+it('equips an explicit standard scenario profile only after the native player is alive',()=>{
+ const config=nativeRoundFixture();const source=exportHaloCeFirefightRound(config).content;
+ expect(source).toContain('(if (!= gs_ff_state 5) (player_add_equipment gs_ff_player gs_firefight_start true))');
+ expect(source.indexOf('(player_add_equipment')).toBeGreaterThan(source.indexOf('(set gs_ff_player (unit (list_get (players) 0)))'));
+ for(const patch of [{health:0},{shields:4},{primaryLoaded:-1},{primaryReserved:32768},{fragmentationGrenades:5},{primaryWeapon:'../original'},{secondaryWeapon:config.nativePlayerProfile!.primaryWeapon}])
+  expect(()=>exportHaloCeFirefightRound({...config,nativePlayerProfile:{...config.nativePlayerProfile!,...patch}})).toThrow();
+});
+it('retains old generated source for comparison but requires an explicit loadout for new native attachment',()=>{
+ const config=nativeRoundFixture();delete config.nativePlayerProfile;
+ expect(exportHaloCeFirefightRound(config).content).not.toContain('player_add_equipment');
+ const p={firefight:config,quickForge:{gameMode:'firefight',runtimeId:'mccSteam'}} as Project;
+ expect(()=>attachNativeFirefightRound(p)).toThrow(/Player loadout/);
+ const fixed=nativeSoloFirefightRules(config);expect(fixed.nativePlayerProfile).toEqual(defaultNativePlayerProfile());
+ expect(config.nativePlayerProfile).toBeUndefined();
 });

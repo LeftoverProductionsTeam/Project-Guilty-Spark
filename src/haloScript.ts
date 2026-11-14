@@ -6,7 +6,7 @@
  */
 import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
-import type { FirefightConfig } from './firefight';
+import { defaultNativePlayerProfile, type FirefightConfig } from './firefight';
 import type { Project } from './types';
 export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
@@ -142,6 +142,17 @@ export function exportHaloCeFirefight(config:FirefightConfig):ScriptExport {
  */
 export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport {
   const conservative=exportHaloCeFirefight(config);
+  const player=config.nativePlayerProfile;
+  if(player){
+    for(const weapon of [player.primaryWeapon,...(player.secondaryWeapon?[player.secondaryWeapon]:[])]){
+      if(typeof weapon!=='string'||!weapon.length||weapon.length>240||/[^\x20-\x7e]/.test(weapon)||/\.weapon$/i.test(weapon)||/^(?:[\/]|[A-Za-z]:)/.test(weapon)||weapon.replaceAll('\\','/').split('/').some(part=>!part||part==='.'||part==='..'))throw Error('Choose native player weapon tag paths without extensions.');
+    }
+    if(!Number.isFinite(player.health)||player.health<.01||player.health>1||!Number.isFinite(player.shields)||player.shields<0||player.shields>3||
+      [player.primaryLoaded,player.primaryReserved,player.secondaryLoaded,player.secondaryReserved].some(n=>!Number.isSafeInteger(n)||n<0||n>32767)||
+      [player.fragmentationGrenades,player.plasmaGrenades].some(n=>!Number.isSafeInteger(n)||n<0||n>4)||
+      (!player.secondaryWeapon&&(player.secondaryLoaded!==0||player.secondaryReserved!==0))||
+      (player.secondaryWeapon?.replaceAll('\\','/').toLowerCase()===player.primaryWeapon.replaceAll('\\','/').toLowerCase()))throw Error('Native player loadout exceeds Halo limits or duplicates the starting weapon.');
+  }
   if(config.playerCount!==1 || config.teamLives!==1 || config.allowRevives || config.endless || config.difficultyStepPercent!==0 ||
     config.extraPlayerCountPercent!==0 || config.replenishAmmoEachWave ||
     !Array.isArray(config.startingEquipment) || config.startingEquipment.length ||
@@ -214,8 +225,9 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
     '  (gs_ff_reset)','  (set gs_ff_state 1)',
     `  (sleep_until (> (unit_get_health (unit (list_get (players) 0))) 0) 1 ${ticks(config.spawnTimeoutMs)})`,
     '  (set gs_ff_player (unit (list_get (players) 0)))',
-    '  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))',
-    `  (sleep ${ticks(config.preparationMs+config.countdownMs)})`);
+    '  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))');
+  if(player)lines.push('  (if (!= gs_ff_state 5) (player_add_equipment gs_ff_player gs_firefight_start true))');
+  lines.push(`  (sleep ${ticks(config.preparationMs+config.countdownMs)})`);
   for(let r=0;r<config.rounds;r++){
     lines.push(`  (set gs_ff_round ${r+1})`);
     for(let w=0;w<waves.length;w++)lines.push(`  (gs_wave_${String(w+1).padStart(2,'0')})`,
@@ -223,7 +235,8 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
   }
   lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
   lines.push(')','');
-  return {...conservative,content:lines.join('\r\n'),activation:'(set gs_ff_start true)',scenarioType:'singleplayer',warnings:[
+  return {...conservative,content:lines.join('\r\n'),activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
+    ...(player?['Create gs_firefight_start as a standard scenario player starting profile using the exported player-loadout authoring metadata; include its exact weapon dependencies.']:[]),
     'Experimental native solo round source. Build only into a separate reviewed singleplayer/campaign scenario with these exact encounters/counts and safe spawn/navigation data.',
     'Start or request another round with (set gs_ff_start true). The continuous controller resets only its own encounters and score, then waits for actual living counts to reach zero.',
     'Missing/partial spawns, a dead player or the authored wave deadline refuse progression. No phantom success, forced kills or invulnerability is generated.',
@@ -255,6 +268,7 @@ export function attachNativeFirefightRound(project: Project): Project {
   if (!doc || !config || doc.gameMode !== 'firefight' ||
       !['mccSteam','haloCustomEdition','chupathingyCe'].includes(doc.runtimeId) || doc.native)
     throw Error('Open an editable solo Firefight level with a supported native build target first. Original Zombie restoration and shared-source scenarios use separate acceptance paths.');
+  if (!config.nativePlayerProfile) throw Error('Use solo native rules and review Player loadout before preparing a native round.');
   if (config.maxSpawnAttempts !== 1) throw Error('Native solo rounds require one spawn attempt; retries remain an authoring rule.');
   if (config.waves.reduce((n,wave)=>n+wave.groups.length,0)>128) throw Error('Native scenario supports at most 128 encounters.');
   const module = {filename:'gs_firefight.hsc', content:nativeRoundModule(config)};
@@ -281,5 +295,5 @@ export function nativeSoloFirefightRules(config: FirefightConfig): FirefightConf
   return {...config,playerCount:1,teamLives:1,allowRevives:false,rounds:1,endless:false,
     preparationMs:1000,countdownMs:1000,intermissionMs:1000,spawnTimeoutMs:5000,stuckTimeoutMs:60000,
     maxSpawnAttempts:1,maxAlive:32,maxTotalPerWave:32,difficultyStepPercent:0,extraPlayerCountPercent:0,
-    startingEquipment:[],replenishAmmoEachWave:false,supplyDropTags:[]};
+    startingEquipment:[],replenishAmmoEachWave:false,supplyDropTags:[],nativePlayerProfile:config.nativePlayerProfile??defaultNativePlayerProfile()};
 }

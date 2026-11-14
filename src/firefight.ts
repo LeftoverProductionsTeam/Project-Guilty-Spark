@@ -18,6 +18,13 @@ export interface WaveDefinition {
   scoreMultiplierMilli: number;
   groups: { enemyId: string; count: number }[];
 }
+export interface NativePlayerProfile {
+  primaryWeapon:string; primaryLoaded:number; primaryReserved:number;
+  secondaryWeapon:string|null; secondaryLoaded:number; secondaryReserved:number;
+  health:number; shields:number; fragmentationGrenades:number; plasmaGrenades:number;
+}
+export const defaultNativePlayerProfile=():NativePlayerProfile=>({primaryWeapon:'weapons/pistol/pistol',primaryLoaded:12,primaryReserved:60,
+  secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0,health:1,shields:1,fragmentationGrenades:2,plasmaGrenades:0});
 export interface FirefightConfig {
   schemaVersion: number;
   title: string;
@@ -45,6 +52,7 @@ export interface FirefightConfig {
   startingEquipment: string[];
   replenishAmmoEachWave: boolean;
   supplyDropTags: string[];
+  nativePlayerProfile?: NativePlayerProfile;
 }
 export interface FirefightPreset {
   id: string;

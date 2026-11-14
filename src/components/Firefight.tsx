@@ -1,6 +1,7 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
+import { defaultNativePlayerProfile, type NativePlayerProfile } from '../firefight';
 import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
 import { call } from '../api';
@@ -64,6 +65,9 @@ export default function Firefight({
   }, [config]);
   function change(next: FirefightConfig, description: string) {
     edit({ ...project, firefight: next }, description);
+  }
+  function playerProfile(patch:Partial<NativePlayerProfile>) {
+    if(config?.nativePlayerProfile)change({...config,nativePlayerProfile:{...config.nativePlayerProfile,...patch}},'Edit native player loadout');
   }
   function begin(next?: FirefightConfig) {
     if (!catalog) return;
@@ -135,7 +139,7 @@ export default function Firefight({
       const bytes=sourceZip([{name:source.filename,contents:source.content},
         {name:'native-round.json',contents:scriptManifest(source)},
         {name:'encounter-plan.json',contents:JSON.stringify({scenarioType:'singleplayer',sourceSha256:config.sourceSha256,enemies:config.enemies,
-          spawnZones:config.spawnZones,waves:config.waves,dependencies:source.dependencies,compiled:false,gameplayVerified:false},null,2)}]);
+          spawnZones:config.spawnZones,waves:config.waves,nativePlayerProfile:config.nativePlayerProfile??null,dependencies:source.dependencies,compiled:false,gameplayVerified:false},null,2)}]);
       const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/zip'}));
       const link=document.createElement('a');link.href=url;link.download='spark-native-firefight-round-source.zip';
       document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setError('');
@@ -528,13 +532,23 @@ export default function Firefight({
             </div>
           ))}
           </section><section className="firefight-validation">
+          <details>
+            <summary>Player loadout</summary>
+            <p className="subtle">Starting gear for the native solo round. Weapon paths use your selected source tags; missing dependencies block the build. These are normal weapon slots, not dual wielding.</p>
+            <button disabled={busy} onClick={()=>config&&change({...config,nativePlayerProfile:defaultNativePlayerProfile()},'Set pistol starting profile')}>Use pistol loadout</button>
+            {config.nativePlayerProfile&&<div className="forge-rule-grid">
+              <label>Primary weapon tag<input aria-label="Primary weapon tag" key={'primary:'+config.nativePlayerProfile.primaryWeapon} defaultValue={config.nativePlayerProfile.primaryWeapon} maxLength={240} onBlur={event=>{if(event.target.value!==config.nativePlayerProfile?.primaryWeapon)playerProfile({primaryWeapon:event.target.value});}}/></label>
+              <label>Secondary weapon tag (optional)<input aria-label="Secondary weapon tag" key={'secondary:'+config.nativePlayerProfile.secondaryWeapon} defaultValue={config.nativePlayerProfile.secondaryWeapon??''} maxLength={240} onBlur={event=>{const value=event.target.value||null;if(value!==config.nativePlayerProfile?.secondaryWeapon)playerProfile(value?{secondaryWeapon:value}:{secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0});}}/></label>
+              {([['primaryLoaded','Primary rounds loaded',0,32767,1],['primaryReserved','Primary rounds reserved',0,32767,1],['secondaryLoaded','Secondary rounds loaded',0,32767,1],['secondaryReserved','Secondary rounds reserved',0,32767,1],['health','Starting health',.01,1,.05],['shields','Starting shields',0,3,.1],['fragmentationGrenades','Fragmentation grenades',0,4,1],['plasmaGrenades','Plasma grenades',0,4,1]] as const).map(([key,label,min,max,step])=><label key={key}>{label}<NumberField label={label} value={config.nativePlayerProfile![key]} min={min} max={max} step={step} onCommit={value=>playerProfile({[key]:value})}/></label>)}
+            </div>}
+          </details>
           <div className="analysis-actions">
             <button disabled={busy} onClick={() => change(nativeSoloFirefightRules(config), 'Use solo native Firefight rules')}
-              title="One player, one life, one finite round, one spawn attempt, bounded preparation/timeouts; no revives, scaling, starting-equipment overrides or resupply. Enemy groups and zones are retained. Undo restores the previous rules.">
+              title="One player, one life, one finite round, one spawn attempt, bounded preparation/timeouts; no revives, scaling, starting-equipment overrides or resupply. Enemy groups, zones and any selected native player loadout are retained. A fresh profile starts with a pistol, ammunition, health and shields. Undo restores the previous rules.">
               Use solo native rules
             </button>
             <button disabled={busy || !project.quickForge} onClick={prepareNativeRound}
-              title="Prepare a solo round with native actor encounters and startup HaloScript. One player/life, finite waves, no scaling or supplies. Save, then use Build & playtest; compilation and gameplay remain separate checks.">
+              title="Prepare a solo round with native actor encounters and startup HaloScript. Review Player loadout first. One player/life, finite waves, no scaling or supplies. Save, then use Build & playtest; compilation and gameplay remain separate checks.">
               Prepare native solo round
             </button>
             <button disabled={busy} onClick={() => void run('validate')}>
