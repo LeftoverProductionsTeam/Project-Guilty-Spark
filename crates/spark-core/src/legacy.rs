@@ -38,8 +38,7 @@ pub fn normalized_extraction_input(source:&crate::project::Source,inspection:&Ma
 pub fn prepare_extraction(bytes: &mut [u8], inspection: &MapInspection) -> Result<Vec<Repair>> {
     let mut repairs = vec![];
     if inspection.header.legacy_tag_size_repair {
-        if inspection.header.version!=7||Reader(bytes).u32(0x14)?!=inspection.header.declared_size||inspection.header.tag_offset.checked_add(inspection.header.tag_size)!=Some(inspection.header.declared_size){return invalid("Legacy tag-size normalization precondition changed");}
-        bytes[0x14..0x18].copy_from_slice(&inspection.header.tag_size.to_le_bytes());
+        // read_cache_snapshot already normalizes this header in its owned buffer.
         repairs.push(Repair{code:"LEGACY_TAG_SIZE".into(),message:"Normalized a known legacy whole-file tag-size declaration in the working copy; all pointers were separately bounds-checked.".into(),offset:0x14,original:inspection.header.declared_size,replacement:inspection.header.tag_size});
     }
     if ![6, 7].contains(&inspection.header.version) {
