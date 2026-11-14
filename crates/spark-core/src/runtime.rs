@@ -334,6 +334,7 @@ pub struct RuntimeInventory {
 pub struct LaunchPlan {
     pub runtime_id: RuntimeId,
     pub executable: PathBuf,
+    pub executable_sha256: String,
     pub cwd: PathBuf,
     pub args: Vec<String>,
     pub direct_map_launch: bool,
@@ -718,6 +719,9 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
         executable=fs::canonicalize(engine)?;executable_sha256=engine_hash;
         diagnostics.push("Reviewed Chupathingy launcher resolved to its exact installed game executable; no launcher configuration was changed.".into());
     }
+    if registration.runtime_id == RuntimeId::OpenCe && executable_sha256 == FORERUNNER_WINDOWS_X86_SHA256 {
+        diagnostics.push("Forerunner firefight-build-002: shared content uses separate Spark-managed settings, saves, logs and caches. Play opens its menus, not the current project; project deployment and Live Rebuild remain unavailable. Spark launch acceptance is pending.".into());
+    }
     if binary_platform != platform() {
         diagnostics.push(format!(
             "Executable format targets {binary_platform}; this host is {}. Launch is blocked.",
@@ -921,10 +925,16 @@ pub fn activate_registration(registrations: &mut Vec<RuntimeRegistration>, id: &
     remember_registration(registrations, selected)
 }
 
+/// Forerunner TEST_EVIDENCE.md, firefight-build-002, source 21a809b0.
+/// This pins reviewed path settings, not acceptance of Spark's launch adapter.
+pub const FORERUNNER_WINDOWS_X86_SHA256: &str =
+    "fb8d204f21e57a4db6ed44f078338a02023c49a3998b6a437e1f4d1d8f8fa4b7";
+
 /// Reviewed path interfaces only. A declared version or a similarly named executable is insufficient.
 /// Local Faber234/Chupathingy identities are owner-installed, not publisher attestations.
 pub fn shared_content_interface(id: RuntimeId, executable_sha256: &str) -> Option<&'static str> {
     match (id, executable_sha256) {
+        (RuntimeId::OpenCe, FORERUNNER_WINDOWS_X86_SHA256) => Some("forerunner"),
         (RuntimeId::OpenCe, "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0" |
             "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9" |
             "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3" |
@@ -961,7 +971,9 @@ pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> 
         .ok_or_else(|| crate::SparkError::Invalid("No executable parent".into()))?
         .to_path_buf();
     let shared = installed.data_root != installed.root;
-    let interface = shared_content_interface(registration.runtime_id, installed.executable_sha256.as_deref().unwrap_or(""));
+    let executable_sha256 = installed.executable_sha256
+        .ok_or_else(|| crate::SparkError::Invalid("Missing inspected executable identity".into()))?;
+    let interface = shared_content_interface(registration.runtime_id, &executable_sha256);
     if shared && interface.is_none() {
         return invalid("This exact engine has no verified shared-folder interface. For modern Chupathingy select chupathingy.exe, not its small launcher. Stock Custom Edition and MCC keep their own native map layouts.");
     }
@@ -975,17 +987,22 @@ pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> 
         environment.insert("HALO_DATA_ROOT".into(), process_path(&installed.data_root)?);
     }
     if interface.is_some() {
-        if registration.data_root.is_some(){environment.insert("HALO_DATA_ROOT".into(),process_path(&installed.data_root)?);}
+        if registration.data_root.is_some() || interface == Some("forerunner") {
+            environment.insert("HALO_DATA_ROOT".into(),process_path(&installed.data_root)?);
+        }
         let ce = installed.data_root.join("maps_ce");
         crate::reject_links(&ce)?;
-        if interface == Some("openCe") {
+        if matches!(interface, Some("openCe" | "forerunner")) {
             let custom=if ce.is_dir(){process_path(&fs::canonicalize(&ce)?)?}else{process_path(&installed.data_root)?.join("custom_maps")};
             crate::reject_links(&custom)?;
             environment.insert("HALO_CUSTOM_MAPS_ROOT".into(),custom);
         }
     }
-    Ok(LaunchPlan { runtime_id: registration.runtime_id, executable, cwd, args: vec![], direct_map_launch: false, environment,
-        warnings: vec!["This plan starts only the explicitly registered user-installed runtime. It does not deploy or select a map, verify gameplay, or attach a bridge.".into(),
+    let mut warnings = vec!["This plan starts only the explicitly registered user-installed runtime. It does not deploy or select a map, verify gameplay, or attach a bridge.".into(),
         "Runtime startup/hosting may have its own migration, asset-sharing and telemetry behavior; review its settings.".into(),
-        "For supported OpenCE shared layouts, maps_ce supplies CE content; older custom_maps content stays preserved in its original folder. Engine-generated pack caches may still use the data folder.".into()] })
+        "For supported OpenCE shared layouts, maps_ce supplies CE content; older custom_maps content stays preserved in its original folder. Engine-generated pack caches may still use the data folder.".into()];
+    if interface == Some("forerunner") {
+        warnings.push("This exact Forerunner profile uses separate Spark-managed settings, saves, logs and caches. Inherited HALO overrides, automatic map downloads, old-map migration and update checks are disabled for this launch. Its menu remains the map-selection route; automatic authored-cache deployment, Live Rebuild and live editing are not enabled. Spark adapter launch acceptance is pending.".into());
+    }
+    Ok(LaunchPlan { runtime_id: registration.runtime_id, executable, executable_sha256, cwd, args: vec![], direct_map_launch: false, environment, warnings })
 }

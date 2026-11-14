@@ -2474,20 +2474,57 @@ async fn choose_runtime_path(kind: String) -> Reply<Option<PathBuf>> {
 }
 fn registered_runtime_command(state:&AppState,registration:&runtime::RuntimeRegistration,plan:&runtime::LaunchPlan)->Reply<std::process::Command>{
     let executable=runtime::process_path(&plan.executable).map_err(error)?;
+    if plan.runtime_id != registration.runtime_id || maps::hash_file(&executable).map_err(error)? != plan.executable_sha256 {
+        return Err("Runtime executable changed after inspection; prepare the launch again".into());
+    }
+    let forerunner = runtime::shared_content_interface(plan.runtime_id, &plan.executable_sha256) == Some("forerunner");
     let mut command=steam::command(executable.to_string_lossy().as_ref());
-        command.current_dir(runtime::process_path(&plan.cwd).map_err(error)?).args(&plan.args).envs(&plan.environment);
-        if plan.environment.get("HALO_DATA_ROOT").is_some_and(|data|fs::canonicalize(&registration.root).ok()!=fs::canonicalize(data).ok()) {
-            // Data is common; writable saves and logs are specific to this profile.
-            core::safe_relative(&registration.id).map_err(error)?;
-            if std::path::Path::new(&registration.id).components().count()!=1 { return Err("Invalid runtime profile identifier".into()); }
-            let private=state.root.join("runtime-state").join(&registration.id);
-            core::reject_links(&private).map_err(error)?;
-            for (key,folder) in [("HALO_SAVE_ROOT","saves"),("HALO_LOG_ROOT","logs"),("HALO_CACHE_ROOT","cache")] {
-                let directory=private.join(folder); core::reject_links(&directory).map_err(error)?;
-                fs::create_dir_all(&directory).map_err(error)?; command.env(key,runtime::process_path(&directory).map_err(error)?);
-            }
+    if forerunner {
+        // Only this exact reviewed engine implements the private config/path contract.
+        // Do not inherit another engine's config, test, hosting or startup overrides.
+        for (key, _) in std::env::vars_os().filter(|(key,_)|key.to_string_lossy().to_ascii_uppercase().starts_with("HALO_")) {
+            command.env_remove(key);
         }
-
+    }
+    command.current_dir(runtime::process_path(&plan.cwd).map_err(error)?).args(&plan.args).envs(&plan.environment);
+    if forerunner || plan.environment.get("HALO_DATA_ROOT").is_some_and(|data|fs::canonicalize(&registration.root).ok()!=fs::canonicalize(data).ok()) {
+        // Shared content never implies shared writable profile state.
+        core::safe_relative(&registration.id).map_err(error)?;
+        if std::path::Path::new(&registration.id).components().count()!=1 { return Err("Invalid runtime profile identifier".into()); }
+        let private=state.root.join("runtime-state").join(&registration.id);
+        core::reject_links(&private).map_err(error)?;
+        for (key,folder) in [("HALO_SAVE_ROOT","saves"),("HALO_LOG_ROOT","logs"),("HALO_CACHE_ROOT","cache")] {
+            let directory=private.join(folder); core::reject_links(&directory).map_err(error)?;
+            fs::create_dir_all(&directory).map_err(error)?;
+            command.env(key,runtime::process_path(&directory).map_err(error)?);
+        }
+        if forerunner {
+            let config=private.join("config.toml");
+            core::reject_links(&config).map_err(error)?;
+            match fs::OpenOptions::new().write(true).create_new(true).open(&config) {
+                Ok(mut file) => {
+                    // Existing engine settings are never replaced on a later launch.
+                    std::io::Write::write_all(&mut file,b"# Forerunner settings for this Spark runtime profile.\n").map_err(error)?;
+                    file.sync_all().map_err(error)?;
+                }
+                Err(problem) if problem.kind()==std::io::ErrorKind::AlreadyExists => {}
+                Err(problem) => return Err(error(problem)),
+            }
+            core::reject_links(&config).map_err(error)?;
+            let metadata=fs::metadata(&config).map_err(error)?;
+            if !metadata.is_file() || metadata.len()>1024*1024 {
+                return Err("Forerunner profile settings must be a regular file no larger than 1 MiB".into());
+            }
+            command.arg("--config").arg(runtime::process_path(&config).map_err(error)?);
+            command.env("HALO_MOVE_OLD_MAP_FOLDERS","no")
+                .env("HALO_NET_MAP_DOWNLOADS","never")
+                .env("HALO_UPDATE_AUTO","false");
+            // Do not enable the newer, unbuilt game.start_map interface or a wave director.
+        }
+    }
+    if maps::hash_file(&executable).map_err(error)? != plan.executable_sha256 {
+        return Err("Runtime executable changed while preparing its profile; no launch was attempted".into());
+    }
     Ok(command)
 }
 #[tauri::command]
