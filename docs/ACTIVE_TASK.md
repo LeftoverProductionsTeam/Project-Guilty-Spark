@@ -2,9 +2,9 @@
 
 Task: Operation110 — restore current CI, protect user files, then native Firefight acceptance
 Status: implementation incomplete
-Starting revision: 05efc661ac1e4acf35e5bba2f879d17bd309d814, canonical D:/Project Guilty Spark, local master, 14 November 2026. This merge was observed during recovery; it was not created by this engineering increment.
-Latest verified revision: 05efc661ac1e4acf35e5bba2f879d17bd309d814 plus scoped CI/pack-ownership source; R641931Rust/9explicit ignores, R642280browser, R648fresh native Windows Save/restart/compile/readback pass. Exact source manifest and scoped local commit follow below; no remote publication.
-Next action: Commit the verified scoped CI/ownership/readback work with refreshed source manifests. Then repair the newly observed empty native solo player profile through the existing Firefight/source builder, add its legitimate weapon dependencies, independently read back the profile and load the isolated scenario. Continue remaining file-ownership gates; Linux requires the existing approved native runner. No push/publication or Operation110/M1–M6 completion.
+Starting revision: 1ecbc6826dbe6ab23e0852b6117792aae3babcea, canonical D:/Project Guilty Spark local master.
+Latest verified revision: 33fafd497dae19b48216236b75f32d4eeb4daa9b — native solo starting-loadout source, controlled dependencies, native readback and actual Windows Save/Undo/restart; combat remains unaccepted. R655932Rust/9ignored, R653510frontend, R652280browser and R657 real preview-tree regression pass.
+Next action: Computer Use was stopped by physical Escape during R656; do not resume game input without renewed permission. Preserve native gameplay as open. After return, inspect a controllable equipped player and actual AI state in the source-pinned Standalone trial, then genuine combat/waves. Meanwhile the next independent engineering is general user-file ownership validation and the existing owner-run Linux build/startup gate. No push/publication.
 
 ## Acceptance
 
@@ -24,13 +24,24 @@ R648 current native replay: actual UI preparation/history/Save/restart/native co
 
 Prior native Firefight R621: standard actor encounters, HaloScript, immediate Save/Undo/Redo/restart and source-backed singleplayer cache13 compiled/read back. App3f46fc03bc8c1288541b6772ee900158ea584c3f3d1a05e2a52b0b646ab10685; map257cc1fc0d36296d2c5964577dcc777d0d1847c920c4feacb9bf0344bf16b4fe. No game launch/combat/player-led waves/HUD/peers accepted. Exact prior evidence FIREFIGHT_ENGINE.md.
 
-Prior public Windows preview5 is source d832af36cb55ecd55d6c0730c24c13f90594424c, not current master. Five real assets independently downloaded/hash-verified10Nov; source-matched local installer/portable startup and uninstall passed. Accepted C49/earlier releases unchanged. Exact receipts/hashes RELEASE_CANDIDATE_20261108.md. Remote mastera045ea7 has later owner README/checksum changes; preserve them. Prior rejected direct-master push must not be bypassed.
+Prior public Windows preview5 is source d832af36cb55ecd55d6c0730c24c13f90594424c, not current master. Five real assets independently downloaded/hash-verified10Nov; source-matched local installer/portable startup and uninstall passed. Accepted C49/earlier releases unchanged. Exact receipts/hashes RELEASE_CANDIDATE_20261108.md. Remote current05efc661 includes owner README/checksum changes; preserve them. Prior rejected direct-master push must not be bypassed.
 
 Prior M2 R398: three editors, frozen CE compile/readback, two real same-PC private Chupathingy clients, guarded Live Rebuild and server-crash rollback. Separate MCC R396 source/native compile. Not human gameplay, AI parity, remote computers or all M2. Evidence CHUPATHINGY_DEDICATED_20261108.md and C39_NATIVE_CONTENT_ACCEPTANCE.md.
 
 M3 R277 connected CE cachee048b11b1a50027307f60ae0a45222f9e2035e501a95319f8e89d9487d7528ce;287connector/32252source/15862render/16230collision triangles. Physical human-verified region connections0. Foot/Warthog/ridge/cave/projectile/light/material gates precede19regions. NATIVE_ASSETS_AND_SHOWCASE.md retains source-native renderer evidence and open game-parity gates.
 
+
+R651 current loadout source builds and independently reads back standard gs_firefight_start, pistol12loaded/72reserved, health/shields1 and two native encounters. Map7b3f9bcb0857d8ae6f918edc065c01c5c056c35c4349a0d6ba8d522883353d03; extracted scenario04ad62c679816d265a83d38092a338a5a07613dea488726cd07b562041f023c9. QA appf8a8d430c4001a36d124e5d624b52eb1eab1701236228fc453f6845f1c2b6a49/50,772,992B, runtimeFP1f65010b6884549d3f763850f65597415af07ce2b42a9ca36e6deeb617abe643. Optional native SDK review reaches an actual Halo window and scripts rebuild, but no weapon/combat is verified.180second review timeout followed by EBUSY cleanup: harness killed only app, leaving owned game35224. Computer Use now works; activated that returned Halo window and closed only it normally withAlt+F4; fresh window inventory is empty. No terminal/UI workaround or unrelated process touched. Harness now normal-closes app inside callback before workspace cleanup, uses existing stopQaProcess owned-tree fallback, and hashes staged publisher/archive inputs on failure. Full game and cleanup retry remain pending.
+
+R652 current full browser280/280 in10.3min, output26,462,298logical/26,597,504allocated-fileB disposed. R653 current full frontend510/106files; R649 focused10 and R650 focusedRust14 pass. R654 was refused before running by the aggregate storage budget; no limits were raised. R655 safely recovered the dead R651 owner after game close;932Rust tests pass,9explicit opt-ins skipped. Owned3,280,457,969logicalB/peak3,280,462,419B disposed.
+
+R656 native retry reproduces the same starting-profile/cache/scenario hashes and actual-control Save/history/readback results. During new game review the owner stopped Computer Use with physical Escape. No further Computer Use calls were issued. Exact hash-verified QA app17280 and its observed native child40664/owned descendants were stopped as temporary-test cleanup. Receipt complete=false/gameplayVerified=false; originalInputsUnchanged=true. Native output430,773,327logical/441,341,248allocated-fileB was disposed without EBUSY. The forced interruption is not a normal gameplay pass. R657 actual Windows descendant shutdown regression passes1/1.
+
+Current hosted run43559849944 at05efc661 rechecked read-only: Linux132340863467 and Windows132340863858 pass storage/Rust then fail the same old framebuffer assertion279/280. Local committed1ecbc68 repair is not pushed. No Linux package/startup lane has run; do not advertise Linux acceptance. Owner retains push/workflow responsibility.
+
 ## Changed work
+
+Committed in33fafd49 after1ecbc68: optional nativePlayerProfile in existing Firefight metadata/controls, standard scenario starting profile and weapon dependency closure, explicit guarded player_add_equipment at round start, backward-preserved legacy generated source, extended native readback and optional owned-game review. R651/R656 current native compilation/independent profile readback pass; no playable-game acceptance. R64910frontend/R65014Rust, R655932fullRust/9ignored, R653510frontend and R652280browser pass.
 
 Verified implementation files: runtime_mods.rs, runtime_mod_archive.rs, storage.rs, tests/ui/fixtures/haloMaterials.ts, tests/ui/halo-materials.spec.ts. Existing native pack writer now reuses project::atomic_write_checked/FileRevision rather than another unguarded rename writer. It checks reviewed file identity/hash, refuses hardlink aliases, tracks its actual create-new lock handle and exact bounded lock bytes, preserves replaced/changed locks and rechecks before archive adoption. Five adversarial fixtures pass. No actual runtime install/config was changed.
 
@@ -47,11 +58,11 @@ R640 first focused Rust compile failed because runtime_mod_archive still used th
 
 ## Operations and safe checkpoint
 
-E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf (private small receipts/logs/screens; no public Halo payloads). Source-only disposable workspace owner GuiltySpark-Development-d49eb02588bf. R642browser complete/exit0:280passed in10.8minutes, scratch disposed. R641Rust1817 has exited0 and disposed output; other listed completed test sessions exited0. No owned game launched in this increment. R648 native source/control test is now complete; no process or temporary native tree remains.
+E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Verified source33fafd497dae19b48216236b75f32d4eeb4daa9b. Checkpoint-only documentation update follows; source manifests must be regenerated from staged blobs. No incomplete dashboard-meter changes are present. The earlier GPU-meter fix is committed1ecbc68; no production renderer brightness/shader change.
 
-Before native operation: use current source only, existing verify-source-only.mjs/test-firefight-native.mjs, owner-installed HCEEK archive/tool and Invader, bounded dependency closure and original-hash checks. Never replay an obsolete whole .local tree. Previous native QA is stale when runtime fingerprint changes.
+R651/R656 receipts/logs/screens preserve failures and native hashes. R651 incomplete cleanup recovered safely by R655 after the game closed. R656 source hashes verified and all owned scratch disposed; no running validation remains after session44669/85635 complete. Owned app17280/game40664 were explicitly stopped after Computer Use cancellation, not declared normal exits. R652/R653/R655/R657 are complete. No original map, installation, tag tree or accepted release was changed.
 
-Historical exact checkpoint/source/evidence retained in master05efc661 and ACTIVE_TASK.previous.md. No original data, source history, release artifact or requirement was removed to shorten this checkpoint.
+QA app E/qa-firefight-r651/GuiltySpark.exe remains one explicitly exported source-pinned50,772,992B diagnostic, SHA256f8a8d430c4001a36d124e5d624b52eb1eab1701236228fc453f6845f1c2b6a49 and runtimeFP1f65010b6884549d3f763850f65597415af07ce2b42a9ca36e6deeb617abe643. Reuse only if the current runtime fingerprint still matches. Test-harness repairs are separate; production changes invalidate reuse. No release archive, full SDK tree or replacement backup was generated.
 
 ## Deferred requests
 
