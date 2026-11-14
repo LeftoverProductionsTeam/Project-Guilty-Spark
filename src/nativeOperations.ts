@@ -1,6 +1,7 @@
-export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number}
+import type { FirefightConfig } from './firefight';
+export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;grid?:{total:number;offset:number}}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' }
-  | ({kind:'appendEncounter'}&NativeEncounterAppend) | {kind:'appendEncounters';encounters:NativeEncounterAppend[]};
+  | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;
@@ -12,6 +13,8 @@ export interface NativeTagContext {
   lensFlareScale: number | null;
   actorVariants?:string[];
   canAppendEncounter?:boolean;
+  firefightPlan?:Extract<NativeOperation,{kind:'appendEncounters'}>|null;
+  firefightPlanIssue?:string|null;
   canEdit: boolean;
   canRepair: boolean;
   editIssue: string | null;

@@ -219,6 +219,13 @@ export default function NativeTagOperations({
             <summary>Append native AI encounter</summary>
             <p className="subtle">Add one source-backed squad, or queue up to 16 named groups / 128 total starts for one reviewed source revision. Each squad has up to 32 starting and firing positions. Existing encounters stay in place. Accept, then Build working tag edits; collision and navigation still need native review.</p>
             {!context.canAppendEncounter&&<Notice tone="info">Requires unshared singleplayer CE/H1A working source with its matching reviewed native writer and build target. Multiplayer AI uses its runtime-specific path.</Notice>}
+            <div className="native-encounter-actions">
+              <button disabled={busy||dirty||!context.canAppendEncounter||!context.firefightPlan}
+                title="Prepares saved source-bound wave groups with their authored zones. Preview only; no controller, loadout or source revision is applied until separately reviewed."
+                onClick={()=>context.firefightPlan&&makePreview(context.firefightPlan)}>Preview saved Firefight groups</button>
+            </div>
+            {context.firefightPlan&&<p className="subtle">{context.firefightPlan.encounters.length} saved groups · {context.firefightPlan.encounters.reduce((sum,entry)=>sum+(entry.count??1),0)} starts. Shared zones use partitioned grids. Existing player equipment is retained; review all source positions and native navigation before gameplay.</p>}
+            {context.firefightPlanIssue&&<p className="subtle">Saved-group preparation: {context.firefightPlanIssue}. Manual encounter authoring remains separate.</p>}
             <label>Encounter name<input aria-label="Native encounter name" maxLength={31} value={encounterName} disabled={busy||dirty} onChange={e=>{setEncounterName(e.target.value);if(!accepted)setPreview(null);}}/></label>
             <label>Actor variant<select aria-label="Native encounter actor" value={actorPath} disabled={busy||dirty} onChange={e=>{setActorPath(e.target.value);if(!accepted)setPreview(null);}}>
               <option value="">Choose an actor from this source…</option>{context.actorVariants?.map(path=><option key={path} value={path}>{path}</option>)}

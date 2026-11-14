@@ -1221,6 +1221,47 @@ pub(crate) fn native_actor_start_grid(center:[f32;3],total:usize,offset:usize,co
     }).collect()
 }
 
+/// Source authoring layout shared by fresh construction and preserving appends.
+/// This checks authored radius/start clearance, not BSP collision or pathfinding.
+#[derive(Clone,Debug)]
+pub struct NativeGroupGrid {pub center:[f32;3],pub total:usize,pub offset:usize,pub starts:Vec<([f32;3],[f32;2])>}
+pub fn native_group_grid(config:&FirefightConfig,w:usize,g:usize,player_starts:&[[f32;3]])->Result<NativeGroupGrid> {
+    let wave=config.waves.get(w).ok_or_else(||SparkError::Invalid("Native wave is missing".into()))?;
+    let group=wave.groups.get(g).ok_or_else(||SparkError::Invalid("Native wave group is missing".into()))?;
+    let zones=config.spawn_zones.iter().filter(|zone|zone.enabled).collect::<Vec<_>>();
+    if zones.is_empty(){return invalid("Native encounter groups need an enabled spawn zone");}
+    let zone_for=|j:usize|->Result<usize>{
+        match &wave.groups[j].spawn_zone_id {
+            Some(id)=>zones.iter().position(|zone|&zone.id==id).ok_or_else(||SparkError::Invalid("Native group references a missing/disabled spawn zone".into())),
+            None=>Ok((w+j)%zones.len()),
+        }
+    };
+    let zone_index=zone_for(g)?;let zone=zones[zone_index];
+    if !zone.radius.is_finite()||zone.radius<0.||player_starts.iter().flatten().any(|value|!value.is_finite()){return invalid("Native zone radius or player starting position is not finite");}
+    let mut total=0usize;let mut offset=0usize;
+    for (j,other) in wave.groups.iter().enumerate(){if zone_for(j)?==zone_index{total+=other.count as usize;if j<g{offset+=other.count as usize;}}}
+    let starts=native_actor_start_grid(zone.position,total,offset,group.count as usize,0.75)?;
+    for(position,[dx,dy]) in &starts {
+        if (dx*dx+dy*dy).sqrt()*0.75>zone.radius{return invalid("Native actor starting positions do not fit the authored spawn-zone radius; enlarge or split the group");}
+        if player_starts.iter().any(|spawn|spawn.iter().zip(position).map(|(a,b)|(a-b).powi(2)).sum::<f32>()<4.0){return invalid("Move the enemy spawn zone at least two world units from the player start before preparing a native round");}
+    }
+    Ok(NativeGroupGrid{center:zone.position,total,offset,starts})
+}
+
+pub fn validate_native_round_rules(config:&FirefightConfig)->Result<()> {
+    validate(config)?;
+    if config.player_count != 1 || config.team_lives != 1 || config.allow_revives || config.endless || config.rounds > 32 || config.waves.len() > 32 || config.max_alive > 32 ||
+       config.max_spawn_attempts != 1 || config.difficulty_step_percent != 0 || config.extra_player_count_percent != 0 || config.replenish_ammo_each_wave || !config.starting_equipment.is_empty() || !config.supply_drop_tags.is_empty() ||
+       config.preparation_ms + config.countdown_ms > 600000 || config.spawn_timeout_ms < 1000 || config.stuck_timeout_ms > 600000 {
+        return invalid("Native solo round supports one player/life, one spawn attempt, finite waves, bounded ten-minute timings and no revives/scaling/supply overrides");
+    }
+    for wave in &config.waves {
+        let actors:u32=wave.groups.iter().map(|group|u32::from(group.count)).sum();
+        if wave.groups.is_empty()||wave.groups.len()>8||actors>u32::from(config.max_alive)||wave.score_multiplier_milli>10000{return invalid("Native wave must fit 1–8 groups, maxAlive and the native score multiplier bound");}
+    }
+    Ok(())
+}
+
 pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<NativeRoundPlan>> {
     let Some(doc) = &project.quick_forge else { return Ok(None); };
     if !has_native_round_source(doc) { return Ok(None); }
@@ -1233,14 +1274,9 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let binding = source.content.lines().next().unwrap().strip_prefix(NATIVE_ROUND_BINDING).unwrap();
     let bound: FirefightConfig = serde_json::from_str(binding).map_err(|_|SparkError::Invalid("Invalid native Firefight configuration binding; prepare the round again without discarding handwritten source".into()))?;
     if &bound != config { return invalid("Firefight rules changed after preparing the native controller. Prepare native solo round again before building; the previous-good map remains unchanged"); }
-    if config.player_count != 1 || config.team_lives != 1 || config.allow_revives || config.endless || config.rounds > 32 || config.waves.len() > 32 || config.max_alive > 32 ||
-       config.max_spawn_attempts != 1 || config.difficulty_step_percent != 0 || config.extra_player_count_percent != 0 || config.replenish_ammo_each_wave || !config.starting_equipment.is_empty() || !config.supply_drop_tags.is_empty() ||
-       config.preparation_ms + config.countdown_ms > 600000 || config.spawn_timeout_ms < 1000 || config.stuck_timeout_ms > 600000 {
-        return invalid("Native solo round supports one player/life, one spawn attempt, finite waves, bounded ten-minute timings and no revives/scaling/supply overrides");
-    }
+    validate_native_round_rules(config)?;
     let count:usize = config.waves.iter().map(|wave|wave.groups.len()).sum();
     if count > 128 { return invalid("Native Firefight exceeds the standard scenario's 128 encounter limit"); }
-    let zones = config.spawn_zones.iter().filter(|zone|zone.enabled).collect::<Vec<_>>();
     let scenario = crate::quickforge::scenario_path(doc)?;
     let tag = format!("{scenario}.scenario");
     let player=config.native_player_profile.as_ref().ok_or_else(||SparkError::Invalid("Native solo round needs a player loadout. Use solo native rules, review Player loadout and prepare the source again".into()))?;
@@ -1283,6 +1319,7 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
         for(key,value)in[("secondary_weapon",format!("{}.weapon",weapon.tag_path)),("secondary_rounds_loaded",player.secondary_loaded.to_string()),("secondary_rounds_reserved",player.secondary_reserved.to_string())] {set(&mut loadout,format!("{p}.{key}"),value);}
     }
     loadout.push(tag.clone());add(&mut plan,loadout);
+    let player_starts=doc.spawns.iter().map(|spawn|spawn.position).collect::<Vec<_>>();
     for (w,wave) in config.waves.iter().enumerate() {
         let actors:u32=wave.groups.iter().map(|group|group.count as u32).sum();
         if wave.groups.len()>8 || actors>config.max_alive as u32 || wave.score_multiplier_milli>10000 {return invalid("Native wave must fit 1–8 groups, maxAlive and the native score multiplier bound");}
@@ -1306,21 +1343,7 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
             for (key,value) in [(format!("{e}.name"),name),(format!("{e}.flags.not_initially_created"),"1".into()),(format!("{e}.team_index"),"default_by_unit".into()),(format!("{e}.manual_bsp_index"),"-1".into()),
                 (format!("{s}.name"),"round_squad".into()),(format!("{s}.actor_type"),index.to_string()),(format!("{s}.platoon"),"-1".into()),(format!("{s}.initial_state"),"alert".into()),(format!("{s}.return_state"),"alert".into()),(format!("{s}.maneuver_to_squad"),"-1".into()),
                 (format!("{s}.normal_diff_count"),group.count.to_string()),(format!("{s}.insane_diff_count"),group.count.to_string()),(format!("{s}.major_upgrade"),"none".into())] {set(&mut args,key,value);}
-            // Use the same group binding for layout, capacity and command emission.
-            // Validation above rejects missing/disabled IDs; never silently relocate a squad.
-            let zone_for = |j: usize| -> usize {
-                wave.groups[j].spawn_zone_id.as_ref()
-                    .map(|id| zones.iter().position(|zone| &zone.id == id).unwrap())
-                    .unwrap_or((w + j) % zones.len())
-            };
-            let zone_index=zone_for(g);
-            let zone=zones[zone_index];
-            let same_zone=|j:usize|zone_for(j)==zone_index;
-            let total:usize=wave.groups.iter().enumerate().filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
-            let offset:usize=wave.groups.iter().enumerate().take(g).filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
-            for (a,(position,[dx,dy])) in native_actor_start_grid(zone.position,total,offset,group.count as usize,0.75)?.into_iter().enumerate() {
-                if (dx*dx+dy*dy).sqrt()*0.75>zone.radius {return invalid("Native actor starting positions do not fit the authored spawn-zone radius; enlarge or split the group");}
-                if doc.spawns.iter().any(|spawn|spawn.position.iter().zip(position).map(|(a,b)|(a-b).powi(2)).sum::<f32>()<4.0) {return invalid("Move the enemy spawn zone at least two world units from the player start before preparing a native round");}
+            for (a,(position,_)) in native_group_grid(config,w,g,&player_starts)?.starts.into_iter().enumerate() {
                 layout.positions.push(position);
                 let p=format!("{s}.starting_locations[{a}]");let f=format!("{e}.firing_positions[{a}]");
                 args.extend(["-I".into(),format!("{s}.starting_locations"),"1".into(),"end".into(),"-I".into(),format!("{e}.firing_positions"),"1".into(),"end".into()]);

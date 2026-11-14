@@ -10,18 +10,26 @@ pub enum Operation {
     Dependencies,
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32 },
-    AppendEncounters { encounters:Vec<EncounterAppend> },
+    AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     BoundingRadius { value: f64 },
     LensFlareScaleRepair,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EncounterGrid {pub total:u16,pub offset:u16}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterAppend {
     pub name:String,pub actor_path:String,pub position:[f32;3],pub start_active:bool,
     #[serde(default="single_actor")] pub count:u16,
     #[serde(default="actor_spacing")] pub spacing:f32,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub grid:Option<EncounterGrid>,
 }
 impl EncounterAppend {
+    pub fn positions(&self)->Result<Vec<[f32;3]>> {
+        let(total,offset)=self.grid.as_ref().map(|grid|(usize::from(grid.total),usize::from(grid.offset))).unwrap_or((usize::from(self.count),0));
+        Ok(crate::firefight::native_actor_start_grid(self.position,total,offset,usize::from(self.count),self.spacing)?.into_iter().map(|value|value.0).collect())
+    }
     pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing}}
 }
 fn single_actor()->u16{1}
@@ -30,8 +38,8 @@ impl Operation {
     pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
     pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
         match self {
-            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing}]),
-            Self::AppendEncounters{encounters}=>{
+            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,grid:None}]),
+            Self::AppendEncounters{encounters,..}=>{
                 if encounters.is_empty()||encounters.len()>16{return invalid("Review 1–16 native encounter groups in one operation");}
                 Ok(encounters.clone())
             },
@@ -73,10 +81,12 @@ impl Operation {
                 if *count==0||*count>32{return invalid("A native encounter squad supports 1–32 authored starting locations");}
                 let _=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
             }
-            Self::AppendEncounters{..}=>{
+            Self::AppendEncounters{source_rules,..}=>{
+                if let Some(rules)=source_rules{crate::firefight::validate(rules)?;}
                 let entries=self.encounter_appends()?;let mut names=std::collections::BTreeSet::new();let mut total=0usize;
                 for entry in entries {
                     entry.operation().validate(class,tag)?;
+                    let _=entry.positions()?;
                     if !names.insert(entry.name.to_ascii_lowercase()){return invalid("Each appended encounter needs a distinct native name");}
                     total+=usize::from(entry.count);
                 }
@@ -189,14 +199,14 @@ impl Operation {
         if !self.is_encounter_append(){return self.arguments(tags,class,tag);}
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
         for (entry,index,actor,add_palette) in encounter_append_layouts(before,self)? {
-        let EncounterAppend{name,actor_path,position,start_active,count,spacing}=&entry;
+        let EncounterAppend{name,actor_path,start_active,count,..}=&entry;
         let e=format!("encounters[{index}]");let squad=format!("{e}.squads[0]");
-        let positions=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
+        let positions=entry.positions()?;
         if add_palette {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
         args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),count.to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
             (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),count.to_string()),(format!("{squad}.insane_diff_count"),count.to_string()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into())] {args.extend(["-S".into(),key,value]);}
-        for(index,(position,_))in positions.into_iter().enumerate() {
+        for(index,position)in positions.into_iter().enumerate() {
             let start=format!("{squad}.starting_locations[{index}]");let firing=format!("{e}.firing_positions[{index}]");let vector=position.map(|value|value.to_string()).join(",");
             for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),"0".into()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),"alert".into()),(format!("{start}.return_state"),"alert".into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
         }
@@ -206,7 +216,7 @@ impl Operation {
     pub fn actor_start_positions(&self)->Result<Option<Vec<[f32;3]>>> {
         if !self.is_encounter_append(){return Ok(None);}
         let mut positions=vec![];
-        for entry in self.encounter_appends()? {positions.extend(crate::firefight::native_actor_start_grid(entry.position,entry.count as usize,0,entry.count as usize,entry.spacing)?.into_iter().map(|value|value.0));}
+        for entry in self.encounter_appends()? {positions.extend(entry.positions()?);}
         Ok(Some(positions))
     }
     /// Keep reviewed command actions intact while respecting Windows argument
@@ -297,16 +307,46 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
     Ok(differences)
 }
 
+/// Prepare current saved wave groups only; no native writer or source selection.
+/// The desktop must rederive this against the same saved source before writing.
+pub fn saved_firefight_encounters(project:&crate::project::Project,parent_sha:&str,fields:&str)->Result<Operation> {
+    let config=project.firefight.as_ref().ok_or_else(||crate::SparkError::Invalid("Save source-bound Firefight rules before preparing native groups".into()))?;
+    crate::firefight::validate_native_round_rules(config)?;
+    let source=project.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Fresh levels use Prepare native solo round; this append preserves recovered source".into()))?;
+    if config.source_sha256.as_deref()!=Some(source.sha256.as_str())&&config.source_sha256.as_deref()!=Some(parent_sha){return invalid("Saved Firefight rules use another source map; explicitly reconcile their source first");}
+    let starts=array_listing(fields,"player_starting_locations")?;
+    if starts.count==0||starts.count>256{return invalid("Review 1–256 native player starts before planning recovered encounter groups");}
+    let mut players=vec![];
+    for line in &starts.body {
+        if let Some(vector)=line.strip_prefix("        position (").and_then(|tail|tail.split_once(')').map(|pair|pair.0)) {
+            let values=vector.split(',').map(|value|value.trim().parse::<f32>().ok().filter(|value|value.is_finite())).collect::<Option<Vec<_>>>().ok_or_else(||crate::SparkError::Invalid("Native player-start position is unreadable".into()))?;
+            let position:[f32;3]=values.try_into().map_err(|_|crate::SparkError::Invalid("Native player-start position needs three coordinates".into()))?;players.push(position);
+        }
+    }
+    if players.len()!=starts.count{return invalid("Native player-start field listing is incomplete; no group positions were guessed");}
+    let mut encounters=vec![];
+    for(w,wave)in config.waves.iter().enumerate(){for(g,group)in wave.groups.iter().enumerate(){
+        let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||crate::SparkError::Invalid("Saved wave actor is missing".into()))?;
+        let layout=crate::firefight::native_group_grid(config,w,g,&players)?;
+        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16})});
+    }}
+    let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
+    operation.validate("scnr","planned.scenario")?;
+    let _=encounter_append_layouts(fields,&operation)?;
+    Ok(operation)
+}
+
 /// Independently inspected cache, not the source writer's success status.
 impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
-        if matches!(self,Self::AppendEncounters{..}) {
-            self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
-            for entry in self.encounter_appends()?{entry.operation().verify_compiled_encounter(map)?;}
-            return Ok(());
-        }
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
-        let Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=self else{return invalid("Unsupported encounter readback expectation");};
+        if !self.is_encounter_append(){return invalid("Unsupported encounter readback expectation");}
+        for entry in self.encounter_appends()?{verify_compiled_append(&entry,map)?;}
+        Ok(())
+    }
+}
+fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::MapInspection)->Result<()> {
+        let EncounterAppend{name,actor_path,start_active,count,..}=entry;
         let found=map.encounters.iter().filter(|encounter|encounter.name==*name).collect::<Vec<_>>();
         if map.header.scenario_type!=0||found.len()!=1{return invalid("Compiled native encounter is missing, ambiguous or not singleplayer");}
         let details=found[0].details.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled native encounter details are unreadable".into()))?;
@@ -316,7 +356,7 @@ impl Operation {
         if actors.len()!=1{return invalid("Compiled source actor is missing, ambiguous or has no embedded body");}
         let actor=Some(actors[0].id);let squad=&details.squads[0];
         if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=*count as i16||squad.insane_count!=*count as i16||squad.initial_state!=2||squad.return_state!=2||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
-        let positions=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?.into_iter().map(|value|value.0).collect::<Vec<_>>();
+        let positions=entry.positions()?;
         let consume=|remaining:&mut Vec<[f32;3]>,position:[f32;3]|->Result<()> {
             let index=remaining.iter().position(|expected|expected.iter().zip(position).all(|(a,b)|(*a-b).abs()<=0.0001)).ok_or_else(||crate::SparkError::Invalid("Compiled native start/firing position differs from the accepted grid".into()))?;
             remaining.remove(index);Ok(())
@@ -331,7 +371,6 @@ impl Operation {
         // Cached firing cluster/surface values can deliberately be NULL.
         // Source/cache identity is not navigation, collision or gameplay proof.
         Ok(())
-    }
 }
 
 pub fn number(fields: &str, name: &str) -> Result<f64> {

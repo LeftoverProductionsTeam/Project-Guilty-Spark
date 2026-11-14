@@ -85,6 +85,8 @@ pub(super) struct Context {
     lens_flare_scale: Option<f64>,
     actor_variants:Vec<String>,
     can_append_encounter:bool,
+    firefight_plan:Option<recipes::Operation>,
+    firefight_plan_issue:Option<String>,
     can_edit: bool,
     can_repair: bool,
     edit_issue: Option<String>,
@@ -346,6 +348,15 @@ fn encounter_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
     if maps::hash_file(&dependency).map_err(error)?!=dependency_hash{return Err("The dependency reader changed during review".into());}
     check_dependency_pins(&source.tags,&pins)?;Ok(pins)
 }
+// Saved-rule plans are authoring metadata, not authority supplied by a caller.
+// Recompute them against the current saved revision and actual native fields.
+fn verify_firefight_plan(project:&Project,build:&BuildRecord,fields:&str,operation:&recipes::Operation)->Reply<()> {
+    if matches!(operation,recipes::Operation::AppendEncounters{source_rules:Some(_),..}) {
+        let planned=recipes::saved_firefight_encounters(project,build.sha256.as_deref().ok_or("Native source output has no hash")?,fields).map_err(error)?;
+        if &planned!=operation{return Err("Saved Firefight rules, source or native group layout changed after review; prepare the groups again".into());}
+    }
+    Ok(())
+}
 fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply<Receipt> {
     let file = root(state, id)?.join("operation.json");
     core::reject_links(&file).map_err(error)?;
@@ -416,7 +427,11 @@ pub(super) async fn native_tag_context(
             }
         }
         let can_append_encounter=can_append_encounter&&edit_issue.is_none()&&studio_native_source::require_unshared(&state,&source.project.id).is_ok();
+        let (firefight_plan,firefight_plan_issue)=if can_append_encounter {
+            match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
+        }else{(None,None)};
         Ok(Context {
+            firefight_plan,firefight_plan_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,
@@ -505,6 +520,7 @@ pub(super) async fn native_operation_preview(
     if history.len()>=32{return Err("This map retains 32 managed previews. Review/recover existing revisions before creating more; no source was deleted.".into());}
     let exe=executable(&state,&source.project,operation.tool_id())?;let executable_sha256=maps::hash_file(&exe).map_err(error)?;
     let before_fields=fields(&state,&source.project,&source.tags,&source.tag)?;
+    verify_firefight_plan(&source.project,&source.build,&before_fields,&operation)?;
     let source_dependencies=encounter_dependencies(&state,&source,&operation,&exe)?;
     if let Some(field)=operation.field(){if recipes::number(&before_fields,field).map_err(error)?==operation.target().unwrap(){return Err("This native value already matches. No serialization or repair was performed.".into());}}
     if matches!(operation,recipes::Operation::LensFlareScaleRepair)&&!recipes::broken_lens_scale(recipes::number(&before_fields,"rotation_function_scale").map_err(error)?){return Err("This lens flare does not have the reviewed 360-to-zero repair precondition. No repair ran.".into());}
@@ -587,6 +603,7 @@ pub(super) async fn native_operation_accept(
     let current_hash=maps::hash_file(&current.join(&relative)).map_err(error)?;
     let wanted_current=if restore{&receipt.after_sha256}else{&receipt.before_sha256};if &current_hash!=wanted_current{return Err("This native tag changed after preview/acceptance. Overlapping edits need review; both sources are retained.".into());}
     if !restore&&fields(&state,&project,&current,&receipt.tag)?!=receipt.before_fields{return Err("The current native fields no longer match the reviewed starting source".into());}
+    if !restore{verify_firefight_plan(&project,&build,&receipt.before_fields,&receipt.operation)?;}
     let directory=root(&state,&operation_id)?;let candidate=directory.join("candidate/tags");let before=bounded_read(&directory.join("before.tag"),MAX_TAG)?;
     if hash_bytes(&before)!=receipt.before_sha256||maps::hash_file(&candidate.join(&relative)).map_err(error)?!=receipt.after_sha256{return Err("The retained native preview or recovery bytes changed; no revision was selected".into());}
     let actual_fields=fields(&state,&project,&candidate,&receipt.tag)?;if actual_fields!=receipt.after_fields{return Err("Candidate native fields no longer match the reviewed result".into());}

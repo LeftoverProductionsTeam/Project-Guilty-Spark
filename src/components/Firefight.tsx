@@ -4,7 +4,7 @@ import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
 import { defaultNativePlayerProfile, reconcileFirefightSource, type NativePlayerProfile } from '../firefight';
 import { beginProjectMutation } from '../projectMutation';
 import { attachAssetImport, prepareFirefightImports } from '../nativeAssetImport';
-import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
+import { exportHaloCeFirefightRound, matchGeneratedFirefightGroups, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
 import {useMapState} from '../mapSession';
 import { call, native } from '../api';
@@ -709,6 +709,9 @@ export default function Firefight({
               <p className="subtle">Choose the exact compiled singleplayer map as the rules source. If you appended encounters, build and open that output first. This reads source inventory; it does not modify encounters or prove navigation. Bound controllers keep the scenario’s existing player equipment.</p>
               {(!sourceMatches||catalog?.sourceScenarioType!==0)&&<Notice>Select the matching singleplayer rules source and use solo native rules before binding a controller.</Notice>}
               {!catalog?.encounters?.length&&<p className="subtle">No decoded native encounters in this source. Create inactive source encounters in AI &amp; scenario or a compatible native editor, then build and reopen the result.</p>}
+              <button disabled={busy||!sourceMatches||catalog?.sourceScenarioType!==0}
+                title="Replace the temporary binding selection with exact decoded generated encounter names, actors, counts and inactive flags. Script ownership must still be reviewed separately."
+                onClick={()=>{if(!catalog)return;try{const names=matchGeneratedFirefightGroups(config,catalog);setBindingDraft({...nativeBinding,names});setOwnershipReviewed(false);setError('');}catch(problem){setError(String(problem));}}}>Match generated group names</button>
               {config.waves.map((wave,w)=>wave.groups.map((group,g)=>{
                 const enemy=config.enemies.find(enemy=>enemy.id===group.enemyId),value=nativeBinding.names[w]?.[g]??'';
                 return <label key={wave.id+':'+g} className="firefight-native-binding">{wave.name} · {enemy?.name??group.enemyId} · {group.count} actors

@@ -6,7 +6,7 @@
  */
 import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
-import { defaultNativePlayerProfile, type FirefightConfig, type NativeEncounterCandidate } from './firefight';
+import { defaultNativePlayerProfile, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
 import type { Project } from './types';
 export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
@@ -102,10 +102,18 @@ export interface NativeRoundBindings {
   sourceSha256:string;sourceScenarioType:number;encounters:NativeEncounterCandidate[];
   encounterNames:string[][];activation:'manual'|'startup';exclusiveOwnershipConfirmed:boolean;
 }
+const generatedEncounterRefs=(config:FirefightConfig)=>config.waves.map((wave,w)=>wave.groups.map((_,g)=>`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`));
 function nativeEncounterRefs(config:FirefightConfig,binding?:NativeRoundBindings):string[][] {
-  if(!binding)return config.waves.map((wave,w)=>wave.groups.map((_,g)=>`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`));
-  if(binding.sourceScenarioType!==0||!config.sourceSha256||!/^[0-9a-f]{64}$/i.test(binding.sourceSha256)||binding.sourceSha256.toLowerCase()!==config.sourceSha256.toLowerCase())throw Error('Native encounter bindings require the exact singleplayer source used by these rules.');
+  if(!binding)return generatedEncounterRefs(config);
   if(!binding.exclusiveOwnershipConfirmed||!['manual','startup'].includes(binding.activation)||config.maxSpawnAttempts!==1)throw Error('Use solo native rules and explicitly confirm exclusive encounter ownership and activation before exporting.');
+  return matchedNativeEncounterRefs(config,binding);
+}
+/** Suggest only exact decoded source matches; this grants no script ownership. */
+export function matchGeneratedFirefightGroups(config:FirefightConfig,catalog:FirefightCatalog):string[][] {
+  return matchedNativeEncounterRefs(config,{sourceSha256:catalog.defaultConfig.sourceSha256??'',sourceScenarioType:catalog.sourceScenarioType??-1,encounters:catalog.encounters??[],encounterNames:generatedEncounterRefs(config)});
+}
+function matchedNativeEncounterRefs(config:FirefightConfig,binding:Pick<NativeRoundBindings,'sourceSha256'|'sourceScenarioType'|'encounters'|'encounterNames'>):string[][] {
+  if(binding.sourceScenarioType!==0||!config.sourceSha256||!/^[0-9a-f]{64}$/i.test(binding.sourceSha256)||binding.sourceSha256.toLowerCase()!==config.sourceSha256.toLowerCase())throw Error('Native encounter bindings require the exact singleplayer source used by these rules.');
   if(binding.encounterNames.length!==config.waves.length)throw Error('Review native encounter bindings after changing waves.');
   const key=(path:string)=>path.replaceAll('\\','/').toLowerCase(),used=new Set<string>();
   return config.waves.map((wave,w)=>{
