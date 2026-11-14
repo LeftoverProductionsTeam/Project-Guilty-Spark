@@ -7,6 +7,7 @@
 import type { CreatorStudioDocument } from './creatorStudio';
 import { emptyCreatorStudio, validateCreatorStudio } from './creatorStudio.ts';
 import { inspectScenarioBindings } from './scenarioBindings';
+import { sameJson } from './semanticJson';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
 import type { Project } from './types';
 import type { NativeOperation } from './nativeOperations';
@@ -50,7 +51,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
           throw new Error(`Beat ${i+1} needs timerSeconds between 1 and 600.`);
         scripted.push(`  (sleep ${ticks(beat.timerSeconds!*1000)})`);break;
       case 'triggerVolume':{
-        const ref=ensureName(beat.triggerRef,`Beat ${i+1} trigger volume`);
+        const ref=ensureName(beat.triggerRef??undefined,`Beat ${i+1} trigger volume`);
         deps.push(`trigger_volume:${ref}`);
         scripted.push(`  (sleep_until (volume_test_objects ${ref} (players)) 15)`);break;
       }
@@ -77,12 +78,89 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
 
 /** Binding comments remain source metadata; engines execute ordinary HaloScript. */
 export const nativeMissionBinding = '; Spark native mission configuration: ';
-interface NativeMissionBinding {
+export interface NativeMissionBinding {
   schemaVersion:1;
   missions:import('./creatorStudio').MissionBeat[];
   activation:'manual'|'startup';
   sourceSha256:string;
 }
+
+async function nativeMissionHash(body:string):Promise<string> {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
+    .map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+/** Read our comment metadata and checksum; never evaluate script source.
+ * A checksum detects changes, not author identity or trusted peer permissions. */
+async function readNativeMissionModule(module:{filename:string;content:string}):Promise<NativeMissionBinding> {
+  const end=module.content.indexOf('\n');
+  if(!module.filename.toLowerCase().endsWith('.hsc')||!module.content.startsWith(nativeMissionBinding)||end<0)
+    throw Error('No generated mission binding is available. Handwritten HaloScript is preserved.');
+  if(module.content.length>1024*1024||/[\x00\x80-\uffff]/.test(module.content))
+    throw Error('Attached mission exceeds the native source budget or has unsupported source encoding. No data was adopted.');
+  let binding:NativeMissionBinding;
+  try {binding=JSON.parse(module.content.slice(nativeMissionBinding.length,end).trimEnd());}
+  catch {throw Error('Attached mission metadata is invalid. Preserve the source module before reconciling it.');}
+  const fields=['schemaVersion','missions','activation','sourceSha256'];
+  if(!binding||typeof binding!=='object'||Array.isArray(binding)||Object.keys(binding).some(key=>!fields.includes(key))||
+    binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
+    !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
+    throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds'];
+  if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
+    Object.keys(beat).some(key=>!beatFields.includes(key))||
+    (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
+    (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||
+    (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')))
+    throw Error('Attached mission contains unsupported beat fields. Keep the original source for explicit review.');
+  const errors=validateCreatorStudio({...emptyCreatorStudio(),missions:binding.missions});
+  if(errors.length)throw Error(errors.join('; '));
+  // Required identifiers/delays use the same exporter validation as preparation.
+  exportHaloCeMission({...emptyCreatorStudio(),missions:binding.missions});
+  const body=module.content.slice(end+1);
+  if((await nativeMissionHash(body)).toLowerCase()!==binding.sourceSha256.toLowerCase())
+    throw Error('Attached mission source differs from its checksum. No mission data was adopted or regenerated.');
+  if(body!==nativeMissionBody(binding.missions,binding.activation))
+    throw Error('Attached mission data differs from the current generated source, or uses another generator. Preserve/export the module in Logic / Events before explicit reconciliation.');
+  return binding;
+}
+/** Rust Option values serialize as null; absence has the same authored meaning. */
+export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
+  const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
+    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null}));
+  return sameJson(normalize(a),normalize(b));
+}
+export interface NativeMissionReview {
+  projectId:string;
+  document:NonNullable<Project['quickForge']>;
+  module:{filename:string;content:string};
+  binding:NativeMissionBinding;
+  localMissions:NativeMissionBinding['missions'];
+}
+export async function reviewNativeCampaignMission(project:Project):Promise<NativeMissionReview> {
+  const document=project.quickForge;
+  const owned=document?.logic?.handwrittenSources?.filter(source=>source.content.startsWith(nativeMissionBinding))??[];
+  if(!document||owned.length!==1||owned[0].filename.toLowerCase()!=='gs_mission.hsc')
+    throw Error('Review requires one attached gs_mission.hsc binding. Preserve and reconcile missing, renamed or duplicate modules in Logic / Events.');
+  const localMissions=structuredClone(project.studio?.missions??[]);
+  const module=owned[0],binding=await readNativeMissionModule(module);
+  return {projectId:project.id,document,module,binding,localMissions};
+}
+/** Explicit replacement of mission data only. Source modules and unrelated
+ * Studio settings remain unchanged; normal project history owns Undo/Redo. */
+export function applyNativeCampaignMission(project:Project,review:NativeMissionReview):Project {
+  const document=project.quickForge;
+  if(project.id!==review.projectId||!document||document!==review.document||!sameMissionData(project.studio?.missions??[],review.localMissions))
+    throw Error('Source or local mission data changed after review. Review again; no stale data was applied.');
+  const owned=document.logic?.handwrittenSources?.filter(source=>source.content.startsWith(nativeMissionBinding))??[];
+  if(owned.length!==1||owned[0].filename!==review.module.filename||owned[0].content!==review.module.content)
+    throw Error('The attached mission changed after review. Existing drafts remain intact.');
+  const studio={...(project.studio??emptyCreatorStudio()),missions:structuredClone(review.binding.missions)};
+  const errors=validateCreatorStudio(studio);
+  if(errors.length)throw Error('Cannot combine attached missions with current Studio data: '+errors.join('; '));
+  if(sameMissionData(project.studio?.missions??[],studio.missions))return project;
+  return {...project,studio};
+}
+
 function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation']):string {
   const output=exportHaloCeMission({...emptyCreatorStudio(),missions},{waitForLogic:true});
   return output.content+(activation==='startup'?[
@@ -93,8 +171,7 @@ function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:
 async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation']):Promise<string> {
   if(!['manual','startup'].includes(activation))throw Error('Choose manual or startup mission activation.');
   const body=nativeMissionBody(missions,activation);
-  const sourceSha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
-    .map(value=>value.toString(16).padStart(2,'0')).join('');
+  const sourceSha256=await nativeMissionHash(body);
   const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256};
   const header=JSON.stringify(binding).replace(/[\u007f-\uffff]/g,character=>
     '\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'));
@@ -128,12 +205,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   if(sources.some(source=>source.content.startsWith(nativeMissionBinding)&&source!==existing))
     throw Error('A renamed mission binding is still present. Preserve and reconcile source modules in Logic / Events.');
   if(existing) {
-    const end=existing.content.indexOf('\n');
-    if(!existing.content.startsWith(nativeMissionBinding)||end<0)
-      throw Error('gs_mission.hsc is handwritten. Export and explicitly remove it from this build before replacing it.');
-    let old:NativeMissionBinding;
-    try {old=JSON.parse(existing.content.slice(nativeMissionBinding.length,end).trimEnd());}
-    catch {throw Error('The existing mission binding is invalid. Preserve it in Logic / Events before replacing it.');}
+    const old=await readNativeMissionModule(existing);
     let original:string;
     try {
       if(old.schemaVersion!==1||!['manual','startup'].includes(old.activation)||!Array.isArray(old.missions))throw Error('Invalid binding');

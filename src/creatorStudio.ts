@@ -11,8 +11,8 @@ export interface MissionBeat {
   objective: string;
   trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'timer';
   encounterName: string;
-  triggerRef?: string;
-  timerSeconds?: number;
+  triggerRef?: string | null;
+  timerSeconds?: number | null;
 }
 export interface CameraShot {
   id: string;
@@ -106,8 +106,8 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   };
   for (const m of doc.missions) {
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
-      (m.triggerRef !== undefined && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
-      (m.timerSeconds !== undefined && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)))
+      (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
+      (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)))
       failures.push(`Invalid mission beat ${m.id?.slice(0, 40) ?? '(unknown)'}`);
   }
   for (const shot of doc.shots) {

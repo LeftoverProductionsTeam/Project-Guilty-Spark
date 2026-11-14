@@ -2,6 +2,7 @@ import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useId, useRef, useState } from 'react';
 import { beginProjectMutation } from '../projectMutation';
 import CampaignEncounters from './CampaignEncounters';
+import MissionSourceReview from './MissionSourceReview';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
 import {
@@ -247,6 +248,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <p className="studio-hint">Save before Build &amp; playtest. The build checks the saved mission binding,
           module hash, encounter/volume names and compiled script identities. Native execution, HUD objectives,
           checkpoints and a playable mission ending remain separate work and acceptance.</p>
+        <MissionSourceReview project={project} edit={edit} onActivation={setMissionActivation} exportLocal={report}/>
       </details>
       <CampaignEncounters project={project} edit={edit}/>
       <datalist id={encounterChoices}>{[...new Set([
