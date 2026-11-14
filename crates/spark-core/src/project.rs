@@ -456,7 +456,7 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         let identity = crate::storage::unique_file_handle_identity(&f)
             .ok_or_else(|| crate::SparkError::Invalid("Staged output ownership unavailable; retained".into()))?;
         if let Err(error) = f.write_all(bytes).and_then(|_| f.sync_all()) {
-            #[cfg(windows)] let _ = dispose_staged_handle(&f);
+            #[cfg(windows)] let _ = dispose_verified_handle(&f);
             return Err(error.into());
         }
         use sha2::{Digest, Sha256};
@@ -563,7 +563,7 @@ fn open_staged_file(path: &Path, revision: &StagedRevision) -> Result<fs::File> 
 }
 fn dispose_staged_file(path: &Path, revision: &StagedRevision) -> Result<()> {
     let file = open_staged_file(path, revision)?;
-    #[cfg(windows)] { dispose_staged_handle(&file)?; }
+    #[cfg(windows)] { dispose_verified_handle(&file)?; }
     #[cfg(not(windows))] {
         // Preserve the pathname guard on other targets. Descriptor-relative
         // unlink race closure needs separate native platform acceptance.
@@ -586,7 +586,7 @@ fn set_staged_information(file: &fs::File, class: u32, information: *const std::
     Ok(())
 }
 #[cfg(windows)]
-fn dispose_staged_handle(file: &fs::File) -> Result<()> {
+pub(crate) fn dispose_verified_handle(file: &fs::File) -> Result<()> {
     // FILE_DISPOSITION_INFO: delete this verified handle on close, never a
     // newly resolved pathname. No read-only/security bypass flags are used.
     let delete_file = 1u8;

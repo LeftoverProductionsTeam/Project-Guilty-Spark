@@ -655,6 +655,8 @@ impl Store {
             // Only outputs created under a successful reserve() are admitted. The
             // marker binds the absolute path; unknown/legacy directories have no marker.
             let marker = marker(&row.path);
+            #[cfg(windows)]
+            let pinned = CleanupPins::capture(&row.path, &marker)?;
             let owner: Owner = read_json(&marker)?;
             if owner.id != *id || owner.path != row.path || owner.store != self.root {
                 return invalid("Generated output ownership changed; cleanup refused");
@@ -668,12 +670,18 @@ impl Store {
             {
                 return invalid("Generated output changed since preview; cleanup refused");
             }
-            if row.path.is_dir() {
-                fs::remove_dir_all(&row.path)?;
-            } else if row.path.is_file() {
-                fs::remove_file(&row.path)?;
+            #[cfg(test)]
+            tests::run_cleanup_deletion_hook();
+            #[cfg(windows)]
+            pinned.dispose()?;
+            #[cfg(not(windows))] {
+                if row.path.is_dir() {
+                    fs::remove_dir_all(&row.path)?;
+                } else if row.path.is_file() {
+                    fs::remove_file(&row.path)?;
+                }
+                fs::remove_file(marker)?;
             }
-            fs::remove_file(marker)?;
             removed += measured.allocated_bytes.unwrap_or(measured.logical_bytes);
             entries.retain(|e| e.id != *id);
             entries.retain(|e| !e.path.starts_with(&row.path));
@@ -1083,7 +1091,8 @@ fn content_snapshot(root: &Path, maximum_bytes: u64) -> Result<String> {
         }
         let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
         if metadata.is_dir() {
-            rows.push((relative, String::new()));
+            let identity = file_identity(&path).ok_or_else(|| fail("Generated directory ownership is unavailable; retained for review"))?;
+            rows.push((relative, format!("directory-v1:{:016x}:{:016x}", identity.0, identity.1)));
             for child in fs::read_dir(&path)? {
                 if pending.len() >= 200000 {
                     return invalid(
@@ -1110,6 +1119,84 @@ fn content_snapshot(root: &Path, maximum_bytes: u64) -> Result<String> {
     Ok(crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(
         &rows,
     )?)))
+}
+// A transient protection set for this confirmed cleanup, never a second ledger.
+// All handles are acquired before final review and released on any refusal.
+#[cfg(windows)]
+struct CleanupPin { path: PathBuf, file: fs::File, identity: (u64, u64), directory: bool }
+#[cfg(windows)]
+struct CleanupPins { nodes: Vec<CleanupPin>, marker: CleanupPin }
+#[cfg(windows)]
+impl CleanupPins {
+    fn open(path: &Path) -> Result<CleanupPin> {
+        use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+        reject_links(path)?;
+        let file = fs::OpenOptions::new().read(true).access_mode(0x80000000 | 0x00010000)
+            .share_mode(1).custom_flags(0x02000000 | 0x00200000).open(path)?;
+        let metadata = file.metadata()?;
+        if metadata.file_attributes() & 0x400 != 0 || !(metadata.is_file() || metadata.is_dir()) {
+            return invalid("Cleanup encountered a linked or special object; retained");
+        }
+        let (identity, links) = file_handle_ownership(&file)
+            .ok_or_else(|| fail("Cleanup object identity is unavailable; retained"))?;
+        if metadata.is_file() && links != 1 {
+            return invalid("Cleanup file has shared aliases; original data retained");
+        }
+        Ok(CleanupPin { path: path.to_path_buf(), file, identity, directory: metadata.is_dir() })
+    }
+    fn capture(root: &Path, marker: &Path) -> Result<Self> {
+        let marker = Self::open(marker)?;
+        if marker.directory { return invalid("Cleanup marker is not a file; retained"); }
+        let mut pending = vec![(root.to_path_buf(), 0usize)];
+        let mut nodes = Vec::new();
+        while let Some((path, depth)) = pending.pop() {
+            if depth > 64 || nodes.len() >= 200000 {
+                return invalid("Cleanup exceeds its existing file/depth budget; retained");
+            }
+            let pin = Self::open(&path)?;
+            if pin.directory {
+                for child in fs::read_dir(&path)? {
+                    if pending.len() + nodes.len() >= 200000 {
+                        return invalid("Cleanup exceeds its existing pending-file budget; retained");
+                    }
+                    pending.push((child?.path(), depth + 1));
+                }
+            }
+            nodes.push(pin);
+        }
+        Ok(Self { nodes, marker })
+    }
+    fn validate_names(&self) -> Result<()> {
+        let names = self.nodes.iter().map(|pin| &pin.path).collect::<std::collections::BTreeSet<_>>();
+        for pin in self.nodes.iter().chain(std::iter::once(&self.marker)) {
+            reject_links(&pin.path)?;
+            if file_identity(&pin.path) != Some(pin.identity) {
+                return invalid("Cleanup path changed ownership after review; all replacement objects retained");
+            }
+            if pin.directory {
+                for child in fs::read_dir(&pin.path)? {
+                    if !names.contains(&child?.path()) {
+                        return invalid("Cleanup found a new child after review; inspect the new plan");
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    fn dispose(mut self) -> Result<()> {
+        self.validate_names()?;
+        #[cfg(test)] tests::run_cleanup_disposal_hook();
+        // Children close before their parents. No recursive pathname sweep:
+        // a later unknown child is never opened/deleted and keeps its parent
+        // nonempty, causing a safe failure instead of sweeping new content.
+        while let Some(pin) = self.nodes.pop() {
+            project::dispose_verified_handle(&pin.file).map_err(|error| fail(format!("Verified cleanup stopped: {error}. Added, changed or in-use content was retained. Some confirmed generated files may already be removed; inspect Storage & Cache before retrying")))?;
+            drop(pin);
+        }
+        project::dispose_verified_handle(&self.marker.file)?;
+        drop(self.marker);
+        Ok(())
+    }
 }
 pub fn estimate_copy(files: usize, bytes: u64) -> u64 {
     bytes.saturating_add((files as u64).saturating_mul(65536))
@@ -1371,10 +1458,139 @@ mod tests {
     // pre-lock boundary. Thread-local state cannot affect parallel fixtures.
     std::thread_local! {
         static CLEANUP_REVIEW_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        static CLEANUP_DELETION_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        static CLEANUP_DISPOSAL_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
     }
     pub(super) fn run_cleanup_review_hook() {
         let hook = CLEANUP_REVIEW_HOOK.with(|slot| slot.borrow_mut().take());
         if let Some(hook) = hook { hook(); }
+    }
+    pub(super) fn run_cleanup_deletion_hook() {
+        let hook = CLEANUP_DELETION_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[cfg(windows)]
+    pub(super) fn run_cleanup_disposal_hook() {
+        let hook = CLEANUP_DISPOSAL_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[cfg(windows)]
+    fn cleanup_race_retains_foreign_data(kind: &'static str) {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("storage")).unwrap();
+        let output = root.path().join("native-output");
+        let lease = store.reserve(&output, None, 65536, Category::Staging, "cleanup race fixture").unwrap();
+        fs::create_dir_all(output.join("tags")).unwrap();
+        fs::write(output.join("tags/generated.tag"), b"generated source").unwrap();
+        drop(lease);
+        let plan = store.cleanup_plan().unwrap();assert_eq!(plan.eligible.len(), 1);
+        let id = plan.eligible[0].id.clone();
+        let candidate = output.clone();
+        let marker_file = marker(&output);
+        let foreign_file = match kind {
+            "marker" => marker_file.clone(),
+            "write" => output.join("tags/generated.tag"),
+            _ => output.join("tags/foreign.tag"),
+        };
+        let accepted = std::rc::Rc::new(std::cell::Cell::new(false));
+        let observed = accepted.clone();
+        CLEANUP_DELETION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let result = match kind {
+                "root" => fs::rename(&candidate, candidate.with_extension("detached")),
+                "child" => fs::rename(candidate.join("tags"), candidate.join("detached-tags")),
+                "write" => fs::write(candidate.join("tags/generated.tag"), b"another author's unique source"),
+                "insert" => fs::write(candidate.join("tags/foreign.tag"), b"another author's unique source"),
+                "marker" => fs::write(&marker_file, b"another author's unique source"),
+                _ => unreachable!(),
+            };
+            if let Err(error) = &result { assert!(matches!(error.raw_os_error(), Some(5 | 32)), "unexpected refusal: {error}"); }
+            observed.set(result.is_ok());
+            if result.is_ok() && matches!(kind, "root" | "child") {
+                fs::create_dir_all(candidate.join("tags")).unwrap();
+                fs::write(candidate.join("tags/foreign.tag"), b"another author's unique source").unwrap();
+            }
+        })));
+        let result = store.cleanup(&plan, &[id.clone()], true);
+        if accepted.get() {
+            assert!(result.is_err(), "cleanup must not sweep a post-review foreign revision ({kind})");
+            assert_eq!(fs::read(&foreign_file).unwrap(), b"another author's unique source");
+            assert!(store.entries().unwrap().iter().any(|entry| entry.id == id));
+            if kind == "insert" { assert_eq!(fs::read(output.join("tags/generated.tag")).unwrap(), b"generated source"); }
+        } else {
+            result.unwrap();
+            assert!(!output.exists());
+            assert!(!store.entries().unwrap().iter().any(|entry| entry.id == id));
+        }
+    }
+    #[cfg(windows)] #[test]
+    fn cleanup_retains_root_replaced_after_review() { cleanup_race_retains_foreign_data("root"); }
+    #[cfg(windows)] #[test]
+    fn cleanup_retains_child_directory_replaced_after_review() { cleanup_race_retains_foreign_data("child"); }
+    #[cfg(windows)] #[test]
+    fn cleanup_retains_file_changed_after_review() { cleanup_race_retains_foreign_data("write"); }
+    #[cfg(windows)] #[test]
+    fn cleanup_retains_unknown_child_added_after_review() { cleanup_race_retains_foreign_data("insert"); }
+    #[cfg(windows)] #[test]
+    fn cleanup_retains_owner_marker_changed_after_review() { cleanup_race_retains_foreign_data("marker"); }
+    #[test]
+    fn cleanup_plan_retains_replaced_directory_with_unchanged_descendant_files() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("storage")).unwrap();
+        let output = root.path().join("native-output");
+        let lease = store.reserve(&output, None, 65536, Category::Staging, "directory identity fixture").unwrap();
+        fs::create_dir_all(output.join("tags")).unwrap();
+        fs::write(output.join("tags/generated.tag"), b"generated source").unwrap();
+        drop(lease);
+        assert_eq!(store.cleanup_plan().unwrap().eligible.len(), 1);
+        let file_id = file_identity(&output.join("tags/generated.tag"));
+        let directory_id = file_identity(&output);
+        let detached = output.with_extension("detached");
+        fs::rename(&output, &detached).unwrap();
+        fs::create_dir(&output).unwrap();
+        fs::rename(detached.join("tags"), output.join("tags")).unwrap();
+        assert_eq!(file_identity(&output.join("tags/generated.tag")), file_id);
+        assert_ne!(file_identity(&output), directory_id);
+        assert!(store.cleanup_plan().unwrap().eligible.is_empty(), "a new directory cannot inherit the old cleanup approval");
+        assert_eq!(fs::read(output.join("tags/generated.tag")).unwrap(), b"generated source");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn cleanup_retains_child_created_after_the_final_name_check() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("storage")).unwrap();
+        let output = root.path().join("native-output");
+        let lease = store.reserve(&output, None, 65536, Category::Staging, "late cleanup insertion").unwrap();
+        fs::create_dir_all(output.join("tags")).unwrap();
+        fs::write(output.join("tags/generated.tag"), b"generated source").unwrap();
+        drop(lease);
+        let marker_path = marker(&output);
+        let marker_bytes = fs::read(&marker_path).unwrap();
+        let plan = store.cleanup_plan().unwrap();let id = plan.eligible[0].id.clone();
+        let foreign = output.join("tags/foreign.tag");let inserted = foreign.clone();
+        CLEANUP_DISPOSAL_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            fs::write(inserted, b"another author's late source").unwrap();
+        })));
+        let error = store.cleanup(&plan, &[id.clone()], true).unwrap_err();
+        assert!(error.to_string().contains("Some confirmed generated files may already be removed"));
+        assert_eq!(fs::read(foreign).unwrap(), b"another author's late source");
+        assert_eq!(fs::read(marker_path).unwrap(), marker_bytes);
+        assert!(store.entries().unwrap().iter().any(|entry| entry.id == id));
+        assert!(store.cleanup_plan().unwrap().eligible.is_empty());
+    }
+    #[test]
+    fn cleanup_retains_legacy_directory_digest_without_silently_recertifying_it() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("storage")).unwrap();
+        let output = root.path().join("native-output");
+        let lease = store.reserve(&output, None, 65536, Category::Staging, "legacy digest fixture").unwrap();
+        fs::create_dir(&output).unwrap();fs::write(output.join("generated.tag"), b"generated source").unwrap();drop(lease);
+        let legacy = vec![(PathBuf::new(), String::new()), (PathBuf::from("generated.tag"), crate::maps::hash_file(&output.join("generated.tag")).unwrap())];
+        let old_digest = crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(&legacy).unwrap()));
+        let mut entries = store.entries().unwrap();let id = entries[0].id.clone();entries[0].content_snapshot = old_digest.clone();
+        write(&store.root.join("entries.json"), &entries).unwrap();
+        let plan = store.cleanup_plan().unwrap();assert!(plan.eligible.is_empty());assert!(plan.protected.contains(&id));
+        assert_eq!(store.entries().unwrap()[0].content_snapshot, old_digest);
+        assert_eq!(fs::read(output.join("generated.tag")).unwrap(), b"generated source");
     }
     #[test]
     fn cleanup_preserves_output_accepted_between_review_and_catalog_lock() {
