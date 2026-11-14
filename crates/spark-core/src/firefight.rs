@@ -1130,6 +1130,21 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let mut plan = NativeRoundPlan { dependencies:vec![],commands:vec![],encounter_names:vec![] };
     let player=config.native_player_profile.as_ref().ok_or_else(||SparkError::Invalid("Native solo round needs a player loadout. Use solo native rules, review Player loadout and prepare the source again".into()))?;
     validate_native_profile(player)?;
+    crate::native_asset_imports::validate(&project.native_asset_imports)?;
+    // An explicitly imported source closure wins over an editing-kit path.
+    // Receipt bytes are checked by the existing staging path before compilation.
+    let dependency = |path: &str, class: &str, kind: &str| {
+        let binding = config.source_sha256.as_deref().and_then(|sha256|
+            crate::native_asset_imports::find_source(project,sha256,class,path));
+        crate::quickforge::ForgeDependency {
+            kind:kind.into(),tag_path:binding.map_or_else(||path.replace('\\',"/"),|binding|binding.native_path.clone()),
+            tag_class:(if class == "actv" {"actor_variant"} else {"weapon"}).into(),
+            source_project_id:binding.map(|binding|binding.source_project_id.clone()),
+            source_sha256:binding.map(|binding|binding.source_sha256.clone()),
+        }
+    };
+    let primary = dependency(&player.primary_weapon,"weap","firefightPlayerWeapon");
+    let secondary = player.secondary_weapon.as_ref().map(|path|dependency(path,"weap","firefightPlayerWeapon"));
     let mut palette = BTreeMap::<String,usize>::new();
     let add = |plan:&mut NativeRoundPlan,args:Vec<String>| plan.commands.push(crate::quickforge::ForgeCommand {
         phase:"firefight-scenario".into(),tool:"invaderEdit".into(),args,expected_outputs:vec![format!("tags/{}",tag.replace('\\',"/"))],
@@ -1139,15 +1154,14 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let p="player_starting_profile[0]";
     let mut loadout=vec!["-I".into(),"player_starting_profile".into(),"1".into(),"end".into()];
     for (key,value) in [("name","gs_firefight_start".into()),("starting_health_modifier",player.health.to_string()),("starting_shield_modifier",player.shields.to_string()),
-        ("primary_weapon",format!("{}.weapon",player.primary_weapon)),("primary_rounds_loaded",player.primary_loaded.to_string()),("primary_rounds_reserved",player.primary_reserved.to_string()),
+        ("primary_weapon",format!("{}.weapon",primary.tag_path)),("primary_rounds_loaded",player.primary_loaded.to_string()),("primary_rounds_reserved",player.primary_reserved.to_string()),
         ("starting_fragmentation_grenade_count",player.fragmentation_grenades.to_string()),("starting_plasma_grenade_count",player.plasma_grenades.to_string())] {
         set(&mut loadout,format!("{p}.{key}"),value);
     }
-    for weapon in std::iter::once(&player.primary_weapon).chain(player.secondary_weapon.iter()) {
-        plan.dependencies.push(crate::quickforge::ForgeDependency{kind:"firefightPlayerWeapon".into(),tag_path:weapon.replace('\\',"/"),tag_class:"weapon".into(),source_project_id:None,source_sha256:None});
-    }
-    if let Some(weapon)=&player.secondary_weapon {
-        for(key,value)in[("secondary_weapon",format!("{weapon}.weapon")),("secondary_rounds_loaded",player.secondary_loaded.to_string()),("secondary_rounds_reserved",player.secondary_reserved.to_string())] {set(&mut loadout,format!("{p}.{key}"),value);}
+    plan.dependencies.push(primary);
+    plan.dependencies.extend(secondary.iter().cloned());
+    if let Some(weapon)=&secondary {
+        for(key,value)in[("secondary_weapon",format!("{}.weapon",weapon.tag_path)),("secondary_rounds_loaded",player.secondary_loaded.to_string()),("secondary_rounds_reserved",player.secondary_reserved.to_string())] {set(&mut loadout,format!("{p}.{key}"),value);}
     }
     loadout.push(tag.clone());add(&mut plan,loadout);
     for (w,wave) in config.waves.iter().enumerate() {
@@ -1155,12 +1169,13 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
         if wave.groups.len()>8 || actors>config.max_alive as u32 || wave.score_multiplier_milli>10000 {return invalid("Native wave must fit 1–8 groups, maxAlive and the native score multiplier bound");}
         for (g,group) in wave.groups.iter().enumerate() {
             let enemy = config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).unwrap();
-            let path=enemy.actor_variant_path.replace('\\',"/");
-            if path.ends_with(".actor_variant") {return invalid("Select an actor-variant tag path without its extension");}
+            if enemy.actor_variant_path.ends_with(".actor_variant") {return invalid("Select an actor-variant tag path without its extension");}
+            let selected = dependency(&enemy.actor_variant_path,"actv","firefightActor");
+            let path = selected.tag_path.clone();
             let next=palette.len();
             let index=*palette.entry(path.clone()).or_insert(next);
             if index==next {
-                plan.dependencies.push(crate::quickforge::ForgeDependency {kind:"firefightActor".into(),tag_path:path.clone(),tag_class:"actor_variant".into(),source_project_id:None,source_sha256:None});
+                plan.dependencies.push(selected);
                 add(&mut plan,vec!["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{index}].reference"),format!("{path}.actor_variant"),tag.clone()]);
             }
             let encounter=plan.encounter_names.len();

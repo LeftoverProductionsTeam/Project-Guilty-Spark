@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
 import { defaultNativePlayerProfile, reconcileFirefightSource, type NativePlayerProfile } from '../firefight';
 import { beginProjectMutation } from '../projectMutation';
+import { attachAssetImport, prepareFirefightImports } from '../nativeAssetImport';
 import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
 import { call, native } from '../api';
@@ -64,9 +65,15 @@ export default function Firefight({
   const prepared=!!project.quickForge&&!project.quickForge.native&&project.quickForge.gameMode==='firefight'&&
     !!project.quickForge.logic?.handwrittenSources?.some(source=>source.filename==='gs_firefight.hsc');
   const canExportSources=native&&!!onSave&&prepared&&!busy;
+  const editableNativeRound=!!project.quickForge&&!project.quickForge.native&&project.quickForge.gameMode==='firefight'&&
+    ['mccSteam','haloCustomEdition','chupathingyCe'].includes(project.quickForge.runtimeId);
+  const canIncludeAssets=native&&!!onSave&&editableNativeRound&&!!config&&sourceMatches&&!busy;
+  const includeAssetsHint=!native?'Recursive source imports require the desktop app.':!onSave?'Use the owning editable window and wait for the current build.':!editableNativeRound?'Open an editable native solo Firefight level. Recovered-scenario authoring is separate.':!sourceMatches?'Choose and apply the rules source first.':'Extracts referenced actors, starting weapons and their dependencies from this exact map through installed Invader tools. Originals stay unchanged; native compilation and gameplay remain separate.';
+  const retainedRulesImports=(project.nativeAssetImports??[]).filter(binding=>binding.sourceSha256===config?.sourceSha256&&['actv','weap'].includes(binding.tagClass));
   const sourceExportHint=!native?'Native source export is available in the desktop app.':!onSave?'Use the owning editable window and wait for the active build to finish.':!prepared?'Use solo native rules, review the loadout, then Prepare native solo round in this editable level.':'Saves this map and exports geometry, scenario commands, dependencies and HaloScript. Source export does not compile or launch Halo.';
-  const staleExport=!!sourceExport&&(sourceExport.receipt.current===false||sourceExport.input.quickForge!==project.quickForge||sourceExport.input.firefight!==config);
+  const staleExport=!!sourceExport&&(sourceExport.receipt.current===false||sourceExport.input.quickForge!==project.quickForge||sourceExport.input.firefight!==config||sourceExport.input.nativeAssetImports!==project.nativeAssetImports);
   useWorkspaceFileActions('firefight:'+project.id,config?[
+    {id:'firefight-source-assets',label:'Include Firefight source assets…',hint:includeAssetsHint,disabled:!canIncludeAssets,run:()=>void includeSourceAssets()},
     {id:'firefight-round-source',label:'Export native Firefight round sources…',hint:sourceExportHint,disabled:!canExportSources,run:()=>void exportNativeRound()},
     {id:'firefight-script-plan',label:'Export Firefight script & encounter plan…',hint:'Advanced authoring ZIP only; no generated scenario or playable cache.',disabled:busy,run:()=>exportRound()},
   ]:[]);
@@ -184,6 +191,20 @@ export default function Firefight({
       edit({...latestProject.current,firefight:candidate},'Reconcile Firefight actor and loadout source');
     } catch(problem){setError(String(problem));}finally{release();setBusy(false);}
   }
+  async function includeSourceAssets() {
+    if(!config||!canIncludeAssets)return;
+    const stillCurrent=()=>activeProject.current===project.id&&latestProject.current.id===project.id&&
+      latestProject.current.firefight===config&&latestProject.current.quickForge?.runtimeId===project.quickForge?.runtimeId&&
+      latestProject.current.quickForge?.gameMode==='firefight'&&!latestProject.current.quickForge?.native;
+    const release=beginProjectMutation(project.id);
+    setBusy(true);setError('');
+    try {
+      const bindings=await prepareFirefightImports(project,sourceId,stillCurrent);
+      if(!stillCurrent())throw Error('The project or rules changed during asset preparation. No old plan was reapplied.');
+      const next=bindings.reduce((current,binding)=>attachAssetImport(current,binding),latestProject.current);
+      if(next!==latestProject.current)edit(next,'Include Firefight source actors and weapons');
+    } catch(problem){setError(String(problem));}finally{release();setBusy(false);}
+  }
   function prepareNativeRound() {
     try {
       edit(attachNativeFirefightRound(project), 'Prepare native solo Firefight encounters and script');
@@ -196,7 +217,7 @@ export default function Firefight({
     setBusy(true);setError('');
     try {
       await onSave();
-      if(latestProject.current.quickForge!==input.quickForge||latestProject.current.firefight!==input.firefight)
+      if(activeProject.current!==input.id||latestProject.current.id!==input.id||latestProject.current.quickForge!==input.quickForge||latestProject.current.firefight!==input.firefight||latestProject.current.nativeAssetImports!==input.nativeAssetImports)
         throw Error('The round or geometry changed while saving. Prepare the intended round, then export again.');
       const receipt=await call<QuickForgeBuildReceipt>('quickforge_export',{projectId:input.id,expectedProject:input});
       setSourceExport({receipt,input});
@@ -265,6 +286,12 @@ export default function Firefight({
           </select>
         </label>)}
         <button disabled={busy||native&&!onSave} onClick={()=>void adoptSource()} title="Checks the selected map's actual actor and weapon paths, then changes the rules source as one Undo step. Scripts are not regenerated and no tags are converted.">Use this source for existing rules</button>
+      </details>}
+      {config&&<details className="forge-details">
+        <summary>Native source actors &amp; weapons · {retainedRulesImports.length} retained imports</summary>
+        <p className="subtle">Include the actors used by your waves and the starting weapons from the rules source. Their recursive native tags stay in this project's existing import store. Without an import, the build still requires matching editing-kit tags; selecting a catalog alone does not extract them.</p>
+        <button disabled={!canIncludeAssets} title={includeAssetsHint} onClick={()=>void includeSourceAssets()}>Include source actors &amp; weapons</button>
+        <p className="subtle">Uses installed Invader tools. Unsupported extraction or dependencies block the operation. Undo removes the accepted bindings from this plan; original maps and prior builds stay unchanged. Prepare, Save and native rebuild/readback are still required.</p>
       </details>}
       {error && <Notice>{error}</Notice>}
       {catalog && (

@@ -103,7 +103,7 @@ pub(super) async fn prepare_native_asset_import(
             retain_source_reference(&state,&owner,&source,&inspection)?;
             check_document_owner(&state,&project_id,&owner)?;
             if lock(&state.forge_session)?.as_ref().is_some_and(|s|s.project_id==project_id){return Err("The project joined a shared session during extraction; no local placement was committed".into());}
-            event(&app,JobEvent{job_id:id.clone(),project_id:project_id.clone(),phase:"asset-imported".into(),message:format!("{} real native tags copied, references updated and read back. Ready for placement and a native build.",binding.file_count),progress:100,severity:"success".into(),timestamp:chrono::Utc::now().to_rfc3339()});
+            event(&app,JobEvent{job_id:id.clone(),project_id:project_id.clone(),phase:"asset-imported".into(),message:format!("{} real native tags copied, references updated and read back. Ready for its supported authoring workflow and a native build.",binding.file_count),progress:100,severity:"success".into(),timestamp:chrono::Utc::now().to_rfc3339()});
             Ok(binding)
         })();
         if let Ok(mut jobs)=state.jobs.lock(){jobs.remove(&id);}

@@ -147,10 +147,32 @@ pub fn find<'a>(
             && b.tag_path == source.path
     })
 }
+/// One immutable source identity can be opened under several library IDs.
+/// Choose its first retained closure consistently for source-driven references;
+/// placements still retain their own exact binding IDs.
+pub fn find_source<'a>(project: &'a Project, sha256: &str, class: &str, path: &str) -> Option<&'a Binding> {
+    let key = |value: &str| value.replace('\\',"/").to_ascii_lowercase();
+    project.native_asset_imports.iter().find(|binding|
+        binding.source_sha256 == sha256 && binding.tag_class == class && key(&binding.tag_path) == key(path))
+}
 /// Current placements select immutable imports; older unused receipts remain
 /// available to Undo but must not block a replacement's newer source revision.
 pub fn is_used(project: &Project, binding: &Binding) -> bool {
-    project.scene.iter().any(|object| {
+    let firefight = project.firefight.as_ref().is_some_and(|config| {
+        if config.source_sha256.as_deref() != Some(binding.source_sha256.as_str()) {return false;}
+        if find_source(project,&binding.source_sha256,&binding.tag_class,&binding.tag_path)
+            .is_none_or(|selected|selected.id != binding.id) {return false;}
+        let key = |path: &str| path.replace('\\',"/").to_ascii_lowercase();
+        let path = key(&binding.tag_path);
+        match binding.tag_class.as_str() {
+            "actv" => config.waves.iter().flat_map(|wave| &wave.groups).any(|group|
+                config.enemies.iter().any(|enemy|enemy.id == group.enemy_id && key(&enemy.actor_variant_path) == path)),
+            "weap" => config.native_player_profile.as_ref().is_some_and(|profile|
+                key(&profile.primary_weapon) == path || profile.secondary_weapon.as_ref().is_some_and(|weapon|key(weapon) == path)),
+            _ => false,
+        }
+    });
+    firefight || project.scene.iter().any(|object| {
         object.source_model.as_ref().and_then(|source| find(project, source))
             .is_some_and(|value| value.id == binding.id)
     }) || project.quick_forge.as_ref().is_some_and(|document| {
@@ -169,7 +191,7 @@ pub fn require_origin_revision(binding: &Binding, source: &Project) -> Result<()
         return invalid("Imported asset origin no longer matches its pinned source revision");
     }
     require_native_source(source).map_err(|_| SparkError::Invalid(
-        "Imported asset source has tag changes newer than its extracted revision. In Tag editor → Native Output, save a validated map copy, open it, then use Asset library → Replace selected for every affected placement. Existing imports and previous-good builds are unchanged.".into()
+        "Imported asset source has tag changes newer than its extracted revision. In Tag editor → Native Output, save a validated map copy and open it. Use Asset library → Replace selected for affected placements, or review the Firefight actor source and choose Include source actors & weapons again. Existing imports and previous-good builds are unchanged.".into()
     ))
 }
 
@@ -262,7 +284,7 @@ pub fn prepare(
         .ok_or_else(|| SparkError::Invalid("Import source tag is missing".into()))?;
     if !matches!(
         tag.class.as_str(),
-        "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach" | "snd!" | "lsnd" | "senv"
+        "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach" | "snd!" | "lsnd" | "senv" | "actv"
     ) {
         return invalid("This native asset class has no verified automatic import workflow yet");
     }
