@@ -4,97 +4,158 @@
 
 ### ALL THE TOOLS, AND THEN SOME.
 
-**Build bigger Halo worlds. Create together. Play what you make.**
+**THE FRONT DOOR TO HALO 1 MODDING.**
 
-A native **Halo 1 creation studio** for Forge and BSP authoring, MegaWorld worldbuilding, real-time collaboration, assets, tags, conversion, Live Link and machinima.
+Your maps. Your tools. Your favorite flavor of Halo. One place to make some shit.
 
-[![Windows preview](https://img.shields.io/badge/Windows_x64-Download_preview-89d9e8?logo=windows)](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/tag/v0.4.1-preview.5)
-[![Build](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/actions/workflows/build.yml/badge.svg)](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-56c5b0.svg)](LICENSE)
-
-**[Download](#download) · [Flagship features](#build-beyond-the-map) · [Get started](docs/GETTING_STARTED.md) · [Roadmap](ROADMAP.md)**
+**[GET THE COMMUNITY ALPHA](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/tag/v0.4.1-preview.5) | [GET STARTED](docs/GETTING_STARTED.md) | [TELL ME WHAT BROKE](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose)**
 
 </div>
 
-## Build beyond the map
+![Guilty Spark editing a real Halo map on Windows](docs/screenshots/c60/native-mcc-map.png)
 
-**One Halo. Every World. Every Tool. Together.** Build native spaces, connect your creations and keep the whole workflow in one studio.
+## So what the fuck is Guilty Spark?
 
-| Flagship | What you can create | Status |
-| --- | --- | --- |
-| **[Halo MegaWorld](docs/MEGAWORLD_SEAM_ROUTES_20261108.md)** | Plan a 19-map world; join compatible BSP regions with an infantry tunnel, vehicle road and elevated ridge. The Timberland–Sidewinder prototype compiles and loads in Chupathingy. Full 19-region construction and human/Warthog traversal remain open. | **In development** |
-| **[Native Forge & BSP Workshop](docs/DEMO_WORKFLOWS.md)** | Shape rooms, stairs, ramps and corridors in four linked views. Edit supported faces, edges, vertices, UVs and materials; place native objects, doors and triggers; compile through a matching Halo toolchain. | **Available now** — supported source workflows |
-| **[Multiplayer AI synchronization](docs/C51_RUNTIME_AND_FLAGSHIPS.md)** | Bring native encounters and host-authoritative AI into shared Halo experiences. Actor-lifecycle and peer experiments exist; consistent multiplayer combat, vehicles and shared victory still need acceptance. | **In development** |
-| **[Firefight & original Zombie Apocalypse](docs/FIREFIGHT_ENGINE.md)** | Author wave plans and native encounter/script source, and restore the original Zombie Apocalypse mechanics. Solo Firefight compilation/readback passes; complete human survival, scoring and multiplayer rounds remain open. | **In development** |
-| **[Universal Halo editing & conversion](docs/COMPATIBILITY_MATRIX.md)** | Inspect source-native maps, tags, models, bitmaps and sounds; use proven bounded cache edits or reconstruct loose tags and rebuild for supported targets. Each format keeps its own identity and limits. | **Available now** — conversion routes vary |
-| **[Live Link & Live Rebuild](docs/CHUPATHINGY_DEDICATED_20261108.md)** | Preview supported object changes on validated MCC builds. Rebuild and reload a Spark-owned Chupathingy session with revision checks and previous-good recovery. BSP rebuilds require a map/session reload. | **Available now** — exact-runtime operations |
-| **[Real-time SparkLink collaboration](docs/CONTINUATION_59_WORKSPACE.md)** | Edit shared source across independent Spark processes: BSP changes, native tag fields, assets, author-owned Undo, conflicts, disconnect recovery and frozen native builds. Physical two-computer LAN/VPN acceptance remains open. | **Available now** — tested on one computer |
-| **[Multiplayer Hub](docs/CHUPATHINGY_DEDICATED_20261108.md)** | Choose a runtime, find compatible games, prepare native content or host an isolated private session. Host, Join and editor collaboration have distinct workflows. | **Available now** — supported providers |
-| **[Campaign creation & machinima](docs/DEMO_WORKFLOWS.md)** | Author mission beats, supported HaloScript interactions, camera keys, named takes and reversible editor greenscreen. A full campaign playthrough and complete capture pipeline remain in development. | **Available now** — authoring tools |
+Back in the MacGamingMods days, I spent a stupid amount of time in Eschaton, SwordEdit and every other Halo tool I could get my hands on. Loved them. But I always wanted one damn place where I could open a map, tear into its tags, build something new and play the result without juggling fifteen programs and six copies of Halo.
 
-**Research:** OpenH1 VR Forge, larger cooperative sessions, high-player-count worlds and true engine-level region streaming. These have separate hardware, runtime and gameplay gates.
+I wanted that in 2010. Still want it. So I'm building it.
 
-![Guilty Spark editing a real Halo map in its native Windows application](docs/screenshots/c60/native-mcc-map.png)
+**Guilty Spark is an open-source, all-in-one Halo 1 creation suite.** It's a real editor, not just a pretty launcher for other people's tools. It also connects supported community tools and runtimes so the whole process feels like one workspace.
 
-*Actual Windows application capture. Native content, interactive editing and one workspace for the full creation process.*
+Have a tool you swear by? Bring it. Have a favorite version of Halo? Use it. Just want to load Blood Gulch and fuck around with a Warthog? That's kind of the point.
 
-## Your worlds, connected
+**The runtime manager is optional.** You don't need to move a single Halo folder just to use Spark as a modding tool.
 
-![Native shared-region prototype with original Halo material previews](docs/screenshots/20261107/shared-native-regions.png)
+## Okay, what can I actually do with this thing?
 
-*Two-region development prototype. A compiled connection is distinct from a human-accepted journey, and from a completed 19-map world.*
+### 1. Open a map and dig into the guts
 
-- **Create in native Halo source.** Keep structural geometry, collision, portals, materials, scenario references and scripts tied to the matching build pipeline.
-- **Work across maps and monitors.** Detach eligible tabs and drawers, retain inactive editors, keep per-project history and recover interrupted sessions.
-- **Move assets through the whole workflow.** Discover → inspect → preview → import → transform → validate → build → playtest, with explicit support and dependency checks.
-- **Keep originals intact.** Source Guardian, content identities, staged builds and previous-good recovery protect user-owned maps and tags.
+Open supported Halo 1 maps, fly around the 3D world and inspect **BSP geometry, objects, scenery, models, shaders, bitmaps, sounds, tags and their references**. Preview source textures, model materials and supported sound samples without playing guessing games with raw IDs.
 
-See the [current capabilities](docs/CURRENT_FEATURES.md), [complete feature ledger](docs/MASTER_FEATURE_LEDGER.md), [hands-on guides](docs/DEMO_WORKFLOWS.md) and [human test plan](docs/HUMAN_TEST_PLAN.md) for exact workflows and acceptance limits.
+Spark recognizes several Halo 1 source families: **Custom Edition, MCC Halo 1, Demo, community-engine content, and supported original PC/Xbox/legacy sources**. Inspection, editing, building and actual game compatibility are different things. Not every format supports every operation, because Halo's file formats are a goddamn adventure.
 
-## Download
+### 2. Edit the actual map
 
-**Windows 10/11 x64 · 0.4.1 Preview 5 · built November 10, 2026**
+Select and move supported scenery and objects using the 3D gizmo. Rotate, duplicate, copy/paste, snap and tweak supported tag fields. Drag compatible assets from the library, bring along their required native dependencies, and keep real **Undo/Redo, Save, separate map histories and restart recovery**.
 
-**[Download the Windows installer](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/download/v0.4.1-preview.5/Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe)** · **[Portable ZIP](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/download/v0.4.1-preview.5/Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip)** · **[All release files & checksums](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/tag/v0.4.1-preview.5)**
+Multiple maps? Open them in tabs. Want the tag editor or another view on a second monitor? Detach eligible windows. Want to go back to the map you were working on twenty minutes ago? Spark remembers your workspace instead of making you start from scratch.
 
-These are actual public GitHub Release downloads. The installer, portable ZIP, source archive and manifest were downloaded anonymously and checked against their SHA-256 records. Source commit: **d832af36cb55ecd55d6c0730c24c13f90594424c**. All nine release gates passed; the portable and installed applications both reached the native workspace, and installation/uninstallation passed on the development host.
+### 3. Make your own geometry
 
-This is an **unsigned development preview** requiring Microsoft WebView2. Clean-machine/upgrade acceptance remains open. Linux and macOS packages are separate, unverified targets. No Halo games, maps, resource banks, runtime binaries or proprietary editing-kit content are bundled.
+The **Forge / BSP Workshop** includes linked editing views, rooms, corridors, ramps, faces, edges, vertices, extrusion, UVs, materials, player starts and supported native placements.
 
-[Exact build, checksums and acceptance report](docs/RELEASE_CANDIDATE_20261108.md) · [Repeatable release process](docs/RELEASING.md) · [Build from source](docs/BUILD_WINDOWS.md)
+You can assemble compatible BSP source, build tunnels and connections, and feed it into the right Halo toolchain. There's even a supported **door + trigger + HaloScript** workflow that compiled and opened both ways in H1A Standalone.
 
-## Start creating
+Yes, I'm working on the whole **drive a Warthog through a mountain tunnel between maps** thing. The Timberland-Sidewinder prototype compiles and loads. Full human/vehicle two-way traversal and the big seamless world still need proof. A map loading is not the same as a map playing correctly. Fucking Halo.
 
-1. **Connect your Halo.** Use your own legitimate runtime/content directories, or configure isolated managed engine packages with your shared content library.
-2. **Open a map or create editable source.** Pick a supported native workflow and follow its guide in **Learning center → Guides**.
-3. **Make a change, save, build and playtest.** Spark keeps saved source, compiled output and the running game distinct.
+### 4. Actually edit tags, models, sounds and materials
 
-**Chupathingy is the preferred standard runtime.** MCC Halo 1, Custom Edition, OpenCE, Faber and OpenH1 use separate profiles and compatibility contracts. Retail PC, Xbox and legacy Mac/Demo content retain supported source-preservation and conversion routes. Selecting a hosting runtime never changes a map's source identity.
+Browse tag classes and references, edit supported fields, preview shaders and models, inspect original texture detail and lightmaps, and audition supported Halo sounds. Import supported OBJ scenery through a reviewed geometry workflow, or use the matching native tools to prepare and rebuild more involved assets.
 
-OpenH1 is the immersive research target; its Windows build is **not verified for SteamVR**. SparkLink is editor collaboration, Live Link controls supported game state, and gameplay networking belongs to the chosen engine.
+There's source-aware **sky, fog, lighting and environment authoring**, native sound-emitter work, and tools for inspecting what actually ended up in a compiled map. Full in-game shading, animations and lighting parity are still being worked on. I won't pretend a pretty viewport is identical to the engine.
 
-[Setup guide](docs/GETTING_STARTED.md) · [Runtime compatibility](docs/RUNTIME_COMPATIBILITY.md) · [Shared library & runtime setup](docs/SHARED_RUNTIMES_AND_PACKS_20261107.md)
+### 5. Bring the tools we all grew up with
 
-## Specialist tools, part of your studio
+**Invader. Guerilla. Sapien. Halo Tool. Baboon. Blender.** And a growing catalog of other stuff.
 
-Use the appropriate tool from Spark's existing **Games & Tools** workflow: **Guerilla**, **Sapien**, **Halo Tool**, **Invader**, **Baboon**, **Blender + Halo addon**, **Mantle**, **OpenTool**, **Reclaimer/Mozzarilla** and **Excession**, where their edition, source and interface are supported.
+Spark can help match supported tools to a compatible map and editing kit, prepare separate working files, launch reviewed tool workflows, pick up supported external edits and bring those changes back into an accepted build revision.
 
-Source-aware handoffs connect external edits to reconciliation, native validation and rebuilding. Installation, automation and round-trip coverage differ by tool; see [compatible tools](docs/COMPATIBLE_TOOLS.md).
+The goal isn't to replace the legends who built the Halo modding scene. Those tools are why we're still doing this shit. I want to connect them, fill the gaps, and stop making modders perform twelve manual rituals just to change something.
 
-## Help build what comes next
+Not every tool has full integration. Some are registered companions; others only have specific tested handoffs. See the [real tool compatibility list](docs/COMPATIBLE_TOOLS.md).
 
-Guilty Spark is open source under the [MIT License](LICENSE). Modders, engine developers, artists, testers and tool authors are welcome.
+### 6. Build it, check it and get it into Halo
 
-**[Report an issue](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Community credits](COMMUNITY_CREDITS.md)**
+For supported targets, Spark stages native source and dependencies, runs the matching build workflow, validates the resulting map or tags, and opens a compiled revision separately for inspection.
 
-Implemented source, automated checks, native compilation, game loading, human gameplay and real-peer acceptance are recorded separately. Operation 110 and the full product mandate remain in progress; working tools ship alongside clearly labeled development and research goals.
+Some narrowly supported MCC cache edits can be made on **independent preserved copies** without reconstructing everything. Larger changes use the proper CE/MCC native toolchain. You can inspect an output and test it in a compatible runtime.
 
-Halo and its assets belong to their respective owners. Guilty Spark is an independent community project. Use legitimately obtained files and respect the [asset and copyright policy](docs/ASSET_AND_COPYRIGHT_POLICY.md).
+This isn't one magical format that every Halo engine eats. Selecting another runtime doesn't automatically convert your map. If a route isn't supported, Spark should tell you instead of silently producing broken bullshit.
+
+### 7. Mod with your friends and change things in-game
+
+**SparkLink** shares supported source edits, placements, author-owned Undo, conflicts and revisions between independent Spark editors. Three real editor processes have passed the local native collaboration workflow. Two physical computers are still an open acceptance gate.
+
+**Live Link** has specific tested MCC game-side operations. **Live Rebuild** can compile a frozen source revision, reload a validated map into a Spark-owned Chupathingy server, and roll back to the previous good version if a build goes sideways. Native tests include two real game clients on one computer.
+
+Editor co-op, live game editing and multiplayer game networking are not the same thing. I'm building toward all of it, but don't mistake the current tests for universal engine cross-play or hot-swappable BSPs.
+
+### 8. Stop keeping six Halos in six mystery folders
+
+While working on this mess, I had **Custom Edition, Halo Trial, Chupathingy, OpenCE, OpenH1** and more scattered around. So Spark got a runtime manager.
+
+It can discover supported existing installations, remember your profiles, optionally download reviewed community-engine packages into separate managed folders, and select the compatible engine for your next launch. Shared content-library setup is optional and engine-specific.
+
+**It does not need to replace the EXE in your original Halo installation.** Want to ignore all this and just open a map? Please do.
+
+Runtime-specific hosting and joining exist, too. That's not the same as magically unifying every Halo multiplayer protocol. Yet.
+
+### 9. Make machinima and learn the damn thing
+
+You can work with supported **camera keys, takes, recording views and reversible greenscreen** options, plus source-aware atmosphere and material previews.
+
+There's a **Learning Center** with searchable workflow guides and an in-app glossary because nobody should need to decipher a fucking engineering thesis to place a door.
+
+[Every documented capability](docs/CURRENT_FEATURES.md) | [Hands-on workflows](docs/DEMO_WORKFLOWS.md) | [Runtime compatibility](docs/COMPATIBILITY_MATRIX.md)
+
+## The ridiculous shit I'm still building
+
+These are the big ambitions, **not a list of magically finished features**:
+
+- **MegaWorld:** nineteen planned Halo regions connected by real terrain, caves, mountains and Warthog roads. Prototypes compile and load; the complete world and verified two-way gameplay aren't done.
+- **Zombie Apocalypse and Firefight:** original zombie mechanics, native AI encounters, proper wave survival, sounds, scoring and co-op. Authoring tools and native experiments exist; full accepted player combat isn't done.
+- **Extraction:** Halo PvPvE with loot, banked inventory, actual extraction and persistence, without forcing a raid timer. Not a finished playable mode.
+- **More ways to play together:** multiplayer AI, expanded co-op, more peers, runtime bridges and split-screen. Real engine/peer acceptance is still ahead.
+- **VR and more platforms:** OpenH1 headset editing, native Linux and macOS releases, and keeping the old Mac/Demo stuff alive. Those are separate unfinished hardware and release gates.
+
+I want Halo 1 to do things I couldn't pull off in 2010. I also want the damn thing to work before I call those features done.
+
+## Will Spark fuck up my Halo files?
+
+Fair question. Some of us have been hoarding maps, tags, SDKs and questionable modding utilities for twenty years. I'd be pissed if a shiny new alpha destroyed that collection too.
+
+**Here's how it's designed to behave:**
+
+- **Open a map:** read the original; saved imported projects use a managed copy. Opening Blood Gulch should not overwrite Blood Gulch.
+- **Edit, save and compile:** write project files and separate working/build outputs, with source hashes, revision checks and preservation rules.
+- **Find existing runtimes:** discovery doesn't automatically move, reinstall or delete them.
+- **Optionally install managed engines:** use their own reviewed folders rather than clobbering a stock Halo installation.
+- **Optionally install presentation packs:** this **can add files** in a selected engine's `mods` directory. Applying pack choices when launching **can modify** its `mods/load_order.toml`.
+- **Clean temporary output:** Spark **can delete** verified Spark-owned generated files after review and confirmation. That's an actual destructive operation, not a claim that the app is read-only.
+- **Launch external tools:** those are independent programs with their own file-writing behavior, not magically sandboxed by Spark.
+
+I've built in hashing, isolated workspaces, original-source protection, path checks and ownership-aware cleanup. That's a shitload of safety engineering. **It's still a community alpha, not an ironclad promise that software can never have a bug.** Back up anything irreplaceable and try your first edits on disposable copies.
+
+If Spark touches a file it shouldn't, loses an edit, or does some truly stupid shit, **tell me what you did and what changed. I'll dig into it.** Protecting people's Halo collections isn't negotiable.
+
+## Get the Community Alpha
+
+**Windows 10/11 x64 | v0.4.1 Preview 5 | unsigned development build**
+
+**[WINDOWS INSTALLER](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/download/v0.4.1-preview.5/Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe) | [PORTABLE ZIP](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/download/v0.4.1-preview.5/Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip) | [CHECKSUMS](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases/tag/v0.4.1-preview.5)**
+
+1. Open Spark. Connect a Halo installation if you want, or open a map.
+2. Inspect the map, or create an editable source project. Change something small.
+3. Save it. With a compatible source and editing kit, build and test what you made.
+
+**Important:** Preview 5 is the actual November 10 release build. Newer changes on GitHub are **not automatically in that download**. No Halo games, maps, proprietary editing kits or external runtime binaries are bundled. Bring legally obtained content. Windows requires Microsoft WebView2. Development-host installation and uninstall passed; clean-machine and upgrade acceptance remain open.
+
+[Getting started](docs/GETTING_STARTED.md) | [Known limits](docs/HUMAN_TEST_PLAN.md) | [Source/asset policy](docs/ASSET_AND_COPYRIGHT_POLICY.md)
+
+## Now do something we couldn't do in 2010
+
+Got a favorite tool? Some cursed old Halo build? A map you always wanted to make? A completely batshit idea?
+
+**Try it. Break it. Tell me what sucks.** Show me something Spark can't do, tell me what it needs, and I'll keep working on it.
+
+I don't want to bury the old Halo modding community. I was part of it. I love this shit. I'm trying to make one place where all those tools, engines and ideas can come together.
+
+**[REPORT A BUG OR IDEA](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose) | [CONTRIBUTE](CONTRIBUTING.md) | [ROADMAP](ROADMAP.md) | [COMMUNITY CREDITS](COMMUNITY_CREDITS.md)**
+
+Independent, open-source community software under the [MIT License](LICENSE). Halo and its assets belong to their respective owners.
 
 <div align="center">
 
-**MAKE HALO YOURS.**
-
-*One Halo. Every World. Every Tool. Together.*
+**ALL THE TOOLS, AND THEN SOME.**
 
 </div>
