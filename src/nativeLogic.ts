@@ -74,6 +74,82 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
   }
   return {...doc,logic};
 }
+
+/** Authoring-space review only. Native collision, use distance, source tags and
+ * actual runtime admission still need independent native/game verification. */
+export function extractionLayout(doc:QuickForgeDocument) {
+  const logic=doc.logic,issues:{message:string;objectId?:string}[]=[];
+  const terminal=(name:string,label:string)=>{
+    const bindings=logic?.devices.filter(d=>d.nativeName===name)??[];
+    const placements=bindings.flatMap(d=>doc.placements.filter(p=>p.id===d.placementId));
+    const value=bindings.length===1&&placements.length===1&&placements[0].tagClass==='ctrl'?placements[0]:undefined;
+    if(!value)issues.push({message:label+' needs one named native control terminal.',objectId:placements[0]?.id});
+    else if(!bindings[0].powered)issues.push({message:label+' has startup power turned off.',objectId:value.id});
+    return value;
+  };
+  const zone=(name:string,label:string)=>{
+    const values=logic?.triggers.filter(t=>t.nativeName===name)??[];
+    if(values.length!==1)issues.push({message:label+' needs one named trigger volume.',objectId:values[0]?.id});
+    return values.length===1?values[0]:undefined;
+  };
+  const deploy=terminal('extraction_deploy','Deployment'),activate=terminal('extraction_activate','Activation');
+  const activation=zone('extraction_zone','Activation area'),returnZone=zone('extraction_return','Safe return area');
+  const inside=(point:Vec3,volume:LogicTrigger)=>{
+    if(point.some(v=>!Number.isFinite(v))||volume.position.some(v=>!Number.isFinite(v))||
+      volume.rotation.some(v=>!Number.isFinite(v))||volume.dimensions.some(v=>!Number.isFinite(v)||v<=0)||
+      Math.abs(volume.rotation[0])>1e-5||Math.abs(volume.rotation[1])>1e-5)return false;
+    const dx=point[0]-volume.position[0],dy=point[1]-volume.position[1],yaw=volume.rotation[2];
+    return [dx*Math.cos(yaw)+dy*Math.sin(yaw),-dx*Math.sin(yaw)+dy*Math.cos(yaw),point[2]-volume.position[2]]
+      .every((v,i)=>Math.abs(v)<=volume.dimensions[i]/2+1e-5);
+  };
+  if(deploy&&returnZone&&!inside(deploy.position,returnZone))
+    issues.push({message:'Deployment terminal origin is outside the safe return volume.',objectId:deploy.id});
+  if(deploy&&activation&&inside(deploy.position,activation))
+    issues.push({message:'Deployment terminal must be outside the activation volume.',objectId:deploy.id});
+  if(activate&&activation&&!inside(activate.position,activation))
+    issues.push({message:'Activation terminal origin is outside its activation volume.',objectId:activate.id});
+  if(returnZone&&activation) {
+    const c=Math.cos(returnZone.rotation[2]),s=Math.sin(returnZone.rotation[2]);
+    const corners=[-1,1].flatMap(x=>[-1,1].flatMap(y=>[-1,1].map(z=>[
+      returnZone.position[0]+c*x*returnZone.dimensions[0]/2-s*y*returnZone.dimensions[1]/2,
+      returnZone.position[1]+s*x*returnZone.dimensions[0]/2+c*y*returnZone.dimensions[1]/2,
+      returnZone.position[2]+z*returnZone.dimensions[2]/2,
+    ] as Vec3)));
+    if(corners.every(p=>inside(p,activation)))
+      issues.push({message:'The return volume is entirely inside activation; Forerunner requires a return outside activation.',objectId:returnZone.id});
+    if(!doc.spawns.some(p=>inside(p.position,returnZone)&&!inside(p.position,activation)))
+      issues.push({message:'No authored player start is inside the hub and outside activation.',objectId:returnZone.id});
+  }
+  if(logic?.manualSource!=null)issues.push({message:'Handwritten HaloScript owns startup behavior; metadata power settings need native review.'});
+  if(!['haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))
+    issues.push({message:'The current Forerunner authoring handoff needs a standard Custom Edition build target. Other source formats require explicit conversion.'});
+  if(!['firefight','zombie'].includes(doc.gameMode))
+    issues.push({message:'This source currently exports multiplayer. Forerunner Extraction needs standard solo content; independent campaign/loadout authoring remains unfinished.'});
+  else issues.push({message:'This solo route includes survival authoring. An independent Extraction campaign must not start a second Firefight controller.'});
+  const bindings=[deploy,activate,activation,returnZone].filter(Boolean).length;
+  const present=[...(logic?.devices??[]),...(logic?.triggers??[])].some(t=>t.nativeName?.startsWith('extraction_'));
+  return {present,bindings,deploy,activate,activation,returnZone,issues};
+}
+
+/** Create just the missing standard volume, through the existing authoring
+ * helper/history path. Never move terminals, replace zones, teleport or add AI. */
+export function addExtractionZone(doc:QuickForgeDocument,role:'activation'|'return') {
+  const logic=logicDocument(doc),name=role==='activation'?'extraction_zone':'extraction_return';
+  const matches=logic.triggers.filter(t=>t.nativeName===name);
+  if(matches.length>1)throw Error('Resolve duplicate native volume names before editing this setup.');
+  if(matches.length)return {document:doc,id:matches[0].id};
+  const terminalName=role==='activation'?'extraction_activate':'extraction_deploy';
+  const bindings=logic.devices.filter(d=>d.nativeName===terminalName);
+  const terminal=bindings.length===1?doc.placements.find(p=>p.id===bindings[0].placementId&&p.tagClass==='ctrl'):undefined;
+  if(!terminal)throw Error('Place a control terminal and choose its native Extraction role first.');
+  if(logic.triggers.length>=64)throw Error('The native trigger-volume budget is full.');
+  const added=addLogicTrigger(doc,[terminal.position[0],terminal.position[1],terminal.position[2]+1.5]);
+  const trigger=added.document.logic!.triggers.find(t=>t.id===added.id)!;
+  trigger.name=role==='activation'?'Extraction activation area':'Extraction safe return area';
+  trigger.dimensions=[6,6,4];trigger.rotation=[0,0,terminal.rotation[2]];
+  return {document:setNativeLogicName(added.document,{type:'trigger',value:trigger},name),id:added.id};
+}
+
 export function addLogicTrigger(
   doc: QuickForgeDocument,
   position: Vec3,

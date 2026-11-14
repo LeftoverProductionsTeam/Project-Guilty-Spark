@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ForgeNode, QuickForgeDocument } from '../forge';
 import {
   addLogicTrigger,
@@ -9,6 +9,8 @@ import {
   isLogicTarget,
   logicDocument,
   setNativeLogicName,
+  extractionLayout,
+  addExtractionZone,
 } from '../nativeLogic';
 import type { LogicRule, NativeLogicSource } from '../nativeLogic';
 import { downloadLocalText } from '../exportHelpers';
@@ -45,6 +47,7 @@ export default function LogicEvents({
   const handwritten = logic?.handwrittenSources ?? [];
   const selectedModule = handwritten.find((m) => m.filename === moduleName) ?? handwritten[0];
   const overridden = logic?.manualSource != null;
+  const extraction=useMemo(()=>extractionLayout(doc),[doc]);
   const controlSelected=node?.type==='placement'&&node.value.tagClass==='ctrl';
   const namingNeedsDoorBinding=node?.type==='placement'&&node.value.tagClass==='mach'&&
     !logic?.devices.some(d=>d.placementId===node.value.id);
@@ -77,6 +80,13 @@ export default function LogicEvents({
       if(next!==latestDocument.current)commit(next,'Set native scenario name');
       setError('');return true;
     } catch(error){setError(String(error));return false;}
+  };
+  const createExtractionZone=(role:'activation'|'return')=>{
+    try {
+      const added=addExtractionZone(latestDocument.current,role);
+      if(added.document!==latestDocument.current)commit(added.document,'Add native Extraction '+role+' volume');
+      onSelect(added.id);setError('');
+    } catch(error){setError(String(error));}
   };
   const changeRule = (id: string, update: (rule: LogicRule) => LogicRule) => {
     const next = logicDocument(doc);
@@ -132,6 +142,29 @@ export default function LogicEvents({
           </div>}
           {nativeBindingName.startsWith('extraction_')&&<p className="forge-hint">Place the deploy terminal inside the safe return volume, outside activation.
             Place the activation terminal inside its zone. Keep a physical route between both areas; no raid timer or teleport is authored here.</p>}
+          {extraction.present&&<details className="forge-details">
+            <summary>Extraction layout · {extraction.bindings}/4 native bindings</summary>
+            <div className="button-row">
+              <button disabled={!extraction.activate||!!extraction.activation}
+                title="Create one editable 6 × 6 × 4 activation volume around the named terminal. Existing objects stay in place."
+                onClick={()=>createExtractionZone('activation')}>Add activation zone at terminal</button>
+              <button disabled={!extraction.deploy||!!extraction.returnZone}
+                title="Create one editable 6 × 6 × 4 hub return volume around the deployment terminal. Review the route and floor afterward."
+                onClick={()=>createExtractionZone('return')}>Add safe return zone at terminal</button>
+            </div>
+            <div className="button-row">
+              {([['Deploy terminal',extraction.deploy],['Activate terminal',extraction.activate],
+                ['Activation zone',extraction.activation],['Return zone',extraction.returnZone]] as const)
+                .map(([label,value])=>value&&<button key={label} onClick={()=>onSelect(value.id)}
+                  title={'Select the authored '+label.toLowerCase()+' in this project'}>{label}</button>)}
+            </div>
+            <ul className="forge-hint">{extraction.issues.map((issue,i)=><li key={i}>
+              {issue.message}{issue.objectId&&<button className="small-button" onClick={()=>onSelect(issue.objectId!)}>Select</button>}
+            </li>)}</ul>
+            <p className="forge-hint">Checks use authored terminal origins and yaw-aligned volumes only.
+              Native control tags, player clearance, physical routes, runtime configuration and gameplay remain unverified.
+              No timer, teleport, inventory award or engine activation is added.</p>
+          </details>}
           <div className="button-row">
             <button onClick={add}>Add trigger volume</button>
           </div>
