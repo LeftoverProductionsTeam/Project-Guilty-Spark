@@ -102,6 +102,8 @@ export function exportHaloCeCinematic(studio:CreatorStudioDocument): ScriptExpor
 export interface NativeRoundBindings {
   sourceSha256:string;sourceScenarioType:number;encounters:NativeEncounterCandidate[];
   encounterNames:string[][];activation:'manual'|'startup';exclusiveOwnershipConfirmed:boolean;
+  /** Only an atomic native source review can prepare an existing-HUD merge. */
+  hudMergePrepared?:boolean;
 }
 const generatedEncounterRefs=(config:FirefightConfig)=>config.waves.map((wave,w)=>wave.groups.map((_,g)=>`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`));
 function nativeEncounterRefs(config:FirefightConfig,binding?:NativeRoundBindings):string[][] {
@@ -215,7 +217,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
   });
   if(waves.reduce((n,w)=>n+w.score,0)*config.rounds>2147483647)throw Error('Native round score exceeds Halo long range.');
   const hud=nativeFirefightHudMessages(config),feedback=hud.length>0;
-  if(binding&&feedback)throw Error('Generated HUD messages require a fresh native scenario. Existing scenario HUD messages need a preserving merge before this option can be used; no source was replaced.');
+  if(binding&&feedback&&!binding.hudMergePrepared)throw Error('HUD-enabled bound controllers require Runtime Dock → Firefight groups & controller. Review the preserving HUD append and build it atomically; no source was replaced.');
   const owned=(group:{slot:string})=>`gs_ff_units_${group.slot}`;
   const clean=(group:{slot:string})=>`gs_ff_clean_${group.slot}`;
   const lines=heading('Firefight native round candidate · solo encounter controller');
@@ -311,7 +313,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
 /** Planned source specifications, never a decoded native inventory. The caller
  * must review and build this controller with the exact append operation in the
  * atomic source build; ordinary script attachment cannot create encounters. */
-export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup',retainBootstrap=false):ScriptExport {
+export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup',retainBootstrap=false,hudMergePrepared=false):ScriptExport {
   const config=operation.sourceRules;
   if(!config?.sourceSha256||!operation.encounters.length||operation.encounters.length>16)throw Error('Review a source-bound native group plan first.');
   const groups=config.waves.flatMap(wave=>wave.groups);
@@ -320,7 +322,7 @@ export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{k
   const names=config.waves.map(wave=>wave.groups.map(()=>operation.encounters[index++].name));
   const output=exportHaloCeFirefightRound(config,{sourceSha256:config.sourceSha256,sourceScenarioType:0,encounterNames:names,
     encounters:operation.encounters.map(entry=>({name:entry.name,actorVariantPaths:[entry.actorPath],normalCount:entry.count??1,insaneCount:entry.count??1,startingLocations:entry.count??1,notInitiallyCreated:!entry.startActive,issue:null})),
-    activation,exclusiveOwnershipConfirmed:true});
+    activation,exclusiveOwnershipConfirmed:true,hudMergePrepared});
   // Keep the owned startup signature when disabling automatic activation.
   // It becomes a no-op; original native signature preservation stays enabled.
   const content=output.content+(retainBootstrap&&activation==='manual'?'\r\n(script startup gs_ff_bootstrap\r\n  (sleep 1)\r\n)\r\n':'');

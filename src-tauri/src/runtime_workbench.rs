@@ -933,6 +933,7 @@ pub(super) struct FirefightSourcePlan {
     groups:Vec<core::firefight::NativeRoundEncounter>,
     previous_controller:Option<core::working_tags::ScriptAttachment>,
     previous_groups:Vec<core::firefight::NativeRoundEncounter>,
+    hud:Option<core::working_tags::HudAppendPlan>,
 }
 fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext)->Reply<FirefightSourcePlan> {
     if source_scenario_type(state,project)?!=0{return Err("New Firefight groups require a native singleplayer source".into());}
@@ -959,11 +960,18 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
     let writer=native_operations_native::executable(state,project,"invaderNative")?;
     let writer_sha256=maps::hash_file(&writer).map_err(error)?;
     native_operations_native::review_encounter_dependencies(state,project,&context.build,&context.tags,&operation)?;
+    let hud=if project.firefight.as_ref().is_some_and(|rules|rules.native_hud_messages==Some(true)) {
+        let string=writer.with_file_name(if cfg!(windows){"invader-string.exe"}else{"invader-string"});core::reject_links(&string).map_err(error)?;
+        if fs::metadata(&string).map_err(error)?.len()>256*1024*1024{return Err("Native HUD string tool exceeds its identity limit".into());}
+        let sha=maps::hash_file(&string).map_err(error)?;
+        core::working_tags::prepare_hud_append(project.firefight.as_ref().unwrap(),&context.tags,&fields,context.generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref()),&sha).map_err(error)?
+    }else{None};
     if core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?!=identity||core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?!=scripts_sha256{return Err("Native tags or original scripts changed while preparing Firefight groups; review them again".into());}
     let groups=operation.encounter_appends().map_err(error)?.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>().map_err(error)?;
     let previous_groups=context.generated_firefight.as_ref().map(|previous|previous.operation.encounter_appends().and_then(|entries|entries.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>())).transpose().map_err(error)?.unwrap_or_default();
-    Ok(FirefightSourcePlan{groups,previous_controller,previous_groups,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
-        request:core::working_tags::EncounterAppendRequest{operation,existing_controller:context.generated_firefight.as_ref().map(|generated|generated.controller.clone()),fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
+    let hud_review=hud.as_ref().map(|plan|plan.review.clone());
+    Ok(FirefightSourcePlan{groups,previous_controller,previous_groups,hud,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
+        request:core::working_tags::EncounterAppendRequest{operation,hud:hud_review,existing_controller:context.generated_firefight.as_ref().map(|generated|generated.controller.clone()),fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
 }
 #[tauri::command]
 pub(super) async fn prepare_firefight_source(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<FirefightSourcePlan> {

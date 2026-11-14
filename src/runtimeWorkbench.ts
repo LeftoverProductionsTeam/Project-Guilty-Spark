@@ -92,13 +92,17 @@ export interface CompiledSourceProject {
 export interface EncounterAppendRequest {
   operation:Extract<NativeOperation,{kind:'appendEncounters'}>;
   existingController?:{filename:string;sha256:string}|null;
+  hud?:HudAppendReview|null;
   fieldsSha256:string;scriptsSha256:string;writerSha256:string;projectFingerprint:string;
 }
+export interface NativeHudMessage {name:string;panels:({kind:'text';value:string}|{kind:'button';value:number})[]}
+export interface HudAppendReview {inputReference:string|null;inputTagSha256:string|null;sourceSha256:string;messagesSha256:string;outputTagPath:string;stringToolSha256:string}
 export interface FirefightSourcePlan {
   projectId:string;buildId:string;tagsDirectory:string;tagIdentity:string;request:EncounterAppendRequest;
   groups:{name:string;actorPath:string;positions:[number,number,number][]}[];
   previousController?:NativeScriptAttachment|null;
   previousGroups:{name:string;actorPath:string;positions:[number,number,number][]}[];
+  hud?:{review:HudAppendReview;originalCount:number;inputMessages:NativeHudMessage[];messages:NativeHudMessage[]}|null;
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string }
 export interface ToolLaunchPlan {

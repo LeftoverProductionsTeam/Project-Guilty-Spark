@@ -1262,9 +1262,29 @@ const HUD_BUTTON_TOKENS:[&str;40]=[
 pub fn preserving_native_hud_source(config:&FirefightConfig,original:Option<&crate::maps::HudSourceTag>)->Result<Option<NativeHudAppendPlan>> {
     let generated=native_hud_messages(config)?;
     if generated.is_empty(){return Ok(None);}
+    format_native_hud_append(generated,original,&[])
+}
+/// Only an exact recorded generated HUD may revise its own named messages.
+/// Existing indices and now-unused generated messages remain in place.
+pub fn revise_preserving_native_hud_source(config:&FirefightConfig,original:&crate::maps::HudSourceTag,owned_names:&[String])->Result<Option<NativeHudAppendPlan>> {
+    let generated=native_hud_messages(config)?;
+    if generated.is_empty(){return Ok(None);}
+    format_native_hud_append(generated,Some(original),owned_names)
+}
+fn format_native_hud_append(generated:Vec<NativeRoundHudMessage>,original:Option<&crate::maps::HudSourceTag>,owned_names:&[String])->Result<Option<NativeHudAppendPlan>> {
     let original_count=original.map_or(0,|tag|tag.messages.len());
     let mut messages=original.map_or_else(Vec::new,|tag|tag.messages.clone());
-    messages.extend(generated.into_iter().map(|message|crate::maps::NativeHudMessage{name:message.name,panels:vec![crate::maps::NativeHudPanel::Text(message.text)]}));
+    let mut owned=BTreeSet::new();
+    for name in owned_names {
+        if !owned.insert(name.clone())||!messages.iter().any(|message|&message.name==name){return invalid("Generated HUD ownership names no longer match native source");}
+    }
+    for message in generated {
+        let desired=crate::maps::NativeHudMessage{name:message.name,panels:vec![crate::maps::NativeHudPanel::Text(message.text)]};
+        if let Some(index)=messages.iter().position(|old|old.name.eq_ignore_ascii_case(&desired.name)) {
+            if messages[index].name!=desired.name||!owned.contains(&desired.name){return invalid("An original HUD message owns a generated name; no message was overwritten");}
+            messages[index]=desired;
+        }else{messages.push(desired);}
+    }
     if messages.len()>1024 {return invalid("Original and generated HUD messages exceed the native1024-message capacity");}
     let mut names=BTreeSet::new();let mut text_units=0usize;let mut elements=0usize;let mut source=String::new();
     for message in &messages {
