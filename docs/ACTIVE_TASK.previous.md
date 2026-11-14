@@ -2,9 +2,9 @@
 
 Task: Operation110 — restore current CI, protect user files, then native Firefight acceptance
 Status: implementation incomplete
-Starting revision: 68f0c3206e39fc1644db076a3dfdcb8f167d85c5, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 8e7e68351a3bac1d8de00a81fdb100411261c32c — accepted-output cleanup catalog race repaired; R658 genuine red reproduction, R662933fullRust/9explicit skips, R66343storage/repository regressions pass. Prior native loadout evidence33fafd49 remains scoped, not gameplay.
-Next action: Collect R665 full Rust, session99193, E/resume-20261114/r665-rust-workspace.log. R664 reproduced both checked/unchecked new-file overwrites after last check. Current project.rs WIP uses native no-replace publication for absent targets; existing replacement stays separate. Check relative-filename handling before committing. Preserve PID-reused interrupted workspace; no game input or publication.
+Starting revision: d2f6ab17dfdfac83738088552fc0e1978f27fcb8, canonical D:/Project Guilty Spark local master.
+Latest verified revision: 2e97ccd6b046629b8da0adc1102b003f754a44b2 — new-filename no-replace publication; both R664red cases fixed, R665full937Rust/9skips before final resolver refinement, R66613project regressions on final source. Prior8e7e683catalog cleanup and33fafd49native loadout evidence stay scoped.
+Next action: Continue existing-file replacement and recursive-cleanup filesystem race protection within existing writers; separately repair QA process-lifetime identity before recovering run-8Ak6hz. New-file last-moment arrival now preserves the foreign file. No running tests remain. Game input still needs renewed authorization after Escape; native Linux packaging/startup and hosted reruns await owner/platform action. No push/publication.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Read goal56474fe8 and its linked Complete Creator Mission; current goal's da7bc0
 User files are sacred: originals, ISO/maps/mods/tags/SDKs/runtime installs, current source/history/stash and accepted C49/c035/dc/preview5 builds stay protected. No new branch/worktree/clone/archive/SDK warehouse, unsafe security changes, unapproved install/download/external writes or remote publication. Use existing bounded external owned scratch. Physical human/peer/headset/platform gates stay open without stopping independent safe engineering.
 
 ## Verified milestones
+
+R664 reproduces checked and unchecked new-file overwrite after the last check (2failures). R665 passes937full Windows Rust tests/9explicit skips after native no-replace publication. Final path refinement reuses native_staging::canonical_destination; R66613/13project tests pass, including a real separate process writing a relative filename, long Unicode path, normal Save/backup and both arrival races. No final938-test full-run claim. Source2e97ccd; exact native API references and evidence in SOURCE_ONLY_STORAGE_POLICY.md.
 
 R662 full workspace933passed/0failed/9explicit opt-in skips; R66343/43storage/repository checks pass. Newly accepted output is preserved in the exact handoff that failed R658. Catalog validation/deletion now shares one guard. This does not close independent filesystem replacement races. Exact source/evidence:8e7e683 and SOURCE_ONLY_STORAGE_POLICY.md.
 
@@ -45,7 +47,7 @@ R658 deterministically reproduces deletion of a generated output accepted by ano
 
 R659/R660 handles disappeared after goal pause; logs end before results. Owners and recorded Rust writers have exited except reusedPID11588, now an unrelated conhost started later. It was not stopped. The prior12GiB reservation remains protected. R661 admission refused a stale test lock. Reviewed exact220B lock owner31504 is gone; its nonce/root/hash were checked, its empty run-RU0Dix and only that dead lock were removed. No recursive cleanup or metadata bypass.
 
-R664 new-file adversarial tests both fail on the old replacing rename: a foreign project arrives after the last existence/revision check and is overwritten. Current project.rs WIP remembers initial absence, uses MoveFileExW(flags0) on Windows and sibling-temp link/unlink off Windows, and refuses replacing fallback. Native Windows paths are canonical extended absolute paths. New normal-save/backup and long-Unicode-path tests accompany the two red cases. R665 full Rust is running. No existing-file replacement, recursive cleanup or process-lifetime race is declared closed.
+R664 new-file adversarial tests both fail on the old replacing rename: a foreign project arrives after the last existence/revision check and is overwritten. Committed2e97ccd project.rs remembers initial absence, uses MoveFileExW(flags0) on Windows and sibling-temp link/unlink off Windows, and refuses replacing fallback. Native Windows paths are canonical extended absolute paths. New normal-save/backup and long-Unicode-path tests accompany the two red cases. R665 full Rust passed937tests/9skips before final resolver reuse; R66613project tests pass on final source. No existing-file replacement, recursive cleanup or process-lifetime race is declared closed.
 
 ## Changed work
 
@@ -66,11 +68,13 @@ R640 first focused Rust compile failed because runtime_mod_archive still used th
 
 ## Operations and safe checkpoint
 
-E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Verified code8e7e68351a3bac1d8de00a81fdb100411261c32c; checkpoint-only documentation follows. R662session80902 and R663session75986 exited0. No validation or game is running from this turn. R662 owned output3,280,491,905logicalB/peak3,280,496,369B was disposed. R658red/659interrupted/660interrupted/661admission-refused/662green/663green logs are preserved separately; never relabel interrupted results as passes.
+E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Verified code2e97ccd6b046629b8da0adc1102b003f754a44b2; checkpoint-only documentation follows. R664session24703 ended with the intended2red failures. R665session99193 exited0; R666session66747 exited0. No validation/game is running from this increment. R665 owned3,283,434,077logicalB/peak3,283,438,539B and R666370,327,105B/peak431,122,649B were disposed. Source manifests verify without producing an archive.
 
-Interrupted old run-8Ak6hz/owner34740 remains protected because its recorded writerPID11588 was later reused by an unrelated conhost. Only the exact220-byte dead admission lock owner31504/nonce0bef9e09-01f7-40c9-bf94-76d894ffdc6c/SHA87589f6fadcca5498cfe14c841f012b48fa72b3a519a2f840d07d91b5f7983c0 and empty run-RU0Dix were removed after explicit path/content/owner checks. No full-tree purge or unrelated process termination. Future recovery needs process-lifetime identity, not rawPID guesses.
+The existing atomic writer now distinguishes absent targets and uses non-replacing native publication. Windows flags0, canonical extended paths and relative/Unicode tests are verified locally. Non-Windows branch execution and exotic filesystems remain unverified; no unsafe replacing fallback. Existing-file replacement and recursive cleanup races are still open. The475ID CSV retains SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643.
 
-The older E/qa-firefight-r651/GuiltySpark.exe f8a8d430c4001a36d124e5d624b52eb1eab1701236228fc453f6845f1c2b6a49 remains a historical QA binary. Its runtime fingerprint no longer matches current storage.rs; it must NOT be reused as a current application. No new installer, portable, Linux package or game acceptance was produced. Source manifests verify without creating an archive. Original maps/runtimes/SDKs/releases and all475 IDs remain unchanged.
+Interrupted old run-8Ak6hz/owner34740 remains protected because writerPID11588 was reused by an unrelated conhost. It was not killed; no record/lease was altered to bypass recovery. The earlier exact220-byte admission lock and empty run-RU0Dix were already reviewed/retired; do not repeat that cleanup. Future recovery needs lifetime identity, not raw PID guesses.
+
+The older E/qa-firefight-r651 appSHAf8a8d430c4001a36d124e5d624b52eb1eab1701236228fc453f6845f1c2b6a49 is historical and stale against current runtime source. No new desktop release executable, Linux package, game acceptance or remote publication is produced by these tests. Do not use old QA source identity as current. Original maps/runtimes/SDKs and accepted releases are unchanged.
 
 ## Deferred requests
 
