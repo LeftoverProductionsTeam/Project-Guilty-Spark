@@ -24,6 +24,8 @@ import type {
   RuntimeWorkbenchReport,
   CompiledSourceProject,
   NativeScriptAttachment,
+  WorkingScriptSources,
+  WorkingScriptSource,
   FirefightSourcePlan,
   RuntimeDockAction,
   ToolLaunchPlan,
@@ -167,6 +169,16 @@ export default function RuntimeDock({
   const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,workingTarget,project?.firefight,applyFirefightLoadout]);
   const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
   const selectedScript=scriptAttachment?.sourceKey===scriptSourceKey?scriptAttachment:null;
+  const moduleRequest=useRef(0);
+  const [moduleInventory,setModuleInventory]=useState<{key:string;value:WorkingScriptSources}|null>(null);
+  const [moduleBusy,setModuleBusy]=useState(false);
+  const [moduleName,setModuleName]=useMapState<string>(id,'sourceScripts.module','');
+  const [moduleSearch,setModuleSearch]=useMapState<string>(id,'sourceScripts.search','');
+  const modules=moduleInventory?.key===scriptSourceKey?moduleInventory.value:null;
+  const pickedModule=modules?.modules.find(module=>module.filename===moduleName);
+  useEffect(()=>{
+    moduleRequest.current++;setModuleBusy(false);
+  },[scriptSourceKey]);
   const [firefightActivation,setFirefightActivation]=useState<'manual'|'startup'>('manual');
   const [firefightSource,setFirefightSource]=useState<{sourceKey:string;plan:FirefightSourcePlan;script:NativeScriptAttachment;reviewed:boolean}|null>(null);
   const selectedFirefightSource=firefightSource?.sourceKey===scriptSourceKey?firefightSource:null;
@@ -394,6 +406,47 @@ export default function RuntimeDock({
     } finally {
       if (request === generation.current) setBusy(false);
     }
+  }
+  function sourceSelectionMatches(selection:WorkingScriptSources,source:NonNullable<RuntimeWorkbenchReport['workingSource']>) {
+    return selection.projectId===project?.id&&selection.buildId===source.buildId&&selection.tagsDirectory===source.tagsDirectory
+      &&selection.projectFingerprint===source.projectFingerprint;
+  }
+  async function listScriptModules() {
+    const source=report?.workingSource;if(!native||!project||!source?.projectFingerprint||dirty||busy||working||moduleBusy)return;
+    const request=++moduleRequest.current,scope=generation.current,key=scriptSourceKey;
+    setModuleBusy(true);setError('');
+    try {
+      const value=await call<WorkingScriptSources>('working_script_sources',{projectId:project.id,expectedBuildId:source.buildId,
+        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint});
+      if(request!==moduleRequest.current||scope!==generation.current||key!==currentScriptSourceKey.current)return;
+      if(!sourceSelectionMatches(value,source))throw Error('The recovered script listing belongs to a different source revision. Refresh its selection.');
+      setModuleInventory({key,value});
+      setModuleName(name=>value.modules.some(module=>module.filename===name)?name:value.modules.find(module=>!module.unavailable)?.filename??value.modules[0]?.filename??'');
+    } catch(problem){if(request===moduleRequest.current&&scope===generation.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    finally{if(request===moduleRequest.current)setModuleBusy(false);}
+  }
+  async function openScriptModule() {
+    const source=report?.workingSource,inventory=modules,module=pickedModule,draft=currentProject.current?.scenarioScriptDraft;
+    if(!native||!project||!source?.projectFingerprint||!inventory||!module||module.unavailable||dirty||busy||working||moduleBusy)return;
+    if(draft&&!window.confirm('Replace the current project script draft with this recovered module? Project Undo can restore the previous draft.'))return;
+    const request=++moduleRequest.current,scope=generation.current,key=scriptSourceKey,selection=++scriptSelection.current;
+    setModuleBusy(true);setError('');
+    try {
+      const value=await call<WorkingScriptSource>('working_script_source',{projectId:project.id,expectedBuildId:source.buildId,
+        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,
+        expectedSourcesSha256:inventory.sourceSha256,filename:module.filename,expectedSha256:module.sha256});
+      const bytes=new TextEncoder().encode(value.script.content);
+      if(!bytes.length||bytes.length>1048576)throw Error('The recovered module exceeded its editor limit; the previous draft was retained.');
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
+      if(request!==moduleRequest.current||scope!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
+      if(currentProject.current?.scenarioScriptDraft!==draft)throw Error('The project draft changed while opening source; the current draft was retained.');
+      if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||
+        value.script.filename!==module.filename||value.script.sha256!==module.sha256||sha256!==module.sha256||
+        value.script.replacesSha256!==module.sha256)throw Error('Recovered source identity changed; refresh the module list before editing.');
+      keepScriptDraft({...value.script,fileSha256:sha256,sourceKey:key,reviewed:false});
+    } catch(problem){if(request===moduleRequest.current&&scope===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    finally{if(request===moduleRequest.current)setModuleBusy(false);}
   }
   function keepScriptDraft(input:ScriptEditorAttachment|null) {
     const latest=currentProject.current;
@@ -774,6 +827,22 @@ export default function RuntimeDock({
           {project&&report?.workingSource&&workingSourceAvailable&&<details ref={scriptEditor} open={scriptsOpen} onToggle={event=>setScriptsOpen(event.currentTarget.open)} className="native-script-attachment">
             <summary>Edit or attach scenario HaloScript</summary>
             <p className="subtle">Choose a recovered scenario module or new UTF8 .hsc file, up to 1 MiB. You can edit AI and cutscene script bodies here. Revising an existing module requires its exact original file and explicit revision selection; writes occur only in a separate build candidate. Original source must be fully recovered, and existing native script/global identities remain protected. This control retains original native script/global identities; global-source files and structural identity changes need further native editing support. Draft edits use project Undo/Redo and Save; reopening restores the draft, which must be reviewed again before compilation. Saving a draft does not change native source or the running game. Successful builds retain the revised module; Project Undo changes drafts, not compiled source revisions.</p>
+            <div className="button-row">
+              <button disabled={!native||busy||working||moduleBusy||dirty||!report.workingSource.projectFingerprint} onClick={()=>void listScriptModules()}>{moduleBusy?'Reading source…':modules?'Refresh recovered modules':'List recovered modules'}</button>
+              {modules&&<label>Find module<input type="search" value={moduleSearch} onChange={event=>setModuleSearch(event.target.value)} placeholder="Script filename"/></label>}
+            </div>
+            {modules&&<div>
+              {modules.modules.length>0?<><label>Recovered scenario module<select value={moduleName}
+                disabled={moduleBusy||busy||working} onChange={event=>setModuleName(event.target.value)}>
+                {modules.modules.filter(module=>module.filename===moduleName||module.filename.toLowerCase().includes(moduleSearch.toLowerCase())).map(module=>
+                  <option key={module.filename} value={module.filename}>{module.filename}{module.unavailable?' · read-only':''}</option>)}
+              </select></label>
+                {pickedModule&&<p className="subtle">{pickedModule.bytes.toLocaleString()} bytes · {pickedModule.unavailable??'Original module is available for a separate reviewed revision.'}</p>}
+                <button disabled={!pickedModule||!!pickedModule.unavailable||moduleBusy||busy||working||dirty} onClick={()=>void openScriptModule()}>Edit selected module</button>
+              </>:<p className="subtle">No recovered scenario modules are present. Recover the original campaign source before editing it, or choose a new .hsc file below.</p>}
+              {moduleSearch&&!modules.modules.some(module=>module.filename.toLowerCase().includes(moduleSearch.toLowerCase()))&&<p className="subtle">No filenames match. Clear the search to see the recovered modules; the current selection is retained.</p>}
+            </div>}
+            {dirty&&<p className="subtle">Save the project to refresh or open recovered modules.</p>}
             <label>Recovered or new HaloScript module<input type="file" accept=".hsc" style={{maxWidth:'100%',minWidth:0}} disabled={busy||working} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void selectScript(file);}}/></label>
             {selectedScript&&<>
               <p><strong>{selectedScript.filename}</strong> · <code className="wrap-code">{selectedScript.sha256||'Edited draft — review to calculate its hash'}</code></p>

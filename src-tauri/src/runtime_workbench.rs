@@ -330,10 +330,88 @@ pub(super) fn script_source_directory(state:&AppState, project_id:&str, build_id
     let project=lock(&state.library)?.get(project_id).map_err(error)?;
     let context=source_context(state,&project)?;
     if context.build.id!=build_id{return Err("The native source build changed; refresh the dock before opening its scripts".into());}
+    script_data_directory(&context)
+}
+fn script_data_directory(context:&SourceContext)->Reply<PathBuf> {
     let data=context.workspace.join("data");
     core::reject_links(&data).map_err(error)?;
     if !data.is_dir(){return Err("This build has no recovered script source folder. Recover/review native source first; original compiled scripts remain intact".into());}
     owned_child(&context.workspace,&data)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct WorkingScriptModule {filename:String,sha256:String,bytes:u64,unavailable:Option<String>}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct WorkingScriptSources {
+    project_id:String,build_id:String,tags_directory:PathBuf,project_fingerprint:String,
+    source_sha256:String,modules:Vec<WorkingScriptModule>,
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct WorkingScriptSource {selection:WorkingScriptSources,script:core::working_tags::ScriptAttachment}
+
+/// Parameters are expected identities only, never caller-selected read paths.
+fn working_script_inventory(state:&AppState,project_id:&str,build_id:&str,tags:&Path,fingerprint:&str)->Reply<(WorkingScriptSources,PathBuf)> {
+    let project=lock(&state.library)?.get(project_id).map_err(error)?;
+    if project.fingerprint().map_err(error)?!=fingerprint{return Err("Saved authoring changed; refresh the script source selection".into());}
+    let context=source_context(state,&project)?;
+    if context.build.id!=build_id||context.tags.as_path()!=tags{return Err("Native source selection changed; no script was opened".into());}
+    let data=script_data_directory(&context)?;
+    let (files,identity)=core::working_tags::script_source_inventory(Some(&data),&AtomicBool::new(false)).map_err(error)?;
+    let scenario=core::safe_relative(&context.scenario_path).map_err(error)?;
+    let prefix=format!("{}/",scenario.parent().unwrap_or(Path::new("")).join("scripts").to_string_lossy().replace('\\',"/"));
+    let mut modules=Vec::new();let mut names=std::collections::BTreeSet::new();
+    for (relative,sha256) in files {
+        let filename=if relative=="global_scripts.hsc"{relative.as_str()}
+            else if let Some(name)=relative.strip_prefix(&prefix).filter(|name|!name.contains('/')){name}else{continue};
+        if !names.insert(filename.to_ascii_lowercase()){return Err("Recovered module filenames collide; reconcile the native source before editing".into());}
+        let file=owned_child(&data,&data.join(core::safe_relative(&relative).map_err(error)?))?;
+        let bytes=fs::metadata(&file).map_err(error)?.len();
+        let stem=filename.strip_suffix(".hsc").unwrap_or("");
+        let unavailable=if relative=="global_scripts.hsc"{Some("Global source is retained and is currently read-only in this editor".into())}
+            else if stem.is_empty()||stem.len()>31||stem.eq_ignore_ascii_case("global_scripts")||!stem.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c)){Some("This module needs a canonical scenario .hsc filename before revision".into())}
+            else if bytes>1024*1024{Some("This source exceeds the current 1 MiB script editor limit".into())}
+            else if context.generated_firefight.as_ref().is_some_and(|generated|generated.controller.filename.eq_ignore_ascii_case(filename)){
+                Some("Use Firefight groups & controller to revise this owned generated module".into())}
+            else{None};
+        modules.push(WorkingScriptModule{filename:filename.into(),sha256,bytes,unavailable});
+    }
+    Ok((WorkingScriptSources{project_id:project.id,build_id:context.build.id,tags_directory:context.tags,
+        project_fingerprint:fingerprint.into(),source_sha256:identity,modules},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
+}
+#[tauri::command]
+pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:String,expected_build_id:String,
+    expected_source_directory:PathBuf,expected_project_fingerprint:String)->Reply<WorkingScriptSources> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        working_script_inventory(&state,&project_id,&expected_build_id,&expected_source_directory,&expected_project_fingerprint).map(|value|value.0)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+pub(super) async fn working_script_source(app:tauri::AppHandle,project_id:String,expected_build_id:String,
+    expected_source_directory:PathBuf,expected_project_fingerprint:String,expected_sources_sha256:String,
+    filename:String,expected_sha256:String)->Reply<WorkingScriptSource> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let (selection,directory)=working_script_inventory(&state,&project_id,&expected_build_id,&expected_source_directory,&expected_project_fingerprint)?;
+        if selection.source_sha256!=expected_sources_sha256{return Err("Script source changed since listing; refresh before opening a module".into());}
+        let module=selection.modules.iter().find(|module|module.filename==filename&&module.sha256==expected_sha256)
+            .ok_or("Selected script is missing or changed; the project draft was retained")?;
+        if let Some(reason)=&module.unavailable{return Err(reason.clone());}
+        let file=owned_child(&directory,&directory.join(core::safe_relative(&filename).map_err(error)?))?;
+        let bytes=bounded_read(&file,1024*1024)?;
+        if core::hex_bytes(sha2::Sha256::digest(&bytes))!=expected_sha256{return Err("Selected script changed while reading; the project draft was retained".into());}
+        let content=String::from_utf8(bytes).map_err(|_|"This script is not UTF8 source; preserve it and recover a compatible editable module".to_owned())?;
+        if content.trim().is_empty()||content.chars().any(|c|c.is_control()&&!matches!(c,'\r'|'\n'|'\t')){
+            return Err("Selected source is empty or contains binary controls; the project draft was retained".into());
+        }
+        let (current,_)=working_script_inventory(&state,&project_id,&expected_build_id,&expected_source_directory,&expected_project_fingerprint)?;
+        if current.source_sha256!=selection.source_sha256{return Err("Native script inventory changed during reading; refresh before editing".into());}
+        Ok(WorkingScriptSource{selection:current,script:core::working_tags::ScriptAttachment{
+            filename,content,sha256:expected_sha256.clone(),replaces_sha256:Some(expected_sha256)}})
+    }).await.map_err(error)?
 }
 
 pub(super) fn compiled_tags(

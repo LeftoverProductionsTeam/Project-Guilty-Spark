@@ -686,7 +686,13 @@ fn prepare(
 /// Bind the reviewed original source modules, including an empty inventory.
 /// Uses the same bounded, link-rejecting scan as native script staging.
 pub fn script_source_identity(root:Option<&Path>,cancel:&AtomicBool)->Result<String> {
-    inventory_identity(&script_hashes(root,cancel)?)
+    Ok(script_source_inventory(root,cancel)?.1)
+}
+/// Read-only editor selection uses exactly the native staging inventory/bounds.
+pub fn script_source_inventory(root:Option<&Path>,cancel:&AtomicBool)->Result<(BTreeMap<String,String>,String)> {
+    let files=script_hashes(root,cancel)?;
+    let identity=inventory_identity(&files)?;
+    Ok((files,identity))
 }
 
 /// Only engine script sources are carried forward. Original JMS/textures and

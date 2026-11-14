@@ -107,6 +107,11 @@ export interface FirefightSourcePlan {
   hud?:{review:HudAppendReview;originalCount:number;inputMessages:NativeHudMessage[];messages:NativeHudMessage[]}|null;
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string;replacesSha256?:string|null }
+export interface WorkingScriptSources {
+  projectId:string;buildId:string;tagsDirectory:string;projectFingerprint:string;sourceSha256:string;
+  modules:{filename:string;sha256:string;bytes:number;unavailable:string|null}[];
+}
+export interface WorkingScriptSource {selection:WorkingScriptSources;script:NativeScriptAttachment}
 export interface ToolLaunchPlan {
   id: string;
   runtimeId: RuntimeId;

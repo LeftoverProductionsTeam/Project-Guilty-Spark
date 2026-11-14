@@ -3242,6 +3242,8 @@ pub fn run() {
             runtime_workbench::rebuild::runtime_rebuild_stop,
             runtime_workbench::prepare_firefight_source,
             runtime_workbench::build_working_tags,
+            runtime_workbench::working_script_sources,
+            runtime_workbench::working_script_source,
             baboon_native::baboon_report,
             baboon_native::baboon_register,
             baboon_native::baboon_prepare,
