@@ -352,6 +352,7 @@ pub fn run_prepared_job(
                 if !custom.models.is_empty(){custom.inspect_cache(&inspected,output)?;custom.verify_sources()?;}
                 if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected,output)?;}
                 crate::quickforge::verify_starting_profile(document,&inspected)?;
+                crate::quickforge::verify_campaign_encounters(document,&inspected)?;
                 crate::native_logic::verify_compiled(document,&inspected)?;
                 Ok(())
             })();
@@ -530,6 +531,29 @@ pub fn run_prepared_job(
                 if !file.is_file() || fs::metadata(file)?.len()<64{return invalid(format!("{} did not produce a complete expected tag: {expected}",command.phase));}
             }
         }
+        if let Some(operation)=quickforge::campaign_encounter_operation(document) {
+            // Reuse the preserving native operation against the actual fresh
+            // scenario inventory, never an invented listing or a second writer.
+            let edit=invader(tools,"invader-edit").unwrap();
+            let tag=format!("{}.scenario",sources.scenario_path);
+            let listing=vec!["-t".into(),stage.to_string_lossy().into_owned(),"-L".into(),tag.clone()];
+            let before=runner.run(&edit,&listing,workspace,"campaign-encounters-review",68)?;
+            let args=operation.arguments_with_fields(&stage,"scnr",&tag,&before)?;
+            for batch in operation.argument_batches(args,false)? {
+                runner.run(&edit,&batch,workspace,"campaign-encounters",69)?;
+            }
+            let after=runner.run(&edit,&listing,workspace,"campaign-encounters-review",70)?;
+            let changes=crate::native_operations::reviewed_difference(&before,&after,&operation)?;
+            if changes.len()!=document.campaign_encounters.len() {return invalid("Campaign native encounter review omitted an authored group");}
+            let args=operation.readback_arguments(&stage,"scnr",&tag,&before)?.ok_or_else(||SparkError::Invalid("Campaign encounters have no native readback recipe".into()))?;
+            let mut values=vec![];
+            for batch in operation.argument_batches(args,true)? {
+                let output=runner.run(&edit,&batch,workspace,"campaign-encounters-readback",71)?;
+                values.extend(output.lines().map(str::to_owned));
+            }
+            operation.verify_readback(&stage,"scnr",&tag,&before,&values.join("\n"))?;
+            project::atomic_write(&workspace.join("campaign-encounter-review.json"),&serde_json::to_vec_pretty(&changes)?,false)?;
+        }
         let output_dir=directory.join("output");fs::create_dir(&output_dir)?;
         crate::powerups::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
         crate::native_audio::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
@@ -554,6 +578,7 @@ pub fn run_prepared_job(
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
         crate::quickforge::verify_starting_profile(document,&inspected)?;
+        crate::quickforge::verify_campaign_encounters(document,&inspected)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
         if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;

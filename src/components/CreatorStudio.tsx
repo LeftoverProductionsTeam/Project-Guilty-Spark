@@ -1,5 +1,6 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import CampaignEncounters from './CampaignEncounters';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
 import {
@@ -20,6 +21,11 @@ import PowerupStudio from './PowerupStudio';
 import {useMapState} from '../mapSession';
 import ExternalBrowserLink from './ExternalBrowserLink';
 
+const bindingLabels = {
+  presentInImportedCache:'In source map', absentInImportedCache:'Not in source map',
+  presentInAuthoringSource:'Authored', absentInAuthoringSource:'Missing in source',
+  notInspectable:'Review required',
+};
 type Pane = 'mission' | 'cinematic' | 'powerups' | 'server' | 'playtest';
 function freshId(): string { return crypto.randomUUID(); }
 function safeDownload(filename: string, contents: string, mime = 'text/plain;charset=utf-8'): void {
@@ -56,6 +62,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
   const [error, setError] = useState('');
   const studio = project.studio ?? emptyCreatorStudio();
+  const encounterChoices=useId(), volumeChoices=useId();
+  const sourceInspection=inspection?.sha256&&inspection.sha256===project.source?.sha256?inspection:null;
   useWorkspaceFileActions('creator:'+project.id,[
     {id:'script-pack',label:'Export CE script sources…',run:()=>exportSourcePack()},
     {id:'creator-evidence',label:'Export creator evidence…',run:()=>report()},
@@ -65,9 +73,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     const scripts: ScriptExport[]=[];
     try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio)); } catch { /* incomplete authoring has no safe export yet */ }
     try { if(studio.shots.length) scripts.push(exportHaloCeCinematic(studio)); } catch { /* unresolved marker */ }
-    try { if(project.firefight) scripts.push(exportHaloCeFirefight(project.firefight)); } catch { /* invalid/endless wave authoring */ }
-    const validSource = inspection?.sha256 && inspection.sha256 === project.source?.sha256;
-    return inspectScenarioBindings(scripts, validSource ? inspection : null);
+    try { if(project.firefight&&project.quickForge?.gameMode!=='campaign') scripts.push(exportHaloCeFirefight(project.firefight)); } catch { /* invalid/endless wave authoring */ }
+    return inspectScenarioBindings(scripts,sourceInspection,project.quickForge);
   })();
   const change = (next: CreatorStudioDocument, label: string) => {
     const problems = validateCreatorStudio(next);
@@ -176,10 +183,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       <small className="studio-hint">The official compiler and actual target game must independently validate the scripts, BSP, AI, lighting and network behavior.</small>
     </div></details>
     {bindingChecks.length>0 && <details className="analysis-card studio-bindings"><summary>Scenario references · {bindingChecks.length} to check</summary>
-      <p>Imported map names are evidence only; your editable scenario must still be compiled and playtested.</p>
+      <p>Authored source names and imported cache names are separate evidence. Native compilation and gameplay are still required.</p>
       {bindingChecks.map(check => <div className="squad-row" key={check.dependency}>
         <span><code>{check.dependency}</code> — {check.detail}</span>
-        <Pill tone={check.status==='presentInImportedCache'?'green':'muted'}>{check.status}</Pill>
+        <Pill tone={check.status==='presentInImportedCache'||check.status==='presentInAuthoringSource'?'green':'muted'}>{bindingLabels[check.status]}</Pill>
       </div>)}
     </details>}
     <p className="studio-hint">Exports are Halo CE .hsc source. Matching scenario assets, native compilation and an in-game test are required.</p>
@@ -200,6 +207,13 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <button className="primary" type="button" disabled={studio.missions.length >= 128} onClick={() => change({ ...studio,
           missions: [...studio.missions, { id: freshId(), title: `Beat ${studio.missions.length + 1}`, objective: '', trigger: 'manual', encounterName: '' }] }, 'Add mission beat')}><Plus size={15}/> Add beat</button></div>
       <div className="analysis-actions"><button type="button" onClick={()=>exportScript('mission')}><Download size={15}/> Export mission .hsc</button><button type="button" onClick={()=>exportScript('mission',true)}>Export required tags list</button></div>
+      <CampaignEncounters project={project} edit={edit}/>
+      <datalist id={encounterChoices}>{[...new Set([
+        ...(project.quickForge?.gameMode==='campaign'?project.quickForge.campaignEncounters??[]:[]).map(entry=>entry.name),
+        ...(sourceInspection?.encounters??[]).map(entry=>entry.name),
+      ])].map(name=><option key={name} value={name}/>)}</datalist>
+      <datalist id={volumeChoices}>{(project.quickForge?.logic?.triggers??[]).filter(trigger=>trigger.nativeName)
+        .map(trigger=><option key={trigger.id} value={trigger.nativeName}>{trigger.name}</option>)}</datalist>
       {studio.missions.length === 0 && <p className="studio-empty">No authored mission beats. Add an objective to start a custom campaign flow.</p>}
       {studio.missions.map((beat, i) => <div className="studio-record" key={beat.id}>
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
@@ -207,9 +221,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <label title="Choose when this objective starts. Volumes and encounters must have the same names in your editable scenario.">Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
           <option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="timer">Timer (needs script binding)</option></select></label>
-        <label title="The encounter name from Sapien’s AI hierarchy; this does not create or place actors by itself.">Encounter name (optional)<input maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
+        <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
-        {beat.trigger === 'triggerVolume' && <label>Scenario trigger-volume identifier<input maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
+        {beat.trigger === 'triggerVolume' && <label>Scenario trigger-volume identifier<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
       </div>)}

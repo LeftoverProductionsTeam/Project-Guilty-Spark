@@ -177,6 +177,8 @@ pub fn is_used(project: &Project, binding: &Binding) -> bool {
         object.source_model.as_ref().and_then(|source| find(project, source))
             .is_some_and(|value| value.id == binding.id)
     }) || project.quick_forge.as_ref().is_some_and(|document| {
+        if binding.tag_class=="actv" && document.game_mode=="campaign" &&
+            document.campaign_encounters.iter().any(|entry|key(&entry.actor_path)==key(&binding.native_path)) {return true;}
         if binding.tag_class == "weap" && crate::quickforge::campaign_profile(document).is_some_and(|profile| {
             let path=key(&binding.native_path);
             key(&profile.primary_weapon)==path || profile.secondary_weapon.as_ref().is_some_and(|weapon|key(weapon)==path)

@@ -69,6 +69,7 @@ export interface QuickForgeDocument {
   runtimeId: RuntimeId;
   gameMode: ForgeMode;
   startingProfile?: import('./firefight').NativePlayerProfile;
+  campaignEncounters?: import('./nativeOperations').NativeEncounterAppend[];
   skyPath: string | null;
   /** Visual authoring intent only; never treated as compiled Halo sky/fog tags. */
   environment?: EditorEnvironment | null;
@@ -117,6 +118,8 @@ export interface ForgeSourceExport {
   validation: GeometryReport;
   dependencies: unknown[];
   commands: unknown[];
+  /** Native source recipes, not a runtime gameplay format. */
+  nativeOperations?: import('./nativeOperations').NativeOperation[];
   blockers: string[];
 }
 export interface QuickForgeBuildReceipt {

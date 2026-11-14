@@ -425,7 +425,7 @@ impl Operation {
         Ok(())
     }
 }
-fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::MapInspection)->Result<()> {
+pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::MapInspection)->Result<()> {
         let EncounterAppend{name,actor_path,start_active,count,..}=entry;
         let found=map.encounters.iter().filter(|encounter|encounter.name==*name).collect::<Vec<_>>();
         if map.header.scenario_type!=0||found.len()!=1{return invalid("Compiled native encounter is missing, ambiguous or not singleplayer");}

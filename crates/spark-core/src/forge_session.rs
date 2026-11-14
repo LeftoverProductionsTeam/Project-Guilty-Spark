@@ -47,6 +47,14 @@ pub fn merge(
         }
         next.starting_profile.clone()
     };
+    let campaign_encounters = if base.campaign_encounters == next.campaign_encounters {
+        current.campaign_encounters.clone()
+    } else {
+        if current.campaign_encounters != base.campaign_encounters && current.campaign_encounters != next.campaign_encounters {
+            return invalid("Concurrent edit conflict: campaignEncounters. Your local draft was retained.");
+        }
+        next.campaign_encounters.clone()
+    };
     let b = serde_json::to_value(base)?;
     let n = serde_json::to_value(next)?;
     let mut c = serde_json::to_value(current)?;
@@ -54,7 +62,7 @@ pub fn merge(
         if b.get(key) == Some(value) {
             continue;
         }
-        if key == "native" || key == "workshop" || key == "logic" || key == "nativeLighting" || key == "startingProfile" {
+        if key == "native" || key == "workshop" || key == "logic" || key == "nativeLighting" || key == "startingProfile" || key == "campaignEncounters" {
             continue;
         }
         if [
@@ -127,6 +135,7 @@ pub fn merge(
     doc.logic = logic;
     doc.native_lighting = native_lighting;
     doc.starting_profile = starting_profile;
+    doc.campaign_encounters = campaign_encounters;
     quickforge::validate_portable_document(&doc)?;
     Ok(doc)
 }

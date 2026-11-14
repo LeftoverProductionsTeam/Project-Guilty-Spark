@@ -42,6 +42,8 @@ pub struct QuickForgeDocument {
     pub game_mode: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub starting_profile: Option<crate::firefight::NativePlayerProfile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub campaign_encounters: Vec<crate::native_operations::EncounterAppend>,
     pub geometry: Vec<ForgeBrush>,
     pub materials: Vec<ForgeMaterial>,
     pub placements: Vec<ForgePlacement>,
@@ -66,6 +68,18 @@ pub const CAMPAIGN_PROFILE_NAME: &str = "gs_campaign_start";
 /// Inactive authoring metadata survives mode switches and Undo.
 pub fn campaign_profile(doc:&QuickForgeDocument)->Option<&crate::firefight::NativePlayerProfile> {
     if doc.game_mode == "campaign" {doc.starting_profile.as_ref()} else {None}
+}
+pub fn campaign_encounter_operation(doc:&QuickForgeDocument)->Option<crate::native_operations::Operation> {
+    (doc.game_mode=="campaign" && !doc.campaign_encounters.is_empty()).then(||crate::native_operations::Operation::AppendEncounters {
+        encounters:doc.campaign_encounters.clone(),source_rules:None,
+    })
+}
+pub fn verify_campaign_encounters(doc:&QuickForgeDocument,map:&maps::MapInspection)->Result<()> {
+    if let Some(operation)=campaign_encounter_operation(doc) {
+        operation.validate("scnr","campaign.scenario")?;
+        for entry in &doc.campaign_encounters {crate::native_operations::verify_compiled_append(entry,map)?;}
+    }
+    Ok(())
 }
 pub fn verify_starting_profile(doc:&QuickForgeDocument,map:&maps::MapInspection)->Result<()> {
     if let Some(profile)=campaign_profile(doc) {
@@ -289,6 +303,9 @@ pub struct SourceExport {
     pub validation: GeometryReport,
     pub dependencies: Vec<ForgeDependency>,
     pub commands: Vec<ForgeCommand>,
+    /// Existing native recipes resolved against actual staged scenario inventory.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub native_operations: Vec<crate::native_operations::Operation>,
     pub blockers: Vec<String>,
 }
 
@@ -454,6 +471,13 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
     crate::studio_native::validate(doc)?;
     if let Some(profile)=&doc.starting_profile {
         crate::firefight::native_player_profile_arguments(profile,0,CAMPAIGN_PROFILE_NAME)?;
+    }
+    if !doc.campaign_encounters.is_empty() {
+        crate::native_operations::Operation::AppendEncounters {encounters:doc.campaign_encounters.clone(),source_rules:None}
+            .validate("scnr","campaign.scenario")?;
+        if doc.campaign_encounters.iter().any(|entry| !entry.name.as_bytes()[0].is_ascii_alphabetic() && !entry.name.starts_with('_')) {
+            return invalid("Campaign encounter names must begin with an ASCII letter or underscore for HaloScript references");
+        }
     }
     crate::native_logic::validate(doc)?;
     if doc.placements.iter().filter(|p| p.tag_class == "ctrl").count() > 100 {
@@ -621,6 +645,7 @@ pub fn create_arena(name: &str, template: &str) -> Result<QuickForgeDocument> {
         runtime_id: RuntimeId::MccSteam,
         game_mode: "slayer".into(),
         starting_profile: None,
+        campaign_encounters: vec![],
         geometry: vec![],
         materials: vec![ForgeMaterial {
             id: "surface".into(),
@@ -2023,6 +2048,10 @@ pub fn source_requirements(doc: &QuickForgeDocument) -> Result<(Vec<ForgeDepende
         blockers.push("Select a legal sky tag for ambient lighting before compilation; emitted lighting is not inferred from preview colors".into());
     }
     if doc.game_mode == "campaign" {
+        for encounter in &doc.campaign_encounters {
+            dependencies.push(ForgeDependency {kind:"campaignActor".into(),tag_path:encounter.actor_path.replace('\\',"/"),
+                tag_class:"actor_variant".into(),source_project_id:None,source_sha256:None});
+        }
         if doc.native.is_some() {blockers.push("Independent campaign source requires an editable geometry project; shared native-cache sources retain their separate preserving build workflow".into());}
         if let Some(profile)=campaign_profile(doc) {
             for path in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
@@ -2101,6 +2130,7 @@ pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceE
         validation,
         dependencies,
         commands,
+        native_operations: campaign_encounter_operation(doc).into_iter().collect(),
         blockers,
     };
     // A source export is a small transaction: write and verify EVERYTHING in

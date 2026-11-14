@@ -1,14 +1,31 @@
-/** Cross-check authored HaloScript dependencies against the *read-only* source
- * cache's encounter index. This is a diagnostic, not a scenario compiler.
- * Camera points and trigger volumes cannot be proven by this inspection.
+/** Cross-check HaloScript references against authored campaign intent or the
+ * read-only imported cache. Neither proves native compilation or gameplay.
+ * Native camera/trigger indexes are not decoded; explicit authoring names are separate.
  */
 import type { MapInspection } from './types';
 import type { ScriptExport } from './haloScript';
-export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'notInspectable';
+import type { QuickForgeDocument } from './forge';
+export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'notInspectable';
 export interface BindingResult { dependency: string; status: BindingStatus; detail: string }
-export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null): BindingResult[] {
+export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null): BindingResult[] {
   const dependencies=[...new Set(scripts.flatMap(s=>s.dependencies))];
   return dependencies.map(dependency=>{
+    if(source?.gameMode==='campaign'&&dependency.startsWith('ai_encounter:')) {
+      const [name,squad,...extra]=dependency.slice('ai_encounter:'.length).split(':')[0].split('/');
+      const found=(source.campaignEncounters??[]).filter(entry=>entry.name===name);
+      const present=extra.length===0&&found.length===1&&(!squad||squad==='source_squad');
+      return {dependency,status:present?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,
+        detail:present?(found[0].startActive?'Authored group starts active; a mission ai_place call needs explicit ownership review. Native/game validation remains required.':
+          'Name matches campaign encounter source. Native actor dependencies, compilation and gameplay remain separate checks.'):
+          'No matching campaign source encounter/squad. Add or select a group below; the native source writer uses source_squad.'};
+    }
+    if(source?.gameMode==='campaign'&&dependency.startsWith('trigger_volume:')) {
+      const name=dependency.slice('trigger_volume:'.length);
+      const found=source.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
+      return {dependency,status:found.length===1?'presentInAuthoringSource' as const:'notInspectable' as const,
+        detail:found.length===1?'Name matches an explicitly named authoring volume. Native bounds, compilation and gameplay remain unverified.':
+          'Choose an explicitly named volume from Level Editor → Logic / Events. Implicit generated names require native source review.'};
+    }
     if(!inspection) return {dependency,status:'notInspectable' as const,detail:'No imported source map; requires an editable scenario tag.'};
     if(dependency.startsWith('ai_encounter:')) {
       const full=dependency.slice('ai_encounter:'.length).split(':')[0];

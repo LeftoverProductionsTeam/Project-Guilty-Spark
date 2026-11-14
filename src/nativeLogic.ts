@@ -125,7 +125,7 @@ export function extractionLayout(doc:QuickForgeDocument) {
     issues.push({message:'The current Forerunner authoring handoff needs a standard Custom Edition build target. Other source formats require explicit conversion.'});
   if(doc.gameMode==='campaign') {
     if(!doc.startingProfile)issues.push({message:'Choose Campaign starting loadout in Map properties before building solo source.'});
-    if(logic?.handwrittenSources.some(source=>source.filename.toLowerCase()==='gs_firefight.hsc'))
+    if(logic?.handwrittenSources?.some(source=>source.filename.toLowerCase()==='gs_firefight.hsc'))
       issues.push({message:'A survival HaloScript module is still present. Review and remove it explicitly before building independent Extraction source.'});
   } else if(!['firefight','zombie'].includes(doc.gameMode))
     issues.push({message:'This source exports multiplayer. In Map properties, choose Campaign / scripted solo for standard solo Extraction content.'});

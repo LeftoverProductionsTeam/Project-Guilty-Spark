@@ -105,6 +105,17 @@ export function studioDifferences(
       rows.push({ target: key, mine: brief(local[key]), shared: brief(shared[key]) });
     if (rows.length >= 12) return rows;
   }
+  const mineEncounters=local.campaignEncounters??[], sharedEncounters=shared.campaignEncounters??[];
+  for (const name of new Set([...mineEncounters,...sharedEncounters].map(entry=>entry.name))) {
+    const mine=mineEncounters.find(entry=>entry.name===name), theirs=sharedEncounters.find(entry=>entry.name===name);
+    if (!mine || !theirs) rows.push({target:`campaignEncounters/${name}`,mine:mine?'Present':'Absent',shared:theirs?'Present':'Absent'});
+    else for (const field of Object.keys(mine) as (keyof typeof mine)[]) {
+      if (JSON.stringify(mine[field])!==JSON.stringify(theirs[field]))
+        rows.push({target:`campaignEncounters/${name}/${field}`,mine:brief(mine[field]),shared:brief(theirs[field])});
+      if (rows.length>=12) return rows;
+    }
+    if (rows.length>=12) return rows;
+  }
   const mineProfile = local.startingProfile, sharedProfile = shared.startingProfile;
   if (!mineProfile || !sharedProfile) {
     if (mineProfile !== sharedProfile)
