@@ -124,7 +124,7 @@ export function effectiveReferenceId(project: Project, tag: Tag, reference: TagR
 export function setTagValue(project: Project, tag: Tag, field: TagField, value: number): Project {
   if (!Number.isFinite(value) || value < field.min || value > field.max)
     throw new Error(`${field.label} must be between ${field.min} and ${field.max}`);
-  if (['i16','u16','i32','reference'].includes(field.kind) && !Number.isInteger(value))
+  if (['i8','u8','i16','u16','i32','u32','reference'].includes(field.kind) && !Number.isInteger(value))
     throw new Error(`${field.label} must be a whole number`);
   const edits = project.tagEdits.filter((e) => e.tagId !== tag.id || e.fieldKey !== field.key);
   if (value !== field.value) edits.push({ tagId: tag.id, fieldKey: field.key, value });

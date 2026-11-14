@@ -1382,8 +1382,8 @@ fn read_fields(
             }
         }
     }
-    if matches!(version,6|7|13|609) && matches!(tag.class.as_str(),"DeLa"|"tagc"|"Soul") {
-        ui_tags::read(r,space,tag,ids)?;
+    if matches!(version,6|7|13|609) && matches!(tag.class.as_str(),"DeLa"|"tagc"|"Soul"|"unhi"|"wphi"|"grhi"|"hudg") {
+        ui_tags::read(r,space,tag,ids,version)?;
     }
     if matches!(version,5|6|7|13|609)&&tag.class=="snd!" {
         space.pointer(space.address+(at-space.begin)as u32,164)?;

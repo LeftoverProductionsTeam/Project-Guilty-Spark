@@ -33,7 +33,7 @@ export default function TagFields({
                 {field.unit ||
                   (field.kind === 'reference'
                     ? `Reference · ${classNames[field.targetClass ?? ''] ?? field.targetClass}`
-                    : 'Float32')}
+                    : field.kind === 'f32' ? 'Float32' : field.kind.toUpperCase())}
                 {advanced && ` · 0x${field.offset.toString(16).toUpperCase()}`}
               </small>
             </div>

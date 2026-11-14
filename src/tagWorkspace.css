@@ -71,3 +71,32 @@
  .tag-selection-layout.is-sound .field-table {grid-template-columns:repeat(2,minmax(0,1fr));}
  .tag-selection-layout.is-sound .tag-native-tools {grid-template-columns:minmax(0,1fr);}
 }
+
+/* Native in-game HUD authoring shares the Tags pane and project history. */
+.native-hud-editor {min-width:0;grid-column:1/-1;}
+.hud-editor-toolbar {display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:6px 0;}
+.hud-editor-toolbar label {display:flex;align-items:center;gap:5px;font-size:11px;min-width:0;}
+.hud-editor-toolbar select {max-width:min(100%,260px);min-width:0;}
+.hud-layout-canvas {display:block;width:100%;max-height:420px;min-height:160px;border:1px solid var(--line);border-radius:4px;touch-action:none;}
+.hud-canvas-background {fill:var(--panel);}
+.hud-canvas-guide {stroke:var(--line);stroke-width:1;stroke-dasharray:5 5;}
+.hud-layout-point {cursor:grab;outline:none;}
+.hud-layout-point circle {fill:var(--panel-hover,#23323d);stroke:var(--muted);stroke-width:2;}
+.hud-layout-point path {stroke:var(--muted);stroke-width:1;pointer-events:none;}
+.hud-layout-point:is(.selected,:focus-visible) circle {stroke:var(--accent);fill:var(--panel);stroke-width:3;}
+.hud-layout-point:focus-visible {filter:drop-shadow(0 0 2px var(--accent));}
+.hud-layout-point.selected path {stroke:var(--accent);}
+.hud-field-heading {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin:8px 0;}
+.hud-field-heading input {max-width:260px;min-width:0;}
+.hud-native-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:4px 12px;}
+.hud-native-fields .property-row {min-width:0;}
+.hud-choice {display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,1fr) auto;align-items:center;gap:5px;font-size:11px;}
+.hud-choice select {min-width:0;max-width:100%;}
+.hud-flag-set {min-width:0;border:1px solid var(--line);border-radius:4px;margin:0;padding:5px 7px;display:flex;flex-wrap:wrap;gap:5px 10px;font-size:11px;}
+.hud-flag-set small {width:100%;color:var(--muted);font-size:10px;}
+.hud-color {display:flex;align-items:center;flex-wrap:wrap;gap:5px;font-size:11px;}
+.hud-color label {display:flex;align-items:center;gap:5px;flex:1;}
+.hud-color input[type="color"] {width:36px;min-width:36px;height:25px;padding:1px;}
+.hud-color .number-field {max-width:90px;}
+.hud-bitmap-source {margin:8px 0;padding:6px;border:1px solid var(--line);border-radius:4px;}
+.hud-bitmap-source .gs-bitmap-preview {max-width:640px;}

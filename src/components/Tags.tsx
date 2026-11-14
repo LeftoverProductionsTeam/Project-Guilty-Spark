@@ -2,6 +2,8 @@ import NativeModelPreview from './NativeModelPreview';
 import BitmapPreview from './BitmapPreview';
 import { catalogAssets } from '../forge';
 import TagFields from './TagFields';
+import HudEditor from './HudEditor';
+import {isNativeHud} from '../nativeHud';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, ChevronRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
 import type { LibraryEntry, MapInspection, Project, Tag, TagField } from '../types';
@@ -411,13 +413,10 @@ export default function Tags({
                   Show offsets
                 </label>
               </div>
-              <TagFields
-                project={project}
-                tag={selectedTag}
-                tags={tags}
-                advanced={advanced}
-                change={(field, value) => change(selectedTag, field, value)}
-              />
+              {isNativeHud(selectedTag)?<HudEditor key={project.id+':'+inspection.sha256+':'+selectedTag.id}
+                project={project} tag={selectedTag} tags={tags} advanced={advanced} edit={edit} notify={notify} onNavigate={navigateToTag}/>:<TagFields
+                project={project} tag={selectedTag} tags={tags} advanced={advanced}
+                change={(field, value) => change(selectedTag, field, value)}/>}
               <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
             </div>
             {projectile && rocket && (

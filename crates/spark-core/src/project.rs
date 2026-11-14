@@ -742,7 +742,7 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
                 .as_f64()
                 .ok_or_else(|| crate::SparkError::Invalid("Field must be numeric".into()))?;
             if !value.is_finite() || value < field.min || value > field.max ||
-                (matches!(field.kind.as_str(),"i16"|"u16"|"i32")&&value.fract()!=0.) {
+                (matches!(field.kind.as_str(),"i8"|"u8"|"i16"|"u16"|"i32"|"u32")&&value.fract()!=0.) {
                 return invalid(format!(
                     "{} must be between {} and {}",
                     field.label, field.min, field.max
@@ -812,7 +812,7 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
             bytes[f.offset + 4..f.offset + 8].copy_from_slice(&path_ptr.to_le_bytes());
         } else {
             let value=edit.value.as_f64().unwrap();
-            let encoded=match f.kind.as_str(){"i16"=>(value as i16).to_le_bytes().to_vec(),
+            let encoded=match f.kind.as_str(){"i8"=>vec![(value as i8) as u8],"u8"=>vec![value as u8],"u32"=>(value as u32).to_le_bytes().to_vec(),"i16"=>(value as i16).to_le_bytes().to_vec(),
                 "u16"=>(value as u16).to_le_bytes().to_vec(),"i32"=>(value as i32).to_le_bytes().to_vec(),
                 "f32"=>(value as f32).to_le_bytes().to_vec(),_=>return invalid("Unsupported editable field encoding")};
             bytes[f.offset..f.offset+encoded.len()].copy_from_slice(&encoded);

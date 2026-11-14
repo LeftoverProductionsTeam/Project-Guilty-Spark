@@ -53,7 +53,7 @@ export interface TagField {
   key: string;
   label: string;
   offset: number;
-  kind: 'f32' | 'reference' | 'i16' | 'u16' | 'i32';
+  kind: 'f32' | 'reference' | 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32';
   value: number;
   min: number;
   max: number;

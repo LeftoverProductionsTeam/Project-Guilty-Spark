@@ -355,8 +355,9 @@ pub fn verify_preservation(
                 ranges.push([at, at + 8]);
                 ranges.push([at + 12, at + 16]);
             }
+            "i8" | "u8" => ranges.push([at, at + 1]),
             "i16" | "u16" => ranges.push([at, at + 2]),
-            "f32" | "i32" => ranges.push([at, at + 4]),
+            "f32" | "i32" | "u32" => ranges.push([at, at + 4]),
             _ => return invalid("Unreviewed native field width"),
         }
     }
