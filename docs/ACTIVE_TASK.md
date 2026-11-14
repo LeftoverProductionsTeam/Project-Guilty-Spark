@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — creator source: GPU lightbaker, Linux, recovery/outbreak
+Task: Operation110 — native creator source: control terminals/Extraction markers; lighting/Linux/outbreak
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
-Next action: Continue native creator integration from the source-reviewed Forerunner boundary: existing QuickForge lacks ctrl placements and generates hashed trigger names, while Forerunner Extraction requires two named controls and two named volumes. Add supported source authoring through current native writers, not a JSON gameplay importer. Continue GPU native-lightmap work (GI/emissive/alpha, atlas/padding/mips/encoding/readback) and genuine Linux source gaps independently. Full GPU/native/game/platform acceptance remains open. No tests/typecheck/builds/native tools/apps/games/Forerunner edits/push.
+Next action: Continue source-only Extraction layout/actor/loot/objective authoring through existing scenario/Firefight systems and Forerunner’s current native contract; complete source geometry review before any future native/game acceptance. Do not invent stash/import/live APIs. Advance GPU baker native-output/fidelity, demonstrated Linux source gaps and original Zombie/Flood outbreak independently. All execution remains deferred: no tests/typecheck/builds/native tools/apps/games/Forerunner edits/push.
 
 ## Acceptance
 
@@ -24,6 +24,9 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Native creator source increment 9f99f29d0eed4578a58e416b5127873be63a9029, WIP/untested: standard ctrl terminals now reuse Asset Library/drop/copy/import/dependency/scenario/render/readback paths; standard controls/control_palette and native control limits replace the missing class gates. Optional trigger/device nativeName bindings reuse Logic / Events/HSC/Invader readback; original UUIDs/display names/history stay separate. Inspector presets author the four actual Forerunner native marker names, expose startup power/position and keep door templates separate. No game mode activation or JSON importer. Copies clear new trigger aliases and preserve an existing destination-door binding; unbound automatic-door semantics are not changed by naming alone. Source schemas are pinned696830ff; exact file hashes and routes in RUNTIME_INTEGRATION_20261107.md. Current Forerunner read-only snapshotfcbb042cfe166dfe65d56e1588b17a2e8cd4bc4e retains those native markers and no advertised Extraction operation. No AGPL engine code copied.
+
 
 Current source increment 63f1fedf35adf5b7a349be30fa20425703861188 (after0905bf30c0d03bc5ff66666529783ef368e058bb), WIP/untested: src/gpuLightmap.ts implements shared-renderer WebGL2 native-UV direct-light drafting, opaque BSP sun shadows, additive UV overlap rejection, float readback, hardware/geometry/source checks, tiled cancellation, try/finally renderer restoration and disposable resources. World reuses its existing R3F renderer and resident texture budget; GpuLightmapDraft controls provide page/resolution/Bake/Cancel, source/light/renderer invalidation and display-only tone mapping. No second renderer, persistent cache, native page replacement or disk output. Source review added rejection for empty/invalid shadow readback; native-quality GI/emissive/transparency/object shadow/native encoding and Xbox/CE/MCC acceptance are not implemented by this draft. Existing native Halo Tool/fog path unchanged.
 
@@ -53,6 +56,8 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
+- Native controls/marker WIP: native compile/readback/gameplay/Undo/Save/restart, control tag compatibility, old saved-project reconciliation for newly decoded controls and target-specific render/count changes await authorized execution. Naming and source checks are not a playable Extraction or persistence result.
+
 - Current WIP: compilation, UI, discovery, profile persistence, window isolation and source preservation checks deferred by explicit owner instruction. No new executable represents it.
 - R692 actual Windows Library/Create a map timed out for New map name. Source repair untested. Its final original-file gate was not reached; originalFilesUnchanged=false is not a passing result.
 - Joint Spark→Forerunner authored original-Zombie encounter loading/score/completion remains unimplemented/unverified. Preserve original carrier/spawner/audio recovery and source provenance; no stock-enemy replacement, guard removal, synthetic gameplay, private-memory or chat-console fallback.
@@ -60,7 +65,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Latest source checkpoint63f1fedf35adf5b7a349be30fa20425703861188, local master WIP/untested; source commit clean before this bookkeeping. Manifest49ad98e552ebae32ee378ae874aa6b2fd4177eabecd51878b3c3d78f33e74045 covers2156files/52,298,064B; no archive/executable. gpuLightmap.ts SHA3efb172b8cde3a19ab5f1c10ec6a3eb3a842fcc6befde16ac886918e6ce84703; GpuLightmapDraft.tsx SHAa8364b2db6cde7e469b3b0b1d46961b1cb219e0cce9ac198f67c94e36d4c5380; World.tsx SHA228ea1a1380af25dae767965c8b94b49d4c6e9a2f884d5294251b7d984163931. All475CSV SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 unchanged. No tests/typecheck/native tools/builds/apps/games/new executable or execution acceptance; original assets/Forerunner/releases/remotes untouched. The transient command-host disconnect was recovered by rereading Git; the interrupted edit had not run and was then applied once. No test/game process was started or stopped.
+Latest source checkpoint9f99f29d0eed4578a58e416b5127873be63a9029, local master WIP/untested; source commit clean before bookkeeping. Manifesta5a62cb8c6c83e2aa9ec66227d6f67c04b1feb4be3dbd5a09039bf07bea74834 covers2156files/52,293,687B; no archive/executable. native_logic.rs SHA177cf5d38db017913be2657c40545300ae26751e70f981a26cf0882b96747a21; maps.rs SHAadaa0843ca20a1684dcde96d15f979b2331afcbeecd78f11ac333ca54e17a7ae; LogicEvents.tsx SHA56e8d864e2f3bd9c68907b01836b27ebd228cfc36027a06347408c3870496914. All475CSV SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 unchanged. Manual source/diff review only: no tests/typecheck/native tools/builds/apps/games/new executable or execution acceptance. Originals/Forerunner/releases/remotes untouched. Two edit-script syntax errors occurred before any files were written; corrected source edits were then applied once. No production test was run or failed.
 
 Earlier exact source hashes/manifests are retained in Git2efcbf8:docs/ACTIVE_TASK.md, FIREFIGHT_ENGINE.md and RUNTIME_INTEGRATION_20261107.md, including35fbf85/17fe5cd HUD source,2f85d0f companion metadata,a19a626 owned stage,db43c04 profile and ec7602d/705d1ad/f0cb591 native group/controller work. Those commits are source-only, not execution acceptance. This bounded summary removes duplicate checkpoint paragraphs only; no requirements, source, native evidence or history was removed.
 
