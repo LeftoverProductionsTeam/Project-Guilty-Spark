@@ -32,7 +32,7 @@ export interface ForgePlacement extends ForgeEntity {
   publishedAssetId?: string;
   tagId: number | null;
   tagPath: string;
-  tagClass: 'scen' | 'weap' | 'eqip' | 'vehi' | 'bipd' | 'itmc' | 'mach';
+  tagClass: 'scen' | 'weap' | 'eqip' | 'vehi' | 'bipd' | 'itmc' | 'mach' | 'ctrl';
   sourceProjectId: string | null;
   sourceSha256: string | null;
   rotation: Vec3;
@@ -213,6 +213,7 @@ export function nodeCategory(node: ForgeNode): string {
             scen: 'Scenery',
             itmc: 'Item collections',
             mach: 'Doors & devices',
+            ctrl: 'Control terminals',
           }[node.value.tagClass];
 }
 export function mapForgeNodes(
@@ -287,7 +288,7 @@ export function appendForgeNodes(doc:QuickForgeDocument,nodes:ForgeNode[],offset
     else if (copy.type === 'placement') result.placements.push(copy.value);
     else if (copy.type === 'spawn') result.spawns.push(copy.value);
     else if(copy.type==='objective') result.objectives.push(copy.value);
-    else {result.logic??={schemaVersion:1,triggers:[],devices:[],rules:[]};result.logic.triggers.push(copy.value);}
+    else {delete copy.value.nativeName;result.logic??={schemaVersion:1,triggers:[],devices:[],rules:[]};result.logic.triggers.push(copy.value);}
   }
   return { document: result, ids: created };
 }
@@ -328,7 +329,7 @@ export function createBrush(kind: BrushKind, point: Vec3, materialId: string): F
 export function catalogAssets(open: OpenProject): ForgeAsset[] {
   if (!open.inspection || !open.project.source) return [];
   return open.inspection.tags
-    .filter((tag) => ['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc', 'mach'].includes(tag.class))
+    .filter((tag) => ['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc', 'mach', 'ctrl'].includes(tag.class))
     .map((tag) => ({
       key: `${open.project.id}:${tag.id}`,
       tagId: tag.id,

@@ -141,6 +141,8 @@ export function placeLibraryModel(
     if (replaceId && !old) throw Error('Select a placed model to replace.');
     if (!old && project.quickForge.placements.length >= 1024)
       throw Error('The placement library is full (1024 objects).');
+    if(asset.class==='ctrl'&&project.quickForge.placements.filter(p=>p.tagClass==='ctrl'&&p.id!==old?.id).length>=100)
+      throw Error('The native control-terminal limit is full (100).');
     const placement = {
       ...placeAsset(asset, old?.position ?? point),
       ...(old

@@ -874,6 +874,8 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         (0x258, 0x264, 40, "Equipment"),
         (0x270, 0x27c, 92, "Weapon"),
         (0x294, 0x2a0, 64, "Machine"),
+        // Standard control + palette reflexives follow the machine palette.
+        (0x2ac, 0x2b8, 64, "Control"),
         (0x2dc, 0x2e8, 40, "Sound scenery"),
     ] {
         match placements(
@@ -1648,6 +1650,7 @@ fn placements(
             "Equipment" => "eqip",
             "Weapon" => "weap",
             "Machine" => "mach",
+            "Control" => "ctrl",
             "Sound scenery" => "ssce",
             _ => "",
         };

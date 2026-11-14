@@ -8,6 +8,7 @@ import {
   copyDeviceBehavior,
   isLogicTarget,
   logicDocument,
+  setNativeLogicName,
 } from '../nativeLogic';
 import type { LogicRule, NativeLogicSource } from '../nativeLogic';
 import { downloadLocalText } from '../exportHelpers';
@@ -44,6 +45,11 @@ export default function LogicEvents({
   const handwritten = logic?.handwrittenSources ?? [];
   const selectedModule = handwritten.find((m) => m.filename === moduleName) ?? handwritten[0];
   const overridden = logic?.manualSource != null;
+  const controlSelected=node?.type==='placement'&&node.value.tagClass==='ctrl';
+  const namingNeedsDoorBinding=node?.type==='placement'&&node.value.tagClass==='mach'&&
+    !logic?.devices.some(d=>d.placementId===node.value.id);
+  const nativeBindingName=node?.type==='trigger'?node.value.nativeName??'':
+    node?.type==='placement'?logic?.devices.find(d=>d.placementId===node.value.id)?.nativeName??'':'';
   const trigger =
     node?.type === 'trigger'
       ? node.value.id
@@ -64,6 +70,14 @@ export default function LogicEvents({
         (node.type === 'trigger' && r.event.kind !== 'timer' && r.event.triggerId === node.value.id) ||
         r.actions.some((a) => a.kind !== 'delay' && a.targetId === node.value.id),
     ) ?? [];
+  const applyNativeBinding=(name:string)=>{
+    if(!node)return false;
+    try {
+      const next=setNativeLogicName(latestDocument.current,node,name);
+      if(next!==latestDocument.current)commit(next,'Set native scenario name');
+      setError('');return true;
+    } catch(error){setError(String(error));return false;}
+  };
   const changeRule = (id: string, update: (rule: LogicRule) => LogicRule) => {
     const next = logicDocument(doc);
     next.rules = next.rules.map((r) => (r.id === id ? update(r) : r));
@@ -96,9 +110,34 @@ export default function LogicEvents({
           </p>
         )}
         <fieldset className="forge-logic-visual" disabled={overridden}>
+          {isLogicTarget(node)&&node&&<label>
+            Native scenario name
+            <input key={node.value.id+':'+nativeBindingName} aria-label="Native scenario name"
+              defaultValue={nativeBindingName} maxLength={31} placeholder="Automatic unique name"
+              disabled={node.value.locked||namingNeedsDoorBinding}
+              title={namingNeedsDoorBinding?'Connect this door to a trigger below first; naming alone must not change automatic operation.':'Optional exact native script/engine binding. Display name and identity stay separate; blank restores the generated name.'}
+              onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}
+              onBlur={e=>{e.currentTarget.value=applyNativeBinding(e.currentTarget.value)?e.currentTarget.value.trim():nativeBindingName;}}/>
+            {namingNeedsDoorBinding&&<small className="forge-hint">Connect the door to a trigger below before assigning its native name. Automatic operation is preserved.</small>}
+            <small className="forge-hint">Standard scenario name; handwritten scripts are not rewritten.
+              A native binding does not enable a game mode. Extraction also needs both controls, both volumes and a compatible runtime.</small>
+          </label>}
+          {(node?.type==='trigger'||controlSelected)&&<div className="button-row" aria-label="Forerunner native Extraction marker roles">
+            {(node?.type==='trigger'?
+              [['extraction_zone','Activation zone'],['extraction_return','Safe return zone']]:
+              [['extraction_deploy','Deploy terminal'],['extraction_activate','Activate terminal']]).map(([name,label])=>
+              <button key={name} disabled={node?.value.locked||nativeBindingName===name}
+                title={'Bind the standard native name '+name+'; this does not enable the runtime mode.'}
+                onClick={()=>applyNativeBinding(name)}>{label}</button>)}
+          </div>}
+          {nativeBindingName.startsWith('extraction_')&&<p className="forge-hint">Place the deploy terminal inside the safe return volume, outside activation.
+            Place the activation terminal inside its zone. Keep a physical route between both areas; no raid timer or teleport is authored here.</p>}
           <div className="button-row">
             <button onClick={add}>Add trigger volume</button>
           </div>
+          {controlSelected&&<p className="forge-hint">Control terminal: use its native binding and power settings here.
+            Choose a touched-by-player control tag for Extraction. Runtime mode activation remains separate.</p>}
+          {!controlSelected&&<>
           {!doors.length && (
             <p className="forge-hint">
               In the Asset library, choose Show → Doors & devices and drag in a door. Drop a Trigger volume
@@ -237,6 +276,7 @@ export default function LogicEvents({
               </button>
             </div>
           )}
+          </>}
           {rules.map((rule) => (
             <section className="forge-logic-rule" key={rule.id} aria-label={`Logic connection ${rule.name}`}>
               <div className="forge-logic-rule-heading">
@@ -449,7 +489,7 @@ export default function LogicEvents({
             </section>
           ))}
           {node?.type === 'placement' &&
-            node.value.tagClass === 'mach' &&
+            ['mach','ctrl'].includes(node.value.tagClass) &&
             logic?.devices
               .filter((d) => d.placementId === node.value.id)
               .map((device) => (

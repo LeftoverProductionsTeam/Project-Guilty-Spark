@@ -436,6 +436,9 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
     crate::bsp_workshop::validate_source(doc)?;
     crate::studio_native::validate(doc)?;
     crate::native_logic::validate(doc)?;
+    if doc.placements.iter().filter(|p| p.tag_class == "ctrl").count() > 100 {
+        return invalid("Standard Halo scenarios support at most 100 control terminals");
+    }
     if doc.schema_version != SCHEMA_VERSION
         || doc.name.trim().is_empty()
         || doc.name.len() > 100
@@ -516,13 +519,14 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
             ".scenery",
             ".biped",
             ".item_collection",
+            ".device_control",
         ]
         .iter()
         .any(|suffix| p.tag_path.ends_with(suffix))
         {
             return invalid("Asset tag paths must omit the tag class extension");
         }
-        if !["scen", "weap", "eqip", "vehi", "bipd", "itmc", "mach"].contains(&p.tag_class.as_str())
+        if !["scen", "weap", "eqip", "vehi", "bipd", "itmc", "mach", "ctrl"].contains(&p.tag_class.as_str())
             || !finite(&p.position)
             || !finite(&p.rotation)
             || !(-1..=15).contains(&p.team)
@@ -1668,6 +1672,7 @@ fn class_extension(class: &str) -> Result<&'static str> {
         "bipd" => Ok("biped"),
         "itmc" => Ok("item_collection"),
         "mach" => Ok("device_machine"),
+        "ctrl" => Ok("device_control"),
         _ => invalid("Unsupported scenario asset class"),
     }
 }
@@ -1843,7 +1848,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             add_set(&mut args, format!("{prefix}.item_collection"), collection);
             edit_command(&mut commands, &scenario_tag, args);
         } else {
-            let (array,palette)=match p.tag_class.as_str(){"scen"=>("scenery","scenery_palette"),"vehi"=>("vehicles","vehicle_palette"),"bipd"=>("bipeds","biped_palette"),"weap"=>("weapons","weapon_palette"),"eqip"=>("equipment","equipment_palette"),"mach"=>("machines","machine_palette"),_=>return invalid("Campaign item_collection placement needs an encounter/equipment translation that is not implemented")};
+            let (array,palette)=match p.tag_class.as_str(){"scen"=>("scenery","scenery_palette"),"vehi"=>("vehicles","vehicle_palette"),"bipd"=>("bipeds","biped_palette"),"weap"=>("weapons","weapon_palette"),"eqip"=>("equipment","equipment_palette"),"mach"=>("machines","machine_palette"),"ctrl"=>("controls","control_palette"),_=>return invalid("Campaign item_collection placement needs an encounter/equipment translation that is not implemented")};
             let index = *palette_counts.entry(array).or_default();
             *palette_counts.get_mut(array).unwrap() += 1;
             let mut args = vec![
@@ -1858,9 +1863,12 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             ];
             add_set(&mut args, format!("{palette}[{index}].name"), reference);
             let prefix = format!("{array}[{index}]");
-            if p.tag_class == "mach" {
+            if p.tag_class == "mach" || p.tag_class == "ctrl" {
                 add_set(&mut args, format!("{prefix}.power_group"), "-1");
                 add_set(&mut args, format!("{prefix}.position_group"), "-1");
+            }
+            if p.tag_class == "ctrl" {
+                add_set(&mut args, format!("{prefix}.control_flags.usable_from_both_sides"), "1");
             }
             add_set(&mut args, format!("{prefix}.type"), index.to_string());
             add_set(&mut args, format!("{prefix}.name"), "-1");

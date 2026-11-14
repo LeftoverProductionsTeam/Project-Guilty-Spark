@@ -213,7 +213,7 @@ pub fn allowed_addition(
             .is_some_and(|b| {
                 matches!(
                     b.tag_class.as_str(),
-                    "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach"
+                    "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach" | "ctrl"
                 )
             })
 }
@@ -284,7 +284,7 @@ pub fn prepare(
         .ok_or_else(|| SparkError::Invalid("Import source tag is missing".into()))?;
     if !matches!(
         tag.class.as_str(),
-        "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach" | "snd!" | "lsnd" | "senv" | "actv"
+        "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach" | "ctrl" | "snd!" | "lsnd" | "senv" | "actv"
     ) {
         return invalid("This native asset class has no verified automatic import workflow yet");
     }
@@ -593,10 +593,10 @@ pub fn verify_compiled(project: &Project, compiled: &maps::MapInspection) -> Res
         if !used {
             continue;
         }
-        if matches!(binding.tag_class.as_str(), "mach" | "scen") {
+        if matches!(binding.tag_class.as_str(), "mach" | "ctrl" | "scen") {
             let requested:Vec<_>=project.scene.iter().filter(|object|object.source_model.as_ref().and_then(|source|find(project,source)).is_some_and(|value|value.id==binding.id)).collect();
             if !requested.is_empty() {
-                let kind = if binding.tag_class == "mach" { "Machine" } else { "Scenery" };
+                let kind = match binding.tag_class.as_str() { "mach" => "Machine", "ctrl" => "Control", _ => "Scenery" };
                 let native=compiled.tags.iter().find(|tag|tag.class==binding.tag_class&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&binding.native_path));
                 let placed:Vec<_>=compiled.objects.iter().filter(|object|object.kind==kind&&object.tag_id==native.map(|tag|tag.id)).collect();
                 if native.is_none()||placed.len()!=requested.len() {
@@ -743,6 +743,7 @@ pub(crate) fn append_scenario(
                     "weap" => ("weapons", "weapon_palette"),
                     "eqip" => ("equipment", "equipment_palette"),
                     "mach" => ("machines", "machine_palette"),
+                    "ctrl" => ("controls", "control_palette"),
                     _ => return invalid(
                         "This asset needs a native scenario translation that is not implemented",
                     ),
@@ -763,7 +764,7 @@ pub(crate) fn append_scenario(
             set(&mut args, format!("{palette}[{pi}].name"), reference);
             set(&mut args, format!("{prefix}.type"), pi.to_string());
             set(&mut args, format!("{prefix}.name"), "-1".into());
-            if binding.tag_class == "mach" {
+            if binding.tag_class == "mach" || binding.tag_class == "ctrl" {
                 // Same standard native device defaults as QuickForge: no
                 // inherited group index from an unrelated source scenario.
                 set(&mut args, format!("{prefix}.power_group"), "-1".into());
@@ -774,6 +775,9 @@ pub(crate) fn append_scenario(
                 format!("{prefix}.position"),
                 vector(object.position),
             );
+            if binding.tag_class == "ctrl" {
+                set(&mut args, format!("{prefix}.control_flags.usable_from_both_sides"), "1".into());
+            }
             // Imported World SceneObject rotations already use Halo Y/P/R,
             // as read by maps.rs and displayed by World's native ZYX basis.
             // QuickForge placements have an independent intrinsic XYZ format.

@@ -31,6 +31,8 @@ pub struct HandwrittenSource {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Trigger {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_name: Option<String>,
     pub id: String,
     pub name: String,
     pub position: [f32; 3],
@@ -42,6 +44,8 @@ pub struct Trigger {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Device {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_name: Option<String>,
     pub placement_id: String,
     pub initial_position: f32,
     pub powered: bool,
@@ -113,6 +117,20 @@ pub fn native_name(prefix: &str, id: &str) -> String {
         &crate::studio_native::digest(id.as_bytes())[..12]
     )
 }
+fn authored_name(value: &Option<String>) -> bool {
+    value.as_ref().is_none_or(|name| {
+        !name.is_empty() && name.len() <= 31 && !name.starts_with("gs_")
+            && name.as_bytes()[0].is_ascii_lowercase()
+            && name.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+    })
+}
+fn trigger_name(trigger: &Trigger) -> String {
+    trigger.native_name.clone().unwrap_or_else(|| native_name("tv", &trigger.id))
+}
+fn device_name(logic: &Document, id: &str) -> String {
+    logic.devices.iter().find(|d| d.placement_id == id).and_then(|d| d.native_name.clone())
+        .unwrap_or_else(|| native_name("obj", id))
+}
 fn text(value: &str, max: usize) -> bool {
     !value.is_empty() && value.len() <= max && !value.chars().any(char::is_control)
 }
@@ -171,7 +189,12 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     if let Some(workshop) = &doc.workshop {
         ids.extend(workshop.brushes.iter().map(|v| v.id.as_str()));
     }
+    let mut names: BTreeSet<String> = ["gs_logic_ready".to_owned(), "gs_logic_init".to_owned()]
+        .into_iter().chain(logic.rules.iter().map(|r| native_name("evt", &r.id))).collect();
     for trigger in &logic.triggers {
+        if !authored_name(&trigger.native_name) || !names.insert(trigger_name(trigger)) {
+            return invalid("Native trigger names must be unique ASCII identifiers of 1–31 lowercase characters; gs_ is reserved");
+        }
         if !text(&trigger.id, 72)
             || !ids.insert(&trigger.id)
             || !text(&trigger.name, 160)
@@ -197,14 +220,17 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     }
     let mut devices = BTreeSet::new();
     for binding in &logic.devices {
+        if !authored_name(&binding.native_name) || !names.insert(device_name(logic, &binding.placement_id)) {
+            return invalid("Native device names must be unique ASCII identifiers of 1–31 lowercase characters; gs_ is reserved");
+        }
         if !devices.insert(binding.placement_id.as_str())
             || !unit(binding.initial_position)
             || !doc
                 .placements
                 .iter()
-                .any(|p| p.id == binding.placement_id && p.tag_class == "mach")
+                .any(|p| p.id == binding.placement_id && ["mach", "ctrl"].contains(&p.tag_class.as_str()))
         {
-            return invalid("A logic device must reference one existing device_machine placement with position 0–1");
+            return invalid("A logic device must reference one existing device_machine or device_control placement with position 0–1");
         }
     }
     for rule in &logic.rules {
@@ -276,8 +302,10 @@ fn real(v: f32) -> String {
 fn ticks(v: f32) -> u32 {
     ((v * 30.).round() as u32).max(1)
 }
-fn volume(id: &str) -> String {
-    format!("(volume_test_objects {} (players))", native_name("tv", id))
+fn volume(logic: &Document, id: &str) -> String {
+    let name = logic.triggers.iter().find(|t| t.id == id).map(trigger_name)
+        .unwrap_or_else(|| native_name("tv", id));
+    format!("(volume_test_objects {name} (players))")
 }
 pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
     validate(doc)?;
@@ -291,9 +319,11 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
         "(script startup gs_logic_init".into(),
     ];
     for device in &logic.devices {
-        let name = native_name("obj", &device.placement_id);
+        let name = device_name(logic, &device.placement_id);
+        if doc.placements.iter().any(|p| p.id == device.placement_id && p.tag_class == "mach") {
+            lines.push(format!("  (device_operates_automatically_set {name} false)"));
+        }
         lines.extend([
-            format!("  (device_operates_automatically_set {name} false)"),
             format!(
                 "  (device_set_power {name} {})",
                 if device.powered { "1.0" } else { "0.0" }
@@ -316,18 +346,18 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
         lines.push("  (sleep_until gs_logic_ready 1)".into());
         match &rule.event {
             Event::Enter { trigger_id } => {
-                lines.push(format!("  (sleep_until {} 1)", volume(trigger_id)))
+                lines.push(format!("  (sleep_until {} 1)", volume(logic, trigger_id)))
             }
             Event::Exit { trigger_id } => lines.extend([
-                format!("  (sleep_until {} 1)", volume(trigger_id)),
-                format!("  (sleep_until (not {}) 1)", volume(trigger_id)),
+                format!("  (sleep_until {} 1)", volume(logic, trigger_id)),
+                format!("  (sleep_until (not {}) 1)", volume(logic, trigger_id)),
             ]),
             Event::Timer { seconds } => lines.push(format!("  (sleep {})", ticks(*seconds))),
         }
         if let Some(condition) = &rule.condition {
             lines.push(format!(
                 "  (if (>= (device_get_position {}) {}) (begin",
-                native_name("obj", &condition.target_id),
+                device_name(logic, &condition.target_id),
                 real(condition.at_least)
             ));
         }
@@ -335,12 +365,12 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
             lines.push(match action {
                 Action::DevicePosition { target_id, value } => format!(
                     "  (device_set_position {} {})",
-                    native_name("obj", target_id),
+                    device_name(logic, target_id),
                     real(*value)
                 ),
                 Action::DevicePower { target_id, value } => format!(
                     "  (device_set_power {} {})",
-                    native_name("obj", target_id),
+                    device_name(logic, target_id),
                     real(*value)
                 ),
                 Action::Delay { seconds } => format!("  (sleep {})", ticks(*seconds)),
@@ -351,7 +381,7 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
         }
         if !rule.once {
             if let Event::Enter { trigger_id } = &rule.event {
-                lines.push(format!("  (sleep_until (not {}) 1)", volume(trigger_id)));
+                lines.push(format!("  (sleep_until (not {}) 1)", volume(logic, trigger_id)));
             }
         }
         lines.push(")".into());
@@ -396,12 +426,10 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         expected_outputs: vec![format!("tags/{}", tag.replace('\\', "/"))],
     };
     for (i, device) in logic.devices.iter().enumerate() {
-        let machine_index = doc
-            .placements
-            .iter()
-            .filter(|p| p.tag_class == "mach")
-            .position(|p| p.id == device.placement_id)
-            .unwrap();
+        let placement = doc.placements.iter().find(|p| p.id == device.placement_id).unwrap();
+        let array = if placement.tag_class == "ctrl" { "controls" } else { "machines" };
+        let device_index = doc.placements.iter().filter(|p| p.tag_class == placement.tag_class)
+            .position(|p| p.id == device.placement_id).unwrap();
         // Invader marks this Sapien-authored table read-only. Use its documented
         // per-invocation authoring option only for this fresh generated table;
         // forge_build verifies emptiness first and every binding afterward.
@@ -416,28 +444,26 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         set(
             &mut args,
             format!("object_names[{i}].name"),
-            native_name("obj", &device.placement_id),
+            device_name(logic, &device.placement_id),
         );
         set(
             &mut args,
-            format!("machines[{machine_index}].name"),
+            format!("{array}[{device_index}].name"),
             i.to_string(),
         );
         set(
             &mut args,
-            format!("machines[{machine_index}].power_group"),
+            format!("{array}[{device_index}].power_group"),
             "-1",
         );
         set(
             &mut args,
-            format!("machines[{machine_index}].position_group"),
+            format!("{array}[{device_index}].position_group"),
             "-1",
         );
-        set(
-            &mut args,
-            format!("machines[{machine_index}].machine_flags.does_not_operate_automatically"),
-            "1",
-        );
+        if placement.tag_class == "mach" {
+            set(&mut args, format!("{array}[{device_index}].machine_flags.does_not_operate_automatically"), "1");
+        }
         args.push(tag.clone());
         let mut names = command(args);
         names.phase = "logic-names".into();
@@ -458,7 +484,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         set(
             &mut args,
             format!("{prefix}.name"),
-            native_name("tv", &trigger.id),
+            trigger_name(trigger),
         );
         // Halo volume basis is forward/up, dimensions positive from one corner.
         // The editor currently exposes yaw-only volumes; reject tilted volumes
@@ -629,18 +655,23 @@ pub(crate) fn compile(
     // trusted merely because a setter returned zero.
     let logic = doc.logic.as_ref().unwrap();
     for (i, binding) in logic.devices.iter().enumerate() {
-        let index = doc
-            .placements
-            .iter()
-            .filter(|p| p.tag_class == "mach")
-            .position(|p| p.id == binding.placement_id)
-            .unwrap();
+        let placement = doc.placements.iter().find(|p| p.id == binding.placement_id).unwrap();
+        let array = if placement.tag_class == "ctrl" { "controls" } else { "machines" };
+        let index = doc.placements.iter().filter(|p| p.tag_class == placement.tag_class)
+            .position(|p| p.id == binding.placement_id).unwrap();
+        if placement.tag_class == "ctrl" && matches!(binding.native_name.as_deref(), Some("extraction_deploy" | "extraction_activate")) {
+            let actual = runner.run(edit, &["-t".into(), tags.clone(), "-G".into(), "triggers_when".into(),
+                format!("{}.device_control", placement.tag_path)], workspace, "logic-control-readback", 72)?;
+            if actual.trim().replace('_', " ") != "touched by player" {
+                return invalid("Extraction terminal must use a native touched-by-player control tag. Its source was not modified; choose a compatible terminal.");
+            }
+        }
         for (key, expected) in [
             (
                 format!("object_names[{i}].name"),
-                native_name("obj", &binding.placement_id),
+                device_name(logic, &binding.placement_id),
             ),
-            (format!("machines[{index}].name"), i.to_string()),
+            (format!("{array}[{index}].name"), i.to_string()),
         ] {
             let actual = runner.run(
                 edit,
@@ -654,7 +685,12 @@ pub(crate) fn compile(
             }
         }
     }
-    for i in 0..logic.triggers.len() {
+    for (i, trigger) in logic.triggers.iter().enumerate() {
+        let actual_name = runner.run(edit, &["-t".into(), tags.clone(), "-G".into(),
+            format!("trigger_volumes[{i}].name"), tag.clone()], workspace, "logic-readback", 72)?;
+        if actual_name.trim() != trigger_name(trigger) {
+            return invalid("Native trigger name failed independent readback");
+        }
         let actual = runner.run(
             edit,
             &[

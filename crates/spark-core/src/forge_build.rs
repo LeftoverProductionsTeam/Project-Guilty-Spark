@@ -178,7 +178,7 @@ fn target(runtime: RuntimeId)->Result<(&'static str,u32)> {
     }
 }
 pub fn dependency_path(root:&Path,path:&str,class:&str)->Result<PathBuf> {
-    let extension=match class {"senv"|"shader_environment"=>"shader_environment","soso"|"shader_model"=>"shader_model","sky "|"sky"=>"sky","weap"|"weapon"=>"weapon","eqip"|"equipment"=>"equipment","itmc"|"item_collection"=>"item_collection","vehi"|"vehicle"=>"vehicle","scen"|"scenery"=>"scenery","actv"|"actor_variant"=>"actor_variant","bipd"|"biped"=>"biped","mach"|"device_machine"=>"device_machine",_=>return invalid(format!("Unsupported build dependency class {class}"))};
+    let extension=match class {"senv"|"shader_environment"=>"shader_environment","soso"|"shader_model"=>"shader_model","sky "|"sky"=>"sky","weap"|"weapon"=>"weapon","eqip"|"equipment"=>"equipment","itmc"|"item_collection"=>"item_collection","vehi"|"vehicle"=>"vehicle","scen"|"scenery"=>"scenery","actv"|"actor_variant"=>"actor_variant","bipd"|"biped"=>"biped","mach"|"device_machine"=>"device_machine","ctrl"|"device_control"=>"device_control",_=>return invalid(format!("Unsupported build dependency class {class}"))};
     let file=root.join(safe_relative(&format!("{path}.{extension}"))?);
     crate::reject_links(&file)?;
     Ok(file)

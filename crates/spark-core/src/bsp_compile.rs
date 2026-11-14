@@ -918,6 +918,7 @@ pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result
             "Equipment" => ("equipment", "Equipment", false),
             "Weapon" => ("weapons", "Weapon", false),
             "Machine" => ("machines", "Machine", false),
+            "Control" => ("controls", "Control", false),
             "Sound scenery" => ("sound_scenery", "Sound scenery", false),
             _ => return invalid(format!("{} has no reviewed connected-world native transform setter", old.kind)),
         };
@@ -936,6 +937,7 @@ pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result
                 ("Scenery", "scen") => "scenery", ("Biped", "bipd") => "biped",
                 ("Vehicle", "vehi") => "vehicle", ("Equipment", "eqip") => "equipment",
                 ("Weapon", "weap") => "weapon", ("Machine", "mach") => "device_machine",
+                ("Control", "ctrl") => "device_control",
                 ("Sound scenery", "ssce") => "sound_scenery",
                 _ => return invalid("Source placement class does not match its native scenario palette"),
             };

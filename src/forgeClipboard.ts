@@ -53,7 +53,7 @@ function validate(value: unknown): asserts value is ForgeClipboard {
       throw Error('The copied geometry kind is unsupported.');
     if (
       node.type === 'placement' &&
-      (!['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc', 'mach'].includes(node.value.tagClass) ||
+      (!['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc', 'mach', 'ctrl'].includes(node.value.tagClass) ||
         !text(node.value.tagPath))
     )
       throw Error('The copied asset class or native tag path is unsupported.');

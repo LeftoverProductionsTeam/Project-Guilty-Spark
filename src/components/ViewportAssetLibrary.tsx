@@ -72,7 +72,7 @@ export default function ViewportAssetLibrary({
           (kind === 'all' ||
             (kind === 'models' ? item.kind === 'model' || item.kind === 'mesh' :
              kind === 'sounds' ? item.kind === 'sound' || item.kind === 'customSound' :
-             item.kind === 'model' && item.asset.class === (kind === 'doors' ? 'mach' : kind))) &&
+             item.kind === 'model' && (kind === 'doors' ? ['mach','ctrl'].includes(item.asset.class) : item.asset.class === kind))) &&
           `${item.name} ${item.path}`.toLowerCase().includes(query.toLowerCase()),
       ),
     [assets, source, kind, query],
@@ -122,6 +122,7 @@ export default function ViewportAssetLibrary({
             <option value="eqip">Equipment</option>
             <option value="bipd">Bipeds</option>
             <option value="doors">Doors & devices</option>
+            <option value="ctrl">Control terminals</option>
             <option value="sounds">Sounds</option>
           </select>
         </label>

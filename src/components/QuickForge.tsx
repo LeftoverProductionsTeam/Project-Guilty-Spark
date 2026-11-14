@@ -2618,6 +2618,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                             ['vehi', 'Vehicles'],
                             ['scen', 'Scenery'],
                             ['mach', 'Doors & devices'],
+                            ['ctrl', 'Control terminals'],
                             ['bipd', 'Characters'],
                             ['itmc', 'Item collections'],
                           ] as const

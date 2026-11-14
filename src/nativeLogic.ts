@@ -2,6 +2,8 @@ import type { ForgeNode, QuickForgeDocument } from './forge';
 import type { Vec3 } from './types';
 
 export interface LogicTrigger {
+  /** Optional authoring binding written to the standard scenario name. */
+  nativeName?: string;
   id: string;
   name: string;
   position: Vec3;
@@ -26,7 +28,7 @@ export interface LogicRule {
 export interface NativeLogicDocument {
   schemaVersion: 1;
   triggers: LogicTrigger[];
-  devices: { placementId: string; initialPosition: number; powered: boolean }[];
+  devices: { placementId: string; initialPosition: number; powered: boolean; nativeName?: string }[];
   rules: LogicRule[];
   manualSource?: string | null;
   handwrittenSources?: { filename: string; content: string }[];
@@ -40,6 +42,37 @@ export interface NativeLogicSource {
 }
 export function logicDocument(doc: QuickForgeDocument): NativeLogicDocument {
   return structuredClone(doc.logic ?? { schemaVersion: 1, triggers: [], devices: [], rules: [] });
+}
+/** Explicit native binding. Display names/UUIDs and handwritten source stay intact.
+ * Blank restores the existing generated name; a copied object needs its own binding.
+ */
+export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:string):QuickForgeDocument {
+  const logic=logicDocument(doc),value=name.trim();
+  if(logic.manualSource!=null)throw Error('Return to generated logic before changing native names. Keep handwritten source separately.');
+  if(value&&(!/^[a-z][a-z0-9_]{0,30}$/.test(value)||value.startsWith('gs_')))
+    throw Error('Use 1–31 lowercase letters, digits or underscores, starting with a letter. gs_ is reserved for generated names.');
+  const trigger=node.type==='trigger'?logic.triggers.find(t=>t.id===node.value.id):undefined;
+  const device=node.type==='placement'?doc.placements.find(p=>p.id===node.value.id&&['mach','ctrl'].includes(p.tagClass)):undefined;
+  if(!trigger&&!device)throw Error('Select an existing native trigger, door or control terminal.');
+  if((trigger??device)!.locked)throw Error('Unlock this object before changing its native name.');
+  const existing=trigger?.nativeName??logic.devices.find(d=>d.placementId===device?.id)?.nativeName;
+  if(value===(existing??''))return doc;
+  if(value&&[...logic.triggers.filter(t=>t.id!==trigger?.id).map(t=>t.nativeName),
+      ...logic.devices.filter(d=>d.placementId!==device?.id).map(d=>d.nativeName)].includes(value))
+    throw Error('Another object already uses this native name. Choose a unique binding.');
+  if(trigger) {
+    if(value)trigger.nativeName=value;else delete trigger.nativeName;
+  } else {
+    let binding=logic.devices.find(d=>d.placementId===device!.id);
+    if(!binding) {
+      if(!value)return doc;
+      if(device!.tagClass!=='ctrl')throw Error('Connect this door to its trigger first. Naming alone must not change automatic door behavior.');
+      if(logic.devices.length>=64)throw Error('The native device binding budget is full.');
+      binding={placementId:device!.id,initialPosition:0,powered:true};logic.devices.push(binding);
+    }
+    if(value)binding.nativeName=value;else delete binding.nativeName;
+  }
+  return {...doc,logic};
 }
 export function addLogicTrigger(
   doc: QuickForgeDocument,
@@ -150,6 +183,7 @@ export function copyDeviceBehavior(
     remap.set(t.id, id);
     logic.triggers.push({
       ...structuredClone(t),
+      nativeName: undefined,
       id,
       name: `${t.name} · ${to.name}`.slice(0, 160),
       position: [
@@ -161,8 +195,9 @@ export function copyDeviceBehavior(
       locked: false,
     });
   }
+  const targetNativeName=logic.devices.find(d=>d.placementId===toId)?.nativeName;
   logic.devices = logic.devices.filter((d) => d.placementId !== toId);
-  logic.devices.push({ ...binding, placementId: toId });
+  logic.devices.push({ ...binding, nativeName: targetNativeName, placementId: toId });
   for (const rule of rules)
     logic.rules.push({
       ...structuredClone(rule),
@@ -246,5 +281,5 @@ export function removeLogicReferences(
   };
 }
 export function isLogicTarget(node: ForgeNode | null): boolean {
-  return node?.type === 'trigger' || (node?.type === 'placement' && node.value.tagClass === 'mach');
+  return node?.type === 'trigger' || (node?.type === 'placement' && ['mach','ctrl'].includes(node.value.tagClass));
 }
