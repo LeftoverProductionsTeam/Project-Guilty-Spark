@@ -267,6 +267,8 @@ export interface Project {
   quickForge?: QuickForgeDocument | null;
   firefight?: FirefightConfig | null;
   studio?: CreatorStudioDocument | null;
+  /** Saved draft only; native source changes require explicit review and compilation. */
+  scenarioScriptDraft?: {sourceKey:string;filename:string;content:string;fileSha256:string;replaceExisting:boolean} | null;
   schemaVersion: number;
   id: string;
   title: string;

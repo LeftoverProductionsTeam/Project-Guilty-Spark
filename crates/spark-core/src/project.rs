@@ -103,6 +103,30 @@ pub struct EngineBuildTarget {
     #[serde(default)] pub ce_compatible_tagset:bool,
     #[serde(default)] pub open_sauce:bool,
 }
+/// Project-local source draft. It never writes a native tag or selects a tool path.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScenarioScriptDraft {
+    pub source_key:String,
+    pub filename:String,
+    pub content:String,
+    pub file_sha256:String,
+    pub replace_existing:bool,
+}
+impl ScenarioScriptDraft {
+    fn validate(&self)->Result<()> {
+        let stem=self.filename.strip_suffix(".hsc").unwrap_or("");
+        if stem.is_empty()||stem.len()>31||stem.eq_ignore_ascii_case("global_scripts")||!stem.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c)) {
+            return invalid("Scenario script draft needs a safe scenario .hsc module name");
+        }
+        if self.source_key.is_empty()||self.source_key.len()>128*1024||self.source_key.chars().any(char::is_control)
+            ||self.file_sha256.len()!=64||!self.file_sha256.bytes().all(|c|c.is_ascii_digit()||b"abcdef".contains(&c))
+            ||self.content.len()>1024*1024||self.content.chars().any(|c|c.is_control()&&!matches!(c,'\r'|'\n'|'\t')) {
+            return invalid("Scenario script draft exceeds its text/identity limits");
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
@@ -152,6 +176,9 @@ pub struct Project {
     pub firefight: Option<crate::firefight::FirefightConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub studio: Option<crate::creative::CreatorStudio>,
+    /// Saved authoring only; compilation still requires a separate reviewed attachment.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub scenario_script_draft:Option<ScenarioScriptDraft>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub build_targets:Vec<EngineBuildTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -200,6 +227,7 @@ impl Project {
             quick_forge: None,
             firefight: None,
             studio: None,
+            scenario_script_draft:None,
             build_targets:vec![],active_build_target:None,
             world_environment:None,
             native_lighting:None,
@@ -216,6 +244,7 @@ impl Project {
         next.active_build_target=Some(id);next.validate()?;*self=next;Ok(true)
     }
     pub fn validate(&self) -> Result<()> {
+        if let Some(draft)=&self.scenario_script_draft{draft.validate()?;}
         if self.automatic_backup_retention.is_some_and(|value|value>MAX_AUTOMATIC_BACKUP_RETENTION) {
             return invalid("Automatic backup retention must be None (0) or 1–100");
         }
@@ -341,6 +370,8 @@ impl Project {
         Ok(value)
     }
     pub fn fingerprint(&self) -> Result<String> {
+        // scenario_script_draft is saved authoring, not an applied native input.
+        // Reviewed script attachments carry their own exact byte/source identities.
         use sha2::{Digest, Sha256};
         let bytes = fingerprint_json(serde_json::to_vec(&(
             &self.source.as_ref().map(|s| &s.sha256),

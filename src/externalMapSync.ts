@@ -43,6 +43,7 @@ export function hasSourceBoundEdits(project: Project, inspection: MapInspection 
     project.bspAssembly ||
     project.firefight ||
     project.studio ||
+    project.scenarioScriptDraft ||
     project.worldEnvironment ||
     project.renderFeatures ||
     project.audioPreview ||

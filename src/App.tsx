@@ -1879,6 +1879,7 @@ export default function App() {
             </EditorAudioProvider>
           </main>
           {ready&&<RuntimeDock
+            onEdit={edit}
             project={current}
             settings={data.settings}
             dirty={unsaved}
