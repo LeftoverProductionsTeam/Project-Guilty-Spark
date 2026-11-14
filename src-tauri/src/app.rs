@@ -586,6 +586,20 @@ async fn preview_owned_cache_bitmap(
         ).map_err(error)
     }).await.map_err(error)?
 }
+/// Optional native sequence metadata for HUD/bitmap inspection. Ordinary model
+/// and material previews never request or serialize these atlas inventories.
+#[tauri::command]
+async fn inspect_owned_cache_bitmap_layout(app:tauri::AppHandle,project_id:String,bitmap_tag_id:u32)->Reply<core::bitmap_preview::OwnedBitmapLayout>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source=project.source.as_ref().ok_or("Project has no preserved Halo map")?;
+        let inspection=inspect(&state,&project)?;
+        let pinned=source.resource_directory.as_ref().and_then(|folder|source.resource_sha256.get("bitmaps.map").map(|hash|(folder.join("bitmaps.map"),hash.as_str())));
+        core::bitmap_preview::owned_bitmap_layout(&source.preserved_path,&source.sha256,&inspection,bitmap_tag_id,
+            pinned.as_ref().map(|(path,hash)|(path.as_path(),*hash))).map_err(error)
+    }).await.map_err(error)?
+}
+
 /// Resource alternatives attached to an independently preserved copy of the
 /// exact same map. This is viewer recovery, never a new compiler binding.
 #[tauri::command]
@@ -3333,6 +3347,7 @@ pub fn run() {
             forge_session_update,
             forge_session_leave,
             preview_owned_cache_bitmap,
+            inspect_owned_cache_bitmap_layout,
             original_bitmap_preview_sources,
             inspect_source_appearance,
             preview_owned_cache_bitmap_batch,

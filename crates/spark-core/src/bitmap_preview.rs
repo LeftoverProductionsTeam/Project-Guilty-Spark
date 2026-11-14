@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs::File, path::Path};
 #[path="bitmap_alias.rs"] mod bitmap_alias;
 use bitmap_alias::BitmapAliases;
+#[path="bitmap_layout.rs"] mod bitmap_layout;
+pub use bitmap_layout::{owned_bitmap_layout,BitmapLayoutImage,BitmapLayoutSequence,BitmapLayoutSprite,OwnedBitmapLayout};
 
 const MAX_IMAGE_EDGE: u16 = 4096;
 const MAX_IMAGE_PIXELS: u32 = 16_777_216;

@@ -2,7 +2,7 @@ import {useMemo,useRef,useState} from 'react';
 import type {KeyboardEvent,PointerEvent} from 'react';
 import type {Project,Tag,TagField} from '../types';
 import {fieldValue,setTagValue,shortPath} from '../editor';
-import {HUD_ANCHORS,nativeHudDefinition,nativeHudLayers} from '../nativeHud';
+import {HUD_ANCHORS,nativeHudArtwork,nativeHudDefinition,nativeHudLayers} from '../nativeHud';
 import type {HudLayer} from '../nativeHud';
 import {useMapState} from '../mapSession';
 import {NumberField} from './ui';
@@ -82,7 +82,7 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
     commit([[layer.x,value(layer.x)+delta[0]*step],[layer.y,value(layer.y)+delta[1]*step]],'Move HUD '+layer.label);
   }
   const visibleFields=chosen?.fields.filter(field=>!query.trim()||field.label.toLowerCase().includes(query.trim().toLowerCase()))??[];
-  const reference=chosen?.fields.find(field=>field.kind==='reference'&&field.targetClass==='bitm');
+  const {reference,sequence:artworkSequence}=nativeHudArtwork(tag,chosen);
   const bitmap=reference?tags.find(candidate=>candidate.id===value(reference)&&candidate.class==='bitm'):undefined;
   return <section className="native-hud-editor" aria-label="In-game HUD editor">
     <div className="hud-editor-toolbar"><strong>In-game HUD</strong>
@@ -118,7 +118,7 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
         return <TagFields key={field.key} project={project} tag={{...tag,fields:[field]}} tags={tags} advanced={advanced} change={(_,next)=>change(next)}/>;
       })}</div>
       {!visibleFields.length&&<p className="subtle">No matching properties in this element.</p>}
-      {bitmap&&<details key={bitmap.id} className="hud-bitmap-source" onToggle={event=>setPreviewBitmap(event.currentTarget.open?bitmap.id:null)}><summary>Original bitmap · {shortPath(bitmap.path)}</summary>{previewBitmap===bitmap.id&&<BitmapPreview project={project} tagId={bitmap.id}/>}<button onClick={()=>onNavigate(bitmap.id)}>Open bitmap tag</button><p className="subtle">Original bitmap image, not a composed HUD sprite. Sequence selection and native runtime composition are separate.</p></details>}
+      {bitmap&&<details key={bitmap.id} className="hud-bitmap-source" onToggle={event=>setPreviewBitmap(event.currentTarget.open?bitmap.id:null)}><summary>Original bitmap · {shortPath(bitmap.path)}</summary>{previewBitmap===bitmap.id&&<BitmapPreview project={project} tagId={bitmap.id} hudSequence={artworkSequence?{index:value(artworkSequence),onSelect:index=>commit([[artworkSequence,index]],'HUD: '+artworkSequence.label)}:undefined}/>}<button onClick={()=>onNavigate(bitmap.id)}>Open bitmap tag</button><p className="subtle">Choose a native sequence to edit this element; frame arrows and Full atlas only change inspection. Original sprite bounds and registration come from this source. HUD tint, meter fill, flashing and fonts still need native composition.</p></details>}
     </>}
     <p className="subtle">Edits belong to this map’s project. Save preserves the draft; use Native Output and the reviewed native build route for a rebuilt map. Element insertion/removal, sprite compositing and HUD gameplay acceptance are not implemented by this layout view.</p>
   </section>;

@@ -36,3 +36,23 @@ export function nativeHudLayers(tag:Tag):HudLayer[] {
   return layers;
 }
 export const HUD_ANCHORS=[[0,0],[1,0],[0,1],[1,1],[.5,.5],[.5,0],[.5,1],[0,.5],[1,.5]] as const;
+
+/** Base artwork may belong to the enclosing crosshair/overlay element. */
+export function nativeHudArtwork(tag:Tag,layer:HudLayer|undefined):{reference?:TagField;sequence?:TagField}{
+  if(!layer)return {};
+  const prefixes:string[]=[];if(layer.prefix)prefixes.push(layer.prefix);
+  let parent=layer.prefix?.replace(/[_.]$/,'');
+  while(parent?.includes('.')){parent=parent.slice(0,parent.lastIndexOf('.'));prefixes.push(parent+'.');}
+  const names=['interface_bitmap','meter_bitmap','crosshair_bitmap','overlay_bitmap','icon_bitmap'];
+  let reference:TagField|undefined;
+  for(const prefix of prefixes){
+    reference=tag.fields.find(field=>field.kind==='reference'&&field.targetClass==='bitm'&&names.some(name=>field.key===prefix+name));
+    if(reference)break;
+  }
+  if(!reference&&tag.class==='grhi'&&layer.id.startsWith('hud:total_grenades_overlays['))reference=tag.fields.find(field=>field.key==='hud:total_grenades_overlay_bitmap');
+  // Non-layout reference groups still expose their own original image, without
+  // pretending that a missing sequence selects native frame zero.
+  reference??=layer.fields.find(field=>field.kind==='reference'&&field.targetClass==='bitm');
+  const sequence=layer.prefix?tag.fields.find(field=>field.key===layer.prefix+'sequence_index'):undefined;
+  return {reference,sequence};
+}

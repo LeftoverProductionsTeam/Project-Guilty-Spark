@@ -100,3 +100,8 @@
 .hud-color .number-field {max-width:90px;}
 .hud-bitmap-source {margin:8px 0;padding:6px;border:1px solid var(--line);border-radius:4px;}
 .hud-bitmap-source .gs-bitmap-preview {max-width:640px;}
+
+.hud-sequence-preview .gs-bitmap-toolbar {flex-wrap:wrap;}
+.hud-sequence-preview .gs-bitmap-toolbar > label:not(.checkbox-label) {display:flex;align-items:center;gap:5px;flex:1 1 180px;min-width:0;}
+.hud-sequence-preview .gs-bitmap-toolbar select {flex:1;min-width:0;max-width:100%;width:0;}
+.hud-sequence-preview .gs-bitmap-toolbar > span {font-size:10px;}

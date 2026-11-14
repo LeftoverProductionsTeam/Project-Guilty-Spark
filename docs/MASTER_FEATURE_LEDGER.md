@@ -164,3 +164,6 @@ Owner addendum: full in-game HUD editor is required, not just Firefight text or 
 
 
 14Nov HUD source increment: native HUD descriptors/reader and existing Tags → Properties → In-game HUD anchor-layout/property controls now have untested source. Existing history, Save, native encoding/preservation and verified bitmap preview are reused. UI_INTERACTION_AUDIT records exact source scope. Full HUD editor is still incomplete: native sprite/meter/font composition, structural element authoring, proven loose-tag/export/build/readback and actual game fidelity/edition acceptance remain open. Not Spark appearance or just Firefight messages; no tests/builds/apps/games ran and all475CSVIDs/M1–M6 remain unchanged.
+
+
+14Nov HUD artwork source continuation: existing bitmap pipeline now has untested source for bounded native sequence/sprite metadata and indexed CE resource-body readback; existing BitmapPreview selects original sequence frames/atlas crops and exposes registrations. Existing HUD inspector resolves parent artwork and edits native sequence through shared history; frame/atlas navigation is inspection only. No native HUD compositing/game acceptance or tests/builds were performed. Full structural/source-output/HUD/runtime gates and all475IDs/M1–M6 remain open; see UI_INTERACTION_AUDIT.
