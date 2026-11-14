@@ -11,6 +11,7 @@ import {
   disposeQaScratch,
   admitCargoOutput,
   recoverQaScratch,
+  qaProcessOwnershipActive,
   stopQaProcess,
   waitForQaExit,
   watchOutputBudget,
@@ -736,6 +737,14 @@ test('a killed real harness recovers only its declared scratch and refuses a cha
       /lease differs/,
     );
     assert.equal((await fs.stat(path.join(root, 'library/generated.map'))).size, 65536);
+    const changedLifetime=JSON.parse(original);
+    if(changedLifetime.processIdentities?.owner){
+      const pin=changedLifetime.processIdentities.owner;
+      changedLifetime.processIdentities.owner=pin.slice(0,-1)+(pin.endsWith('0')?'1':'0');
+      await fs.writeFile(leaseFile,JSON.stringify(changedLifetime));
+      await assert.rejects(recoverQaScratch(root,{storageRoot:options(parent).storageRoot}),/lease differs/);
+      assert.equal(await fs.readFile(path.join(root,'library/generated.map')).then(bytes=>bytes.length),65536);
+    }
     await fs.writeFile(leaseFile, original);
     const recovered = await recoverQaScratch(root, { storageRoot: options(parent).storageRoot });
     assert.equal(recovered.status, 'interrupted');
@@ -910,3 +919,42 @@ test('an owned signal-exited child can be awaited again without a lost exit-even
   await waitForQaExit(child);
  }finally{await stopQaProcess(child);await waitForQaExit(child);}
 });
+
+
+test('QA lifetime pins distinguish reused PIDs while preserving live and unknown owners', async()=>{
+ const old='windows:133000000000000000',current='windows:134000000000000000';
+ const record={ownerPid:111,writers:[222],processIdentities:{owner:old,writers:[{pid:222,identity:old,exited:false}]}};
+ assert.equal(await qaProcessOwnershipActive(record,{live:()=>true,identity:async()=>current}),false);
+ assert.equal(await qaProcessOwnershipActive(record,{live:()=>true,identity:async pid=>pid===222?old:current}),true);
+ assert.equal(await qaProcessOwnershipActive(record,{live:()=>true,identity:async()=>null}),true);
+ assert.equal(await qaProcessOwnershipActive({ownerPid:111,writers:[222]},{live:()=>true,identity:async()=>current}),true);
+ assert.equal(await qaProcessOwnershipActive({...record,processIdentities:{owner:old,writers:[{pid:222,identity:old,exited:true}]}},{live:pid=>pid===222,identity:async()=>old}),false);
+ await assert.rejects(qaProcessOwnershipActive({...record,processIdentities:{owner:old,writers:[]}}),/inventory differs/);
+});
+
+
+test('real QA child lifetime and observed exit are pinned in both owner receipts', {
+ skip: !['win32','linux'].includes(process.platform),
+},()=>fixture(async parent=>{
+ const root=await mkdir(path.join(parent,'lifetime-owner'));
+ const finish=await beginQaStorage(root,options(parent));
+ const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',windowsHide:true});
+ await finish.trackProcess(child);
+ try {
+  const record=JSON.parse(await fs.readFile(path.join(root,'storage-run.json'),'utf8'));
+  assert.ok(record.processIdentities.owner,'Owner creation time must come from the native process');
+  const pin=record.processIdentities.writers.find(row=>row.pid===child.pid);
+  assert.ok(pin?.identity);assert.equal(pin.exited,false);
+  const leaseFolder=path.join(options(parent).storageRoot,'.leases');
+  const leases=await fs.readdir(leaseFolder);const file=leases.find(name=>name.endsWith('.json'));
+  const lease=JSON.parse(await fs.readFile(path.join(leaseFolder,file),'utf8'));
+  assert.deepEqual(lease.processIdentities,record.processIdentities);
+  const justWriter={...record,ownerPid:record.ownerPid,processIdentities:{owner:record.processIdentities.owner,writers:[pin]},writers:[child.pid]};
+  assert.equal(await qaProcessOwnershipActive(justWriter,{live:pid=>pid===child.pid}),true);
+  const different=structuredClone(justWriter);different.processIdentities.writers[0].identity=pin.identity.slice(0,-1)+(pin.identity.endsWith('0')?'1':'0');
+  assert.equal(await qaProcessOwnershipActive(different,{live:pid=>pid===child.pid}),false,'A native queried different creation identity cannot be the recorded writer');
+  await stopQaProcess(child);await finish.sample('child-exit');
+  const ended=JSON.parse(await fs.readFile(path.join(root,'storage-run.json'),'utf8'));
+  assert.equal(ended.processIdentities.writers.find(row=>row.pid===child.pid).exited,true);
+ }finally{await stopQaProcess(child);await finish('passed');}
+}));

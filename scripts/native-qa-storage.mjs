@@ -34,6 +34,44 @@ const isLive = (pid) => {
     return error.code !== 'ESRCH';
   }
 };
+// Lifetime pins extend the existing nonce-bound owner receipt. They never
+// grant permission to stop a process; unknown/legacy live PIDs stay protected.
+async function processIdentity(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1) return null;
+  if (process.platform === 'linux') {
+    try {
+      const [stat,boot]=await Promise.all([fs.readFile('/proc/'+pid+'/stat','utf8'),fs.readFile('/proc/sys/kernel/random/boot_id','utf8')]);
+      const start=stat.slice(stat.lastIndexOf(') ')+2).split(' ')[19];
+      if(!/^[0-9]+$/.test(start)||!/^[a-f0-9-]{36}$/.test(boot.trim()))return null;
+      return 'linux:'+boot.trim()+':'+start;
+    } catch { return null; }
+  }
+  if (process.platform !== 'win32') return null;
+  // Only a numeric PID and creation time are queried. No paths, command lines,
+  // environment, credentials or Windows security settings are read or changed.
+  const script='$ErrorActionPreference="Stop";try{$p=[Diagnostics.Process]::GetProcessById('+pid+');$p.StartTime.ToUniversalTime().ToFileTimeUtc().ToString([Globalization.CultureInfo]::InvariantCulture)}catch{exit 2}';
+  return new Promise(resolve=>execFile('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,timeout:5000,maxBuffer:4096},(error,stdout)=>{
+    const value=(stdout??'').trim();resolve(!error&&/^[0-9]{10,20}$/.test(value)?'windows:'+value:null);
+  }));
+}
+const validProcessIdentity=value=>value===null||typeof value==='string'&&(/^(windows):[0-9]{10,20}$/.test(value)||/^linux:[a-f0-9-]{36}:[0-9]+$/.test(value));
+export async function qaProcessOwnershipActive(record, {live=isLive,identity=processIdentity}={}) {
+  if(!Number.isSafeInteger(record.ownerPid)||record.ownerPid<1||!Array.isArray(record.writers)||record.writers.length>4096||record.writers.some(pid=>!Number.isSafeInteger(pid)||pid<1))throw Error('Invalid QA process ownership');
+  const pins=record.processIdentities;
+  if(pins!==undefined&&(!pins||!validProcessIdentity(pins.owner)||!Array.isArray(pins.writers)||pins.writers.length!==record.writers.length||pins.writers.some((row,i)=>row.pid!==record.writers[i]||typeof row.exited!=='boolean'||!validProcessIdentity(row.identity))))throw Error('QA process lifetime inventory differs');
+  const observed=[{pid:record.ownerPid,identity:pins?.owner??null,exited:false},...record.writers.map((pid,i)=>pins?.writers[i]??{pid,identity:null,exited:false})];
+  for(const row of observed){
+    if(row.exited||!live(row.pid))continue;
+    if(!row.identity)return true;
+    const current=await identity(row.pid);
+    // A failed/unsupported query is never evidence of death or PID reuse.
+    if(!current||current.split(':')[0]!==row.identity.split(':')[0]||current===row.identity)return true;
+  }
+  return false;
+}
+async function qaOwnerActive(record) {
+  return qaProcessOwnershipActive({ownerPid:record.ownerPid,writers:[],processIdentities:record.processIdentities?{owner:record.processIdentities.owner,writers:[]}:undefined});
+}
 async function noLinks(file) {
   for (let current = path.resolve(ordinary(file)); ; current = path.dirname(current)) {
     const info = await fs.lstat(current).catch((error) => {
@@ -774,8 +812,7 @@ export async function recoverQaScratch(root, { storageRoot = defaultQaRoot } = {
     record.schemaVersion !== 3 ||
     !Array.isArray(record.writers) ||
     key(record.root) !== key(absolute) ||
-    isLive(record.ownerPid) ||
-    record.writers.some(isLive) ||
+    await qaProcessOwnershipActive(record) ||
     !record.active
   )
     throw Error('Unknown or active QA ownership protects recovery data');
@@ -789,7 +826,7 @@ export async function recoverQaScratch(root, { storageRoot = defaultQaRoot } = {
   );
   await noLinks(leaseFile);
   const lease = JSON.parse(await fs.readFile(leaseFile, 'utf8'));
-  if (lease.nonce !== record.nonce || key(lease.root) !== key(absolute))
+  if (lease.nonce !== record.nonce || key(lease.root) !== key(absolute) || lease.ownerPid !== record.ownerPid || JSON.stringify(lease.writers)!==JSON.stringify(record.writers) || JSON.stringify(lease.processIdentities)!==JSON.stringify(record.processIdentities))
     throw Error('Recovery lease differs; retained');
   let sealedBytes = 0;
   const sealsFile = path.join(absolute, 'disposable-seals.json');
@@ -801,7 +838,7 @@ export async function recoverQaScratch(root, { storageRoot = defaultQaRoot } = {
     if (
       !Array.isArray(seals) ||
       seals.length > 128 ||
-      seals.some((seal) => seal.ownerPid !== record.ownerPid)
+      seals.some((seal) => seal.ownerPid !== record.ownerPid || (seal.ownerIdentity&&record.processIdentities?.owner&&seal.ownerIdentity!==record.processIdentities.owner))
     )
       throw Error('Recovery disposable owner differs');
     for (const seal of seals) sealedBytes += (await disposeQaScratch(absolute, seal)).bytes;
@@ -835,7 +872,7 @@ export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } 
   )
     throw Error('Disposable ownership does not match this QA run');
   if (seal.ownerPid !== process.pid || !ownerFinished) {
-    if (isLive(seal.ownerPid)) throw Error('Active QA owner protects its disposable files');
+    if (await qaProcessOwnershipActive({ownerPid:seal.ownerPid,writers:[],processIdentities:seal.ownerIdentity===undefined?undefined:{owner:seal.ownerIdentity,writers:[]}})) throw Error('Active QA owner protects its disposable files');
   }
   const current = await snapshot(target, seal.inventory.bytes + 1);
   if (JSON.stringify(current) !== JSON.stringify(seal.inventory))
@@ -877,6 +914,7 @@ export async function sealQaScratch(runRoot, file, maximumBytes = policy.qaRunBy
     root: absolute,
     path: target,
     ownerPid: process.pid,
+    ownerIdentity: await processIdentity(process.pid),
     inventory: await snapshot(target, maximumBytes),
   };
 }
@@ -1064,6 +1102,8 @@ export async function beginQaStorage(
     retained: [],
   };
   const writers = new Set();
+  const writerIdentities = new Map();
+  const ownerIdentity = await processIdentity(process.pid);
   // Serialize progress with process-registration writes. The same nonce-bound
   // receipt/lease remains the only ledger; no append-only monitoring database.
   let metadataWrite = Promise.resolve();
@@ -1081,8 +1121,13 @@ export async function beginQaStorage(
         )
           throw Error('QA progress owner changed; unrelated files remain protected');
       }
-      await atomicJson(output, record);
-      await atomicJson(leaseFile, record);
+      record.writers=[...writers].map(child=>child.pid);
+      record.processIdentities={owner:ownerIdentity,writers:[...writers].map(child=>({pid:child.pid,identity:child.exitCode!==null||child.signalCode!==null?null:writerIdentities.get(child)??null,exited:child.exitCode!==null||child.signalCode!==null}))};
+      // Publish the same frozen observation to both existing owner receipts.
+      // A concurrent registration must not change only half of this pair.
+      const snapshot=structuredClone(record);
+      await atomicJson(output, snapshot);
+      await atomicJson(leaseFile, snapshot);
     });
     return metadataWrite;
   };
@@ -1228,6 +1273,11 @@ export async function beginQaStorage(
     writers.add(child);
     record.writers = [...writers].map((child) => child.pid);
     await persistRecord();
+    if(child.exitCode===null&&child.signalCode===null){
+      const pin=await processIdentity(child.pid);
+      if(child.exitCode===null&&child.signalCode===null&&pin)writerIdentities.set(child,pin);
+    }
+    await persistRecord();
   };
   // Only completed, regenerable CRX installers in a freshly declared QA
   // WebView profile. Installed components, browser state and unknown files
@@ -1343,7 +1393,7 @@ export async function withDevelopmentWorkspace(
       record.schemaVersion !== 3 ||
       record.workflow !== 'source-development' ||
       !record.active ||
-      !isLive(record.ownerPid) ||
+      !await qaOwnerActive(record) ||
       record.nonce !== process.env.SPARK_BUILD_NONCE ||
       key(record.root) !== key(run)
     )
@@ -1389,8 +1439,7 @@ export async function withDevelopmentWorkspace(
     if (
       row.workflow === 'source-development' &&
       row.active &&
-      !isLive(row.ownerPid) &&
-      !row.writers.some(isLive)
+      !await qaProcessOwnershipActive(row)
     )
       await recoverQaScratch(prior, { storageRoot: base });
     const finalText=await fs.readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return null;throw error;});
@@ -1538,14 +1587,15 @@ export async function readDevelopmentStorage(checkout = projectRoot) {
         record.nonce !== lease.nonce ||
         record.ownerPid !== lease.ownerPid ||
         key(lease.root) !== key(run) ||
-        JSON.stringify(record.writers) !== JSON.stringify(lease.writers)
+        JSON.stringify(record.writers) !== JSON.stringify(lease.writers) ||
+        JSON.stringify(record.processIdentities) !== JSON.stringify(lease.processIdentities)
       )
         throw Error('Operation and lease ownership differ; wait or review this exact item');
       report.runs.push({
         root: run,
         ownerPid: record.ownerPid,
         writerPids: record.writers,
-        ownerLive: isLive(record.ownerPid),
+        ownerLive: await qaOwnerActive(record),
         active: record.active,
         sourceCommit: record.sourceCommit,
         sourceDirty: record.sourceDirty,
