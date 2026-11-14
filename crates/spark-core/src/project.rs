@@ -419,13 +419,19 @@ impl FileRevision {
     }
 }
 
-/// Write to a sibling temporary file, fsync, then replace. Keep an exact backup before replacement.
+/// Sync a sibling temporary file, then publish a new name or replace a reviewed existing one.
+/// A new name never overwrites an arriving file; replacement retains the requested exact backup.
 pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<PathBuf>> {
     atomic_write_checked(path,bytes,backup,None)
 }
 pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:Option<&FileRevision>)->Result<Option<PathBuf>> {
     reject_links(path)?;
     if let Some(expected)=expected{expected.verify(path)?;}
+    let create_only = match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+        Err(error) => return Err(error.into()),
+        Ok(_) => false,
+    };
     let parent = path
         .parent()
         .ok_or_else(|| crate::SparkError::Invalid("Output has no parent".into()))?;
@@ -439,7 +445,7 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         f.write_all(bytes)?;
         f.sync_all()?;
         drop(f);
-        let bak = if backup && path.is_file() {
+        let bak = if !create_only && backup && path.is_file() {
             let bak = parent.join(format!(
                 "{}.bak-{}",
                 path.file_name().unwrap_or_default().to_string_lossy(),
@@ -451,13 +457,47 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
             None
         };
         if let Some(expected)=expected{expected.verify(path)?;}
-        fs::rename(&temp, path)?;
+        #[cfg(test)]
+        atomic_publication_tests::run_publication_hook();
+        if create_only { publish_new_file(&temp, path)?; }
+        else { fs::rename(&temp, path)?; }
         Ok(bak)
     })();
     if temp.exists() {
         let _ = fs::remove_file(temp);
     }
     result
+}
+// Part of the existing sibling-temp writer: publish a previously absent name
+// without any replacing fallback. Only our completed temporary bytes are moved.
+fn publish_new_file(temp: &Path, path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        #[link(name = "kernel32")]
+        extern "system" { fn MoveFileExW(source: *const u16, destination: *const u16, flags: u32) -> i32; }
+        // canonicalize supplies Windows' extended absolute prefix, including
+        // UNC and long Unicode paths. Both names stay in the same directory.
+        let source = crate::native_staging::canonical_destination(temp)?;
+        let destination = crate::native_staging::canonical_destination(path)?;
+        let source = source.as_os_str().encode_wide().collect::<Vec<_>>();
+        let destination = destination.as_os_str().encode_wide().collect::<Vec<_>>();
+        if source.contains(&0) || destination.contains(&0) { return invalid("Output path contains a null character"); }
+        let source = source.into_iter().chain([0]).collect::<Vec<_>>();
+        let destination = destination.into_iter().chain([0]).collect::<Vec<_>>();
+        // No REPLACE_EXISTING, COPY_ALLOWED or delayed/reboot operation.
+        if unsafe { MoveFileExW(source.as_ptr(), destination.as_ptr(), 0) } == 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        // linkat refuses an existing destination atomically. The short-lived
+        // second name references our own temp, never a protected user input.
+        fs::hard_link(temp, path)?;
+        fs::remove_file(temp)?;
+    }
+    Ok(())
 }
 pub(crate) fn encoded_project(path:&Path,project:&Project)->Result<Vec<u8>> {
     project.validate()?;
@@ -771,4 +811,70 @@ mod native_lighting_revision_tests {
         p.native_lighting=None;p.validate().unwrap();
         assert_eq!(p.fingerprint().unwrap(),original);
     }
+}
+
+
+#[cfg(test)]
+mod atomic_publication_tests {
+    use super::*;
+    std::thread_local! {
+        static PUBLICATION_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+    }
+    pub(super) fn run_publication_hook() {
+        let hook = PUBLICATION_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    fn arriving_file_is_preserved(checked: bool) {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("new-project.gsproject");
+        let absent = FileRevision::capture(&target).unwrap();
+        let foreign = target.clone();
+        PUBLICATION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            fs::write(foreign, b"independently saved user project").unwrap();
+        })));
+        let result = atomic_write_checked(&target, b"our new project", false, checked.then_some(&absent));
+        assert!(result.is_err(), "publishing a new file must not replace an independently arriving revision");
+        assert_eq!(fs::read(&target).unwrap(), b"independently saved user project");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1, "only our unused temporary file may be retired");
+    }
+    #[test]
+    fn new_file_publication_supports_relative_filename() {
+        const CHILD_ROOT: &str = "SPARK_ATOMIC_RELATIVE_TEST_ROOT";
+        if let Some(root) = std::env::var_os(CHILD_ROOT) {
+            assert_eq!(fs::canonicalize(std::env::current_dir().unwrap()).unwrap(), fs::canonicalize(root).unwrap());
+            atomic_write(Path::new("relative-fixture.gsproject"), b"relative path source", false).unwrap();
+            return;
+        }
+        let root = tempfile::tempdir().unwrap();
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "project::atomic_publication_tests::new_file_publication_supports_relative_filename"])
+            .env(CHILD_ROOT, root.path()).current_dir(root.path()).output().unwrap();
+        assert!(child.status.success(), "{}", String::from_utf8_lossy(&child.stderr));
+        assert_eq!(fs::read(root.path().join("relative-fixture.gsproject")).unwrap(), b"relative path source");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+    #[test]
+    fn new_file_publication_keeps_normal_save_and_exact_backup() {
+        let root = tempfile::tempdir().unwrap(); let target = root.path().join("project.gsproject");
+        assert!(atomic_write(&target, b"first", true).unwrap().is_none());
+        assert!(crate::storage::unique_file_identity(&target).is_some());
+        let backup = atomic_write(&target, b"second", true).unwrap().unwrap();
+        assert_eq!(fs::read(backup).unwrap(), b"first");
+        assert_eq!(fs::read(target).unwrap(), b"second");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
+    }
+    #[cfg(windows)]
+    #[test]
+    fn new_file_publication_supports_long_unicode_windows_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = (0..4).fold(root.path().to_path_buf(), |path, n| path.join(format!("section{n}-{}", "x".repeat(75))));
+        let target = parent.join("creation-\u{00e9}.gsproject");
+        atomic_write(&target, b"long path source", false).unwrap();
+        assert_eq!(fs::read(target).unwrap(), b"long path source");
+        assert_eq!(fs::read_dir(parent).unwrap().count(), 1);
+    }
+    #[test]
+    fn unchecked_new_file_publication_preserves_last_moment_arrival() { arriving_file_is_preserved(false); }
+    #[test]
+    fn checked_new_file_publication_preserves_last_moment_arrival() { arriving_file_is_preserved(true); }
 }
