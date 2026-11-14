@@ -52,7 +52,13 @@ test('shared model and BSP components preserve glass pass order, chroma mode and
   expect(result.errors).toEqual([]);
   expect(result.meterState).toEqual({inputs:[1,1,1,1,1],scope:'source-preview',samplerOwned:true,nearest:true,originalUnchanged:true});
   expect(result.disposedSampler).toBe(true);expect(result.unknownMaps).toBe(0);
-  expect(result.meterEmpty.pixel).toEqual([25,51,76,255]);
+  // 0.1/0.3 lie at half-byte boundaries (25.5/76.5). GPUs may
+  // quantize either way; no material may change the independently cleared pixel.
+  for(const [channel,value] of [.1,.2,.3].entries())
+    expect(Math.abs(result.meterEmpty.clearPixel[channel]-value*255)).toBeLessThanOrEqual(.5);
+  expect(result.meterEmpty.clearPixel[3]).toBe(255);
+  expect(result.meterEmpty.pixel).toEqual(result.meterEmpty.clearPixel);
+  expect(result.meterFilled.pixel).not.toEqual(result.meterEmpty.clearPixel);
   for(const [i,value]of[96,188,105,255].entries())expect(Math.abs(result.meterFilled.pixel[i]-value)).toBeLessThanOrEqual(1);
   for(const frame of [result.model,result.completed,result.bsp]){
     for(const [channel,expected]of[118,78,110,255].entries())expect(Math.abs(frame.pixel[channel]-expected)).toBeLessThanOrEqual(1);

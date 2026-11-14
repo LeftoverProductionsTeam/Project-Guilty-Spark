@@ -171,8 +171,30 @@ fn order_text(text:&str,packs:&[Pack],enabled:&BTreeMap<String,bool>)->Result<St
     if let Some(decor)=decor{*doc["disabled"].as_value_mut().unwrap().decor_mut()=decor;}
     Ok(doc.to_string())
 }
-struct OwnedFile(PathBuf);
-impl Drop for OwnedFile{fn drop(&mut self){let _=fs::remove_file(&self.0);}}
+struct OwnedFile { path:PathBuf, identity:(u64,u64), sha256:String, bytes:u64 }
+impl OwnedFile {
+    fn new(path:PathBuf,file:&fs::File,expected:&[u8])->Result<Self> {
+        use sha2::Digest;
+        let identity=crate::storage::unique_file_handle_identity(file).ok_or_else(||SparkError::Invalid("Pack lock ownership is unavailable; retained".into()))?;
+        if crate::storage::unique_file_identity(&path)!=Some(identity){return invalid("Pack lock was replaced; external file retained");}
+        Ok(Self{path,identity,sha256:crate::hex_bytes(sha2::Sha256::digest(expected)),bytes:expected.len() as u64})
+    }
+    fn verify(&self)->Result<()> {
+        use sha2::Digest;
+        crate::reject_links(&self.path)?;
+        let file=fs::File::open(&self.path)?;
+        if crate::storage::unique_file_handle_identity(&file)!=Some(self.identity)||file.metadata()?.len()!=self.bytes{
+            return invalid("Pack lock changed outside this operation; external file retained");
+        }
+        // Read only the expected tiny lock plus one byte, even if another
+        // process grows this inode while cleanup is checking it.
+        let mut bytes=Vec::new();file.take(self.bytes+1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64!=self.bytes||crate::hex_bytes(sha2::Sha256::digest(&bytes))!=self.sha256
+            ||crate::storage::unique_file_identity(&self.path)!=Some(self.identity){return invalid("Pack lock changed outside this operation; external file retained");}
+        Ok(())
+    }
+}
+impl Drop for OwnedFile { fn drop(&mut self){if self.verify().is_ok(){let _=fs::remove_file(&self.path);}} }
 // Only at deliberate launch, after the desktop's running-game check. Shared
 // roots alternate known Spark states, never overwrite an unreviewed menu edit.
 pub fn apply(reg:&RuntimeRegistration,pref:&Preference,applied:&[Applied])->Result<Applied>{
@@ -180,26 +202,32 @@ pub fn apply(reg:&RuntimeRegistration,pref:&Preference,applied:&[Applied])->Resu
     apply_inventory(inventory,pref,applied)
 }
 fn apply_inventory(inventory:Inventory,pref:&Preference,applied:&[Applied])->Result<Applied>{
+    apply_after_review(inventory,pref,applied,|_|Ok(()))
+}
+// A private checkpoint lets adversarial tests interrupt the real adoption path;
+// no callback or executable operation is exposed to users, tools or peers.
+fn apply_after_review(inventory:Inventory,pref:&Preference,applied:&[Applied],before_adopt:impl FnOnce(&Path)->Result<()>)->Result<Applied>{
     if !inventory.supported||!inventory.saved{return invalid("Runtime or pack metadata changed. Recheck and save pack choices before launching");}
     let mods=inventory.data_root.join("mods");
     if inventory.packs.is_empty(){return invalid("No installed packs to apply");}
     crate::reject_links(&mods)?;
     let lock=mods.join(".spark-pack.lock");crate::reject_links(&lock)?;
     let mut handle=fs::OpenOptions::new().write(true).create_new(true).open(&lock).map_err(|_|SparkError::Invalid("Pack settings are busy or interrupted; inspect .spark-pack.lock before retrying".into()))?;
-    let _lock=OwnedFile(lock);writeln!(handle,"{}",std::process::id())?;handle.sync_all()?;drop(handle);
+    let owner_text=format!("{}\n",std::process::id());
+    let lock=OwnedFile::new(lock,&handle,owner_text.as_bytes())?;handle.write_all(owner_text.as_bytes())?;handle.sync_all()?;drop(handle);
     let file=mods.join("load_order.toml");
-    let old=bounded(&file)?;let old_hash=old.as_deref().map(digest);
+    let revision=crate::project::FileRevision::capture(&file)?;
+    let old=bounded(&file)?;revision.verify(&file)?;let old_hash=old.as_deref().map(digest);
     if old_hash!=pref.baseline_order_sha256 && !applied.iter().any(|p|p.data_root==inventory.data_root&&p.inventory_sha256==inventory.inventory_sha256&&p.order_sha256==old_hash){
         return invalid("The game's pack settings changed outside Spark. Recheck and save your choices before launching");
     }
     let text=order_text(old.as_deref().unwrap_or(""),&inventory.packs,&pref.enabled)?;
     if old.as_deref()!=Some(&text){
-        let stage=mods.join(format!(".spark-pack-{}.tmp",uuid::Uuid::new_v4()));
-        let mut out=fs::OpenOptions::new().write(true).create_new(true).open(&stage)?;let _stage=OwnedFile(stage.clone());
-        out.write_all(text.as_bytes())?;out.sync_all()?;drop(out);
         let (_,now_inventory,now_order)=scan(&inventory.data_root)?;
         if now_inventory!=inventory.inventory_sha256||now_order!=old_hash{return invalid("Native pack settings changed during launch; no settings were adopted");}
-        fs::rename(&stage,&file)?;
+        before_adopt(&file)?;
+        lock.verify()?;
+        crate::project::atomic_write_checked(&file,text.as_bytes(),false,Some(&revision))?;
         if bounded(&file)?.as_deref()!=Some(&text){return invalid("Native pack settings readback failed; game was not launched");}
     }
     Ok(Applied{data_root:inventory.data_root,inventory_sha256:inventory.inventory_sha256,order_sha256:Some(digest(&text))})
@@ -258,6 +286,46 @@ fn apply_inventory(inventory:Inventory,pref:&Preference,applied:&[Applied])->Res
         assert!(apply_inventory(i,&pref,&[]).is_err());
         assert_eq!(fs::read_to_string(t.path().join("mods/.spark-pack.lock")).unwrap(),"other owner");
         assert!(!t.path().join("mods/load_order.toml").exists());
+    }
+
+    #[test]fn pack_adoption_preserves_an_equivalent_byte_external_replacement(){
+        let t=tempfile::tempdir().unwrap();fixture(t.path(),"audio","");
+        let file=t.path().join("mods/load_order.toml");fs::write(&file,"disabled=[]\n").unwrap();
+        let i=inventory(t.path());let pref=preference(&i,&i.inventory_sha256,i.order_sha256.as_deref(),BTreeMap::from([("audio".into(),false)])).unwrap();
+        let original=t.path().join("reviewed-original.toml");
+        let result=apply_after_review(i,&pref,&[],|path|{fs::rename(path,&original)?;fs::write(path,"disabled=[]\n")?;Ok(())});
+        assert!(result.is_err());assert_eq!(fs::read(&file).unwrap(),b"disabled=[]\n");assert_eq!(fs::read(original).unwrap(),b"disabled=[]\n");
+        assert!(!t.path().join("mods/.spark-pack.lock").exists());
+    }
+    #[test]fn pack_adoption_retains_external_bytes_changed_after_review(){
+        let t=tempfile::tempdir().unwrap();fixture(t.path(),"audio","");let i=inventory(t.path());
+        let pref=preference(&i,&i.inventory_sha256,None,BTreeMap::from([("audio".into(),false)])).unwrap();
+        let result=apply_after_review(i,&pref,&[],|path|{fs::write(path,"# external engine settings\ndisabled=[]\n")?;Ok(())});
+        assert!(result.is_err());assert_eq!(fs::read(t.path().join("mods/load_order.toml")).unwrap(),b"# external engine settings\ndisabled=[]\n");
+        assert!(!t.path().join("mods/.spark-pack.lock").exists());
+    }
+    #[test]fn replaced_pack_lock_is_never_deleted_or_used_to_adopt_settings(){
+        let t=tempfile::tempdir().unwrap();fixture(t.path(),"audio","");let i=inventory(t.path());
+        let pref=preference(&i,&i.inventory_sha256,None,BTreeMap::from([("audio".into(),false)])).unwrap();
+        let saved=t.path().join("original-lock");let lock=t.path().join("mods/.spark-pack.lock");
+        let result=apply_after_review(i,&pref,&[],|_|{fs::rename(&lock,&saved)?;fs::write(&lock,b"foreign user file")?;Ok(())});
+        assert!(result.is_err());assert_eq!(fs::read(&lock).unwrap(),b"foreign user file");assert!(saved.is_file());
+        assert!(!t.path().join("mods/load_order.toml").exists());
+    }
+    #[test]fn changed_in_place_pack_lock_is_retained(){
+        let t=tempfile::tempdir().unwrap();fixture(t.path(),"audio","");let i=inventory(t.path());
+        let pref=preference(&i,&i.inventory_sha256,None,BTreeMap::from([("audio".into(),false)])).unwrap();
+        let lock=t.path().join("mods/.spark-pack.lock");
+        let result=apply_after_review(i,&pref,&[],|_|{fs::write(&lock,b"externally changed lock")?;Ok(())});
+        assert!(result.is_err());assert_eq!(fs::read(&lock).unwrap(),b"externally changed lock");
+        assert!(!t.path().join("mods/load_order.toml").exists());
+    }
+    #[test]fn hardlinked_native_order_is_not_replaced(){
+        let t=tempfile::tempdir().unwrap();fixture(t.path(),"audio","");let file=t.path().join("mods/load_order.toml");
+        fs::write(&file,b"disabled=[]\n").unwrap();let alias=t.path().join("user-alias.toml");fs::hard_link(&file,&alias).unwrap();
+        let i=inventory(t.path());let pref=preference(&i,&i.inventory_sha256,i.order_sha256.as_deref(),BTreeMap::from([("audio".into(),false)])).unwrap();
+        assert!(apply_inventory(i,&pref,&[]).is_err());assert_eq!(fs::read(&file).unwrap(),b"disabled=[]\n");assert_eq!(fs::read(alias).unwrap(),b"disabled=[]\n");
+        assert!(!t.path().join("mods/.spark-pack.lock").exists());
     }
 
 }

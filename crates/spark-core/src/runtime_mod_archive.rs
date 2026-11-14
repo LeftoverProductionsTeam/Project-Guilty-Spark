@@ -66,8 +66,10 @@ pub fn install_archive(file:&Path,kind:&str,expected_sha:&str,root:&Path,expecte
     let mods=root.join("mods");crate::reject_links(&mods)?;fs::create_dir_all(&mods)?;
     if crate::storage::free_bytes(&mods).is_some_and(|n|n<plan.installed_bytes.saturating_add(256*1024*1024)){return invalid("Not enough free space to install the complete pack safely");}
     let lock=mods.join(".spark-pack.lock");crate::reject_links(&lock)?;
-    let lock_file=fs::OpenOptions::new().write(true).create_new(true).open(&lock).map_err(|_|SparkError::Invalid("Another pack operation is active or interrupted".into()))?;
-    let _lock=OwnedFile(lock);drop(lock_file);
+    let mut lock_file=fs::OpenOptions::new().write(true).create_new(true).open(&lock).map_err(|_|SparkError::Invalid("Another pack operation is active or interrupted".into()))?;
+    let owner_text=format!("{}\n",std::process::id());
+    let lock=OwnedFile::new(lock,&lock_file,owner_text.as_bytes())?;
+    lock_file.write_all(owner_text.as_bytes())?;lock_file.sync_all()?;drop(lock_file);
     let destination=mods.join(&plan.folder);crate::reject_links(&destination)?;
     if destination.exists(){return invalid("This pack folder already exists. Spark will not overwrite it; keep the current pack or choose a separate reviewed version");}
     let mut stage=archive::StageGuard::new(&mods,uuid::Uuid::new_v4().to_string())?;
@@ -85,6 +87,7 @@ pub fn install_archive(file:&Path,kind:&str,expected_sha:&str,root:&Path,expecte
     let record=serde_json::to_vec_pretty(&receipt)?;
     let record_path=stage.path().join("payload/.spark-pack-receipt.json");
     stage.copy(&mut std::io::Cursor::new(record),&record_path)?;
+    lock.verify()?;
     stage.publish_payload_new(&destination)?;
     Ok(receipt)
 }

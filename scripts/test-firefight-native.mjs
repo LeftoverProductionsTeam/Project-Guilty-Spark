@@ -89,6 +89,19 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const query=await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-G','encounters[*].name','-G','encounters[*].squads[*].normal_diff_count','-G','encounters[*].squads[*].starting_locations[*].position','-G','scripts[*].name',scenario+'.scenario']);
    const text=query.stdout.trim();expect(text).toContain('gs_w01_g01');expect(text).toContain('gs_w02_g01');expect(text).toContain('gs_ff_bootstrap');expect(text).toContain('gs_firefight');
    const field=async(key,flag='-G')=>(await run(path.join(invader,'invader-edit.exe'),['-t',readback,flag,key,scenario+'.scenario'])).stdout.trim();
+   // Report the standard singleplayer loadout independently of successful
+   // encounter compilation. An empty profile is not a playable round.
+   const profileCount=Number(await field('player_starting_profile','-C'));
+   expect(Number.isSafeInteger(profileCount)&&profileCount>=0&&profileCount<=256).toBe(true);
+   const playerProfiles=[];
+   for(let i=0;i<profileCount;i++){
+    const prefix='player_starting_profile['+i+']';
+    playerProfiles.push({name:await field(prefix+'.name'),primaryWeapon:await field(prefix+'.primary_weapon'),
+     primaryLoaded:Number(await field(prefix+'.primary_rounds_loaded')),primaryReserved:Number(await field(prefix+'.primary_rounds_reserved')),
+     secondaryWeapon:await field(prefix+'.secondary_weapon'),secondaryLoaded:Number(await field(prefix+'.secondary_rounds_loaded')),
+     secondaryReserved:Number(await field(prefix+'.secondary_rounds_reserved'))});
+   }
+   report.playerLoadout={nativeReadback:true,profileCount,profiles:playerProfiles,gameplayVerified:false};
    const nativeCounts=[],nativePositions=[];
    for(let i=0;i<2;i++){
     const prefix='encounters['+i+']';

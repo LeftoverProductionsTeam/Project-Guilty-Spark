@@ -1,5 +1,23 @@
 # Canonical cumulative feature and evidence ledger
 
+## 14 November 2026 — Complete Creator Mission intake
+
+The original475 CSV records and wordings remain byte-identical (SHA256 b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643). The owner’s new mission and resume are preserved in [Complete Creator Mission](Master%20Engineering%20Prompts/GS_2026-11-14_Complete_Creator_Mission.txt) and [resume/file-safety directive](Master%20Engineering%20Prompts/GS_2026-11-14_Resume_File_Safety_And_Native_Acceptance.txt). This is traceability through the existing ledger, not acceptance or a second queue. Full M1–M6/Operation110 remain active.
+
+| Existing requirement identities | New detail that remains required | Current boundary |
+|---|---|---|
+| C33-lighting; Living-22; P03-002 | Spark-owned shared GPU lighting, 4K-capable bounded pages, live lights/fog, original-layout and full relighting, measured native output | Existing native lighting/tool pipeline is not a completed Spark GPU baker. Target allocation, fidelity, native readback and game gates remain open. |
+| P06-002; P06-004; C36-external-tools; C37-licensing | Optional Halo Tool/OpenTool setup, selected versions, monitored safe launch and validated synchronization | Preserve existing external handoffs; OpenTool GPL-3.0 is not copied into MIT source. Broader round trips remain open. |
+| P10-002; P03-005; C34-all-runtimes | Universal Adaptive Export including original Xbox via pinned Invader xbox-ntsc; explicit target budgets and loss review | Existing format profiles/conversions are partial. No universal exporter, Xbox gameplay or header-only conversion acceptance. |
+| C34-all-runtimes; C34-identity; C34-operations | MCC, Chupathingy and OpenH1 preferred testing, without abandoning other editions | Exact runtime/source identity remains authoritative. Linux/OpenH1 headset/engine operations need independent evidence. |
+| C34-all-runtimes; C34-creation-vision | Full original and rerelease Stubbs readers, authoring, native writers/export and gameplay | Separate first-class target is required, not completed by shallow cache inspection or Halo ancestry. No identical-format assumption. |
+| C34-fault-tests; C38-revisions; C49-storage-preservation | Strict original-file ownership, operation-specific external-write approval, hostile cleanup/alias/replacement/save/rollback cases | R641931Rust pass includes five new pack-adoption adversarial cases. General recursive cleanup and final adoption races remain open. |
+| P06-001; C35-external-tags; C36-external-tools | Better integrated native workflows while preserving specialist-tool compatibility and source/license boundaries | Reuse current source builders/registries; no duplicate editor, source writer, network stack or invented automation interface. |
+| P05-008; C49-linux-packages | Functional native Linux build, real AppImage/Deb startup and actual creator workflows | Existing release pipeline requires native compilation/startup. Current PC has no Linux host; Windows results do not close this gate. |
+
+Current baseline repair and exact test receipts are recorded in [CI/native evidence](CI_NATIVE_SOURCE_CLOSURE_20261108.md). Original Firefight human/peer gates remain in [the existing engine evidence](FIREFIGHT_ENGINE.md). No requirement is retired because another one is difficult or hardware-blocked.
+
+
 **10 November vehicle coverage diagnostics accepted:** Vehicle coverage R409–R414 passes full479frontend/272browser and fresh Windows/native source-family checks. Native triangle-strip/material partitions are independently matched, with exact visible warnings for4dashboard meter triangles and3179Demo carrier triangles;0missing supported shaders in inspected vehicle previews. Dynamic meter rendering and H29actual-game comparison remain open. See NATIVE_ASSETS_AND_SHOWCASE.md#material-coverage-follow-through--10-november. All475CSV requirements remain byte-unchanged.
 
 **10 November vehicle material repair:** shared parser/renderer preserve native model detail-after-reflection order. R399 GPU failure is repaired; R401 full909Rust/9explicit ignores,476frontend/271browser, offline/storage/contracts and fresh Windows/native checks pass. R402–R404/R406/R407 verify source flags/UVs and actual preview controls. The Demo carrier with15 light references remains unsupported material rendering; matched-game H29 stays open. [Evidence](NATIVE_ASSETS_AND_SHOWCASE.md#10-november-native-vehicle-detail-and-reflection-order). All475CSV requirements remain byte-unchanged.

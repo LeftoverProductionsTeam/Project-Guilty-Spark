@@ -200,10 +200,14 @@ export async function renderComponentGlassChecks(){
   const target=new THREE.WebGLRenderTarget(32,32),pause=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
   const read=async(element:ReturnType<typeof createElement>)=>{
     root.render(element);await pause();if(!state)throw Error('Native component renderer did not initialize');
-    state.gl.setRenderTarget(target);state.gl.setClearColor(new THREE.Color(.1,.2,.3),1);state.gl.clear();state.gl.render(state.scene,camera);
+    state.gl.setRenderTarget(target);state.gl.setClearColor(new THREE.Color(.1,.2,.3),1);state.gl.clear();
+    // Independently sample the untouched framebuffer on this GPU. A transparent
+    // native meter must preserve those exact bytes, including UNORM rounding.
+    const clearPixel=new Uint8Array(4);state.gl.readRenderTargetPixels(target,16,16,1,1,clearPixel);
+    state.gl.render(state.scene,camera);
     const pixel=new Uint8Array(4);state.gl.readRenderTargetPixels(target,16,16,1,1,pixel);
     const mesh=state.scene.children.find(child=>child instanceof THREE.Mesh) as THREE.Mesh|undefined;
-    return{pixel:[...pixel],groups:mesh?.geometry.groups.length,geometry:mesh?.geometry.uuid,draws:state.gl.info.render.calls,triangles:state.gl.info.render.triangles};
+    return{pixel:[...pixel],clearPixel:[...clearPixel],groups:mesh?.geometry.groups.length,geometry:mesh?.geometry.uuid,draws:state.gl.info.render.calls,triangles:state.gl.info.render.triangles};
   };
   const props={data,shaderTextures:{7:texture},shaderMetadata:{7:metadata},extraTextures:{'7:reflectionCube':cube}};
   const model=await read(createElement(HaloMesh,props));

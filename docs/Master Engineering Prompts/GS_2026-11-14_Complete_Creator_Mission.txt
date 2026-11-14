@@ -1,0 +1,244 @@
+# PROJECT GUILTY SPARK
+# THE COMPLETE CREATOR MISSION
+## ALL THE TOOLS, AND THEN SOME.
+### ONE HALO. EVERY WORLD. EVERY TOOL. TOGETHER.
+
+## Mission
+
+Finish Project Guilty Spark as the most capable, safe, unified creation suite we can build for Halo 1 and compatible Halo-derived games.
+
+Not just a launcher.
+
+Not just a map inspector.
+
+Not just experimental code that compiles.
+
+**One application where a creator can open a game, modify its actual content, create something new, compile it, test it, play it, collaborate and share it.**
+
+Existing tools remain useful and supported, but Spark must develop superior native workflows wherever practical.
+
+Continue from the current implementation and preserve every accepted feature and previous-good build.
+
+This mission extends Operation 110 and the original directives. It does not supersede their outstanding requirements.
+
+## The permanent engineering rule
+
+**User files are sacred.**
+
+Never silently modify, replace, relocate, delete, or install into a user-owned game, map, SDK, mod or project directory.
+
+Read-only discovery and inspection are the defaults.
+
+Use explicit operation-specific permission for external writes. Stage automatic edits and builds separately, validate them, and maintain recoverable revisions.
+
+Automatic external-tool synchronization may inspect changes without modifying the original files. Any conflicting or destructive adoption requires review.
+
+A successful build must never destroy the previous-good build.
+
+No unapproved Git publication, proprietary download, operating-system security change or destructive cleanup.
+
+Safety failures block release.
+
+## The execution loop
+
+Work continuously on the highest-impact unfinished, unblocked requirement within the available execution session.
+
+For each meaningful engineering increment:
+
+1. Identify an actual missing capability, defect or acceptance gate in existing code.
+2. Trace its implementation, UI control, dependent functions, source data and native runtime behavior.
+3. Repair or finish it using existing architecture.
+4. Run focused and broad regressions.
+5. Verify the genuine native artifact and game behavior when available.
+6. Confirm original source hashes and recoverable state.
+7. Record the exact result in the existing ledger/checkpoint.
+8. Continue immediately to the next dependency-respecting task.
+
+**Do not stop voluntarily after a successful test when feasible engineering remains.**
+
+If human input, hardware, credentials or unavailable tools block one gate, retain the exact blocker and continue another independent task.
+
+At session interruption or resource exhaustion, save a precise bounded checkpoint so the next Codex session can resume immediately.
+
+Do not claim asynchronous execution, invent test results or build a scheduler to keep Codex alive.
+
+## Priority A — Finish the reliable core
+
+Resolve current CI failures and file-protection gaps.
+
+Complete end-to-end workflows for maps, native tags, shaders, models, collision, textures, sounds, animations, scripts, geometry, assets and dependencies.
+
+Fix dead buttons, inaccurate labels, broken window navigation, unreliable Save/Undo and disconnected tools.
+
+The viewport must accurately display textured, populated Halo worlds with usable selection and manipulation—not substitute shapes pretending to be game objects.
+
+Preserve the existing single-scroll workspace preference, window independence, understandable tooltips and authentic user-provided Halo UI themes.
+
+## Priority B — Build Spark's GPU lighting engine
+
+Create one shared GPU lighting system with two authoring modes:
+
+**New-map lighting:** optimized lightmap UVs, target-verified 4K pages, modern shadows, indirect light, emissive materials, per-vertex radiosity and denoising.
+
+**Original-map relighting:** preserve original geometry, UV coordinates and page assignments where supported, with separate exact-layout and complete-relight outputs.
+
+Allow interactive sun, lighting, fog, emissive-material and placed-light editing inside the 3D workspace.
+
+Provide **Bake in Spark**, **Bake with Halo Tool** and **Bake with OpenTool**.
+
+Maintain approved external tool installation, version selection, process monitoring and automatic validated readback. The creator should return to an updated Spark workspace after external editing.
+
+Reuse existing `native_lighting.rs`, `forge_build.rs`, `haloLightmap.ts`, the bitmap readers and the native project transaction system.
+
+Develop a memory-safe 4K path using appropriate streaming or tiling rather than removing existing allocation limits.
+
+Compare Spark against real Halo Tool and OpenTool builds using equivalent scenes and hardware. Measure rendering accuracy, bake time, peak memory, image quality, output size and engine behavior.
+
+OpenTool is GPL-3.0; Spark is MIT. Respect source licensing, attribution and redistribution boundaries. Do not copy GPL implementations into Spark without an approved licensing decision.
+
+## Priority C — Universal Adaptive Export
+
+A creator selects a target runtime. Spark automatically performs supported format conversion, asset processing and optimization needed for that runtime.
+
+Preserve one high-quality master project and create separate native outputs.
+
+Target every applicable Halo 1 family:
+
+- MCC H1A Steam, Microsoft Store and applicable Proton paths.
+- Chupathingy, OpenCE, OpenH1 and independently verified community engines.
+- Halo PC Retail, Custom Edition and Trial.
+- Original Halo Xbox, supported regions and hardware configurations.
+- Mac Retail, Mac Demo, HaloMD, Intel and legacy PowerPC where feasible.
+- OpenSauce and other reviewed engine extensions, including Arena Evolved and compatible dedicated servers.
+
+**Original Xbox export is a required capability.**
+
+Investigate and integrate Invader's existing Xbox build support, including its native `xbox-ntsc` target, before attempting a duplicate cache writer.
+
+For a selected Xbox target, automatically adapt supported lightmaps, bitmaps, shaders, geometry, models, collision, audio, animation, dependencies, scripts and resource budgets.
+
+Apply only verified conversions. Preserve gameplay semantics.
+
+When a feature has no valid equivalent, identify the exact problem, offer a user-reviewed compatible alternative and refuse misleading exports. Never silently remove functionality.
+
+Verify the result through native tools, independent readback and actual hardware/emulator gameplay separately.
+
+Do not assume identical cache versions imply compatible rendering or networking.
+
+## Priority D — Finish the worlds
+
+Complete the Timberland–Sidewinder native connection before scaling.
+
+Require real two-way foot traversal, Warthog roads, cave entrances, mountain and sniper paths, collision, visibility, lighting and projectile behavior.
+
+Then construct and validate the full 19-region MegaWorld.
+
+Expand the native BSP Workshop with terrain sculpting, real imported-BSP editing where possible, robust topology repairs, portals, material painting, geometry validation and actionable compiler diagnostics.
+
+All source changes must compile and produce genuinely playable results.
+
+## Priority E — Make the gameplay real
+
+Finish **Zombie Apocalypse** with functioning native AI spawning, carrier release, stable physics, animation, infection, combat, death, cleanup and synchronized multiplayer behavior.
+
+Finish **Firefight** with actual AI encounters, waves, combat, scoring, HUD, objectives, modifiers, supplies, defeat/victory and cooperative behavior.
+
+Finish **Extraction** as persistent PvPvE with loot, player inventory, banked progression, extraction, death handling, reconnect and host-authoritative recovery—without imposing a mandatory raid timer.
+
+Complete campaign creation, mission scripting, checkpoints, cinematics, objectives, pathfinding and gametype placement, including Slayer, CTF, King of the Hill and other compatible native modes.
+
+Offline simulations and compiled tags are useful development evidence. **They are not a substitute for actual gameplay.**
+
+## Priority F — Finish Live Link, Live Rebuild and collaboration
+
+Extend supported runtime-specific Live Link operations and reversible game edits.
+
+Improve native Live Rebuild with frozen source identities, safe dependency updates, previous-good recovery and reliable client state.
+
+Complete SparkLink across actual separate computers with authenticated collaboration, shared native content, independent author Undo, conflict handling, recovery, reconnect and permission management.
+
+Finish engine-specific multiplayer hosting/joining, community browsers, map voting, map downloads, safe mod packages, dedicated sessions and appropriate game-server features.
+
+Pursue expanded co-op, split-screen, larger multiplayer matches and cross-runtime interoperability where genuine engine capabilities permit them.
+
+Six-player co-op and 128-player multiplayer remain research/engineering targets, not accepted stock-engine capabilities.
+
+Never confuse shared editor state with synchronized game state.
+
+## Priority G — Extend the Halo-derived ecosystem
+
+Add complete **Stubbs the Zombie in Rebel Without a Pulse** editing as a separate first-class product target.
+
+Investigate and support its original releases and modern rerelease through version-specific file readers, tag definitions, asset extraction, native writers/builders and actual gameplay tests.
+
+Extend the unified 3D editor, tag editor, asset workshop, lighting system, map editing, zombie gameplay authoring and conversion system to Stubbs where compatible.
+
+Preserve Stubbs-specific mechanics and formats. Do not assume Halo cache compatibility from a shared engine ancestor.
+
+Use Ghidra and similar developer research tools where useful to investigate undocumented behavior legally. Do not import proprietary reverse-engineered game code or ship copyrighted assets.
+
+Keep Chupathingy, OpenCE, OpenH1 and other upstream communities independent and respected. Contribute improvements upstream where authorized instead of silently incorporating incompatible or differently licensed source.
+
+## Priority H — Complete the creator experience
+
+Finish full model, vehicle, weapon, animation, sound, shader, bitmap, collision, scenario and tag editing.
+
+Provide accurate dependency tracking, understandable validation, automatic compatible fixes, preview-versus-game comparisons and source-safe conversion.
+
+Complete machinima camera controls, recording/takes, greenscreen, cinematic tools and the Learning Center.
+
+Make ordinary editing operations possible inside Spark without requiring Blender, Guerilla, Sapien, Eschaton or other tools—while keeping all compatible external tools available.
+
+Add useful capabilities older Halo editors lacked: incremental builds, dependency-aware diagnostics, smart BSP repairs, live shader/lighting previews, target-specific optimization reports and one-click native playtesting.
+
+## Priority I — Release quality and platform independence
+
+Complete actual creator workflows on Windows, native macOS and native Linux.
+
+Test real display scaling, multiple monitors, physical input, hardware GPUs, headsets, native audio, renderer quality, crash recovery, performance and clean-machine installation.
+
+Finish OpenH1 VR editing with genuine headset interaction, scene placement, source persistence and correct native output.
+
+Keep runtime/download setup easy, optional and legally sourced.
+
+Build trustworthy installers and portable packages with exact source identities, hashes, safe upgrades, clear release notes and verified uninstall preservation.
+
+Do not publish an unverified release or mark a feature complete based on screenshots, mocks, declarations or simulated players.
+
+## Mandatory acceptance
+
+For every feature and supported runtime, independently track:
+
+**Source implemented → automated tests → native tag/source readback → native compilation → game loading → actual human gameplay → real peer behavior → release acceptance.**
+
+A higher stage must never be inferred from a lower one.
+
+Every major feature must have a working user-facing entry point, matching backend behavior, valid native output and honest compatibility status.
+
+Preserve all historical requirements, original prompts, research, user assets, source history and previous-good releases.
+
+Record new requirements without losing or rewriting the historical 475 IDs.
+
+## Focus for the next engineering cycle
+
+1. Restore green hosted CI without weakening renderer or safety tests.
+2. Close the remaining user-file protection gaps with adversarial tests.
+3. Finish the highest-priority real Firefight gameplay gate already identified in Operation 110.
+4. Establish the first integrated Spark GPU lighting slice, including interactive authoring, 4K-capable architecture and safe native output.
+5. Begin a verified original Xbox adaptive-export slice using the existing native toolchain.
+
+Continue with the next highest-value unblocked creator-to-game requirement.
+
+Do not spend entire sessions writing plans, repeating audits, polishing documentation or claiming partial infrastructure as finished gameplay.
+
+At each checkpoint provide:
+
+**Implemented | Tested | Native/game result | Safety verification | Still blocked | Exact next task**
+
+No fabricated completion percentages. No lowering tests to obtain green results. No discarding ambitious requests because they are difficult.
+
+**The finish line is not another checkpoint. It is a creation suite that actually delivers the complete vision, with every technically feasible feature either implemented and proven or transparently bounded by verified engine limitations.**
+
+## ALL THE TOOLS, AND THEN SOME.
+
+**Get back to building.**

@@ -1,0 +1,100 @@
+# PROJECT GUILTY SPARK — CODEX ENGINEERING RESUME
+
+## ALL THE TOOLS, AND THEN SOME.
+
+You are continuing the existing Project Guilty Spark. This is not a new project, rewrite or planning exercise.
+
+**Canonical repository:** `D:\Project Guilty Spark`
+
+**GitHub:** `LeftoverProductionsTeam/Project-Guilty-Spark`
+
+**Reference remote master at preparation:** `a045ea7c3532cfe46f8f67cd1ad0880e30370cd4`
+
+Verify the actual local and remote revisions before working. Never assume this reference is still current.
+
+### 1. Recover the existing engineering state
+
+Read and obey:
+
+- `AGENTS.md`
+- `docs/ENGINEERING_CONTRACT.md`
+- `docs/ACTIVE_TASK.md`
+- `docs/PENDING_REQUESTS.md`
+- `docs/DIRECTIVE_LEDGER.md`
+- `docs/MASTER_FEATURE_LEDGER.csv`
+- `docs/HUMAN_TEST_PLAN.md`
+- `docs/COMPATIBILITY_MATRIX.md`
+- `docs/UI_INTERACTION_AUDIT.md`
+- `docs/NATIVE_PORTABILITY.md`
+- All 25 original numbered Master Engineering Prompts (04–28)
+- The November 8 Unified Creator, 100% Completion and Operation 110 directives
+
+Inspect Git status, unfinished changes, existing tests, previous-good builds and outstanding native acceptance.
+
+Preserve all 475 existing ledger IDs and their historical provenance. A requirement record is not proof that the feature works.
+
+Do not create new branches, worktrees, clones, tracking systems or recovery warehouses.
+
+### 2. User files are sacred
+
+**Never modify, move, replace or delete any user-owned file without explicit authorization for that exact operation.**
+
+This includes Halo maps, ISOs, game installations, SDKs, mods, original tags, assets, preferences and user projects—even when those files reside inside the repository directory.
+
+All automatic operations must use isolated, owned working copies. No surprise game-folder changes. No automatic cleanup of ambiguous files.
+
+Investigate and harden:
+
+- `storage.rs` recursive cleanup and directory replacement races.
+- `runtime_mods.rs` modification of `mods/load_order.toml`.
+- Symlinks, junctions, hardlinks, interrupted writes and concurrent editors.
+- External-tool save monitoring, ownership, file comparison and conflict handling.
+- Backup, rollback, uninstall and project restoration.
+
+Use hostile test fixtures containing unexpected files, not real user collections. Never weaken preservation checks to make a test pass.
+
+No force push, destructive Git cleanup, history rewrite, security bypass, unapproved publication or unauthorized downloads.
+
+### 3. Repair and establish the current baseline
+
+Investigate the current GitHub CI failure involving `tests/ui/halo-materials.spec.ts`, particularly the observed one-value RGB difference.
+
+Determine whether it is an actual rendering defect or platform-dependent pixel rounding.
+
+Repair the genuine cause. Preserve meaningful rendering assertions.
+
+Run focused tests, complete available regressions and native validation. Record exact pass/fail evidence.
+
+Reconcile stale checkpoint statements about the README and public release with the actual GitHub state.
+
+### 4. Reconcile the newest owner requirements
+
+The November 13 additions must join the existing product scope:
+
+1. Spark-owned GPU lightmapping, target-verified 4K pages, live lighting placement, optimized new layouts and original-layout relighting.
+2. Optional official Halo Tool and OpenTool workflows with approved setup, safe launch and automatic validated synchronization.
+3. Universal Adaptive Export across Halo 1 runtimes, especially original Xbox, with automatic target-specific optimization and no silent loss of functionality.
+4. MCC, Chupathingy and OpenH1 as preferred testing targets, without abandoning any other runtime.
+5. Full original and rerelease **Stubbs the Zombie** creation support, using game-specific readers, writers, exporters and independent acceptance.
+6. Strict user-file ownership and explicit permission for external writes.
+7. Continuing improvements beyond historical Halo modding tools without removing compatibility with them.
+
+Keep these additions traceable through the existing requirements system. Preserve the original 475 historical entries. Do not create a competing task queue.
+
+### 5. Resume actual work
+
+After the baseline is restored, continue the highest-value unfinished native creator-to-game workflow.
+
+The existing active directive identifies real **Firefight gameplay acceptance** as the next major gate. Preserve that priority unless a genuine dependency or release-blocking defect requires attention first.
+
+Do not spend the session merely summarizing files, rewriting prompts, adding placeholders or increasing test counts.
+
+**Implement a meaningful improvement, test it, preserve the exact results, and continue.**
+
+Use `scripts/active-task.mjs` for concise checkpoints. Follow the existing size and provenance requirements.
+
+Commit verified source changes locally through the established workflow. Do not push or publish without authorization.
+
+At each checkpoint, report only what changed, what passed, what failed and the specific next engineering action.
+
+**Begin engineering now.**
