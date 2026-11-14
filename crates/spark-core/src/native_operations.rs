@@ -8,10 +8,13 @@ use std::path::Path;
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Operation {
     Dependencies,
-    AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool },
+    AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
+        #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32 },
     BoundingRadius { value: f64 },
     LensFlareScaleRepair,
 }
+fn single_actor()->u16{1}
+fn actor_spacing()->f32{0.75}
 impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
@@ -40,12 +43,13 @@ impl Operation {
             return invalid("Native tag path is too long or begins with a command option");
         }
         match self {
-            Self::AppendEncounter {name,actor_path,position,..} => {
+            Self::AppendEncounter {name,actor_path,position,count,spacing,..} => {
                 if class!="scnr" {return invalid("Append encounter requires a native scenario tag");}
                 if name.is_empty()||name.len()>31||!name.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_') {return invalid("Encounter name needs1–31ASCII letters, digits or underscores");}
                 safe_relative(actor_path)?;
                 if actor_path.is_empty()||actor_path.len()>240||actor_path.starts_with('-')||actor_path.ends_with(".actor_variant")||!actor_path.bytes().all(|c|c.is_ascii_alphanumeric()||b"_/\\ .-".contains(&c)) {return invalid("Choose a safe native actor-variant path without its extension");}
-                if position.iter().any(|v|!v.is_finite()||v.abs()>2048.) {return invalid("Encounter position must be finite and within2048world units; native collision/navigation still need review");}
+                if *count==0||*count>32{return invalid("A native encounter squad supports 1–32 authored starting locations");}
+                let _=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
             }
             Self::BoundingRadius { value } => {
                 if ![
@@ -132,19 +136,49 @@ fn encounter_append_layout(fields:&str,name:&str,actor:&str)->Result<(ArrayListi
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
-        let Self::AppendEncounter{name,actor_path,position,start_active}=self else{return self.arguments(tags,class,tag);};
+        let Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=self else{return self.arguments(tags,class,tag);};
         let (encounters,palette,actor)=encounter_append_layout(before,name,actor_path)?;
-        let e=format!("encounters[{}]",encounters.count);let squad=format!("{e}.squads[0]");let start=format!("{squad}.starting_locations[0]");let firing=format!("{e}.firing_positions[0]");
+        let e=format!("encounters[{}]",encounters.count);let squad=format!("{e}.squads[0]");
+        let positions=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
         if actor==palette.count {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
-        args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),"1".into(),"end".into(),"-I".into(),format!("{e}.firing_positions"),"1".into(),"end".into()]);
-        let vector=position.map(|v|v.to_string()).join(",");
+        args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),count.to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
-            (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),"1".into()),(format!("{squad}.insane_diff_count"),"1".into()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into()),
-            (format!("{start}.position"),vector.clone()),(format!("{start}.facing"),"0".into()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),"alert".into()),(format!("{start}.return_state"),"alert".into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
+            (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),count.to_string()),(format!("{squad}.insane_diff_count"),count.to_string()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into())] {args.extend(["-S".into(),key,value]);}
+        for(index,(position,_))in positions.into_iter().enumerate() {
+            let start=format!("{squad}.starting_locations[{index}]");let firing=format!("{e}.firing_positions[{index}]");let vector=position.map(|value|value.to_string()).join(",");
+            for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),"0".into()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),"alert".into()),(format!("{start}.return_state"),"alert".into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
+        }
         args.push(tag.into());Ok(args)
     }
-    /// Reuse the exact emitted scalar keys for one bounded native -G readback.
+    pub fn actor_start_positions(&self)->Result<Option<Vec<[f32;3]>>> {
+        let Self::AppendEncounter{position,count,spacing,..}=self else{return Ok(None);};
+        Ok(Some(crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?.into_iter().map(|value|value.0).collect()))
+    }
+    /// Keep reviewed command actions intact while respecting Windows argument
+    /// length. All batches edit the same isolated candidate; acceptance is atomic.
+    pub fn argument_batches(&self,args:Vec<String>,readback:bool)->Result<Vec<Vec<String>>> {
+        if !matches!(self,Self::AppendEncounter{..}){return Ok(vec![args]);}
+        if args.len()<3||args[0]!="-t"{return invalid("Malformed native argument envelope");}
+        let cost=|value:&str|value.encode_utf16().count()+value.chars().filter(|c|*c=='\\'||*c=='"').count()+3;
+        let end=args.len()-1;let tag=args[end].clone();let base=args[..2].to_vec();
+        let overhead=base.iter().map(|v|cost(v)).sum::<usize>()+cost(&tag);
+        const LIMIT:usize=24000;
+        if overhead>=LIMIT{return invalid("Native source path leaves no checked command-line capacity");}
+        let mut result=vec![];let mut batch=base.clone();let mut used=overhead;let mut i=2;
+        while i<end {
+            let width=match(args[i].as_str(),readback){("-G",true)=>2,("-S",false)=>3,("-I",false)=>4,_=>return invalid("Unknown action in native encounter batch")};
+            if i+width>end{return invalid("Incomplete native encounter action");}
+            let action=&args[i..i+width];let bytes=action.iter().map(|v|cost(v)).sum::<usize>();
+            if bytes>LIMIT-overhead{return invalid("One native action exceeds its checked command-line capacity");}
+            if used+bytes>LIMIT {batch.push(tag.clone());result.push(batch);batch=base.clone();used=overhead;}
+            batch.extend_from_slice(action);used+=bytes;i+=width;
+        }
+        if batch.len()>2{batch.push(tag);result.push(batch);}
+        if result.is_empty(){return invalid("Native encounter batch contains no actions");}
+        Ok(result)
+    }
+    /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
         if !matches!(self,Self::AppendEncounter{..}) {return Ok(None);}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
@@ -169,39 +203,48 @@ impl Operation {
     }
 }
 fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
-    let Operation::AppendEncounter{name,actor_path,position,start_active}=operation else{return invalid("Not an encounter append");};
+    let Operation::AppendEncounter{name,actor_path,position,start_active,count,spacing}=operation else{return invalid("Not an encounter append");};
     let (old_encounters,old_palette,actor)=encounter_append_layout(before,name,actor_path)?;
     let new_encounters=array_listing(after,"encounters")?;let new_palette=array_listing(after,"actor_palette")?;
     let added=usize::from(actor==old_palette.count);
     if new_encounters.count!=old_encounters.count+1||new_palette.count!=old_palette.count+added||!new_encounters.body.starts_with(&old_encounters.body)||!new_palette.body.starts_with(&old_palette.body)|| (added==0&&new_palette.body!=old_palette.body) {return invalid("Native append changed existing encounter/palette rows or unexpected array counts");}
     let added_body=&new_encounters.body[old_encounters.body.len()..];
-    for expected in ["squads[1] array","starting_locations[1] array","firing_positions[1] array"] {
+    for expected in ["squads[1] array".to_string(),format!("starting_locations[{count}] array"),format!("firing_positions[{count}] array")] {
         if added_body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native encounter append has unexpected squad/start/firing array sizes");}
     }
     let remaining=|text:&str,arrays:[&ArrayListing;2]| {
         text.lines().enumerate().filter(|(index,_)|arrays.iter().all(|a|*index<a.start||*index>=a.end)).map(|(_,line)|line).collect::<Vec<_>>().join("\n")
     };
     if remaining(before,[&old_encounters,&old_palette])!=remaining(after,[&new_encounters,&new_palette]) {return invalid("Native encounter append changed other scenario fields; no revision was selected");}
-    Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at {position:?}; initial creation={start_active}")}])
+    Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")}])
 }
 
 /// Independently inspected cache, not the source writer's success status.
 impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
-        let Self::AppendEncounter{name,actor_path,position,start_active}=self else{return invalid("Unsupported encounter readback expectation");};
+        let Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=self else{return invalid("Unsupported encounter readback expectation");};
         let found=map.encounters.iter().filter(|encounter|encounter.name==*name).collect::<Vec<_>>();
         if map.header.scenario_type!=0||found.len()!=1{return invalid("Compiled native encounter is missing, ambiguous or not singleplayer");}
         let details=found[0].details.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled native encounter details are unreadable".into()))?;
-        if (details.flags&1==0)!=*start_active||details.manual_bsp_index!=-1||details.squads.len()!=1||details.firing_positions.len()!=1{return invalid("Compiled native encounter flags/BSP/squad/firing counts differ from the accepted source append");}
+        if (details.flags&1==0)!=*start_active||details.manual_bsp_index!=-1||details.squads.len()!=1||details.firing_positions.len()!=*count as usize{return invalid("Compiled native encounter flags/BSP/squad/firing counts differ from the accepted source append");}
         let path=actor_path.replace('\\',"/");
         let actors=map.tags.iter().filter(|tag|tag.class=="actv"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&path)&&!tag.external&&tag.data_offset.is_some()).collect::<Vec<_>>();
         if actors.len()!=1{return invalid("Compiled source actor is missing, ambiguous or has no embedded body");}
         let actor=Some(actors[0].id);let squad=&details.squads[0];
-        if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=1||squad.insane_count!=1||squad.initial_state!=2||squad.return_state!=2||squad.starting_locations.len()!=1{return invalid("Compiled native squad differs from the accepted source append");}
-        let start=&squad.starting_locations[0];let firing=&details.firing_positions[0];
-        let same=|other:[f32;3]|other.iter().zip(position).all(|(a,b)|(*a-*b).abs()<=0.0001);
-        if start.actor_variant_tag_id!=actor||start.actor_palette_index!=-1||start.command_list!=-1||start.flags&1==0||start.facing.abs()>0.0001||start.initial_state!=2||start.return_state!=2||!same(start.position)||!same(firing.position)||firing.group_index!=0{return invalid("Compiled native actor placement/state differs from the accepted source append");}
+        if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=*count as i16||squad.insane_count!=*count as i16||squad.initial_state!=2||squad.return_state!=2||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
+        let positions=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?.into_iter().map(|value|value.0).collect::<Vec<_>>();
+        let consume=|remaining:&mut Vec<[f32;3]>,position:[f32;3]|->Result<()> {
+            let index=remaining.iter().position(|expected|expected.iter().zip(position).all(|(a,b)|(*a-b).abs()<=0.0001)).ok_or_else(||crate::SparkError::Invalid("Compiled native start/firing position differs from the accepted grid".into()))?;
+            remaining.remove(index);Ok(())
+        };
+        let mut remaining=positions.clone();
+        for start in &squad.starting_locations {
+            if start.actor_variant_tag_id!=actor||start.actor_palette_index!=-1||start.command_list!=-1||start.flags&1==0||start.facing.abs()>0.0001||start.initial_state!=2||start.return_state!=2{return invalid("Compiled native actor state differs from the accepted source append");}
+            consume(&mut remaining,start.position)?;
+        }
+        let mut remaining=positions;
+        for firing in &details.firing_positions {if firing.group_index!=0{return invalid("Compiled native firing group differs from the accepted source append");}consume(&mut remaining,firing.position)?;}
         // Cached firing cluster/surface values can deliberately be NULL.
         // Source/cache identity is not navigation, collision or gameplay proof.
         Ok(())

@@ -233,6 +233,7 @@ pub(super) fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str
     }
     Ok(text)
 }
+const MAX_TOOL_STREAM: usize = 1024 * 1024;
 fn pipe<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(String, bool)> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
@@ -242,7 +243,7 @@ fn pipe<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(Str
             match reader.read(&mut buffer) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
-                    let room = (1024 * 1024usize).saturating_sub(bytes.len());
+                    let room = MAX_TOOL_STREAM.saturating_sub(bytes.len());
                     cut |= n > room;
                     bytes.extend_from_slice(&buffer[..n.min(room)]);
                 }
@@ -399,7 +400,7 @@ pub(super) async fn native_tag_context(
         for id in ids.iter().rev() {
             if let Ok(receipt) = read_receipt(&state, id, window.label(), &project_id) {
                 if receipt.tag == source.tag {
-                    history.push(preview_view(&receipt, &hash));
+                    history.push(preview_view(&receipt, &hash)?);
                 }
             }
         }
@@ -468,11 +469,12 @@ pub(super) struct Preview {
     after_sha256: String,
     changed_bytes: usize,
     field_changes: Vec<recipes::FieldDifference>,
+    actor_positions:Option<Vec<[f32;3]>>,
     detail: String,
     current_state: String,
 }
-fn preview_view(receipt: &Receipt, current: &str) -> Preview {
-    Preview{id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::AppendEncounter{..}){"One native encounter is appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()}
+fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::AppendEncounter{..}){"One native encounter is appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -498,12 +500,34 @@ pub(super) async fn native_operation_preview(
     let before_sha256=hash_bytes(&before);let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
     let candidate=directory.join("candidate/tags");fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;
-    let (ok,stdout,stderr)=run(&exe,&operation.arguments_with_fields(&candidate,&source.class,&source.tag,&before_fields).map_err(error)?)?;
-    project::atomic_write(&directory.join("native-output.txt"),format!("{stdout}{stderr}").as_bytes(),false).map_err(error)?;
-    if !ok{return Err(format!("{} rejected the isolated candidate: {}. The starting source is unchanged.",operation.tool_id(),stderr.chars().take(600).collect::<String>()));}
+    let failed=|ok:bool,out:&str,err:&str|!ok||out.lines().chain(err.lines()).any(|line|line.trim().to_ascii_lowercase().starts_with("error:"));
+    let args=operation.arguments_with_fields(&candidate,&source.class,&source.tag,&before_fields).map_err(error)?;
+    let mut stdout=String::new();let mut stderr=String::new();
+    for args in operation.argument_batches(args,false).map_err(error)? {
+        let(ok,out,problem)=run(&exe,&args)?;
+        if out.len()>MAX_TOOL_STREAM.saturating_sub(stdout.len())||problem.len()>MAX_TOOL_STREAM.saturating_sub(stderr.len()) {
+            return Err("Native encounter batches exceeded the retained output bound; starting source is unchanged and no partial append was selected.".into());
+        }
+        stdout.push_str(&out);stderr.push_str(&problem);
+        project::atomic_write(&directory.join("native-output.txt"),format!("{stdout}{stderr}").as_bytes(),false).map_err(error)?;
+        if failed(ok,&out,&problem){
+            let diagnostic=if problem.trim().is_empty(){&out}else{&problem};
+            return Err(format!("{} rejected an isolated candidate batch: {}. Starting source remains unchanged; no partial append was selected.",operation.tool_id(),diagnostic.chars().take(600).collect::<String>()));
+        }
+    }
     if let Some(args)=operation.readback_arguments(&candidate,&source.class,&source.tag,&before_fields).map_err(error)? {
-        let(ok,readback,stderr)=run(&exe,&args)?;
-        if !ok{return Err(format!("Native encounter readback failed: {stderr}"));}
+        let mut readback=String::new();
+        for args in operation.argument_batches(args,true).map_err(error)? {
+            let(ok,part,problem)=run(&exe,&args)?;
+            if failed(ok,&part,&problem){
+                let diagnostic=if problem.trim().is_empty(){&part}else{&problem};
+                return Err(format!("Native encounter readback failed: {}",diagnostic.chars().take(600).collect::<String>()));
+            }
+            if part.len().saturating_add(1)>MAX_TOOL_STREAM.saturating_sub(readback.len()) {
+                return Err("Native encounter readback batches exceeded the retained output bound; no partial append was selected.".into());
+            }
+            readback.push_str(part.trim_end_matches(&['\r','\n'][..]));readback.push('\n');
+        }
         operation.verify_readback(&candidate,&source.class,&source.tag,&before_fields,&readback).map_err(error)?;
         project::atomic_write(&directory.join("native-encounter-readback.txt"),readback.as_bytes(),false).map_err(error)?;
     }
@@ -517,7 +541,7 @@ pub(super) async fn native_operation_preview(
     let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields,after_fields,field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
     project::atomic_write(&directory.join("operation.json"),&serde_json::to_vec_pretty(&receipt).map_err(error)?,false).map_err(error)?;
     history.push(id.clone());lock(&state.library)?.set_setting(&history_key(&project_id),&history).map_err(error)?;
-    Ok(preview_view(&receipt,&before_sha256))
+    preview_view(&receipt,&before_sha256)
 }).await.map_err(error)?
 }
 #[derive(Serialize)]

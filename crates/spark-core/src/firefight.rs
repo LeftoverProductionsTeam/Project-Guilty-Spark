@@ -1113,6 +1113,21 @@ pub struct NativeRoundEncounter {
     pub actor_path:String,
     pub positions:Vec<[f32;3]>,
 }
+/// Shared native actor grid. Offsets remain unscaled so the existing zone-radius
+/// calculation keeps its original arithmetic and group partitioning.
+pub(crate) fn native_actor_start_grid(center:[f32;3],total:usize,offset:usize,count:usize,spacing:f32)->Result<Vec<([f32;3],[f32;2])>> {
+    if total==0||total>32||count==0||offset.checked_add(count).is_none_or(|end|end>total)||!spacing.is_finite()||!(0.25..=16.).contains(&spacing)||center.iter().any(|value|!value.is_finite()) {
+        return invalid("Native actor grid needs 1–32 starts, a valid partition and finite 0.25–16 unit spacing");
+    }
+    let side=(total as f32).sqrt().ceil() as usize;let half=(side-1) as f32/2.;
+    (offset..offset+count).map(|slot| {
+        let dx=(slot%side)as f32-half;let dy=(slot/side)as f32-half;
+        let position=[center[0]+dx*spacing,center[1]+dy*spacing,center[2]];
+        if position.iter().any(|value|!value.is_finite()||value.abs()>2048.) {return invalid("Native actor starting positions exceed the editable 2048 unit coordinate bound");}
+        Ok((position,[dx,dy]))
+    }).collect()
+}
+
 pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<NativeRoundPlan>> {
     let Some(doc) = &project.quick_forge else { return Ok(None); };
     if !has_native_round_source(doc) { return Ok(None); }
@@ -1210,12 +1225,7 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
             let same_zone=|j:usize|zone_for(j)==zone_index;
             let total:usize=wave.groups.iter().enumerate().filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
             let offset:usize=wave.groups.iter().enumerate().take(g).filter(|(j,_)|same_zone(*j)).map(|(_,group)|group.count as usize).sum();
-            let side=(total as f32).sqrt().ceil() as usize;
-            for a in 0..group.count as usize {
-                let center=(side-1) as f32/2.0;
-                let slot=offset+a;let dx=(slot%side) as f32-center;let dy=(slot/side) as f32-center;
-                let position=[zone.position[0]+dx*0.75,zone.position[1]+dy*0.75,zone.position[2]];
-                if position.iter().any(|value|value.abs()>2048.0) {return invalid("Native actor position exceeds the editable level coordinate bound");}
+            for (a,(position,[dx,dy])) in native_actor_start_grid(zone.position,total,offset,group.count as usize,0.75)?.into_iter().enumerate() {
                 if (dx*dx+dy*dy).sqrt()*0.75>zone.radius {return invalid("Native actor starting positions do not fit the authored spawn-zone radius; enlarge or split the group");}
                 if doc.spawns.iter().any(|spawn|spawn.position.iter().zip(position).map(|(a,b)|(a-b).powi(2)).sum::<f32>()<4.0) {return invalid("Move the enemy spawn zone at least two world units from the player start before preparing a native round");}
                 layout.positions.push(position);
