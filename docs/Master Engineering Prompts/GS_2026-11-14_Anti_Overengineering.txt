@@ -1,0 +1,183 @@
+# PROJECT GUILTY SPARK — ANTI-OVERENGINEERING DIRECTIVE
+## All the Tools, and Then Some.
+
+**Effective immediately.** These instructions supersede previous directives wherever they encourage unnecessary complexity, redundant work, or unlimited scope expansion.
+
+### 1. Our priority is a finished, functioning product
+
+Guilty Spark must become the definitive Halo 1 creation suite.
+
+Preserve every previously approved feature and ambition. However, implement them through manageable, independently testable milestones.
+
+**Do not confuse engineering activity with product progress.**
+
+Prioritize features creators can actually use.
+
+### 2. Simplicity is mandatory
+
+- Prefer existing code, libraries, and native Halo tooling.
+- Fix root causes rather than layering workarounds.
+- Avoid unnecessary abstractions, managers, wrappers, and compatibility layers.
+- Do not create new frameworks when existing systems are sufficient.
+- Remove genuinely redundant code when safe.
+- Avoid duplicated workflows and overlapping implementations.
+- Do not turn isolated failures into permanent validation infrastructure.
+- Keep source code understandable and maintainable.
+- Never rewrite working systems simply to make them architecturally cleaner.
+
+Before adding a substantial subsystem, determine whether existing functionality can solve the problem.
+
+### 3. Eliminate wasted engineering cycles
+
+- Never repeatedly analyze the entire repository without a specific reason.
+- Reuse previously verified findings unless relevant code has changed.
+- Do not rerun passing tests unnecessarily.
+- Run focused tests during implementation and broader regression tests at integration checkpoints.
+- Avoid repeated rebuilding, hashing, scanning, and recovery operations without demonstrated need.
+- After two unsuccessful approaches, reassess the cause instead of accumulating patches.
+- Do not create extensive documentation for minor changes.
+- Do not generate enormous test suites for trivial modifications.
+- Avoid multiple agents independently investigating the same issue.
+- Do not introduce unnecessary dependencies, build systems, or tooling.
+- Stop polishing a completed feature once its acceptance criteria are satisfied.
+
+Never invent artificial blockers or approval requirements that prevent ordinary development.
+
+### 4. Prioritize actual Spark functionality
+
+Focus engineering effort on completing and stabilizing:
+
+**Core editing**
+- Reliable map opening, modification, saving, and reopening
+- Fully functional 3D scenario editing
+- Asset placement, manipulation, and deletion
+- Native tag editing and dependency handling
+- Automatic asset extraction and conversion
+- Working undo/redo across windows and sessions
+- Lighting, fog, shaders, terrain, and environmental editing
+- Stable UI navigation and complete creator workflows
+
+**Native Halo integration**
+- CE, MCC, Xbox, Chupathingy, OpenCE, OpenH1, and other supported runtimes
+- Native compilation, conversion, and testing
+- LiveLink, SparkLink, and Live Rebuild
+- Runtime-specific compatibility and automatic supported conversions
+- Existing Halo tools available through Spark, including their installation and launch workflows
+- Reliable Forge, Firefight, and game-type editing
+
+**Modern gameplay creation**
+- Visual Firefight wave and AI spawn designer
+- Extraction objectives, loot, insertion, and evacuation points
+- Zombie and Infection configuration
+- MegaWorld environment connections
+- Multiplayer and cooperative gameplay configuration
+- VR-compatible authoring and testing workflows
+
+These remain product requirements, not permission to attempt everything simultaneously.
+
+### 5. Coordinate with Project Forerunner
+
+Forerunner is developing the unified runtime using Chupathingy, Faber, and OpenH1 capabilities.
+
+Spark owns the editing experience. Forerunner owns runtime gameplay execution.
+
+- Share one versioned integration specification.
+- Reuse actual runtime capabilities rather than duplicating engine systems inside Spark.
+- Build Spark's Firefight and Extraction authoring interfaces around compatible, documented gameplay data.
+- Support live editing and runtime testing where implemented.
+- Do not invent unsupported engine functionality or claim untested integration works.
+- Continue independent Spark work when Forerunner features are unavailable.
+
+Do not modify the Forerunner repository without explicit authorization.
+
+### 6. Protect users and existing functionality
+
+These safeguards are never optional:
+
+- User-selected maps, game installations, ISOs, tags, and asset directories are sacred.
+- Never delete, relocate, overwrite, or modify these files without explicit authorization.
+- Never treat file size or directory location as proof something is disposable.
+- Perform destructive compilation and conversion only on disposable staging copies.
+- Preserve original source files and working editor functionality.
+- Do not introduce proprietary tag extensions when sidecars or native formats suffice.
+- Maintain valid runtime compatibility and accurate export warnings.
+- Never sacrifice data integrity, security, or licensing compliance to simplify implementation.
+
+**Simplify unnecessary protections, never essential protections.**
+
+### 7. Every development cycle must produce value
+
+For each selected task:
+
+1. Identify the specific incomplete feature or verified defect.
+2. Inspect only the relevant code and dependencies.
+3. Implement the simplest reliable solution.
+4. Run focused validation and native acceptance where applicable.
+5. Fix regressions.
+6. Commit the verified implementation.
+7. Update the existing requirements ledger briefly.
+8. Move to the next meaningful requirement.
+
+Do not create additional ledgers when existing records already cover the work.
+
+Do not accumulate test artifacts, backups, archives, or large generated files inside the source repository.
+
+### 8. Prove actual creator workflows
+
+A feature is complete only when the intended workflow functions.
+
+For example:
+
+Open a Halo map → place an object → change its properties → save → close Spark → reopen → verify the object and properties survived → compile or launch in the target runtime → confirm the change in-game.
+
+Apply equivalent acceptance tests to AI spawning, Firefight, Extraction, lighting, Forge, asset conversion, and other creator functionality.
+
+Unit tests alone cannot establish that an interactive workflow works.
+
+Do not substitute placeholder UI, simulated results, or documentation for working functionality.
+
+### 9. Prevent scope drift
+
+The complete Guilty Spark vision remains approved.
+
+However:
+
+- Work on one coherent milestone at a time.
+- Choose the next milestone by user value, dependencies, and verified blockers.
+- Do not abandon incomplete workflows to chase unrelated enhancements.
+- Do not repeatedly redesign the UI without identifying an actual usability problem.
+- Do not manufacture work after acceptance criteria have passed.
+- Request approval before substantial architectural rewrites or changes that could affect protected data.
+- If blocked by another project, continue useful independent work.
+
+Maintain momentum without manufacturing complexity.
+
+### 10. Measure real progress
+
+At meaningful checkpoints, report concisely:
+
+- **Completed:** What now actually works?
+- **Verified:** What was tested, and where?
+- **Remaining:** What specific functionality is still incomplete?
+- **Complexity:** Did this work introduce unnecessary infrastructure?
+- **Next:** What is the next concrete engineering task?
+
+Never use commit counts, test counts, code volume, or elapsed execution time as substitutes for functioning features.
+
+### Immediate engineering instruction
+
+Review the current work and identify the highest-value unfinished creator workflow.
+
+Finish that workflow end-to-end using existing infrastructure wherever possible.
+
+Preserve verified progress, avoid unrelated refactoring, and do not repeat previously completed audits.
+
+Continue through the existing approved requirements in a sensible dependency order. Stop individual tasks once their acceptance criteria pass, and leave accurate checkpoints whenever execution ends.
+
+**Your mission is not to create the world's most elaborate development framework.**
+
+**Your mission is to finish Guilty Spark.**
+
+A powerful, intuitive, dependable Halo creation suite where people can open a map, build something incredible, save it, and actually play it.
+
+**ALL THE TOOLS, AND THEN SOME.**

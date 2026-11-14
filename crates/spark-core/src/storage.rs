@@ -130,18 +130,23 @@ pub(crate) fn lock(file: &Path) -> Result<fs::File> {
         .create(true)
         .truncate(false)
         .open(file)?;
+    #[cfg(test)] tests::run_lock_open_hook();
     // Catalog updates serialize brief metadata work. A transient held handle
     // must not fail a completed producer on its first WouldBlock. Operation
     // leases remain immediate probes: waiting must never turn an active job
     // into eligible cleanup. I/O and identity failures are never retried.
     let catalog=file.file_name().is_some_and(|name|name=="catalog.lock");
-    let identity=file_identity(file).ok_or_else(||fail("Storage lock identity is unavailable"))?;
+    let identity=file_handle_ownership(&f).map(|(identity,_)|identity).ok_or_else(||fail("Storage lock identity is unavailable"))?;
     let deadline=std::time::Instant::now()+std::time::Duration::from_millis(if catalog{500}else{0});
     loop {
         reject_links(file)?;
         if file_identity(file)!=Some(identity){return invalid("Storage lock identity changed while waiting; retained");}
         match f.try_lock() {
-            Ok(())=>return Ok(f),
+            Ok(())=>{
+                reject_links(file)?;
+                if file_identity(file)!=Some(identity){return invalid("Storage lock name changed during admission; retained");}
+                return Ok(f);
+            },
             Err(fs::TryLockError::WouldBlock) if catalog&&std::time::Instant::now()<deadline=>{
                 std::thread::sleep(std::time::Duration::from_millis(5).min(deadline.saturating_duration_since(std::time::Instant::now())));
             }
@@ -149,6 +154,33 @@ pub(crate) fn lock(file: &Path) -> Result<fs::File> {
             Err(fs::TryLockError::Error(reason))=>return Err(reason.into()),
         }
     }
+}
+// Keep the original native lock until its own empty record is delete-pending.
+// Reopen the actual object, not the mutable name; other owners remain untouched.
+#[cfg(windows)]
+fn retire_locked_lease(path: &Path, held: &fs::File) -> Result<()> {
+    use std::os::windows::io::{AsRawHandle, FromRawHandle};
+    if !held.metadata()?.is_file() || held.metadata()?.len() != 0 { return Ok(()); }
+    let Some(identity) = unique_file_handle_identity(held) else { return Ok(()); };
+    reject_links(path)?;
+    if unique_file_identity(path) != Some(identity) { return Ok(()); }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn ReOpenFile(original: *mut std::ffi::c_void, access: u32, share: u32, flags: u32) -> *mut std::ffi::c_void;
+    }
+    // DELETE + FILE_READ_ATTRIBUTES, sharing the existing lock's read/write
+    // access while denying new delete/rename handles. No privilege changes.
+    let raw = unsafe { ReOpenFile(held.as_raw_handle(), 0x00010000 | 0x80, 1 | 2, 0x00200000) };
+    if raw.is_null() || raw as isize == -1 { return Err(std::io::Error::last_os_error().into()); }
+    let retirement = unsafe { fs::File::from_raw_handle(raw) };
+    if unique_file_handle_identity(&retirement) != Some(identity)
+        || retirement.metadata()?.len() != 0
+        || unique_file_identity(path) != Some(identity) { return Ok(()); }
+    project::dispose_verified_handle(&retirement)?;
+    #[cfg(test)] tests::run_lease_disposition_hook();
+    // The name retires only when its existing held lock closes. There is no
+    // unlock -> pathname-unlink interval for a new owner to enter.
+    Ok(())
 }
 fn write<T: Serialize>(file: &Path, value: &T) -> Result<()> {
     project::atomic_write(file, &serde_json::to_vec(value)?, false)?;
@@ -686,10 +718,16 @@ impl Store {
             entries.retain(|e| e.id != *id);
             entries.retain(|e| !e.path.starts_with(&row.path));
             write(&self.root.join("entries.json"), &entries)?;
+            #[cfg(test)] tests::run_lease_retirement_hook();
+            #[cfg(windows)]
+            for (file, held) in lease_files.iter().zip(&leases) {
+                retire_locked_lease(file, held).map_err(|error| fail(format!("Generated output was removed, but its synchronization record was retained: {error}")))?;
+            }
             drop(leases);
+            #[cfg(not(windows))]
             for file in lease_files {
-                // These UUID files are empty synchronization records owned by
-                // the removed entries. Preserve any unexpected changed content.
+                // Descriptor-relative lease retirement still needs independent
+                // native acceptance on other platforms; preserve changed data.
                 reject_links(&file)?;
                 if fs::metadata(&file)?.len() == 0 {
                     fs::remove_file(file)?;
@@ -1460,6 +1498,94 @@ mod tests {
         static CLEANUP_REVIEW_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
         static CLEANUP_DELETION_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
         static CLEANUP_DISPOSAL_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        static LEASE_RETIREMENT_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        static LOCK_OPEN_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        static LEASE_DISPOSITION_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+    }
+    pub(super) fn run_lock_open_hook() {
+        let hook = LOCK_OPEN_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[cfg(windows)]
+    pub(super) fn run_lease_disposition_hook() {
+        let hook = LEASE_DISPOSITION_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    pub(super) fn run_lease_retirement_hook() {
+        let hook = LEASE_RETIREMENT_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[test]
+    fn lock_admission_refuses_a_replaced_name_after_opening_the_original() {
+        let root = tempfile::tempdir().unwrap();let target = root.path().join("operation.lock");
+        fs::write(&target, b"").unwrap();let candidate = target.clone();
+        let foreign = std::rc::Rc::new(std::cell::RefCell::new(None));let captured = foreign.clone();
+        LOCK_OPEN_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            fs::rename(&candidate, candidate.with_extension("detached")).unwrap();
+            let owner = fs::OpenOptions::new().read(true).write(true).create_new(true).open(&candidate).unwrap();
+            owner.try_lock().unwrap();*captured.borrow_mut() = Some(owner);
+        })));
+        assert!(lock(&target).is_err(), "a lock on the old object must never certify the replacement name");
+        assert!(target.exists());assert!(lock(&target).is_err());
+        drop(foreign.borrow_mut().take());assert!(lock(&target).is_ok());
+    }
+    #[cfg(windows)]
+    fn lease_retirement_preserves_active_owner(replace: bool) {
+        let root = tempfile::tempdir().unwrap();let store = Store::open(&root.path().join("storage")).unwrap();
+        let output = root.path().join("native-output");let lease = store.reserve(&output, None, 65536, Category::Staging, "lease retirement fixture").unwrap();
+        fs::create_dir(&output).unwrap();fs::write(output.join("generated.tag"), b"generated source").unwrap();drop(lease);
+        let plan = store.cleanup_plan().unwrap();let id = plan.eligible[0].id.clone();
+        let record = store.root.join("leases").join(format!("{id}.lock"));let candidate = record.clone();
+        let foreign = std::rc::Rc::new(std::cell::RefCell::new(None));let captured = foreign.clone();
+        let admitted = std::rc::Rc::new(std::cell::Cell::new(false));let observed = admitted.clone();
+        LEASE_RETIREMENT_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            if replace { fs::rename(&candidate, candidate.with_extension("detached")).unwrap(); }
+            let owner = fs::OpenOptions::new().read(true).write(true).create(replace).truncate(false).open(&candidate).unwrap();
+            match owner.try_lock() {
+                Ok(()) => { observed.set(true);*captured.borrow_mut() = Some(owner); }
+                Err(fs::TryLockError::WouldBlock) if !replace => {},
+                other => panic!("unexpected owner admission: {other:?}"),
+            }
+        })));
+        let result = store.cleanup(&plan, &[id], true);
+        if admitted.get() {
+            assert!(record.exists(), "cleanup must not remove another active owner's empty record");
+            assert!(lock(&record).is_err(), "the other owner must remain authoritative");
+            drop(foreign.borrow_mut().take());assert!(lock(&record).is_ok());
+        } else { result.unwrap();assert!(!record.exists()); }
+        assert!(!output.exists());
+    }
+    #[cfg(windows)] #[test]
+    fn lease_retirement_preserves_a_named_replacement_owned_by_another_handle() { lease_retirement_preserves_active_owner(true); }
+    #[cfg(windows)] #[test]
+    fn lease_retirement_does_not_unlink_a_newly_acquired_original_record() { lease_retirement_preserves_active_owner(false); }
+    #[cfg(windows)]
+    #[test]
+    fn lease_retirement_keeps_lock_authority_until_the_name_is_retired() {
+        let root = tempfile::tempdir().unwrap();let record = root.path().join("operation.lock");
+        let held = lock(&record).unwrap();let candidate = record.clone();
+        LEASE_DISPOSITION_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            if let Ok(peer) = fs::OpenOptions::new().read(true).write(true).open(&candidate) {
+                assert!(matches!(peer.try_lock(), Err(fs::TryLockError::WouldBlock)), "a new owner must not enter while retirement holds the original lock");
+            }
+        })));
+        retire_locked_lease(&record, &held).unwrap();
+        assert_eq!(held.metadata().unwrap().len(), 0);
+        drop(held);assert!(!record.exists());assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+    #[cfg(windows)]
+    #[test]
+    fn lease_retirement_does_not_accumulate_empty_records_after_normal_cleanup() {
+        let root = tempfile::tempdir().unwrap();let store = Store::open(&root.path().join("storage")).unwrap();
+        for number in 0..5 {
+            let output = root.path().join(format!("generated-{number}"));
+            let lease = store.reserve(&output, None, 65536, Category::Staging, "normal retirement fixture").unwrap();
+            fs::create_dir(&output).unwrap();fs::write(output.join("generated.tag"), b"generated source").unwrap();drop(lease);
+            let plan = store.cleanup_plan().unwrap();assert_eq!(plan.eligible.len(), 1);
+            store.cleanup(&plan, &[plan.eligible[0].id.clone()], true).unwrap();
+            assert!(!output.exists());assert!(store.entries().unwrap().is_empty());
+            assert_eq!(fs::read_dir(store.root.join("leases")).unwrap().count(), 0);
+        }
     }
     pub(super) fn run_cleanup_review_hook() {
         let hook = CLEANUP_REVIEW_HOOK.with(|slot| slot.borrow_mut().take());
