@@ -6,7 +6,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::{borrow::Cow, collections::BTreeSet};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -166,6 +166,12 @@ pub fn validate_handwritten_sources(sources: &[HandwrittenSource]) -> Result<()>
     Ok(())
 }
 pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
+    if let Some(profile)=crate::quickforge::campaign_profile(doc) {
+        crate::firefight::native_player_profile_arguments(profile,0,crate::quickforge::CAMPAIGN_PROFILE_NAME)?;
+        if doc.logic.as_ref().is_some_and(|logic|logic.manual_source.is_some()) {
+            return invalid("Campaign starting loadout needs generated startup logic. Preserve handwritten HaloScript separately and explicitly return to generated logic before enabling the loadout");
+        }
+    }
     let Some(logic) = &doc.logic else {
         return Ok(());
     };
@@ -307,9 +313,18 @@ fn volume(logic: &Document, id: &str) -> String {
         .unwrap_or_else(|| native_name("tv", id));
     format!("(volume_test_objects {name} (players))")
 }
+pub fn has_source(doc:&QuickForgeDocument)->bool {
+    doc.logic.is_some() || crate::quickforge::campaign_profile(doc).is_some()
+}
+fn effective_logic(doc:&QuickForgeDocument)->Option<Cow<'_,Document>> {
+    doc.logic.as_ref().map(Cow::Borrowed).or_else(||crate::quickforge::campaign_profile(doc).map(|_|Cow::Owned(Document {
+        schema_version:1,triggers:vec![],devices:vec![],rules:vec![],manual_source:None,handwritten_sources:vec![],
+    })))
+}
 pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
     validate(doc)?;
-    let Some(logic) = &doc.logic else {
+    let effective=effective_logic(doc);
+    let Some(logic) = effective.as_deref() else {
         return Ok(None);
     };
     let mut lines = vec![
@@ -332,6 +347,12 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
                 "  (device_set_position_immediate {name} {})",
                 real(device.initial_position)
             ),
+        ]);
+    }
+    if crate::quickforge::campaign_profile(doc).is_some() {
+        lines.extend([
+            "  (sleep_until (> (unit_get_health (unit (list_get (players) 0))) 0) 1)".into(),
+            format!("  (player_add_equipment (unit (list_get (players) 0)) {} true)",crate::quickforge::CAMPAIGN_PROFILE_NAME),
         ]);
     }
     lines.extend(["  (set gs_logic_ready true)".into(), ")".into()]);
@@ -567,7 +588,7 @@ pub fn source_modules(doc: &QuickForgeDocument) -> Result<Vec<Source>> {
         return Ok(vec![]);
     };
     let mut modules = vec![generated];
-    for module in &doc.logic.as_ref().unwrap().handwritten_sources {
+    for module in doc.logic.iter().flat_map(|logic| &logic.handwritten_sources) {
         modules.push(Source {
             filename: module.filename.clone(),
             content: module.content.clone(),
@@ -653,7 +674,8 @@ pub(crate) fn compile(
     let tags = workspace.join("tags").to_string_lossy().into_owned();
     // Independently read through the native editor without -n. Names are not
     // trusted merely because a setter returned zero.
-    let logic = doc.logic.as_ref().unwrap();
+    let effective=effective_logic(doc);
+    let logic = effective.as_deref().ok_or_else(||crate::SparkError::Invalid("Generated native startup has no source document".into()))?;
     for (i, binding) in logic.devices.iter().enumerate() {
         let placement = doc.placements.iter().find(|p| p.id == binding.placement_id).unwrap();
         let array = if placement.tag_class == "ctrl" { "controls" } else { "machines" };

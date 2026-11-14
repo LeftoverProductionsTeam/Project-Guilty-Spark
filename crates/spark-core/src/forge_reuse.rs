@@ -156,10 +156,10 @@ pub(crate) fn find(
                 "invaderInfo",
                 "invaderDependency",
             ]);
-            if document.logic.is_some() {
+            if crate::native_logic::has_source(document) {
                 required.insert("invaderScript");
             }
-            if project.firefight.as_ref().is_some_and(|config|config.native_hud_messages==Some(true)){
+            if document.game_mode!="campaign" && project.firefight.as_ref().is_some_and(|config|config.native_hud_messages==Some(true)){
                 required.insert("invaderString");
             }
             if document.runtime_id != crate::runtime::RuntimeId::MccSteam {

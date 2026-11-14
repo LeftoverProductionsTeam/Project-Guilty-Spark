@@ -123,8 +123,12 @@ export function extractionLayout(doc:QuickForgeDocument) {
   if(logic?.manualSource!=null)issues.push({message:'Handwritten HaloScript owns startup behavior; metadata power settings need native review.'});
   if(!['haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))
     issues.push({message:'The current Forerunner authoring handoff needs a standard Custom Edition build target. Other source formats require explicit conversion.'});
-  if(!['firefight','zombie'].includes(doc.gameMode))
-    issues.push({message:'This source currently exports multiplayer. Forerunner Extraction needs standard solo content; independent campaign/loadout authoring remains unfinished.'});
+  if(doc.gameMode==='campaign') {
+    if(!doc.startingProfile)issues.push({message:'Choose Campaign starting loadout in Map properties before building solo source.'});
+    if(logic?.handwrittenSources.some(source=>source.filename.toLowerCase()==='gs_firefight.hsc'))
+      issues.push({message:'A survival HaloScript module is still present. Review and remove it explicitly before building independent Extraction source.'});
+  } else if(!['firefight','zombie'].includes(doc.gameMode))
+    issues.push({message:'This source exports multiplayer. In Map properties, choose Campaign / scripted solo for standard solo Extraction content.'});
   else issues.push({message:'This solo route includes survival authoring. An independent Extraction campaign must not start a second Firefight controller.'});
   const bindings=[deploy,activate,activation,returnZone].filter(Boolean).length;
   const present=[...(logic?.devices??[]),...(logic?.triggers??[])].some(t=>t.nativeName?.startsWith('extraction_'));

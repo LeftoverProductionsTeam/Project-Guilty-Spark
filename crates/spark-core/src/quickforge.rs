@@ -40,6 +40,8 @@ pub struct QuickForgeDocument {
     pub template: String,
     pub runtime_id: RuntimeId,
     pub game_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starting_profile: Option<crate::firefight::NativePlayerProfile>,
     pub geometry: Vec<ForgeBrush>,
     pub materials: Vec<ForgeMaterial>,
     pub placements: Vec<ForgePlacement>,
@@ -56,7 +58,21 @@ pub struct QuickForgeDocument {
 }
 /// The native scenario writer and tool launcher must agree on game generation.
 pub fn native_scenario_type(doc:&QuickForgeDocument)->u16 {
-    if ["firefight","zombie"].contains(&doc.game_mode.as_str()){0}else{1}
+    if ["campaign","firefight","zombie"].contains(&doc.game_mode.as_str()){0}else{1}
+}
+
+pub const CAMPAIGN_PROFILE_NAME: &str = "gs_campaign_start";
+/// Independent solo source uses the same native profile writer as Firefight.
+/// Inactive authoring metadata survives mode switches and Undo.
+pub fn campaign_profile(doc:&QuickForgeDocument)->Option<&crate::firefight::NativePlayerProfile> {
+    if doc.game_mode == "campaign" {doc.starting_profile.as_ref()} else {None}
+}
+pub fn verify_starting_profile(doc:&QuickForgeDocument,map:&maps::MapInspection)->Result<()> {
+    if let Some(profile)=campaign_profile(doc) {
+        if map.header.scenario_type != 0 {return invalid("Campaign loadout output is not a native singleplayer scenario");}
+        crate::firefight::verify_native_player_profile(profile,CAMPAIGN_PROFILE_NAME,0,map)?;
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -293,6 +309,7 @@ fn mode(s: &str) -> bool {
         "king",
         "oddball",
         "race",
+        "campaign",
         "firefight",
         "zombie",
     ]
@@ -435,6 +452,9 @@ pub fn validate_portable_document(doc: &QuickForgeDocument) -> Result<()> {
 fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<()> {
     crate::bsp_workshop::validate_source(doc)?;
     crate::studio_native::validate(doc)?;
+    if let Some(profile)=&doc.starting_profile {
+        crate::firefight::native_player_profile_arguments(profile,0,CAMPAIGN_PROFILE_NAME)?;
+    }
     crate::native_logic::validate(doc)?;
     if doc.placements.iter().filter(|p| p.tag_class == "ctrl").count() > 100 {
         return invalid("Standard Halo scenarios support at most 100 control terminals");
@@ -600,6 +620,7 @@ pub fn create_arena(name: &str, template: &str) -> Result<QuickForgeDocument> {
         template: template.into(),
         runtime_id: RuntimeId::MccSteam,
         game_mode: "slayer".into(),
+        starting_profile: None,
         geometry: vec![],
         materials: vec![ForgeMaterial {
             id: "surface".into(),
@@ -1329,13 +1350,13 @@ fn scenario_issues(doc:&QuickForgeDocument)->Vec<GeometryIssue> {
             }
         } else {tag_origins.insert(key,placed.source_sha256.clone());}
     }
-    // A prepared native solo controller exports a singleplayer scenario. Keep
-    // the multiplayer arena requirement for every other source workflow.
-    let solo_round = crate::firefight::has_native_round_source(doc);
+    // Campaign source is independent of survival controllers; unprepared
+    // Firefight/Zombie source keeps the existing arena/controller guards.
+    let solo_round = doc.game_mode == "campaign" || crate::firefight::has_native_round_source(doc);
     if doc.spawns.len() < if solo_round { 1 } else { 4 } {
         issues.push(issue(
             "SPAWN_MINIMUM",
-            if solo_round { "A native solo round needs at least one player start" }
+            if solo_round { "A native solo scenario needs at least one player start" }
             else { "A QuickForge arena needs at least four player starts" },
             vec![],
         ));
@@ -1398,7 +1419,7 @@ fn scenario_issues(doc:&QuickForgeDocument)->Vec<GeometryIssue> {
             issues.push(i);
         }
     }
-    if !["firefight", "zombie"].contains(&doc.game_mode.as_str()) {
+    if native_scenario_type(doc) != 0 {
         for placement in &doc.placements {
             if ["weap", "eqip", "itmc"].contains(&placement.tag_class.as_str())
                 && (placement.rotation[0].abs() > 0.00001 || placement.rotation[1].abs() > 0.00001)
@@ -1765,6 +1786,10 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
         add_set(&mut initial, "skies[0].sky", format!("{sky}.sky"));
     }
     edit_command(&mut commands, &scenario_tag, initial);
+    if let Some(profile)=campaign_profile(doc) {
+        edit_command(&mut commands,&scenario_tag,
+            crate::firefight::native_player_profile_arguments(profile,0,CAMPAIGN_PROFILE_NAME)?);
+    }
     for (i, spawn) in doc.spawns.iter().enumerate() {
         let mut args = vec![
             "-I".into(),
@@ -1997,6 +2022,19 @@ pub fn source_requirements(doc: &QuickForgeDocument) -> Result<(Vec<ForgeDepende
     } else {
         blockers.push("Select a legal sky tag for ambient lighting before compilation; emitted lighting is not inferred from preview colors".into());
     }
+    if doc.game_mode == "campaign" {
+        if doc.native.is_some() {blockers.push("Independent campaign source requires an editable geometry project; shared native-cache sources retain their separate preserving build workflow".into());}
+        if let Some(profile)=campaign_profile(doc) {
+            for path in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
+                dependencies.push(ForgeDependency {kind:"playerLoadout".into(),tag_path:path.replace('\\',"/"),
+                    tag_class:"weapon".into(),source_project_id:None,source_sha256:None});
+            }
+        } else {blockers.push("Campaign source needs a starting loadout. In Map properties, open Campaign starting loadout and review the weapon paths before building".into());}
+        if doc.logic.as_ref().is_some_and(|logic|logic.handwritten_sources.iter().any(|source|
+            source.filename.eq_ignore_ascii_case("gs_firefight.hsc"))) {
+            blockers.push("Campaign source still contains gs_firefight.hsc. Review and explicitly remove the survival module in Logic / Events before building an independent campaign; the original module and Firefight rules were retained".into());
+        }
+    }
     for p in &doc.placements {
         dependencies.push(ForgeDependency {
             kind: "placement".into(),
@@ -2005,13 +2043,13 @@ pub fn source_requirements(doc: &QuickForgeDocument) -> Result<(Vec<ForgeDepende
             source_project_id: p.source_project_id.clone(),
             source_sha256: p.source_sha256.clone(),
         });
-        if !["firefight", "zombie"].contains(&doc.game_mode.as_str())
+        if native_scenario_type(doc) != 0
             && ["weap", "eqip", "itmc"].contains(&p.tag_class.as_str())
             && (p.rotation[0].abs() > 0.00001 || p.rotation[1].abs() > 0.00001)
         {
             blockers.push(format!("Multiplayer item '{}' supports facing only; set pitch and roll to zero before compilation",p.name));
         }
-        if p.tag_class == "bipd" && !["firefight", "zombie"].contains(&doc.game_mode.as_str()) {
+        if p.tag_class == "bipd" && native_scenario_type(doc) != 0 {
             blockers.push(format!(
                 "Biped '{}' does not establish synchronized multiplayer AI",
                 p.name

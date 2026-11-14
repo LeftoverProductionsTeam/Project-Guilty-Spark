@@ -28,20 +28,20 @@ export function assembleHceekSourcePack(
 ):HceekSourcePack {
   const forge=project.quickForge;
   if(!forge)throw new Error('Open a QuickForge source project before staging scenario scripts');
-  if(!['mccSteam','haloCustomEdition'].includes(forge.runtimeId))
+  if(!['mccSteam','haloCustomEdition','chupathingyCe'].includes(forge.runtimeId))
     throw new Error('Script staging targets an editable H1A/Custom Edition scenario, not a Demo/retail/native cache');
-  if(!['firefight','zombie'].includes(forge.gameMode))
-    throw new Error('Choose a QuickForge singleplayer Firefight/Zombie source scenario before staging mission/AI scripts');
+  if(!['campaign','firefight','zombie'].includes(forge.gameMode))
+    throw new Error('Choose a QuickForge Campaign / scripted solo, Firefight or Zombie source scenario before staging mission/AI scripts');
   const slug=scenarioSlug(forge.name);
   const scriptDirectory=`data/levels/quickforge/${slug}/scripts`;
   const scenarioPath=`levels\\quickforge\\${slug}\\${slug}`;
   const scripts:ScriptExport[]=[];
   if(project.studio?.missions.length)scripts.push(exportHaloCeMission(project.studio));
   if(project.studio?.shots.length)scripts.push(exportHaloCeCinematic(project.studio));
-  if(project.firefight)scripts.push(exportHaloCeFirefight(project.firefight));
+  if(project.firefight&&forge.gameMode!=='campaign')scripts.push(exportHaloCeFirefight(project.firefight));
   if(!scripts.length)throw new Error('Create a mission, camera timeline or finite Firefight wave configuration first');
   if(activation==='mission'&&!scripts.some(s=>s.filename==='gs_mission.hsc'))throw new Error('No mission script to start');
-  if(activation==='firefight'&&!scripts.some(s=>s.filename==='gs_firefight.hsc'))throw new Error('No Firefight script to start');
+  if(activation==='firefight'&&!scripts.some(s=>s.filename==='gs_firefight.hsc'))throw new Error('Choose Firefight source mode and configured rules before starting its controller; independent campaign source keeps saved Firefight rules inactive');
   if(!['none','mission','firefight'].includes(activation))throw new Error('Invalid script activation mode');
   const files=scripts.flatMap(script=>[
     {name:`${scriptDirectory}/${script.filename}`,contents:script.content},

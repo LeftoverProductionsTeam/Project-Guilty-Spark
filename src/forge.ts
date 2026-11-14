@@ -6,7 +6,7 @@ import type { LogicTrigger, NativeLogicDocument, NativeLogicSource } from './nat
 
 export type BrushKind = 'room' | 'box' | 'wall' | 'floor' | 'ramp' | 'stairs' | 'platform' | 'terrain' | 'caveTunnel';
 export type ForgeMode =
-  'slayer' | 'teamSlayer' | 'ctf' | 'king' | 'oddball' | 'race' | 'firefight' | 'zombie';
+  'slayer' | 'teamSlayer' | 'ctf' | 'king' | 'oddball' | 'race' | 'campaign' | 'firefight' | 'zombie';
 interface ForgeEntity {
   id: string;
   name: string;
@@ -68,6 +68,7 @@ export interface QuickForgeDocument {
   template: string;
   runtimeId: RuntimeId;
   gameMode: ForgeMode;
+  startingProfile?: import('./firefight').NativePlayerProfile;
   skyPath: string | null;
   /** Visual authoring intent only; never treated as compiled Halo sky/fog tags. */
   environment?: EditorEnvironment | null;
@@ -158,6 +159,7 @@ export const forgeModes: Record<ForgeMode, string> = {
   king: 'King of the Hill',
   oddball: 'Oddball',
   race: 'Race',
+  campaign: 'Campaign / scripted solo',
   firefight: 'Firefight',
   zombie: 'Zombie Apocalypse',
 };

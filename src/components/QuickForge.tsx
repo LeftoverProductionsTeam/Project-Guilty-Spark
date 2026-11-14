@@ -7,6 +7,8 @@ import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImpo
 import { draggedAsset } from '../assetDragRegistry';
 import {copyForgeSelection,readForgeSelection,prepareForgePaste,applyForgePaste} from '../forgeClipboard';
 import BuildTargets from './BuildTargets';
+import NativePlayerProfileEditor from './NativePlayerProfileEditor';
+import { defaultNativePlayerProfile } from '../firefight';
 import { WorkspacePanel, WorkspacePanelAddon, useWorkspaceFileActions, useRevealWorkspacePanel } from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import SmartEditPanel from './SmartEditPanel';
@@ -2665,6 +2667,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   {tab === 'properties' && (
                     <ForgeProperties
                       document={doc}
+                      weaponPaths={project.nativeAssetImports?.filter(binding=>binding.tagClass==='weap').map(binding=>binding.nativePath)}
                       onBakeNative={bakeLighting}
                       chosen={chosen}
                       changeNode={changeNode}
@@ -3317,6 +3320,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
 
 function ForgeProperties({
   document: doc,
+  weaponPaths,
   onBakeNative,
   chosen,
   changeNode,
@@ -3326,6 +3330,7 @@ function ForgeProperties({
   onSelectLogic,
 }: {
   document: QuickForgeDocument;
+  weaponPaths?: string[];
   onBakeNative:(quality:"draft"|"final")=>Promise<void>;
   chosen: ForgeNode[];
   changeNode: (update: (node: ForgeNode) => ForgeNode, description: string) => void;
@@ -3752,6 +3757,32 @@ function ForgeProperties({
             Changing mode does not invent supported runtime behavior. Review starts/objectives and native
             build diagnostics for the selected target.
           </p>
+          {doc.gameMode==='campaign'&&<details className="forge-details" open>
+            <summary>Campaign starting loadout</summary>
+            <p className="forge-hint">Standard solo source, without a wave controller or match timer.
+              Choose a reviewed imported weapon path below, or enter an exact weapon tag path from your editing kit.
+              Required source tags are checked during the native build. Normal weapon slots are separate from dual wielding.</p>
+            <label><input type="checkbox" checked={!!doc.startingProfile}
+              aria-label="Use campaign starting loadout"
+              disabled={!doc.startingProfile&&doc.logic?.manualSource!=null}
+              onChange={event=>commit({...doc,startingProfile:event.target.checked?defaultNativePlayerProfile():undefined},
+                'Change campaign starting loadout')}/>Use native starting loadout</label>
+            {doc.logic?.manualSource!=null&&<p className="forge-hint">
+              Handwritten HaloScript owns startup. Keep a copy in Handwritten scripts, then explicitly
+              return Native HaloScript to generated logic before enabling this loadout.</p>}
+            {doc.startingProfile&&<>
+              <button type="button" disabled={doc.logic?.manualSource!=null}
+                onClick={()=>commit({...doc,startingProfile:defaultNativePlayerProfile()},'Reset campaign starting loadout')}>
+                Reset pistol loadout
+              </button>
+              <NativePlayerProfileEditor value={doc.startingProfile} weaponPaths={weaponPaths}
+                disabled={doc.logic?.manualSource!=null}
+                onChange={patch=>commit({...doc,startingProfile:{...doc.startingProfile!,...patch}},'Edit campaign starting loadout')}/>
+            </>}
+            <p className="forge-hint">Changes use this project's Undo/Redo. Save before Build &amp; playtest, which compiles the profile and startup
+              HaloScript, then independently checks the cache. Native compilation, spawning and engine gameplay are
+              separate acceptance steps; Extraction inventory persistence is owned by Forerunner.</p>
+          </details>}
         </>
       )}
       {node?.value.locked && <Notice>This object is locked. Unlock it in the hierarchy to edit it.</Notice>}

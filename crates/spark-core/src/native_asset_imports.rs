@@ -158,11 +158,12 @@ pub fn find_source<'a>(project: &'a Project, sha256: &str, class: &str, path: &s
 /// Current placements select immutable imports; older unused receipts remain
 /// available to Undo but must not block a replacement's newer source revision.
 pub fn is_used(project: &Project, binding: &Binding) -> bool {
-    let firefight = project.firefight.as_ref().is_some_and(|config| {
+    let key = |path: &str| path.replace('\\',"/").to_ascii_lowercase();
+    let firefight = project.quick_forge.as_ref().is_none_or(|doc|doc.game_mode!="campaign")
+        && project.firefight.as_ref().is_some_and(|config| {
         if config.source_sha256.as_deref() != Some(binding.source_sha256.as_str()) {return false;}
         if find_source(project,&binding.source_sha256,&binding.tag_class,&binding.tag_path)
             .is_none_or(|selected|selected.id != binding.id) {return false;}
-        let key = |path: &str| path.replace('\\',"/").to_ascii_lowercase();
         let path = key(&binding.tag_path);
         match binding.tag_class.as_str() {
             "actv" => config.waves.iter().flat_map(|wave| &wave.groups).any(|group|
@@ -176,6 +177,10 @@ pub fn is_used(project: &Project, binding: &Binding) -> bool {
         object.source_model.as_ref().and_then(|source| find(project, source))
             .is_some_and(|value| value.id == binding.id)
     }) || project.quick_forge.as_ref().is_some_and(|document| {
+        if binding.tag_class == "weap" && crate::quickforge::campaign_profile(document).is_some_and(|profile| {
+            let path=key(&binding.native_path);
+            key(&profile.primary_weapon)==path || profile.secondary_weapon.as_ref().is_some_and(|weapon|key(weapon)==path)
+        }) {return true;}
         document.placements.iter().any(|placement| {
             placement.source_project_id.as_ref() == Some(&binding.source_project_id)
                 && placement.source_sha256.as_ref() == Some(&binding.source_sha256)

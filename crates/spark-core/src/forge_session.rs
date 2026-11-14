@@ -37,6 +37,16 @@ pub fn merge(
         }
         next.native_lighting.clone()
     };
+    // Loadout is an atomic recipe: weapon slots and their ammunition must not
+    // be merged from conflicting drafts. Explicit removal/Undo must propagate.
+    let starting_profile = if base.starting_profile == next.starting_profile {
+        current.starting_profile.clone()
+    } else {
+        if current.starting_profile != base.starting_profile && current.starting_profile != next.starting_profile {
+            return invalid("Concurrent edit conflict: startingProfile. Your local draft was retained.");
+        }
+        next.starting_profile.clone()
+    };
     let b = serde_json::to_value(base)?;
     let n = serde_json::to_value(next)?;
     let mut c = serde_json::to_value(current)?;
@@ -44,7 +54,7 @@ pub fn merge(
         if b.get(key) == Some(value) {
             continue;
         }
-        if key == "native" || key == "workshop" || key == "logic" || key == "nativeLighting" {
+        if key == "native" || key == "workshop" || key == "logic" || key == "nativeLighting" || key == "startingProfile" {
             continue;
         }
         if [
@@ -116,6 +126,7 @@ pub fn merge(
     doc.workshop = workshop;
     doc.logic = logic;
     doc.native_lighting = native_lighting;
+    doc.starting_profile = starting_profile;
     quickforge::validate_portable_document(&doc)?;
     Ok(doc)
 }

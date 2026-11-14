@@ -41,7 +41,7 @@ export function mergeForge(
     n = next as unknown as Record<string, unknown>,
     result = structuredClone(current) as unknown as Record<string, unknown>;
   for (const key of Object.keys(n)) {
-    if (key === 'logic' || key === 'nativeLighting') continue; // Optional source recipes merge atomically below, including deletion.
+    if (key === 'logic' || key === 'nativeLighting' || key === 'startingProfile') continue; // Optional source recipes merge atomically below, including deletion.
     if (same(b[key], n[key])) continue;
     if (key === 'workshop') {
       result.workshop = mergeWorkshop(base.workshop, next.workshop, current.workshop, forceRemote);
@@ -150,6 +150,12 @@ export function mergeForge(
       throw Error('Concurrent native lighting conflict; retain both drafts');
     if (next.nativeLighting) result.nativeLighting = structuredClone(next.nativeLighting);
     else delete result.nativeLighting;
+  }
+  if (!same(base.startingProfile, next.startingProfile)) {
+    if (!forceRemote && !same(current.startingProfile, base.startingProfile) && !same(current.startingProfile, next.startingProfile))
+      throw Error('Concurrent campaign loadout conflict; retain both drafts');
+    if (next.startingProfile) result.startingProfile = structuredClone(next.startingProfile);
+    else delete result.startingProfile;
   }
   return result as unknown as QuickForgeDocument;
 }

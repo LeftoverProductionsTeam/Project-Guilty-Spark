@@ -346,16 +346,17 @@ pub fn run_prepared_job(
         if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root).filter(|receipt|reuse_has_scene_sources(tools,receipt,document)){
             let readback=(|| -> Result<()> {
                 let round=crate::firefight::native_round_plan(project)?;
-                if project.firefight.is_some()&&round.is_none(){return invalid("The retained build has no current prepared native Firefight controller");}
-                if custom.models.is_empty()&&round.is_none(){return Ok(());}
+                if project.firefight.is_some()&&document.game_mode!="campaign"&&round.is_none(){return invalid("The retained build has no current prepared native Firefight controller");}
                 let output=receipt.build.as_ref().and_then(|build|build.output.as_deref()).ok_or_else(||SparkError::Invalid("Reused build has no native output".into()))?;
                 let inspected=maps::inspect_map(output,None)?;
                 if !custom.models.is_empty(){custom.inspect_cache(&inspected,output)?;custom.verify_sources()?;}
                 if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected,output)?;}
+                crate::quickforge::verify_starting_profile(document,&inspected)?;
+                crate::native_logic::verify_compiled(document,&inspected)?;
                 Ok(())
             })();
             match readback {
-                Ok(())=>{on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool and compiled tag/map identities match; required model/round readback passed. No new tag tree was copied.",receipt.job_id)});return Ok(receipt);},
+                Ok(())=>{on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool and compiled tag/map identities match; required model/round/loadout/script readback passed. No new tag tree was copied.",receipt.job_id)});return Ok(receipt);},
                 Err(problem)=>on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"reuse-readback".into(),severity:"warning".into(),progress:0,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Retained build did not pass current native readback: {problem}. It remains unchanged; the normal build path will validate a new output.")}),
             }
         }
@@ -417,7 +418,7 @@ pub fn run_prepared_job(
             Err(error)=>receipt.blockers.push(error.to_string()),
             _=>(),
         }
-        if project.firefight.is_some() && native_round.is_none(){sources.blockers.push("This source has no valid prepared native Firefight round. In Firefight rules, choose Use solo native rules, review Player loadout, then Prepare native solo round and Save before exporting or rebuilding. Multiplayer AI requires a separately supported runtime integration.".into());}
+        if project.firefight.is_some() && document.game_mode!="campaign" && native_round.is_none(){sources.blockers.push("This source has no valid prepared native Firefight round. In Firefight rules, choose Use solo native rules, review Player loadout, then Prepare native solo round and Save before exporting or rebuilding. Multiplayer AI requires a separately supported runtime integration.".into());}
         receipt.blockers.extend(sources.blockers.clone());
         receipt.sources=Some(sources.clone());
         custom.export(&sources.directory)?;
@@ -436,7 +437,7 @@ pub fn run_prepared_job(
         let tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
         for name in ["invader-edit","invader-build","invader-info","invader-dependency"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
-        if document.logic.is_some()&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
+        if crate::native_logic::has_source(document)&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
         if native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some())&&invader(tools,"invader-string").is_none(){receipt.blockers.push("Native Firefight HUD messages require invader-string in the selected Invader folder; no native tag was fabricated".into());}
         let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
         let imported=if let Some(inputs)=&native_inputs {inputs.imported.files.iter().map(|file|file.path.clone()).collect()}else{crate::native_asset_imports::available_files(import_root,project)?};
@@ -455,7 +456,7 @@ pub fn run_prepared_job(
         if !receipt.blockers.is_empty(){receipt.status="blocked".into();return Ok(());}
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
         let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap()),("invaderDependency",invader(tools,"invader-dependency").unwrap())];
-        if document.logic.is_some(){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
+        if crate::native_logic::has_source(document){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
         if native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some()){executables.push(("invaderString",invader(tools,"invader-string").unwrap()));}
         if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
         for (name,path) in executables {
@@ -552,6 +553,7 @@ pub fn run_prepared_job(
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
+        crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
         if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;

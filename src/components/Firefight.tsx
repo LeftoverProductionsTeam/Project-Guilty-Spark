@@ -1,5 +1,6 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import NativePlayerProfileEditor from './NativePlayerProfileEditor';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
 import { defaultNativePlayerProfile, nativeFirefightHudSource, reconcileFirefightSource, type NativePlayerProfile } from '../firefight';
 import { beginProjectMutation } from '../projectMutation';
@@ -64,7 +65,6 @@ export default function Firefight({
   const missingActors=config?.enemies.filter(enemy=>catalog&&!catalog.enemies.some(candidate=>tagKey(candidate.actorVariantPath)===tagKey(enemy.actorVariantPath)))??[];
   const missingWeapons=[...new Set(config?.nativePlayerProfile?[config.nativePlayerProfile.primaryWeapon,...(config.nativePlayerProfile.secondaryWeapon?[config.nativePlayerProfile.secondaryWeapon]:[])].map(tagKey):[])]
     .filter(path=>catalog&&!(catalog.weapons??[]).some(candidate=>tagKey(candidate)===path));
-  const weaponChoicesId = useId();
   const latestProject=useRef(project);latestProject.current=project;
   const activeProject=useRef<string|null>(project.id);
   useEffect(()=>{activeProject.current=project.id;return()=>{activeProject.current=null;};},[project.id]);
@@ -674,13 +674,9 @@ export default function Firefight({
           <details>
             <summary>Player loadout</summary>
             <p className="subtle">Starting gear for the native solo round. Choose a weapon from the selected actor source, or enter its exact tag path without an extension. Validate rules &amp; actors checks these paths; the native build also needs their matching source tags. These are normal weapon slots, not dual wielding.</p>
-            <datalist id={weaponChoicesId}>{(sourceMatches?catalog?.weapons??[]:[]).map(path=><option key={path} value={path}/>)}</datalist>
             <button disabled={busy} onClick={()=>config&&change({...config,nativePlayerProfile:defaultNativePlayerProfile()},'Set pistol starting profile')}>Use pistol loadout</button>
-            {config.nativePlayerProfile&&<div className="forge-rule-grid">
-              <label>Primary weapon tag<input aria-label="Primary weapon tag" list={weaponChoicesId} key={'primary:'+config.nativePlayerProfile.primaryWeapon} defaultValue={config.nativePlayerProfile.primaryWeapon} maxLength={240} onBlur={event=>{if(event.target.value!==config.nativePlayerProfile?.primaryWeapon)playerProfile({primaryWeapon:event.target.value});}}/></label>
-              <label>Secondary weapon tag (optional)<input aria-label="Secondary weapon tag" list={weaponChoicesId} key={'secondary:'+config.nativePlayerProfile.secondaryWeapon} defaultValue={config.nativePlayerProfile.secondaryWeapon??''} maxLength={240} onBlur={event=>{const value=event.target.value||null;if(value!==config.nativePlayerProfile?.secondaryWeapon)playerProfile(value?{secondaryWeapon:value}:{secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0});}}/></label>
-              {([['primaryLoaded','Primary rounds loaded',0,32767,1],['primaryReserved','Primary rounds reserved',0,32767,1],['secondaryLoaded','Secondary rounds loaded',0,32767,1],['secondaryReserved','Secondary rounds reserved',0,32767,1],['health','Starting health',.01,1,.05],['shields','Starting shields',0,3,.1],['fragmentationGrenades','Fragmentation grenades',0,4,1],['plasmaGrenades','Plasma grenades',0,4,1]] as const).map(([key,label,min,max,step])=><label key={key}>{label}<NumberField label={label} value={config.nativePlayerProfile![key]} min={min} max={max} step={step} onCommit={value=>playerProfile({[key]:value})}/></label>)}
-            </div>}
+            {config.nativePlayerProfile&&<NativePlayerProfileEditor value={config.nativePlayerProfile}
+              weaponPaths={sourceMatches?catalog?.weapons??[]:[]} disabled={busy} onChange={playerProfile}/>}
           </details>
           <label><input type="checkbox" aria-label="Native Firefight HUD messages" checked={config.nativeHudMessages===true} disabled={busy||(!editableNativeRound&&catalog?.sourceScenarioType!==0&&config.nativeHudMessages!==true)} onChange={event=>change({...config,nativeHudMessages:event.target.checked?true:undefined},'Change native Firefight HUD feedback')}/>Native HUD: waves, team score and replay instructions</label>
           <p className="subtle">For fresh native solo source, Prepare again after changing this option. For recovered solo source, Save, then Runtime Dock details → Firefight groups & controller → Prepare groups & controller; review the HUD append before building. The native build uses invader-string to create a separate standard HUD tag. After victory or a stopped round, use Halo’s pause menu to restart this cache or quit. This is team wave-clear scoring, not kill medals or multiplayer results. Original message indices are retained; unsupported lossless merges refuse without replacing source. Native UI/build/game acceptance is still pending.</p>

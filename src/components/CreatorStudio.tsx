@@ -160,14 +160,19 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     </section>
     <details className="analysis-card studio-handoff"><summary>Export &amp; compile setup</summary><div>
       <h2>QuickForge → Editing Kit source handoff</h2>
-      <p>Places your generated scripts under the matching <code>data/levels/quickforge/.../scripts/</code> folder inside a review-only ZIP. Requires a QuickForge singleplayer Firefight/Zombie source project and separately owned editing tools. No Halo files are modified.</p>
+      <p>Places your generated scripts under the matching <code>data/levels/quickforge/.../scripts/</code> folder inside a review-only ZIP. Requires a QuickForge Campaign / scripted solo, Firefight or Zombie source project and separately owned editing tools. No Halo files are modified.</p>
       <div className="studio-fields"><label>Script startup (optional)
         <select aria-label="HCEEK startup selection" value={scriptActivation} onChange={e=>setScriptActivation(e.target.value as Activation)}>
           <option value="none">None — manual activation</option>
           <option value="mission">Start mission only (review first)</option>
-          <option value="firefight">Start finite Firefight only (review first)</option>
+          <option value="firefight" disabled={project.quickForge?.gameMode==='campaign'}>Start finite Firefight only (review first)</option>
         </select></label></div>
-      <button type="button" onClick={exportHceekTree}><Download size={15}/> Export HCEEK source tree ZIP</button>
+      {project.quickForge?.gameMode==='campaign'&&scriptActivation==='firefight'&&
+        <p className="studio-hint">Choose manual activation or mission startup for this independent campaign. Saved Firefight rules remain inactive.</p>}
+      <button type="button" disabled={project.quickForge?.gameMode==='campaign'&&scriptActivation==='firefight'}
+        title={project.quickForge?.gameMode==='campaign'&&scriptActivation==='firefight'?'Choose manual activation or mission startup first.':undefined}
+        onClick={exportHceekTree}><Download size={15}/> Export HCEEK source tree ZIP</button>
+      <small className="studio-hint">This script-only pack excludes scenario and starting-loadout tags. Use the Level Editor native build for those.</small>
       <small className="studio-hint">The official compiler and actual target game must independently validate the scripts, BSP, AI, lighting and network behavior.</small>
     </div></details>
     {bindingChecks.length>0 && <details className="analysis-card studio-bindings"><summary>Scenario references · {bindingChecks.length} to check</summary>

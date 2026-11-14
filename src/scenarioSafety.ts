@@ -19,7 +19,7 @@ export function inspectScenarioRisks(doc:QuickForgeDocument, firefight?:Firefigh
     else sourceForPath.set(path,origin);
     if(!p.sourceSha256 || !p.sourceProjectId) warn('warning','UNVERIFIED_TAG_ORIGIN',
       `Placement ${p.name||p.id} needs a verified source map and its full dependency tree before building.`,[p.id]);
-    if(p.tagClass==='bipd' && !['firefight','zombie'].includes(doc.gameMode))
+    if(p.tagClass==='bipd' && !['campaign','firefight','zombie'].includes(doc.gameMode))
       warn('warning','UNSYNCED_MULTIPLAYER_AI', 'Placing a biped in multiplayer does not synchronize AI across clients.',[p.id]);
   }
   for(let i=0;i<doc.spawns.length;i++)for(let j=i+1;j<doc.spawns.length;j++){

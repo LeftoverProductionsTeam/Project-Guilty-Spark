@@ -105,6 +105,18 @@ export function studioDifferences(
       rows.push({ target: key, mine: brief(local[key]), shared: brief(shared[key]) });
     if (rows.length >= 12) return rows;
   }
+  const mineProfile = local.startingProfile, sharedProfile = shared.startingProfile;
+  if (!mineProfile || !sharedProfile) {
+    if (mineProfile !== sharedProfile)
+      rows.push({target:'startingProfile',mine:mineProfile?'Present':'Absent',shared:sharedProfile?'Present':'Absent'});
+  } else {
+    for (const field of Object.keys(mineProfile) as (keyof typeof mineProfile)[]) {
+      if (JSON.stringify(mineProfile[field]) !== JSON.stringify(sharedProfile[field]))
+        rows.push({target:`startingProfile/${field}`,mine:brief(mineProfile[field]),shared:brief(sharedProfile[field])});
+      if (rows.length >= 12) return rows;
+    }
+  }
+  if (rows.length >= 12) return rows;
   const mineLighting = local.nativeLighting, sharedLighting = shared.nativeLighting;
   if (!mineLighting || !sharedLighting) {
     if (mineLighting !== sharedLighting)

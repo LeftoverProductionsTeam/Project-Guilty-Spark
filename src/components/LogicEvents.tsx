@@ -42,7 +42,7 @@ export default function LogicEvents({
   useEffect(() => {
     if (isLogicTarget(node)) setOpen(true);
   }, [node?.value.id]);
-  const logic = doc.logic,
+  const logic = doc.logic ?? (doc.gameMode==='campaign'&&doc.startingProfile?logicDocument(doc):undefined),
     doors = doc.placements.filter((p) => p.tagClass === 'mach');
   const handwritten = logic?.handwrittenSources ?? [];
   const selectedModule = handwritten.find((m) => m.filename === moduleName) ?? handwritten[0];
@@ -648,6 +648,15 @@ export default function LogicEvents({
               >
                 Export original .hsc
               </button>
+              <button type="button" title="Exclude this module from the next build. Undo restores its exact source; the original file is untouched."
+                onClick={()=>{
+                  const next=logicDocument(doc);
+                  next.handwrittenSources=handwritten.filter(module=>module.filename!==selectedModule.filename);
+                  commit({...doc,logic:next},'Remove handwritten module from build');
+                  setModuleName('');
+                }}>Remove from this build</button>
+              <p className="forge-hint">Removal changes this project's source list only. Export the original first
+                if needed; Undo restores the module. Files in other projects and prior builds are untouched.</p>
             </>
           )}
         </details>
@@ -658,7 +667,8 @@ export default function LogicEvents({
               <input
                 type="checkbox"
                 checked={logic.manualSource !== undefined && logic.manualSource !== null}
-                disabled={!source && !logic.manualSource}
+                disabled={(!source && !logic.manualSource)||(doc.gameMode==='campaign'&&!!doc.startingProfile&&!logic.manualSource)}
+                title={doc.gameMode==='campaign'&&doc.startingProfile?'Disable Campaign starting loadout in Map properties before taking over generated startup HaloScript.':undefined}
                 onChange={(e) =>
                   commit(
                     {

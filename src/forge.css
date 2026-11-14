@@ -124,6 +124,7 @@
 .forge-template-art small { position:absolute; right:0; top:0; color:#6a9b9b; letter-spacing:2px; }
 .forge-template >strong { font-size:14px; color:#c5e1dd; }
 .forge-template >span:not(.forge-template-art):not(.pill) { font-size:11px; line-height:1.7; color:#8eafba; }
+.forge-player-profile { border:0; min-width:0; padding:0; }
 .forge-rule-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:15px 0; }
 .forge-rule-grid label { display:flex; flex-direction:column; gap:7px; color:#8aafbc; font-size:10px; }
 .forge-rule-grid input { width:100%; }
