@@ -1,6 +1,6 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native encounter inspection and exact round layout readback
+Task: Operation110 — native encounter/loadout inspection and exact round readback
 Status: implementation incomplete
 Starting revision: 20acb45fb84bd4789732a5f99c41c6a0acaafadb, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
@@ -24,6 +24,8 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Latest source-only increment: decoded optional native player profiles, source-bound weapon navigation, and exact round loadout readback (weapon slots, ammo, health/shields, grenades). Actor dependency classes are checked. Existing inspection fixture literals include None for the additive field; no tests/compilation ran. Native loadouts and How To distinguish scenario equipment from engine save profiles. Source syntax/offsets/callers were reviewed manually, not accepted through execution. All prior native AI WIP and companion findings remain preserved.
 
 Companion check-in14Nov: Forerunner f96bf1d234d238ca9d5576d6f123c19ee51007ad was read-only/clean; contractSHA428595fdbe01edada9c39eafb5a555e4e507ec8b8911ed9d5d0294c3d84ba6dd. New source adds one-shot game.start_map for an installed CE solo cache, carrier-child tracking, late-join notices and revert reset; all unbuilt/untested. Spark registration/discovery exists, but exact-hash shared-data launch and CE-build-to-companion routing remain incomplete. Keep native HaloScript and finite engine director as separate wave owners. Details/source references: FIREFIGHT_ENGINE.md companion check-in. No tests/builds/queries/games, original/companion edits or remote actions. Existing native AI decoder/readback WIP remains untouched and uncommitted.
 
