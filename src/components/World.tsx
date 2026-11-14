@@ -1,4 +1,5 @@
 import NativeObjectShadows from './NativeObjectShadows';
+import GpuLightmapDraft,{GpuLightmapRenderer} from './GpuLightmapDraft';
 import {useAssemblyDonor} from '../useAssemblyDonor';
 import {assemblyBounds} from '../assemblyViewport';
 import type {AssemblyViewportSource} from '../assemblyViewport';
@@ -668,6 +669,8 @@ export default function World({
   } | null>(null);
   const [textureNames, setTextureNames] = useState<Record<number, string>>({});
   const [lightmapTextures,setLightmapTextures] = useState<Record<string, THREE.Texture>>({});
+  const [gpuDraftRenderer,setGpuDraftRenderer]=useState<THREE.WebGLRenderer|null>(null);
+  const gpuDraftReservedBytes=useRef(0);
   const [detailTextures, setExtraTextures] = useState<Record<string, THREE.Texture>>({});
   const materialModels=useMemo(()=>sceneModelMeshes(inspection,project.scene),[inspection,project.scene]);
   const materialShaderIds=useMemo(()=>new Set([
@@ -689,9 +692,18 @@ export default function World({
   useEffect(() => () => {Object.values(lightmapsRef.current).forEach(t=>t.dispose());}, []);
   const texturesRef = useRef(shaderTextures);
   texturesRef.current = shaderTextures;
+  function reserveGpuDraftBytes(bytes:number){
+    const all=new Set([...residentTextures.current,...Object.values(texturesRef.current),...Object.values(lightmapsRef.current),...Object.values(extrasRef.current)]);
+    const resident=[...all].reduce((sum,t)=>sum+previewTextureBytes(t),0);
+    if(!Number.isSafeInteger(bytes)||bytes<=0||gpuDraftReservedBytes.current+resident+bytes>texturePreviewBudget())
+      throw Error('GPU draft exceeds the remaining Storage & Cache preview budget. Choose a smaller page or release unused previews.');
+    gpuDraftReservedBytes.current+=bytes;
+    let released=false;
+    return ()=>{if(!released){released=true;gpuDraftReservedBytes.current-=bytes;}};
+  }
   function withinTextureBudget(texture:THREE.Texture,replaced?:THREE.Texture,queued:THREE.Texture[]=[]){
     const all=[...new Set([...residentTextures.current,...Object.values(texturesRef.current),...Object.values(lightmapsRef.current),...Object.values(extrasRef.current),...queued])].filter(t=>t!==replaced&&t!==texture);
-    if(all.reduce((sum,t)=>sum+previewTextureBytes(t),0)+previewTextureBytes(texture)>texturePreviewBudget()){
+    if(gpuDraftReservedBytes.current+all.reduce((sum,t)=>sum+previewTextureBytes(t),0)+previewTextureBytes(texture)>texturePreviewBudget()){
       texture.dispose();throw new Error(`The ${texturePreviewBudget()/1024**2} MiB resident texture budget is full. Review Storage & Cache limits before loading more images.`);
     }
     residentTextures.current.add(texture);texture.addEventListener('dispose',()=>residentTextures.current.delete(texture));
@@ -1471,6 +1483,7 @@ export default function World({
                 }}
               >
                 <ViewportActivity continuous={cinematic} />
+                <GpuLightmapRenderer onRenderer={setGpuDraftRenderer}/>
                 <Scene
                   {...{
                     project,
@@ -2196,6 +2209,8 @@ export default function World({
                       }}
                     />
                   </label>
+                  <GpuLightmapDraft renderer={gpuDraftRenderer} mesh={previewMesh} inspection={inspection}
+                    environment={environment} active={activity.active} reserveBytes={reserveGpuDraftBytes}/>
                   {availableLightmapPages.map((page) => (
                     <div className="material-lens-assignment" key={page.key}>
                       <div>
