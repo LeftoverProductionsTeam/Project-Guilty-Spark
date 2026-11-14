@@ -567,7 +567,7 @@ pub(super) async fn smart_edit_execute(
             })
         }
         Route::WorkingTags => {
-            let job_id = runtime_workbench::build_working_tags(app, window, id, None,fresh.native_source_identity,Some(false),None,None,None).await?;
+            let job_id = runtime_workbench::build_working_tags(app, window, id, None,fresh.native_source_identity,Some(false),None,None,None,None).await?;
             Ok(Execution {
                 route,
                 job_id,

@@ -27,6 +27,15 @@ use std::{
 
 const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 
+/// One reviewed source-derived append, applied only inside a complete native build.
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EncounterAppendRequest {
+    pub operation:crate::native_operations::Operation,
+    pub fields_sha256:String,pub scripts_sha256:String,pub writer_sha256:String,pub project_fingerprint:String,
+}
+pub fn encounter_fields_identity(fields:&str)->String {crate::hex_bytes(Sha256::digest(fields.replace("\r\n","\n").as_bytes()))}
+
 /// One explicitly reviewed new module, never a replacement for recovered source.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -56,6 +65,8 @@ impl ScriptAttachment {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub encounter_append:Option<EncounterAppendRequest>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub script_attachment:Option<ScriptAttachment>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub expected_encounter:Option<crate::native_operations::Operation>,
@@ -79,6 +90,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub encounter_expectations:Vec<crate::native_operations::Operation>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub attached_script:Option<ScriptAttachmentIdentity>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -89,6 +102,8 @@ pub struct WorkingTagsReceipt {
     pub compiled_script_modules:Vec<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub reviewed_tag_identity:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub reviewed_script_identity:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub bsp_audio: Option<crate::bsp_audio::Request>,
     pub schema_version: u32,
@@ -162,6 +177,7 @@ struct Prepared {
     tags: PathBuf,
     source_data: Option<PathBuf>,
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
+    encounter_expectations:Vec<crate::native_operations::Operation>,
     source_project:Project,
     parent_output: PathBuf,
     parent_inspection: maps::MapInspection,
@@ -292,9 +308,9 @@ fn parent_native_identity(
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>)> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>)> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
-    let mut controller_binding=None;
+    let mut controller_binding=None;let mut encounter_expectations=vec![];
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -319,6 +335,7 @@ fn parent_native_identity(
             verify_hash_manifest(parent, &receipt.input_script_hashes)?;
         }
         controller_binding=receipt.controller_binding;
+        for expectation in receipt.encounter_expectations.into_iter().chain(receipt.expected_encounter){retain_encounter_expectation(&mut encounter_expectations,expectation)?;}
         receipt.workspace
     } else if forge_receipt.exists() {
         let receipt: forge_build::QuickForgeBuildReceipt = read_receipt(&forge_receipt)?;
@@ -368,9 +385,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok((Some(data),controller_binding))
+        Ok((Some(data),controller_binding,encounter_expectations))
     } else {
-        Ok((None,controller_binding))
+        Ok((None,controller_binding,encounter_expectations))
     }
 }
 
@@ -498,8 +515,18 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    let (source_data,parent_controller_binding,mut encounter_expectations) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
+    for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
+    if let Some(expected)=&input.expected_encounter{retain_encounter_expectation(&mut encounter_expectations,expected.clone())?;}
+    if let Some(append)=&input.encounter_append {
+        if input.scenario_type!=0||!input.compile_scripts||input.script_attachment.is_none()||input.bsp_audio.is_some()||input.expected_tag_identity.is_none(){return invalid("New Firefight groups require a solo source, reviewed new controller, explicit script compilation and exact source inventory; audio editing is separate");}
+        if append.project_fingerprint!=project.fingerprint()?||!valid_hash(&append.fields_sha256)||!valid_hash(&append.scripts_sha256)||!valid_hash(&append.writer_sha256){return invalid("The reviewed Firefight source plan no longer matches this saved revision");}
+        let crate::native_operations::Operation::AppendEncounters{source_rules:Some(rules),..}=&append.operation else{return invalid("Atomic Firefight source preparation requires saved-rule encounter groups");};
+        if Some(rules)!=project.firefight.as_ref(){return invalid("The reviewed groups were prepared for different Firefight rules");}
+        append.operation.validate("scnr",&format!("{scenario}.scenario"))?;
+        retain_encounter_expectation(&mut encounter_expectations,append.operation.clone())?;
+    }
     if input.compile_scripts {
         if source_data.is_none()&&input.script_attachment.is_none(){return invalid("This working source has no recovered HaloScript directory. Recover/review the original source modules first; compiled script bytecode is retained");}
         for (key,name) in [("invaderEdit","invader-edit"),("invaderScript","invader-script")] {
@@ -508,16 +535,24 @@ fn prepare(
             tools.insert(key.into(),maps::hash_file(&path)?);
         }
     }
+    if let Some(append)=&input.encounter_append {if tools.get("invaderEdit")!=Some(&append.writer_sha256){return invalid("The native encounter writer changed after source review");}}
     preserved_source(project)?;
     Ok(Prepared {
         tags,
         source_data,
         parent_controller_binding,
+        encounter_expectations,
         source_project,
         parent_output,
         parent_inspection,
         tools,
     })
+}
+
+/// Bind the reviewed original source modules, including an empty inventory.
+/// Uses the same bounded, link-rejecting scan as native script staging.
+pub fn script_source_identity(root:Option<&Path>,cancel:&AtomicBool)->Result<String> {
+    inventory_identity(&script_hashes(root,cancel)?)
 }
 
 /// Only engine script sources are carried forward. Original JMS/textures and
@@ -723,6 +758,52 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
     Ok(())
 }
 
+// Keep native expectations through later tag/script builds. A conflicting
+// definition is a source-review failure, never permission to drop an old check.
+fn retain_encounter_expectation(values:&mut Vec<crate::native_operations::Operation>,value:crate::native_operations::Operation)->Result<()> {
+    value.validate("scnr","review.scenario")?;
+    if !value.is_encounter_append(){return invalid("Only native encounter appends can supply encounter readback expectations");}
+    let entries=value.encounter_appends()?;let mut unseen=false;
+    for entry in &entries {
+        let mut found=false;
+        for prior in values.iter(){for old in prior.encounter_appends()?{if old.name.eq_ignore_ascii_case(&entry.name){if &old!=entry{return invalid("Conflicting native encounter expectations need source reconciliation");}found=true;}}}
+        unseen|=!found;
+    }
+    if unseen {if values.len()>=32{return invalid("Native encounter expectation history exceeds32reviewed operations");}values.push(value);}
+    Ok(())
+}
+fn apply_encounter_append(
+    project:&Project,input:&WorkingTagsInput,prepared:&Prepared,request:&EncounterAppendRequest,
+    tags:&Path,workspace:&Path,runner:&Runner<'_>,invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>,
+)->Result<()> {
+    let scenario=normalize_scenario(&input.scenario_path)?;let tag=format!("{scenario}.scenario");
+    let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+    let read=||->Result<String>{recheck_tools(input,&prepared.tools)?;let fields=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()],workspace,"encounter-readback",41)?;if fields.len()>1024*1024{return invalid("Native scenario fields exceed the reviewed1MiB bound");}Ok(fields.replace("\r\n","\n"))};
+    let before=read()?;
+    if encounter_fields_identity(&before)!=request.fields_sha256{return invalid("Native scenario fields changed after group review; no writer ran");}
+    let planned=crate::native_operations::saved_firefight_encounters(project,input.parent_build.sha256.as_deref().ok_or_else(||SparkError::Invalid("Native parent has no cache hash".into()))?,&before)?;
+    if planned!=request.operation{return invalid("Staged Firefight source no longer matches the reviewed saved-rule plan");}
+    let mut written=0usize;
+    for args in planned.argument_batches(planned.arguments_with_fields(tags,"scnr",&tag,&before)?,false)? {
+        recheck_tools(input,&prepared.tools)?;
+        let output=invoke(runner,&edit,&args,workspace,"encounter-append",42)?;
+        written=written.saturating_add(output.len());
+        if written>1024*1024||output.lines().any(|line|line.trim().to_ascii_lowercase().starts_with("error:")){return invalid("Native encounter writer returned an error or exceeded its aggregate output bound; no output was adopted");}
+    }
+    let args=planned.readback_arguments(tags,"scnr",&tag,&before)?.ok_or_else(||SparkError::Invalid("Native encounter scalar readback is unavailable".into()))?;
+    let mut scalars=String::new();
+    for args in planned.argument_batches(args,true)? {
+        recheck_tools(input,&prepared.tools)?;
+        let output=invoke(runner,&edit,&args,workspace,"encounter-readback",43)?;
+        if output.len().saturating_add(1)>1024*1024-scalars.len(){return invalid("Native encounter scalar readback exceeded1MiB");}
+        scalars.push_str(output.trim_end_matches(&['\r','\n'][..]));scalars.push('\n');
+    }
+    planned.verify_readback(tags,"scnr",&tag,&before,&scalars)?;
+    crate::native_operations::reviewed_difference(&before,&read()?,&planned)?;
+    recheck_tools(input,&prepared.tools)?;
+    Ok(())
+}
+
 fn run_with(
     project: &Project,
     input: &WorkingTagsInput,
@@ -759,11 +840,13 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        encounter_expectations:prepared.encounter_expectations.clone(),
         attached_script:None,
         controller_binding:prepared.parent_controller_binding.clone(),
         expected_encounter:input.expected_encounter.clone(),
         compiled_script_modules:vec![],
         reviewed_tag_identity:input.expected_tag_identity.clone(),
+        reviewed_script_identity:input.encounter_append.as_ref().map(|request|request.scripts_sha256.clone()),
         bsp_audio: input.bsp_audio.clone(),
         schema_version: 1,
         job_id: job_id.into(),
@@ -788,6 +871,9 @@ fn run_with(
     let input_scripts = script_hashes(prepared.source_data.as_deref(), &cancel)?;
     let mut staged_scripts=input_scripts.clone();
     let result = (|| -> Result<PathBuf> {
+        if let Some(append)=&input.encounter_append {
+            if inventory_identity(&input_scripts)?!=append.scripts_sha256{return invalid("Original script sources changed after Firefight review; prepare the groups and controller again. No native writer or compiler ran");}
+        }
         runner.emit("working-tags", "Copying current editable job tags; no source extraction/regeneration will overwrite native tool edits", 5, "info");
         input_hashes = forge_build::stage_tags(
             &prepared.tags,
@@ -898,6 +984,12 @@ fn run_with(
             crate::bsp_audio::apply(request, &metadata, &tags, &edit, &runner, &workspace)?;
             if maps::hash_file(&edit)? != prepared.tools["invaderEdit"] { return invalid("Invader edit changed during audio editing"); }
         }
+        if let Some(append)=&input.encounter_append {
+            let binding=receipt.controller_binding.as_ref().ok_or_else(||SparkError::Invalid("New Firefight groups require their reviewed bound controller".into()))?;
+            let entries=append.operation.encounter_appends()?;
+            if binding.rules.as_ref()!=project.firefight.as_ref()||binding.groups.len()!=entries.len()||binding.groups.iter().zip(&entries).any(|(group,entry)|group.name!=entry.name||group.count!=entry.count||!group.actor_variant_path.replace('\\',"/").eq_ignore_ascii_case(&entry.actor_path.replace('\\',"/"))){return invalid("Reviewed controller and newly prepared native groups differ");}
+            apply_encounter_append(project,input,&prepared,append,&tags,&workspace,&runner,&invoke)?;
+        }
         if input.compile_scripts {
             receipt.compiled_script_modules=compile_script_sources(input,&prepared,&tags,&workspace,&staged_scripts,&runner,&invoke)?;
             project::atomic_write(&directory.join("working-tags-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
@@ -955,7 +1047,7 @@ fn run_with(
         {
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
-        if let Some(expected)=&input.expected_encounter{expected.verify_compiled_encounter(&inspected)?;}
+        for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
         if let Some(binding)=&receipt.controller_binding{binding.verify_map(&inspected)?;}
         if input.compile_scripts {
             for script in &prepared.parent_inspection.scripts {
@@ -1170,6 +1262,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            encounter_append:None,
             script_attachment:None,
             expected_encounter:None,
             compile_scripts:false,

@@ -1200,7 +1200,8 @@ pub struct NativeRoundPlan {
     pub encounter_layouts: Vec<NativeRoundEncounter>,
     pub player_profile: NativePlayerProfile,
 }
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct NativeRoundEncounter {
     pub name:String,
     pub actor_path:String,

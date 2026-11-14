@@ -921,6 +921,44 @@ pub(super) async fn inspect_bsp_audio_workspace(app:tauri::AppHandle,project_id:
     }).await.map_err(error)?
 }
 
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct FirefightSourcePlan {
+    project_id:String,build_id:String,tags_directory:PathBuf,tag_identity:String,
+    request:core::working_tags::EncounterAppendRequest,
+    groups:Vec<core::firefight::NativeRoundEncounter>,
+}
+fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext)->Reply<FirefightSourcePlan> {
+    if source_scenario_type(state,project)?!=0{return Err("New Firefight groups require a native singleplayer source".into());}
+    let cancel=AtomicBool::new(false);
+    let identity=core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?;
+    let data=context.workspace.join("data");
+    core::reject_links(&data).map_err(error)?;
+    let data=if data.exists(){Some(owned_child(&context.workspace,&data)?)}else{None};
+    let scripts_sha256=core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?;
+    let fields=native_operations_native::fields(state,project,&context.tags,&format!("{}.scenario",context.scenario_path))?;
+    if fields.len()>1024*1024{return Err("Native scenario fields exceed the reviewed1MiB bound; use a separately reviewed native editor".into());}
+    let operation=core::native_operations::saved_firefight_encounters(project,context.build.sha256.as_deref().ok_or("Native parent output has no identity")?,&fields).map_err(error)?;
+    let writer=native_operations_native::executable(state,project,"invaderNative")?;
+    let writer_sha256=maps::hash_file(&writer).map_err(error)?;
+    native_operations_native::review_encounter_dependencies(state,project,&context.build,&context.tags,&operation)?;
+    if core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?!=identity||core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?!=scripts_sha256{return Err("Native tags or original scripts changed while preparing Firefight groups; review them again".into());}
+    let groups=operation.encounter_appends().map_err(error)?.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>().map_err(error)?;
+    Ok(FirefightSourcePlan{groups,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
+        request:core::working_tags::EncounterAppendRequest{operation,fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
+}
+#[tauri::command]
+pub(super) async fn prepare_firefight_source(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<FirefightSourcePlan> {
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{
+        let _guard=native_operations_native::source_guard()?;let state=app.state::<AppState>();
+        native_operations_native::require_idle(&state)?;check_document_owner(&state,&project_id,&owner)?;studio_native_source::require_unshared(&state,&project_id)?;
+        if processes(&state)?.iter().any(|p|p.project_id==project_id&&p.status=="running")||baboon_native::has_running(&project_id)?{return Err("Save and close this map's native editor/test processes before reviewing Firefight source".into());}
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;let context=source_context(&state,&project)?;
+        firefight_source_plan(&state,&project,&context)
+    }).await.map_err(error)?
+}
+
 #[tauri::command]
 pub(super) async fn build_working_tags(
     app: tauri::AppHandle,
@@ -932,6 +970,7 @@ pub(super) async fn build_working_tags(
     script_attachment:Option<core::working_tags::ScriptAttachment>,
     expected_build_id:Option<String>,
     expected_source_directory:Option<PathBuf>,
+    encounter_append:Option<core::working_tags::EncounterAppendRequest>,
 ) -> Reply<String> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
@@ -949,6 +988,11 @@ pub(super) async fn build_working_tags(
             return Err("The native build/source selection changed after script review. Select and review the module again; no build was started.".into());
         }
         if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}
+        if let Some(append)=&encounter_append {
+            if !compile_scripts.unwrap_or(false)||script_attachment.is_none()||bsp_audio.is_some()||expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags){return Err("Review new Firefight groups and their controller together against the selected native source; no job was started".into());}
+            let reviewed=firefight_source_plan(&state,&project,&context)?;
+            if &reviewed.request!=append||expected_tag_identity.as_deref()!=Some(reviewed.tag_identity.as_str()){return Err("Firefight source, rules, writer or inventory changed after review; prepare again before building".into());}
+        }
         let (settings,tool,invader_info)=working_compiler(&state,&project,&context.build)?;
         if context.build.target=="mcc-cea" {
             verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
@@ -956,7 +1000,7 @@ pub(super) async fn build_working_tags(
         let scenario_type=source_scenario_type(&state,&project)?;
         let expected_encounter=native_operations_native::encounter_expectation(&state,&context.source_project,&context.build)?;
         let source_project=context.source_project;
-        let mut input=core::working_tags::WorkingTagsInput{script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
+        let mut input=core::working_tags::WorkingTagsInput{encounter_append,script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
         let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is running; wait for completion or cancel it first".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);

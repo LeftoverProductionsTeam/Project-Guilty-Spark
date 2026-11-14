@@ -1,4 +1,5 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
+import type { NativeOperation } from './nativeOperations';
 
 export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';
 export type OpenCeFlavor = 'opence' | 'faber' | 'openh1' | 'forerunner';
@@ -87,6 +88,14 @@ export interface RuntimeWorkbenchReport {
 export interface CompiledSourceProject {
   projectId:string;title:string;buildId:string;outputSha256:string;
   target:'mcc-cea'|'gbx-custom';authoringChanged:boolean;
+}
+export interface EncounterAppendRequest {
+  operation:Extract<NativeOperation,{kind:'appendEncounters'}>;
+  fieldsSha256:string;scriptsSha256:string;writerSha256:string;projectFingerprint:string;
+}
+export interface FirefightSourcePlan {
+  projectId:string;buildId:string;tagsDirectory:string;tagIdentity:string;request:EncounterAppendRequest;
+  groups:{name:string;actorPath:string;positions:[number,number,number][]}[];
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string }
 export interface ToolLaunchPlan {

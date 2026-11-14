@@ -16,12 +16,14 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
+import { exportPlannedFirefightRound } from '../haloScript';
 import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
 import type {
   RuntimeWorkbenchReport,
   CompiledSourceProject,
   NativeScriptAttachment,
+  FirefightSourcePlan,
   RuntimeDockAction,
   ToolLaunchPlan,
   ToolProcessView,
@@ -149,6 +151,9 @@ export default function RuntimeDock({
   const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,workingTarget,project?.firefight]);
   const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
   const selectedScript=scriptAttachment?.sourceKey===scriptSourceKey?scriptAttachment:null;
+  const [firefightActivation,setFirefightActivation]=useState<'manual'|'startup'>('manual');
+  const [firefightSource,setFirefightSource]=useState<{sourceKey:string;plan:FirefightSourcePlan;script:NativeScriptAttachment;reviewed:boolean}|null>(null);
+  const selectedFirefightSource=firefightSource?.sourceKey===scriptSourceKey?firefightSource:null;
   const currentReport = useRef(report);
   currentReport.current = report;
   const detailsDialog = useRef<HTMLElement | null>(null);
@@ -163,7 +168,7 @@ export default function RuntimeDock({
     const controls = () =>
       [
         ...element.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]',
+          'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]',
         ),
       ].filter((node) => node.offsetParent !== null);
     const frame = requestAnimationFrame(() => controls()[0]?.focus());
@@ -384,7 +389,23 @@ export default function RuntimeDock({
       setScriptAttachment({filename:file.name,content,sha256,sourceKey:key,reviewed:false});
     }catch(problem){if(request===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
   }
-  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false, attachment?:NativeScriptAttachment) {
+  async function prepareFirefightSource(){
+    if(!native||!project||dirty||working||busy||!workingSourceAvailable||!report?.workingSource)return;
+    const request=generation.current,key=scriptSourceKey,selection=++scriptSelection.current;
+    setBusy(true);setError('');setFirefightSource(null);
+    try {
+      const plan=await call<FirefightSourcePlan>('prepare_firefight_source',{projectId:project.id});
+      if(plan.projectId!==project.id||plan.buildId!==report.workingSource.buildId||plan.tagsDirectory!==report.workingSource.tagsDirectory)throw Error('Native source selection changed; refresh and prepare again.');
+      const source=exportPlannedFirefightRound(plan.request.operation,firefightActivation);
+      const bytes=new TextEncoder().encode(source.content);if(!bytes.length||bytes.length>1048576)throw Error('Generated controller exceeds the reviewed1MiB bound.');
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
+      if(request!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
+      setFirefightSource({sourceKey:key,plan,script:{filename:source.filename,content:source.content,sha256},reviewed:false});
+    }catch(problem){if(request===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    finally{if(request===generation.current)setBusy(false);}
+  }
+  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false, attachment?:NativeScriptAttachment, firefight?:NonNullable<typeof firefightSource>) {
     if (
       !project ||
       dirty ||
@@ -395,15 +416,17 @@ export default function RuntimeDock({
     )
       return;
     if(!report?.workingSource||!workingSourceAvailable)return;
-    if(authoringPending&&!compileScripts){setError('Firefight rules changed. Review their bound controller and choose Attach source & compile or Compile scripts & build.');return;}
-    if(attachment&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
+    if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new groups, review Build new Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
+    if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
+    if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
-        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256}}:{}) });
+        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256}}:{}),
+        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:{}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
@@ -412,7 +435,7 @@ export default function RuntimeDock({
         onNavigate('build');
       }
     } catch (e) {
-      if (request === generation.current) setError(String(e));
+      if (request === generation.current) {setError(String(e));if(firefight)setFirefightSource(null);}
     } finally {
       if (request === generation.current) setBusy(false);
     }
@@ -596,7 +619,7 @@ export default function RuntimeDock({
           </div>
           {workingSourceAvailable && <small>Working source: {workingTarget==='gbx-custom'?'Custom Edition · Invader native rebuild':'MCC Halo 1 · H1A native rebuild'}. Source format is independent of the hosting runtime.</small>}
           {authoringPending && report?.workingSource && <Notice>
-            Firefight rules are saved but not compiled. The retained source belongs to the earlier build; it is available for a reviewed controller rebuild only. Export the current bound controller in Firefight rules → Advanced script export, then attach it below. For an existing controller, edit/review its original module through Open script source folder and choose Compile scripts &amp; build. A tag-only build cannot apply these rules.
+            Firefight rules are saved but not compiled. The retained source belongs to the earlier build; it is available for a reviewed controller rebuild only. For new encounters, use Build new Firefight groups & controller below to review and stage groups plus source together. For existing encounters, export the current bound controller in Firefight rules → Advanced script export, then attach it below. For an existing controller, edit/review its original module through Open script source folder and choose Compile scripts &amp; build. A tag-only build cannot apply these rules.
             <details><summary>Source and authored revisions</summary><p className="wrap-code">Compiled source: {report.workingSource.sourceProjectFingerprint}<br/>Saved authoring: {report.workingSource.projectFingerprint}</p></details>
           </Notice>}
           {project && report?.workingSource && h1aSource && !authoringPending && <WorkingTagChanges {...toolTags} />}
@@ -667,6 +690,23 @@ export default function RuntimeDock({
               </small>
             </div>
           )}
+          {project?.firefight&&report?.workingSource&&workingSourceAvailable&&<details className="native-script-attachment">
+            <summary>Build new Firefight groups &amp; controller</summary>
+            <p className="subtle">Prepare new inactive encounters and a controller from saved solo rules and zones in one separate native build. Review source, locations and exclusive script ownership. Existing encounters/scripts and player equipment stay; saved loadout settings are not applied by this preserving operation. Existing generated names need separate reconciliation. Failure preserves previous-good source/cache and never restarts a game.</p>
+            <label>Controller activation<select aria-label="New Firefight controller activation" value={firefightActivation} disabled={busy||working||dirty} onChange={event=>{scriptSelection.current++;setFirefightSource(null);setFirefightActivation(event.target.value as 'manual'|'startup');}}><option value="manual">Manual · set gs_ff_start true in reviewed source</option><option value="startup">Start automatically after map load</option></select></label>
+            <button disabled={busy||working||dirty||!native||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void prepareFirefightSource()}>Prepare groups &amp; controller</button>
+            {selectedFirefightSource&&<>
+              <p>{selectedFirefightSource.plan.request.operation.encounters.length} new groups · source <code className="wrap-code">{selectedFirefightSource.plan.tagIdentity}</code></p>
+              <small>Original script inventory <code className="wrap-code">{selectedFirefightSource.plan.request.scriptsSha256}</code></small>
+              <ol className="native-encounter-queue">{selectedFirefightSource.plan.request.operation.encounters.map(entry=><li key={entry.name}><span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>Zone center {entry.position.join(' / ')} · grid {entry.grid?.offset??0} / {entry.grid?.total??entry.count}</small></span></li>)}</ol>
+              <details><summary>Review {selectedFirefightSource.plan.groups.reduce((sum,group)=>sum+group.positions.length,0)} planned starting/firing positions</summary><ol className="native-encounter-readback">{selectedFirefightSource.plan.groups.map(group=><li key={group.name}><strong>{group.name}</strong><ol>{group.positions.map((position,index)=><li key={index}><code>{position.map(value=>value.toFixed(4)).join(' · ')}</code></li>)}</ol></li>)}</ol></details>
+              <p>{selectedFirefightSource.script.filename} · <code className="wrap-code">{selectedFirefightSource.script.sha256}</code></p>
+              <label>Review generated controller<textarea readOnly rows={6} spellCheck={false} style={{width:'100%',boxSizing:'border-box'}} value={selectedFirefightSource.script.content}/></label>
+              <label><input type="checkbox" checked={selectedFirefightSource.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setFirefightSource(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed original scripts, new encounter locations, controller source and exclusive wave ownership.</label>
+              <div className="button-row"><button disabled={busy||working||dirty||!selectedFirefightSource.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void buildWorkingTags(undefined,true,selectedFirefightSource.script,selectedFirefightSource)}>Build new groups &amp; controller</button><button disabled={busy||working} onClick={()=>{scriptSelection.current++;setFirefightSource(null);}}>Clear prepared source</button></div>
+              <p className="subtle">Temporary planned source, not compiled readback or gameplay proof. Forerunner’s separate finite encounter director must stay off for these scripted waves.</p>
+            </>}
+          </details>}
           {project&&report?.workingSource&&workingSourceAvailable&&<details className="native-script-attachment">
             <summary>Attach new controller/script source</summary>
             <p className="subtle">Choose a reviewed UTF8 .hsc module, up to 1 MiB. It is added only to a separate build candidate; an existing module with the same name is never replaced. Original scripts must be fully recovered. The selected file is not saved in the project draft; successful output retains it in the new native source. Project Undo does not remove a compiled source module.</p>

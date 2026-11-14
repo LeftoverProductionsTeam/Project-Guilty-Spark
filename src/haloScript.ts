@@ -8,6 +8,7 @@ import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
 import { defaultNativePlayerProfile, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
 import type { Project } from './types';
+import type { NativeOperation } from './nativeOperations';
 export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
@@ -284,6 +285,22 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
     'Solo only. Team lives, revives, supplies, difficulty scaling, infection and multiplayer AI are separate gates. Native compilation is not human gameplay acceptance.',
   ]};
 }
+/** Planned source specifications, never a decoded native inventory. The caller
+ * must review and build this controller with the exact append operation in the
+ * atomic source build; ordinary script attachment cannot create encounters. */
+export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup'):ScriptExport {
+  const config=operation.sourceRules;
+  if(!config?.sourceSha256||!operation.encounters.length||operation.encounters.length>16)throw Error('Review a source-bound native group plan first.');
+  const groups=config.waves.flatMap(wave=>wave.groups);
+  if(groups.length!==operation.encounters.length||groups.some((group,index)=>group.count!==(operation.encounters[index].count??1)||operation.encounters[index].startActive||config.enemies.find(enemy=>enemy.id===group.enemyId)?.actorVariantPath.replaceAll('\\','/').toLowerCase()!==operation.encounters[index].actorPath.replaceAll('\\','/').toLowerCase()))throw Error('Planned native groups differ from their saved rule actors/counts/inactive state.');
+  let index=0;
+  const names=config.waves.map(wave=>wave.groups.map(()=>operation.encounters[index++].name));
+  const output=exportHaloCeFirefightRound(config,{sourceSha256:config.sourceSha256,sourceScenarioType:0,encounterNames:names,
+    encounters:operation.encounters.map(entry=>({name:entry.name,actorVariantPaths:[entry.actorPath],normalCount:entry.count??1,insaneCount:entry.count??1,startingLocations:entry.count??1,notInitiallyCreated:!entry.startActive,issue:null})),
+    activation,exclusiveOwnershipConfirmed:true});
+  return {...output,warnings:['Planned new encounters are not native readback. Apply the exact groups and reviewed controller together through the atomic source build.',...output.warnings]};
+}
+
 /** Plain JSON contract for creator tool integration. No secrets or local source paths. */
 export function scriptManifest(out:ScriptExport):string {
   return JSON.stringify({schemaVersion:1,kind:'guilty-spark-h1-script-source',file:out.filename,

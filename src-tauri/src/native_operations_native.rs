@@ -357,6 +357,12 @@ fn verify_firefight_plan(project:&Project,build:&BuildRecord,fields:&str,operati
     }
     Ok(())
 }
+pub(super) fn review_encounter_dependencies(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path,operation:&recipes::Operation)->Reply<()> {
+    let source=Source{project:project.clone(),build:build.clone(),tags:tags.to_path_buf(),tag:format!("{}.scenario",project.scenario_path().map_err(error)?),class:"scnr".into()};
+    operation.validate(&source.class,&source.tag).map_err(error)?;
+    let edit=executable(state,project,"invaderNative")?;
+    encounter_dependencies(state,&source,operation,&edit).map(|_|())
+}
 fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply<Receipt> {
     let file = root(state, id)?.join("operation.json");
     core::reject_links(&file).map_err(error)?;
