@@ -98,6 +98,7 @@ export interface FirefightSourcePlan {
   projectId:string;buildId:string;tagsDirectory:string;tagIdentity:string;request:EncounterAppendRequest;
   groups:{name:string;actorPath:string;positions:[number,number,number][]}[];
   previousController?:NativeScriptAttachment|null;
+  previousGroups:{name:string;actorPath:string;positions:[number,number,number][]}[];
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string }
 export interface ToolLaunchPlan {

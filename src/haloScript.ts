@@ -301,7 +301,7 @@ export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{k
   // Keep the owned startup signature when disabling automatic activation.
   // It becomes a no-op; original native signature preservation stays enabled.
   const content=output.content+(retainBootstrap&&activation==='manual'?'\r\n(script startup gs_ff_bootstrap\r\n  (sleep 1)\r\n)\r\n':'');
-  return {...output,content,warnings:['Planned source is not native readback. Build the exact groups and reviewed controller through the atomic source path; recorded existing groups must stay unchanged.',...output.warnings]};
+  return {...output,content,warnings:['Planned source is not native readback. Build the exact groups and reviewed controller through the atomic source path; recorded native group changes require exact generated-field ownership and stable names/indices.',...output.warnings]};
 }
 
 /** Plain JSON contract for creator tool integration. No secrets or local source paths. */

@@ -932,6 +932,7 @@ pub(super) struct FirefightSourcePlan {
     request:core::working_tags::EncounterAppendRequest,
     groups:Vec<core::firefight::NativeRoundEncounter>,
     previous_controller:Option<core::working_tags::ScriptAttachment>,
+    previous_groups:Vec<core::firefight::NativeRoundEncounter>,
 }
 fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext)->Reply<FirefightSourcePlan> {
     if source_scenario_type(state,project)?!=0{return Err("New Firefight groups require a native singleplayer source".into());}
@@ -945,7 +946,7 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
     if fields.len()>1024*1024{return Err("Native scenario fields exceed the reviewed1MiB bound; use a separately reviewed native editor".into());}
     let parent_sha=context.build.sha256.as_deref().ok_or("Native parent output has no identity")?;
     let (operation,previous_controller)=if let Some(generated)=&context.generated_firefight {
-        let operation=core::native_operations::saved_firefight_controller_groups(project,parent_sha,&fields,&generated.operation).map_err(error)?;
+        let operation=core::native_operations::saved_firefight_controller_groups(project,parent_sha,&fields,&generated.operation,generated.encounter_fields_sha256.as_deref()).map_err(error)?;
         let data=data.as_ref().ok_or("Generated controller source is unavailable; preserve/reconcile its original module manually")?;
         let relative=core::safe_relative(&context.scenario_path).map_err(error)?;
         let script=data.join(relative.parent().unwrap_or(Path::new(""))).join("scripts").join(core::safe_relative(&generated.controller.filename).map_err(error)?);
@@ -960,7 +961,8 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
     native_operations_native::review_encounter_dependencies(state,project,&context.build,&context.tags,&operation)?;
     if core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?!=identity||core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?!=scripts_sha256{return Err("Native tags or original scripts changed while preparing Firefight groups; review them again".into());}
     let groups=operation.encounter_appends().map_err(error)?.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>().map_err(error)?;
-    Ok(FirefightSourcePlan{groups,previous_controller,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
+    let previous_groups=context.generated_firefight.as_ref().map(|previous|previous.operation.encounter_appends().and_then(|entries|entries.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>())).transpose().map_err(error)?.unwrap_or_default();
+    Ok(FirefightSourcePlan{groups,previous_controller,previous_groups,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
         request:core::working_tags::EncounterAppendRequest{operation,existing_controller:context.generated_firefight.as_ref().map(|generated|generated.controller.clone()),fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
 }
 #[tauri::command]

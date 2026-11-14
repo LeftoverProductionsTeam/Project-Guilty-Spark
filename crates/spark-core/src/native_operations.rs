@@ -2,6 +2,7 @@
 //! This is orchestration, not another native tag parser or tag schema.
 use crate::{invalid, safe_relative, Result};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest,Sha256};
 use std::path::Path;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -193,6 +194,57 @@ fn encounter_append_layouts(fields:&str,operation:&Operation)->Result<Vec<(Encou
     }
     Ok(result)
 }
+// Exact normalized native rows include fields Spark does not edit. Their
+// recorded identity prevents overwriting later handwritten encounter changes.
+fn owned_encounter_rows(fields:&str,operation:&Operation)->Result<Vec<(usize,Vec<String>)>> {
+    operation.validate("scnr","review.scenario")?;
+    let array=array_listing(fields,"encounters")?;
+    if array.count>128{return invalid("Native encounter inventory exceeds128rows");}
+    let starts=array.body.iter().enumerate().filter_map(|(index,line)|line.starts_with("    encounters[").then_some(index)).collect::<Vec<_>>();
+    if starts.len()!=array.count{return invalid("Native encounter row count differs from its declaration");}
+    let mut rows=vec![];
+    for(index,begin)in starts.iter().copied().enumerate(){
+        if array.body[begin]!=format!("    encounters[{index}] struct"){return invalid("Native encounter row order is incomplete or ambiguous");}
+        let end=starts.get(index+1).copied().unwrap_or(array.body.len());let body=&array.body[begin..end];
+        let names=body.iter().filter_map(|line|line.strip_prefix("        name (")).filter_map(|tail|tail.split_once(')').map(|pair|pair.0)).collect::<Vec<_>>();
+        if names.len()!=1{return invalid("Native encounter name is missing or ambiguous");}
+        rows.push((index,names[0],body));
+    }
+    let mut result=vec![];
+    for entry in operation.encounter_appends()? {
+        let found=rows.iter().filter(|(_,name,_)|name.eq_ignore_ascii_case(&entry.name)).collect::<Vec<_>>();
+        if found.len()!=1{return invalid("Recorded native encounter is missing or ambiguous; no replacement is permitted");}
+        result.push((found[0].0,found[0].2.to_vec()));
+    }
+    Ok(result)
+}
+pub fn owned_encounter_identity(fields:&str,operation:&Operation)->Result<String> {
+    Ok(crate::hex_bytes(Sha256::digest(serde_json::to_vec(&owned_encounter_rows(fields,operation)?)?)))
+}
+pub fn validate_owned_encounter_revision(existing:&Operation,desired:&Operation)->Result<()> {
+    existing.validate("scnr","review.scenario")?;desired.validate("scnr","review.scenario")?;
+    let old=existing.encounter_appends()?;let new=desired.encounter_appends()?;
+    if old.len()!=new.len()||old.iter().zip(&new).any(|(old,new)|old.name!=new.name||old.start_active!=new.start_active){return invalid("Owned encounter revision must keep group names/order and activation flags. Adding/removing groups needs separate source reconciliation");}
+    Ok(())
+}
+/// A recorded, unchanged generated suffix can be recreated at the same indices.
+/// This synthetic listing is planning data, never native readback evidence.
+pub fn encounter_revision_base(fields:&str,existing:&Operation,expected:&str)->Result<(String,Vec<usize>)> {
+    if owned_encounter_identity(fields,existing)?!=expected{return invalid("Generated native encounter fields changed after their build; preserve/reconcile handwritten source before replacing groups");}
+    let array=array_listing(fields,"encounters")?;let rows=owned_encounter_rows(fields,existing)?;
+    let count=array.count.checked_sub(rows.len()).ok_or_else(||crate::SparkError::Invalid("Invalid generated encounter range".into()))?;
+    if rows.iter().enumerate().any(|(offset,(index,_))|*index!=count+offset){return invalid("Generated groups are no longer the contiguous final encounter rows. Original indices cannot be shifted; reconcile the native source separately");}
+    let first=array.body.iter().position(|line|line==&format!("    encounters[{count}] struct")).ok_or_else(||crate::SparkError::Invalid("Generated native encounter boundary is missing".into()))?;
+    let lines=fields.lines().map(str::to_owned).collect::<Vec<_>>();
+    let mut base=lines[..array.start].to_vec();base.push(format!("encounters[{count}] array"));base.extend_from_slice(&array.body[..first]);base.extend_from_slice(&lines[array.end..]);
+    Ok((base.join("\n")+"\n",rows.into_iter().map(|(index,_)|index).collect()))
+}
+pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
+    let a=array_listing(expected,"encounters")?;let b=array_listing(actual,"encounters")?;
+    let remaining=|text:&str,array:&ArrayListing|text.lines().enumerate().filter(|(index,_)|*index<array.start||*index>=array.end).map(|(_,line)|line).collect::<Vec<_>>().join("\n");
+    if a.count!=b.count||a.body!=b.body||remaining(expected,&a)!=remaining(actual,&b){return invalid("Native generated-group removal changed original encounters, palettes or other scenario fields; candidate refused");}
+    Ok(())
+}
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
@@ -231,7 +283,7 @@ impl Operation {
         if overhead>=LIMIT{return invalid("Native source path leaves no checked command-line capacity");}
         let mut result=vec![];let mut batch=base.clone();let mut used=overhead;let mut i=2;
         while i<end {
-            let width=match(args[i].as_str(),readback){("-G",true)=>2,("-S",false)=>3,("-I",false)=>4,_=>return invalid("Unknown action in native encounter batch")};
+            let width=match(args[i].as_str(),readback){("-G",true)=>2,("-S",false)=>3,("-I",false)=>4,("-E",false)=>2,_=>return invalid("Unknown action in native encounter batch")};
             if i+width>end{return invalid("Incomplete native encounter action");}
             let action=&args[i..i+width];let bytes=action.iter().map(|v|cost(v)).sum::<usize>();
             if bytes>LIMIT-overhead{return invalid("One native action exceeds its checked command-line capacity");}
@@ -314,12 +366,16 @@ pub fn saved_firefight_encounters(project:&crate::project::Project,parent_sha:&s
     let _=encounter_append_layouts(fields,&operation)?;
     Ok(operation)
 }
-/// Revise controller rules only when every native group specification stays
-/// identical to the owned source. This grants no arbitrary overwrite/resize.
-pub fn saved_firefight_controller_groups(project:&crate::project::Project,parent_sha:&str,fields:&str,existing:&Operation)->Result<Operation> {
-    existing.validate("scnr","review.scenario")?;
+/// Reuse exact owned groups, or plan a reviewed replacement of the unchanged
+/// generated suffix. Group names/indices and unrelated native data stay stable.
+pub fn saved_firefight_controller_groups(project:&crate::project::Project,parent_sha:&str,fields:&str,existing:&Operation,owned_fields:Option<&str>)->Result<Operation> {
     let operation=saved_firefight_group_plan(project,parent_sha,fields)?;
-    if operation.encounter_appends()?!=existing.encounter_appends()?{return invalid("Saved rules change native group actors, counts or positions. Controller-only revision preserves those groups; review their native source separately");}
+    validate_owned_encounter_revision(existing,&operation)?;
+    if operation.encounter_appends()?!=existing.encounter_appends()? {
+        let expected=owned_fields.ok_or_else(||crate::SparkError::Invalid("This older build has no generated-field ownership identity; native group replacement needs separate review".into()))?;
+        let (base,_)=encounter_revision_base(fields,existing,expected)?;
+        let _=encounter_append_layouts(&base,&operation)?;
+    }
     Ok(operation)
 }
 fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,fields:&str)->Result<Operation> {

@@ -52,6 +52,8 @@ pub struct ScriptAttachmentIdentity { pub filename:String, pub sha256:String }
 pub struct GeneratedFirefightSource {
     pub operation:crate::native_operations::Operation,
     pub controller:ScriptAttachmentIdentity,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub encounter_fields_sha256:Option<String>,
 }
 fn parse_controller_binding(content:&str)->Result<Option<crate::firefight::NativeControllerBinding>> {
         let line=content.lines().next().unwrap_or("").trim_start_matches('\u{feff}');
@@ -543,8 +545,14 @@ fn prepare(
         if let Some(previous)=&append.existing_controller {
             let generated=parent_generated_firefight.as_ref().ok_or_else(||SparkError::Invalid("This build has no owned generated controller; preserve/review its source manually".into()))?;
             let attachment=input.script_attachment.as_ref().unwrap();
-            if previous!=&generated.controller||attachment.filename!=previous.filename||append.operation.encounter_appends()?!=generated.operation.encounter_appends()? {
-                return invalid("Controller revision must retain the exact owned native groups and module identity; changed groups need separate native reconciliation");
+            if previous!=&generated.controller||attachment.filename!=previous.filename {
+                return invalid("Generated source revision must retain the exact recorded controller module identity");
+            }
+            crate::native_operations::validate_owned_encounter_revision(&generated.operation,&append.operation)?;
+            if append.operation.encounter_appends()?!=generated.operation.encounter_appends()? {
+                let mut removed=0usize;let old=generated.operation.encounter_appends()?;
+                encounter_expectations.retain(|value|{let same=value.encounter_appends().is_ok_and(|entries|entries==old);if same{removed+=1;}!same});
+                if removed!=1{return invalid("Owned encounter readback history needs explicit reconciliation; unrelated checks were not removed");}
             }
             let relative=attachment.relative_path(&scenario)?.to_string_lossy().replace(char::from(92u8),"/");
             if script_hashes(source_data.as_deref(),&AtomicBool::new(false))?.get(&relative)!=Some(&previous.sha256){return invalid("Generated controller was changed or removed; handwritten source is never replaced automatically");}
@@ -804,16 +812,28 @@ fn apply_encounter_append(
     let scenario=normalize_scenario(&input.scenario_path)?;let tag=format!("{scenario}.scenario");
     let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
     let read=||->Result<String>{recheck_tools(input,&prepared.tools)?;let fields=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()],workspace,"encounter-readback",41)?;if fields.len()>1024*1024{return invalid("Native scenario fields exceed the reviewed1MiB bound");}Ok(fields.replace("\r\n","\n"))};
-    let before=read()?;
+    let mut before=read()?;
     if encounter_fields_identity(&before)!=request.fields_sha256{return invalid("Native scenario fields changed after group review; no writer ran");}
     let parent_sha=input.parent_build.sha256.as_deref().ok_or_else(||SparkError::Invalid("Native parent has no cache hash".into()))?;
     let planned=if request.existing_controller.is_some() {
         let generated=prepared.parent_generated_firefight.as_ref().ok_or_else(||SparkError::Invalid("Generated controller ownership is unavailable".into()))?;
-        crate::native_operations::saved_firefight_controller_groups(project,parent_sha,&before,&generated.operation)?
+        crate::native_operations::saved_firefight_controller_groups(project,parent_sha,&before,&generated.operation,generated.encounter_fields_sha256.as_deref())?
     }else{crate::native_operations::saved_firefight_encounters(project,parent_sha,&before)?};
     if planned!=request.operation{return invalid("Staged Firefight source no longer matches the reviewed saved-rule plan");}
-    if request.existing_controller.is_some(){return Ok(());}// Existing native groups remain independently checked after compilation.
     let mut written=0usize;
+    if request.existing_controller.is_some() {
+        let generated=prepared.parent_generated_firefight.as_ref().unwrap();
+        if planned.encounter_appends()?==generated.operation.encounter_appends()?{return Ok(());}
+        let (expected_base,indices)=crate::native_operations::encounter_revision_base(&before,&generated.operation,generated.encounter_fields_sha256.as_deref().ok_or_else(||SparkError::Invalid("Generated native fields have no ownership identity".into()))?)?;
+        let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+        for index in indices.into_iter().rev(){args.extend(["-E".into(),format!("encounters[{index}]")]);}args.push(tag.clone());
+        for args in planned.argument_batches(args,false)? {
+            recheck_tools(input,&prepared.tools)?;
+            let output=invoke(runner,&edit,&args,workspace,"encounter-revision",42)?;written=written.saturating_add(output.len());
+            if written>1024*1024||output.lines().any(|line|line.trim().to_ascii_lowercase().starts_with("error:")){return invalid("Native generated-group removal failed; no candidate was adopted");}
+        }
+        before=read()?;crate::native_operations::verify_encounter_revision_base(&expected_base,&before)?;
+    }
     for args in planned.argument_batches(planned.arguments_with_fields(tags,"scnr",&tag,&before)?,false)? {
         recheck_tools(input,&prepared.tools)?;
         let output=invoke(runner,&edit,&args,workspace,"encounter-append",42)?;
@@ -1023,7 +1043,9 @@ fn run_with(
             let entries=append.operation.encounter_appends()?;
             if binding.rules.as_ref()!=project.firefight.as_ref()||binding.groups.len()!=entries.len()||binding.groups.iter().zip(&entries).any(|(group,entry)|group.name!=entry.name||group.count!=entry.count||!group.actor_variant_path.replace('\\',"/").eq_ignore_ascii_case(&entry.actor_path.replace('\\',"/"))){return invalid("Reviewed controller and newly prepared native groups differ");}
             apply_encounter_append(project,input,&prepared,append,&tags,&workspace,&runner,&invoke)?;
-            receipt.generated_firefight=Some(GeneratedFirefightSource{operation:append.operation.clone(),controller:receipt.attached_script.clone().ok_or_else(||SparkError::Invalid("Generated controller source identity disappeared".into()))?});
+            let unchanged=prepared.parent_generated_firefight.as_ref().filter(|previous|append.existing_controller.is_some()&&previous.operation.encounter_appends().ok()==append.operation.encounter_appends().ok());
+            let encounter_fields_sha256=unchanged.and_then(|previous|previous.encounter_fields_sha256.clone());
+            receipt.generated_firefight=Some(GeneratedFirefightSource{operation:append.operation.clone(),controller:receipt.attached_script.clone().ok_or_else(||SparkError::Invalid("Generated controller source identity disappeared".into()))?,encounter_fields_sha256});
         }
         if input.compile_scripts {
             receipt.compiled_script_modules=compile_script_sources(input,&prepared,&tags,&workspace,&staged_scripts,&runner,&invoke)?;
@@ -1135,6 +1157,17 @@ fn run_with(
             );
         }
         recheck_tools(input, &prepared.tools)?;
+        if let Some(request)=&input.encounter_append {
+            let changed=prepared.parent_generated_firefight.as_ref().is_none_or(|previous|request.existing_controller.is_none()||previous.operation.encounter_appends().ok()!=request.operation.encounter_appends().ok());
+            if changed {
+                let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+                let fields=invoke(&runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),format!("{}.scenario",receipt.scenario_path)],&workspace,"encounter-readback",92)?;
+                if fields.len()>1024*1024{return invalid("Generated encounter field ownership exceeds the native1MiB review bound");}
+                let identity=crate::native_operations::owned_encounter_identity(&fields,&request.operation)?;
+                receipt.generated_firefight.as_mut().ok_or_else(||SparkError::Invalid("Generated source provenance disappeared".into()))?.encounter_fields_sha256=Some(identity);
+                recheck_tools(input,&prepared.tools)?;
+            }
+        }
         let final_hashes = tree_hashes(&tags, &cancel)?;
         receipt.final_tag_hashes = Some(save_hash_manifest(
             &directory,
