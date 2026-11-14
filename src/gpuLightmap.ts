@@ -123,7 +123,7 @@ export async function bakeGpuLightmapDraft(
   // Conservative transient+retained payload estimate: CPU/GPU geometry, two GPU
   // targets, depth, tiled readback, float result and a display image. No disk cache.
   const bytes=mesh.positions.length*8*2+mesh.lightmapUvs.length*8+mesh.indices.length*16+
-    request.size**2*56+shadowSize**2*24+request.size*32*16;
+    request.size**2*56+shadowSize**2*24+Math.max(request.size,shadowSize)*32*16;
   if(!Number.isSafeInteger(bytes))throw Error('Invalid draft allocation size.');
   const releaseReservation=request.reserveBytes(bytes);
   let released=false;
@@ -229,6 +229,18 @@ export async function bakeGpuLightmapDraft(
     }
     request.progress?.('Baking BSP sun shadows');
     renderPass(shadowTarget,blocker,false,0xffffff);
+    let shadowTexels=0;
+    for(let y=0;y<shadowSize;y+=32) {
+      cancelled(request,renderer);
+      const tile=new Float32Array(shadowSize*32*4);
+      isolated(renderer,()=>renderer.readRenderTargetPixels(shadowTarget!,0,y,shadowSize,32,tile));
+      for(let i=0;i<tile.length;i+=4) {
+        if(!Number.isFinite(tile[i])||tile[i]<0||tile[i]>1)throw Error('Invalid GPU shadow depth.');
+        if(tile[i+3]>0.5)shadowTexels++;
+      }
+      await yieldUi();
+    }
+    if(!shadowTexels)throw Error('The GPU shadow pass produced no BSP coverage.');
     const lighting=makeMaterial(uvVertex,lightFragment,{depthTest:false,depthWrite:false,uniforms:{
       shadowMatrix:{value:shadowMatrix},depthPage:{value:shadowTarget.texture},sunDirection:{value:direction},
       ambient:{value:new THREE.Vector3(...request.ambient)},sunlight:{value:new THREE.Vector3(...request.sunlight)},

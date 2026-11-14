@@ -56,7 +56,7 @@ export default function GpuLightmapDraft({renderer,mesh,inspection,environment,a
     operation.current?.abort();discard();setPreview(null);setStatus('');
     return ()=>{operation.current?.abort();discard();};
   },[renderer,mesh,inspection?.sha256,environment,page?.key,size]);
-  useEffect(()=>{if(!active)operation.current?.abort();},[active]);
+  useEffect(()=>{if(!active&&operation.current){operation.current.abort();setStatus('GPU draft stopped while this editor is paused.');}},[active]);
 
   async function bake() {
     if(busy||!renderer||!mesh||!inspection||!page||!active)return;
@@ -91,8 +91,8 @@ export default function GpuLightmapDraft({renderer,mesh,inspection,environment,a
     <summary>Spark GPU lightmap draft</summary>
     <p className="forge-hint">Direct sun, BSP shadows and ambient fill on existing native UVs.
       Opaque BSP only; no object shadows, indirect light, emissive transport, fog or native output.
-      Use Bake lighting &amp; rebuild for the existing native Halo Tool workflow.</p>
-    <div className="action-row">
+      This draft does not replace the native Halo Tool/OpenTool baking workflows.</p>
+    <div className="action-row" style={{display:'flex',flexWrap:'wrap',gap:4}}>
       <select aria-label="GPU draft native lightmap page" value={page?.key??''} disabled={busy}
         onChange={e=>setPageKey(e.target.value)}>
         {pages.map(p=><option key={p.key} value={p.key}>BSP {p.bspIndex+1} · Page {p.page}</option>)}
