@@ -3,16 +3,22 @@ import {call,native} from '../api';
 import {decodeOwnedBitmapPreview} from '../ownedBitmapPreview';
 import type {OwnedBitmapPreview} from '../ownedBitmapPreview';
 import {bitmapSequenceFrame,validateOwnedBitmapLayout} from '../ownedBitmapLayout';
-import type {OwnedBitmapLayout} from '../ownedBitmapLayout';
+import type {OwnedBitmapLayout,BitmapSequenceFrame} from '../ownedBitmapLayout';
 import type {DdsImage} from '../haloDds';
 import type {Project} from '../types';
 import {useMapState} from '../mapSession';
 import {textureResourceScope,bitmapResourceSha256} from '../textureResourceScope';
 import {decodeReflectionCube, readReflectionCube} from '../ownedReflectionCube';
 
+/** A borrowed live canvas; never retained in project/session data or copied into another asset cache. */
+export interface HudArtworkFrame {
+  scope:string;bitmapTagId:number;sourceSha256:string;sequenceIndex:number;frameIndex:number;
+  canvas:HTMLCanvasElement;imageWidth:number;imageHeight:number;
+  displayedCrop:{left:number;top:number;width:number;height:number};nativeFrame:BitmapSequenceFrame;
+}
 /** Original, source-checked pixels. HUD sequence edits are explicit parent transactions. */
-export default function BitmapPreview({project,tagId,cube=false,hudSequence}:{project:Project;tagId:number;cube?:boolean;
-  hudSequence?:{index:number;onSelect:(index:number)=>void}}){
+export default function BitmapPreview({project,tagId,cube=false,hudSequence,onHudFrame}:{project:Project;tagId:number;cube?:boolean;
+  hudSequence?:{index:number;onSelect:(index:number)=>void};onHudFrame?:(frame:HudArtworkFrame|null)=>void}){
   const hudMode=!!hudSequence&&!cube;
   const resourceScope=textureResourceScope(project.source),layoutScope=project.id+':'+tagId+':'+resourceScope;
   const [layoutState,setLayout]=useState<{scope:string;value:OwnedBitmapLayout}|null>(null),
@@ -36,7 +42,7 @@ export default function BitmapPreview({project,tagId,cube=false,hudSequence}:{pr
   const face=Number.isInteger(storedFace)&&storedFace>=0&&storedFace<6?storedFace:0;
   const [frame,setFrame]=useState<{images:DdsImage[];previews:OwnedBitmapPreview[];scope:string}|null>(null),
     [count,setCount]=useState(1),[levels,setLevels]=useState(1),[error,setError]=useState(''),[loading,setLoading]=useState(false);
-  const canvas=useRef<HTMLCanvasElement>(null);
+  const canvas=useRef<HTMLCanvasElement>(null),artworkCallback=useRef(onHudFrame);artworkCallback.current=onHudFrame;
   const ready=!hudMode||!!selected.frame;
   const scope=layoutScope+':'+(cube?'cube':index+':mip'+mip)+':'+ready;
   const shown=useMemo(()=>frame?.scope===scope?{image:frame.images[cube?face:0],preview:frame.previews[cube?face:0]}:null,[frame,scope,cube,face]);
@@ -85,6 +91,14 @@ export default function BitmapPreview({project,tagId,cube=false,hudSequence}:{pr
     const pixels=context.createImageData(shown.image.width,shown.image.height);pixels.data.set(shown.image.pixels);
     context.putImageData(pixels,-crop.left,-crop.top,crop.left,crop.top,crop.width,crop.height);
   },[shown,crop]);
+  useLayoutEffect(()=>{
+    const target=canvas.current;
+    if(!hudMode||!shown||!crop||!selected.frame||!target||!hudSequence){artworkCallback.current?.(null);return;}
+    artworkCallback.current?.({scope:layoutScope,bitmapTagId:tagId,sourceSha256:shown.preview.sourceSha256,
+      sequenceIndex:hudSequence.index,frameIndex:hudFrame,canvas:target,imageWidth:shown.image.width,imageHeight:shown.image.height,
+      displayedCrop:crop,nativeFrame:selected.frame});
+    return()=>{artworkCallback.current?.(null);};
+  },[hudMode,shown,crop,selected.frame,hudSequence?.index,hudFrame,layoutScope,tagId]);
   return <section className={'gs-bitmap-preview'+(hudMode?' hud-sequence-preview':'')} aria-label={hudMode?'Original HUD sequence preview':'Original bitmap preview'}>
     <div className="gs-bitmap-toolbar"><strong>{cube?'Original reflection cube':hudMode?'Original HUD artwork':'Original bitmap'}</strong>
       {cube?<select aria-label="Cubemap face" value={face} onChange={event=>setFace(Number(event.target.value))}>

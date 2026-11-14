@@ -167,3 +167,6 @@ Owner addendum: full in-game HUD editor is required, not just Firefight text or 
 
 
 14Nov HUD artwork source continuation: existing bitmap pipeline now has untested source for bounded native sequence/sprite metadata and indexed CE resource-body readback; existing BitmapPreview selects original sequence frames/atlas crops and exposes registrations. Existing HUD inspector resolves parent artwork and edits native sequence through shared history; frame/atlas navigation is inspection only. No native HUD compositing/game acceptance or tests/builds were performed. Full structural/source-output/HUD/runtime gates and all475IDs/M1–M6 remain open; see UI_INTERACTION_AUDIT.
+
+
+14Nov selected HUD artwork source continuation: original sprite artwork can now be placed in the existing HUD view using the existing bitmap preview canvas, authored native anchors/scales and source/sequence identities (untested source). Source review also corrected outward corner signs in marker/drag/nudge math and retained unknown-anchor/scales refusal. No duplicate decoder/cache/writer or runtime adapter. Full layered/stateful HUD rendering, structural/native source output and UI/native/game/peer acceptance remain open; no tests/builds/apps/games executed. All475IDs/M1–M6/Operation110 unchanged.

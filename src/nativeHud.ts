@@ -1,5 +1,6 @@
 import schemaData from './nativeHudSchema.json';
-import type {Tag,TagField} from './types';
+import {fieldValue} from './editor';
+import type {Project,Tag,TagField} from './types';
 
 interface HudDefinition {name:string;label:string;type:string;struct?:string;options?:string[];flags?:string[];width?:number;classes?:string[]}
 interface HudSchema {roots:Record<string,string>;structs:Record<string,{size:number;fields:HudDefinition[]}>}
@@ -55,4 +56,31 @@ export function nativeHudArtwork(tag:Tag,layer:HudLayer|undefined):{reference?:T
   reference??=layer.fields.find(field=>field.kind==='reference'&&field.targetClass==='bitm');
   const sequence=layer.prefix?tag.fields.find(field=>field.key===layer.prefix+'sequence_index'):undefined;
   return {reference,sequence};
+}
+
+/** Coordinate conventions only: no engine safe-area, zoom or multiplayer simulation. */
+export function nativeHudAnchor(project:Project,tag:Tag,layer:HudLayer):number {
+  const value=(field:TagField|undefined)=>field?fieldValue(project,tag,field):-1;
+  const resolve=(key:string)=>{
+    const field=tag.fields.find(candidate=>candidate.key===key);
+    // An absent admitted MCC child-anchor cell is not the legacy "inherit" cell.
+    if(!field&&project.source?.cacheVersion===13&&/^hud:(static_elements|meter_elements|number_elements|overlay_elements)\[\d+\]\.anchor$/.test(key))return NaN;
+    let n=value(field);
+    if(field&&nativeHudDefinition(tag,field)?.type==='HUDInterfaceChildAnchor')n-=1;
+    return n;
+  };
+  if(layer.id.includes('.crosshair_overlays['))return 4;
+  if(tag.class==='unhi'&&layer.id.startsWith('hud:overlays['))return resolve('hud:auxiliary_overlay_anchor');
+  let n=resolve(layer.prefix+'anchor');
+  let parent=layer.prefix?.replace(/[_.]$/,'');
+  while(n<0&&parent?.includes('.')){parent=parent.slice(0,parent.lastIndexOf('.'));n=resolve(parent+'.anchor');}
+  if(n<0)n=resolve('hud:anchor');
+  return Number.isInteger(n)&&n>=0&&n<HUD_ANCHORS.length?n:-1;
+}
+export function hudAnchorBasis(anchor:number,width:number,height:number){
+  const normalized=HUD_ANCHORS[anchor]??HUD_ANCHORS[0];
+  // Native right/bottom corner and edge-center offsets increase inward.
+  const signX=anchor===1||anchor===3||anchor===8?-1:1;
+  const signY=anchor===2||anchor===3||anchor===6?-1:1;
+  return {origin:[normalized[0]*width,normalized[1]*height] as [number,number],sign:[signX,signY] as [number,number],normalized};
 }
