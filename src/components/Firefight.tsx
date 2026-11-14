@@ -1,10 +1,11 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
 import { defaultNativePlayerProfile, type NativePlayerProfile } from '../firefight';
 import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
 import { sourceZip } from '../sourceZip';
-import { call } from '../api';
+import { call, native } from '../api';
+import type { QuickForgeBuildReceipt } from '../forge';
 import type {
   FirefightCatalog,
   FirefightConfig,
@@ -19,6 +20,7 @@ export default function Firefight({
   project,
   entries,
   edit,
+  onSave,
   compact = false,
   selectedZone,
   onSelectZone,
@@ -26,6 +28,7 @@ export default function Firefight({
   project: Project;
   entries: LibraryEntry[];
   edit: (project: Project, description: string) => void;
+  onSave?: () => Promise<void>;
   compact?: boolean;
   selectedZone?: string | null;
   onSelectZone?: (id: string) => void;
@@ -43,7 +46,24 @@ export default function Firefight({
   const [busy, setBusy] = useState(false);
   const config = project.firefight;
   const weaponChoicesId = useId();
-  useWorkspaceFileActions('firefight:'+project.id,config?[{id:'firefight-round-source',label:'Export native Firefight round source…',hint:'Native scenario/script sources; compilation and gameplay are separate checks.',disabled:busy,run:()=>exportRound()}]:[]);
+  const latestProject=useRef(project);latestProject.current=project;
+  const [sourceExport,setSourceExport]=useState<{receipt:QuickForgeBuildReceipt;input:Project}|null>(null);
+  const prepared=!!project.quickForge&&!project.quickForge.native&&project.quickForge.gameMode==='firefight'&&
+    !!project.quickForge.logic?.handwrittenSources?.some(source=>source.filename==='gs_firefight.hsc');
+  const canExportSources=native&&!!onSave&&prepared&&!busy;
+  const sourceExportHint=!native?'Native source export is available in the desktop app.':!onSave?'Use the owning editable window and wait for the active build to finish.':!prepared?'Use solo native rules, review the loadout, then Prepare native solo round in this editable level.':'Saves this map and exports geometry, scenario commands, dependencies and HaloScript. Source export does not compile or launch Halo.';
+  const staleExport=!!sourceExport&&(sourceExport.receipt.current===false||sourceExport.input.quickForge!==project.quickForge||sourceExport.input.firefight!==config);
+  useWorkspaceFileActions('firefight:'+project.id,config?[
+    {id:'firefight-round-source',label:'Export native Firefight round sources…',hint:sourceExportHint,disabled:!canExportSources,run:()=>void exportNativeRound()},
+    {id:'firefight-script-plan',label:'Export Firefight script & encounter plan…',hint:'Advanced authoring ZIP only; no generated scenario or playable cache.',disabled:busy,run:()=>exportRound()},
+  ]:[]);
+  useEffect(()=>{
+    let alive=true;setSourceExport(null);
+    if(native&&project.quickForge)void call<QuickForgeBuildReceipt|null>('quickforge_build_report',{projectId:project.id})
+      .then(receipt=>{if(alive&&receipt?.status==='exported'&&receipt.sources)setSourceExport(previous=>previous??{receipt,input:project});})
+      .catch(problem=>{if(alive)setError('Previous source export could not be read: '+String(problem));});
+    return()=>{alive=false;};
+  },[project.id]);
   useEffect(() => {
     let alive = true;
     setCatalog(null);
@@ -133,6 +153,20 @@ export default function Firefight({
       setError('');
     } catch (error) { setError(String(error)); }
   }
+  async function exportNativeRound() {
+    if(!canExportSources||!onSave)return;
+    const input=project;
+    setBusy(true);setError('');
+    try {
+      await onSave();
+      if(latestProject.current.quickForge!==input.quickForge||latestProject.current.firefight!==input.firefight)
+        throw Error('The round or geometry changed while saving. Prepare the intended round, then export again.');
+      const receipt=await call<QuickForgeBuildReceipt>('quickforge_export',{projectId:input.id,expectedProject:input});
+      setSourceExport({receipt,input});
+      if(receipt.status!=='exported'||!receipt.sources||receipt.blockers.length)
+        setError(receipt.blockers.join(' | ')||'Source export did not finish. Inspect its job diagnostics; no compiled map was created.');
+    } catch(problem){setError(String(problem));}finally{setBusy(false);}
+  }
   function exportRound() {
     if(!config)return;
     try {
@@ -142,7 +176,7 @@ export default function Firefight({
         {name:'encounter-plan.json',contents:JSON.stringify({scenarioType:'singleplayer',sourceSha256:config.sourceSha256,enemies:config.enemies,
           spawnZones:config.spawnZones,waves:config.waves,nativePlayerProfile:config.nativePlayerProfile??null,dependencies:source.dependencies,compiled:false,gameplayVerified:false},null,2)}]);
       const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/zip'}));
-      const link=document.createElement('a');link.href=url;link.download='spark-native-firefight-round-source.zip';
+      const link=document.createElement('a');link.href=url;link.download='spark-firefight-script-plan.zip';
       document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setError('');
     }catch(error){setError(String(error));}
   }
@@ -571,10 +605,22 @@ export default function Firefight({
               <Play size={14} />
               Preview rule sequence
             </button>
-            <button disabled={busy} onClick={exportRound} title="Experimental singleplayer source: one player/life, finite waves and no scaling or supplies. Requires matching native encounters and a separate build.">
-              <Download size={14} />Export native round source
+            <button disabled={!canExportSources} onClick={()=>void exportNativeRound()} title={sourceExportHint}>
+              <Download size={14} />Export native round sources
             </button>
           </div>
+          <details><summary>Advanced script export</summary>
+            <p className="subtle">The script and encounter-plan ZIP describes authoring intent. It does not contain a generated native scenario or a playable map.</p>
+            <button disabled={busy} onClick={exportRound}><Download size={14} />Export script &amp; encounter plan</button>
+          </details>
+          {sourceExport&&<details open><summary>{staleExport?'Previous source export · changed since export':sourceExport.receipt.status!=='exported'?'Source export · did not finish':sourceExport.receipt.blockers.length?'Source export · resolve blockers':'Source export · not compiled'}</summary>
+            {sourceExport.receipt.sources&&<>
+              <code className="wrap-code">{sourceExport.receipt.sources.scenarioPlanPath}</code>
+              <p className="subtle">{sourceExport.receipt.sources.commands.length} construction commands · {sourceExport.receipt.sources.dependencies.length} dependency entries. Includes source geometry, HaloScript and Firefight authoring metadata. Matching editable tags and native compilation are still required.</p>
+              <button onClick={()=>void call('reveal_folder',{kind:'quickforgeSources',id:project.id+':'+sourceExport.receipt.jobId}).catch(problem=>setError(String(problem)))}>Open exported source folder</button>
+            </>}
+            {sourceExport.receipt.blockers.map((message,index)=><p key={index}>{message}</p>)}
+          </details>}
           {project.quickForge?.logic?.handwrittenSources?.some(source => source.filename === 'gs_firefight.hsc') &&
             <p role="status" className="subtle">Native solo source attached. Save and build to validate. Changed rules need preparing again; manual source edits are protected.</p>}
           {validation && (

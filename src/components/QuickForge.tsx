@@ -1319,7 +1319,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       await props.onSave();
       if (latestProject.current.quickForge !== expectedDoc)
         throw new Error('QuickForge changed while saving; rerun preflight before exporting.');
-      setReceipt(await call<QuickForgeBuildReceipt>('quickforge_export', { projectId: project.id }));
+      setReceipt(await call<QuickForgeBuildReceipt>('quickforge_export', { projectId: project.id, expectedProject: project }));
     } catch (e) {
       setBuildError(String(e));
     } finally {
@@ -2678,6 +2678,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       project={project}
                       entries={data.entries}
                       edit={edit}
+                      onSave={props.activeJob?undefined:()=>props.onSave()}
                       compact
                       selectedZone={selectedZone}
                       onSelectZone={(id) => {
@@ -3279,6 +3280,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       <summary>Generated source paths and dependencies</summary>
                       <code>{receipt.sources.jmsPath}</code>
                       <code>{receipt.sources.scenarioPlanPath}</code>
+                      <button onClick={()=>void call('reveal_folder',{kind:'quickforgeSources',id:project.id+':'+receipt.jobId}).catch(problem=>setBuildError(String(problem)))}>Open exported source folder</button>
                       <pre>
                         {JSON.stringify(
                           {

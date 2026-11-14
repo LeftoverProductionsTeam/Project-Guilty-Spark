@@ -391,7 +391,6 @@ pub fn run_prepared_job(
         if let Some(plan)=&native_round {
             sources.commands.extend(plan.commands.clone());sources.dependencies.extend(plan.dependencies.clone());
             project::atomic_write(&sources.scenario_plan_path,&serde_json::to_vec_pretty(&sources.commands)?,false)?;
-            project::atomic_write(&sources.directory.join("source-export.json"),&serde_json::to_vec_pretty(&sources)?,false)?;
         }
         sources.blockers.extend(source_blockers.clone());
         // Include resolved model shader classes in the native build receipt.
@@ -401,15 +400,19 @@ pub fn run_prepared_job(
             Err(error)=>receipt.blockers.push(error.to_string()),
             _=>(),
         }
+        if project.firefight.is_some() && native_round.is_none(){sources.blockers.push("This source has no valid prepared native Firefight round. In Firefight rules, choose Use solo native rules, review Player loadout, then Prepare native solo round and Save before exporting or rebuilding. Multiplayer AI requires a separately supported runtime integration.".into());}
         receipt.blockers.extend(sources.blockers.clone());
         receipt.sources=Some(sources.clone());
         custom.export(&sources.directory)?;
         project::save_project(&sources.directory.join("project.gsproject"),project)?;
         if let Some(config)=&project.firefight {project::atomic_write(&sources.directory.join("firefight-authoring.json"),&serde_json::to_vec_pretty(config)?,false)?;}
+        // Keep the on-disk descriptor consistent with the final command/dependency
+        // list and source blockers, including export-only jobs. Exported means files
+        // were written; receipt blockers still prevent native-ready acceptance.
+        project::atomic_write(&sources.directory.join("source-export.json"),&serde_json::to_vec_pretty(&sources)?,false)?;
         if export_only {receipt.status="exported".into();return Ok(());}
         if document.native.is_some() && prepared.is_none() {return invalid("Native shared source requires an explicit local verified materialization before compilation");}
         let engine=match target(document.runtime_id){Ok(v)=>Some(v),Err(e)=>{receipt.blockers.push(e.to_string());None}};
-        if project.firefight.is_some() && native_round.is_none(){receipt.blockers.push("This build has no valid prepared native Firefight round. In Firefight rules, choose Use solo native rules, review Player loadout, then Prepare native solo round and Save before rebuilding. Multiplayer AI requires a separately supported runtime integration.".into());}
         let tool=tool_file(tools);
         if let Err(problem)=authoring_preflight(project,tools,document) {receipt.blockers.push(problem.to_string());}
         if tool.is_none(){receipt.blockers.push("Halo 1 Editing Kit Tool is missing. Select the separately installed matching HEK or H1A kit folder in Settings.".into());}

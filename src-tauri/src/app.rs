@@ -813,10 +813,18 @@ fn save_forge_receipt(state:&AppState, receipt:&forge_build::QuickForgeBuildRece
     Ok(())
 }
 #[tauri::command]
-async fn quickforge_export(app:tauri::AppHandle,project_id:String)->Reply<forge_build::QuickForgeBuildReceipt> {
+async fn quickforge_export(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,expected_project:Option<Project>)->Reply<forge_build::QuickForgeBuildReceipt> {
+    let owner=window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
         let _source_guard=native_operations_native::source_guard()?;
-        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        if let Some(expected)=expected_project {
+            expected.validate().map_err(error)?;
+            if expected.id!=project_id||expected.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)? {
+                return Err("The saved source changed before export. Save the intended revision and export again; no source job was created.".into());
+            }
+        }
         baboon_native::guard_regeneration(&state,&project)?;
         let receipt=forge_build::run_job(&project,&forge_build::tools_for_target(&project,forge_tools(&state)?).map_err(error)?,&state.root.join("jobs"),&uuid::Uuid::new_v4().to_string(),true,forge_provenance_blockers(&state,&project),Arc::new(AtomicBool::new(false)),|e|event(&app,e)).map_err(error)?;
         save_forge_receipt(&state,&receipt)?;Ok(receipt)
@@ -1985,6 +1993,23 @@ fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Re
         "project" => lock(&state.library)?
             .project_dir(&id.ok_or("Missing project ID")?)
             .map_err(error)?,
+        "quickforgeSources" => {
+            let ids=id.ok_or("Missing source project and export job IDs")?;
+            let (project_id,job_id)=ids.split_once(':').ok_or("Expected source project and export job IDs")?;
+            uuid::Uuid::parse_str(project_id).map_err(error)?;uuid::Uuid::parse_str(job_id).map_err(error)?;
+            let receipt=lock(&state.library)?.quickforge_receipt(project_id).map_err(error)?.ok_or("No retained source export for this project")?;
+            let sources=receipt.sources.ok_or("This job has no source export")?;
+            let expected=state.root.join("jobs").join(job_id).join("workspace");
+            if receipt.project_id!=project_id||receipt.job_id!=job_id {
+                return Err("This source export was superseded or its job identity differs; export again to open the current folder".into());
+            }
+            core::reject_links(&expected).map_err(error)?;core::reject_links(&sources.directory).map_err(error)?;
+            let expected=fs::canonicalize(expected).map_err(error)?;
+            if fs::canonicalize(&sources.directory).map_err(error)?!=expected {
+                return Err("Source export path differs from its owned job folder".into());
+            }
+            expected
+        },
         "tagExchange" => {
             let job_id = id.ok_or("Missing tag extraction ID")?;
             uuid::Uuid::parse_str(&job_id).map_err(error)?;
