@@ -36,6 +36,14 @@ pub struct MissionBeat {
     pub trigger_ref: Option<String>,
     #[serde(default)]
     pub timer_seconds: Option<u32>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub hud_objective:Option<bool>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub hud_text:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub checkpoint:Option<bool>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub complete_mission:Option<bool>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -161,7 +169,10 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
     }
-    for beat in &binding.missions {
+    for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)) {
+            return invalid("Native level completion must be the final beat, without a checkpoint request on the same beat");
+        }
         match beat.trigger.as_str() {
             "triggerVolume"=>{
                 let name=beat.trigger_ref.as_deref().unwrap_or("");
@@ -188,11 +199,12 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
             _=>return invalid("Prepared mission trigger is unsupported"),
         }
     }
+    let _=native_mission_hud(&binding)?;
     Ok(Some(binding))
 }
 /// Native ScriptType values follow the existing Invader scenario definition.
 /// Presence/type checks are independent readback, not gameplay acceptance.
-pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection)->Result<()> {
+pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
     if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
@@ -205,7 +217,31 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
             return invalid(format!("Compiled mission script is missing, ambiguous or has the wrong native type: {name}"));
         }
     }
+    if let Some(hud)=native_mission_hud(binding)? {
+        let expected=format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/"));
+        let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&expected)).collect::<Vec<_>>();
+        if tags.len()!=1||tags[0].external||tags[0].data_offset.is_none(){return invalid("Compiled mission HUD dependency is missing, ambiguous or external");}
+        let actual=crate::maps::scenario_hud_messages(cache,map)?.ok_or_else(||crate::SparkError::Invalid("Compiled mission has no scenario HUD-message reference".into()))?;
+        if actual.tag_id!=tags[0].id||!actual.tag_path.replace('\\',"/").eq_ignore_ascii_case(&expected) {
+            return invalid("Compiled mission references a different HUD-message tag");
+        }
+        crate::firefight::verify_preserving_hud(&hud,&actual)?;
+    }
     Ok(())
+}
+/// Share the standard HMT source writer; never invent an engine HUD payload.
+pub fn native_mission_hud(binding:&NativeMissionBinding)->Result<Option<crate::firefight::NativeHudAppendPlan>> {
+    let mut messages=vec![];
+    for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.hud_objective!=Some(true){continue;}
+        let text=beat.hud_text.clone().unwrap_or_default();
+        if text.is_empty()||text.encode_utf16().count()>254||text.contains('%')||text.chars().any(char::is_control) {
+            return invalid(format!("Mission '{}' HUD text needs 1–254 UTF-16 characters without percent/control characters; direction notes remain separate",beat.title));
+        }
+        messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_obj_{}",index+1),text});
+    }
+    if messages.is_empty(){return Ok(None);}
+    crate::firefight::format_native_hud_append(messages,None,&[])
 }
 
 fn bounded(s: &str, max: usize) -> bool {
@@ -254,6 +290,7 @@ impl CreatorStudio {
                 || !["manual", "triggerVolume", "encounterCleared", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.timer_seconds.is_some_and(|n| n>600)
+                || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
         }
         for shot in &self.shots {

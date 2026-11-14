@@ -38,6 +38,15 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
   studio.missions.forEach((beat,i)=>{
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
+    if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true))
+      throw Error('Native level completion must be the final beat, without a checkpoint request on the same beat.');
+    if(beat.hudObjective===true) {
+      const text=beat.hudText??'';
+      if(!text.length||text.length>254||/[%\x00-\x1f\x7f]/.test(text))
+        throw Error(`Beat ${i+1} HUD text needs 1–254 UTF-16 characters without percent signs or control characters. Direction notes are preserved separately.`);
+      const name=`gs_mission_obj_${i+1}`;deps.push('hud_message:'+name);
+      scripted.push(`  (hud_set_objective_text ${name})`);
+    }
     switch(beat.trigger){
       case 'manual':
         const key=`gs_manual_${i+1}_done`;
@@ -65,6 +74,8 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
       }
     }
     scripted.push('  (print "gs objective complete")');
+    if(beat.checkpoint===true)scripted.push('  (game_save)');
+    if(beat.completeMission===true)scripted.push('  (game_won)');
   });
   scripted.push(')', '');
   lines.push(...globals, '', ...manualSetters, ...scripted);
@@ -72,7 +83,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function.',
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
-    'HUD objective text, checkpoints and scripting compile/gameplay remain unverified.',
+    'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
   ],generatedOnly:true};
 }
 
@@ -105,12 +116,14 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||
-    (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')))
+    (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')||
+    (beat.hudText!=null&&typeof beat.hudText!=='string')||
+    [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
     throw Error('Attached mission contains unsupported beat fields. Keep the original source for explicit review.');
   const errors=validateCreatorStudio({...emptyCreatorStudio(),missions:binding.missions});
   if(errors.length)throw Error(errors.join('; '));
@@ -126,7 +139,8 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
-    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null}));
+    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,
+    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null}));
   return sameJson(normalize(a),normalize(b));
 }
 export interface NativeMissionReview {
@@ -190,7 +204,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
   const output=exportHaloCeMission({...emptyCreatorStudio(),missions});
   const bindings=inspectScenarioBindings([output],null,doc);
-  const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource');
+  const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource'&&!binding.dependency.startsWith('hud_message:'));
   if(missing.length)throw Error(missing.map(binding=>binding.dependency+': '+binding.detail).join('\n'));
   for(const beat of missions)if(beat.trigger==='encounterCleared') {
     const name=beat.encounterName.split('/')[0];

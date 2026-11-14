@@ -159,7 +159,9 @@ pub(crate) fn find(
             if crate::native_logic::has_source(document) {
                 required.insert("invaderScript");
             }
-            if document.game_mode!="campaign" && project.firefight.as_ref().is_some_and(|config|config.native_hud_messages==Some(true)){
+            let mission_hud=crate::creative::native_mission_binding(project,document)?
+                .is_some_and(|binding|binding.missions.iter().any(|beat|beat.hud_objective==Some(true)));
+            if mission_hud || (document.game_mode!="campaign" && project.firefight.as_ref().is_some_and(|config|config.native_hud_messages==Some(true))){
                 required.insert("invaderString");
             }
             if document.runtime_id != crate::runtime::RuntimeId::MccSteam {

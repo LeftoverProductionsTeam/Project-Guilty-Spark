@@ -13,6 +13,10 @@ export interface MissionBeat {
   encounterName: string;
   triggerRef?: string | null;
   timerSeconds?: number | null;
+  hudObjective?: boolean | null;
+  hudText?: string | null;
+  checkpoint?: boolean | null;
+  completeMission?: boolean | null;
 }
 export interface CameraShot {
   id: string;
@@ -107,7 +111,9 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   for (const m of doc.missions) {
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
-      (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)))
+      (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
+      (m.hudText != null && !safeText(m.hudText,254)) ||
+      [m.hudObjective,m.checkpoint,m.completeMission].some(value=>value!=null&&typeof value!=='boolean'))
       failures.push(`Invalid mission beat ${m.id?.slice(0, 40) ?? '(unknown)'}`);
   }
   for (const shot of doc.shots) {

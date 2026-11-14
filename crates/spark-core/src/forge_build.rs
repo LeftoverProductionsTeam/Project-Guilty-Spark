@@ -341,6 +341,7 @@ pub fn run_prepared_job(
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Job ID is not a UUID".into()))?;
     let document=&custom.document;
     let mission=crate::creative::native_mission_binding(project,document);
+    let mission_hud=if let Ok(Some(binding))=&mission {crate::creative::native_mission_hud(binding)?} else {None};
     let started=Instant::now();
     let jobs_root=future_jobs_root(jobs_root)?;
     if !export_only&&prepared.is_none()&&extra_blockers.is_empty()&&mission.is_ok(){
@@ -355,7 +356,7 @@ pub fn run_prepared_job(
                 crate::quickforge::verify_starting_profile(document,&inspected)?;
                 crate::quickforge::verify_campaign_encounters(document,&inspected)?;
                 crate::native_logic::verify_compiled(document,&inspected)?;
-                if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected)?;}
+                if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,output)?;}
                 Ok(())
             })();
             match readback {
@@ -414,6 +415,17 @@ pub fn run_prepared_job(
             sources.commands.extend(plan.commands.clone());sources.dependencies.extend(plan.dependencies.clone());
             project::atomic_write(&sources.scenario_plan_path,&serde_json::to_vec_pretty(&sources.commands)?,false)?;
         }
+        if let Some(hud)=&mission_hud {
+            let path=format!("{}/gs_mission_messages",sources.scenario_path.replace('\\',"/"));
+            project::atomic_write(&sources.directory.join("data").join(safe_relative(&format!("{path}.hmt"))?),&hud.source,false)?;
+            sources.commands.push(quickforge::ForgeCommand {phase:"mission-hud-messages".into(),tool:"invaderString".into(),
+                args:vec!["-T".into(),"hud_message_text".into(),path.clone()],
+                expected_outputs:vec![format!("tags/{path}.hud_message_text")]});
+            sources.commands.push(quickforge::ForgeCommand {phase:"mission-hud-reference".into(),tool:"invaderEdit".into(),
+                args:vec!["-S".into(),"hud_messages".into(),format!("{path}.hud_message_text"),format!("{}.scenario",sources.scenario_path)],
+                expected_outputs:vec![format!("tags/{}.scenario",sources.scenario_path.replace('\\',"/"))]});
+            project::atomic_write(&sources.scenario_plan_path,&serde_json::to_vec_pretty(&sources.commands)?,false)?;
+        }
         sources.blockers.extend(source_blockers.clone());
         // Include resolved model shader classes in the native build receipt.
         sources.dependencies.extend(requirements.iter().filter(|dependency|dependency.kind=="modelShader").cloned());
@@ -442,7 +454,7 @@ pub fn run_prepared_job(
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
         for name in ["invader-edit","invader-build","invader-info","invader-dependency"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
         if crate::native_logic::has_source(document)&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
-        if native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some())&&invader(tools,"invader-string").is_none(){receipt.blockers.push("Native Firefight HUD messages require invader-string in the selected Invader folder; no native tag was fabricated".into());}
+        if (mission_hud.is_some()||native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some()))&&invader(tools,"invader-string").is_none(){receipt.blockers.push("Native HUD messages require invader-string in the selected Invader folder; no native tag was fabricated".into());}
         let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
         let imported=if let Some(inputs)=&native_inputs {inputs.imported.files.iter().map(|file|file.path.clone()).collect()}else{crate::native_asset_imports::available_files(import_root,project)?};
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
@@ -461,7 +473,7 @@ pub fn run_prepared_job(
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
         let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap()),("invaderDependency",invader(tools,"invader-dependency").unwrap())];
         if crate::native_logic::has_source(document){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
-        if native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some()){executables.push(("invaderString",invader(tools,"invader-string").unwrap()));}
+        if mission_hud.is_some()||native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some()){executables.push(("invaderString",invader(tools,"invader-string").unwrap()));}
         if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
         for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
@@ -583,7 +595,7 @@ pub fn run_prepared_job(
         crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::quickforge::verify_campaign_encounters(document,&inspected)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
-        if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected)?;}
+        if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,&output)?;}
         if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;
         if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}

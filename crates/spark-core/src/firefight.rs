@@ -1283,7 +1283,7 @@ pub fn revise_preserving_native_hud_source(config:&FirefightConfig,original:&cra
     if generated.is_empty(){return Ok(None);}
     format_native_hud_append(generated,Some(original),owned_names)
 }
-fn format_native_hud_append(generated:Vec<NativeRoundHudMessage>,original:Option<&crate::maps::HudSourceTag>,owned_names:&[String])->Result<Option<NativeHudAppendPlan>> {
+pub(crate) fn format_native_hud_append(generated:Vec<NativeRoundHudMessage>,original:Option<&crate::maps::HudSourceTag>,owned_names:&[String])->Result<Option<NativeHudAppendPlan>> {
     let original_count=original.map_or(0,|tag|tag.messages.len());
     let mut messages=original.map_or_else(Vec::new,|tag|tag.messages.clone());
     let mut owned=BTreeSet::new();

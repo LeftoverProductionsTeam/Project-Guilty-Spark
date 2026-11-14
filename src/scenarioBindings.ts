@@ -26,6 +26,8 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
         detail:found.length===1?'Name matches an explicitly named authoring volume. Native bounds, compilation and gameplay remain unverified.':
           'Choose an explicitly named volume from Level Editor → Logic / Events. Implicit generated names require native source review.'};
     }
+    if(dependency.startsWith('hud_message:'))return {dependency,status:'notInspectable' as const,
+      detail:'Prepared campaign builds generate this standard HUD message tag. Script-only exports require the matching native HMT asset; compilation/readback still need validation.'};
     if(!inspection) return {dependency,status:'notInspectable' as const,detail:'No imported source map; requires an editable scenario tag.'};
     if(dependency.startsWith('ai_encounter:')) {
       const full=dependency.slice('ai_encounter:'.length).split(':')[0];

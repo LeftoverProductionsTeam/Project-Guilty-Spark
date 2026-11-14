@@ -246,8 +246,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           ?'A mission binding is attached. Changed mission data requires preparation again; edited source is preserved and blocks automatic replacement.'
           :'No generated mission binding is attached. Separate exported script packs are not attached automatically.'}</p>
         <p className="studio-hint">Save before Build &amp; playtest. The build checks the saved mission binding,
-          module hash, encounter/volume names and compiled script identities. Native execution, HUD objectives,
-          checkpoints and a playable mission ending remain separate work and acceptance.</p>
+          module hash, encounter/volume names, HUD messages and compiled script identities. Actual HUD display,
+          accepted checkpoint restoration and native level progression require separate game acceptance.</p>
         <MissionSourceReview project={project} edit={edit} onActivation={setMissionActivation} exportLocal={report}/>
       </details>
       <CampaignEncounters project={project} edit={edit}/>
@@ -269,6 +269,26 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         {beat.trigger === 'triggerVolume' && <label>Scenario trigger-volume identifier<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
+        <details><summary>Native objective &amp; completion</summary>
+          <label><input type="checkbox" checked={beat.hudObjective===true}
+            onChange={event=>updateBeat(beat.id,{hudObjective:event.target.checked?true:undefined,
+              ...(event.target.checked&&beat.hudText==null?{hudText:beat.title}:{})})}/>Show native HUD objective while this beat is active</label>
+          {beat.hudObjective&&<label>HUD objective text<input aria-label={'HUD objective '+(i+1)} maxLength={254}
+            value={beat.hudText??''} onChange={event=>updateBeat(beat.id,{hudText:event.target.value})}/></label>}
+          <p className="studio-hint">HUD text is separate from direction notes: 1–254 UTF-16 characters, no percent signs or control characters.
+            The prepared native build creates a standard message tag; a script-only export does not include that tag.</p>
+          <label><input type="checkbox" checked={beat.checkpoint===true}
+            disabled={beat.completeMission===true&&beat.checkpoint!==true}
+            onChange={event=>updateBeat(beat.id,{checkpoint:event.target.checked?true:undefined})}/>Request a safe checkpoint after this beat</label>
+          <p className="studio-hint">The engine may refuse or time out a save when unsafe. This does not prove a saved checkpoint.</p>
+          <label title="Only the final beat can request completion; disable its checkpoint first.">
+            <input type="checkbox" checked={beat.completeMission===true}
+              disabled={beat.completeMission!==true&&(i+1!==studio.missions.length||beat.checkpoint===true)}
+              onChange={event=>updateBeat(beat.id,{completeMission:event.target.checked?true:undefined})}/>Request native level completion after this beat
+          </label>
+          <p className="studio-hint">Completion can advance the campaign according to the selected engine's level configuration.
+            Prepare mission again after changes. HUD display, save restoration and level progression require native/game testing.</p>
+        </details>
       </div>)}
     </section>}
     {pane === 'cinematic' && <section className="analysis-card">

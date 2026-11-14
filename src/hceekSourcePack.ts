@@ -79,7 +79,8 @@ export function assembleHceekSourcePack(
     '5. Legacy HEK: compile scripts through Sapien File > Compile Scripts; H1A toolset compiles during scenario processing.',
     '6. Run Tool/Invader build against a disposable build workspace, and test only a managed copy.',
     '7. A successful script parse or generated .map is NOT a game test. Preserve original hashes and collect evidence.',
-    'NOT INCLUDED: scenario tags, bitmap/shader assets, compiled BSP, runtime, AI syncing or gameplay verification.',
+    'HUD-enabled mission scripts need the matching standard message tag from the prepared campaign native build. This script-only archive does not create it.',
+    'NOT INCLUDED: scenario/HUD tags, bitmap/shader assets, compiled BSP, runtime, AI syncing or gameplay verification.',
     '',
   ].join('\r\n')});
   return {scenarioPath,scriptDirectory,files,bytes:sourceTreeZip(files),bootstrap:activation,gameplayVerified:false};
