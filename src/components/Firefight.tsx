@@ -1,7 +1,7 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
-import { defaultNativePlayerProfile, reconcileFirefightSource, type NativePlayerProfile } from '../firefight';
+import { defaultNativePlayerProfile, nativeFirefightHudSource, reconcileFirefightSource, type NativePlayerProfile } from '../firefight';
 import { beginProjectMutation } from '../projectMutation';
 import { attachAssetImport, prepareFirefightImports } from '../nativeAssetImport';
 import { exportHaloCeFirefightRound, matchGeneratedFirefightGroups, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
@@ -249,6 +249,7 @@ export default function Firefight({
       const source=exportHaloCeFirefightRound(config);
       const bytes=sourceZip([{name:source.filename,contents:source.content},
         {name:'native-round.json',contents:scriptManifest(source)},
+        ...(source.hudMessages?[{name:'gs_firefight_messages.hmt',contents:nativeFirefightHudSource(source.hudMessages)}]:[]),
         {name:'encounter-plan.json',contents:JSON.stringify({scenarioType:'singleplayer',sourceSha256:config.sourceSha256,enemies:config.enemies,
           spawnZones:config.spawnZones,waves:config.waves,nativePlayerProfile:config.nativePlayerProfile??null,dependencies:source.dependencies,compiled:false,gameplayVerified:false},null,2)}]);
       downloadSource(new Uint8Array(bytes),'spark-firefight-script-plan.zip','application/zip');setError('');
@@ -681,6 +682,8 @@ export default function Firefight({
               {([['primaryLoaded','Primary rounds loaded',0,32767,1],['primaryReserved','Primary rounds reserved',0,32767,1],['secondaryLoaded','Secondary rounds loaded',0,32767,1],['secondaryReserved','Secondary rounds reserved',0,32767,1],['health','Starting health',.01,1,.05],['shields','Starting shields',0,3,.1],['fragmentationGrenades','Fragmentation grenades',0,4,1],['plasmaGrenades','Plasma grenades',0,4,1]] as const).map(([key,label,min,max,step])=><label key={key}>{label}<NumberField label={label} value={config.nativePlayerProfile![key]} min={min} max={max} step={step} onCommit={value=>playerProfile({[key]:value})}/></label>)}
             </div>}
           </details>
+          <label><input type="checkbox" aria-label="Native Firefight HUD messages" checked={config.nativeHudMessages===true} disabled={busy||(!editableNativeRound&&config.nativeHudMessages!==true)} onChange={event=>change({...config,nativeHudMessages:event.target.checked?true:undefined},'Change native Firefight HUD feedback')}/>Native HUD: waves, team score and replay instructions</label>
+          <p className="subtle">Fresh native solo source only. Prepare again after changing this option; the native build uses invader-string to create standard HUD messages. After victory or a stopped round, use Halo’s pause menu to restart this cache or quit. This is team wave-clear scoring, not kill medals or multiplayer results. Existing source HUD merging remains separate.</p>
           <div className="analysis-actions">
             <button disabled={busy} onClick={() => change(nativeSoloFirefightRules(config), 'Use solo native Firefight rules')}
               title="One player, one life, one finite round, one spawn attempt, bounded preparation/timeouts; no revives, scaling, starting-equipment overrides or resupply. Enemy groups, zones and any selected native player loadout are retained. A fresh profile starts with a pistol, ammunition, health and shields. Undo restores the previous rules.">
@@ -729,7 +732,8 @@ export default function Firefight({
                 <option value="manual">Manual · set gs_ff_start true in reviewed HaloScript</option><option value="startup">Start automatically · add a startup script</option>
               </select></label>
               <label><input type="checkbox" checked={ownershipReviewed} disabled={busy||!sourceMatches||catalog?.sourceScenarioType!==0} onChange={event=>setOwnershipReviewed(event.target.checked)}/>I reviewed the original scripts; only this controller will manipulate these encounters.</label>
-              <button disabled={busy||!sourceMatches||catalog?.sourceScenarioType!==0||!ownershipReviewed||config.waves.some((wave,w)=>wave.groups.some((_,g)=>!nativeBinding.names[w]?.[g]))} onClick={exportBoundController}><Download size={14}/>Download bound controller .hsc</button>
+              {config.nativeHudMessages===true&&<p className="subtle">Bound controllers cannot replace existing HUD messages. Return to the fresh creator source for a full build, or turn generated HUD feedback off; a preserving HUD merge is not implemented.</p>}
+              <button disabled={busy||config.nativeHudMessages===true||!sourceMatches||catalog?.sourceScenarioType!==0||!ownershipReviewed||config.waves.some((wave,w)=>wave.groups.some((_,g)=>!nativeBinding.names[w]?.[g]))} onClick={exportBoundController}><Download size={14}/>Download bound controller .hsc</button>
               <p className="subtle">Review this module, then Runtime Dock → Attach new controller/script source → Attach source &amp; compile. Existing source modules are retained; matching names may need manual reconciliation. This is solo source authoring, not runtime configuration import, Live Link, multiplayer AI or gameplay acceptance.</p>
             </details>
           </details>

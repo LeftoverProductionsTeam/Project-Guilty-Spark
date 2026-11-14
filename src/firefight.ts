@@ -53,6 +53,47 @@ export interface FirefightConfig {
   replenishAmmoEachWave: boolean;
   supplyDropTags: string[];
   nativePlayerProfile?: NativePlayerProfile;
+  nativeHudMessages?: boolean;
+}
+export interface NativeFirefightHudMessage {name:string;text:string}
+/** Standard HMT source for the opt-in fresh-scenario controller, not engine HUD RPC. */
+export function nativeFirefightHudMessages(config:FirefightConfig):NativeFirefightHudMessage[] {
+  if(config.nativeHudMessages!==true)return [];
+  if(!Number.isSafeInteger(config.rounds)||config.rounds<1||config.rounds>32||!config.waves.length||config.waves.length>32)
+    throw Error('Native HUD messages require 1–32 finite rounds and waves.');
+  const messages:NativeFirefightHudMessage[]=[
+    {name:'gs_ff_ready',text:'Firefight: prepare for combat. One life.'},
+    {name:'gs_ff_victory',text:'Victory! Pause menu: restart to replay, or quit to leave.'},
+    {name:'gs_ff_no_player',text:'Round stopped: no living player. Pause to restart or quit.'},
+    {name:'gs_ff_spawn_failed',text:'Round stopped: enemy wave not ready. Pause to restart or quit.'},
+    {name:'gs_ff_defeated',text:'Defeat. Pause menu: restart to replay, or quit to leave.'},
+    {name:'gs_ff_timed_out',text:'Round stopped: wave time limit reached. Pause to restart or quit.'},
+  ];
+  const enemies=new Map(config.enemies.map(enemy=>[enemy.id,enemy]));
+  const scores=new Set<number>([0]);let score=0;
+  for(let r=0;r<config.rounds;r++){
+    messages.push({name:'gs_ff_round_'+(r+1),text:'Round '+(r+1)+' of '+config.rounds});
+    for(let w=0;w<config.waves.length;w++){
+      const wave=config.waves[w];let count=0,points=0;
+      if(!Number.isSafeInteger(wave.scoreMultiplierMilli)||wave.scoreMultiplierMilli<1||wave.scoreMultiplierMilli>10000)throw Error('Native HUD score multiplier is invalid.');
+      for(const group of wave.groups){const enemy=enemies.get(group.enemyId);
+        if(!enemy||!Number.isSafeInteger(group.count)||group.count<1||group.count>32||!Number.isSafeInteger(enemy.points)||enemy.points<0||enemy.points>100000)throw Error('Native HUD needs valid finite actor counts and point values.');
+        count+=group.count;points+=Math.floor(group.count*enemy.points*wave.scoreMultiplierMilli/1000);
+      }
+      if(r===0)messages.push({name:'gs_ff_wave_'+(w+1),text:'Wave '+(w+1)+' of '+config.waves.length+': eliminate '+count+' hostiles.'});
+      score+=points;if(!Number.isSafeInteger(score)||score>2147483647)throw Error('Native HUD score exceeds Halo long range.');scores.add(score);
+    }
+  }
+  for(const value of scores)messages.push({name:'gs_ff_score_'+value,text:'Team wave-clear score: '+value});
+  if(messages.length>1024||messages.reduce((sum,message)=>sum+(message.text.length+1)*2,0)>65536)
+    throw Error('Native HUD messages exceed the standard tag limits. Reduce finite rounds/waves or leave HUD generation off; the rules were retained.');
+  return messages;
+}
+export function nativeFirefightHudSource(messages:NativeFirefightHudMessage[]):Uint8Array {
+  const text=messages.map(message=>message.name+'='+message.text+'\r\n').join('');
+  const bytes=new Uint8Array(2+text.length*2);bytes[0]=255;bytes[1]=254;
+  const view=new DataView(bytes.buffer);for(let i=0;i<text.length;i++)view.setUint16(2+i*2,text.charCodeAt(i),true);
+  return bytes;
 }
 export interface FirefightPreset {
   id: string;

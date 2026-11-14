@@ -6,10 +6,10 @@
  */
 import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
-import { defaultNativePlayerProfile, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
+import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
 import type { Project } from './types';
 import type { NativeOperation } from './nativeOperations';
-export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
+export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; hudMessages?:NativeFirefightHudMessage[]; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
 const safeComment = (s: string): string => s.replace(/[\r\n\0]/g,' ').replace(/[^\x20-\x7e]/g,'?').slice(0,110);
@@ -214,13 +214,22 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
     return {groups,count:groups.reduce((n,g)=>n+g.count,0),score:groups.reduce((n,g)=>n+g.points,0)};
   });
   if(waves.reduce((n,w)=>n+w.score,0)*config.rounds>2147483647)throw Error('Native round score exceeds Halo long range.');
+  const hud=nativeFirefightHudMessages(config),feedback=hud.length>0;
+  if(binding&&feedback)throw Error('Generated HUD messages require a fresh native scenario. Existing scenario HUD messages need a preserving merge before this option can be used; no source was replaced.');
   const owned=(group:{slot:string})=>`gs_ff_units_${group.slot}`;
   const clean=(group:{slot:string})=>`gs_ff_clean_${group.slot}`;
   const lines=heading('Firefight native round candidate · solo encounter controller');
   lines.push('; State: 0 idle, 1 preparing, 2 active, 3 intermission, 4 complete, 5 refused/defeated.',
-    '; Score is team wave-clear points, not player kill attribution or a native HUD/medal implementation.',
+    feedback?'; Score is team wave-clear points shown with standard HUD messages; not player kill attribution or medals.':'; Score is team wave-clear points, not player kill attribution or a native HUD/medal implementation.',
     '(global boolean gs_ff_start false)','(global short gs_ff_state 0)','(global short gs_ff_round 0)',
     '(global short gs_ff_wave 0)','(global long gs_ff_score 0)','(global long gs_ff_cleared 0)','(global unit gs_ff_player none)','');
+  if(feedback){
+    lines.push('(global short gs_ff_failure 0)','; Failure: 1 no player, 2 incomplete spawn, 3 player death, 4 wave deadline.','',
+      '(script static void gs_ff_show_score');
+    for(const message of hud.filter(message=>message.name.startsWith('gs_ff_score_')))
+      lines.push('  (if (= gs_ff_score '+message.name.slice('gs_ff_score_'.length)+') (hud_set_objective_text '+message.name+'))');
+    lines.push(')','');
+  }
   for(const wave of waves)for(const group of wave.groups)
     lines.push(`(global object_list ${owned(group)} (ai_actors ${group.ref}))`);
   lines.push('');
@@ -237,23 +246,27 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
   }
   lines.push('(script static void gs_ff_reset');
   for(const wave of waves)for(const group of wave.groups)lines.push(`  (${clean(group)})`);
-  lines.push('  (set gs_ff_score 0)','  (set gs_ff_cleared 0)','  (set gs_ff_round 0)','  (set gs_ff_wave 0)',')','');
+  lines.push('  (set gs_ff_score 0)','  (set gs_ff_cleared 0)','  (set gs_ff_round 0)','  (set gs_ff_wave 0)',...(feedback?['  (set gs_ff_failure 0)']:[]),')','');
   waves.forEach((wave,w)=>{
     const counts=wave.groups.map(g=>`(ai_living_count ${g.ref})`), living=counts.length===1?counts[0]:`(+ ${counts.join(' ')})`;
-    lines.push(`(script static void gs_wave_${String(w+1).padStart(2,'0')}`, '  (if (!= gs_ff_state 5) (begin',
+    lines.push(`(script static void gs_wave_${String(w+1).padStart(2,'0')}`);
+    if(feedback)lines.push('  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))');
+    lines.push('  (if (!= gs_ff_state 5) (begin',
       '    (set gs_ff_state 2)',`    (set gs_ff_wave ${w+1})`);
+    if(feedback)lines.push(`    (hud_set_help_text gs_ff_wave_${w+1})`);
     for(const group of wave.groups)lines.push(`    (ai_place ${group.ref})`,
       `    (set ${owned(group)} (ai_actors ${group.ref}))`,`    (ai_force_active ${group.ref} true)`);
     const exact=wave.groups.map(g=>`(= (ai_living_count ${g.ref}) ${g.count})`), ready=exact.length===1?exact[0]:`(and ${exact.join(' ')})`;
-    lines.push(`    (sleep_until ${ready} 1 ${ticks(config.spawnTimeoutMs)})`,
-      `    (if (not ${ready}) (set gs_ff_state 5))`,
+    lines.push(`    (sleep_until ${feedback?`(or ${ready} (<= (unit_get_health gs_ff_player) 0))`:ready} 1 ${ticks(config.spawnTimeoutMs)})`,
+      `    (if (not ${ready}) ${feedback?'(begin (set gs_ff_failure 2) (set gs_ff_state 5))':'(set gs_ff_state 5)'})`,
+      ...(feedback?['    (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))']:[]),
       '    (if (!= gs_ff_state 5) (begin',
       `      (sleep_until (or (= ${living} 0) (<= (unit_get_health gs_ff_player) 0)) 1 ${ticks(config.stuckTimeoutMs)})`,
       `      (if (and (= ${living} 0) (> (unit_get_health gs_ff_player) 0))`,
       '        (begin',`          (set gs_ff_score (+ gs_ff_score ${wave.score}))`,
       `          (set gs_ff_cleared (+ gs_ff_cleared ${wave.count}))`,
-      '          (set gs_ff_state 3)',
-      '        )','        (set gs_ff_state 5)', '      )','    ))',
+      '          (set gs_ff_state 3)',...(feedback?['          (gs_ff_show_score)']:[]),
+      '        )',feedback?'        (begin (set gs_ff_failure (if (<= (unit_get_health gs_ff_player) 0) 3 4)) (set gs_ff_state 5))':'        (set gs_ff_state 5)', '      )','    ))',
       '    (if (= gs_ff_state 3) (sleep 60))');
     for(const group of wave.groups)lines.push(`    (${clean(group)})`);
     lines.push('  ))',')','');
@@ -262,25 +275,35 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
     '  (gs_ff_reset)','  (set gs_ff_state 1)',
     `  (sleep_until (> (unit_get_health (unit (list_get (players) 0))) 0) 1 ${ticks(config.spawnTimeoutMs)})`,
     '  (set gs_ff_player (unit (list_get (players) 0)))',
-    '  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))');
+    feedback?'  (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 1) (set gs_ff_state 5)))':'  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))');
+  if(feedback)lines.push('  (show_hud_help_text true)','  (if (!= gs_ff_state 5) (hud_set_help_text gs_ff_ready))','  (gs_ff_show_score)');
   if(player)lines.push('  (if (!= gs_ff_state 5) (player_add_equipment gs_ff_player gs_firefight_start true))');
-  lines.push(`  (sleep ${ticks(config.preparationMs+config.countdownMs)})`);
+  if(feedback)lines.push(`  (if (!= gs_ff_state 5) (begin (sleep_until (<= (unit_get_health gs_ff_player) 0) 1 ${ticks(config.preparationMs+config.countdownMs)}) (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))))`);
+  else lines.push(`  (sleep ${ticks(config.preparationMs+config.countdownMs)})`);
   for(let r=0;r<config.rounds;r++){
-    lines.push(`  (set gs_ff_round ${r+1})`);
-    for(let w=0;w<waves.length;w++)lines.push(`  (gs_wave_${String(w+1).padStart(2,'0')})`,
-      `  (if (!= gs_ff_state 5) (sleep ${ticks(config.intermissionMs)}))`);
+    lines.push(feedback?`  (if (!= gs_ff_state 5) (set gs_ff_round ${r+1}))`:`  (set gs_ff_round ${r+1})`);
+    if(feedback)lines.push(`  (if (!= gs_ff_state 5) (hud_set_objective_text gs_ff_round_${r+1}))`);
+    for(let w=0;w<waves.length;w++){lines.push(`  (gs_wave_${String(w+1).padStart(2,'0')})`);
+      if(!feedback||r!==config.rounds-1||w!==waves.length-1)lines.push(`  (if (!= gs_ff_state 5) (sleep ${ticks(config.intermissionMs)}))`);
+    }
   }
+  if(feedback)lines.push('  (if (and (!= gs_ff_state 5) (<= (unit_get_health gs_ff_player) 0)) (begin (set gs_ff_failure 3) (set gs_ff_state 5)))');
   lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
+  if(feedback){
+    lines.push('  (if (= gs_ff_state 4) (hud_set_help_text gs_ff_victory))');
+    ['gs_ff_no_player','gs_ff_spawn_failed','gs_ff_defeated','gs_ff_timed_out'].forEach((name,index)=>lines.push(`  (if (= gs_ff_failure ${index+1}) (hud_set_help_text ${name}))`));
+    lines.push('  (gs_ff_show_score)');
+  }
   lines.push(')','');
   const sourceBinding=binding?{schemaVersion:1 as const,rules:config,sourceSha256:binding.sourceSha256.toLowerCase(),encounters:references,groups:config.waves.flatMap((wave,w)=>wave.groups.map((group,g)=>({name:references[w][g],actorVariantPath:config.enemies.find(enemy=>enemy.id===group.enemyId)!.actorVariantPath,count:group.count}))),activation:binding.activation,loadout:'scenario' as const}:undefined;
   const content=(sourceBinding?'; Spark source encounter bindings: '+JSON.stringify(sourceBinding)+'\r\n':'')+lines.join('\r\n')+(binding?.activation==='startup'?nativeRoundBootstrap:'');
-  return {...conservative,...(sourceBinding?{sourceBinding}:{}),content,activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
+  return {...conservative,...(sourceBinding?{sourceBinding}:{}),...(feedback?{hudMessages:hud}:{}),content,activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
     ...(binding?['Bound encounters come from the exact source cache inventory. Their ownership, navigation and gameplay still require review; original scripts may also manipulate them.','Keep this scenario’s existing player equipment. No generated starting profile or weapon override is applied.','Activation: '+(binding.activation==='startup'?'an explicit gs_ff_bootstrap startup script is included.':'manual; a reviewed scenario script must set gs_ff_start true.')]:[]),
     ...(player?['Create gs_firefight_start as a standard scenario player starting profile using the exported player-loadout authoring metadata; include its exact weapon dependencies.']:[]),
     'Experimental native solo round source. Build only into a separate reviewed singleplayer/campaign scenario with these exact encounters/counts and safe spawn/navigation data.',
     'Start or request another round with (set gs_ff_start true). The continuous controller resets only its own encounters and score, then waits for actual living counts to reach zero.',
     'Missing/partial spawns, a dead player or the authored wave deadline refuse progression. No phantom success, forced kills or invulnerability is generated.',
-    'Wave-clear points are a script global, not per-player kill credit, medals or a Halo HUD. External scripts must not erase or respawn these owned encounters during a round.',
+    feedback?'Generated standard scenario HUD calls request wave/round status and the actual team wave-clear score; compile and game display remain unverified. They do not provide per-player kill credit or medals. Pause menu restart replays this cache; it does not load a rebuilt revision.':'Wave-clear points are a script global, not per-player kill credit, medals or a Halo HUD. External scripts must not erase or respawn these owned encounters during a round.',
     'Each cleared wave allows two seconds for native death animation, then removes only its captured units/corpses before the authored intermission. Defeat and partial-spawn refusal also clean owned units. Encounters must be not initially created and exclusively owned by this controller.',
     'Solo only. Team lives, revives, supplies, difficulty scaling, infection and multiplayer AI are separate gates. Native compilation is not human gameplay acceptance.',
   ]};
@@ -307,7 +330,7 @@ export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{k
 /** Plain JSON contract for creator tool integration. No secrets or local source paths. */
 export function scriptManifest(out:ScriptExport):string {
   return JSON.stringify({schemaVersion:1,kind:'guilty-spark-h1-script-source',file:out.filename,
-    status:'exportedNotCompiled',gameplayVerified:false,scenarioType:out.scenarioType??null,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings,...(out.sourceBinding?{sourceBinding:out.sourceBinding}:{})},null,2);
+    status:'exportedNotCompiled',gameplayVerified:false,scenarioType:out.scenarioType??null,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings,...(out.hudMessages?{hudMessages:{sourceFile:'gs_firefight_messages.hmt',encoding:'UTF-16LE with BOM',nativeType:'hud_message_text',messages:out.hudMessages}}:{}),...(out.sourceBinding?{sourceBinding:out.sourceBinding}:{})},null,2);
 }
 
 /** Attach the existing solo controller to an editable level. Configuration is

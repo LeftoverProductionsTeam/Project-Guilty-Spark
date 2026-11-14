@@ -2,7 +2,7 @@
  * Only STORED entries and safe flat filenames; no filesystem access and no
  * user-controlled archive paths. This is for authoring exports, not compiled maps.
  */
-export interface SourceFile { name: string; contents: string }
+export interface SourceFile { name: string; contents: string | Uint8Array }
 const encoder = new TextEncoder();
 const table = new Uint32Array(256);
 for (let i=0;i<256;i++) {
@@ -27,12 +27,12 @@ export function sourceTreeZip(files: SourceFile[]): Uint8Array {
 function encodeSourceZip(files: SourceFile[], allowPaths:boolean): Uint8Array {
   if (!Array.isArray(files) || !files.length || files.length > 32) throw new Error('Source bundle requires 1-32 files');
   const items = files.map((file) => {
-    if (typeof file.name !== 'string' || typeof file.contents !== 'string' ||
+    if (typeof file.name !== 'string' || (typeof file.contents !== 'string' && !(file.contents instanceof Uint8Array)) ||
         file.name.length > 240 || !(allowPaths ?
           file.name.split('/').length<=8 && file.name.split('/').every(part=>part.length<=63 && /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(part) && part !== '..') :
           /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(file.name) && file.name !== '..'))
       throw new Error('Unsafe source filename or contents');
-    const name = encoder.encode(file.name), bytes = encoder.encode(file.contents);
+    const name = encoder.encode(file.name), bytes = typeof file.contents === 'string' ? encoder.encode(file.contents) : new Uint8Array(file.contents);
     if (bytes.byteLength > 2*1024*1024) throw new Error('Generated source file exceeds 2 MiB');
     return {name, bytes, crc:crc32(bytes), str:file.name};
   });

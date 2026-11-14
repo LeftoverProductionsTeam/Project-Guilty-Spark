@@ -159,6 +159,9 @@ pub(crate) fn find(
             if document.logic.is_some() {
                 required.insert("invaderScript");
             }
+            if project.firefight.as_ref().is_some_and(|config|config.native_hud_messages==Some(true)){
+                required.insert("invaderString");
+            }
             if document.runtime_id != crate::runtime::RuntimeId::MccSteam {
                 required.insert("invaderBuild");
             }
@@ -200,6 +203,7 @@ pub(crate) fn find(
                         "invaderInfo" => "invader-info",
                         "invaderBuild" => "invader-build",
                         "invaderScript" => "invader-script",
+                        "invaderString" => "invader-string",
                         "invaderDependency" => "invader-dependency",
                         _ => return crate::invalid("Unknown cached native tool"),
                     };

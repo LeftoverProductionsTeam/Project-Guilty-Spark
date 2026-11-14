@@ -107,6 +107,8 @@ pub struct FirefightConfig {
     pub supply_drop_tags: Vec<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub native_player_profile: Option<NativePlayerProfile>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub native_hud_messages: Option<bool>,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -255,6 +257,7 @@ pub fn default_config() -> FirefightConfig {
         replenish_ammo_each_wave: false,
         supply_drop_tags: vec![],
         native_player_profile: None,
+        native_hud_messages: None,
     }
 }
 fn identifier(value: &str) -> bool {
@@ -1199,6 +1202,38 @@ pub struct NativeRoundPlan {
     pub encounter_names: Vec<String>,
     pub encounter_layouts: Vec<NativeRoundEncounter>,
     pub player_profile: NativePlayerProfile,
+    pub hud_messages: Vec<NativeRoundHudMessage>,
+    pub hud_tag_path: Option<String>,
+}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeRoundHudMessage {pub name:String,pub text:String}
+/// Independent authoring of the documented HMT key=value text format. Invader
+/// writes the actual native tag; no engine implementation or serializer is copied.
+pub fn native_hud_messages(config:&FirefightConfig)->Result<Vec<NativeRoundHudMessage>>{
+    if config.native_hud_messages!=Some(true){return Ok(vec![]);}
+    validate_native_round_rules(config)?;
+    let mut messages=vec![];
+    for(name,text)in[("gs_ff_ready","Firefight: prepare for combat. One life."),("gs_ff_victory","Victory! Pause menu: restart to replay, or quit to leave."),("gs_ff_no_player","Round stopped: no living player. Pause to restart or quit."),("gs_ff_spawn_failed","Round stopped: enemy wave not ready. Pause to restart or quit."),("gs_ff_defeated","Defeat. Pause menu: restart to replay, or quit to leave."),("gs_ff_timed_out","Round stopped: wave time limit reached. Pause to restart or quit.")]{messages.push(NativeRoundHudMessage{name:name.into(),text:text.into()});}
+    let mut scores=vec![0u64];let mut score=0u64;
+    for round in 0..config.rounds{
+        messages.push(NativeRoundHudMessage{name:format!("gs_ff_round_{}",round+1),text:format!("Round {} of {}",round+1,config.rounds)});
+        for(index,wave)in config.waves.iter().enumerate(){let mut count=0u32;let mut points=0u64;
+            for group in &wave.groups{let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||SparkError::Invalid("Native HUD actor reference is missing".into()))?;
+                count+=u32::from(group.count);points+=u64::from(group.count)*u64::from(enemy.points)*u64::from(wave.score_multiplier_milli)/1000;
+            }
+            if round==0{messages.push(NativeRoundHudMessage{name:format!("gs_ff_wave_{}",index+1),text:format!("Wave {} of {}: eliminate {} hostiles.",index+1,config.waves.len(),count)});}
+            score=score.checked_add(points).ok_or_else(||SparkError::Invalid("Native HUD score overflow".into()))?;
+            if score>i32::MAX as u64{return invalid("Native HUD score exceeds Halo long range");}
+            if !scores.contains(&score){scores.push(score);}
+        }
+    }
+    for value in scores{messages.push(NativeRoundHudMessage{name:format!("gs_ff_score_{value}"),text:format!("Team wave-clear score: {value}")});}
+    if messages.len()>1024 || messages.iter().map(|message|(message.text.encode_utf16().count()+1)*2).sum::<usize>()>65536{return invalid("Native HUD messages exceed standard tag limits; reduce rounds/waves or leave HUD generation off. Rules were retained");}
+    Ok(messages)
+}
+pub fn native_hud_source(messages:&[NativeRoundHudMessage])->Vec<u8>{
+    let mut bytes=vec![0xff,0xfe];for message in messages{for unit in format!("{}={}\r\n",message.name,message.text).encode_utf16(){bytes.extend_from_slice(&unit.to_le_bytes());}}bytes
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
@@ -1300,7 +1335,13 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let mut player_profile=player.clone();
     player_profile.primary_weapon=primary.tag_path.clone();
     player_profile.secondary_weapon=secondary.as_ref().map(|weapon|weapon.tag_path.clone());
-    let mut plan=NativeRoundPlan {dependencies:vec![],commands:vec![],encounter_names:vec![],encounter_layouts:vec![],player_profile};
+    let mut plan=NativeRoundPlan {dependencies:vec![],commands:vec![],encounter_names:vec![],encounter_layouts:vec![],player_profile,hud_messages:native_hud_messages(config)?,hud_tag_path:None};
+    if !plan.hud_messages.is_empty(){
+        let hud=format!("{scenario}/gs_firefight_messages");
+        plan.commands.push(crate::quickforge::ForgeCommand{phase:"firefight-hud-messages".into(),tool:"invaderString".into(),args:vec!["-T".into(),"hud_message_text".into(),hud.clone()],expected_outputs:vec![format!("tags/{hud}.hud_message_text")]});
+        plan.commands.push(crate::quickforge::ForgeCommand{phase:"firefight-hud-reference".into(),tool:"invaderEdit".into(),args:vec!["-S".into(),"hud_messages".into(),format!("{hud}.hud_message_text"),tag.clone()],expected_outputs:vec![format!("tags/{tag}")]});
+        plan.hud_tag_path=Some(hud);
+    }
     let mut palette = BTreeMap::<String,usize>::new();
     let add = |plan:&mut NativeRoundPlan,args:Vec<String>| plan.commands.push(crate::quickforge::ForgeCommand {
         phase:"firefight-scenario".into(),tool:"invaderEdit".into(),args,expected_outputs:vec![format!("tags/{}",tag.replace('\\',"/"))],
@@ -1368,6 +1409,10 @@ pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection
     }
     if map.header.scenario_type != 0 {
         return invalid("Compiled native solo Firefight output must be a singleplayer scenario");
+    }
+    if let Some(path)=&plan.hud_tag_path{
+        let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag_key(&tag.path)==tag_key(path)).collect::<Vec<_>>();
+        if tags.len()!=1 || tags[0].external || tags[0].data_offset.is_none(){return invalid("Compiled native Firefight HUD-message tag is missing, ambiguous or external");}
     }
     for dependency in &plan.dependencies {
         let class = match dependency.tag_class.as_str() {

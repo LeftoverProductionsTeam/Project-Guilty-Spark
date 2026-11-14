@@ -401,6 +401,10 @@ pub fn run_prepared_job(
         emit("geometry","Validating editable geometry and writing JMS source".into(),5,"info");
         let mut sources=quickforge::export_sources(document,&directory.join("workspace"))?;
         if let Some(plan)=&native_round {
+            if let Some(path)=&plan.hud_tag_path{
+                let file=sources.directory.join("data").join(safe_relative(&format!("{path}.hmt"))?);
+                project::atomic_write(&file,&crate::firefight::native_hud_source(&plan.hud_messages),false)?;
+            }
             sources.commands.extend(plan.commands.clone());sources.dependencies.extend(plan.dependencies.clone());
             project::atomic_write(&sources.scenario_plan_path,&serde_json::to_vec_pretty(&sources.commands)?,false)?;
         }
@@ -432,6 +436,7 @@ pub fn run_prepared_job(
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
         for name in ["invader-edit","invader-build","invader-info","invader-dependency"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
         if document.logic.is_some()&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
+        if native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some())&&invader(tools,"invader-string").is_none(){receipt.blockers.push("Native Firefight HUD messages require invader-string in the selected Invader folder; no native tag was fabricated".into());}
         let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
         let imported=if let Some(inputs)=&native_inputs {inputs.imported.files.iter().map(|file|file.path.clone()).collect()}else{crate::native_asset_imports::available_files(import_root,project)?};
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
@@ -450,6 +455,7 @@ pub fn run_prepared_job(
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
         let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap()),("invaderDependency",invader(tools,"invader-dependency").unwrap())];
         if document.logic.is_some(){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
+        if native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some()){executables.push(("invaderString",invader(tools,"invader-string").unwrap()));}
         if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
         for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
@@ -485,6 +491,7 @@ pub fn run_prepared_job(
             for expected in &command.expected_outputs {
                 let output=workspace.join(safe_relative(expected)?);
                 crate::reject_links(&output)?;
+                if command.tool=="invaderString"&&output.try_exists()?{return invalid("Generated HUD tag already exists in this candidate; no native file was overwritten");}
                 fs::create_dir_all(output.parent().unwrap())?;
             }
             let (executable,mut args)=match command.tool.as_str(){
@@ -497,6 +504,7 @@ pub fn run_prepared_job(
                     (tool.clone(),kit_args)
                 },
                 "invaderEdit"=>(invader(tools,"invader-edit").unwrap(),vec!["-t".into(),stage.to_string_lossy().into_owned()]),
+                "invaderString"=>(invader(tools,"invader-string").ok_or_else(||SparkError::Invalid("Native HUD message writer is missing".into()))?,vec!["-t".into(),stage.to_string_lossy().into_owned(),"-d".into(),workspace.join("data").to_string_lossy().into_owned()]),
                 other=>return invalid(format!("Unsupported compiler command {other}")),
             };
             let mut native_args=command.args.clone();
