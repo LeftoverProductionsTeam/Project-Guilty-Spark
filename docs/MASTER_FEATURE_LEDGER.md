@@ -1,5 +1,9 @@
 # Canonical cumulative feature and evidence ledger
 
+## 14 November 2026 — Native source-preservation WIP
+
+Existing MCC camera builds now have source code for preserving/recovering embedded native gameplay modules before adding camera controls, with explicit module selection and before/after inventory/hash checks. This is uncompiled and untested under the owner's code-only instruction; it does not accept gameplay, recovered Firefight or Forerunner authoring. See CONTINUATION_67_SOURCE_GUARDIAN.md and HUMAN_TEST_PLAN.md. All475CSV records and M1–M6 remain unchanged/open as evidenced.
+
 ## 14 November 2026 — Complete Creator Mission intake
 
 The original475 CSV records and wordings remain byte-identical (SHA256 b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643). The owner’s new mission and resume are preserved in [Complete Creator Mission](Master%20Engineering%20Prompts/GS_2026-11-14_Complete_Creator_Mission.txt) and [resume/file-safety directive](Master%20Engineering%20Prompts/GS_2026-11-14_Resume_File_Safety_And_Native_Acceptance.txt). This is traceability through the existing ledger, not acceptance or a second queue. Full M1–M6/Operation110 remain active.

@@ -1,6 +1,6 @@
 # Human acceptance plan
 
-Source: local master1d160ec plus the current connected-scenery continuation. This is not a release manifest. The sealed Windows candidate is exact c035b68; later source must use its own matching QA executable/receipt, never the older installer as proof of newer features.
+Source: canonical local master; ACTIVE_TASK.md identifies the current source and last verified executable. November10 Preview5/d832af3 and the earlier sealed c035b68 candidate are historical artifacts, never proof of later untested source.
 
 Record each result as **Pass / Fail / Blocked / Not run**, with date, tester, app SHA-256, runtime executable hash, source/project revision, monitor/scaling, exact observation, screenshot/log and original-file hash check. A blank result is not a pass. Keep tests on copies or Spark-owned projects.
 
@@ -200,3 +200,14 @@ Prerequisites: testing reauthorized; desktop build containing the new source cha
 6. Only after native checks, run the private compatible runtime and observe real hostile actors, equipped player, damage/death and round progression. Keep human combat, HUD/score, co-op and Forerunner acceptance separate. Record source commit/executable hash, input/output hashes, actual UI actions, screenshots/logs, expected/observed results and PASS/FAIL/BLOCKED.
 
 Current status: source implementation only. No step above has been executed against this increment.
+
+## Native camera source-preservation follow-through — NOT RUN
+
+Prerequisites: testing reauthorized, a matching fresh desktop executable, compatible installed Invader edit/recover/script and H1A tools, an owned imported MCC scenario with embedded source, a separate globals-only fixture and an empty-script fixture. Use disposable Spark-owned output and compare input hashes; never edit installed game/SDK masters.
+
+1. Open the source project in Machinima. Capture one fixed camera or sequence. In In-game recording enable Include native engine camera controls in the next MCC build. Save, close/reopen and use the existing native build route. Expect native source recovery only for the selected staged scenario; original script/global names and source files must remain alongside the generated camera module.
+2. Independently read the built scenario and engine-machinima.json. Compare inherited names/counts, recovered source SHA-256 values and recovery/compiler identities. Expect exactly the original controllers/globals plus the camera controllers/three globals, and one additional source module. An unrelated workspace HSC/global file must not enter the output. Source/code inspection alone does not count as a pass.
+3. Repeat for globals-only and empty-script source; then exercise missing embedded source, missing recovery tool, malformed/duplicate filenames, reserved-name collision, preexisting destination files and full source-module capacity. Expect actionable build failure with original inputs/previous-good cache intact. Review failure logs and source hashes; do not weaken checks to obtain a pass.
+4. After native/readback checks, launch the private MCC take through its existing supported path. Verify the original gameplay still works, flashlight start/stop, actor movement, HUD restoration and both fixed/sequence behavior. Actual recording and audio/video acceptance remain independent. Record source/executable/tool/input/output hashes, UI actions, screenshots/logs, observed result and PASS/FAIL/BLOCKED.
+
+Status: none of these steps has been executed for the new source increment. Recovered-map Firefight/Forerunner authored encounters remain outside this camera substep and OPEN.

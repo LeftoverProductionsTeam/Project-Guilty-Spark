@@ -492,7 +492,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
       'Choose a fixed camera or sequence, then build the native variant.',
       'Load the scenario and toggle the flashlight to start or stop the take; record with OBS.',
     ],
-    'Existing scenario gameplay scripts require their original source to be recovered and merged first.',
+    'Private MCC builds use installed Invader-recover to recover existing embedded script modules, then compile those exact modules alongside the camera take. Missing original source, filename/name collisions or lost script/global definitions block adoption. Native game behavior still needs independent acceptance.',
   ),
   f(
     'missions',

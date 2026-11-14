@@ -158,11 +158,83 @@ pub(crate) fn prepare(
         return Ok(());
     };
     studio.validate()?;
-    if original_scripts > 0 {
-        return invalid("This scenario already has scripts. Recover and merge their original source before adding an engine camera take; Spark will not replace authored gameplay scripts");
-    }
     let tags = workspace.join("tags");
     let tag = format!("{scenario}.scenario");
+    let scenario_path=safe_relative(scenario)?;
+    let generated_source=workspace.join("data").join(scenario_path.parent().unwrap_or(Path::new(""))).join("scripts/gs_machinima.hsc");
+    crate::reject_links(&generated_source)?;
+    if generated_source.exists() {return invalid("The camera source file already exists in this job. Preserve/review its contents before preparing another take");}
+    // Read the owned native scenario, not a guessed cache offset or script name.
+    // Invader 696830ff: edit -C/-G and recover's ordinary scenario source output.
+    let read_names = |field: &str, limit: usize| -> Result<Vec<String>> {
+        let count = runner.run(edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),field.into(),tag.clone()],workspace,"engine-script-readback",46)?
+            .trim().parse::<usize>().map_err(|_|SparkError::Invalid(format!("Native {field} count unavailable")))?;
+        if count > limit {return invalid(format!("Native {field} exceed the selected scenario bound"));}
+        if count == 0 {return Ok(vec![]);}
+        let output = runner.run(edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-G".into(),format!("{field}[*].name"),tag.clone()],workspace,"engine-script-readback",46)?;
+        let names:Vec<_> = output.lines().map(str::to_owned).collect();
+        if names.len()!=count || names.iter().any(|name|name.is_empty()||name.chars().any(char::is_control)) {
+            return invalid(format!("Native {field} names do not match their array count"));
+        }
+        Ok(names)
+    };
+    let inherited_scripts=read_names("scripts",1024)?;
+    let inherited_globals=read_names("globals",512)?;
+    let inherited_sources=read_names("source_files",16)?;
+    if inherited_scripts.len()!=original_scripts {
+        return invalid("The staged scenario script inventory differs from the source cache. Reconcile its source before adding camera controls");
+    }
+    let generated_scripts=if options.playback=="sequence" {5} else {4};
+    if inherited_scripts.len()+generated_scripts>1024 || inherited_globals.len()+3>512 {
+        return invalid("The existing script/global tables have no capacity for this native camera take");
+    }
+    let reserved=["gs_record_stop","gs_record_start","gs_mc_initialize","gs_mc_controls","gs_mc_sequence","gs_mc_active","gs_mc_ready","gs_mc_flash"];
+    if inherited_scripts.iter().chain(&inherited_globals).any(|name|reserved.iter().any(|reserved|name.eq_ignore_ascii_case(reserved))) {
+        return invalid("Existing gameplay owns a generated camera script/global name. Keep that source and resolve the name collision before adding camera controls");
+    }
+    let mut recovered_sources=std::collections::BTreeMap::<String,String>::new();
+    let mut source_recovery_tool=None;
+    if !inherited_scripts.is_empty() || !inherited_globals.is_empty() || !inherited_sources.is_empty() {
+        if inherited_sources.is_empty() {
+            return invalid("Existing gameplay scripts/globals have no recoverable source modules. Recover and review their source first; Spark will not replace them");
+        }
+        crate::source_recovery::validate_output_names(&inherited_sources.join("\n"))?;
+        let mut names=std::collections::BTreeSet::new();
+        for name in &inherited_sources {
+            if !names.insert(name.to_ascii_lowercase()) || name.eq_ignore_ascii_case("gs_machinima") {
+                return invalid("Recovered script filenames collide with each other or the camera module; no source was overwritten");
+            }
+        }
+        if inherited_sources.len()+1>16 {return invalid("The scenario has no source-module slot for the generated camera source");}
+        let parent=safe_relative(scenario)?;
+        let source_directory=workspace.join("data").join(parent.parent().unwrap_or(Path::new(""))).join("scripts");
+        let mut paths=vec![];
+        for name in &inherited_sources {
+            let path=if name=="global_scripts" {workspace.join("data/global_scripts.hsc")} else {source_directory.join(format!("{name}.hsc"))};
+            crate::reject_links(&path)?;
+            if path.exists() {return invalid("A recovered script destination already exists in this job. Review the staged source rather than overwriting authored files");}
+            paths.push(path);
+        }
+        let recover=edit.parent().ok_or_else(||SparkError::Invalid("Native recovery tool folder unavailable".into()))?
+            .join(if cfg!(windows) {"invader-recover.exe"} else {"invader-recover"});
+        crate::reject_links(&recover)?;
+        if !recover.is_file() {return invalid("Preserving existing gameplay while adding a camera take requires invader-recover alongside invader-edit");}
+        let recover_hash=crate::maps::hash_file(&recover)?;
+        let scenario_file=tags.join(safe_relative(&tag)?);
+        let scenario_hash=crate::maps::hash_file(&scenario_file)?;
+        runner.run(&recover,&["-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),workspace.join("data").to_string_lossy().into_owned(),tag.clone()],workspace,"engine-script-recovery",47)?;
+        if crate::maps::hash_file(&recover)?!=recover_hash || crate::maps::hash_file(&scenario_file)?!=scenario_hash {
+            return invalid("Native recovery changed its executable or source scenario; the derived job is not accepted");
+        }
+        source_recovery_tool=Some(recover_hash);
+        for path in paths {
+            crate::reject_links(&path)?;
+            let size=fs::metadata(&path).map_err(|problem|SparkError::Invalid(format!("Native recovery did not provide source module {}: {problem}",path.file_name().unwrap_or_default().to_string_lossy())))?.len();
+            if !path.is_file() || size>1024*1024 {return invalid("Recovered script module is missing or exceeds the native source bound");}
+            let relative=path.strip_prefix(workspace).map_err(|_|SparkError::Invalid("Recovered source escaped the owned job".into()))?.to_string_lossy().replace('\\',"/");
+            recovered_sources.insert(relative,crate::maps::hash_file(&path)?);
+        }
+    }
     let args = vec![
         "-t".into(),
         tags.to_string_lossy().into_owned(),
@@ -244,14 +316,6 @@ pub(crate) fn prepare(
         source.as_bytes(),
         false,
     )?;
-    let globals = workspace.join("data/global_scripts.hsc");
-    if !globals.exists() {
-        project::atomic_write(
-            &globals,
-            b"; Spark owned take: no original global script definitions.\r\n",
-            false,
-        )?;
-    }
     let compiler = edit
         .parent()
         .ok_or_else(|| SparkError::Invalid("Script compiler folder unavailable".into()))?
@@ -264,47 +328,49 @@ pub(crate) fn prepare(
     if !compiler.is_file() {
         return invalid("In-engine camera takes require invader-script alongside invader-edit");
     }
-    runner.run(
-        &compiler,
-        &[
-            "-g".into(),
-            "mcc-cea".into(),
-            "-t".into(),
-            tags.to_string_lossy().into_owned(),
-            "-d".into(),
-            workspace.join("data").to_string_lossy().into_owned(),
-            scenario.into(),
-        ],
-        workspace,
-        "engine-script",
-        52,
-    )?;
-    let sources = runner.run(
-        edit,
-        &[
-            "-t".into(),
-            tags.to_string_lossy().into_owned(),
-            "-C".into(),
-            "source_files".into(),
-            tag,
-        ],
-        workspace,
-        "engine-script",
-        53,
-    )?;
-    if sources
-        .trim()
-        .parse::<usize>()
-        .ok()
-        .filter(|n| *n > 0)
-        .is_none()
-    {
-        return invalid("Native camera script source was not embedded in the scenario");
+    let mut compile_args=vec!["-g".into(),"mcc-cea".into(),"-t".into(),tags.to_string_lossy().into_owned(),
+        "-d".into(),workspace.join("data").to_string_lossy().into_owned(),"-x".into(),"gs_machinima".into()];
+    // Include only the original embedded modules and this generated take.
+    // An unrelated global_scripts.hsc in the workspace is never adopted.
+    if !inherited_sources.iter().any(|name|name=="global_scripts") {compile_args.push("-E".into());}
+    for name in inherited_sources.iter().filter(|name|name.as_str()!="global_scripts") {
+        compile_args.extend(["-x".into(),name.clone()]);
+    }
+    compile_args.push(scenario.into());
+    let compiler_hash=crate::maps::hash_file(&compiler)?;
+    runner.run(&compiler,&compile_args,workspace,"engine-script",52)?;
+    if crate::maps::hash_file(&compiler)?!=compiler_hash {return invalid("Native script compiler changed during source merging");}
+    let final_scripts=read_names("scripts",1024)?;
+    let final_globals=read_names("globals",512)?;
+    let final_sources=read_names("source_files",16)?;
+    if final_scripts.len()!=inherited_scripts.len()+generated_scripts || final_globals.len()!=inherited_globals.len()+3 || final_sources.len()!=inherited_sources.len()+1 {
+        return invalid("Recovered source compiled a different script/global/module inventory beyond the camera controls. Review that source before adopting the build");
+    }
+    for name in ["gs_record_stop","gs_record_start","gs_mc_initialize","gs_mc_controls"] {
+        if final_scripts.iter().filter(|value|value.as_str()==name).count()!=1 {return invalid(format!("Native camera controller is missing or ambiguous: {name}"));}
+    }
+    if options.playback=="sequence" && final_scripts.iter().filter(|name|name.as_str()=="gs_mc_sequence").count()!=1 {
+        return invalid("Native camera sequence controller is missing or ambiguous");
+    }
+    for name in ["gs_mc_active","gs_mc_ready","gs_mc_flash"] {
+        if final_globals.iter().filter(|value|value.as_str()==name).count()!=1 {return invalid(format!("Native camera global is missing or ambiguous: {name}"));}
+    }
+    for (original,actual,kind) in [(&inherited_scripts,&final_scripts,"script"),(&inherited_globals,&final_globals,"global"),(&inherited_sources,&final_sources,"source module")] {
+        for name in original {
+            if actual.iter().filter(|candidate|*candidate==name).count()<original.iter().filter(|candidate|*candidate==name).count() {
+                return invalid(format!("Native camera compilation lost an original {kind}: {name}"));
+            }
+        }
+    }
+    for (relative,expected) in &recovered_sources {
+        if crate::maps::hash_file(&workspace.join(safe_relative(relative)?))? != *expected {
+            return invalid("Recovered gameplay source changed while compiling the camera take");
+        }
     }
     project::atomic_write(
         &workspace.join("engine-machinima.json"),
         &serde_json::to_vec_pretty(
-            &serde_json::json!({"schemaVersion":2,"scenario":scenario,"scenarioSha256":crate::maps::hash_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?,"projectFingerprint":project.fingerprint()?,"cameras":names,"options":options,"hud":"hidden during takes; restored on stop","actorInput":true,"recording":"OBS Game Capture at game resolution; editor capture limits do not apply","runtimeAcceptance":"pending"}),
+            &serde_json::json!({"schemaVersion":2,"inheritedScripts":inherited_scripts,"inheritedGlobals":inherited_globals,"recoveredSourceHashes":recovered_sources,"sourceRecoveryToolSha256":source_recovery_tool,"scriptCompilerSha256":compiler_hash,"scenario":scenario,"scenarioSha256":crate::maps::hash_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?,"projectFingerprint":project.fingerprint()?,"cameras":names,"options":options,"hud":"hidden during takes; restored on stop","actorInput":true,"recording":"OBS Game Capture at game resolution; editor capture limits do not apply","runtimeAcceptance":"pending"}),
         )?,
         false,
     )?;
