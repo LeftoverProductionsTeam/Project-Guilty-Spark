@@ -75,6 +75,7 @@ pub(super) fn encounter_expectation(state:&AppState,project:&Project,build:&Buil
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Context {
+    source_target: String,
     project_id: String,
     build_id: String,
     tag: String,
@@ -112,8 +113,7 @@ pub(super) async fn native_tag_inventory(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
-        let build = current_native_build(&state, &project)?;
-        let _ = runtime_workbench::compiled_tags(&state, &project, &build)?;
+        let (build,_) = runtime_workbench::native_operation_source(&state, &project)?;
         let inspection = if project.source.is_some() {
             inspect(&state, &project)?
         } else {
@@ -143,8 +143,7 @@ pub(super) async fn native_tag_inventory(
 }
 fn source(state: &AppState, id: &str, tag_id: Option<u32>) -> Reply<Source> {
     let project = lock(&state.library)?.get(id).map_err(error)?;
-    let build = current_native_build(state, &project)?;
-    let tags = runtime_workbench::compiled_tags(state, &project, &build)?;
+    let (build,tags) = runtime_workbench::native_operation_source(state, &project)?;
     let (tag, class) = if let Some(id) = tag_id {
         let inspection = if project.source.is_some() {
             inspect(state, &project)?
@@ -406,6 +405,7 @@ pub(super) async fn native_tag_context(
         }
         let can_append_encounter=can_append_encounter&&edit_issue.is_none()&&studio_native_source::require_unshared(&state,&source.project.id).is_ok();
         Ok(Context {
+            source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,
             tag: source.tag,
@@ -565,12 +565,12 @@ pub(super) async fn native_operation_accept(
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
     let _gate=source_guard()?;let state=app.state::<AppState>();require_idle(&state)?;check_document_owner(&state,&project_id,&owner)?;let receipt=read_receipt(&state,&operation_id,&owner,&project_id)?;
-    let project=lock(&state.library)?.get(&project_id).map_err(error)?;let build=current_native_build(&state,&project)?;
+    let project=lock(&state.library)?.get(&project_id).map_err(error)?;let (build,current)=runtime_workbench::native_operation_source(&state,&project)?;
     if project.fingerprint().map_err(error)?!=receipt.fingerprint||(!restore&&build.id!=receipt.parent_build_id){return Err("The saved map/build changed after this preview. No source was selected; preview the current saved map again.".into());}
     if baboon_native::has_running(&project_id)?||runtime_workbench::has_running(&state,&project_id)?{return Err("Close this map's native editor/test process before selecting a new source revision".into());}
     let exe=executable(&state,&project,&receipt.tool_id)?;if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("The native writer changed after preview; review its identity again".into());}
     let expected=native_source_revisions::current(&state,&project_id)?;let legacy=native_source_revisions::legacy_revision(&state,&project_id)?;
-    let current=runtime_workbench::compiled_tags(&state,&project,&build)?;let relative=core::safe_relative(&receipt.tag).map_err(error)?;
+    let relative=core::safe_relative(&receipt.tag).map_err(error)?;
     if !restore{check_dependency_pins(&current,&receipt.source_dependencies)?;}
     let current_hash=maps::hash_file(&current.join(&relative)).map_err(error)?;
     let wanted_current=if restore{&receipt.after_sha256}else{&receipt.before_sha256};if &current_hash!=wanted_current{return Err("This native tag changed after preview/acceptance. Overlapping edits need review; both sources are retained.".into());}
@@ -588,7 +588,7 @@ pub(super) async fn native_operation_accept(
     let expected_hash=if restore{&receipt.before_sha256}else{&receipt.after_sha256};let mut wanted=baseline.clone();wanted.insert(receipt.tag.clone(),expected_hash.clone());
     if transaction::inventory(&tags).map_err(error)?!=wanted||transaction::inventory(&current).map_err(error)?!=baseline{return Err("Native source changed while staging. The staged copy is retained but was not selected.".into());}
     let restored_fields=fields(&state,&project,&tags,&receipt.tag)?;if restored_fields!=if restore{receipt.before_fields.clone()}else{receipt.after_fields.clone()}{return Err("Staged native field readback differs; no source was selected".into());}
-    if runtime_workbench::compiled_tags(&state,&project,&build)?!=current{return Err("The selected native source changed while staging; refresh before accepting".into());}
+    if runtime_workbench::native_operation_source(&state,&project)?.1!=current{return Err("The selected native source changed while staging; refresh before accepting".into());}
     if !restore{check_dependency_pins(&tags,&receipt.source_dependencies)?;check_dependency_pins(&current,&receipt.source_dependencies)?;}
     if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("Native writer changed while selecting the revision; no source was selected".into());}
     let selection=native_source_revisions::Selection{project_id:project_id.clone(),fingerprint:receipt.fingerprint,parent_build_id:build.id,job_id:operation_id.clone(),revision_id:revision_id.clone(),baboon_revision_at_selection:legacy};

@@ -130,7 +130,8 @@ mod path_tests {
 /// Native tag readers/writers use the source authoring profile. Do not route
 /// CE QuickForge through the separately restricted MCC imported-map converter.
 pub(super) fn invader_directory(state: &AppState, project: &Project) -> Reply<PathBuf> {
-    let directory=if project.quick_forge.as_ref().is_some_and(|doc|matches!(doc.runtime_id,runtime::RuntimeId::HaloCustomEdition|runtime::RuntimeId::ChupathingyCe)) {
+    let ce_target=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|target|&target.id==id)).is_some_and(|target|matches!(target.runtime_id,runtime::RuntimeId::HaloCustomEdition|runtime::RuntimeId::ChupathingyCe));
+    let directory=if ce_target||project.quick_forge.as_ref().is_some_and(|doc|matches!(doc.runtime_id,runtime::RuntimeId::HaloCustomEdition|runtime::RuntimeId::ChupathingyCe)) {
         forge_build::tools_for_target(project,forge_tools(state)?).map_err(error)?.invader_directory
     }else{project_tools(state,project)?.invader_directory};
     directory.ok_or_else(||"Configure the tested Invader build for native source checks and reviewed operations".into())

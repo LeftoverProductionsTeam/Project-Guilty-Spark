@@ -1,6 +1,7 @@
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' }
   | {kind:'appendEncounter';name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number};
 export interface NativeTagContext {
+  sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;
   buildId: string;
   tag: string;

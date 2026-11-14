@@ -39,6 +39,7 @@ export default function NativeTagOperations({
     [actorCount,setActorCount]=useState('1'),[actorSpacing,setActorSpacing]=useState('0.75');
   const generation = useRef(0);
   const projectId = project.id;
+  const ceSource=context?.sourceTarget==='gbx-custom'||project.buildTargets?.some(target=>target.id===project.activeBuildTarget&&['haloCustomEdition','chupathingyCe'].includes(target.runtimeId));
   const [nativeTag, setNativeTag] = useState<number | null>(null),
     [choices, setChoices] = useState<{ id: number; class: string; path: string }[]>([]);
   const selectedTagId = tagId ?? nativeTag;
@@ -211,7 +212,7 @@ export default function NativeTagOperations({
           {context.class==='scnr'&&<details className="native-encounter-authoring">
             <summary>Append native AI encounter</summary>
             <p className="subtle">Adds one source-backed squad with up to 32 starting and firing positions without replacing existing encounters. Accept the preview, then Build working tag edits. Review coordinates, collision and native navigation before gameplay.</p>
-            {!context.canAppendEncounter&&<Notice tone="info">Requires unshared MCC/H1A singleplayer working source and the reviewed native writer. Multiplayer AI uses its runtime-specific path.</Notice>}
+            {!context.canAppendEncounter&&<Notice tone="info">Requires unshared singleplayer CE/H1A working source with its matching reviewed native writer and build target. Multiplayer AI uses its runtime-specific path.</Notice>}
             <label>Encounter name<input aria-label="Native encounter name" maxLength={31} value={encounterName} disabled={busy||dirty} onChange={e=>{setEncounterName(e.target.value);if(!accepted)setPreview(null);}}/></label>
             <label>Actor variant<select aria-label="Native encounter actor" value={actorPath} disabled={busy||dirty} onChange={e=>{setActorPath(e.target.value);if(!accepted)setPreview(null);}}>
               <option value="">Choose an actor from this source…</option>{context.actorVariants?.map(path=><option key={path} value={path}>{path}</option>)}
@@ -350,7 +351,7 @@ export default function NativeTagOperations({
           {accepted.detail} {accepted.files.toLocaleString()} native files retained.
         </Notice>
       )}
-      {context && tagId === undefined && (
+      {context && !ceSource && tagId === undefined && (
         <BaboonTools project={project} tagId={selectedTagId ?? undefined} dirty={dirty} epoch={epoch} />
       )}
     </details>

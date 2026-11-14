@@ -78,10 +78,14 @@ export default function RuntimeDock({
   const [plan, setPlan] = useState<ToolLaunchPlan | null>(null),
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
+  const workingTarget=report?.workingSource?.target ?? (runtime==='mccSteam'&&report?.workingSource?'mcc-cea':null);
+  const workingSourceAvailable=workingTarget==='mcc-cea'||workingTarget==='gbx-custom';
+  const h1aSource=workingTarget==='mcc-cea';
+  const showH1aTools=h1aSource||(!workingTarget&&runtime==='mccSteam');
   const authoringPending=report?.workingSource?.authoringPending===true;
   const toolTags = useWorkingTagChanges(
     project?.id ?? null,
-    runtime === 'mccSteam' && !authoringPending ? (report?.workingSource?.buildId ?? null) : null,
+    h1aSource && !authoringPending ? (report?.workingSource?.buildId ?? null) : null,
     report?.workingSource?.tagsDirectory ?? null,
   );
   const [handoffIntegrity, setHandoffIntegrity] = useState<{
@@ -103,7 +107,7 @@ export default function RuntimeDock({
   const generation = useRef(0);
   const scriptSelection = useRef(0);
   const [scriptAttachment,setScriptAttachment]=useState<(NativeScriptAttachment&{sourceKey:string;reviewed:boolean})|null>(null);
-  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,project?.firefight]);
+  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,workingTarget,project?.firefight]);
   const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
   const selectedScript=scriptAttachment?.sourceKey===scriptSourceKey?scriptAttachment:null;
   const currentReport = useRef(report);
@@ -351,7 +355,7 @@ export default function RuntimeDock({
       integrityBlocks(toolTags.report?.integrity)
     )
       return;
-    if(!report?.workingSource||runtime!=='mccSteam')return;
+    if(!report?.workingSource||!workingSourceAvailable)return;
     if(authoringPending&&!compileScripts){setError('Firefight rules changed. Review their bound controller and choose Attach source & compile or Compile scripts & build.');return;}
     if(attachment&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
     const request = generation.current;
@@ -359,7 +363,7 @@ export default function RuntimeDock({
     setError('');
     try {
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),
-        ...(compileScripts?{expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory}:{}),
+        expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
         ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256}}:{}) });
       if (request === generation.current) {
         setDetails(false);
@@ -466,7 +470,7 @@ export default function RuntimeDock({
           </div>
         )}
       </footer>
-      {runtime === 'mccSteam' && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} monitorOnly />}
+      {showH1aTools && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} monitorOnly />}
       {details && (
       <div className="modal-backdrop">
         <section
@@ -542,16 +546,17 @@ export default function RuntimeDock({
               Play &amp; servers
             </button>
           </div>
+          {workingSourceAvailable && <small>Working source: {workingTarget==='gbx-custom'?'Custom Edition · Invader native rebuild':'MCC Halo 1 · H1A native rebuild'}. Source format is independent of the hosting runtime.</small>}
           {authoringPending && report?.workingSource && <Notice>
             Firefight rules are saved but not compiled. The retained source belongs to the earlier build; it is available for a reviewed controller rebuild only. Export the current bound controller in Firefight rules → Advanced script export, then attach it below. For an existing controller, edit/review its original module through Open script source folder and choose Compile scripts &amp; build. A tag-only build cannot apply these rules.
             <details><summary>Source and authored revisions</summary><p className="wrap-code">Compiled source: {report.workingSource.sourceProjectFingerprint}<br/>Saved authoring: {report.workingSource.projectFingerprint}</p></details>
           </Notice>}
-          {project && report?.workingSource && !authoringPending && <WorkingTagChanges {...toolTags} />}
-          {runtime === 'mccSteam' && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} />}
-          {runtime === 'mccSteam' && project && report?.workingSource && !authoringPending && (
+          {project && report?.workingSource && h1aSource && !authoringPending && <WorkingTagChanges {...toolTags} />}
+          {showH1aTools && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} />}
+          {workingSourceAvailable && project && report?.workingSource && !authoringPending && (
             <NativeTagOperations project={project} dirty={dirty} epoch={epoch} />
           )}
-          {project && report?.workingSource && runtime === 'mccSteam' && !authoringPending && (
+          {project && report?.workingSource && h1aSource && !authoringPending && (
             <BspAudioEditor
               key={project.id + report.workingSource.buildId}
               projectId={project.id}
@@ -568,7 +573,7 @@ export default function RuntimeDock({
               onBuild={buildWorkingTags}
             />
           )}
-          {project && report?.workingSource && runtime === 'mccSteam' && (
+          {project && report?.workingSource && workingSourceAvailable && (
             <div className="button-row">
               <button
                 disabled={
@@ -587,7 +592,7 @@ export default function RuntimeDock({
                 onClick={() => void buildWorkingTags()}
               >
                 <Hammer size={13} />
-                Build working tag edits
+                {workingTarget==='gbx-custom'?'Build CE working tag edits':'Build working tag edits'}
               </button>
               <button
                 disabled={busy||working||dirty||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report?.sourceIssue||!!report?.toolsIssue||report?.processes.some(p=>p.projectId===project.id&&p.status==='running')}
@@ -610,11 +615,11 @@ export default function RuntimeDock({
               )}
               <small>
                 Save and close the native tools first. This preserves working tag changes in a new cache; the
-                ordinary build regenerates source.
+                ordinary build regenerates source. {workingTarget==='gbx-custom'&&'Keep this source workspace for further CE native edits; Open working-tags build opens the compiled result for inspection.'}
               </small>
             </div>
           )}
-          {project&&report?.workingSource&&runtime==='mccSteam'&&<details className="native-script-attachment">
+          {project&&report?.workingSource&&workingSourceAvailable&&<details className="native-script-attachment">
             <summary>Attach new controller/script source</summary>
             <p className="subtle">Choose a reviewed UTF8 .hsc module, up to 1 MiB. It is added only to a separate build candidate; an existing module with the same name is never replaced. Original scripts must be fully recovered. The selected file is not saved in the project draft; successful output retains it in the new native source. Project Undo does not remove a compiled source module.</p>
             <label>New HaloScript module<input type="file" accept=".hsc" style={{maxWidth:'100%',minWidth:0}} disabled={busy||working||dirty} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void selectScript(file);}}/></label>

@@ -167,7 +167,7 @@ pub(super) struct WorkbenchReport {
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-struct WorkingSource { build_id:String, tags_directory:PathBuf, authoring_pending:bool, source_project_fingerprint:String, project_fingerprint:String }
+struct WorkingSource { target:String, build_id:String, tags_directory:PathBuf, authoring_pending:bool, source_project_fingerprint:String, project_fingerprint:String }
 
 #[derive(Clone)]
 struct SourceContext {
@@ -228,23 +228,57 @@ fn source_scenario_type(state:&AppState,project:&Project)->Reply<u16> {
     else{Ok(inspect(state,project)?.header.scenario_type)}
 }
 
+// Source edition is selected explicitly by the project, not a hosting profile.
+fn working_target(project:&Project)->Reply<&'static str> {
+    let Some(id)=&project.active_build_target else{return Ok("mcc-cea");};
+    let target=project.build_targets.iter().find(|target|&target.id==id).ok_or("Selected native build target is missing")?;
+    match target.runtime_id {
+        runtime::RuntimeId::MccSteam=>Ok("mcc-cea"),
+        runtime::RuntimeId::HaloCustomEdition|runtime::RuntimeId::ChupathingyCe=>{
+            // Reuse the current CE builder/profile review, including OpenSauce
+            // refusal and explicit CE-compatible source confirmation.
+            forge_build::tools_for_target(project,Default::default()).map_err(error)?;
+            Ok("gbx-custom")
+        },
+        _=>Err("Choose an explicit supported CE/Chupathingy or MCC source build target. Hosting/runtime selection does not convert native source.".into()),
+    }
+}
+fn working_source_context(state:&AppState,project:&Project,build:BuildRecord)->Reply<SourceContext> {
+    if build.target!=working_target(project)?{return Err("Native parent and selected source build target differ; rebuild/review that source before editing".into());}
+    if build.target=="mcc-cea"{return source_context_for_build(state,project,build);}
+    let job=state.root.join("jobs").join(&build.id);
+    if !job.join("quickforge-receipt.json").is_file()&&!job.join("working-tags-receipt.json").is_file(){return Err("CE source editing needs this project's owned native QuickForge/working-tag receipt. A compiled CE map alone is not editable source.".into());}
+    let output=build.output.as_ref().ok_or("Validated CE output is missing")?;
+    let header=maps::inspect_header(output).map_err(error)?;
+    if header.version!=609||header.extended{return Err("This native source route requires a standard CE609 parent cache, not MCC, Xbox or extended content".into());}
+    owned_source_context(state,project,build)
+}
 fn source_context(state: &AppState, project: &Project) -> Reply<SourceContext> {
-    match current_native_build(state, project) {
-        Ok(build) => source_context_for_build(state, project, build),
+    let target=working_target(project)?;
+    match current_build_matching(state, project, Some(target)) {
+        Ok(build) => working_source_context(state, project, build),
         Err(current_issue) => {
             // Source access for an explicit controller rebuild only. The old
             // cache never becomes a current compiled/playable revision.
             // Never skip a missing/changed latest source to silently revive an
             // older native tree that could discard later external tag edits.
-            let build=project.builds.iter().rev().find(|build|build.status=="validated"&&build.target=="mcc-cea").ok_or(current_issue)?;
+            let build=project.builds.iter().rev().find(|build|build.status=="validated"&&build.target==target).ok_or(current_issue)?;
             let parent=core::working_tags::source_parent_project(project,build,&state.root.join("jobs"))
                 .map_err(|issue|format!("Retained Firefight source is unavailable: {issue}. Use the normal source build for other edits; do not replace the saved native source."))?;
             let verified=verified_build(state,&parent,&build.id)?;
-            let mut context=source_context_for_build(state,&parent,verified)?;
+            let mut context=working_source_context(state,&parent,verified)?;
             context.authoring_pending=build.project_fingerprint!=project.fingerprint().map_err(error)?;
             Ok(context)
         }
     }
+}
+
+/// Native operations share the reviewed CE source route; they do not broaden
+/// the existing H1A tool launch or generic compiled-tag interfaces.
+pub(super) fn native_operation_source(state:&AppState,project:&Project)->Reply<(BuildRecord,PathBuf)> {
+    let context=source_context(state,project)?;
+    if context.authoring_pending{return Err("Compile the current Firefight controller before editing native tags for that revision".into());}
+    Ok((context.build,context.tags))
 }
 
 /// Existing folder shortcut, bound to the current accepted build rather than a
@@ -436,6 +470,31 @@ fn tool_settings(state: &AppState, project: Option<&Project>) -> Reply<Settings>
     }
     Ok(settings)
 }
+// This selects a cache compiler, not a scene/test tool. CE uses its reviewed
+// Invader profile; only the H1A branch may inspect/launch official H1A tools.
+fn working_compiler(state:&AppState,project:&Project,build:&BuildRecord)->Reply<(Settings,PathBuf,PathBuf)> {
+    let target=working_target(project)?;
+    if target!=build.target{return Err("Selected compiler target differs from the native source parent".into());}
+    let (settings,compiler)=if target=="mcc-cea" {
+        let settings=tool_settings(state,Some(project))?;official_h1a_kit(state,&settings)?;
+        let (compiler,_,_)=inspect_tool_file(&settings,"haloTool")?;
+        (settings,compiler)
+    }else{
+        let mut settings=lock(&state.settings)?.clone();
+        settings.invader_directory=Some(native_tag_parser::invader_directory(state,project)?);
+        let tools=build::Toolchain{invader_directory:settings.invader_directory.clone(),..Default::default()};
+        let compiler=build::tool_path(&tools,"invader-build").ok_or("Configure Invader build for this CE source target")?;
+        (settings,compiler)
+    };
+    let tools=build::Toolchain{invader_directory:settings.invader_directory.clone(),..Default::default()};
+    let info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
+    for file in [&compiler,&info] {
+        core::reject_links(file).map_err(error)?;
+        let metadata=fs::metadata(file).map_err(error)?;
+        if !metadata.is_file()||metadata.len()==0||metadata.len()>256*1024*1024{return Err("Selected native compiler/reader is missing or exceeds its identity-check bound".into());}
+    }
+    Ok((settings,compiler,info))
+}
 pub(super) fn has_running(state:&AppState,project:&str)->Reply<bool>{Ok(processes(state)?.iter().any(|p|p.project_id==project&&p.status=="running"))}
 
 fn inspect_tool_file(settings: &Settings, tool_id: &str) -> Reply<(PathBuf, String, String)> {
@@ -583,13 +642,15 @@ pub(super) async fn runtime_workbench_report(
             }
             Err(e) => Some(e.clone()),
         };
-        let tools = tool_settings(&state, project.as_ref()).and_then(|settings| {
-            official_h1a_kit(&state, &settings)?;
-            Ok(settings)
-        });
+        let tools = match (&project,&context) {
+            (Some(project),Ok(Some(context)))=>working_compiler(&state,project,&context.build).map(|value|value.0),
+            (Some(project),_) if working_target(project).ok()==Some("gbx-custom")=>Err("Build/admit this project's owned CE native source before using its working-tag compiler. Configure Invader in the reviewed CE source target; H1A scene tools are separate.".into()),
+            _=>tool_settings(&state, project.as_ref()).and_then(|settings|{official_h1a_kit(&state,&settings)?;Ok(settings)}),
+        };
         let tools_issue = tools.as_ref().err().cloned();
         if runtime_id == runtime::RuntimeId::MccSteam {
             if let (Ok(Some(context)), Ok(settings)) = (&context, &tools) {
+                if context.build.target=="mcc-cea" {
                 let mut kinds = vec![];
                 let mut architectures = std::collections::BTreeSet::new();
                 for (id, kind) in [
@@ -612,25 +673,34 @@ pub(super) async fn runtime_workbench_report(
                     tools: kinds,
                     content_identity: Some(context.scenario_sha256.clone()),
                 });
+                }
             }
         }
         let mut report = adapters::capability_report(&observation);
         if runtime_id==runtime::RuntimeId::MccSteam {
             if let (Some(project),Ok(Some(context)))=(&project,&context) {
+                if context.build.target=="mcc-cea" {
                 if let Err(issue)=source_scenario_type(&state,project).and_then(|kind|core::forge_build::h1a_scene_preflight(&context.tags,kind).map_err(error)) {
                     if let Some(capability)=report.capabilities.iter_mut().find(|c|c.operation==adapters::RuntimeOperation::TestScene) {
                         capability.availability=adapters::ActionAvailability::SetupRequired;
                         capability.detail=issue;capability.next_action="Choose the matching H1A SDK tag source and rebuild. Source/cache editing remains available; no game acceptance is inferred.".into();
                     }
                 }
+                }
             }
         }
-        if context.as_ref().ok().and_then(|context|context.as_ref()).is_some_and(|context|context.authoring_pending) {
+        if let Some(context)=context.as_ref().ok().and_then(|context|context.as_ref()).filter(|context|context.authoring_pending||context.build.target!="mcc-cea") {
             for capability in &mut report.capabilities {
                 if matches!(capability.operation,adapters::RuntimeOperation::TestScene|adapters::RuntimeOperation::EditLevel|adapters::RuntimeOperation::EditTags) {
-                    capability.availability=adapters::ActionAvailability::SetupRequired;
-                    capability.detail="Firefight rules changed after this source cache was compiled. The retained source is available only for a reviewed controller rebuild.".into();
-                    capability.next_action="Save the rules, export/review their bound controller, then use dock details to attach or compile the matching source. Native tools resume after successful build/readback.".into();
+                    if context.build.target=="gbx-custom" {
+                        capability.availability=adapters::ActionAvailability::Unavailable;
+                        capability.detail="This toolbar action launches H1A scene/tag tools, which cannot use this CE native source route.".into();
+                        capability.next_action="Use dock details for reviewed CE native operations, scripts and Invader rebuilds. Launch the resulting CE cache through its compatible runtime workflow.".into();
+                    }else{
+                        capability.availability=adapters::ActionAvailability::SetupRequired;
+                        capability.detail="Firefight rules changed after this source cache was compiled. The retained source is available only for a reviewed controller rebuild.".into();
+                        capability.next_action="Save the rules, export/review their bound controller, then use dock details to attach or compile the matching source. Native tools resume after successful build/readback.".into();
+                    }
                 }
             }
         }
@@ -661,7 +731,7 @@ pub(super) async fn runtime_workbench_report(
             })
             .map(|context| context.build.clone());
         let working_source=match context.as_ref().ok().and_then(|context|context.as_ref()) {
-            Some(context)=>Some(WorkingSource{build_id:context.build.id.clone(),tags_directory:context.tags.clone(),authoring_pending:context.authoring_pending,source_project_fingerprint:context.build.project_fingerprint.clone(),project_fingerprint:project.as_ref().ok_or("Source project is unavailable")?.fingerprint().map_err(error)?}),
+            Some(context)=>Some(WorkingSource{target:context.build.target.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),authoring_pending:context.authoring_pending,source_project_fingerprint:context.build.project_fingerprint.clone(),project_fingerprint:project.as_ref().ok_or("Source project is unavailable")?.fingerprint().map_err(error)?}),
             None=>None,
         };
         Ok(WorkbenchReport {
@@ -713,7 +783,7 @@ pub(super) async fn prepare_runtime_tool(
         if runtime_id!=runtime::RuntimeId::MccSteam {return Err("This source-aware tool route currently implements the H1A kit. Other runtimes retain their separate setup/build workflows.".into());}
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
-        if context.authoring_pending{return Err("Compile the matching Firefight controller before opening native scene/tag tools; the retained cache is not the current authored revision".into());}
+        if context.build.target!="mcc-cea"||context.authoring_pending{return Err("This action requires current MCC source for H1A tools. CE source uses the Invader working-tag controls; pending Firefight rules require explicit controller compilation".into());}
         let settings=tool_settings(&state,Some(&project))?;let kit=official_h1a_kit(&state,&settings)?;
         let tool_id=match action_id.as_str(){"editLevel"=>"sapien","editTags"=>"guerilla","testScene"=>"tagTest",_=>return Err("Choose an integrated scene or tag editor action".into())};
         let (executable,executable_sha256,executable_architecture)=inspect_tool_file(&settings,tool_id)?;
@@ -761,7 +831,7 @@ pub(super) async fn launch_runtime_tool(
         check_document_owner(&state,&plan.view.project_id,&owner)?;
         let project=lock(&state.library)?.get(&plan.view.project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
-        if context.authoring_pending{return Err("Firefight rules changed after the launch preview. Compile their controller before launching native tools".into());}
+        if context.build.target!="mcc-cea"||context.authoring_pending{return Err("The source edition or Firefight rules changed after the launch preview. H1A tools require a current MCC source build".into());}
         let settings=tool_settings(&state,Some(&project))?;let kit=official_h1a_kit(&state,&settings)?;
         let tool_id=match plan.view.action_id.as_str(){"editLevel"=>"sapien","editTags"=>"guerilla","testScene"=>"tagTest",_=>return Err("Unknown tool launch plan".into())};
         let (executable,hash,_)=inspect_tool_file(&settings,tool_id)?;
@@ -802,7 +872,7 @@ pub(super) async fn inspect_bsp_audio_workspace(app:tauri::AppHandle,project_id:
         let state=app.state::<AppState>();
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
-        if context.authoring_pending{return Err("Compile the matching Firefight controller before editing BSP audio for this revision".into());}
+        if context.build.target!="mcc-cea"||context.authoring_pending{return Err("This BSP audio editor requires current MCC source; compile its matching controller first".into());}
         let cache=context.build.output.as_ref().ok_or("Validated parent cache is missing")?;
         let sha=context.build.sha256.as_deref().ok_or("Validated parent cache identity is missing")?;
         core::bsp_audio::inspect_workspace(&context.build.id,cache,sha,&context.tags).map_err(error)
@@ -827,6 +897,9 @@ pub(super) async fn build_working_tags(
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;studio_native_source::require_unshared(&state,&project_id)?;
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
+        if context.build.target=="gbx-custom"&&(expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
+            return Err("The reviewed CE source/build selection changed. Refresh dock details before rebuilding; no job was started.".into());
+        }
         if context.authoring_pending&&(!compile_scripts.unwrap_or(false)||expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
             return Err("Changed Firefight rules require an explicit script build against the reviewed retained source. Refresh/review its source and controller; no build was started.".into());
         }
@@ -834,11 +907,10 @@ pub(super) async fn build_working_tags(
             return Err("The native build/source selection changed after script review. Select and review the module again; no build was started.".into());
         }
         if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}
-        let settings=tool_settings(&state,Some(&project))?;official_h1a_kit(&state,&settings)?;
-        let (tool,_,_)=inspect_tool_file(&settings,"haloTool")?;
-        let tools=build::Toolchain{invader_directory:settings.invader_directory.clone(),..Default::default()};
-        let invader_info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
-        verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
+        let (settings,tool,invader_info)=working_compiler(&state,&project,&context.build)?;
+        if context.build.target=="mcc-cea" {
+            verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
+        }
         let scenario_type=source_scenario_type(&state,&project)?;
         let expected_encounter=native_operations_native::encounter_expectation(&state,&context.source_project,&context.build)?;
         let source_project=context.source_project;

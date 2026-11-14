@@ -82,7 +82,7 @@ export interface RuntimeWorkbenchReport {
   toolsIssue: string | null;
   processes: ToolProcessView[];
   workingBuild: { id: string; message: string } | null;
-  workingSource?: { buildId: string; tagsDirectory: string; authoringPending?: boolean; sourceProjectFingerprint?: string; projectFingerprint?: string } | null;
+  workingSource?: { target?: 'mcc-cea' | 'gbx-custom'; buildId: string; tagsDirectory: string; authoringPending?: boolean; sourceProjectFingerprint?: string; projectFingerprint?: string } | null;
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string }
 export interface ToolLaunchPlan {
