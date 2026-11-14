@@ -3179,6 +3179,7 @@ pub fn run() {
             external_changes_native::external_map_watch_stop,
             external_changes_native::external_map_change_import,
             runtime_workbench::runtime_workbench_report,
+            runtime_workbench::compiled_source_project,
             runtime_workbench::prepare_runtime_tool,
             runtime_workbench::launch_runtime_tool,
             runtime_workbench::rebuild::runtime_rebuild_start,

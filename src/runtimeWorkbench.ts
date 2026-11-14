@@ -84,6 +84,10 @@ export interface RuntimeWorkbenchReport {
   workingBuild: { id: string; message: string } | null;
   workingSource?: { target?: 'mcc-cea' | 'gbx-custom'; buildId: string; tagsDirectory: string; authoringPending?: boolean; sourceProjectFingerprint?: string; projectFingerprint?: string } | null;
 }
+export interface CompiledSourceProject {
+  projectId:string;title:string;buildId:string;outputSha256:string;
+  target:'mcc-cea'|'gbx-custom';authoringChanged:boolean;
+}
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string }
 export interface ToolLaunchPlan {
   id: string;

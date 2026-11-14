@@ -16,10 +16,11 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { useMapState, writeMapSession } from '../mapSession';
+import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
 import type {
   RuntimeWorkbenchReport,
+  CompiledSourceProject,
   NativeScriptAttachment,
   RuntimeDockAction,
   ToolLaunchPlan,
@@ -55,6 +56,7 @@ export default function RuntimeDock({
   onSave,
   onNavigate,
   onOpenCompiled,
+  onOpenSourceProject,
 }: {
   project: Project | null;
   settings: Settings;
@@ -64,8 +66,45 @@ export default function RuntimeDock({
   onSave: () => Promise<void>;
   onNavigate: (workspace: Workspace) => void;
   onOpenCompiled: (buildId: string) => void;
+  onOpenSourceProject?: (id:string) => Promise<boolean> | void;
 }) {
   const id = project?.id ?? 'global';
+  const [storedSource]=useMapState<unknown>(compiledSourceSessionId(project),COMPILED_SOURCE_KEY,()=>null);
+  const sourceHint=compiledSourceHint(storedSource,project);
+  const sourceKey=JSON.stringify([project?.id,sourceHint?.sourceProjectId,sourceHint?.buildId,sourceHint?.outputSha256]);
+  const currentSourceKey=useRef(sourceKey);currentSourceKey.current=sourceKey;
+  const sourceRequest=useRef(0);
+  const [sourceResult,setSourceResult]=useState<{key:string;source?:CompiledSourceProject;error?:string}|null>(null);
+  const [sourceBusy,setSourceBusy]=useState<string|null>(null);
+  const sourceLink=sourceResult?.key===sourceKey?sourceResult.source:undefined;
+  const sourceError=sourceResult?.key===sourceKey?sourceResult.error:undefined;
+  const sourceProjectId=sourceHint?.sourceProjectId,sourceBuildId=sourceHint?.buildId,sourceOutputSha=sourceHint?.outputSha256;
+  const inspectSource=useCallback(async()=>{
+    if(!native||!project?.id||!sourceProjectId||!sourceBuildId||!sourceOutputSha)return null;
+    const request=++sourceRequest.current,key=sourceKey;
+    setSourceBusy(key);
+    try {
+      const source=await call<CompiledSourceProject>('compiled_source_project',{
+        compiledProjectId:project.id,sourceProjectId,buildId:sourceBuildId,
+      });
+      if(request!==sourceRequest.current||currentSourceKey.current!==key)return null;
+      if(source.projectId!==sourceProjectId||source.buildId!==sourceBuildId||source.outputSha256.toLowerCase()!==sourceOutputSha)
+        throw Error('The editable source link changed; open the source through File → Open saved project.');
+      setSourceResult({key,source});return source;
+    } catch(problem) {
+      if(request===sourceRequest.current&&currentSourceKey.current===key)setSourceResult({key,error:String(problem)});
+      return null;
+    } finally {
+      if(request===sourceRequest.current)setSourceBusy(null);
+    }
+  },[project?.id,sourceProjectId,sourceBuildId,sourceOutputSha,sourceKey]);
+  useEffect(()=>{setSourceResult(null);void inspectSource();return()=>{sourceRequest.current++;};},[inspectSource]);
+  async function openEditableSource(){
+    const key=sourceKey,source=await inspectSource();
+    if(!source||currentSourceKey.current!==key||!onOpenSourceProject)return;
+    try {await onOpenSourceProject(source.projectId);}
+    catch(problem){if(currentSourceKey.current===key)setSourceResult({key,error:String(problem)});}
+  }
   const [runtime, setRuntime] = useMapState<RuntimeId>(
     id,
     'hosting.runtime',
@@ -385,6 +424,12 @@ export default function RuntimeDock({
         <div className="runtime-dock-heading">
           <strong>Runtime &amp; tools</strong>
           <span>{project?.title ?? 'Choose a map to use its tools'}</span>
+          {native&&sourceHint&&onOpenSourceProject&&<button
+            className="runtime-dock-tag-changes"
+            disabled={busy||working||sourceBusy===sourceKey}
+            title={sourceLink?'Open '+sourceLink.title+' in its retained Level Editor. Current source may contain later edits; this compiled map stays separate.':'Check the retained native source link. If unavailable, use File → Open saved project; no source is reconstructed from this cache.'}
+            onClick={()=>void (sourceLink?openEditableSource():inspectSource())}
+          >{sourceBusy===sourceKey?'Checking source…':sourceLink?'Edit source':'Check editable source'}</button>}
           <span className="runtime-dock-save">
             {working ? 'Working…' : dirty ? 'Unsaved changes' : 'Saved'}
           </span>
@@ -464,6 +509,7 @@ export default function RuntimeDock({
             </button>
           </div>
         )}
+        {sourceError&&!details&&<div className="runtime-dock-notice" role="alert">Editable source: {sourceError}. Use File → Open saved project if its retained native build is unavailable.</div>}
         {error && !details && (
           <div className="runtime-dock-notice" role="alert">
             {error}
@@ -491,6 +537,8 @@ export default function RuntimeDock({
               Use the desktop app to inspect the installed runtime, tools and owned content.
             </Notice>
           )}
+          {sourceLink&&<Notice tone="info">Edit source opens {sourceLink.title} with its retained document history. {sourceLink.authoringChanged?'The authoring revision has changed since this build. ':''}Current native source may also contain later tool edits. This compiled inspection remains a separate map.</Notice>}
+          {sourceError&&<Notice>Editable source: {sourceError}. Use File → Open saved project for manual selection; this cache is not reconstructed source.</Notice>}
           {error && <Notice>{error}</Notice>}
           {dirty && (
             <Notice tone="info">

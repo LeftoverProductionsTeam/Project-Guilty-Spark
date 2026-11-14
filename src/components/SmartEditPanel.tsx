@@ -4,7 +4,7 @@ import type { OpenProject, Project, RuntimeId } from '../types';
 import { runtimeNames } from '../runtimeWorkbench';
 import { changedEditInputs, editRevisionKey, editRouteNames, intentDescription } from '../smartEdit';
 import type { EditExecution, EditPlan, EditPreference } from '../smartEdit';
-import { useMapState } from '../mapSession';
+import { useMapState, rememberCompiledSource } from '../mapSession';
 import { Notice, Pill } from './ui';
 import './smartEdit.css';
 import MapExport from './MapExport';
@@ -248,6 +248,7 @@ export default function SmartEditPanel({
                     projectId: project.id,
                     buildId: result.jobId,
                   });
+                  rememberCompiledSource(project.id,result.jobId,opened.project);
                   if (current === generation.current) {
                     onSelectMap?.(opened.project.id);
                     notify('Validated edited copy added to the map library.');

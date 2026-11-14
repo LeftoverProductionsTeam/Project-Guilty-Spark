@@ -106,7 +106,7 @@ import RetainedLevelView from './components/RetainedLevelView';
 import type { MapDocument } from './mapDocuments';
 import WorkspacePanels,{WorkspacePanel,closeOtherHeaderMenus,headerMenuKeyDown}from'./components/WorkspacePanels';
 import NavigationSettings from'./components/NavigationSettings';
-import {readMapSession,writeMapSession,useMapState,copyMapViewSession,configureMapViewWindow} from './mapSession';
+import {readMapSession,writeMapSession,useMapState,copyMapViewSession,configureMapViewWindow,rememberCompiledSource} from './mapSession';
 import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
@@ -1428,7 +1428,7 @@ export default function App() {
             key={current.id}
             edit={edit}
             onSave={persist=>save(persist===true,current.id)}
-            onOpenCompiled={buildId=>void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Compiled map preserved and opened in its own Level Editor tab.')}
+            onOpenCompiled={buildId=>void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});rememberCompiledSource(current.id,buildId,opened.project);await load(opened);await refresh();setWorkspace('quickforge');},'Compiled map preserved and opened in its own Level Editor tab.')}
             project={current}
             data={data}
             logs={logs}
@@ -1885,8 +1885,9 @@ export default function App() {
             epoch={epoch+(activeMap?.savedRevision??0)}
             onSave={() => save()}
             onNavigate={(next) => (next === 'settings' ? openDependencySetup() : setWorkspace(next))}
+            onOpenSourceProject={id=>openProject(id,'quickforge')}
             onOpenCompiled={(buildId) => {
-              if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');
+              if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});rememberCompiledSource(current.id,buildId,opened.project);await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');
             }}
           />}
           {busy && (

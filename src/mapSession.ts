@@ -1,7 +1,7 @@
 /** Per-map UI state, separate from authored edits and build fingerprints. */
 import { useSyncExternalStore } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { MapInspection } from './types';
+import type { MapInspection, Project } from './types';
 const cache = new Map<string, Record<string, unknown>>(),
   unpersisted = new Map<string, Record<string, unknown>>(),
   listeners = new Map<string, Map<string, Set<() => void>>>();
@@ -180,6 +180,29 @@ export function useMapState<T>(
   const set: Dispatch<SetStateAction<T>> = (next) =>
     writeMapSession(id, key, typeof next === 'function' ? (next as (value: T) => T)(get()) : next);
   return [value, set];
+}
+
+/** Navigation hint only; the desktop verifies actual native source/build ownership. */
+export interface CompiledSourceHint { sourceProjectId:string;buildId:string;outputSha256:string }
+export const COMPILED_SOURCE_KEY='native.compiledSource';
+const nativeId=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+export function compiledSourceSessionId(project:Project|null) {
+  const sha=project?.source?.sha256;
+  return sha&&/^[0-9a-f]{64}$/i.test(sha)?'compiled-output:'+sha.toLowerCase():'global';
+}
+export function compiledSourceHint(value:unknown,project:Project|null):CompiledSourceHint|null {
+  if(!value||typeof value!=='object'||!project?.source)return null;
+  const hint=value as Partial<CompiledSourceHint>;
+  return nativeId(hint.sourceProjectId)&&nativeId(hint.buildId)&&hint.sourceProjectId!==project.id&&
+    typeof hint.outputSha256==='string'&&/^[0-9a-f]{64}$/i.test(hint.outputSha256)&&
+    hint.outputSha256.toLowerCase()===project.source.sha256.toLowerCase()
+    ?{sourceProjectId:hint.sourceProjectId,buildId:hint.buildId,outputSha256:hint.outputSha256.toLowerCase()}:null;
+}
+/** Called only after open_built_map succeeded; never copies authored state or receipts. */
+export function rememberCompiledSource(sourceProjectId:string,buildId:string,output:Project) {
+  if(![13,609].includes(output.source?.cacheVersion??0))return;
+  const hint=compiledSourceHint({sourceProjectId,buildId,outputSha256:output.source?.sha256},output);
+  if(hint)writeMapSession(compiledSourceSessionId(output),COMPILED_SOURCE_KEY,hint);
 }
 
 /** Carry view preferences across a new immutable cache revision, never game handles. */

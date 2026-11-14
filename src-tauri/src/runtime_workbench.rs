@@ -273,6 +273,48 @@ fn source_context(state: &AppState, project: &Project) -> Reply<SourceContext> {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct CompiledSourceProject {
+    project_id:String, title:String, build_id:String, output_sha256:String,
+    target:String, authoring_changed:bool,
+}
+/// Resolve a navigation hint through the actual source history and owned job.
+/// This never transfers receipts, edits, authority or tag files to the map copy.
+#[tauri::command]
+pub(super) async fn compiled_source_project(
+    app:tauri::AppHandle, compiled_project_id:String, source_project_id:String, build_id:String,
+)->Reply<CompiledSourceProject> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        uuid::Uuid::parse_str(&build_id).map_err(error)?;
+        if compiled_project_id==source_project_id{return Err("This document is already the source project".into());}
+        let (compiled,source)={let library=lock(&state.library)?;(library.get(&compiled_project_id).map_err(error)?,library.get(&source_project_id).map_err(error)?)};
+        let input=compiled.source.as_ref().ok_or("This document is not a compiled map result")?;
+        let _=inspect(&state,&compiled)?;
+        let candidate=source.builds.iter().find(|build|build.id==build_id&&build.status=="validated"&&build.sha256.as_deref()==Some(input.sha256.as_str())&&matches!(build.target.as_str(),"mcc-cea"|"gbx-custom"))
+            .ok_or("This source project's retained build history does not match the compiled map; no source was opened")?;
+        let mut baseline=source.clone();
+        if baseline.fingerprint().map_err(error)?!=candidate.project_fingerprint {
+            let snapshot=state.root.join("jobs").join(&build_id).join("project.gsproject");
+            core::reject_links(&snapshot).map_err(error)?;
+            baseline=serde_json::from_slice(&bounded_read(&snapshot,32*1024*1024)?).map_err(error)?;
+            baseline.validate().map_err(error)?;
+            if baseline.id!=source.id||baseline.fingerprint().map_err(error)?!=candidate.project_fingerprint{return Err("The retained source snapshot does not match this build; no source identity was reassigned".into());}
+            baseline.builds=source.builds.clone();
+        }
+        let build=verified_build(&state,&baseline,&build_id)?;
+        if build.target!=candidate.target||build.sha256!=candidate.sha256||build.output!=candidate.output{return Err("The compiled result's native receipt differs from its source history".into());}
+        let header=maps::inspect_header(build.output.as_ref().ok_or("Native output is unavailable")?).map_err(error)?;
+        let expected=if build.target=="gbx-custom"{609}else{13};
+        if header.version!=expected||input.cache_version!=expected||header.extended{return Err("Compiled result and native source receipt use different cache editions".into());}
+        let _=working_source_context(&state,&baseline,build.clone())?;
+        Ok(CompiledSourceProject{project_id:source.id.clone(),title:source.title.clone(),build_id:build.id,
+            output_sha256:input.sha256.clone(),target:build.target,
+            authoring_changed:source.fingerprint().map_err(error)?!=candidate.project_fingerprint})
+    }).await.map_err(error)?
+}
+
 /// Native operations share the reviewed CE source route; they do not broaden
 /// the existing H1A tool launch or generic compiled-tag interfaces.
 pub(super) fn native_operation_source(state:&AppState,project:&Project)->Reply<(BuildRecord,PathBuf)> {
