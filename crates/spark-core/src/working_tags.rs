@@ -29,6 +29,8 @@ const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub expected_encounter:Option<crate::native_operations::Operation>,
     /// Explicit source compilation; the default rebuild keeps existing compiled scripts.
     #[serde(default)]
     pub compile_scripts:bool,
@@ -47,6 +49,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub expected_encounter:Option<crate::native_operations::Operation>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub compiled_script_modules:Vec<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -320,6 +324,10 @@ fn prepare(
     let tags = checked_directory(&input.tags_directory)?;
     if !tags.starts_with(&parent) || tags == parent {
         return invalid("Working tags must remain inside their own validated parent job; SDK masters are not inputs");
+    }
+    if let Some(expected)=&input.expected_encounter {
+        expected.validate("scnr",&format!("{scenario}.scenario"))?;
+        if !matches!(expected,crate::native_operations::Operation::AppendEncounter{..}){return invalid("Working-tag encounter expectation is not a reviewed append");}
     }
     let scenario_file = checked_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?;
     let globals = checked_file(&tags.join("globals/globals.globals"))?;
@@ -638,6 +646,7 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        expected_encounter:input.expected_encounter.clone(),
         compiled_script_modules:vec![],
         reviewed_tag_identity:input.expected_tag_identity.clone(),
         bsp_audio: input.bsp_audio.clone(),
@@ -768,6 +777,7 @@ fn run_with(
         {
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
+        if let Some(expected)=&input.expected_encounter{expected.verify_compiled_encounter(&inspected)?;}
         if input.compile_scripts {
             for script in &prepared.parent_inspection.scripts {
                 let expected=prepared.parent_inspection.scripts.iter().filter(|other|other.name==script.name&&other.script_type==script.script_type&&other.return_type==script.return_type).count();
@@ -979,6 +989,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            expected_encounter:None,
             compile_scripts:false,
             expected_tag_identity:None,
             bsp_audio: None,

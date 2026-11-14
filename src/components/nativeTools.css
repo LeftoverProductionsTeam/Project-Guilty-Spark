@@ -75,3 +75,5 @@
 .tool-ecosystem code {
   overflow-wrap: anywhere;
 }
+
+.native-encounter-authoring label{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.native-encounter-authoring select{max-width:100%;min-width:0}.native-encounter-position{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.native-encounter-position input{width:100%;min-width:0}.native-encounter-authoring fieldset{min-width:0;margin:6px 0}

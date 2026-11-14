@@ -43,6 +43,8 @@ struct Receipt {
     tag: String,
     class: String,
     operation: recipes::Operation,
+    #[serde(default)]
+    source_dependencies:BTreeMap<String,String>,
     tool_id: String,
     executable_sha256: String,
     before_sha256: String,
@@ -54,6 +56,22 @@ struct Receipt {
     output: String,
     created_at: String,
 }
+/// Bind the active accepted append to subsequent native cache readback. This
+/// does not revive an operation superseded by another source/Baboon revision.
+pub(super) fn encounter_expectation(state:&AppState,project:&Project,build:&BuildRecord)->Reply<Option<recipes::Operation>> {
+    let Some(tags)=native_source_revisions::selected(state,project,&build.id)? else{return Ok(None);};
+    let selection=native_source_revisions::current(state,&project.id)?.ok_or("Native source selection disappeared")?;
+    let receipt:Receipt=serde_json::from_slice(&bounded_read(&root(state,&selection.job_id)?.join("operation.json"),4*1024*1024)?).map_err(error)?;
+    if receipt.schema_version!=1||receipt.id!=selection.job_id||receipt.project_id!=project.id||receipt.fingerprint!=project.fingerprint().map_err(error)? {return Err("Selected encounter receipt differs from its map/build revision".into());}
+    if !matches!(receipt.operation,recipes::Operation::AppendEncounter{..}){return Ok(None);}
+    receipt.operation.validate(&receipt.class,&receipt.tag).map_err(error)?;
+    let file=tags.join(core::safe_relative(&receipt.tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
+    let hash=maps::hash_file(&file).map_err(error)?;
+    if hash==receipt.before_sha256{return Ok(None);}// Exact recovery revision intentionally removes the append.
+    if hash!=receipt.after_sha256||receipt.parent_build_id!=build.id{return Err("Accepted encounter source changed; review it before building".into());}
+    check_dependency_pins(&tags,&receipt.source_dependencies)?;
+    Ok(Some(receipt.operation))
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Context {
@@ -64,6 +82,8 @@ pub(super) struct Context {
     tags_directory: PathBuf,
     bounding_radius: Option<f64>,
     lens_flare_scale: Option<f64>,
+    actor_variants:Vec<String>,
+    can_append_encounter:bool,
     can_edit: bool,
     can_repair: bool,
     edit_issue: Option<String>,
@@ -280,6 +300,40 @@ pub(super) fn verify_bytes(tags: &Path, tag: &str, hash: &str) -> Reply<()> {
     }
     Ok(())
 }
+fn check_dependency_pins(tags:&Path,pins:&BTreeMap<String,String>)->Reply<()> {
+    if pins.len()>2048{return Err("Encounter dependency inventory exceeds2048tags".into());}
+    for(path,expected)in pins {
+        let file=tags.join(core::safe_relative(path).map_err(error)?);core::reject_links(&file).map_err(error)?;
+        if expected.len()!=64||!expected.bytes().all(|c|c.is_ascii_hexdigit())||maps::hash_file(&file).map_err(error)?!=*expected{return Err("An actor dependency changed after review; preserve the source and preview again".into());}
+    }
+    Ok(())
+}
+fn encounter_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path)->Reply<BTreeMap<String,String>> {
+    let recipes::Operation::AppendEncounter{actor_path,..}=operation else{return Ok(BTreeMap::new());};
+    studio_native_source::require_unshared(state,&source.project.id)?;
+    let output=source.build.output.as_ref().ok_or("Validated parent output is missing")?;
+    if maps::inspect_header(output).map_err(error)?.scenario_type!=0{return Err("Native encounter append currently requires a reviewed singleplayer scenario. Multiplayer AI needs its engine-specific adapter.".into());}
+    let(ok,value,stderr)=run(edit,&["-t".into(),source.tags.to_string_lossy().into_owned(),"-G".into(),"type".into(),source.tag.clone()])?;
+    if !ok||value.trim()!="singleplayer"{return Err(format!("Working scenario is not a readable singleplayer source: {stderr}"));}
+    let actor=format!("{}.actor_variant",actor_path.replace('\\',"/"));
+    let file=source.tags.join(core::safe_relative(&actor).map_err(error)?);core::reject_links(&file).map_err(error)?;
+    let hash=maps::hash_file(&file).map_err(error)?;verify_bytes(&source.tags,&actor,&hash)?;
+    let _=fields(state,&source.project,&source.tags,&actor)?;
+    let dependency=executable(state,&source.project,"invaderDependency")?;
+    let dependency_hash=maps::hash_file(&dependency).map_err(error)?;
+    let(ok,stdout,stderr)=run(&dependency,&recipes::Operation::Dependencies.arguments(&source.tags,"actv",&actor).map_err(error)?)?;
+    if !ok{return Err(format!("Native actor dependency traversal failed: {stderr}"));}
+    let rows=recipes::dependency_lines(&stdout).map_err(error)?;
+    if rows.len()>2047{return Err("Actor closure exceeds2048checked native tags".into());}
+    let mut pins=BTreeMap::from([(actor,hash)]);
+    for row in rows {
+        if row.reported_broken{return Err(format!("Actor dependency is broken: {}",row.path));}
+        let path=source.tags.join(core::safe_relative(&row.path).map_err(error)?);core::reject_links(&path).map_err(error)?;
+        pins.insert(row.path,maps::hash_file(&path).map_err(error)?);
+    }
+    if maps::hash_file(&dependency).map_err(error)?!=dependency_hash{return Err("The dependency reader changed during review".into());}
+    check_dependency_pins(&source.tags,&pins)?;Ok(pins)
+}
 fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply<Receipt> {
     let file = root(state, id)?.join("operation.json");
     core::reject_links(&file).map_err(error)?;
@@ -314,6 +368,17 @@ pub(super) async fn native_tag_context(
         let state = app.state::<AppState>();
         let source = source(&state, &project_id, tag_id)?;
         let values = fields(&state, &source.project, &source.tags, &source.tag)?;
+        let mut actor_variants=vec![];
+        let can_append_encounter=source.class=="scnr"&&maps::inspect_header(source.build.output.as_ref().ok_or("Validated output is missing")?).map_err(error)?.scenario_type==0;
+        if can_append_encounter {
+            let inspection=if source.project.source.is_some(){inspect(&state,&source.project)?}else{Arc::new(maps::inspect_map(source.build.output.as_ref().unwrap(),None).map_err(error)?)};
+            for tag in inspection.tags.iter().filter(|tag|tag.class=="actv") {
+                if let Ok(relative)=core::safe_relative(&format!("{}.actor_variant",tag.path.replace('\\',"/"))) {
+                    if source.tags.join(relative).is_file(){actor_variants.push(tag.path.replace('\\',"/"));}
+                }
+            }
+            actor_variants.sort();actor_variants.dedup();
+        }
         let radius = recipes::number(&values, "bounding_radius").ok();
         let flare = recipes::number(&values, "rotation_function_scale").ok();
         let edit_issue = executable(&state, &source.project, "invaderNative").err();
@@ -338,12 +403,15 @@ pub(super) async fn native_tag_context(
                 }
             }
         }
+        let can_append_encounter=can_append_encounter&&edit_issue.is_none()&&studio_native_source::require_unshared(&state,&source.project.id).is_ok();
         Ok(Context {
             project_id,
             build_id: source.build.id,
             tag: source.tag,
             class: source.class,
             tags_directory: source.tags,
+            actor_variants,
+            can_append_encounter,
             bounding_radius: radius,
             lens_flare_scale: flare,
             can_edit: radius.is_some() && edit_issue.is_none(),
@@ -404,7 +472,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Preview {
-    Preview{id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged.".into()}
+    Preview{id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::AppendEncounter{..}){"One native encounter is appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()}
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -421,22 +489,32 @@ pub(super) async fn native_operation_preview(
     let source=source(&state,&project_id,tag_id)?;operation.validate(&source.class,&source.tag).map_err(error)?;
     let mut history:Vec<String>=lock(&state.library)?.setting(&history_key(&project_id)).map_err(error)?;
     if history.len()>=32{return Err("This map retains 32 managed previews. Review/recover existing revisions before creating more; no source was deleted.".into());}
-    let exe=executable(&state,&source.project,operation.tool_id())?;let before_fields=fields(&state,&source.project,&source.tags,&source.tag)?;
-    if recipes::number(&before_fields,operation.field().unwrap()).map_err(error)?==operation.target().unwrap(){return Err("This native value already matches. No serialization or repair was performed.".into());}
+    let exe=executable(&state,&source.project,operation.tool_id())?;let executable_sha256=maps::hash_file(&exe).map_err(error)?;
+    let before_fields=fields(&state,&source.project,&source.tags,&source.tag)?;
+    let source_dependencies=encounter_dependencies(&state,&source,&operation,&exe)?;
+    if let Some(field)=operation.field(){if recipes::number(&before_fields,field).map_err(error)?==operation.target().unwrap(){return Err("This native value already matches. No serialization or repair was performed.".into());}}
     if matches!(operation,recipes::Operation::LensFlareScaleRepair)&&!recipes::broken_lens_scale(recipes::number(&before_fields,"rotation_function_scale").map_err(error)?){return Err("This lens flare does not have the reviewed 360-to-zero repair precondition. No repair ran.".into());}
     let relative=core::safe_relative(&source.tag).map_err(error)?;let before=bounded_read(&source.tags.join(&relative),MAX_TAG)?;
     let before_sha256=hash_bytes(&before);let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
     let candidate=directory.join("candidate/tags");fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;
-    let (ok,stdout,stderr)=run(&exe,&operation.arguments(&candidate,&source.class,&source.tag).map_err(error)?)?;
+    let (ok,stdout,stderr)=run(&exe,&operation.arguments_with_fields(&candidate,&source.class,&source.tag,&before_fields).map_err(error)?)?;
     project::atomic_write(&directory.join("native-output.txt"),format!("{stdout}{stderr}").as_bytes(),false).map_err(error)?;
     if !ok{return Err(format!("{} rejected the isolated candidate: {}. The starting source is unchanged.",operation.tool_id(),stderr.chars().take(600).collect::<String>()));}
+    if let Some(args)=operation.readback_arguments(&candidate,&source.class,&source.tag,&before_fields).map_err(error)? {
+        let(ok,readback,stderr)=run(&exe,&args)?;
+        if !ok{return Err(format!("Native encounter readback failed: {stderr}"));}
+        operation.verify_readback(&candidate,&source.class,&source.tag,&before_fields,&readback).map_err(error)?;
+        project::atomic_write(&directory.join("native-encounter-readback.txt"),readback.as_bytes(),false).map_err(error)?;
+    }
+    check_dependency_pins(&source.tags,&source_dependencies)?;
+    if maps::hash_file(&exe).map_err(error)?!=executable_sha256{return Err("Native writer changed during the preview; no source was selected".into());}
     let after_fields=fields(&state,&source.project,&candidate,&source.tag)?;let field_changes=recipes::reviewed_difference(&before_fields,&after_fields,&operation).map_err(error)?;
     let after=bounded_read(&candidate.join(&relative),MAX_TAG)?;let after_sha256=hash_bytes(&after);verify_bytes(&candidate,&source.tag,&after_sha256)?;
     if maps::hash_file(&source.tags.join(&relative)).map_err(error)?!=before_sha256{return Err("Working source changed during preview. The candidate is retained; refresh before making another preview.".into());}
     if transaction::inventory(&candidate).map_err(error)?!=BTreeMap::from([(source.tag.clone(),after_sha256.clone())]){return Err("The native operation changed unexpected candidate files; no revision was selected".into());}
     let changed_bytes=before.iter().zip(&after).filter(|(a,b)|a!=b).count()+before.len().abs_diff(after.len());
-    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),tool_id:operation.tool_id().into(),executable_sha256:maps::hash_file(&exe).map_err(error)?,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields,after_fields,field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
+    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields,after_fields,field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
     project::atomic_write(&directory.join("operation.json"),&serde_json::to_vec_pretty(&receipt).map_err(error)?,false).map_err(error)?;
     history.push(id.clone());lock(&state.library)?.set_setting(&history_key(&project_id),&history).map_err(error)?;
     Ok(preview_view(&receipt,&before_sha256))
@@ -469,6 +547,7 @@ pub(super) async fn native_operation_accept(
     let exe=executable(&state,&project,&receipt.tool_id)?;if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("The native writer changed after preview; review its identity again".into());}
     let expected=native_source_revisions::current(&state,&project_id)?;let legacy=native_source_revisions::legacy_revision(&state,&project_id)?;
     let current=runtime_workbench::compiled_tags(&state,&project,&build)?;let relative=core::safe_relative(&receipt.tag).map_err(error)?;
+    if !restore{check_dependency_pins(&current,&receipt.source_dependencies)?;}
     let current_hash=maps::hash_file(&current.join(&relative)).map_err(error)?;
     let wanted_current=if restore{&receipt.after_sha256}else{&receipt.before_sha256};if &current_hash!=wanted_current{return Err("This native tag changed after preview/acceptance. Overlapping edits need review; both sources are retained.".into());}
     if !restore&&fields(&state,&project,&current,&receipt.tag)?!=receipt.before_fields{return Err("The current native fields no longer match the reviewed starting source".into());}
@@ -486,6 +565,8 @@ pub(super) async fn native_operation_accept(
     if transaction::inventory(&tags).map_err(error)?!=wanted||transaction::inventory(&current).map_err(error)?!=baseline{return Err("Native source changed while staging. The staged copy is retained but was not selected.".into());}
     let restored_fields=fields(&state,&project,&tags,&receipt.tag)?;if restored_fields!=if restore{receipt.before_fields.clone()}else{receipt.after_fields.clone()}{return Err("Staged native field readback differs; no source was selected".into());}
     if runtime_workbench::compiled_tags(&state,&project,&build)?!=current{return Err("The selected native source changed while staging; refresh before accepting".into());}
+    if !restore{check_dependency_pins(&tags,&receipt.source_dependencies)?;check_dependency_pins(&current,&receipt.source_dependencies)?;}
+    if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("Native writer changed while selecting the revision; no source was selected".into());}
     let selection=native_source_revisions::Selection{project_id:project_id.clone(),fingerprint:receipt.fingerprint,parent_build_id:build.id,job_id:operation_id.clone(),revision_id:revision_id.clone(),baboon_revision_at_selection:legacy};
     let tags=native_source_revisions::publish(&state,&project,selection,expected)?;
     let _=app.emit("spark:library-changed",());

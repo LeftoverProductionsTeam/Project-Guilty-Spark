@@ -1,4 +1,5 @@
 import ProjectSnapshots from './ProjectSnapshots';
+import NativeTagOperations from './NativeTagOperations';
 import SourceRecovery from './SourceRecovery';
 import {useMapState} from '../mapSession';
 import GeometryToolHandoff from './GeometryToolHandoff';
@@ -274,7 +275,7 @@ export function Assets({
     </div>
   );
 }
-export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId }: { inspection: MapInspection | null; onWorld: () => void; onTag?: (id:number) => void; onFirefight?: () => void; projectId?: string }) {
+export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, project, dirty=false }: { inspection: MapInspection | null; onWorld: () => void; onTag?: (id:number) => void; onFirefight?: () => void; projectId?: string; project?:Project|null;dirty?:boolean }) {
   const tags=useMemo(()=>new Map((inspection?.tags??[]).map(tag=>[tag.id,tag] as const)),[inspection]);
   const stateName=(value:number)=>['None','Sleeping','Alert','Repeat position','Loop positions','Loop back and forth','Random loop','Move randomly','Guard','Guard position','Search','Flee'][value]??'Unknown state '+value;
   const scope=projectId??inspection?.sha256??'scenario-empty';
@@ -340,6 +341,7 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId }:
         {inspection?.playerStartingProfiles==null&&<p className="subtle">Native loadout details are unavailable. Older inspections need to be refreshed; unreadable native data is reported in map diagnostics.</p>}
         {inspection?.playerStartingProfiles?.length===0&&<p className="subtle">No player starting profiles are stored in this scenario.</p>}
       </details>
+      {project&&project.builds.some(build=>build.status==='validated')&&<NativeTagOperations project={project} dirty={dirty}/>}
       <div className="scenario-columns">
         <section className="surface">
           <div className="section-heading">

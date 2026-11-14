@@ -1,4 +1,5 @@
-export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' };
+export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' }
+  | {kind:'appendEncounter';name:string;actorPath:string;position:[number,number,number];startActive:boolean};
 export interface NativeTagContext {
   projectId: string;
   buildId: string;
@@ -7,6 +8,8 @@ export interface NativeTagContext {
   tagsDirectory: string;
   boundingRadius: number | null;
   lensFlareScale: number | null;
+  actorVariants?:string[];
+  canAppendEncounter?:boolean;
   canEdit: boolean;
   canRepair: boolean;
   editIssue: string | null;

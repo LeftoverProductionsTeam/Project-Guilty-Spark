@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — explicit recovered HaloScript compilation in working-tag builds
+Task: Operation110 — preserving native source encounter append
 Status: implementation incomplete
-Starting revision: 563111d7f86239d5230f469c5c66058d9474b047, canonical D:/Project Guilty Spark local master.
+Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
-Next action: Continue code-only recovered-scenario native authoring through Source Guardian/working tags. Explicit reviewed HSC compilation now has source, but safe preserving encounter/palette append and original controller metadata still need implementation; do not apply fresh QuickForge index-zero commands to recovered scenarios. When testing resumes compile all WIP and run H12/H13 source/import/script/native/UI/reuse cases before gameplay. Forerunner launch routing is separate, and discovery grants no live-edit/rules importer. No tests/builds/native tools/apps/games until authorized.
+Next action: Continue code-only recovered native encounter/Firefight integration in the existing source path: append source now exists for one actor, but multi-group controller attachment/preservation and Forerunner launch routing remain incomplete. Do not flip original multiplayer source to solo or apply fresh index-zero recipes to recovered arrays. When testing resumes compile all WIP, run H12/H13/H14 including installed reader formatting, source recovery after later builds, dependency races, independent native/cache readback, then actual human actor/gameplay gates. No tests/builds/native tools/apps/games until authorized.
 
 ## Acceptance
 
@@ -24,6 +24,8 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Latest uncompiled source: typed appendEncounter reuses managed native preview/accept/full-source recovery for one MCC/H1A singleplayer actor encounter, appending after original indices and checking original exposed fields, dependencies, scalar readback and selected-source identity. Native controls appear through existing AI/Tag/dock paths; original project Undo and native recovery remain distinct. Active accepted append reaches independent working-tag cache verification; exact before-edit restoration clears that expectation even after another build. All tests/native tools/UI/game behavior are deferred. CONTINUATION_67_SOURCE_GUARDIAN.md/UI_INTERACTION_AUDIT.md and H14 retain exact scope/limits. No source controller/Forerunner/live API or second writer was invented.
 
 Latest source-only increment: explicit Compile scripts & build reuses current native working-tag staging, selected original module retention and standard Invader-script/H1A compilation. Bound Open script source folder reveals only current owned build data. Default tag-only rebuild retains compiled scripts. Tool/source identities, native module inventories and original signatures are checked before candidate adoption; compact receipts list compiled modules. No original user source, companion files or compiled outputs were modified. CONTINUATION_67_SOURCE_GUARDIAN.md/UI_INTERACTION_AUDIT.md and H13 record exact scope and all unrun acceptance. No tests/typecheck/build/tools/UI/games ran. Recovered encounter append remains incomplete.
 

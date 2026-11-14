@@ -34,6 +34,8 @@ export default function NativeTagOperations({
   const [preview, setPreview] = useState<NativePreview | null>(null),
     [accepted, setAccepted] = useState<NativeAccepted | null>(null),
     [dependencies, setDependencies] = useState<NativeDependencies | null>(null);
+  const [encounterName,setEncounterName]=useState('gs_source_actor'),[actorPath,setActorPath]=useState(''),
+    [actorPosition,setActorPosition]=useState<[string,string,string]>(['0','0','0']),[startActive,setStartActive]=useState(false);
   const generation = useRef(0);
   const projectId = project.id;
   const [nativeTag, setNativeTag] = useState<number | null>(null),
@@ -80,6 +82,7 @@ export default function NativeTagOperations({
     setDependencies(null);
     setError('');
     setBusy(false);
+    setEncounterName('gs_source_actor');setActorPath('');setActorPosition(['0','0','0']);setStartActive(false);
     return () => {
       generation.current++;
     };
@@ -204,6 +207,21 @@ export default function NativeTagOperations({
               Refresh source
             </button>
           </div>
+          {context.class==='scnr'&&<details className="native-encounter-authoring">
+            <summary>Append one native AI encounter</summary>
+            <p className="subtle">Adds a source-backed actor start and firing position without replacing existing encounters. Accept the preview, then Build working tag edits. Review coordinates, collision and native navigation before gameplay.</p>
+            {!context.canAppendEncounter&&<Notice tone="info">Requires unshared MCC/H1A singleplayer working source and the reviewed native writer. Multiplayer AI uses its runtime-specific path.</Notice>}
+            <label>Encounter name<input aria-label="Native encounter name" maxLength={31} value={encounterName} disabled={busy||dirty} onChange={e=>{setEncounterName(e.target.value);if(!accepted)setPreview(null);}}/></label>
+            <label>Actor variant<select aria-label="Native encounter actor" value={actorPath} disabled={busy||dirty} onChange={e=>{setActorPath(e.target.value);if(!accepted)setPreview(null);}}>
+              <option value="">Choose an actor from this source…</option>{context.actorVariants?.map(path=><option key={path} value={path}>{path}</option>)}
+            </select></label>
+            {!context.actorVariants?.length&&<p className="subtle">No indexed actor variant has an available file in this working tagset. Recover/build compatible actor source with its dependencies first.</p>}
+            <fieldset><legend>Native starting position</legend><div className="native-encounter-position">{(['X','Y','Z'] as const).map((axis,index)=><label key={axis}>{axis}<input aria-label={'Native actor '+axis} type="number" step="0.25" min={-2048} max={2048} disabled={busy||dirty} value={actorPosition[index]} onChange={e=>{setActorPosition(old=>old.map((v,i)=>i===index?e.target.value:v) as [string,string,string]);if(!accepted)setPreview(null);}}/></label>)}</div></fieldset>
+            <label><input type="checkbox" checked={startActive} disabled={busy||dirty} onChange={e=>{setStartActive(e.target.checked);if(!accepted)setPreview(null);}}/>Allow initial creation</label>
+            <p className="subtle">Unchecked keeps the new encounter not initially created. Activate its name through reviewed scenario HaloScript; this does not attach a Firefight controller or prove spawning.</p>
+            <button disabled={busy||dirty||!context.canAppendEncounter||!context.actorVariants?.includes(actorPath)||!/^[A-Za-z0-9_]{1,31}$/.test(encounterName)||actorPosition.some(v=>v.trim()===''||!Number.isFinite(Number(v))||Math.abs(Number(v))>2048)}
+              onClick={()=>makePreview({kind:'appendEncounter',name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive})}>Preview encounter append</button>
+          </details>}
           {context.boundingRadius !== null && (
             <div className="native-field-edit">
               <label>
