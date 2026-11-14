@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native encounter/loadout inspection and exact round readback
+Task: Operation110 — explicit recovered HaloScript compilation in working-tag builds
 Status: implementation incomplete
-Starting revision: 20acb45fb84bd4789732a5f99c41c6a0acaafadb, canonical D:/Project Guilty Spark local master.
+Starting revision: 563111d7f86239d5230f469c5c66058d9474b047, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
-Next action: Continue code-only recovered-scenario source integration via existing Source Guardian revisions/working-tag build boundary. Actor/start arrays are now readable; they still need a legitimate preserving append writer and reviewed original-script/controller metadata, not the fresh QuickForge index-zero recipe. Forerunner discovery is not an authored-config/live-edit API. When tests resume compile all WIP, run H12 native detail/override/layout/reuse/map-window cases plus source import/script preservation, then gameplay. No tests/builds/native tools/games until authorized.
+Next action: Continue code-only recovered-scenario native authoring through Source Guardian/working tags. Explicit reviewed HSC compilation now has source, but safe preserving encounter/palette append and original controller metadata still need implementation; do not apply fresh QuickForge index-zero commands to recovered scenarios. When testing resumes compile all WIP and run H12/H13 source/import/script/native/UI/reuse cases before gameplay. Forerunner launch routing is separate, and discovery grants no live-edit/rules importer. No tests/builds/native tools/apps/games until authorized.
 
 ## Acceptance
 
@@ -24,6 +24,8 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Latest source-only increment: explicit Compile scripts & build reuses current native working-tag staging, selected original module retention and standard Invader-script/H1A compilation. Bound Open script source folder reveals only current owned build data. Default tag-only rebuild retains compiled scripts. Tool/source identities, native module inventories and original signatures are checked before candidate adoption; compact receipts list compiled modules. No original/source/companion files or compiled outputs were modified. CONTINUATION_67_SOURCE_GUARDIAN.md/UI_INTERACTION_AUDIT.md and H13 record exact scope and all unrun acceptance. No tests/typecheck/build/tools/UI/games ran. Recovered encounter append remains incomplete.
 
 Latest source-only increment: decoded optional native player profiles, source-bound weapon navigation, and exact round loadout readback (weapon slots, ammo, health/shields, grenades). Actor dependency classes are checked. Existing inspection fixture literals include None for the additive field; no tests/compilation ran. Native loadouts and How To distinguish scenario equipment from engine save profiles. Source syntax/offsets/callers were reviewed manually, not accepted through execution. All prior native AI WIP and companion findings remain preserved.
 
