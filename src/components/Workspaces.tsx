@@ -1,5 +1,6 @@
 import ProjectSnapshots from './ProjectSnapshots';
 import SourceRecovery from './SourceRecovery';
+import {useMapState} from '../mapSession';
 import GeometryToolHandoff from './GeometryToolHandoff';
 import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -273,12 +274,17 @@ export function Assets({
     </div>
   );
 }
-export function Scenario({ inspection, onWorld }: { inspection: MapInspection | null; onWorld: () => void }) {
-  const [query, setQuery] = useState('');
-  const [chosen, setChosen] = useState(0);
+export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId }: { inspection: MapInspection | null; onWorld: () => void; onTag?: (id:number) => void; onFirefight?: () => void; projectId?: string }) {
+  const tags=useMemo(()=>new Map((inspection?.tags??[]).map(tag=>[tag.id,tag] as const)),[inspection]);
+  const stateName=(value:number)=>['None','Sleeping','Alert','Repeat position','Loop positions','Loop back and forth','Random loop','Move randomly','Guard','Guard position','Search','Flee'][value]??'Unknown state '+value;
+  const scope=projectId??inspection?.sha256??'scenario-empty';
+  const [query,setQuery]=useMapState(scope,'scenario.query','');
+  const [chosen,setChosen]=useMapState(scope,'scenario.selection',0);
   const encounters =
     inspection?.encounters.filter((e) => e.name.toLowerCase().includes(query.toLowerCase())) ?? [];
   const active = encounters[chosen] ?? encounters[0];
+  const details=active?.details;
+  const unreadable=(code:string)=>inspection?.diagnostics.some(problem=>problem.code===code);
   return (
     <div className="scenario-page">
       <PageTitle
@@ -292,32 +298,48 @@ export function Scenario({ inspection, onWorld }: { inspection: MapInspection | 
           </button>
         }
       />
-      <Notice>
-        This workspace currently inspects AI and script metadata. Wave editing, script compilation, AI
-        simulation, and multiplayer AI replication are not implemented.
+      <Notice tone="info">
+        Inspect stored encounter and script definitions here. Use Wave rules for this project's Firefight plan; playable encounters require a supported native source build. Live AI and multiplayer behavior need their runtime's own verification.
+        {onFirefight&&<button onClick={onFirefight} title="Open Firefight authoring for this project. Native builds require a supported editable source level.">Wave rules</button>}
       </Notice>
       <div className="scenario-stats">
         <div className="surface">
           <Users size={21} />
-          <strong>{inspection?.encounters.length ?? 0}</strong>
+          <strong>{!inspection?'—':unreadable('AI_ENCOUNTERS_UNREADABLE')?'Unavailable':inspection.encounters.length}</strong>
           <span>AI encounters</span>
         </div>
         <div className="surface">
           <Network size={21} />
-          <strong>{inspection?.encounters.reduce((n, e) => n + e.squads.length, 0) ?? 0}</strong>
+          <strong>{!inspection?'—':unreadable('AI_ENCOUNTERS_UNREADABLE')||unreadable('AI_SQUADS_UNREADABLE')?'Unavailable':inspection.encounters.reduce((n,e)=>n+e.squads.length,0)}</strong>
           <span>Squads indexed</span>
         </div>
         <div className="surface">
           <Code2 size={21} />
-          <strong>{inspection?.scripts.length ?? 0}</strong>
+          <strong>{!inspection?'—':unreadable('SCRIPTS_UNREADABLE')?'Unavailable':inspection.scripts.length}</strong>
           <span>Compiled scripts</span>
         </div>
         <div className="surface">
           <Waypoints size={21} />
-          <strong>{inspection?.objects.filter((o) => o.kind === 'Player spawn').length ?? 0}</strong>
+          <strong>{!inspection?'—':unreadable('PLAYER_SPAWNS_UNREADABLE')?'Unavailable':inspection.objects.filter(o=>o.kind==='Player spawn').length}</strong>
           <span>Player spawns</span>
         </div>
       </div>
+      <details className="forge-details">
+        <summary>Native player loadouts · {inspection?.playerStartingProfiles?.length??'Unavailable'}</summary>
+        <p className="subtle">Stored scenario equipment, separate from the engine's player profile and saves. Game mode and scripts decide which loadout is used.</p>
+        {inspection?.playerStartingProfiles?.map((profile,index)=><details className="forge-details" key={index}>
+          <summary>{profile.name||'Profile '+(index+1)} · Health {profile.health} · Shields {profile.shields}</summary>
+          {([['Primary',profile.primaryWeaponTagId,profile.primaryLoaded,profile.primaryReserved],['Secondary',profile.secondaryWeaponTagId,profile.secondaryLoaded,profile.secondaryReserved]] as const).map(([label,id,loaded,reserved])=>{
+            const weapon=id===null?undefined:tags.get(id);
+            return <div key={label}><strong>{label}</strong> · {weapon?.path??(id===null?'None':'Unavailable weapon')} · Loaded {loaded} · Reserve {reserved}
+              <button disabled={!weapon||!onTag} onClick={()=>weapon&&onTag?.(weapon.id)}>Inspect {label.toLowerCase()} weapon</button>
+            </div>;
+          })}
+          <p className="subtle">Grenades: fragmentation {profile.fragmentationGrenades} · plasma {profile.plasmaGrenades} · extra native types {profile.grenadeType2}/{profile.grenadeType3}</p>
+        </details>)}
+        {inspection?.playerStartingProfiles==null&&<p className="subtle">Native loadout details are unavailable. Older inspections need to be refreshed; unreadable native data is reported in map diagnostics.</p>}
+        {inspection?.playerStartingProfiles?.length===0&&<p className="subtle">No player starting profiles are stored in this scenario.</p>}
+      </details>
       <div className="scenario-columns">
         <section className="surface">
           <div className="section-heading">
@@ -358,13 +380,35 @@ export function Scenario({ inspection, onWorld }: { inspection: MapInspection | 
             <>
               <Pill>Team {active.team}</Pill>
               <h3 className="spaced">Squads</h3>
-              {active.squads.map((s, i) => (
-                <div className="squad-row" key={i}>
-                  <Users size={14} />
-                  <span>{s || `Unnamed squad ${i + 1}`}</span>
-                  <Pill>Source data</Pill>
-                </div>
-              ))}
+              {details?<>
+                <p className="subtle">Scenario flag: {details.flags&1?'not initially created':'initial creation allowed'} · BSP index: {details.manualBspIndex===-1?'automatic':details.manualBspIndex}. Native definitions, not live AI telemetry.</p>
+                {details.squads.map((s,i)=>{
+                  const actor=s.actorVariantTagId===null?undefined:tags.get(s.actorVariantTagId);
+                  return <details className="forge-details" key={i}>
+                    <summary>{s.name||'Unnamed squad '+(i+1)} · Normal {s.normalCount} / Legendary {s.insaneCount} · {s.startingLocations.length} starts</summary>
+                    <code className="wrap-code">{actor?.path??'No resolved squad actor; inspect per-start overrides.'}</code>
+                    <button disabled={!actor||!onTag} onClick={()=>actor&&onTag?.(actor.id)} title="Open this map's native actor variant in Tag editor.">Inspect squad actor</button>
+                    <p className="subtle">Initial: {stateName(s.initialState)} · Return: {stateName(s.returnState)}</p>
+                    <details><summary>Starting positions · {s.startingLocations.length}</summary>
+                      {s.startingLocations.map((location,index)=>{
+                        const target=location.actorVariantTagId===null?undefined:tags.get(location.actorVariantTagId);
+                        return <div key={index} className="squad-row"><div>
+                          <code>{location.position.map(value=>value.toFixed(3)).join(', ')}</code>
+                          <p className="subtle">Facing {(location.facing*180/Math.PI).toFixed(1)}° · {location.flags&1?'Required':'Optional'} · {location.actorPaletteIndex===-1?'Squad actor':target?.path??'Unresolved actor override'} · {location.commandList===-1?'No command list':'Command list '+location.commandList}</p>
+                          {location.actorPaletteIndex!==-1&&<button disabled={!target||!onTag} onClick={()=>target&&onTag?.(target.id)}>Inspect starting actor</button>}
+                        </div></div>;
+                      })}
+                    </details>
+                  </details>;
+                })}
+                <details><summary>Firing positions · {details.firingPositions.length}</summary>
+                  {details.firingPositions.map((position,index)=><div key={index} className="squad-row"><code>{position.position.map(value=>value.toFixed(3)).join(', ')}</code><span>Group {position.groupIndex} · Cluster {position.clusterIndex===-1?'unassigned':position.clusterIndex} · Surface index {position.surfaceIndex}</span></div>)}
+                </details>
+                <p className="subtle">Stored positions do not prove valid collision, navigation or actual actor behavior.</p>
+              </>:<>
+                {active.squads.map((s,i)=><div className="squad-row" key={i}><Users size={14}/><span>{s||'Unnamed squad '+(i+1)}</span><Pill>Source name</Pill></div>)}
+                <p className="subtle">Native squad details are unavailable in this inspection. See the map diagnostics; missing data is not reported as zero actors.</p>
+              </>}
             </>
           )}
           <Notice tone="info">

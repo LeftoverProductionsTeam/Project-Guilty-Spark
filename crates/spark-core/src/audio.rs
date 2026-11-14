@@ -707,7 +707,7 @@ mod tests {
         let source=crate::project::Source{original_path:path.clone(),preserved_path:path.clone(),sha256:hash.clone(),cache_version:13,engine:"Halo MCC — Halo 1".into(),scenario_path:"test".into(),archive:None,resource_directory:None,resource_sha256:Default::default(),audio_resources:Some(bank)};
         let inspection=maps::MapInspection{header:maps::parse_header(&bytes,bytes.len()as u64).unwrap(),tag_checksum:None,sha256:hash.clone(),
             tags:vec![maps::Tag{id:0x1234,index:0,class:"snd!".into(),path:"sound/sfx/test".into(),data_offset:Some(0x980),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],
-            objects:vec![],decals:vec![],mesh:Default::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"test".into()};
+            objects:vec![],decals:vec![],mesh:Default::default(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"test".into()};
         let (input,report)=mcc_extraction_input(&source,&inspection,0x1234).unwrap().unwrap();
         assert_eq!((report.sound_count,report.sample_count,report.encoded_bytes),(1,1,36));
         for at in 0..bytes.len(){if !(8..12).contains(&at)&&!(0xb80+68..0xb80+76).contains(&at){assert_eq!(input[at],bytes[at],"unexpected offset {at}");}}

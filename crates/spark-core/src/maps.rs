@@ -346,6 +346,49 @@ pub struct Encounter {
     pub name: String,
     pub squads: Vec<String>,
     pub team: u16,
+    /// None means unavailable/unreadable, including old inspection caches.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub details: Option<EncounterDetails>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct EncounterDetails {
+    pub flags:u32,
+    pub manual_bsp_index:i16,
+    pub squads:Vec<EncounterSquad>,
+    pub firing_positions:Vec<AiFiringPosition>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct EncounterSquad {
+    pub name:String,
+    pub actor_palette_index:i16,
+    pub actor_variant_tag_id:Option<u32>,
+    pub normal_count:i16,
+    pub insane_count:i16,
+    pub initial_state:u16,
+    pub return_state:u16,
+    pub starting_locations:Vec<AiStartingLocation>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct AiStartingLocation {
+    pub position:[f32;3],
+    pub facing:f32,
+    pub flags:u8,
+    pub initial_state:u16,
+    pub return_state:u16,
+    pub actor_palette_index:i16,
+    pub actor_variant_tag_id:Option<u32>,
+    pub command_list:i16,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct AiFiringPosition {
+    pub position:[f32;3],
+    pub group_index:u16,
+    pub cluster_index:i16,
+    pub surface_index:u32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -362,9 +405,29 @@ pub struct Resource {
     pub found: bool,
     pub reason: String,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct PlayerStartingProfile {
+    pub name:String,
+    pub health:f32,
+    pub shields:f32,
+    pub primary_weapon_tag_id:Option<u32>,
+    pub primary_loaded:i16,
+    pub primary_reserved:i16,
+    pub secondary_weapon_tag_id:Option<u32>,
+    pub secondary_loaded:i16,
+    pub secondary_reserved:i16,
+    pub fragmentation_grenades:i8,
+    pub plasma_grenades:i8,
+    pub grenade_type2:i8,
+    pub grenade_type3:i8,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MapInspection {
+    /// None means an older inspection or unreadable native data, not an empty loadout.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub player_starting_profiles: Option<Vec<PlayerStartingProfile>>,
     pub header: MapHeader,
     /// Tag-data checksum, distinct from the cache-header CRC used by the game loader.
     #[serde(default)]
@@ -735,6 +798,41 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         },
         Err(error)=>diagnostics.push(Diagnostic::warning("NETGAME_ITEMS_UNREADABLE",error.to_string())),
     }
+    // Standard scenario player profiles precede player-start locations.
+    // Keep raw signed counts, and require each non-null dependency to resolve.
+    let player_starting_profiles=(|| -> Result<Vec<PlayerStartingProfile>> {
+        let (at,count)=space.block(&r,scenario_at+0x348,104,256)?;
+        let weapon=|at:usize| -> Result<Option<u32>> {
+            let id=r.u32(at+12)?;
+            if id==u32::MAX {return Ok(None);}
+            if r.fourcc(at)!="weap" || !tags.iter().any(|tag|tag.id==id&&tag.class=="weap") {
+                return invalid("Player starting-profile weapon does not resolve to its native weapon tag");
+            }
+            Ok(Some(id))
+        };
+        (0..count).map(|index| {
+            let p=at+index*104;
+            Ok(PlayerStartingProfile {name:r.string(p,32)?,health:r.f32(p+32)?,shields:r.f32(p+36)?,
+                primary_weapon_tag_id:weapon(p+40)?,primary_loaded:r.u16(p+56)? as i16,primary_reserved:r.u16(p+58)? as i16,
+                secondary_weapon_tag_id:weapon(p+60)?,secondary_loaded:r.u16(p+76)? as i16,secondary_reserved:r.u16(p+78)? as i16,
+                fragmentation_grenades:r.bytes(p+80,1)?[0] as i8,plasma_grenades:r.bytes(p+81,1)?[0] as i8,
+                grenade_type2:r.bytes(p+82,1)?[0] as i8,grenade_type3:r.bytes(p+83,1)?[0] as i8})
+        }).collect()
+    })();
+    let player_starting_profiles=match player_starting_profiles {
+        Ok(profiles)=>Some(profiles),
+        Err(problem)=>{diagnostics.push(Diagnostic::warning("PLAYER_PROFILES_UNREADABLE",problem.to_string()));None},
+    };
+    let actor_palette = (|| -> Result<Vec<Option<u32>>> {
+        let (at,count)=space.block(&r,scenario_at+0x420,16,64)?;
+        (0..count).map(|index| {
+            let id=r.u32(at+index*16+12)?;
+            if id==u32::MAX {return Ok(None);}
+            if r.fourcc(at+index*16)!="actv" || !tags.iter().any(|tag|tag.id==id&&tag.class=="actv") {return invalid(format!("Actor palette entry {index} does not resolve to an actor variant"));}
+            Ok(Some(id))
+        }).collect()
+    })();
+    if let Err(problem)=&actor_palette {diagnostics.push(Diagnostic::warning("AI_ACTOR_PALETTE_UNREADABLE",problem.to_string()));}
     match space.block(&r, scenario_at + 0x42c, 176, 128) {
         Ok((at, n)) => {
             for i in 0..n {
@@ -751,10 +849,17 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
                         format!("Encounter {i} squads could not be read: {e}"),
                     )),
                 }
+                let details=actor_palette.as_ref().map_err(|problem|SparkError::Invalid(problem.to_string()))
+                    .and_then(|palette|encounter_details(&r,&space,p,palette));
+                let details=match details {
+                    Ok(details)=>Some(details),
+                    Err(problem)=>{diagnostics.push(Diagnostic::warning("AI_ENCOUNTER_DETAILS_UNREADABLE",format!("Encounter {i}: {problem}")));None},
+                };
                 encounters.push(Encounter {
                     name: r.string(p, 32)?,
                     squads,
                     team: r.u16(p + 36)?,
+                    details,
                 });
             }
         }
@@ -839,6 +944,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
     }
     diagnostics.push(Diagnostic::warning("RUNTIME_TEST_PENDING","Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability."));
     Ok(MapInspection {
+        player_starting_profiles,
         tag_checksum:Some(r.u32(start+8)?),
         header,
         sha256,
@@ -881,6 +987,43 @@ fn external_raw_resource(r:&Reader,space:&Space,tag:&Tag)->Result<Option<&'stati
 }
 fn vec3(r: &Reader, at: usize) -> Result<[f32; 3]> {
     Ok([r.f32(at)?, r.f32(at + 4)?, r.f32(at + 8)?])
+}
+// Published H1 scenario structures: Invader696830ff scenario.json.
+// The existing Space/Reader enforce cache pointers, counts and finite floats.
+fn encounter_details(r:&Reader,space:&Space,at:usize,palette:&[Option<u32>])->Result<EncounterDetails> {
+    let actor=|index:i16| -> Result<Option<u32>> {
+        if index == -1 {return Ok(None);}
+        if index < 0 {return invalid("Invalid negative actor-palette index");}
+        palette.get(index as usize).copied().ok_or_else(||SparkError::Invalid("Actor-palette index is out of bounds".into()))
+    };
+    let (squad_at,squad_count)=space.block(r,at+128,232,64)?;
+    let mut squads=vec![];
+    for index in 0..squad_count {
+        let p=squad_at+index*232;
+        let actor_index=r.u16(p+32)? as i16;
+        let default_actor=actor(actor_index)?;
+        let (locations,count)=space.block(r,p+208,28,32)?;
+        let mut starting_locations=vec![];
+        for index in 0..count {
+            let q=locations+index*28;
+            let override_index=r.u16(q+24)? as i16;
+            starting_locations.push(AiStartingLocation {
+                position:vec3(r,q)?,facing:r.f32(q+12)?,flags:r.bytes(q+19,1)?[0],
+                return_state:r.u16(q+20)?,initial_state:r.u16(q+22)?,actor_palette_index:override_index,
+                actor_variant_tag_id:if override_index == -1 {default_actor} else {actor(override_index)?},
+                command_list:r.u16(q+26)? as i16,
+            });
+        }
+        squads.push(EncounterSquad {name:r.string(p,32)?,actor_palette_index:actor_index,actor_variant_tag_id:default_actor,
+            normal_count:r.u16(p+124)? as i16,insane_count:r.u16(p+126)? as i16,initial_state:r.u16(p+36)?,return_state:r.u16(p+38)?,starting_locations});
+    }
+    let (firing_at,firing_count)=space.block(r,at+152,24,512)?;
+    let mut firing_positions=vec![];
+    for index in 0..firing_count {
+        let p=firing_at+index*24;
+        firing_positions.push(AiFiringPosition {position:vec3(r,p)?,group_index:r.u16(p+12)?,cluster_index:r.u16(p+14)? as i16,surface_index:r.u32(p+20)?});
+    }
+    Ok(EncounterDetails {flags:r.u32(at+32)?,manual_bsp_index:r.u16(at+42)? as i16,squads,firing_positions})
 }
 fn numeric(
     r: &Reader,

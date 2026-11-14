@@ -1104,6 +1104,14 @@ pub struct NativeRoundPlan {
     pub dependencies: Vec<crate::quickforge::ForgeDependency>,
     pub commands: Vec<crate::quickforge::ForgeCommand>,
     pub encounter_names: Vec<String>,
+    pub encounter_layouts: Vec<NativeRoundEncounter>,
+    pub player_profile: NativePlayerProfile,
+}
+#[derive(Clone,Debug)]
+pub struct NativeRoundEncounter {
+    pub name:String,
+    pub actor_path:String,
+    pub positions:Vec<[f32;3]>,
 }
 pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<NativeRoundPlan>> {
     let Some(doc) = &project.quick_forge else { return Ok(None); };
@@ -1127,7 +1135,6 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     let zones = config.spawn_zones.iter().filter(|zone|zone.enabled).collect::<Vec<_>>();
     let scenario = crate::quickforge::scenario_path(doc)?;
     let tag = format!("{scenario}.scenario");
-    let mut plan = NativeRoundPlan { dependencies:vec![],commands:vec![],encounter_names:vec![] };
     let player=config.native_player_profile.as_ref().ok_or_else(||SparkError::Invalid("Native solo round needs a player loadout. Use solo native rules, review Player loadout and prepare the source again".into()))?;
     validate_native_profile(player)?;
     crate::native_asset_imports::validate(&project.native_asset_imports)?;
@@ -1145,6 +1152,10 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     };
     let primary = dependency(&player.primary_weapon,"weap","firefightPlayerWeapon");
     let secondary = player.secondary_weapon.as_ref().map(|path|dependency(path,"weap","firefightPlayerWeapon"));
+    let mut player_profile=player.clone();
+    player_profile.primary_weapon=primary.tag_path.clone();
+    player_profile.secondary_weapon=secondary.as_ref().map(|weapon|weapon.tag_path.clone());
+    let mut plan=NativeRoundPlan {dependencies:vec![],commands:vec![],encounter_names:vec![],encounter_layouts:vec![],player_profile};
     let mut palette = BTreeMap::<String,usize>::new();
     let add = |plan:&mut NativeRoundPlan,args:Vec<String>| plan.commands.push(crate::quickforge::ForgeCommand {
         phase:"firefight-scenario".into(),tool:"invaderEdit".into(),args,expected_outputs:vec![format!("tags/{}",tag.replace('\\',"/"))],
@@ -1174,12 +1185,14 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
             let path = selected.tag_path.clone();
             let next=palette.len();
             let index=*palette.entry(path.clone()).or_insert(next);
+            if index>=64 {return invalid("Native Firefight exceeds the standard 64-entry actor palette; reduce distinct actor variants");}
             if index==next {
                 plan.dependencies.push(selected);
                 add(&mut plan,vec!["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{index}].reference"),format!("{path}.actor_variant"),tag.clone()]);
             }
             let encounter=plan.encounter_names.len();
             let name=format!("gs_w{:02}_g{:02}",w+1,g+1);plan.encounter_names.push(name.clone());
+            let mut layout=NativeRoundEncounter {name:name.clone(),actor_path:path.clone(),positions:vec![]};
             let e=format!("encounters[{encounter}]");let s=format!("{e}.squads[0]");
             let mut args=vec!["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into()];
             for (key,value) in [(format!("{e}.name"),name),(format!("{e}.flags.not_initially_created"),"1".into()),(format!("{e}.team_index"),"default_by_unit".into()),(format!("{e}.manual_bsp_index"),"-1".into()),
@@ -1205,11 +1218,13 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
                 if position.iter().any(|value|value.abs()>2048.0) {return invalid("Native actor position exceeds the editable level coordinate bound");}
                 if (dx*dx+dy*dy).sqrt()*0.75>zone.radius {return invalid("Native actor starting positions do not fit the authored spawn-zone radius; enlarge or split the group");}
                 if doc.spawns.iter().any(|spawn|spawn.position.iter().zip(position).map(|(a,b)|(a-b).powi(2)).sum::<f32>()<4.0) {return invalid("Move the enemy spawn zone at least two world units from the player start before preparing a native round");}
+                layout.positions.push(position);
                 let p=format!("{s}.starting_locations[{a}]");let f=format!("{e}.firing_positions[{a}]");
                 args.extend(["-I".into(),format!("{s}.starting_locations"),"1".into(),"end".into(),"-I".into(),format!("{e}.firing_positions"),"1".into(),"end".into()]);
                 for (key,value) in [(format!("{p}.position"),vector(position)),(format!("{p}.facing"),"0".into()),(format!("{p}.sequence_id"),"-1".into()),(format!("{p}.flags.required"),"1".into()),(format!("{p}.initial_state"),"alert".into()),(format!("{p}.return_state"),"alert".into()),(format!("{p}.actor_type"),"-1".into()),(format!("{p}.command_list"),"-1".into()),(format!("{f}.position"),vector(position)),(format!("{f}.group_index"),"a".into())] {set(&mut args,key,value);}
             }
             args.push(tag.clone());add(&mut plan,args);
+            plan.encounter_layouts.push(layout);
         }
     }
     let total_score:u64=config.waves.iter().map(|wave|wave.groups.iter().map(|group| {
@@ -1220,6 +1235,10 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     Ok(Some(plan))
 }
 pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection)->Result<()> {
+    if plan.encounter_names.is_empty() || plan.encounter_layouts.len()!=plan.encounter_names.len() ||
+        plan.encounter_layouts.iter().zip(&plan.encounter_names).any(|(layout,name)|&layout.name!=name) {
+        return invalid("Native Firefight plan has incomplete encounter-layout readback metadata");
+    }
     if map.header.scenario_type != 0 {
         return invalid("Compiled native solo Firefight output must be a singleplayer scenario");
     }
@@ -1235,11 +1254,67 @@ pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection
             return invalid(format!("Compiled Firefight dependency is missing, ambiguous or has no native body: {}.{}", dependency.tag_path, dependency.tag_class));
         }
     }
+    let profiles=map.player_starting_profiles.as_ref().ok_or_else(||SparkError::Invalid("Compiled Firefight player loadout could not be decoded; inspect native map diagnostics".into()))?;
+    if profiles.len()!=1 || profiles[0].name!="gs_firefight_start" {
+        return invalid("Compiled Firefight must contain exactly its authored gs_firefight_start player profile");
+    }
+    let actual=&profiles[0];
+    let expected=&plan.player_profile;
+    let weapon_id=|path:&str|map.tags.iter().find(|tag|tag.class=="weap"&&tag_key(&tag.path)==tag_key(path)).map(|tag|tag.id);
+    let primary=weapon_id(&expected.primary_weapon);
+    let secondary=expected.secondary_weapon.as_ref().and_then(|path|weapon_id(path));
+    if primary.is_none() || (expected.secondary_weapon.is_some()&&secondary.is_none()) || actual.primary_weapon_tag_id!=primary || actual.secondary_weapon_tag_id!=secondary {
+        return invalid("Compiled Firefight player weapon slots differ from the authored loadout");
+    }
+    if (actual.health-expected.health).abs()>0.0001 || (actual.shields-expected.shields).abs()>0.0001 ||
+        actual.primary_loaded!=expected.primary_loaded as i16 || actual.primary_reserved!=expected.primary_reserved as i16 ||
+        actual.secondary_loaded!=expected.secondary_loaded as i16 || actual.secondary_reserved!=expected.secondary_reserved as i16 ||
+        actual.fragmentation_grenades!=expected.fragmentation_grenades as i8 || actual.plasma_grenades!=expected.plasma_grenades as i8 ||
+        actual.grenade_type2!=0 || actual.grenade_type3!=0 {
+        return invalid(format!("Compiled Firefight player profile differs: health/shields={}/{}, primary ammo={}/{}, secondary ammo={}/{}, grenades={}/{}/{}/{}",
+            actual.health,actual.shields,actual.primary_loaded,actual.primary_reserved,actual.secondary_loaded,actual.secondary_reserved,
+            actual.fragmentation_grenades,actual.plasma_grenades,actual.grenade_type2,actual.grenade_type3));
+    }
     for name in &plan.encounter_names {
         let matches = map.encounters.iter().filter(|encounter| &encounter.name == name).collect::<Vec<_>>();
         if matches.len() != 1 || matches[0].squads != ["round_squad"] {
             return invalid(format!("Compiled Firefight encounter/squad is missing or ambiguous: {name}"));
         }
+    }
+    for expected in &plan.encounter_layouts {
+        let encounter=map.encounters.iter().find(|encounter|encounter.name==expected.name)
+            .ok_or_else(||SparkError::Invalid(format!("Compiled Firefight encounter missing: {}",expected.name)))?;
+        let details=encounter.details.as_ref().ok_or_else(||SparkError::Invalid(format!("Compiled Firefight encounter details could not be decoded: {}. Review native map diagnostics.",expected.name)))?;
+        if details.flags&1==0 || details.manual_bsp_index!=-1 || details.squads.len()!=1 {
+            return invalid(format!("Compiled Firefight encounter {} differs: flags=0x{:X}, manual BSP={}, squads={}",expected.name,details.flags,details.manual_bsp_index,details.squads.len()));
+        }
+        let actor=map.tags.iter().find(|tag|tag.class=="actv"&&tag_key(&tag.path)==tag_key(&expected.actor_path)).map(|tag|tag.id);
+        let squad=&details.squads[0];
+        if actor.is_none() || squad.actor_variant_tag_id!=actor || squad.normal_count as usize!=expected.positions.len() || squad.insane_count as usize!=expected.positions.len() ||
+            squad.initial_state!=2 || squad.return_state!=2 || squad.starting_locations.len()!=expected.positions.len() {
+            return invalid(format!("Compiled Firefight squad {} differs: actor={:?} (expected {}), normal/insane={}/{}, initial/return={}/{}, starts={} (expected {})",expected.name,squad.actor_variant_tag_id,expected.actor_path,squad.normal_count,squad.insane_count,squad.initial_state,squad.return_state,squad.starting_locations.len(),expected.positions.len()));
+        }
+        let mut remaining=expected.positions.clone();
+        for (index,location) in squad.starting_locations.iter().enumerate() {
+            if location.actor_variant_tag_id!=actor || location.actor_palette_index!=-1 || location.flags&1==0 || location.initial_state!=2 || location.return_state!=2 || location.command_list!=-1 || location.facing.abs()>0.0001 {
+                return invalid(format!("Compiled Firefight starting-location properties differ: {} start {}",expected.name,index));
+            }
+            let Some(slot)=remaining.iter().position(|position|position.iter().zip(location.position).all(|(a,b)|(*a-b).abs()<=0.0001)) else {
+                return invalid(format!("Compiled Firefight {} start {} at {:?} differs from its authored layout",expected.name,index,location.position));
+            };
+            remaining.remove(slot);
+        }
+        if details.firing_positions.len()!=expected.positions.len() {return invalid(format!("Compiled Firefight firing-position count differs: {}",expected.name));}
+        let mut remaining=expected.positions.clone();
+        for firing in &details.firing_positions {
+            let Some(slot)=remaining.iter().position(|position|position.iter().zip(firing.position).all(|(a,b)|(*a-b).abs()<=0.0001)) else {
+                return invalid(format!("Compiled Firefight {} firing position {:?} differs from its authored layout",expected.name,firing.position));
+            };
+            if firing.group_index!=0 {return invalid(format!("Compiled Firefight firing-position group differs: {}",expected.name));}
+            remaining.remove(slot);
+        }
+        // Invader intentionally emits NULL cluster/surface cache fields here.
+        // Position readback does not prove native navigation or collision.
     }
     for name in ["gs_firefight","gs_ff_reset","gs_ff_bootstrap"] {
         if map.scripts.iter().filter(|script| script.name == name).count() != 1 {

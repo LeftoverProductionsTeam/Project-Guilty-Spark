@@ -1015,7 +1015,7 @@ mod tests {
         bytes[0x20..0x28].copy_from_slice(b"fixture\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
         let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),bytes).unwrap();
         let sha=maps::hash_file(file.path()).unwrap();
-        let inspection=MapInspection{header,sha256:sha,tag_checksum:None,decals:vec![],tags:vec![Tag{id,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
+        let inspection=MapInspection{header,sha256:sha,tag_checksum:None,decals:vec![],tags:vec![Tag{id,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
         (file,inspection)
     }
     fn ce_indexed_fixture()->(tempfile::NamedTempFile,MapInspection,tempfile::TempDir,String){
@@ -1128,7 +1128,7 @@ mod tests {
         let(mut bytes,mut header)=fixture(15,0);header.version=13;
         let put=|b:&mut[u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
         bytes[..4].copy_from_slice(b"daeh");bytes[0x7fc..0x800].copy_from_slice(b"toof");put(&mut bytes,4,13);let size=bytes.len()as u32;put(&mut bytes,8,size);put(&mut bytes,0x10,0x800);put(&mut bytes,0x14,0x400);put(&mut bytes,0x800,0x40440028);bytes[0x20..0x28].copy_from_slice(b"fixture\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
-        let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),bytes).unwrap();let sha=maps::hash_file(file.path()).unwrap();let i=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
+        let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),bytes).unwrap();let sha=maps::hash_file(file.path()).unwrap();let i=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
         assert!(!mcc_uses_external_bitmaps(file.path(),&sha,&i).unwrap());let batch=preview_mcc_bitmap_batch(file.path(),&sha,&i,&[OwnedBitmapRequest {bitmap_tag_id:0x1234,image_index:0, mip_level:0}],Path::new("no-installed-packs"),&Default::default()).unwrap();assert_eq!(batch.resource_sha256,None);assert_eq!(batch.items[0].preview.as_ref().unwrap().source_kind,"internal-cache");
     }
     #[test] fn alpha_and_luminance_dds_preserve_channel_layout() {
@@ -1205,7 +1205,7 @@ mod tests {
             tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),
                 data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],
             objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),
-            encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"test".into(),
+            player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"test".into(),
         };
         let good = preview_owned_bitmap(file.path(), &expected, &inspection, 0x1234, 0).unwrap();
         assert_eq!((good.width,good.height,good.format.as_str()),(4,4,"DXT3"));
@@ -1245,7 +1245,7 @@ mod tests {
                 id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),
                 data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None,
             }],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),
-            encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into(),
+            player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into(),
         };
         let dir=tempfile::tempdir().unwrap();
         let resource_path=dir.path().join("bitmaps.map");
@@ -1311,7 +1311,7 @@ mod tests {
                 id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),
                 data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None,
             }],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),
-            encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into(),
+            player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into(),
         };
         let dir=tempfile::tempdir().unwrap();
         let path=dir.path().join("bitmaps.map");
@@ -1369,7 +1369,7 @@ mod tests {
                 data_offset: Some(0x900), external: false, fields: vec![], references: vec![],
                 primary_bitmap_status:None,shader_preview:None,
             }], objects:vec![], mesh:MeshData::default(), render_mesh:None,
-            model_meshes:Default::default(), encounters:vec![], scripts:vec![],
+            model_meshes:Default::default(), player_starting_profiles:None,encounters:vec![], scripts:vec![],
             resources:vec![], diagnostics:vec![], scenario_path:"test".into(),
         };
         let req = [
@@ -1407,7 +1407,7 @@ mod tests {
         bytes[0x98a..0x98c].copy_from_slice(&2u16.to_le_bytes());bytes[0x99c..0x9a0].copy_from_slice(&96u32.to_le_bytes());
         for face in 0..6 {bytes[0x2000+face*16..0x2010+face*16].fill(face as u8);}
         let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),&bytes).unwrap();let sha=maps::hash_file(file.path()).unwrap();
-        let mut inspection=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
+        let mut inspection=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
         let cube=preview_owned_cube(file.path(),&sha,&inspection,0x1234,None).unwrap();assert_eq!(cube.faces.len(),6);
         for (face,image)in cube.faces.iter().enumerate(){assert_eq!(image.dds_base64,base64(&dds_top_mip(4,4,"DXT3",&vec![face as u8;16]).unwrap()));}
         assert!(preview_owned_bitmap(file.path(),&sha,&inspection,0x1234,0).is_err());

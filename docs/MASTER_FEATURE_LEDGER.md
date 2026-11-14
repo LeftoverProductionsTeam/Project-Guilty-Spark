@@ -1,5 +1,9 @@
 # Canonical cumulative feature and evidence ledger
 
+## 14 November 2026 — Native AI readback/inspector WIP
+
+The existing reader/AI workspace now have untested source for native actor/start details, source-tag and wave-authoring routes, and map/window-local context. Native Firefight readback now compares its emitted actor/coordinate layouts and is reapplied to retained builds. This is not recovered-scenario writing, navigation/gameplay or peer acceptance. See FIREFIGHT_ENGINE.md and H12 in HUMAN_TEST_PLAN.md. All475CSV records and M1–M6 remain unchanged.
+
 ## 14 November 2026 — Native source-preservation WIP
 
 Existing MCC camera builds now have source code for preserving/recovering embedded native gameplay modules before adding camera controls, with explicit module selection and before/after inventory/hash checks. This is uncompiled and untested under the owner's code-only instruction; it does not accept gameplay, recovered Firefight or Forerunner authoring. See CONTINUATION_67_SOURCE_GUARDIAN.md and HUMAN_TEST_PLAN.md. All475CSV records and M1–M6 remain unchanged/open as evidenced.

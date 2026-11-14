@@ -1033,7 +1033,7 @@ mod base_transform_tests {
         let base = MapInspection {header:maps::MapHeader {version:609,engine:"synthetic".into(),name:"fixture".into(),build:"fixture".into(),scenario_type:1,
             file_size:2048,declared_size:2048,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false},
             sha256:"0".repeat(64),tag_checksum:None,tags:vec![],objects:vec![object.clone()],decals:vec![],mesh:Default::default(),render_mesh:None,
-            model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"levels/fixture/fixture".into()};
+            model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"levels/fixture/fixture".into()};
         let mut project=Project::new("Synthetic placement source");project.scene=vec![object];(project,base)
     }
     #[test]

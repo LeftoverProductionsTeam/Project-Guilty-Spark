@@ -1419,7 +1419,7 @@ export default function App() {
           />
         );
       case 'scenario':
-        return <Scenario inspection={inspection} onWorld={() => setWorkspace('world')} />;
+        return <Scenario projectId={current?.id} inspection={inspection} onWorld={() => setWorkspace('world')} onTag={current?tagId=>{void openSourceTag(current.id,tagId);}:undefined} onFirefight={current?()=>setWorkspace('firefight'):undefined} />;
       case 'preservation':
         return <Preservation project={current} inspection={inspection} edit={edit} onBeforeSave={save} onRestore={load} />;
       case 'build':

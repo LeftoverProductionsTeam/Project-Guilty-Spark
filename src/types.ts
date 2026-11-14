@@ -170,7 +170,14 @@ export interface MapInspection {
   mesh: MeshData;
   renderMesh?: MeshData | null;
   modelMeshes?: Record<string, MeshData>;
-  encounters: { name: string; squads: string[]; team: number }[];
+  playerStartingProfiles?: {name:string;health:number;shields:number;primaryWeaponTagId:number|null;primaryLoaded:number;primaryReserved:number;
+    secondaryWeaponTagId:number|null;secondaryLoaded:number;secondaryReserved:number;fragmentationGrenades:number;plasmaGrenades:number;grenadeType2:number;grenadeType3:number}[]|null;
+  encounters: { name: string; squads: string[]; team: number; details?: {
+    flags:number; manualBspIndex:number;
+    squads:{name:string;actorPaletteIndex:number;actorVariantTagId:number|null;normalCount:number;insaneCount:number;initialState:number;returnState:number;
+      startingLocations:{position:Vec3;facing:number;flags:number;initialState:number;returnState:number;actorPaletteIndex:number;actorVariantTagId:number|null;commandList:number}[];}[];
+    firingPositions:{position:Vec3;groupIndex:number;clusterIndex:number;surfaceIndex:number}[];
+  }|null }[];
   scripts: { name: string; scriptType: number; returnType: number }[];
   resources: { name: string; required: boolean; found: boolean; reason: string }[];
   diagnostics: Diagnostic[];

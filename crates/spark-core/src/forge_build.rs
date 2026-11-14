@@ -344,8 +344,20 @@ pub fn run_prepared_job(
     let jobs_root=future_jobs_root(jobs_root)?;
     if !export_only&&prepared.is_none()&&extra_blockers.is_empty(){
         if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root).filter(|receipt|reuse_has_scene_sources(tools,receipt,document)){
-            if !custom.models.is_empty(){let output=receipt.build.as_ref().and_then(|build|build.output.as_deref()).ok_or_else(||SparkError::Invalid("Reused model build has no native output".into()))?;custom.inspect_cache(&maps::inspect_map(output,None)?,output)?;custom.verify_sources()?;}
-            on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);
+            let readback=(|| -> Result<()> {
+                let round=crate::firefight::native_round_plan(project)?;
+                if project.firefight.is_some()&&round.is_none(){return invalid("The retained build has no current prepared native Firefight controller");}
+                if custom.models.is_empty()&&round.is_none(){return Ok(());}
+                let output=receipt.build.as_ref().and_then(|build|build.output.as_deref()).ok_or_else(||SparkError::Invalid("Reused build has no native output".into()))?;
+                let inspected=maps::inspect_map(output,None)?;
+                if !custom.models.is_empty(){custom.inspect_cache(&inspected,output)?;custom.verify_sources()?;}
+                if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected)?;}
+                Ok(())
+            })();
+            match readback {
+                Ok(())=>{on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool and compiled tag/map identities match; required model/round readback passed. No new tag tree was copied.",receipt.job_id)});return Ok(receipt);},
+                Err(problem)=>on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"reuse-readback".into(),severity:"warning".into(),progress:0,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Retained build did not pass current native readback: {problem}. It remains unchanged; the normal build path will validate a new output.")}),
+            }
         }
     }
     let directory=jobs_root.join(job_id);

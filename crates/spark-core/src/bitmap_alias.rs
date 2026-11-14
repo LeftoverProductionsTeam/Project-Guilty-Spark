@@ -207,7 +207,7 @@ mod tests {
             mesh: maps::MeshData::default(),
             render_mesh: None,
             model_meshes: Default::default(),
-            encounters: vec![],
+            player_starting_profiles:None,encounters:vec![],
             scripts: vec![],
             resources: vec![],
             diagnostics: vec![],
