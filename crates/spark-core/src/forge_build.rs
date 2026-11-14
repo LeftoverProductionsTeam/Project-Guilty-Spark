@@ -409,7 +409,7 @@ pub fn run_prepared_job(
         if export_only {receipt.status="exported".into();return Ok(());}
         if document.native.is_some() && prepared.is_none() {return invalid("Native shared source requires an explicit local verified materialization before compilation");}
         let engine=match target(document.runtime_id){Ok(v)=>Some(v),Err(e)=>{receipt.blockers.push(e.to_string());None}};
-        if project.firefight.is_some() && native_round.is_none(){receipt.blockers.push("Firefight rules are authored and locally simulated, but no supported game-side wave bridge has been implemented or verified. A Firefight game build is blocked.".into());}
+        if project.firefight.is_some() && native_round.is_none(){receipt.blockers.push("This build has no valid prepared native Firefight round. In Firefight rules, choose Use solo native rules, review Player loadout, then Prepare native solo round and Save before rebuilding. Multiplayer AI requires a separately supported runtime integration.".into());}
         let tool=tool_file(tools);
         if let Err(problem)=authoring_preflight(project,tools,document) {receipt.blockers.push(problem.to_string());}
         if tool.is_none(){receipt.blockers.push("Halo 1 Editing Kit Tool is missing. Select the separately installed matching HEK or H1A kit folder in Settings.".into());}
