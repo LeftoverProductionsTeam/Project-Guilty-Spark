@@ -15,6 +15,7 @@ export interface RecoveryPlan {
   toolHashes: Record<string, string>;
   blockers: string[];
   limitations: string[];
+  inputCompatibility?: {sourceSha256:string;inputSha256:string;repairs:{code:string;message:string;offset:number;original:number;replacement:number}[]}|null;
 }
 export interface RecoveredFile {
   path: string;

@@ -54,6 +54,8 @@ pub struct RecoveryPlan {
     pub tool_hashes: BTreeMap<String, String>,
     pub blockers: Vec<String>,
     pub limitations: Vec<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub input_compatibility:Option<crate::legacy::ExtractionInputReport>,
 }
 
 fn signature<T: Serialize>(value: &T) -> Result<String> {
@@ -96,6 +98,7 @@ pub fn review(
         source_edition:crate::source_identity::format_contract(project, inspection).edition.into(),
         source_version:source.cache_version, tag_id, requested_tag, scope:if tag.class=="scnr" {"All native cache tags (scenario project recovery)"} else {"Selected asset and recursive native dependencies"}.into(),
         indexed_tags:inspection.tags.len(), observed_dependencies:vec![], resources:BTreeMap::new(), tool_hashes:BTreeMap::new(), blockers:vec![],
+        input_compatibility:crate::legacy::normalized_extraction_input(source,inspection)?.map(|(_,report)|report),
         limitations:vec![
             "Recovered native tags are reconstructed from this compiled cache, not the exact original authoring project. Unsaved Spark overlays are not applied.".into(),
             "Model JMS and script/string source can be recovered where the installed backend supports it. Original Blender/Max history, original bitmap color plates, script comments and stripped source cannot be promised.".into(),
@@ -378,6 +381,7 @@ pub fn recover(
         cancel.clone(),
         &on_event,
     )?;
+    if extracted.input_compatibility!=plan.input_compatibility{return invalid("Legacy extraction input differs from its reviewed normalization; no recovered project was adopted");}
     let directory = base.join(id);
     let pending = base.join(format!(".pending-{id}"));
     if directory.exists() || pending.exists() {

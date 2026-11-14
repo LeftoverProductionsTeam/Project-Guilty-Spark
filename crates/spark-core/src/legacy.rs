@@ -1,8 +1,9 @@
 //! Narrow, evidence-backed compatibility fixes on job-local buffers only.
 use crate::{binary::Reader, invalid, maps::MapInspection, Result};
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 pub const ZOMBIE_DEMO_SHA256:&str="b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d";
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Repair {
     pub code: String,
@@ -11,9 +12,34 @@ pub struct Repair {
     pub original: u32,
     pub replacement: u32,
 }
+
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(rename_all="camelCase")]
+pub struct ExtractionInputReport {
+    pub source_sha256:String,
+    pub input_sha256:String,
+    pub repairs:Vec<Repair>,
+}
+/// Known legacy metadata normalization for native extraction only. This never
+/// applies the lossy Zombie recovery profile or writes to the preserved map.
+pub fn normalized_extraction_input(source:&crate::project::Source,inspection:&MapInspection)->Result<Option<(Vec<u8>,ExtractionInputReport)>> {
+    if ![6,7].contains(&source.cache_version){return Ok(None);}
+    let (_,mut bytes,sha256)=crate::maps::read_cache_snapshot(&source.preserved_path)?;
+    if sha256!=source.sha256||sha256!=inspection.sha256||source.cache_version!=inspection.header.version{
+        return invalid("Legacy extraction source or inspection changed");
+    }
+    let repairs=prepare_extraction(&mut bytes,inspection)?;
+    if repairs.is_empty(){return Ok(None);}
+    let input_sha256=crate::hex_bytes(sha2::Sha256::digest(&bytes));
+    if input_sha256==source.sha256{return invalid("Legacy extraction normalization reported no actual input change");}
+    Ok(Some((bytes,ExtractionInputReport{source_sha256:source.sha256.clone(),input_sha256,repairs})))
+}
+
 pub fn prepare_extraction(bytes: &mut [u8], inspection: &MapInspection) -> Result<Vec<Repair>> {
     let mut repairs = vec![];
     if inspection.header.legacy_tag_size_repair {
+        if inspection.header.version!=7||Reader(bytes).u32(0x14)?!=inspection.header.declared_size||inspection.header.tag_offset.checked_add(inspection.header.tag_size)!=Some(inspection.header.declared_size){return invalid("Legacy tag-size normalization precondition changed");}
+        bytes[0x14..0x18].copy_from_slice(&inspection.header.tag_size.to_le_bytes());
         repairs.push(Repair{code:"LEGACY_TAG_SIZE".into(),message:"Normalized a known legacy whole-file tag-size declaration in the working copy; all pointers were separately bounds-checked.".into(),offset:0x14,original:inspection.header.declared_size,replacement:inspection.header.tag_size});
     }
     if ![6, 7].contains(&inspection.header.version) {

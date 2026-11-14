@@ -149,6 +149,7 @@ export default function SourceRecovery({
                   {Object.keys(plan.resources).length} source resource identities pinned. Compatible viewer
                   textures do not authorize a native build.
                 </p>
+                {plan.inputCompatibility&&<section aria-label="Reviewed legacy extraction normalization"><strong>Temporary extraction input · original map stays unchanged</strong><ul>{plan.inputCompatibility.repairs.map(repair=><li key={repair.code}>{repair.message}</li>)}</ul><code className="checksum">Tool input SHA-256 {plan.inputCompatibility.inputSha256}</code><p>This adjusts known legacy metadata only. It does not restore missing sounds, repair zombie physics or certify gameplay. The temporary cache is removed after extraction; the report remains.</p></section>}
                 <ul>
                   {plan.limitations.map((text) => (
                     <li key={text}>{text}</li>

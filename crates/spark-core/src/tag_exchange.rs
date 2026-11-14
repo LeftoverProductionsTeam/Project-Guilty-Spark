@@ -9,7 +9,7 @@ const MAX_TAG_BYTES: u64 = 64*1024*1024;
 const MAX_TOTAL: u64 = 512*1024*1024;
 #[derive(Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
-struct ExtractInputs{schema_version:u32,tools:std::collections::BTreeMap<String,String>,resources:std::collections::BTreeMap<String,String>,resource_directory:PathBuf}
+struct ExtractInputs{schema_version:u32,#[serde(default)]legacy_input_sha256:Option<String>,tools:std::collections::BTreeMap<String,String>,resources:std::collections::BTreeMap<String,String>,resource_directory:PathBuf}
 fn reusable_extraction(root:&Path,source:&project::Source,project_id:&str,query:&str,inputs:&ExtractInputs)->Result<Option<TagExtractReceipt>>{
     let out=root.join("tag-exchanges");if !out.is_dir(){return Ok(None);}let mut checked=0;
     for entry in fs::read_dir(out)?{
@@ -18,9 +18,10 @@ fn reusable_extraction(root:&Path,source:&project::Source,project_id:&str,query:
         let attempt=(||->Result<TagExtractReceipt>{
             let receipt=load_receipt(root,id)?;
             if receipt.source_project_id!=project_id||receipt.source_sha256!=source.sha256||receipt.source_version!=source.cache_version||receipt.requested_tag!=query{return invalid("Different extraction revision");}
+            if receipt.input_compatibility.as_ref().map(|report|report.input_sha256.as_str())!=inputs.legacy_input_sha256.as_deref(){return invalid("Extraction input normalization changed");}
             let contract=p.join("extraction-inputs.json");reject_links(&contract)?;if fs::metadata(&contract)?.len()>65536{return invalid("Extraction contract too large");}
             let old:ExtractInputs=serde_json::from_slice(&fs::read(contract)?)?;
-            if old.schema_version!=inputs.schema_version||old.tools!=inputs.tools||old.resources!=inputs.resources||fs::canonicalize(old.resource_directory)?!=fs::canonicalize(&inputs.resource_directory)?{return invalid("Extraction dependencies changed");}
+            if old.schema_version!=inputs.schema_version||old.legacy_input_sha256!=inputs.legacy_input_sha256||old.tools!=inputs.tools||old.resources!=inputs.resources||fs::canonicalize(old.resource_directory)?!=fs::canonicalize(&inputs.resource_directory)?{return invalid("Extraction dependencies changed");}
             let (files,total)=inventory(&receipt.tag_root)?;if files!=receipt.files||total!=receipt.total_bytes{return invalid("Extracted tags changed");}Ok(receipt)
         })();
         if let Ok(mut receipt)=attempt{receipt.notice.push_str(" Reused exact source/tool/resource identities after fresh extracted-file hash checks; no duplicate extraction was created.");return Ok(Some(receipt));}
@@ -32,6 +33,8 @@ pub struct ExtractedFile { pub path: String, pub bytes: u64, pub sha256: String 
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct TagExtractReceipt {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub input_compatibility:Option<crate::legacy::ExtractionInputReport>,
     pub status:String,
     pub job_id:String,
     pub source_sha256:String,
@@ -179,9 +182,12 @@ pub fn extract_selected_tag(
     // it receives empty script/data build parameters. Extract the complete cache
     // in its supported non-recursive mode, keeping all tags and script source.
     // Schema 2 cannot reuse an older partial scenario extraction. Asset scopes
-    // keep their exact schema-1 reuse and recursive dependency extraction.
+    // keep schema-1 reuse and recursive dependency extraction. Known legacy
+    // normalization uses schema 3 and its exact derived-input hash.
     let whole_cache=tag.class=="scnr";
-    let inputs=ExtractInputs{schema_version:if whole_cache{2}else{1},tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
+    if cancel.load(std::sync::atomic::Ordering::Relaxed){return invalid("Native extraction cancelled before input preparation");}
+    let prepared_legacy=crate::legacy::normalized_extraction_input(source,inspection)?;
+    let inputs=ExtractInputs{legacy_input_sha256:prepared_legacy.as_ref().map(|(_,report)|report.input_sha256.clone()),schema_version:if prepared_legacy.is_some(){3}else if whole_cache{2}else{1},tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
     if let Some(receipt)=reusable_extraction(managed_root,source,&project.id,&query,&inputs)?{return Ok(receipt);}
     let out_root=managed_root.join("tag-exchanges");
     reject_links(&out_root)?;fs::create_dir_all(&out_root)?;
@@ -203,6 +209,12 @@ pub fn extract_selected_tag(
             if maps::hash_file(&input)?!=report.input_sha256{return invalid("Native audio extraction input failed exact byte readback");}
             project::atomic_write(&staging.join("mcc-audio-extraction.json"),&serde_json::to_vec_pretty(report)?,false)?;
             input
+        }else if let Some((bytes,report))=&prepared_legacy {
+            let input=staging.join("legacy-extraction-input.map");
+            project::atomic_write(&input,bytes,false)?;
+            if maps::hash_file(&input)?!=report.input_sha256{return invalid("Prepared legacy extraction input changed before native tools");}
+            project::atomic_write(&staging.join("legacy-extraction-input.json"),&serde_json::to_vec_pretty(report)?,false)?;
+            input
         }else{source.preserved_path.clone()};
         let protected=runner.run(&info,&["-T".into(),"is_protected".into(),source.preserved_path.to_string_lossy().into_owned()],&staging,"verify",10)?;
         if !["false","0"].contains(&protected.trim().to_ascii_lowercase().as_str()){
@@ -222,20 +234,31 @@ pub fn extract_selected_tag(
             if maps::hash_file(&extraction_input)?!=report.input_sha256{return invalid("Native audio extraction input changed while the external tool was reading it");}
             crate::mcc_audio::Bank::open(source.audio_resources.as_ref().unwrap())?.verify()?;
         }
+        if let Some((_,report))=&prepared_legacy {
+            if maps::hash_file(&extraction_input)?!=report.input_sha256{return invalid("Legacy extraction input changed while the native tool was reading it");}
+            // This is a new disposable tool input, never an original or reusable cache.
+            fs::remove_file(&extraction_input)?;
+        }
         let receipt_path=final_dir.join("extraction-receipt.json");
         let receipt=TagExtractReceipt{
+            input_compatibility:prepared_legacy.as_ref().map(|(_,report)|report.clone()),
             status:"extracted-unverified-import".into(),job_id:job_id.into(),
             source_sha256:source.sha256.clone(),source_project_id:project.id.clone(),
             source_engine:source.engine.clone(),source_version:inspection.header.version,
             requested_tag:query,tag_root:final_dir.join("tags"),receipt_path:receipt_path.clone(),
             files,total_bytes,
-            notice:"Actual tags extracted into a new isolated folder by installed Invader. Dependencies require inspection before copy/import into a separate tags tree. No map rebuild, Halo run, tag merge, or rights verification has occurred.".into(),
+            notice:format!("Actual tags extracted into a new isolated folder by installed Invader. {}Dependencies require inspection before copy/import into a separate tags tree. No map rebuild, Halo run, tag merge, or rights verification has occurred.",if prepared_legacy.is_some(){"Known legacy extraction metadata was normalized only in a temporary tool input; source/input hashes and exact repairs are retained, and that temporary cache was removed. Audio, placements and gameplay were not repaired. "}else{""}),
         };
         project::atomic_write(&staging.join("extraction-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
         project::atomic_write(&staging.join("extraction-inputs.json"),&serde_json::to_vec_pretty(&inputs)?,false)?;
         lease.adopt(&final_dir)?;
         Ok(receipt)
     })();
+    if result.is_err()&&prepared_legacy.is_some(){
+        // Only this request's newly created, fixed-name disposable input.
+        let input=staging.join("legacy-extraction-input.map");reject_links(&input)?;
+        if input.try_exists()?{fs::remove_file(&input)?;}
+    }
     if result.is_ok(){lease.finish(true,Some(source.sha256.clone()))?;}else{drop(lease);}
     result
 }
@@ -287,6 +310,13 @@ pub(crate) fn load_receipt(root:&Path,job_id:&str)->Result<TagExtractReceipt>{
         r.status!="extracted-unverified-import" || r.files.is_empty() || r.files.len()>MAX_FILES ||
         r.total_bytes>MAX_TOTAL || r.receipt_path!=path || r.tag_root!=folder.join("tags") {
         return invalid("Extraction receipt fails identity or path validation");
+    }
+    if let Some(report)=&r.input_compatibility {
+        if ![6,7].contains(&r.source_version)||report.source_sha256!=r.source_sha256||report.input_sha256==report.source_sha256||
+            report.input_sha256.len()!=64||!report.input_sha256.bytes().all(|b|b.is_ascii_hexdigit())||report.repairs.is_empty()||report.repairs.len()>2||
+            report.repairs.iter().any(|repair|!matches!(repair.code.as_str(),"LEGACY_TAG_SIZE"|"UNUSED_SCRIPT_CAPACITY")){
+            return invalid("Extraction normalization receipt has an invalid source/input identity");
+        }
     }
     Ok(r)
 }
@@ -403,7 +433,7 @@ mod tests {
         let test_path=folder.join("tags").join("test.weapon");
         fs::write(&test_path,b"fixture-tag-bytes").unwrap();
         let (files,total)=inventory(&folder.join("tags")).unwrap();
-        let mut receipt=TagExtractReceipt{
+        let mut receipt=TagExtractReceipt{input_compatibility:None,
             status:"extracted-unverified-import".into(),job_id:job_id.clone(),
             source_sha256:"ab".repeat(32),source_project_id:uuid::Uuid::new_v4().to_string(),
             source_engine:"halo1-fixture".into(),source_version:7,requested_tag:"test.weapon".into(),
@@ -432,7 +462,7 @@ mod tests {
         let bytes=b"synthetic standalone tag transfer fixture - not playable Halo content";
         fs::write(folder.join("tags/weapons/test.weapon"),bytes).unwrap();
         let(files,total)=inventory(&folder.join("tags")).unwrap();
-        let receipt=TagExtractReceipt{status:"extracted-unverified-import".into(),job_id:job.clone(),source_sha256:"ab".repeat(32),source_project_id:uuid::Uuid::new_v4().to_string(),source_engine:"Test engine".into(),source_version:7,requested_tag:"weapons\\test.weapon".into(),tag_root:folder.join("tags"),receipt_path:folder.join("extraction-receipt.json"),files,total_bytes:total,notice:"Synthetic transfer test".into()};
+        let receipt=TagExtractReceipt{input_compatibility:None,status:"extracted-unverified-import".into(),job_id:job.clone(),source_sha256:"ab".repeat(32),source_project_id:uuid::Uuid::new_v4().to_string(),source_engine:"Test engine".into(),source_version:7,requested_tag:"weapons\\test.weapon".into(),tag_root:folder.join("tags"),receipt_path:folder.join("extraction-receipt.json"),files,total_bytes:total,notice:"Synthetic transfer test".into()};
         fs::write(&receipt.receipt_path,serde_json::to_vec(&receipt).unwrap()).unwrap();
         let cache=root.path().join("target.map");fs::write(&cache,b"immutable target identity fixture").unwrap();
         let mut target=Project::new("Target transfer test");target.source=Some(project::Source{audio_resources:None,original_path:cache.clone(),preserved_path:cache.clone(),sha256:maps::hash_file(&cache).unwrap(),cache_version:7,engine:"Test engine".into(),scenario_path:"fixture".into(),archive:None,resource_directory:None,resource_sha256:Default::default()});
