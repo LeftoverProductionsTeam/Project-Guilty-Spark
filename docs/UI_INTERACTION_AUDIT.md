@@ -310,3 +310,9 @@ User path: Level editor → build summary → choose target/quality or Configure
 - **How To**: `featureCatalog.ts`, `forerunner-connection` describes those exact controls and discovery limitations. Runtime discovery, source compilation, game loading and authored gameplay remain separate operations. No successful runtime-query or native UI evidence is claimed.
 
 No new tests were run after the owner's code-only instruction. The existing native source/runtime harness retains the focused default-material/new-map/Save/restart branch for later use; it now uses the actual shared modal's template combobox. R692 failed before this repair and does not establish UI acceptance or its final original-file hash gate.
+
+## Firefight starting weapons — untested source repair, 14 November 2026
+
+Control: Firefight rules → Player loadout → Primary weapon tag / Secondary weapon tag. Expected: choose actual weapon tags from the selected actor-source map, retain exact path entry, and reject a missing/nonweapon starting asset when using Validate rules & actors. Prior source checked only generic starting equipment/supply tags and provided no source weapon choices. The existing native catalog now supplies sorted weapon paths; both fields share an instance-unique native datalist; validation includes both native starting slots in its existing diagnostics. How To entry native-firefight-round includes Player loadout/Validate before preparation. No new menu, document writer or validation framework.
+
+No tests or native mouse/keyboard acceptance were run, by owner instruction. Datalist keyboard behavior, immediate Save/Undo/restart, multiple mounted Firefight panels and dependency rejection are pending. A valid source asset check still does not prove the selected source toolchain has matching tags or that the player receives the weapon in Halo.

@@ -426,13 +426,24 @@ pub fn validate_assets(config: &FirefightConfig, inspection: &MapInspection) -> 
         .filter(|e| !actors.contains(&tag_key(&e.actor_variant_path)))
         .map(|e| e.actor_variant_path.clone())
         .collect::<Vec<_>>();
-    let missing_equipment = config
+    let weapons: BTreeSet<_> = available_weapons(inspection).into_iter().map(|path| tag_key(&path)).collect();
+    let mut missing_equipment = config
         .starting_equipment
         .iter()
         .chain(&config.supply_drop_tags)
         .filter(|p| !equipment.contains(&tag_key(p)))
         .cloned()
         .collect::<Vec<_>>();
+    if let Some(profile) = &config.native_player_profile {
+        for path in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
+            if !weapons.contains(&tag_key(path)) {
+                diagnostics.push(format!("Native starting weapon is missing or is not a weapon tag in this source: {path}"));
+                if !missing_equipment.iter().any(|missing| tag_key(missing) == tag_key(path)) {
+                    missing_equipment.push(path.clone());
+                }
+            }
+        }
+    }
     ValidationReport {
         valid: validate(config).is_ok()
             && source_matches
@@ -444,6 +455,11 @@ pub fn validate_assets(config: &FirefightConfig, inspection: &MapInspection) -> 
         runtime_integrated: false,
         diagnostics,
     }
+}
+/// Source-native weapon choices, not equipment or item-collection aliases.
+pub fn available_weapons(inspection: &MapInspection) -> Vec<String> {
+    inspection.tags.iter().filter(|tag| tag.class == "weap")
+        .map(|tag| tag_key(&tag.path)).collect::<BTreeSet<_>>().into_iter().collect()
 }
 pub fn available_enemies(inspection: &MapInspection) -> Vec<EnemyType> {
     inspection
@@ -1168,11 +1184,31 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     Ok(Some(plan))
 }
 pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection)->Result<()> {
+    if map.header.scenario_type != 0 {
+        return invalid("Compiled native solo Firefight output must be a singleplayer scenario");
+    }
+    for dependency in &plan.dependencies {
+        let class = match dependency.tag_class.as_str() {
+            "actor_variant" => "actv",
+            "weapon" => "weap",
+            other => return invalid(format!("Unrecognized native Firefight dependency class: {other}")),
+        };
+        let path = tag_key(&dependency.tag_path);
+        let matches = map.tags.iter().filter(|tag| tag.class == class && tag_key(&tag.path) == path).collect::<Vec<_>>();
+        if matches.len() != 1 || matches[0].external || matches[0].data_offset.is_none() {
+            return invalid(format!("Compiled Firefight dependency is missing, ambiguous or has no native body: {}.{}", dependency.tag_path, dependency.tag_class));
+        }
+    }
     for name in &plan.encounter_names {
-        if !map.encounters.iter().any(|encounter|&encounter.name==name && encounter.squads==["round_squad"]) {return invalid(format!("Compiled Firefight encounter/squad missing: {name}"));}
+        let matches = map.encounters.iter().filter(|encounter| &encounter.name == name).collect::<Vec<_>>();
+        if matches.len() != 1 || matches[0].squads != ["round_squad"] {
+            return invalid(format!("Compiled Firefight encounter/squad is missing or ambiguous: {name}"));
+        }
     }
     for name in ["gs_firefight","gs_ff_reset","gs_ff_bootstrap"] {
-        if !map.scripts.iter().any(|script|script.name==name) {return invalid(format!("Compiled Firefight script missing: {name}"));}
+        if map.scripts.iter().filter(|script| script.name == name).count() != 1 {
+            return invalid(format!("Compiled Firefight script is missing or ambiguous: {name}"));
+        }
     }
     Ok(())
 }

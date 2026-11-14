@@ -50,7 +50,7 @@ R692 QA executable E/qa-default-materials-r692/GuiltySpark.exe,50,792,960B/SHA37
 
 Interrupted legacy run-8Ak6hz remains protected: PID11588 was reused by unrelated conhost; do not kill it, force legacy recovery or modify its ownership record. Prior exact stale admission-lock/empty-run cleanup was already completed; do not repeat it. Do not regenerate SDK trees or preservation archives.
 
-Source manifests must describe staged source only, without an archive. Commit this increment explicitly as WIP/testing deferred; then record its exact source commit. All475 IDs and the roadmap remain intact; no master Goal/Operation110 completion.
+Source checkpoint: 5001025d9f18e8c981d6207bb01165ececae4d88, explicitly WIP/testing deferred. All current source edits were committed locally; no source remains outside that checkpoint. Its staged-source manifest SHA25693a76b0eb32113bc6f2a1d9924ff4393b4f919ef7f93aa992c5af878d52b72ce covers2148files/51,557,489bytes; no archive was created. runtime_connections.rsSHA4a67d0ace36a757c3c52aa0d6f6c59bd167afbedb41702f4da94104d26a181d5; App.tsxSHA426f5f37ab22409a572a731a74583b0532a47865ec92c9bc0739f8c9012f5787; runtimeWorkbench.tsSHA037510fd945bf4cb9f91311bf730611baa284573c39fe04e266ffe6d14239e37. All475CSV retains SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. This checkpoint-only follow-up changes documentation/manifests, not runtime code. No tests/builds/query or publication; no master Goal/Operation110 completion.
 
 ## Deferred requests
 

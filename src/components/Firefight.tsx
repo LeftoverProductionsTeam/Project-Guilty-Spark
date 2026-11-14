@@ -1,5 +1,5 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
 import { defaultNativePlayerProfile, type NativePlayerProfile } from '../firefight';
 import { exportHaloCeFirefightRound, scriptManifest, attachNativeFirefightRound, nativeSoloFirefightRules } from '../haloScript';
@@ -42,6 +42,7 @@ export default function Firefight({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const config = project.firefight;
+  const weaponChoicesId = useId();
   useWorkspaceFileActions('firefight:'+project.id,config?[{id:'firefight-round-source',label:'Export native Firefight round source…',hint:'Native scenario/script sources; compilation and gameplay are separate checks.',disabled:busy,run:()=>exportRound()}]:[]);
   useEffect(() => {
     let alive = true;
@@ -534,11 +535,12 @@ export default function Firefight({
           </section><section className="firefight-validation">
           <details>
             <summary>Player loadout</summary>
-            <p className="subtle">Starting gear for the native solo round. Weapon paths use your selected source tags; missing dependencies block the build. These are normal weapon slots, not dual wielding.</p>
+            <p className="subtle">Starting gear for the native solo round. Choose a weapon from the selected actor source, or enter its exact tag path without an extension. Validate rules &amp; actors checks these paths; the native build also needs their matching source tags. These are normal weapon slots, not dual wielding.</p>
+            <datalist id={weaponChoicesId}>{(catalog?.weapons??[]).map(path=><option key={path} value={path}/>)}</datalist>
             <button disabled={busy} onClick={()=>config&&change({...config,nativePlayerProfile:defaultNativePlayerProfile()},'Set pistol starting profile')}>Use pistol loadout</button>
             {config.nativePlayerProfile&&<div className="forge-rule-grid">
-              <label>Primary weapon tag<input aria-label="Primary weapon tag" key={'primary:'+config.nativePlayerProfile.primaryWeapon} defaultValue={config.nativePlayerProfile.primaryWeapon} maxLength={240} onBlur={event=>{if(event.target.value!==config.nativePlayerProfile?.primaryWeapon)playerProfile({primaryWeapon:event.target.value});}}/></label>
-              <label>Secondary weapon tag (optional)<input aria-label="Secondary weapon tag" key={'secondary:'+config.nativePlayerProfile.secondaryWeapon} defaultValue={config.nativePlayerProfile.secondaryWeapon??''} maxLength={240} onBlur={event=>{const value=event.target.value||null;if(value!==config.nativePlayerProfile?.secondaryWeapon)playerProfile(value?{secondaryWeapon:value}:{secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0});}}/></label>
+              <label>Primary weapon tag<input aria-label="Primary weapon tag" list={weaponChoicesId} key={'primary:'+config.nativePlayerProfile.primaryWeapon} defaultValue={config.nativePlayerProfile.primaryWeapon} maxLength={240} onBlur={event=>{if(event.target.value!==config.nativePlayerProfile?.primaryWeapon)playerProfile({primaryWeapon:event.target.value});}}/></label>
+              <label>Secondary weapon tag (optional)<input aria-label="Secondary weapon tag" list={weaponChoicesId} key={'secondary:'+config.nativePlayerProfile.secondaryWeapon} defaultValue={config.nativePlayerProfile.secondaryWeapon??''} maxLength={240} onBlur={event=>{const value=event.target.value||null;if(value!==config.nativePlayerProfile?.secondaryWeapon)playerProfile(value?{secondaryWeapon:value}:{secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0});}}/></label>
               {([['primaryLoaded','Primary rounds loaded',0,32767,1],['primaryReserved','Primary rounds reserved',0,32767,1],['secondaryLoaded','Secondary rounds loaded',0,32767,1],['secondaryReserved','Secondary rounds reserved',0,32767,1],['health','Starting health',.01,1,.05],['shields','Starting shields',0,3,.1],['fragmentationGrenades','Fragmentation grenades',0,4,1],['plasmaGrenades','Plasma grenades',0,4,1]] as const).map(([key,label,min,max,step])=><label key={key}>{label}<NumberField label={label} value={config.nativePlayerProfile![key]} min={min} max={max} step={step} onCommit={value=>playerProfile({[key]:value})}/></label>)}
             </div>}
           </details>
@@ -578,7 +580,7 @@ export default function Firefight({
                 <code key={path}>Missing actor: {path}</code>
               ))}
               {validation.missingEquipment.map((path) => (
-                <code key={path}>Missing equipment: {path}</code>
+                <code key={path}>Missing equipment or starting weapon: {path}</code>
               ))}
             </div>
           )}

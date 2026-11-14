@@ -63,6 +63,7 @@ export interface FirefightPreset {
 }
 export interface FirefightCatalog {
   enemies: EnemyType[];
+  weapons?: string[];
   presets: FirefightPreset[];
   defaultConfig: FirefightConfig;
 }

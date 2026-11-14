@@ -1,8 +1,8 @@
 # Active engineering checkpoint
 
-Task: Operation110 — source-native creator workflow and Forerunner companion connection
+Task: Operation110 — source-backed Firefight loadout and compiled dependency integrity
 Status: implementation incomplete
-Starting revision: b57cb654371a5336590fba9fbd0d4c765a7d99d9, canonical D:/Project Guilty Spark local master.
+Starting revision: 5523595443228819c2d692ca51e79c4210cda7d3, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
 Next action: Continue code-only work in existing creator/runtime components. Inspect the existing source-recovery/native_round_plan boundary for a legitimate original-Zombie derived encounter; preserve its fresh-source guard until a supported path is implemented. Do not invent a Forerunner rules-import API. When the owner resumes tests, first compile this WIP and validate actual Library Create a map → textures → Undo/Save/full restart, then saved Forerunner registration/help/discovery and independent windows.
 
@@ -25,7 +25,9 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 
 ## Changed work
 
-All changes since b57cb65 are an explicitly untested WIP, including already-written native harness coverage retained for later:
+Current untested source increment: existing Firefight Player loadout suggests actual source weap tags; validate_assets includes both starting weapon slots instead of checking only supplies. verify_native_round requires singleplayer output, exact embedded planned actor/weapon tag bodies and unique encounter/squad/controller names. The existing build/readback/adoption path consumes this check. No new native writer or source/schema/engine guard is introduced. Detail and deferred validation: FIREFIGHT_ENGINE.md and UI_INTERACTION_AUDIT.md. No tests/compiler/game/query were run.
+
+Prior source5001025 is also an untested WIP, including already-written native harness coverage retained for later:
 
 - asset_sources_native.rs admits Xbox5 preview defaults for Chupa/OpenCE/Xbox using the existing bounded catalog. Native source-material extraction remains strict MCC/CE/PC; no invented conversion.
 - App.tsx Library/Create a map now opens the existing multiplayer creation modal instead of reopening the current QuickForge workspace. The earlier R692 failure is preserved, not counted passed.
@@ -44,13 +46,15 @@ Forerunner read-only source reached c8196f81df7eabd28dd5e31fb1353fb4d00c657d. It
 
 ## Operations and safe checkpoint
 
+Current increment has changed only Spark source/docs. Stage and commit explicitly as WIP/testing deferred, refresh source-only manifests without producing an archive, then record its exact source commit. No Forerunner file or original Halo content was written.
+
 No tests/builds/game queries started after the code-only instruction. R691session66802 and R692session16945 ended; R692 is NOT active. Their owned run outputs were disposed by existing wrappers. No process was stopped in this increment. Evidence root E=C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf; receipts/logs in E/resume-20261114.
 
 R692 QA executable E/qa-default-materials-r692/GuiltySpark.exe,50,792,960B/SHA37dc376fdfa72c850b5150021488c92d9aad12d1f416564b4b2e10000050e1b8; source fingerprint b39075d2411a3d0ddb3ee4bfb6831e2299bab9b30de15e0a3611f66c26a7b4aa. It predates current UI/companion edits. R689 appSHA18ad32666459d64ce4ec485ded708141562ffcc08f8eb4c15ab2448d9a0959d0/runtimeFPaeb184b53db28f2609d607e34358f496f5064b0f59c2d12df16c7b5f0cadd439 is historical accepted scope only. Neither is a current release.
 
 Interrupted legacy run-8Ak6hz remains protected: PID11588 was reused by unrelated conhost; do not kill it, force legacy recovery or modify its ownership record. Prior exact stale admission-lock/empty-run cleanup was already completed; do not repeat it. Do not regenerate SDK trees or preservation archives.
 
-Source checkpoint: 5001025d9f18e8c981d6207bb01165ececae4d88, explicitly WIP/testing deferred. All current source edits were committed locally; no source remains outside that checkpoint. Its staged-source manifest SHA25693a76b0eb32113bc6f2a1d9924ff4393b4f919ef7f93aa992c5af878d52b72ce covers2148files/51,557,489bytes; no archive was created. runtime_connections.rsSHA4a67d0ace36a757c3c52aa0d6f6c59bd167afbedb41702f4da94104d26a181d5; App.tsxSHA426f5f37ab22409a572a731a74583b0532a47865ec92c9bc0739f8c9012f5787; runtimeWorkbench.tsSHA037510fd945bf4cb9f91311bf730611baa284573c39fe04e266ffe6d14239e37. All475CSV retains SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. This checkpoint-only follow-up changes documentation/manifests, not runtime code. No tests/builds/query or publication; no master Goal/Operation110 completion.
+Source checkpoint: 5001025d9f18e8c981d6207bb01165ececae4d88, explicitly WIP/testing deferred. This prior source increment is preserved locally; the current loadout/dependency changes are not included in it. Its staged-source manifest SHA25693a76b0eb32113bc6f2a1d9924ff4393b4f919ef7f93aa992c5af878d52b72ce covers2148files/51,557,489bytes; no archive was created. runtime_connections.rsSHA4a67d0ace36a757c3c52aa0d6f6c59bd167afbedb41702f4da94104d26a181d5; App.tsxSHA426f5f37ab22409a572a731a74583b0532a47865ec92c9bc0739f8c9012f5787; runtimeWorkbench.tsSHA037510fd945bf4cb9f91311bf730611baa284573c39fe04e266ffe6d14239e37. All475CSV retains SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643. Prior checkpoint5523595 changed documentation/manifests only; this continuation now changes the existing Firefight source/catalog/UI. No tests/builds/query or publication; no master Goal/Operation110 completion.
 
 ## Deferred requests
 

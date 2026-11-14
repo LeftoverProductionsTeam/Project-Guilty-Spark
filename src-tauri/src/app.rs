@@ -881,6 +881,7 @@ fn create_project(state: State<AppState>, title: String) -> Reply<OpenProject> {
 struct FirefightCatalog {
     default_config:firefight::FirefightConfig,
     enemies:Vec<firefight::EnemyType>,
+    weapons:Vec<String>,
     presets:Vec<firefight::FirefightPreset>,
 }
 #[tauri::command]
@@ -890,7 +891,7 @@ async fn firefight_catalog(app:tauri::AppHandle,source_project_id:String)->Reply
         let source=p.source.as_ref().ok_or("Choose a preserved source map")?;
         if maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256{return Err("Preserved source changed".into());}
         let mut defaults=firefight::default_config();defaults.source_sha256=Some(i.sha256.clone());
-        Ok(FirefightCatalog{default_config:defaults,enemies:firefight::available_enemies(&i),presets:firefight::presets(&i)})
+        Ok(FirefightCatalog{default_config:defaults,enemies:firefight::available_enemies(&i),weapons:firefight::available_weapons(&i),presets:firefight::presets(&i)})
     }).await.map_err(error)?
 }
 #[tauri::command]
