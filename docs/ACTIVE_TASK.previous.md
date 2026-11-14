@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — explicit Firefight source reconciliation and Forerunner handoff
+Task: Operation110 — source-backed Firefight actor and weapon imports
 Status: implementation incomplete
-Starting revision: 1f167604b034fb0b634d8f3f5a3c71dd08ae7ee0, canonical D:/Project Guilty Spark local master.
+Starting revision: 1ae95799c2deb2b4a1d0aa3c59a57428b57b67ef, canonical D:/Project Guilty Spark local master.
 Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 (R690 wording/14 Rust passes), c83c2be (R688/R689 compact build workflow). Current WIP is not compiled or accepted. R692 separately verified only the prior selector build/default-source IPC checks, then failed actual map creation.
-Next action: Continue code-only on the existing native authoring path; inspect the recovered-scenario encounter append/rebuild boundary before attempting the original-Zombie handoff. Preserve native tables, original actors/audio/carrier provenance and the current fresh-source-only guard until a legitimate source writer exists. Forerunner contract1 remains discovery-only; its uncommitted actor/spawn selection is not an available tested importer. When tests are authorized, compile all WIP first, then source reconciliation/Save/history/restart and full prepared export/native readback/gameplay. No tests/builds/runtime queries until authorized.
+Next action: Continue code-only on recovered-map scenario authoring through the existing native source pipeline. It needs preserving/appending real scenario arrays and source dependencies; QuickForge.native is shared-native collaboration admission, not a recovered-scenario writer. Do not remove that guard to claim Zombie support. Forerunner contract1 still discovery-only. When testing is authorized: compile all WIP, run H12 source imports/history/Save/restart/stale exports and native palette/loadout readback before any gameplay claim. No tests/builds/tool or game commands until authorized.
 
 ## Acceptance
 
@@ -24,6 +24,8 @@ Reuse existing evidence; do not rerun passing suites under the code-only instruc
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Current source increment: Include source actors & weapons / File inclusion reuses existing native asset imports for referenced actv/weap closures. Exact source SHA/class/path and existing source-draft/tool/storage checks are retained; successful bindings commit together under a Save lease, stale rules/closed destinations are refused. Existing native round plan uses namespaced paths/provenance for actor palette and both weapon slots. Source-driven duplicate selection and origin/readback use checks share one helper. Prior export is stale after import edits. No new writer/schema/runtime endpoint. FIREFIGHT_ENGINE.md/UI_INTERACTION_AUDIT.md/HUMAN_TEST_PLAN.md record scope and unrun acceptance. No tools/tests/builds/export/game ran; one failed source-edit script executed no writes before correction.
 
 Current source-only increment: explicit Firefight actor-source browsing/replacement/adoption, catalog SHA identity, project-local actor IDs, existing validation before adoption, queued Save lease and stale/closed review rejection. Rules/zone IDs/scores preserved; no tag extraction, automatic native conversion or script regeneration. FIREFIGHT_ENGINE.md/UI_INTERACTION_AUDIT.md retain exact changes and pending checks. Read-only companion check-in reached Forerunner3347a00c with three uncommitted files preserved. Contract SHA unchanged; explicit actor/spawn selector source is untested and not negotiated as an API. Owner renewed code-only/no-tests instruction while away.
 
