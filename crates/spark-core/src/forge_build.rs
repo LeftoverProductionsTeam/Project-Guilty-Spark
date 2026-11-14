@@ -351,7 +351,7 @@ pub fn run_prepared_job(
                 let output=receipt.build.as_ref().and_then(|build|build.output.as_deref()).ok_or_else(||SparkError::Invalid("Reused build has no native output".into()))?;
                 let inspected=maps::inspect_map(output,None)?;
                 if !custom.models.is_empty(){custom.inspect_cache(&inspected,output)?;custom.verify_sources()?;}
-                if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected)?;}
+                if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected,output)?;}
                 Ok(())
             })();
             match readback {
@@ -552,7 +552,7 @@ pub fn run_prepared_job(
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
-        if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected)?;}
+        if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;
         if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}
         crate::powerups::verify_compiled(project,&inspected,workspace)?;

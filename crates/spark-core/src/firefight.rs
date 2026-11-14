@@ -1402,7 +1402,7 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     if total_score>i32::MAX as u64 {return invalid("Native Firefight score exceeds Halo long range");}
     Ok(Some(plan))
 }
-pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection)->Result<()> {
+pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {
     if plan.encounter_names.is_empty() || plan.encounter_layouts.len()!=plan.encounter_names.len() ||
         plan.encounter_layouts.iter().zip(&plan.encounter_names).any(|(layout,name)|&layout.name!=name) {
         return invalid("Native Firefight plan has incomplete encounter-layout readback metadata");
@@ -1413,7 +1413,19 @@ pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection
     if let Some(path)=&plan.hud_tag_path{
         let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag_key(&tag.path)==tag_key(path)).collect::<Vec<_>>();
         if tags.len()!=1 || tags[0].external || tags[0].data_offset.is_none(){return invalid("Compiled native Firefight HUD-message tag is missing, ambiguous or external");}
-    }
+        let hud=crate::maps::scenario_hud_messages(cache,map)?.ok_or_else(||SparkError::Invalid("Compiled Firefight scenario has no HUD-message dependency".into()))?;
+        if hud.tag_id!=tags[0].id||tag_key(&hud.tag_path)!=tag_key(path)||hud.messages.len()!=plan.hud_messages.len(){return invalid("Compiled Firefight HUD reference or message count differs from authored source");}
+        for (index,(actual,expected)) in hud.messages.iter().zip(&plan.hud_messages).enumerate(){
+            let mut text=String::new();
+            for panel in &actual.panels {
+                match panel {
+                    crate::maps::NativeHudPanel::Text(part)=>text.push_str(part),
+                    crate::maps::NativeHudPanel::Button(_)=>return invalid(format!("Compiled Firefight HUD message {index} unexpectedly contains a button icon")),
+                }
+            }
+            if actual.name!=expected.name||text!=expected.text {return invalid(format!("Compiled Firefight HUD message {index} name/text differs from authored source"));}
+        }
+    }else if !plan.hud_messages.is_empty(){return invalid("Authored Firefight HUD messages have no native tag path");}
     for dependency in &plan.dependencies {
         let class = match dependency.tag_class.as_str() {
             "actor_variant" => "actv",

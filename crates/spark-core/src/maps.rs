@@ -584,6 +584,112 @@ impl Space {
     }
 }
 
+/// A compiled scenario's actual HUD dependency and ordered native messages.
+/// Panels retain button icons separately; converting them to text would lose data.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct ScenarioHudMessages {
+    pub tag_id: u32,
+    pub tag_path: String,
+    pub messages: Vec<NativeHudMessage>,
+}
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeHudMessage {
+    pub name: String,
+    pub panels: Vec<NativeHudPanel>,
+}
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag="kind",content="value",rename_all="camelCase")]
+pub enum NativeHudPanel { Text(String), Button(u8) }
+
+fn cache_tag_space(r:&Reader,header:&MapHeader)->Result<Space> {
+    let begin=header.tag_offset as usize;
+    let end=begin.checked_add(header.tag_size as usize)
+        .ok_or_else(||SparkError::Invalid("Tag region length overflow".into()))?;
+    r.bytes(begin,header.tag_size as usize)?;
+    let tag_header=if header.version==5 {0x24}else{0x28};
+    if r.u32(begin+tag_header-4)?!=0x74616773 {return invalid("Invalid native tag-index signature");}
+    let address=match header.version {
+        5=>0x803a6000,6=>0x4bf10000,
+        13=>r.u32(begin)?.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC tag index pointer".into()))?,
+        _=>0x40440000,
+    };
+    Ok(Space{begin,end,address})
+}
+
+/// Read the real scenario HUD reference and resident HMT payload from the same
+/// content identity as inspection. No resource-map guessing or fallback strings.
+/// Native layout: scenario dependency 0x594; HMT root128, elements2, messages64.
+/// Format provenance: pinned Invader HUD/scenario definitions, not engine code.
+pub fn scenario_hud_messages(path:&Path,inspection:&MapInspection)->Result<Option<ScenarioHudMessages>> {
+    let (header,bytes,hash)=read_cache_snapshot_shared(path)?;
+    if hash!=inspection.sha256 {return invalid("HUD source changed after map inspection");}
+    let r=Reader(&bytes);
+    let space=cache_tag_space(&r,&header)?;
+    let scenario_id=r.u32(space.begin+4)?;
+    let scenarios=inspection.tags.iter().filter(|tag|tag.id==scenario_id&&tag.class=="scnr"&&tag.path==inspection.scenario_path).collect::<Vec<_>>();
+    if scenarios.len()!=1||scenarios[0].external {return invalid("Native HUD scenario identity is missing or ambiguous");}
+    let body=|tag:&Tag,size:usize|->Result<usize>{
+        let at=tag.data_offset.ok_or_else(||SparkError::Invalid("Native HUD tag body is unavailable".into()))?;
+        if at<space.begin||at.checked_add(size).is_none_or(|end|end>space.end){return invalid("Native HUD body escapes the tag region");}
+        r.bytes(at,size)?;Ok(at)
+    };
+    let scenario=body(scenarios[0],0x5b0)?;
+    let reference=scenario+0x594;
+    let id=r.u32(reference+12)?;
+    if id==u32::MAX {return Ok(None);}
+    if r.fourcc(reference)!="hmt " {return invalid("Scenario HUD dependency is not native hud_message_text");}
+    let tags=inspection.tags.iter().filter(|tag|tag.id==id&&tag.class=="hmt ").collect::<Vec<_>>();
+    if tags.len()!=1||tags[0].external {return invalid("Scenario HUD dependency is missing, ambiguous or external; resident readback is required");}
+    let at=body(tags[0],128)?;
+    let text_bytes=r.u32(at)? as usize;
+    if text_bytes>65536||text_bytes%2!=0 {return invalid("Native HUD UTF-16 blob has an invalid byte length");}
+    // HUD text is compiled resident TagDataOffset data, not a file-offset bank.
+    // Pointer64 reserves the high word; current native cache address spaces are32-bit.
+    if r.u32(at+4)?!=0||r.u32(at+16)?!=0 {return invalid("Native HUD text uses unsupported external or wide-pointer data");}
+    let text_at=if text_bytes==0 {0}else{space.pointer(r.u32(at+12)?,text_bytes)?};
+    let text=if text_bytes==0 {&[][..]}else{r.bytes(text_at,text_bytes)?};
+    let units=text.chunks_exact(2).map(|pair|u16::from_le_bytes([pair[0],pair[1]])).collect::<Vec<_>>();
+    let (elements,element_count)=space.block(&r,at+20,2,8192)?;
+    let (rows,count)=space.block(&r,at+32,64,1024)?;
+    let mut messages=Vec::with_capacity(count);
+    let mut names=std::collections::HashSet::new();
+    let mut decoded_units=0usize;
+    let mut decoded_panels=0usize;
+    for index in 0..count {
+        let row=rows+index*64;
+        let name=r.string(row,32)?;
+        if name.is_empty()||!names.insert(name.clone()){return invalid("Native HUD message names are empty or duplicated");}
+        let mut cursor=r.u16(row+32)? as usize;
+        let first=r.u16(row+34)? as usize;
+        let panels=r.bytes(row+36,1)?[0] as usize;
+        if first.checked_add(panels).is_none_or(|end|end>element_count)||cursor>units.len(){return invalid("Native HUD message indices escape their declared data");}
+        decoded_panels+=panels;
+        if decoded_panels>8192 {return invalid("Native HUD repeated panel references exceed bounded readback");}
+        let mut decoded=Vec::with_capacity(panels);
+        for panel in first..first+panels {
+            let element=r.bytes(elements+panel*2,2)?;
+            match element[0] {
+                0=>{
+                    let length=element[1] as usize;
+                    if length==0||cursor.checked_add(length).is_none_or(|end|end>units.len()){return invalid("Native HUD text panel escapes its UTF-16 blob");}
+                    let part=&units[cursor..cursor+length];
+                    if part[length-1]!=0||part[..length-1].contains(&0){return invalid("Native HUD text panel has an invalid terminator");}
+                    decoded_units+=length;
+                    if decoded_units>65536 {return invalid("Native HUD repeated text references exceed bounded readback");}
+                    let text=String::from_utf16(&part[..length-1]).map_err(|_|SparkError::Invalid("Native HUD text contains invalid UTF-16".into()))?;
+                    decoded.push(NativeHudPanel::Text(text));cursor+=length;
+                },
+                1=>decoded.push(NativeHudPanel::Button(element[1])),
+                _=>return invalid("Native HUD message contains an unsupported panel type"),
+            }
+        }
+        messages.push(NativeHudMessage{name,panels:decoded});
+    }
+    Ok(Some(ScenarioHudMessages{tag_id:id,tag_path:tags[0].path.clone(),messages}))
+}
+
 pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<MapInspection> {
     let (header, bytes, sha256) = read_cache_snapshot_shared(path)?;
     inspect_snapshot(path,resource_directory,header,&bytes,sha256,true)
@@ -601,19 +707,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         return invalid("Tag index signature is invalid. Protected/extended maps and compressed MCC chunks require an external decoder; no tags were guessed.");
     }
     let array_ptr = r.u32(start)?;
-    let address = match header.version {
-        5 => 0x803a6000,
-        6 => 0x4bf10000,
-        13 => array_ptr
-            .checked_sub(0x28)
-            .ok_or_else(|| SparkError::Invalid("Invalid MCC tag index pointer".into()))?,
-        _ => 0x40440000,
-    };
-    let space = Space {
-        begin: start,
-        end: start + header.tag_size as usize,
-        address,
-    };
+    let space=cache_tag_space(&r,&header)?;
     let count = r.u32(start + 0xc)? as usize;
     if count == 0 || count > MAX_TAGS {
         return invalid(format!("Invalid tag count {count}; maximum {MAX_TAGS}"));
