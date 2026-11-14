@@ -1,4 +1,4 @@
-import { assertQaOutputPath } from './native-qa-storage.mjs';
+import { assertQaOutputPath,waitForQaExit,stopQaProcess } from './native-qa-storage.mjs';
 // Explicit owned Windows acceptance: actual IPC, registered runtimes and native
 // map imports. No mock bridge, original game writes or gameplay-success claim.
 import fs from 'node:fs/promises';
@@ -23,7 +23,8 @@ const executable=path.join(output,'GuiltySpark-source-contract.exe');
 await fs.copyFile(args.get('--app'),executable,fs.constants.COPYFILE_EXCL);
 const endpoint=net.createServer();await new Promise(resolve=>endpoint.listen(0,'127.0.0.1',resolve));
 const port=endpoint.address().port;await new Promise(resolve=>endpoint.close(resolve));
-const child=spawn(executable,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:data,WEBVIEW2_USER_DATA_FOLDER:path.join(output,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
+const start=()=>spawn(executable,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:data,WEBVIEW2_USER_DATA_FOLDER:path.join(output,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
+let child=start();
 const result={schemaVersion:1,kind:'native-runtime-source-contract',appSha256:await hash(executable),mockBridge:false,originalFilesUnchanged:false,gameplayVerified:false,maps:[],errors:[]};
 let browser,page;
 const invoke=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
@@ -39,6 +40,35 @@ try{
     const root=args.get(key);
     await invoke('register_runtime',{registration:{id:crypto.randomUUID(),runtimeId,root,executable:path.join(root,name),dataRoot:root,version:null,networkVersion:null}});
   }
+  if(process.env.SPARK_QA_DEFAULT_MATERIALS_ONLY==='1'){
+    result.defaultMaterials=[];
+    for(const [runtimeId,file,version] of [['mccSteam',path.join(args.get('--mcc'),'halo1/maps/bloodgulch.map'),13],['haloCustomEdition',path.join(args.get('--ce'),'maps/bloodgulch.map'),609],['openCe',path.join(args.get('--opence'),'maps/bloodgulch.map'),5],['chupathingyCe',path.join(args.get('--chupa'),'maps/bloodgulch.map'),5]]){
+      originals.push({file,sha256:await hash(file)});const open=await invoke('runtime_texture_source',{runtimeId});
+      expect(open.inspection.header.version).toBe(version);expect(open.project.source.sha256).toBe(await hash(file));
+      for(const suffix of ['/cap_metal','/blood ground'])expect(open.inspection.tags.some(tag=>tag.class==='senv'&&tag.path.replaceAll('\\','/').endsWith(suffix))).toBe(true);
+      result.defaultMaterials.push({runtimeId,cacheVersion:version,sourceSha256:open.project.source.sha256});
+    }
+    const boot=await invoke('bootstrap');await invoke('save_settings',{settings:{...boot.settings,preferredHalo:'chupathingyCe'}});
+    await page.reload();await page.getByRole('button',{name:'Create a map',exact:true}).click();
+    await page.getByRole('textbox',{name:'New map name',exact:true}).fill('Chupathingy native material defaults');
+    await page.getByRole('combobox',{name:'New map runtime',exact:true}).selectOption('chupathingyCe');
+    await page.getByRole('combobox',{name:'New map template',exact:true}).selectOption('emptyArena');await page.getByRole('button',{name:'Create editable map',exact:true}).click();
+    const materials=page.locator('.forge-viewport [data-native-material-count]');
+    await expect.poll(async()=>Number(await materials.getAttribute('data-native-material-count')),{timeout:120000}).toBeGreaterThanOrEqual(2);
+    await page.keyboard.press('Control+s');
+    let saved;await expect.poll(async()=>{const entry=(await invoke('bootstrap')).entries.find(entry=>entry.title==='Chupathingy native material defaults');if(entry)saved=await invoke('open_project',{id:entry.id});return !!saved?.project.quickForge.materials.find(material=>material.id==='surface'&&material.shaderPath?.endsWith('/cap_metal'));}).toBe(true);
+    const materialSource=await materials.getAttribute('data-native-material-source');expect(result.defaultMaterials.filter(row=>row.cacheVersion===5).map(row=>row.sourceSha256)).toContain((await invoke('open_project',{id:materialSource})).project.source.sha256);
+    result.createdMap={id:saved.project.id,materials:saved.project.quickForge.materials,realUi:true,nativeTextureCount:Number(await materials.getAttribute('data-native-material-count')),sourceProjectId:materialSource};
+    const preparation=await invoke('prepare_default_halo_materials',{projectId:saved.project.id}).catch(error=>({blocked:String(error)}));expect(preparation.blocked).toContain('compatible MCC, CE or PC source map');result.nativeExtractionGuardUnchanged=true;
+    await page.screenshot({path:path.join(output,'native-default-materials.png')});
+    await invoke('plugin:window|close',{label:'main'}).catch(()=>{});await waitForQaExit(child);expect(child.exitCode).toBe(0);await browser.close();
+    child=start();await expect.poll(()=>fetch('http://127.0.0.1:'+port+'/json/version').then(r=>r.ok,()=>false),{timeout:60000}).toBe(true);browser=await chromium.connectOverCDP('http://127.0.0.1:'+port);await expect.poll(()=>{page=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().includes('tauri.localhost'));return !!page;}).toBe(true);
+    const reopened=await invoke('open_project',{id:saved.project.id});expect(reopened.project.quickForge.materials).toEqual(saved.project.quickForge.materials);expect((await invoke('bootstrap')).settings.preferredHalo).toBe('chupathingyCe');
+    const restored=await invoke('runtime_texture_source',{runtimeId:'chupathingyCe'});expect(restored.inspection.header.version).toBe(5);
+    await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Chupathingy native material defaults',exact:true})}).click();
+    const resumedMaterials=page.locator('.forge-viewport [data-native-material-count]');await expect.poll(async()=>Number(await resumedMaterials.getAttribute('data-native-material-count')),{timeout:120000}).toBeGreaterThanOrEqual(2);
+    result.createdMap.fullProcessRestart=true;result.createdMap.reopenedThroughLibrary=true;result.createdMap.restoredNativeTextureCount=Number(await resumedMaterials.getAttribute('data-native-material-count'));
+  }else{
   // A genuine CE cache in an isolated OpenCE custom_maps directory proves
   // installation provenance is independent of its native CE format. It also
   // exercises the same folder list used by normal runtime inventory.
@@ -118,12 +148,14 @@ try{
     await expect.poll(alive,{timeout:15000}).toBe(false);
     result.sceneLifecycle={executableSha256:preview.executableSha256,resources:plan.resources,launched:true,stoppedWhenOwningWindowClosed:true,gameplayVerified:false};
   }
+  }
   for(const input of originals)expect(await hash(input.file)).toBe(input.sha256);
   result.originalFilesUnchanged=true;
 }catch(error){result.errors.push(String(error));if(browser)result.browserTargets=browser.contexts().flatMap(c=>c.pages()).map(p=>p.url());process.exitCode=1;}finally{
   result.completedAt=new Date().toISOString();
   await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(result,null,2));
+  if(page&&child.exitCode===null){await invoke('plugin:window|close',{label:'main'}).catch(()=>{});await waitForQaExit(child).catch(async()=>{await stopQaProcess(child);});}
   if(browser)await browser.close().catch(()=>{});
-  if(child.exitCode===null)child.kill();
+  if(child.exitCode===null&&child.signalCode===null)await stopQaProcess(child);
 }
 console.log(JSON.stringify({maps:result.maps.length,originalFilesUnchanged:result.originalFilesUnchanged,gameplayVerified:false,errors:result.errors}));

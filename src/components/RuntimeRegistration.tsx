@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { call, native } from '../api';
-import { relocateRuntimeRegistration } from '../runtimeWorkbench';
+import { relocateRuntimeRegistration,type CompanionRuntimeDiscovery } from '../runtimeWorkbench';
 import type { RuntimeReport, RuntimeRegistration, RuntimeInstallation } from '../types';
 import { Notice, Pill } from './ui';
 const tone = (status: string) => (status === 'pass' ? 'green' : 'amber');
@@ -85,6 +85,14 @@ export default function Registration({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const fingerprint = JSON.stringify(draft);
+  const [companion,setCompanion]=useState<CompanionRuntimeDiscovery|null>(null);
+  useEffect(()=>setCompanion(null),[fingerprint]);
+  async function readCompanion(){
+    if(!inspection?.executableSha256||inspected!==fingerprint)return;
+    setBusy(true);setError('');setCompanion(null);
+    try{setCompanion(await call<CompanionRuntimeDiscovery>('inspect_companion_runtime',{registrationId:draft.id,expectedExecutableSha256:inspection.executableSha256}));}
+    catch(problem){setError(String(problem));}finally{setBusy(false);}
+  }
   async function browse(kind: 'executable' | 'root' | 'dataRoot') {
     try {
       const value = await call<string | null>('choose_runtime_path', { kind });
@@ -169,7 +177,7 @@ export default function Registration({
               });
               setInspection(null);
               setMessage(
-                'Connect another installed OpenCE engine, such as Faber. Existing profiles stay available.',
+                'Connect another installed OpenCE-family engine, such as Forerunner, Faber or OpenH1. Existing profiles stay available.',
               );
             }}
           >
@@ -296,6 +304,16 @@ export default function Registration({
           ))}
         </>
       )}
+      {report.id==='openCe'&&<section className="runtime-companion">
+        <button disabled={busy||!native||!inspection?.executableSha256||inspected!==fingerprint||!profiles.some(profile=>profile.id===draft.id&&JSON.stringify(profile)===fingerprint)} onClick={()=>void readCompanion()}>Read Forerunner capabilities</button>
+        <p className="subtle">Save and inspect the installed profile first. This optional query runs the engine's help and advertised read-only version-1 contract; it does not start a map. Engine detection is separate from gameplay acceptance.</p>
+        {companion&&<details open><summary>{companion.capabilities.engine} · contract {companion.capabilities.contract_version}</summary>
+          <p>{companion.capabilities.build.platform} / {companion.capabilities.build.architecture} · build <code>{companion.capabilities.build.commit}</code></p>
+          <p>Advertised operations: {companion.capabilities.operations.join(', ')}</p>
+          <p>Network version {companion.capabilities.network.advertised_version} · native layout {companion.capabilities.network.native_layout_version}. These values do not prove peer compatibility.</p>
+          <p className="subtle">Spark currently consumes discovery only. Spark-authored Firefight encounter loading, live edits and shared gameplay need their own implemented runtime interfaces.</p>
+        </details>}
+      </section>}
       {error && <Notice>{error}</Notice>}
       {message && <Notice tone="info">{message}</Notice>}
     </details>

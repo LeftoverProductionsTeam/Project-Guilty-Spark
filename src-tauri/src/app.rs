@@ -3376,6 +3376,7 @@ pub fn run() {
             launch_toolchain_tool,
             runtime_hosting_plan,
             inspect_runtime_registration,
+            runtime_connections::inspect_companion_runtime,
             inspect_runtime_launch,
             register_runtime,
             prepare_runtime_ce_resources,

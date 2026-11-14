@@ -264,7 +264,7 @@ export default function App() {
   const [runtimeChoice,setDependencyRuntime]=useMapState<RuntimeId|null>(current?.id??'global','hosting.runtime',ready?(current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??PREFERRED_RUNTIME):null);
   const dependencyRuntime=runtimeChoice??data.settings.preferredHalo??PREFERRED_RUNTIME;
   function openDependencySetup(){setSettingsTab('dependencies');setWorkspace('settings');}
-  function openCommunityFlavorSetup(flavor:import('./runtimeWorkbench').OpenCeFlavor){writeMapSession(current?.id??'global','hosting.runtime','openCe');writeMapSession('global','tools.dashboard','setup');writeMapSession('global','tools.enginePackage',flavor);writeMapSession('global','tools.downloadOpen',true);setDependencyRuntime('openCe');setSettingsTab('tools');setWorkspace('settings');}
+  function openCommunityFlavorSetup(flavor:import('./runtimeWorkbench').OpenCeFlavor){writeMapSession(current?.id??'global','hosting.runtime','openCe');writeMapSession('global','tools.dashboard','setup');writeMapSession('global','tools.enginePackage',flavor);writeMapSession('global','tools.downloadOpen',flavor!=='forerunner');if(flavor==='forerunner')writeMapSession('global','tools.connectRuntime','openCe');setDependencyRuntime('openCe');setSettingsTab('tools');setWorkspace('settings');}
   function selectSettingsTab(tab:WorkflowRoute['settingsTab']){setSettingsTab(tab);setWorkspace('settings');}
   const [ownedHeaderArt,setOwnedHeaderArt] = useState<{url:string;tagId:number}|null>(null);
   const [ownedHeaderLoading,setOwnedHeaderLoading] = useState(false);
@@ -1292,7 +1292,7 @@ export default function App() {
           onImport={() => void importFiles()}
           onRuntime={id=>{setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');}}
           onNew={() => setCreateModal(true)}
-          onNewMap={() => setWorkspace('quickforge')}
+          onNewMap={() => setCreateModal('multiplayer')}
           onFindMaps={() => setWorkspace('map-finder')}
           onOpen={(e) => void openProject(e.id)}
           onInbox={() => void action(() => call('reveal_folder', { kind: 'inbox' }))}

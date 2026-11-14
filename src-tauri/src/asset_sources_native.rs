@@ -398,7 +398,8 @@ pub(super) fn default_material_map_for(state:&AppState,runtimes:&[runtime::Runti
     if runtimes.is_empty()||runtimes.len()>4{return Err("No compatible native material source was requested".into());}
     let found = scan(&roots(state)?);
     for runtime in runtimes {
-        let version=match runtime {runtime::RuntimeId::MccSteam=>13,runtime::RuntimeId::HaloCustomEdition=>609,runtime::RuntimeId::HaloPc=>7,_=>continue};
+        let version=match runtime {runtime::RuntimeId::MccSteam=>13,runtime::RuntimeId::HaloCustomEdition=>609,runtime::RuntimeId::HaloPc=>7,
+            runtime::RuntimeId::ChupathingyCe|runtime::RuntimeId::OpenCe|runtime::RuntimeId::HaloXbox=>5,_=>continue};
         if let Some(candidate)=found.maps.iter().find(|c|c.cache_version==Some(version)&&c.name.eq_ignore_ascii_case("bloodgulch.map")) {
             return Ok((*runtime,candidate.path.clone()));
         }

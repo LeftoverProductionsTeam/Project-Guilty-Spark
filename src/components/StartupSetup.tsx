@@ -187,7 +187,7 @@ export default function StartupSetup({
                   <select aria-label="Setup OpenCE flavor" disabled={busy} value={flavorProfile?'profile:'+flavorProfile.id:''} onChange={event=>void selectFlavor(event.target.value)}>
                     <option value="" disabled>Choose a flavor…</option>
                     {flavorProfiles.length>0&&<optgroup label="Connected engines">{flavorProfiles.map(profile=><option key={profile.id} value={'profile:'+profile.id}>{runtimeProfileLabel(profile)}</option>)}</optgroup>}
-                    <optgroup label="Connect or install">{([['opence','OpenCE'],['faber','Faber'],['openh1','OpenH1']] as const).filter(([,name])=>!flavorProfiles.some(profile=>runtimeProfileName(profile)===name)).map(([id,name])=><option key={id} value={'setup:'+id}>{name} · setup</option>)}</optgroup>
+                    <optgroup label="Connect or install">{([['opence','OpenCE'],['faber','Faber'],['openh1','OpenH1'],['forerunner','Forerunner']] as const).filter(([,name])=>!flavorProfiles.some(profile=>runtimeProfileName(profile)===name)).map(([id,name])=><option key={id} value={'setup:'+id}>{name} · setup</option>)}</optgroup>
                   </select>
                 </label>
               </div>:card;

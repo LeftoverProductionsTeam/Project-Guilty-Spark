@@ -1,0 +1,117 @@
+# GUILTY SPARK + FORERUNNER — UNIFIED DEVELOPMENT
+## All the Tools, and Then Some.
+
+Guilty Spark and Forerunner are two halves of one Halo ecosystem. They must actively support each other's development while remaining independently maintainable.
+
+**Spark creates the experience. Forerunner brings it to life.**
+
+### 1. Establish collaboration
+
+- Continue working in `D:\Project Guilty Spark` on the existing local master.
+- Locate the Forerunner repository through the available workspace or its provided path. Do not guess its location.
+- Inspect Forerunner's source and current integration contract read-only.
+- Identify existing runtime capabilities, APIs, game modes, and integration requirements.
+- Coordinate using existing project checkpoints and interface documentation.
+- Keep all existing Spark functionality and historical requirements intact.
+
+### 2. Divide responsibilities
+
+**Guilty Spark owns:**
+- Map, BSP, terrain, and asset creation.
+- Tag editing, conversion, and native compilation.
+- Firefight waves, AI spawns, and objective design.
+- Extraction zones, loot, missions, and game rules.
+- Zombie and Infection scenario authoring.
+- Forge, lighting, fog, and environmental editing.
+- MegaWorld construction and connected environments.
+- LiveLink, SparkLink, and creator collaboration.
+- VR authoring interfaces and game testing.
+- Runtime management, export, and compatibility tools.
+
+**Forerunner owns:**
+- Native gameplay execution.
+- Chupathingy/OpenCE engine integration.
+- Faber Firefight and Forge functionality.
+- OpenH1 VR integration.
+- Multiplayer AI synchronization.
+- Extraction gameplay, inventories, and persistence.
+- Game modes, networking, and runtime world behavior.
+
+Do not duplicate engine functionality inside Spark.
+
+### 3. Establish two-way feature coordination
+
+When Spark needs runtime functionality:
+
+1. Check whether Forerunner already implements it.
+2. If supported, integrate the actual interface.
+3. If missing, document the precise capability Forerunner must expose.
+4. Continue independent Spark work without inventing a simulated replacement.
+
+When Forerunner adds gameplay functionality:
+
+1. Review the updated capability contract.
+2. Implement the corresponding Spark authoring controls.
+3. Support Save, Undo/Redo, validation, and export.
+4. Verify the resulting content executes correctly in Forerunner.
+
+Use one versioned, shared contract defining operations, gameplay data, compatibility, and error handling.
+
+Do not create a new orchestration framework, synchronization service, or duplicate documentation system.
+
+### 4. First joint milestone — Firefight
+
+Produce the following complete workflow:
+
+**Spark → Forerunner → Halo Gameplay**
+
+1. Open a real Halo map in Spark.
+2. Place enemy spawn locations.
+3. Configure Covenant squads, waves, and objectives.
+4. Save and export a compatible encounter.
+5. Launch that encounter in Forerunner.
+6. Spawn actual players with working weapons.
+7. Fight synchronized enemy AI.
+8. Complete waves with correct scoring and victory conditions.
+9. Return to Spark, change the encounter, and verify the new version in-game.
+
+Then extend this shared workflow to Extraction, Zombies, Forge, MegaWorld, and VR as their engine capabilities become available.
+
+### 5. Permanent collaboration rules
+
+- Both projects can inspect each other's source with authorized access.
+- Each Codex session modifies only its own repository.
+- Never modify protected user maps, installations, assets, or game data without authorization.
+- Preserve upstream licensing, attribution, and contributor requirements.
+- Share actual implementation details, not speculative APIs.
+- Coordinate at meaningful milestones rather than constantly polling.
+- Reuse existing architecture and avoid unnecessary abstractions.
+- Do not interrupt working features for broad integration redesigns.
+- Never push, publish, or modify the other project's repository without approval.
+- Preserve the full Spark roadmap and every existing requirement.
+
+### 6. Immediate instructions
+
+Continue the existing Firefight creator milestone.
+
+Inspect Forerunner's available integration capabilities and identify the smallest missing connection needed for Spark-authored encounters to execute in Forerunner.
+
+Implement that connection when the interface is available and verified.
+
+If Forerunner's repository or interface is unavailable, record the exact dependency and continue meaningful independent creator work.
+
+Report concisely:
+
+- What Spark already supports.
+- What Forerunner already supports.
+- What integration is missing.
+- What was implemented and tested.
+- The next concrete shared milestone.
+
+**Success is not two Codex sessions producing code independently.**
+
+Success is both projects continuously delivering compatible functionality that creators can build in Spark and play in Forerunner.
+
+**ONE ECOSYSTEM. TWO PROJECTS. ONE HALO.**
+
+**ALL THE TOOLS, AND THEN SOME.**

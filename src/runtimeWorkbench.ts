@@ -1,7 +1,7 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
 
 export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';
-export type OpenCeFlavor = 'opence' | 'faber' | 'openh1';
+export type OpenCeFlavor = 'opence' | 'faber' | 'openh1' | 'forerunner';
 
 export type ActionAvailability = 'ready' | 'running' | 'setupRequired' | 'updateNeeded' | 'unavailable';
 export type EvidenceLevel =
@@ -36,8 +36,9 @@ export const runtimeNames: Record<RuntimeId, string> = {
 };
 /** Display names do not grant capabilities; native executable validation remains authoritative. */
 export function runtimeProfileName(profile:RuntimeRegistration):string {
- const identity=[profile.id,profile.version??'',profile.root.replaceAll('\\','/').split('/').filter(Boolean).at(-1)??''].join(' ');
- return profile.runtimeId==='chupathingyCe'?'ChupathingyCE':/openh1/i.test(identity)?'OpenH1':/faber/i.test(identity)?'Faber':runtimeNames[profile.runtimeId];
+ const identity=[profile.id,profile.version??'',profile.root.replaceAll('\\','/')].join(' ');
+ if(profile.runtimeId!=='openCe')return runtimeNames[profile.runtimeId];
+ return /forerunner/i.test(identity)?'Forerunner':/openh1/i.test(identity)?'OpenH1':/faber/i.test(identity)?'Faber':runtimeNames.openCe;
 }
 export function runtimeProfileLabel(profile:RuntimeRegistration):string {
  return runtimeProfileName(profile)+' · '+profile.root.replaceAll('\\','/').split('/').filter(Boolean).at(-1);
@@ -210,4 +211,12 @@ export function relocateRuntimeRegistration(registration:RuntimeRegistration,roo
   };
   const executable=relocate(registration.executable,next+'/'+(registration.runtimeId==='haloCustomEdition'?'haloce.exe':'halo.exe'))!;
   return {...registration,root,executable,dataRoot:relocate(registration.dataRoot,next)};
+}
+
+/** Read-only version-1 response; operation names never authorize arbitrary calls. */
+export interface CompanionRuntimeDiscovery {
+ registrationId:string; executableSha256:string;
+ capabilities:{schema:'spark-forerunner.runtime-capabilities';contract_version:1;engine:'Forerunner';
+ build:{upstream_version:string;commit:string;platform:string;architecture:string};simulation_hz:number;
+ network:{advertised_version:number;native_layout_version:number};operations:string[];process_entrypoints:string[];upstream_projects:string[]};
 }

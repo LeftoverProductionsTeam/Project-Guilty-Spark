@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — restore current CI, protect user files, then native Firefight acceptance
+Task: Operation110 — own-runtime default materials for new map authoring
 Status: implementation incomplete
-Starting revision: 116145dc6ad61f26049631fe652eb615783f65e8, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 835a3cf - Windows lease retirement and actual-handle lock admission; R683/R684 three genuine failures, R68539focused passes, R686960fullRust/9explicit skips. Earlier native Firefight evidence remains scoped.
-Next action: Collect R689 session46963: source-matched compact QuickForge build panel in the actual Windows app, UI preparation/history/Save/restart/native compilation/readback. R687 native authoring/readback passed; R688 TypeScript/two browser workflows/all8viewport sizes passed. Game review0; no physical game input or stopped-game restart.
+Starting revision: 81b5d615708eed12d7baf2f5a4002366ad2d3e01, canonical D:/Project Guilty Spark local master.
+Latest verified revision: ac4038b7214d40998064d863a3a4f8a901394122 — corrected native Firefight guidance/R69014Rust passes. c83c2be compact build panel passes real Windows R689 authoring/Save/restart/compile/readback and R6888browser sizes; prior835a3cf lease repair/R686960Rust/9skips preserved.
+Next action: Collect active R692 session16945: fresh source-matched Windows build, existing native runtime harness focused on MCC13/CE609/OpenCE5/Chupathingy5 default shaders plus actual new-map creation, textured preview, Save and normal process restart. R691 reproduced selecting MCC13 instead of linked Chupathingy Xbox5. No game control; pending renewal unanswered.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Read goal56474fe8 and its linked Complete Creator Mission; current goal's da7bc0
 User files are sacred: originals, ISO/maps/mods/tags/SDKs/runtime installs, current source/history/stash and accepted C49/c035/dc/preview5 builds stay protected. No new branch/worktree/clone/archive/SDK warehouse, unsafe security changes, unapproved install/download/external writes or remote publication. Use existing bounded external owned scratch. Physical human/peer/headset/platform gates stay open without stopping independent safe engineering.
 
 ## Verified milestones
+
+R689 actual Windows1500x950 compact build toolbar48px/whole expanded panel194px/no horizontal overflow. R688 browser keyboard/map-specific paths/Save pass at all8requested viewport sizes; not native8display acceptance. R687/R689 preparation, loadout Undo/Redo, Save/two normal restarts/native Tool compile/Invader readback and changed-rules previous-good protection pass. Original SDK/archive unchanged; gameReview0/gameplayVerifiedfalse. R69014existing Firefight Rust tests pass wording-only corrections; no guard changes. Evidence: FIREFIGHT_ENGINE.md and UI_INTERACTION_AUDIT.md.
 
 R686 full Windows workspace exits0:960passed/0failed/9explicit opt-in skips. R68539focused passes; R683two retirement failures/R684one opened-object admission failure reproduced before repair. Windows retirement retains its lock through native deletion; foreign replacements survive. Tests use distinct native handles in one process. Evidence:835a3cf and SOURCE_ONLY_STORAGE_POLICY.md.
 
@@ -63,6 +65,10 @@ R664 new-file adversarial tests both fail on the old replacing rename: a foreign
 
 ## Changed work
 
+Uncommitted own-runtime preview repair: asset_sources_native.rs existing default_material_map_for now admits version5 for Chupathingy/OpenCE/HaloXbox. Strict default_material_map native extraction gate remains MCC/CE/PC only. Existing test-source-runtime-native.mjs gains focused defaults mode, real Create map/preview/Save/reopen and unchanged originals checks; no new test framework. M1 imported source-tag edit already passed full R277; do not repeat it (NATIVE_SOURCE_TAG_EDIT_20261108.md).
+
+c83c2be changes existing QuickForge JSX/CSS: wrapping build toolbar, keyboard Details for paths, error-expanding diagnostics, shorter heading and aria-expanded. Existing browser path test now checks8sizes/keyboard; existing native harness measures/snapshots real build panel. ac4038b changes only two stale Firefight diagnostics to give the actual supported solo authoring path. Current QA app matches c83c2be runtime source and predates only these wording changes; not a release.
+
 835a3cf verified lease repair is committed. Anti-overengineering directive8e568da0 is retained under Master Engineering Prompts/GS_2026-11-14_Anti_Overengineering.txt. Existing native Firefight workflow is next; no new subsystem or Forerunner repository changes.
 
 Committed817a4e8 reuses the native disposition wrapper as dispose_verified_handle and pins Windows cleanup objects/owner marker transiently, before final review. Same-handle deletion replaces the recursive pathname sweep; current names are rechecked, and later unreviewed children are never deleted. Directory IDs bind existing content receipts; legacy digests remain unchanged/protected. R682955/9skips passes final source. No second ledger/cache, permissive fallback, original asset/permission change or unqualified cleanup claim.
@@ -90,10 +96,14 @@ R640 first focused Rust compile failed because runtime_mod_archive still used th
 
 ## Operations and safe checkpoint
 
-R687 session73454 exits0, actual Windows authoring/native compiler/Invader readback passes, zero app errors, two normal restarts, gameReview0. App50,792,960B SHAe0c2b246a82f97ca1a1fbebe6d41b52ef7eaccee7883f864500e25178aec55fb; source049ba95 with checkpoint-only dirty files. Cachea982bf1905cbbd67ed9c082211de4c8f0c06872ca546f9b3534c2c435cc2d6e8/scenario04ad62c679816d265a83d38092a338a5a07613dea488726cd07b562041f023c9. Build268084ms/native165229ms; owned2,272,171,326logicalB disposed.
-R688 session61882 exits0, TypeScript plus both existing map-target configuration paths pass with keyboard Details and eight viewport sizes; owned24,318,648logicalB disposed. R689 active session46963 against compact build source,3.75GiB bounded owned output, gameReview0. Logs/receipt/screenshots E/resume-20261114/r689-native-firefight.*; export E/qa-firefight-r689 is temporary QA, not release. Do not change production source during fingerprint validation.
+R691 session66802 exits1 expected: native catalog contains Chupathingy Xbox5 Blood Gulch, but requested preview returnsMCC13; owned10,421,183logicalB disposed, originalSHA50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f unchanged. Reproduction uses prior R689 app whose selector matches starting HEAD; no gameplay test. R692 active session16945,3.75GiB bounded scratch and fresh current-source QA export E/qa-default-materials-r692. Log/receipt E/resume-20261114/r692-default-materials.log/json. Do not change production source while its fingerprint validation runs.
 
-R687 active session73454, source049ba95. Existing owned workspace3.75GiB reservation, source-only build and native Firefight harness. Logs E/resume-20261114/r687-native-firefight.log; receipt r687-native-firefight.json is written on completion. Explicit gameReview0; native/human gameplay acceptance remains open. Export destination E/qa-firefight-r687 contains one temporary source-matched QA app, not a release. No production-source changes permitted while fingerprint validation runs.
+No validation currently running. R690 session46912 exits0;14passed/0failed/0skips; owned461,884,068logicalB disposed. R689 logSHA 91c7a22c03967259a29910129145170ad7a4ac70107c01d0362cab39a99efbbc / receiptSHA d8ca47073ca7b82282331be6d6e9c6108d1257f63c07292a70ca5449ed1b55f7. R690 logSHA 5805bc46c1ba19ec5c05685e83aa5e59f327b8ecb00ae6b597628bd00e08a54b. Final implementation sourceac4038b manifest99047d2193d2e7dd4dfa26bf699fe01cef15d3d82a5fb5446fff6a13c8c92f89 covers2147files/51,538,202B. Screenshot E/resume-20261114/r689-firefight-build-controls.png. Pending async request asks renewed isolated game-control approval; no answer received and none assumed. No CUA/game control performed. Checkpoint-only docs commit follows.
+
+R687 session73454 exits0, actual Windows authoring/native compiler/Invader readback passes, zero app errors, two normal restarts, gameReview0. App50,792,960B SHAe0c2b246a82f97ca1a1fbebe6d41b52ef7eaccee7883f864500e25178aec55fb; source049ba95 with checkpoint-only dirty files. Cachea982bf1905cbbd67ed9c082211de4c8f0c06872ca546f9b3534c2c435cc2d6e8/scenario04ad62c679816d265a83d38092a338a5a07613dea488726cd07b562041f023c9. Build268084ms/native165229ms; owned2,272,171,326logicalB disposed.
+R688 session61882 exits0, TypeScript plus both existing map-target configuration paths pass with keyboard Details and eight viewport sizes; owned24,318,648logicalB disposed. R689 session46963 exited0; owned2,277,162,643logicalB disposed/peak2,277,167,481B. Source fingerprint aeb184b53db28f2609d607e34358f496f5064b0f59c2d12df16c7b5f0cadd439 matches compact-panel runtime source now committedc83c2be; QA app50,792,960B/SHA18ad32666459d64ce4ec485ded708141562ffcc08f8eb4c15ab2448d9a0959d0 at E/qa-firefight-r689/GuiltySpark.exe. No game launched.
+
+R687 completed; source/native acceptance below. R689 supersedes its temporary QA binary, which was hash/ownership/process-verified and retired; receipts/screenshots remain.
 
 R686 session21557 exited0; owned3,285,133,382logicalB disposed, peak3,285,138,142B. LogSHA256 eb118b9fbfc54afa4f58990a62b7b65cbd94a47556613e200437dd13981cf744. storage.rsSHA256 0e9ab4ae176ec346277c14a8f1441cdfce9e963381c5cd0851585be53a6d9ad3. Code835a3cf manifest cb31c8a247b4203f0decdac28a8f3b25f49707d2badcf3d996fa1d1566995608 covers2146files/51,502,994B. No current validation or new app executable. Checkpoint helper initially called with wrong argument count; no files were written by that failed call. Corrected using existing root,text signature.
 

@@ -548,3 +548,12 @@ The animation reader was independently implemented from the [published native st
 Windows locked workspace: **556 passed, seven existing opt-in cases ignored**. Frontend: **246 passed in 52 files**. Browser interaction/IPC contracts: **90 passed**. Offline contracts, TypeScript and the release build are checked separately. Mocked browser contracts are not counted as native GPU, import or multiplayer evidence.
 
 Work remains on local master as requested. No push, force push, protected-branch bypass, rules change or automated merge was attempted. [Descriptive handoff](NATIVE_ASSETS_GITHUB_DESCRIPTION.md).
+
+
+## Community default materials — partial native evidence, 14 November 2026
+
+R691 reproduced a linked Chupathingy default preview selecting MCC13 rather than Xbox5. The existing `default_material_map_for` now admits Xbox5 previews for OpenCE/Chupathingy/Xbox, before the existing fallback order. It uses the bounded native catalog and actual source tags; the strict native-material extraction entry remains MCC/CE/PC-only. Preview support does not establish Xbox-to-CE source reconstruction.
+
+R692 built the selector change and passed real IPC default-source/tag checks for MCC13, CE609, OpenCE5 and Chupathingy5, including exact grass/metal shader references. Its later actual Library/Create-a-map action failed (see UI_INTERACTION_AUDIT.md); textured new-map Save/restart acceptance is incomplete. Its final original-file check was not reached. R691 separately recorded unchanged original Chupathingy Blood Gulch SHA-256 `50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f`.
+
+R692 executable SHA-256 `37dc376fdfa72c850b5150021488c92d9aad12d1f416564b4b2e10000050e1b8`, 50,792,960 bytes, at `C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf/qa-default-materials-r692/GuiltySpark.exe`; runtime source fingerprint `b39075d2411a3d0ddb3ee4bfb6831e2299bab9b30de15e0a3611f66c26a7b4aa`. This executable predates the creation-dialog and Forerunner edits and is NOT a current-source build. Receipts/logs: the same Engineering root's `resume-20261114/r691-community-defaults-red.*` and `r692-default-materials.*`. Both runs ended; no retry/build/test started after the owner's code-only instruction.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { call, native } from '../api';
 import { primaryRuntimes } from '../useRuntimeConnections';
-import { runtimeNames,runtimeProfileName,runtimeProfileLabel } from '../runtimeWorkbench';
+import { runtimeNames,runtimeProfileName,runtimeProfileLabel,type OpenCeFlavor } from '../runtimeWorkbench';
 import type { RuntimeId, RuntimeRegistration } from '../types';
 export default function HeaderRuntime({
   value,
@@ -9,7 +9,7 @@ export default function HeaderRuntime({
 }: {
   value: RuntimeId;
   onChange: (id: RuntimeId) => void;
-  onSetupFlavor?:(flavor:'openh1'|'faber')=>void;
+  onSetupFlavor?:(flavor:OpenCeFlavor)=>void;
 }) {
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]),
     [busy, setBusy] = useState(false),
@@ -36,7 +36,7 @@ export default function HeaderRuntime({
   const selected = profiles.find((item) => item.runtimeId === value);
   const multiple = profiles.filter((item) => item.runtimeId === value).length > 1||!!selected&&runtimeProfileName(selected)!==runtimeNames[value];
   const change = async (key: string) => {
-    if(key==='setup:openh1'||key==='setup:faber'){onSetupFlavor?.(key.slice(6) as 'openh1'|'faber');return;}
+    if(key==='setup:openh1'||key==='setup:faber'||key==='setup:forerunner'){onSetupFlavor?.(key.slice(6) as OpenCeFlavor);return;}
     if (!key.startsWith('profile:')) {
       onChange(key as RuntimeId);
       return;
@@ -79,6 +79,7 @@ export default function HeaderRuntime({
         })}
         {!profiles.some(item=>runtimeProfileName(item)==='OpenH1')&&<option value="setup:openh1">OpenH1 · connect or download…</option>}
         {!profiles.some(item=>runtimeProfileName(item)==='Faber')&&<option value="setup:faber">Faber · connect or download…</option>}
+        {!profiles.some(item=>runtimeProfileName(item)==='Forerunner')&&<option value="setup:forerunner">Forerunner · connect installed build…</option>}
         </optgroup>
         {!primaryRuntimes.some((id) => id === value) && <option value={value}>{runtimeNames[value]}</option>}
       </select>

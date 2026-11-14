@@ -1,6 +1,6 @@
 //! Read-only, bounded detection of the reviewed portable Halo clients. Detection
-//! does not register or launch them. A separate user action rechecks the exact
-//! executable identity before storing an ordinary runtime registration.
+//! does not register or launch them. Separate user actions register exact
+//! executable identities and optionally query the advertised companion contract.
 use super::*;
 
 #[derive(Clone, Serialize)]
@@ -314,4 +314,101 @@ pub(super) async fn install_runtime_engine_download(app:tauri::AppHandle,id:Stri
   })();
   if result.is_err(){let _=state.map_downloads.mark_import_failed(&id);}result
  }).await.map_err(error)?
+}
+
+
+// Version 1 of Forerunner's existing SPARK_INTEGRATION_CONTRACT.md.
+// This opt-in discovery query is separate from passive file inspection and
+// never grants live-write, encounter-loading or multiplayer capabilities.
+#[derive(Serialize, Deserialize)]
+pub(super) struct CompanionCapabilities {
+    schema: String,
+    contract_version: u32,
+    engine: String,
+    build: CompanionBuild,
+    simulation_hz: u16,
+    network: CompanionNetwork,
+    operations: Vec<String>,
+    process_entrypoints: Vec<String>,
+    upstream_projects: Vec<String>,
+}
+#[derive(Serialize, Deserialize)]
+struct CompanionBuild { upstream_version: String, commit: String, platform: String, architecture: String }
+#[derive(Serialize, Deserialize)]
+struct CompanionNetwork { advertised_version: u32, native_layout_version: u32 }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct CompanionDiscovery {
+    registration_id: String,
+    executable_sha256: String,
+    capabilities: CompanionCapabilities,
+}
+fn companion_query(executable: &Path, arguments: &[&str]) -> Reply<Vec<u8>> {
+    let mut command=steam::command(executable.to_string_lossy().as_ref());
+    command.args(arguments).current_dir(executable.parent().ok_or("Runtime has no installation directory")?)
+        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    for (key,_) in std::env::vars_os() { if key.to_string_lossy().starts_with("HALO_") { command.env_remove(key); } }
+    command.env("HALO_UPDATE_AUTO","false").env("HALO_NET_ONLINE","false").env("HALO_CRASH_REPORTS","no");
+    let mut child=command.spawn().map_err(error)?;
+    let stdout=child.stdout.take().ok_or("Runtime stdout is unavailable")?;
+    let stderr=child.stderr.take().ok_or("Runtime stderr is unavailable")?;
+    let (sender,receiver)=std::sync::mpsc::channel();
+    let read=|mut stream:Box<dyn Read+Send>,index:usize,sender:std::sync::mpsc::Sender<(usize,Reply<Vec<u8>>)>| {
+        std::thread::spawn(move || {
+            let mut bytes=vec![];
+            let result=stream.by_ref().take(65537).read_to_end(&mut bytes).map_err(error)
+                .and_then(|_|if bytes.len()>65536 { Err("Runtime discovery exceeded 64 KiB".into()) }else{Ok(bytes)});
+            let _=sender.send((index,result));
+        });
+    };
+    read(Box::new(stdout),0,sender.clone());read(Box::new(stderr),1,sender);
+    let deadline=Instant::now()+Duration::from_secs(15);
+    let status=loop {
+        match child.try_wait() {
+            Ok(Some(status))=>break status,
+            Ok(None) if Instant::now()<deadline=>std::thread::sleep(Duration::from_millis(20)),
+            outcome=>{let _=child.kill();let _=child.wait();return Err(match outcome {Err(problem)=>error(problem),_=>"Runtime discovery timed out; only this query process was stopped".into()});}
+        }
+    };
+    let mut output=[vec![],vec![]];
+    for _ in 0..2 {
+        let (index,bytes)=receiver.recv_timeout(deadline.saturating_duration_since(Instant::now()))
+            .map_err(|_|"Runtime discovery output did not close before its deadline".to_string())?;
+        output[index]=bytes?;
+    }
+    if !status.success() {return Err(format!("Runtime rejected discovery ({status}): {}",String::from_utf8_lossy(&output[1]).chars().take(512).collect::<String>()));}
+    Ok(std::mem::take(&mut output[0]))
+}
+#[tauri::command]
+pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_id:String,expected_executable_sha256:String)->Reply<CompanionDiscovery>{
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        let registration=registrations.into_iter().find(|row|row.id==registration_id).ok_or("Save the installed runtime registration before querying capabilities")?;
+        if registration.runtime_id!=runtime::RuntimeId::OpenCe {return Err("The companion discovery contract belongs to a separately registered OpenCE-family engine".into());}
+        let installation=runtime::inspect_registration(&registration).map_err(error)?;
+        if installation.validation!=runtime::TestStatus::Pass || installation.executable_sha256.as_deref()!=Some(expected_executable_sha256.as_str()) {
+            return Err("Installed executable changed or inspection is incomplete; inspect the saved profile again".into());
+        }
+        let executable=installation.executable.as_ref().ok_or("Registered executable is unavailable")?;
+        let help=companion_query(executable,&["--help"])?;
+        if !String::from_utf8(help).map_err(error)?.contains("--spark-capabilities") {return Err("This engine does not advertise the Spark companion contract; no capability flag was sent".into());}
+        let bytes=companion_query(executable,&["--spark-capabilities","1"])?;
+        let capabilities:CompanionCapabilities=serde_json::from_slice(&bytes).map_err(|_|"Runtime returned invalid companion discovery JSON".to_string())?;
+        if capabilities.schema!="spark-forerunner.runtime-capabilities" || capabilities.contract_version!=1 || capabilities.engine!="Forerunner" {
+            return Err("Unsupported companion schema or version; no downgrade or live operation was attempted".into());
+        }
+        let text=|value:&str|!value.is_empty()&&value.len()<=256&&!value.chars().any(char::is_control);
+        if !(1..=1000).contains(&capabilities.simulation_hz) ||
+            [&capabilities.build.upstream_version,&capabilities.build.commit,&capabilities.build.platform,&capabilities.build.architecture].iter().any(|value|!text(value)) ||
+            capabilities.operations.is_empty()||capabilities.operations.len()>64||!capabilities.operations.iter().any(|value|value=="runtime.discover")||
+            capabilities.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
+            capabilities.process_entrypoints.len()>16||capabilities.process_entrypoints.iter().any(|value|!text(value))||
+            capabilities.upstream_projects.len()>16||capabilities.upstream_projects.iter().any(|value|!text(value)) {
+            return Err("Companion discovery fields exceed the version-1 contract bounds".into());
+        }
+        let current=runtime::inspect_registration(&registration).map_err(error)?;
+        if current.executable_sha256!=installation.executable_sha256 {return Err("Runtime executable changed during capability discovery; response discarded".into());}
+        Ok(CompanionDiscovery{registration_id,executable_sha256:expected_executable_sha256,capabilities})
+    }).await.map_err(error)?
 }

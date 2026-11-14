@@ -1,4 +1,4 @@
-import {useId,Suspense} from 'react';
+import {useEffect,useId,Suspense} from 'react';
 import {navigateComposite} from '../keyboardNavigation';
 import PagedSurface from './PagedSurface';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
@@ -47,10 +47,11 @@ export default function GamesTools({
   const [advanced, setAdvanced] = useMapState('global', 'tools.advanced', false);
   const { reports, detected, profiles, checking, connecting, error, refresh, connect } = useRuntimeConnections(data);
   const [flavorError,setFlavorError]=useState('');
-  const [foldersFor,setFoldersFor]=useState<RuntimeId|null>(null);
+  const [foldersFor,setFoldersFor]=useMapState<RuntimeId|null>('global','tools.connectRuntime',null);
   type Dashboard='tools'|'setup'|'packs'|'preferences';
   const [section,setSection]=useMapState<Dashboard>('global','tools.dashboard','tools');
   const [visited,setVisited]=useState<Set<Dashboard>>(()=>new Set(['tools',section]));
+  useEffect(()=>{setVisited(old=>old.has(section)?old:new Set([...old,section]));},[section]);
   const dashboard=useId();
   function chooseSection(next:Dashboard){setSection(next);setVisited(old=>new Set([...old,next]));if(next==='preferences')setAdvanced(true);}
   function openFolders(){chooseSection('setup');if(runtime==='mccSteam')onSetup(runtime);else setFoldersFor(runtime);}
@@ -108,11 +109,11 @@ export default function GamesTools({
         })}
       </div>
       {['openCe','chupathingyCe'].includes(runtime)&&<label className="games-tools-flavors">OpenCE flavors · community engines
-        <select aria-label="Community engine flavor" value={profiles.find(item=>item.id===installation?.registrationId)?.id??''} onChange={event=>{const id=event.target.value;if(id.startsWith('setup:')){writeMapSession('global','tools.enginePackage',id.slice(6));writeMapSession('global','tools.downloadOpen',true);chooseSection('setup');return;}const candidate=detected.find(item=>item.executableSha256===id);if(candidate){void connect(candidate);return;}const profile=profiles.find(item=>item.id===id);if(profile)void call('activate_runtime_registration',{registrationId:id}).then(()=>{setRuntime(profile.runtimeId);window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));}).catch(error=>setFlavorError(String(error)));}}>
+        <select aria-label="Community engine flavor" value={profiles.find(item=>item.id===installation?.registrationId)?.id??''} onChange={event=>{const id=event.target.value;if(id.startsWith('setup:')){const flavor=id.slice(6);writeMapSession('global','tools.enginePackage',flavor);writeMapSession('global','tools.downloadOpen',flavor!=='forerunner');if(flavor==='forerunner'){setRuntime('openCe');setFoldersFor('openCe');}chooseSection('setup');return;}const candidate=detected.find(item=>item.executableSha256===id);if(candidate){void connect(candidate);return;}const profile=profiles.find(item=>item.id===id);if(profile)void call('activate_runtime_registration',{registrationId:id}).then(()=>{setRuntime(profile.runtimeId);window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));}).catch(error=>setFlavorError(String(error)));}}>
           <option value="" disabled>Choose an engine or connect one…</option>
           {profiles.filter(item=>['openCe','chupathingyCe'].includes(item.runtimeId)).map(item=><option value={item.id} key={item.id}>{runtimeProfileLabel(item)}</option>)}
           {detected.filter(item=>['openCe','chupathingyCe'].includes(item.runtimeId)&&!profiles.some(profile=>profile.executable.replaceAll('\\','/').toLowerCase()===item.executable.replaceAll('\\','/').toLowerCase())).map(item=><option value={item.executableSha256} key={item.executableSha256}>Connect {runtimeProfileName({...item,id:'detected',networkVersion:null})} · {item.version??'detected'}</option>)}
-          <option value="setup:openh1">OpenH1 · setup / download</option><option value="setup:faber">Faber · setup / download</option>
+          <option value="setup:openh1">OpenH1 · setup / download</option><option value="setup:faber">Faber · setup / download</option><option value="setup:forerunner">Forerunner · connect installed build</option>
         </select><small>Engine files and profiles stay independent. OpenH1 Windows VR remains unverified.</small>{flavorError&&<span role="alert">{flavorError}</span>}
       </label>}
       {runtime==='arenaEvolved'&&<Notice tone="info">Arena Evolved 0.7.7-beta can read owned MCC, Xbox and CE content. Connect its folders below; executable launch is awaiting release verification. <ExternalBrowserLink href="https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta">Official release &amp; setup</ExternalBrowserLink></Notice>}
