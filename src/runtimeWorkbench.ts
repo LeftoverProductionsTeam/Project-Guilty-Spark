@@ -84,6 +84,7 @@ export interface RuntimeWorkbenchReport {
   workingBuild: { id: string; message: string } | null;
   workingSource?: { buildId: string; tagsDirectory: string } | null;
 }
+export interface NativeScriptAttachment { filename:string;content:string;sha256:string }
 export interface ToolLaunchPlan {
   id: string;
   runtimeId: RuntimeId;

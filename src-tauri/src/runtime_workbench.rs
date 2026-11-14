@@ -784,6 +784,9 @@ pub(super) async fn build_working_tags(
     bsp_audio: Option<core::bsp_audio::Request>,
     expected_tag_identity:Option<String>,
     compile_scripts:Option<bool>,
+    script_attachment:Option<core::working_tags::ScriptAttachment>,
+    expected_build_id:Option<String>,
+    expected_source_directory:Option<PathBuf>,
 ) -> Reply<String> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
@@ -791,6 +794,9 @@ pub(super) async fn build_working_tags(
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;studio_native_source::require_unshared(&state,&project_id)?;
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
+        if script_attachment.is_some()&&(expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
+            return Err("The native build/source selection changed after script review. Select and review the module again; no build was started.".into());
+        }
         if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}
         let settings=tool_settings(&state,Some(&project))?;official_h1a_kit(&state,&settings)?;
         let (tool,_,_)=inspect_tool_file(&settings,"haloTool")?;
@@ -799,7 +805,7 @@ pub(super) async fn build_working_tags(
         verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
         let scenario_type=source_scenario_type(&state,&project)?;
         let expected_encounter=native_operations_native::encounter_expectation(&state,&project,&context.build)?;
-        let mut input=core::working_tags::WorkingTagsInput{expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
+        let mut input=core::working_tags::WorkingTagsInput{script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
         let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is running; wait for completion or cancel it first".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);

@@ -20,6 +20,7 @@ import { useMapState, writeMapSession } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
 import type {
   RuntimeWorkbenchReport,
+  NativeScriptAttachment,
   RuntimeDockAction,
   ToolLaunchPlan,
   ToolProcessView,
@@ -99,6 +100,11 @@ export default function RuntimeDock({
   const invalidHandoffFiles =
     handoffIntegrity?.projectId === project?.id ? (handoffIntegrity?.integrity?.invalidFiles ?? 0) : 0;
   const generation = useRef(0);
+  const scriptSelection = useRef(0);
+  const [scriptAttachment,setScriptAttachment]=useState<(NativeScriptAttachment&{sourceKey:string;reviewed:boolean})|null>(null);
+  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory]);
+  const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
+  const selectedScript=scriptAttachment?.sourceKey===scriptSourceKey?scriptAttachment:null;
   const currentReport = useRef(report);
   currentReport.current = report;
   const detailsDialog = useRef<HTMLElement | null>(null);
@@ -318,7 +324,23 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }
-  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false) {
+  async function selectScript(file:File|undefined) {
+    const selection=++scriptSelection.current,request=generation.current,key=scriptSourceKey;
+    setScriptAttachment(null);setError('');
+    if(!file)return;
+    try {
+      if(!/^[A-Za-z0-9_-]{1,31}\.hsc$/.test(file.name)||file.name.toLowerCase()==='global_scripts.hsc')throw Error('Choose a new .hsc module with a safe name of 1–31characters. Existing global source is preserved separately.');
+      if(!file.size||file.size>1048576)throw Error('New HaloScript source must be nonempty and at most 1 MiB.');
+      const bytes=await file.arrayBuffer();
+      const content=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
+      if(!content.trim()||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(content))throw Error('Choose valid UTF8 HaloScript text without binary control characters.');
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
+      if(request!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
+      setScriptAttachment({filename:file.name,content,sha256,sourceKey:key,reviewed:false});
+    }catch(problem){if(request===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+  }
+  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false, attachment?:NativeScriptAttachment) {
     if (
       !project ||
       dirty ||
@@ -328,11 +350,13 @@ export default function RuntimeDock({
       integrityBlocks(toolTags.report?.integrity)
     )
       return;
+    if(attachment&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||!report?.workingSource))return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
-      await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}) });
+      await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),
+        ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256},expectedBuildId:report!.workingSource!.buildId,expectedSourceDirectory:report!.workingSource!.tagsDirectory}:{}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
@@ -581,6 +605,22 @@ export default function RuntimeDock({
               </small>
             </div>
           )}
+          {project&&report?.workingSource&&runtime==='mccSteam'&&<details className="native-script-attachment">
+            <summary>Attach new controller/script source</summary>
+            <p className="subtle">Choose a reviewed UTF8 .hsc module, up to 1 MiB. It is added only to a separate build candidate; an existing module with the same name is never replaced. Original scripts must be fully recovered. The selected file is not saved in the project draft; successful output retains it in the new native source. Project Undo does not remove a compiled source module.</p>
+            <label>New HaloScript module<input type="file" accept=".hsc" style={{maxWidth:'100%',minWidth:0}} disabled={busy||working||dirty} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void selectScript(file);}}/></label>
+            {selectedScript&&<>
+              <p><strong>{selectedScript.filename}</strong> · <code className="wrap-code">{selectedScript.sha256}</code></p>
+              <label>Review source<textarea readOnly rows={6} spellCheck={false} style={{width:'100%',boxSizing:'border-box'}} value={selectedScript.content}/></label>
+              <label><input type="checkbox" checked={selectedScript.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setScriptAttachment(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed this source and its native scenario references.</label>
+              <div className="button-row">
+                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                  onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>Attach source &amp; compile</button>
+                <button disabled={busy||working} onClick={()=>{scriptSelection.current++;setScriptAttachment(null);}}>Clear selection</button>
+              </div>
+              <p className="subtle">Compilation checks references and preserves original module/script inventories. It does not prove actor spawning, gameplay, wave rules or Forerunner compatibility. Missing encounters, loadout profiles or navigation must be authored separately.</p>
+            </>}
+          </details>}
           {report && (
             <>
               <p className="subtle">
