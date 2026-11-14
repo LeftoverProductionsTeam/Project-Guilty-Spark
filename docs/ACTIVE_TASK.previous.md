@@ -2,9 +2,9 @@
 
 Task: Operation110 — restore current CI, protect user files, then native Firefight acceptance
 Status: implementation incomplete
-Starting revision: 1ecbc6826dbe6ab23e0852b6117792aae3babcea, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 33fafd497dae19b48216236b75f32d4eeb4daa9b — native solo starting-loadout source, controlled dependencies, native readback and actual Windows Save/Undo/restart; combat remains unaccepted. R655932Rust/9ignored, R653510frontend, R652280browser and R657 real preview-tree regression pass.
-Next action: Collect R662 full Rust (session80902; E/resume-20261114/r662-rust-workspace.log) for the cleanup catalog-lock race fix. R658 is a genuine red reproduction. R659/R660 were interrupted by goal pause, not accepted; R661 refused stale admission. Preserve older run-8Ak6hz because a recorded PID was reused by an unrelated process. Finish scoped evidence/manifests and local commit after verification. No game input, push or publication.
+Starting revision: 68f0c3206e39fc1644db076a3dfdcb8f167d85c5, canonical D:/Project Guilty Spark local master.
+Latest verified revision: 8e7e68351a3bac1d8de00a81fdb100411261c32c — accepted-output cleanup catalog race repaired; R658 genuine red reproduction, R662933fullRust/9explicit skips, R66343storage/repository regressions pass. Prior native loadout evidence33fafd49 remains scoped, not gameplay.
+Next action: Collect R665 full Rust, session99193, E/resume-20261114/r665-rust-workspace.log. R664 reproduced both checked/unchecked new-file overwrites after last check. Current project.rs WIP uses native no-replace publication for absent targets; existing replacement stays separate. Check relative-filename handling before committing. Preserve PID-reused interrupted workspace; no game input or publication.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Read goal56474fe8 and its linked Complete Creator Mission; current goal's da7bc0
 User files are sacred: originals, ISO/maps/mods/tags/SDKs/runtime installs, current source/history/stash and accepted C49/c035/dc/preview5 builds stay protected. No new branch/worktree/clone/archive/SDK warehouse, unsafe security changes, unapproved install/download/external writes or remote publication. Use existing bounded external owned scratch. Physical human/peer/headset/platform gates stay open without stopping independent safe engineering.
 
 ## Verified milestones
+
+R662 full workspace933passed/0failed/9explicit opt-in skips; R66343/43storage/repository checks pass. Newly accepted output is preserved in the exact handoff that failed R658. Catalog validation/deletion now shares one guard. This does not close independent filesystem replacement races. Exact source/evidence:8e7e683 and SOURCE_ONLY_STORAGE_POLICY.md.
 
 14November current hosted CI43090598198/sourcea045ea7: both Linux130766442288 and Windows130766442745 pass native storage and Rust, then fail the same one browser assertion. Empty native meter expected[25,51,76,255], actual hosted[26,51,77,255]. All other279browser checks pass. The older atomic-manifest EIO failure is not current; do not reintroduce it as a new diagnosis. CI logs were inspected read-only.
 
@@ -39,9 +41,11 @@ R656 native retry reproduces the same starting-profile/cache/scenario hashes and
 
 Current hosted run43559849944 at05efc661 rechecked read-only: Linux132340863467 and Windows132340863858 pass storage/Rust then fail the same old framebuffer assertion279/280. Local committed1ecbc68 repair is not pushed. No Linux package/startup lane has run; do not advertise Linux acceptance. Owner retains push/workflow responsibility.
 
-R658 deterministically reproduces deletion of a generated output accepted by another catalog owner between final review and catalog acquisition. Test-only thread-local scheduling uses the ordinary Store update; the previous implementation fails. Current uncommitted storage.rs retains one catalog guard through fresh plan validation and removal. R662 full workspace is running with3.75GiB reservation (previous measured full Rust3.28GiB), without raising aggregate limits.
+R658 deterministically reproduces deletion of a generated output accepted by another catalog owner between final review and catalog acquisition. Test-only thread-local scheduling uses the ordinary Store update; the previous implementation fails. Committed8e7e683 storage.rs retains one catalog guard through fresh plan validation and removal. R662 full workspace passed933tests/9ignored with3.75GiB reservation (previous measured full Rust3.28GiB), without raising aggregate limits.
 
 R659/R660 handles disappeared after goal pause; logs end before results. Owners and recorded Rust writers have exited except reusedPID11588, now an unrelated conhost started later. It was not stopped. The prior12GiB reservation remains protected. R661 admission refused a stale test lock. Reviewed exact220B lock owner31504 is gone; its nonce/root/hash were checked, its empty run-RU0Dix and only that dead lock were removed. No recursive cleanup or metadata bypass.
+
+R664 new-file adversarial tests both fail on the old replacing rename: a foreign project arrives after the last existence/revision check and is overwritten. Current project.rs WIP remembers initial absence, uses MoveFileExW(flags0) on Windows and sibling-temp link/unlink off Windows, and refuses replacing fallback. Native Windows paths are canonical extended absolute paths. New normal-save/backup and long-Unicode-path tests accompany the two red cases. R665 full Rust is running. No existing-file replacement, recursive cleanup or process-lifetime race is declared closed.
 
 ## Changed work
 
@@ -62,11 +66,11 @@ R640 first focused Rust compile failed because runtime_mod_archive still used th
 
 ## Operations and safe checkpoint
 
-E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Verified source33fafd497dae19b48216236b75f32d4eeb4daa9b. Checkpoint-only documentation update follows; source manifests must be regenerated from staged blobs. One uncommitted storage.rs catalog-race repair/test is present. No incomplete dashboard-meter changes are present. The earlier GPU-meter fix is committed1ecbc68; no production renderer brightness/shader change.
+E = C:/Users/patri/AppData/Local/Temp/GuiltySpark-Engineering-d49eb02588bf. Verified code8e7e68351a3bac1d8de00a81fdb100411261c32c; checkpoint-only documentation follows. R662session80902 and R663session75986 exited0. No validation or game is running from this turn. R662 owned output3,280,491,905logicalB/peak3,280,496,369B was disposed. R658red/659interrupted/660interrupted/661admission-refused/662green/663green logs are preserved separately; never relabel interrupted results as passes.
 
-R651/R656 receipts/logs/screens preserve failures and native hashes. R651 incomplete cleanup recovered safely by R655 after the game closed. R656 source hashes verified and all owned scratch disposed; no running validation remains after session44669/85635 complete. Owned app17280/game40664 were explicitly stopped after Computer Use cancellation, not declared normal exits. R652/R653/R655/R657 are complete. No original map, installation, tag tree or accepted release was changed.
+Interrupted old run-8Ak6hz/owner34740 remains protected because its recorded writerPID11588 was later reused by an unrelated conhost. Only the exact220-byte dead admission lock owner31504/nonce0bef9e09-01f7-40c9-bf94-76d894ffdc6c/SHA87589f6fadcca5498cfe14c841f012b48fa72b3a519a2f840d07d91b5f7983c0 and empty run-RU0Dix were removed after explicit path/content/owner checks. No full-tree purge or unrelated process termination. Future recovery needs process-lifetime identity, not rawPID guesses.
 
-QA app E/qa-firefight-r651/GuiltySpark.exe remains one explicitly exported source-pinned50,772,992B diagnostic, SHA256f8a8d430c4001a36d124e5d624b52eb1eab1701236228fc453f6845f1c2b6a49 and runtimeFP1f65010b6884549d3f763850f65597415af07ce2b42a9ca36e6deeb617abe643. Reuse only if the current runtime fingerprint still matches. Test-harness repairs are separate; production changes invalidate reuse. No release archive, full SDK tree or replacement backup was generated.
+The older E/qa-firefight-r651/GuiltySpark.exe f8a8d430c4001a36d124e5d624b52eb1eab1701236228fc453f6845f1c2b6a49 remains a historical QA binary. Its runtime fingerprint no longer matches current storage.rs; it must NOT be reused as a current application. No new installer, portable, Linux package or game acceptance was produced. Source manifests verify without creating an archive. Original maps/runtimes/SDKs/releases and all475 IDs remain unchanged.
 
 ## Deferred requests
 
