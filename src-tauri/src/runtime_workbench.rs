@@ -935,7 +935,7 @@ pub(super) struct FirefightSourcePlan {
     previous_groups:Vec<core::firefight::NativeRoundEncounter>,
     hud:Option<core::working_tags::HudAppendPlan>,
 }
-fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext)->Reply<FirefightSourcePlan> {
+fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext,apply_player_loadout:bool)->Reply<FirefightSourcePlan> {
     if source_scenario_type(state,project)?!=0{return Err("New Firefight groups require a native singleplayer source".into());}
     let cancel=AtomicBool::new(false);
     let identity=core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?;
@@ -966,22 +966,31 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
         let sha=maps::hash_file(&string).map_err(error)?;
         core::working_tags::prepare_hud_append(project.firefight.as_ref().unwrap(),&context.tags,&fields,context.generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref()),&sha).map_err(error)?
     }else{None};
-    if core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?!=identity||core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?!=scripts_sha256{return Err("Native tags or original scripts changed while preparing Firefight groups; review them again".into());}
     let groups=operation.encounter_appends().map_err(error)?.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>().map_err(error)?;
     let previous_groups=context.generated_firefight.as_ref().map(|previous|previous.operation.encounter_appends().and_then(|entries|entries.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>())).transpose().map_err(error)?.unwrap_or_default();
+    let player_profile=if apply_player_loadout {
+        let profile=project.firefight.as_ref().and_then(|rules|rules.native_player_profile.as_ref()).ok_or("Configure and save Player loadout in Firefight before applying it")?;
+        for weapon in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
+            let path=context.tags.join(core::safe_relative(&format!("{weapon}.weapon")).map_err(error)?);
+            if !path.is_file(){return Err(format!("Player weapon source is missing: {weapon}.weapon. Recover its matching native dependencies before building"));}
+            let _=owned_child(&context.tags,&path)?;
+        }
+        Some(core::native_operations::prepare_player_profile(&fields,profile,context.generated_firefight.as_ref().and_then(|previous|previous.player_profile.as_ref())).map_err(error)?)
+    }else{None};
+    if core::working_tags::source_identity(&context.tags,&cancel).map_err(error)?!=identity||core::working_tags::script_source_identity(data.as_deref(),&cancel).map_err(error)?!=scripts_sha256{return Err("Native tags or original scripts changed while preparing Firefight groups; review them again".into());}
     let hud_review=hud.as_ref().map(|plan|plan.review.clone());
     Ok(FirefightSourcePlan{groups,previous_controller,previous_groups,hud,project_id:project.id.clone(),build_id:context.build.id.clone(),tags_directory:context.tags.clone(),tag_identity:identity,
-        request:core::working_tags::EncounterAppendRequest{operation,hud:hud_review,existing_controller:context.generated_firefight.as_ref().map(|generated|generated.controller.clone()),fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
+        request:core::working_tags::EncounterAppendRequest{player_profile,operation,hud:hud_review,existing_controller:context.generated_firefight.as_ref().map(|generated|generated.controller.clone()),fields_sha256:core::working_tags::encounter_fields_identity(&fields),scripts_sha256,writer_sha256,project_fingerprint:project.fingerprint().map_err(error)?}})
 }
 #[tauri::command]
-pub(super) async fn prepare_firefight_source(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<FirefightSourcePlan> {
+pub(super) async fn prepare_firefight_source(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,apply_player_loadout:Option<bool>)->Reply<FirefightSourcePlan> {
     let owner=window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
         let _guard=native_operations_native::source_guard()?;let state=app.state::<AppState>();
         native_operations_native::require_idle(&state)?;check_document_owner(&state,&project_id,&owner)?;studio_native_source::require_unshared(&state,&project_id)?;
         if processes(&state)?.iter().any(|p|p.project_id==project_id&&p.status=="running")||baboon_native::has_running(&project_id)?{return Err("Save and close this map's native editor/test processes before reviewing Firefight source".into());}
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;let context=source_context(&state,&project)?;
-        firefight_source_plan(&state,&project,&context)
+        firefight_source_plan(&state,&project,&context,apply_player_loadout.unwrap_or(false))
     }).await.map_err(error)?
 }
 
@@ -1016,7 +1025,7 @@ pub(super) async fn build_working_tags(
         if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}
         if let Some(append)=&encounter_append {
             if !compile_scripts.unwrap_or(false)||script_attachment.is_none()||bsp_audio.is_some()||expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags){return Err("Review new Firefight groups and their controller together against the selected native source; no job was started".into());}
-            let reviewed=firefight_source_plan(&state,&project,&context)?;
+            let reviewed=firefight_source_plan(&state,&project,&context,append.player_profile.is_some())?;
             if &reviewed.request!=append||expected_tag_identity.as_deref()!=Some(reviewed.tag_identity.as_str()){return Err("Firefight source, rules, writer or inventory changed after review; prepare again before building".into());}
         }
         let (settings,tool,invader_info)=working_compiler(&state,&project,&context.build)?;

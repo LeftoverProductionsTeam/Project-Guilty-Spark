@@ -9,7 +9,7 @@ import { validateCreatorStudio } from './creatorStudio.ts';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
 import type { Project } from './types';
 import type { NativeOperation } from './nativeOperations';
-export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; hudMessages?:NativeFirefightHudMessage[]; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'} }
+export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; hudMessages?:NativeFirefightHudMessage[]; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'|'authored-profile';playerProfileName?:string} }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
 const safeComment = (s: string): string => s.replace(/[\r\n\0]/g,' ').replace(/[^\x20-\x7e]/g,'?').slice(0,110);
@@ -104,6 +104,8 @@ export interface NativeRoundBindings {
   encounterNames:string[][];activation:'manual'|'startup';exclusiveOwnershipConfirmed:boolean;
   /** Only an atomic native source review can prepare an existing-HUD merge. */
   hudMergePrepared?:boolean;
+  /** Only the reviewed native source transaction may append/reuse this profile. */
+  playerProfileName?:string;
 }
 const generatedEncounterRefs=(config:FirefightConfig)=>config.waves.map((wave,w)=>wave.groups.map((_,g)=>`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`));
 function nativeEncounterRefs(config:FirefightConfig,binding?:NativeRoundBindings):string[][] {
@@ -181,7 +183,9 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
   }
   const conservative=exportHaloCeFirefight(config,binding);
   const references=nativeEncounterRefs(config,binding);
-  const player=binding?undefined:config.nativePlayerProfile;
+  if(binding?.playerProfileName&&(!ident.test(binding.playerProfileName)||!config.nativePlayerProfile))throw Error('Review the named native player profile and saved loadout through the atomic source build.');
+  const player=binding&&!binding.playerProfileName?undefined:config.nativePlayerProfile;
+  const playerProfileName=binding?.playerProfileName??'gs_firefight_start';
   if(player){
     for(const weapon of [player.primaryWeapon,...(player.secondaryWeapon?[player.secondaryWeapon]:[])]){
       if(typeof weapon!=='string'||!weapon.length||weapon.length>240||/[^\x20-\x7e]/.test(weapon)||/\.weapon$/i.test(weapon)||/^(?:[\/]|[A-Za-z]:)/.test(weapon)||weapon.replaceAll('\\','/').split('/').some(part=>!part||part==='.'||part==='..'))throw Error('Choose native player weapon tag paths without extensions.');
@@ -279,7 +283,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
     '  (set gs_ff_player (unit (list_get (players) 0)))',
     feedback?'  (if (<= (unit_get_health gs_ff_player) 0) (begin (set gs_ff_failure 1) (set gs_ff_state 5)))':'  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))');
   if(feedback)lines.push('  (show_hud_help_text true)','  (if (!= gs_ff_state 5) (hud_set_help_text gs_ff_ready))','  (gs_ff_show_score)');
-  if(player)lines.push('  (if (!= gs_ff_state 5) (player_add_equipment gs_ff_player gs_firefight_start true))');
+  if(player)lines.push('  (if (!= gs_ff_state 5) (player_add_equipment gs_ff_player '+playerProfileName+' true))');
   // HUD feedback is presentation only; death and round transitions must not depend on it.
   lines.push(`  (if (!= gs_ff_state 5) (begin (sleep_until (<= (unit_get_health gs_ff_player) 0) 1 ${ticks(config.preparationMs+config.countdownMs)}) (if (<= (unit_get_health gs_ff_player) 0) ${feedback?'(begin (set gs_ff_failure 3) (set gs_ff_state 5))':'(set gs_ff_state 5)'})))`);
   for(let r=0;r<config.rounds;r++){
@@ -297,11 +301,11 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
     lines.push('  (gs_ff_show_score)');
   }
   lines.push(')','');
-  const sourceBinding=binding?{schemaVersion:1 as const,rules:config,sourceSha256:binding.sourceSha256.toLowerCase(),encounters:references,groups:config.waves.flatMap((wave,w)=>wave.groups.map((group,g)=>({name:references[w][g],actorVariantPath:config.enemies.find(enemy=>enemy.id===group.enemyId)!.actorVariantPath,count:group.count}))),activation:binding.activation,loadout:'scenario' as const}:undefined;
+  const sourceBinding=binding?{schemaVersion:1 as const,rules:config,sourceSha256:binding.sourceSha256.toLowerCase(),encounters:references,groups:config.waves.flatMap((wave,w)=>wave.groups.map((group,g)=>({name:references[w][g],actorVariantPath:config.enemies.find(enemy=>enemy.id===group.enemyId)!.actorVariantPath,count:group.count}))),activation:binding.activation,loadout:binding.playerProfileName?'authored-profile' as const:'scenario' as const,...(binding.playerProfileName?{playerProfileName:binding.playerProfileName}:{})}:undefined;
   const content=(sourceBinding?'; Spark source encounter bindings: '+JSON.stringify(sourceBinding)+'\r\n':'')+lines.join('\r\n')+(binding?.activation==='startup'?nativeRoundBootstrap:'');
-  return {...conservative,...(sourceBinding?{sourceBinding}:{}),...(feedback?{hudMessages:hud}:{}),content,activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:gs_firefight_start',...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
-    ...(binding?['Bound encounters come from the exact source cache inventory. Their ownership, navigation and gameplay still require review; original scripts may also manipulate them.','Keep this scenario’s existing player equipment. No generated starting profile or weapon override is applied.','Activation: '+(binding.activation==='startup'?'an explicit gs_ff_bootstrap startup script is included.':'manual; a reviewed scenario script must set gs_ff_start true.')]:[]),
-    ...(player?['Create gs_firefight_start as a standard scenario player starting profile using the exported player-loadout authoring metadata; include its exact weapon dependencies.']:[]),
+  return {...conservative,...(sourceBinding?{sourceBinding}:{}),...(feedback?{hudMessages:hud}:{}),content,activation:'(set gs_ff_start true)',scenarioType:'singleplayer',dependencies:[...conservative.dependencies,...(player?['starting_profile:'+playerProfileName,...Array.from(new Set([player.primaryWeapon,player.secondaryWeapon].filter((path):path is string=>!!path))).map(path=>'weapon:'+path)]:[])],warnings:[
+    ...(binding?['Bound encounters come from the exact source cache inventory. Their ownership, navigation and gameplay still require review; original scripts may also manipulate them.',binding.playerProfileName?'Apply only the reviewed named player profile; original scenario profiles remain.':'Keep this scenario’s existing player equipment. No generated starting profile or weapon override is applied.','Activation: '+(binding.activation==='startup'?'an explicit gs_ff_bootstrap startup script is included.':'manual; a reviewed scenario script must set gs_ff_start true.')]:[]),
+    ...(player?['Use the standard scenario player profile '+playerProfileName+' with its exact weapon dependencies; the atomic source build must verify its fields before adoption.']:[]),
     'Experimental native solo round source. Build only into a separate reviewed singleplayer/campaign scenario with these exact encounters/counts and safe spawn/navigation data.',
     'Start or request another round with (set gs_ff_start true). The continuous controller resets only its own encounters and score, then waits for actual living counts to reach zero.',
     'Missing/partial spawns, a dead player or the authored wave deadline refuse progression. No phantom success, forced kills or invulnerability is generated.',
@@ -313,7 +317,7 @@ export function exportHaloCeFirefightRound(config:FirefightConfig,binding?:Nativ
 /** Planned source specifications, never a decoded native inventory. The caller
  * must review and build this controller with the exact append operation in the
  * atomic source build; ordinary script attachment cannot create encounters. */
-export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup',retainBootstrap=false,hudMergePrepared=false):ScriptExport {
+export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{kind:'appendEncounters'}>,activation:'manual'|'startup',retainBootstrap=false,hudMergePrepared=false,playerProfileName?:string):ScriptExport {
   const config=operation.sourceRules;
   if(!config?.sourceSha256||!operation.encounters.length||operation.encounters.length>16)throw Error('Review a source-bound native group plan first.');
   const groups=config.waves.flatMap(wave=>wave.groups);
@@ -322,7 +326,7 @@ export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{k
   const names=config.waves.map(wave=>wave.groups.map(()=>operation.encounters[index++].name));
   const output=exportHaloCeFirefightRound(config,{sourceSha256:config.sourceSha256,sourceScenarioType:0,encounterNames:names,
     encounters:operation.encounters.map(entry=>({name:entry.name,actorVariantPaths:[entry.actorPath],normalCount:entry.count??1,insaneCount:entry.count??1,startingLocations:entry.count??1,notInitiallyCreated:!entry.startActive,issue:null})),
-    activation,exclusiveOwnershipConfirmed:true,hudMergePrepared});
+    activation,exclusiveOwnershipConfirmed:true,hudMergePrepared,playerProfileName});
   // Keep the owned startup signature when disabling automatic activation.
   // It becomes a no-op; original native signature preservation stays enabled.
   const content=output.content+(retainBootstrap&&activation==='manual'?'\r\n(script startup gs_ff_bootstrap\r\n  (sleep 1)\r\n)\r\n':'');

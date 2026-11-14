@@ -1,4 +1,5 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
+import type { NativePlayerProfile } from './firefight';
 import type { NativeOperation } from './nativeOperations';
 
 export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';
@@ -93,6 +94,7 @@ export interface EncounterAppendRequest {
   operation:Extract<NativeOperation,{kind:'appendEncounters'}>;
   existingController?:{filename:string;sha256:string}|null;
   hud?:HudAppendReview|null;
+  playerProfile?:{index:number;name:string;profile:NativePlayerProfile;reuse:boolean;originalNames:string[];sourceFieldsSha256:string;profileFieldsSha256?:string|null}|null;
   fieldsSha256:string;scriptsSha256:string;writerSha256:string;projectFingerprint:string;
 }
 export interface NativeHudMessage {name:string;panels:({kind:'text';value:string}|{kind:'button';value:number})[]}

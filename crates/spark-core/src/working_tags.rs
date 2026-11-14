@@ -37,6 +37,8 @@ pub struct EncounterAppendRequest {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub existing_controller:Option<ScriptAttachmentIdentity>,
     pub fields_sha256:String,pub scripts_sha256:String,pub writer_sha256:String,pub project_fingerprint:String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub player_profile:Option<crate::native_operations::PlayerProfileAppend>,
 }
 pub fn encounter_fields_identity(fields:&str)->String {crate::hex_bytes(Sha256::digest(fields.replace("\r\n","\n").as_bytes()))}
 
@@ -58,6 +60,8 @@ pub struct GeneratedFirefightSource {
     pub hud:Option<GeneratedHudSource>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub encounter_fields_sha256:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub player_profile:Option<crate::native_operations::PlayerProfileAppend>,
 }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -612,7 +616,7 @@ fn prepare(
     }
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
-    if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
+    if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(profile)=&generated.player_profile{profile.verify_map(&parent_inspection)?;}if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
     if let Some(expected)=&input.expected_encounter{retain_encounter_expectation(&mut encounter_expectations,expected.clone())?;}
     if let Some(append)=&input.encounter_append {
         if input.scenario_type!=0||!input.compile_scripts||input.script_attachment.is_none()||input.bsp_audio.is_some()||input.expected_tag_identity.is_none(){return invalid("New Firefight groups require a solo source, reviewed new controller, explicit script compilation and exact source inventory; audio editing is separate");}
@@ -1072,6 +1076,36 @@ fn apply_encounter_append(
     Ok(())
 }
 
+fn apply_player_profile(project:&Project,input:&WorkingTagsInput,prepared:&Prepared,request:&crate::native_operations::PlayerProfileAppend,
+    tags:&Path,workspace:&Path,runner:&Runner<'_>,invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)->Result<crate::native_operations::PlayerProfileAppend> {
+    let profile=project.firefight.as_ref().and_then(|rules|rules.native_player_profile.as_ref()).ok_or_else(||SparkError::Invalid("Review a native player loadout before applying it to recovered source".into()))?;
+    let root=checked_directory(tags)?;
+    for weapon in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
+        let path=checked_file(&root.join(safe_relative(&format!("{weapon}.weapon"))?))?;
+        if !path.starts_with(&root){return invalid("Player weapon dependency escaped staged tags");}
+    }
+    let tag=format!("{}.scenario",normalize_scenario(&input.scenario_path)?);
+    let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+    let read=||->Result<String>{
+        recheck_tools(input,&prepared.tools)?;
+        let fields=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()],workspace,"encounter-readback",44)?;
+        if fields.len()>1024*1024||fields.lines().any(|line|line.trim_start().to_ascii_lowercase().starts_with("error:")){return invalid("Native profile fields are incomplete or exceed 1 MiB");}
+        Ok(fields.replace("\r\n","\n"))
+    };
+    let before=read()?;
+    let planned=crate::native_operations::prepare_player_profile(&before,profile,prepared.parent_generated_firefight.as_ref().and_then(|previous|previous.player_profile.as_ref()))?;
+    if &planned!=request{return invalid("Player loadout/source changed after review; no profile writer ran");}
+    if !planned.reuse {
+        let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+        args.extend(crate::firefight::native_player_profile_arguments(profile,planned.index,&planned.name)?);args.push(tag.clone());
+        recheck_tools(input,&prepared.tools)?;
+        let log=invoke(runner,&edit,&args,workspace,"encounter-append",45)?;
+        if log.len()>1024*1024||log.lines().any(|line|line.trim_start().to_ascii_lowercase().starts_with("error:")){return invalid("Native player-profile writer reported incomplete output");}
+    }
+    let result=crate::native_operations::review_player_profile(&before,&read()?,&planned)?;
+    recheck_tools(input,&prepared.tools)?;Ok(result)
+}
+
 fn run_with(
     project: &Project,
     input: &WorkingTagsInput,
@@ -1261,10 +1295,14 @@ fn run_with(
             let binding=receipt.controller_binding.as_ref().ok_or_else(||SparkError::Invalid("New Firefight groups require their reviewed bound controller".into()))?;
             let entries=append.operation.encounter_appends()?;
             if binding.rules.as_ref()!=project.firefight.as_ref()||binding.groups.len()!=entries.len()||binding.groups.iter().zip(&entries).any(|(group,entry)|group.name!=entry.name||group.count!=entry.count||!group.actor_variant_path.replace('\\',"/").eq_ignore_ascii_case(&entry.actor_path.replace('\\',"/"))){return invalid("Reviewed controller and newly prepared native groups differ");}
+            if let Some(profile)=&append.player_profile {
+                if binding.loadout!="authored-profile"||binding.player_profile_name.as_deref()!=Some(profile.name.as_str()){return invalid("Controller and reviewed native loadout disagree");}
+            }else if binding.loadout!="scenario"||binding.player_profile_name.is_some(){return invalid("Controller applies a player profile without source review");}
             apply_encounter_append(project,input,&prepared,append,&tags,&workspace,&runner,&invoke)?;
+            let player_profile=if let Some(profile)=&append.player_profile {Some(apply_player_profile(project,input,&prepared,profile,&tags,&workspace,&runner,&invoke)?)}else{prepared.parent_generated_firefight.as_ref().and_then(|previous|previous.player_profile.clone())};
             let unchanged=prepared.parent_generated_firefight.as_ref().filter(|previous|append.existing_controller.is_some()&&previous.operation.encounter_appends().ok()==append.operation.encounter_appends().ok());
             let encounter_fields_sha256=unchanged.and_then(|previous|previous.encounter_fields_sha256.clone());
-            receipt.generated_firefight=Some(GeneratedFirefightSource{hud:prepared.parent_generated_firefight.as_ref().and_then(|previous|previous.hud.clone()),operation:append.operation.clone(),controller:receipt.attached_script.clone().ok_or_else(||SparkError::Invalid("Generated controller source identity disappeared".into()))?,encounter_fields_sha256});
+            receipt.generated_firefight=Some(GeneratedFirefightSource{player_profile,hud:prepared.parent_generated_firefight.as_ref().and_then(|previous|previous.hud.clone()),operation:append.operation.clone(),controller:receipt.attached_script.clone().ok_or_else(||SparkError::Invalid("Generated controller source identity disappeared".into()))?,encounter_fields_sha256});
         }
         if let Some(review)=input.encounter_append.as_ref().and_then(|request|request.hud.as_ref()) {
             let hud=apply_hud_append(project,input,&prepared,review,&tags,&workspace,&runner,&invoke)?;
@@ -1329,6 +1367,7 @@ fn run_with(
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
+        if let Some(profile)=receipt.generated_firefight.as_ref().and_then(|generated|generated.player_profile.as_ref()){profile.verify_map(&inspected)?;}
         let hud_readback=verify_hud_native_output(input,&prepared,&hud_sources,&tags,&workspace,&output,&inspected,&runner,&invoke)?;
         if !hud_readback.is_empty(){
             project::atomic_write(&directory.join("native-hud-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({"sourceParentSha256":receipt.parent_output_sha256,"outputSha256":inspected.sha256,"tags":hud_readback,"scope":"Current staged HUD root reflexive inventories and exposed descendants, independently recovered from compiled output. Root scalars, opaque cells and gameplay are not certified."}))?,false)?;

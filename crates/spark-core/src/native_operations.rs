@@ -256,7 +256,7 @@ impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
         if let Self::HudDuplicate{array,index,..}=self {
-            let listing=array_listing(before,array)?;let _=hud_array_items(&listing,array)?;
+            let listing=array_listing(before,array)?;let _=array_items(&listing,array)?;
             if usize::from(*index)>=listing.count||listing.count>=hud_array_limit(class,array)? {return invalid("Native HUD element is missing or the array has no remaining capacity");}
             return Ok(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-c".into(),format!("{array}[{index}]"),"end".into(),tag.into()]);
         }
@@ -585,23 +585,23 @@ fn hud_array_limit(class:&str,name:&str)->Result<usize> {
     crate::maps::hud_root_arrays(class)?.into_iter().find(|array|array.name==name).map(|array|array.maximum)
         .ok_or_else(||crate::SparkError::Invalid("Choose an admitted native HUD root array, not an arbitrary tool key".into()))
 }
-fn hud_array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>> {
+fn array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>> {
     let mut starts=vec![];
     for(index,line)in listing.body.iter().enumerate() {
         if !line.starts_with("    ")||line.starts_with("        "){continue;}
         let tail=line.strip_prefix(&format!("    {name}[")).and_then(|tail|tail.split_once(']'))
-            .ok_or_else(||crate::SparkError::Invalid("Unknown native HUD array element boundary".into()))?;
-        if tail.1.trim()!="struct"||tail.0.parse::<usize>().ok()!=Some(starts.len()){return invalid("Native HUD elements are not a complete ordered inventory");}
+            .ok_or_else(||crate::SparkError::Invalid("Unknown native array element boundary".into()))?;
+        if tail.1.trim()!="struct"||tail.0.parse::<usize>().ok()!=Some(starts.len()){return invalid("Native elements are not a complete ordered inventory");}
         starts.push(index);
     }
-    if starts.len()!=listing.count||(!starts.is_empty()&&starts[0]!=0)||starts.is_empty()&&!listing.body.is_empty(){return invalid("Native HUD element count differs from its field inventory");}
+    if starts.len()!=listing.count||(!starts.is_empty()&&starts[0]!=0)||starts.is_empty()&&!listing.body.is_empty(){return invalid("Native element count differs from its field inventory");}
     Ok(starts.iter().enumerate().map(|(index,start)|&listing.body[*start..starts.get(index+1).copied().unwrap_or(listing.body.len())]).collect())
 }
 fn reviewed_hud_duplicate(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
     let Operation::HudDuplicate{array,index,..}=operation else{return invalid("Not a HUD duplication");};
     let old=before.replace("\r\n","\n");let new=after.replace("\r\n","\n");
     let original=array_listing(&old,array)?;let result=array_listing(&new,array)?;
-    let old_items=hud_array_items(&original,array)?;let new_items=hud_array_items(&result,array)?;
+    let old_items=array_items(&original,array)?;let new_items=array_items(&result,array)?;
     let copied=old_items.get(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Selected native HUD element no longer exists".into()))?;
     if result.count!=original.count+1||!result.body.starts_with(&original.body) {
         return invalid("HUD duplication changed an original element or unexpected array count");
@@ -616,6 +616,65 @@ fn reviewed_hud_duplicate(before:&str,after:&str,operation:&Operation)->Result<V
         after:format!("{array}[{}] · exact exposed copy appended at {}",result.count,original.count)}])
 }
 
+
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct PlayerProfileAppend {
+    pub index:usize,pub name:String,pub profile:crate::firefight::NativePlayerProfile,pub reuse:bool,
+    pub original_names:Vec<String>,pub source_fields_sha256:String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub profile_fields_sha256:Option<String>,
+}
+fn profile_fields_hash(body:&[String])->Result<String>{Ok(crate::hex_bytes(Sha256::digest(serde_json::to_vec(body)?)))}
+fn profile_names(items:&[&[String]])->Result<Vec<String>> {
+    items.iter().map(|item|{
+        let names=item.iter().filter_map(|line|line.strip_prefix("        name (")).filter_map(|tail|tail.rsplit_once(')').map(|pair|pair.0)).collect::<Vec<_>>();
+        if names.len()!=1||names[0].len()>31{return invalid("Native player profile names are incomplete or unsupported");}
+        Ok(names[0].to_string())
+    }).collect()
+}
+/// Append only. Reusing a previous generated profile requires its exact field identity.
+pub fn prepare_player_profile(fields:&str,profile:&crate::firefight::NativePlayerProfile,previous:Option<&PlayerProfileAppend>)->Result<PlayerProfileAppend> {
+    let _=crate::firefight::native_player_profile_arguments(profile,0,"gs_ff_loadout")?;
+    let array=array_listing(fields,"player_starting_profile")?;
+    let items=array_items(&array,"player_starting_profile")?;
+    if array.count>256{return invalid("Native starting-profile capacity exceeds the admitted scenario format");}
+    let names=profile_names(&items)?;
+    if let Some(old)=previous.filter(|old|old.profile==*profile) {
+        let current=items.get(old.index).ok_or_else(||crate::SparkError::Invalid("Recorded player profile was removed; preserve/reconcile source first".into()))?;
+        if names[old.index]!=old.name||old.profile_fields_sha256.as_deref()!=Some(profile_fields_hash(current)?.as_str()){
+            return invalid("Recorded player loadout changed; automatic reuse was refused");
+        }
+        return Ok(PlayerProfileAppend{index:old.index,name:old.name.clone(),profile:profile.clone(),reuse:true,original_names:names,source_fields_sha256:profile_fields_hash(&array.body)?,profile_fields_sha256:old.profile_fields_sha256.clone()});
+    }
+    if array.count>=256{return invalid("Native scenario has no free player profile slot; original profiles were retained");}
+    let name=format!("gs_ff_loadout_{}",array.count);
+    if names.iter().any(|existing|existing.eq_ignore_ascii_case(&name)){return invalid("Generated player-profile name is already occupied; no profile was replaced");}
+    let _=crate::firefight::native_player_profile_arguments(profile,array.count,&name)?;
+    Ok(PlayerProfileAppend{index:array.count,name,profile:profile.clone(),reuse:false,original_names:names,source_fields_sha256:profile_fields_hash(&array.body)?,profile_fields_sha256:None})
+}
+pub fn review_player_profile(before:&str,after:&str,plan:&PlayerProfileAppend)->Result<PlayerProfileAppend> {
+    let old=array_listing(before,"player_starting_profile")?;let new=array_listing(after,"player_starting_profile")?;
+    if profile_fields_hash(&old.body)?!=plan.source_fields_sha256||new.count!=old.count+usize::from(!plan.reuse)||!new.body.starts_with(&old.body){
+        return invalid("Native profile append changed existing indices/fields or unexpected counts");
+    }
+    let old_items=array_items(&old,"player_starting_profile")?;let items=array_items(&new,"player_starting_profile")?;
+    let names=profile_names(&items)?;
+    if profile_names(&old_items)?!=plan.original_names||names.get(plan.index)!=Some(&plan.name){return invalid("Native profile names differ from reviewed source");}
+    let rest=|text:&str,array:&ArrayListing|text.lines().enumerate().filter(|(index,_)|*index<array.start||*index>=array.end).map(|(_,line)|line).collect::<Vec<_>>().join("\n");
+    if rest(before,&old)!=rest(after,&new){return invalid("Player loadout append changed unrelated scenario fields");}
+    let mut result=plan.clone();result.profile_fields_sha256=Some(profile_fields_hash(items[plan.index])?);Ok(result)
+}
+impl PlayerProfileAppend {
+    pub fn verify_map(&self,map:&crate::maps::MapInspection)->Result<()> {
+        let profiles=map.player_starting_profiles.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled player profiles are unreadable".into()))?;
+        if profiles.len()!=self.original_names.len()+usize::from(!self.reuse)||
+            profiles.iter().take(self.original_names.len()).zip(&self.original_names).any(|(profile,name)|profile.name!=*name){
+            return invalid("Compiled loadout append lost/reordered original player profiles");
+        }
+        crate::firefight::verify_native_player_profile(&self.profile,&self.name,self.index,map)
+    }
+}
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -642,7 +701,7 @@ pub fn compare_hud_arrays(class:&str,source:&str,compiled:&str)->Result<Vec<HudA
     let mut result=vec![];
     for definition in definitions {
         let before=array_listing(source,&definition.name)?;let after=array_listing(compiled,&definition.name)?;
-        let _=hud_array_items(&before,&definition.name)?;let _=hud_array_items(&after,&definition.name)?;
+        let _=array_items(&before,&definition.name)?;let _=array_items(&after,&definition.name)?;
         if before.count>definition.maximum||after.count!=before.count||after.body!=before.body {
             return invalid(format!("Compiled native HUD array differs from staged source: {}",definition.name));
         }

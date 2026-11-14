@@ -148,7 +148,8 @@ export default function RuntimeDock({
   const generation = useRef(0);
   const scriptSelection = useRef(0);
   const [scriptAttachment,setScriptAttachment]=useState<(NativeScriptAttachment&{sourceKey:string;reviewed:boolean})|null>(null);
-  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,workingTarget,project?.firefight]);
+  const [applyFirefightLoadout,setApplyFirefightLoadout]=useMapState<boolean>(id,'firefight.applyNativeLoadout',false);
+  const scriptSourceKey=JSON.stringify([project?.id,runtime,report?.workingSource?.buildId,report?.workingSource?.tagsDirectory,report?.workingSource?.projectFingerprint,workingTarget,project?.firefight,applyFirefightLoadout]);
   const currentScriptSourceKey=useRef(scriptSourceKey);currentScriptSourceKey.current=scriptSourceKey;
   const selectedScript=scriptAttachment?.sourceKey===scriptSourceKey?scriptAttachment:null;
   const [firefightActivation,setFirefightActivation]=useState<'manual'|'startup'>('manual');
@@ -394,9 +395,9 @@ export default function RuntimeDock({
     const request=generation.current,key=scriptSourceKey,selection=++scriptSelection.current;
     setBusy(true);setError('');setFirefightSource(null);
     try {
-      const plan=await call<FirefightSourcePlan>('prepare_firefight_source',{projectId:project.id});
+      const plan=await call<FirefightSourcePlan>('prepare_firefight_source',{projectId:project.id,applyPlayerLoadout:applyFirefightLoadout});
       if(plan.projectId!==project.id||plan.buildId!==report.workingSource.buildId||plan.tagsDirectory!==report.workingSource.tagsDirectory)throw Error('Native source selection changed; refresh and prepare again.');
-      const source=exportPlannedFirefightRound(plan.request.operation,firefightActivation,plan.previousController?.content.includes('(script startup gs_ff_bootstrap')??false,!!plan.hud);
+      const source=exportPlannedFirefightRound(plan.request.operation,firefightActivation,plan.previousController?.content.includes('(script startup gs_ff_bootstrap')??false,!!plan.hud,plan.request.playerProfile?.name);
       const bytes=new TextEncoder().encode(source.content);if(!bytes.length||bytes.length>1048576)throw Error('Generated controller exceeds the reviewed1MiB bound.');
       const digest=await crypto.subtle.digest('SHA-256',bytes);
       const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
@@ -692,11 +693,13 @@ export default function RuntimeDock({
           )}
           {project?.firefight&&report?.workingSource&&workingSourceAvailable&&<details className="native-script-attachment">
             <summary>Firefight groups &amp; controller</summary>
-            <p className="subtle">Prepare new inactive encounters with a controller, or revise recorded generated groups and their exact controller. Review old and new actors, counts, locations, source and exclusive script ownership. Native group revisions require unchanged generated fields at the end of the encounter list, with the same group names/order. Original encounters, palettes, scripts and equipment stay; saved loadout settings are not applied. Handwritten changes or adding/removing groups require separate reconciliation. Failure preserves previous-good source/cache and never restarts a game.</p>
+            <p className="subtle">Prepare new inactive encounters with a controller, or revise recorded generated groups and their exact controller. Review old and new actors, counts, locations, source and exclusive script ownership. Native group revisions require unchanged generated fields at the end of the encounter list, with the same group names/order. Original encounters, palettes, scripts and starting profiles stay. By default the controller keeps scenario equipment; optionally apply the saved loadout through a separate reviewed native profile. Handwritten changes or adding/removing groups require separate reconciliation. Failure preserves previous-good source/cache and never restarts a game.</p>
+            <label><input type="checkbox" checked={applyFirefightLoadout} disabled={busy||working||dirty} onChange={event=>{scriptSelection.current++;setFirefightSource(null);setApplyFirefightLoadout(event.target.checked);}}/>Apply saved Firefight player loadout · append/reuse a separate native profile</label>
             <label>Controller activation<select aria-label="New Firefight controller activation" value={firefightActivation} disabled={busy||working||dirty} onChange={event=>{scriptSelection.current++;setFirefightSource(null);setFirefightActivation(event.target.value as 'manual'|'startup');}}><option value="manual">Manual · set gs_ff_start true in reviewed source</option><option value="startup">Start automatically after map load</option></select></label>
             <button disabled={busy||working||dirty||!native||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void prepareFirefightSource()}>Prepare groups &amp; controller</button>
             {selectedFirefightSource&&<>
               <p>{selectedFirefightSource.plan.request.operation.encounters.length} {selectedFirefightSource.plan.previousController?'reviewed groups':'new groups'} · source <code className="wrap-code">{selectedFirefightSource.plan.tagIdentity}</code></p>
+              {selectedFirefightSource.plan.request.playerProfile&&<p>Player loadout: {selectedFirefightSource.plan.request.playerProfile.reuse?'reuse reviewed':'append'} <strong>{selectedFirefightSource.plan.request.playerProfile.name}</strong> at native index {selectedFirefightSource.plan.request.playerProfile.index}; existing profiles stay. Primary: {selectedFirefightSource.plan.request.playerProfile.profile.primaryWeapon}; secondary: {selectedFirefightSource.plan.request.playerProfile.profile.secondaryWeapon??'none'}.</p>}
               <small>Original script inventory <code className="wrap-code">{selectedFirefightSource.plan.request.scriptsSha256}</code></small>
               <ol className="native-encounter-queue">{selectedFirefightSource.plan.request.operation.encounters.map(entry=><li key={entry.name}><span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>Zone center {entry.position.join(' / ')} · grid {entry.grid?.offset??0} / {entry.grid?.total??entry.count}</small></span></li>)}</ol>
               {selectedFirefightSource.plan.previousGroups.length>0&&<details><summary>Recorded source layout before revision</summary><ol className="native-encounter-readback">{selectedFirefightSource.plan.previousGroups.map(group=><li key={group.name}><strong>{group.name}</strong> · {group.positions.length} × {group.actorPath}<ol>{group.positions.map((position,index)=><li key={index}><code>{position.map(value=>value.toFixed(4)).join(' · ')}</code></li>)}</ol></li>)}</ol></details>}
@@ -711,7 +714,7 @@ export default function RuntimeDock({
                 <small>Authoring source SHA256 <code className="wrap-code">{selectedFirefightSource.plan.hud.review.sourceSha256}</code></small>
               </details>}
               <label>Review generated controller<textarea readOnly rows={6} spellCheck={false} style={{width:'100%',boxSizing:'border-box'}} value={selectedFirefightSource.script.content}/></label>
-              <label><input type="checkbox" checked={selectedFirefightSource.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setFirefightSource(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed original scripts, encounter locations, the exact generated module being revised (if shown), new controller source, HUD messages and exclusive wave ownership.</label>
+              <label><input type="checkbox" checked={selectedFirefightSource.reviewed} disabled={busy||working||dirty} onChange={event=>{const reviewed=event.target.checked;setFirefightSource(old=>old?.sourceKey===scriptSourceKey?{...old,reviewed}:old);}}/>I reviewed original scripts, encounter locations, the exact generated module being revised (if shown), new controller source, HUD messages, player loadout choice and exclusive wave ownership.</label>
               <div className="button-row"><button disabled={busy||working||dirty||!selectedFirefightSource.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue} onClick={()=>void buildWorkingTags(undefined,true,selectedFirefightSource.script,selectedFirefightSource)}>{selectedFirefightSource.plan.previousController?'Build Firefight revision':'Build new groups & controller'}</button><button disabled={busy||working} onClick={()=>{scriptSelection.current++;setFirefightSource(null);}}>Clear prepared source</button></div>
               <p className="subtle">Temporary planned source, not compiled readback or gameplay proof. Forerunner’s separate finite encounter director must stay off for these scripted waves.</p>
             </>}

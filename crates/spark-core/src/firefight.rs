@@ -515,12 +515,19 @@ pub struct NativeControllerBinding {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub rules:Option<FirefightConfig>,
     pub schema_version:u16,pub source_sha256:String,pub encounters:Vec<Vec<String>>,pub groups:Vec<NativeControllerGroup>,pub activation:String,pub loadout:String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub player_profile_name:Option<String>,
 }
 impl NativeControllerBinding {
     pub fn validate(&self)->Result<()> {
-        if self.schema_version!=1||self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_digit()||(b'a'..=b'f').contains(&c))||!matches!(self.activation.as_str(),"manual"|"startup")||self.loadout!="scenario"||self.groups.is_empty()||self.groups.len()>128||self.encounters.is_empty()||self.encounters.len()>32||self.encounters.iter().any(|wave|wave.is_empty()||wave.len()>8)||self.encounters.iter().map(Vec::len).sum::<usize>()!=self.groups.len() {
+        if self.schema_version!=1||self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_digit()||(b'a'..=b'f').contains(&c))||!matches!(self.activation.as_str(),"manual"|"startup")||!matches!(self.loadout.as_str(),"scenario"|"authored-profile")||self.groups.is_empty()||self.groups.len()>128||self.encounters.is_empty()||self.encounters.len()>32||self.encounters.iter().any(|wave|wave.is_empty()||wave.len()>8)||self.encounters.iter().map(Vec::len).sum::<usize>()!=self.groups.len() {
             return invalid("Unsupported or incomplete native controller source binding");
         }
+        if self.loadout=="authored-profile" {
+            let name=self.player_profile_name.as_deref().ok_or_else(||SparkError::Invalid("Authored controller has no native profile name".into()))?;
+            let profile=self.rules.as_ref().and_then(|rules|rules.native_player_profile.as_ref()).ok_or_else(||SparkError::Invalid("Authored controller has no saved player loadout".into()))?;
+            let _=native_player_profile_arguments(profile,0,name)?;
+        }else if self.player_profile_name.is_some(){return invalid("Scenario-equipment controller cannot silently apply an authored profile");}
         if let Some(rules)=&self.rules {
             validate(rules)?;
             if !rules.source_sha256.as_deref().is_some_and(|hash|hash.eq_ignore_ascii_case(&self.source_sha256)){return invalid("Controller rules and native binding use different source maps");}
@@ -547,6 +554,11 @@ impl NativeControllerBinding {
     pub fn verify_map(&self,map:&MapInspection)->Result<()> {
         self.validate()?;
         if map.header.scenario_type!=0{return invalid("Bound native controller output must remain singleplayer");}
+        if let Some(name)=&self.player_profile_name {
+            let profiles=map.player_starting_profiles.as_ref().ok_or_else(||SparkError::Invalid("Authored controller player profiles are unreadable".into()))?;
+            let index=profiles.iter().position(|profile|profile.name==*name).ok_or_else(||SparkError::Invalid("Authored controller player profile is absent".into()))?;
+            verify_native_player_profile(self.rules.as_ref().and_then(|rules|rules.native_player_profile.as_ref()).ok_or_else(||SparkError::Invalid("Authored player loadout is absent".into()))?,name,index,map)?;
+        }
         let candidates=native_encounter_candidates(map);
         for group in &self.groups {
             let found=candidates.iter().filter(|candidate|candidate.name.eq_ignore_ascii_case(&group.name)).collect::<Vec<_>>();
@@ -1392,6 +1404,49 @@ pub fn validate_native_round_rules(config:&FirefightConfig)->Result<()> {
     Ok(())
 }
 
+/// Standard scenario profile arguments shared by fresh and recovered source.
+pub fn native_player_profile_arguments(profile:&NativePlayerProfile,index:usize,name:&str)->Result<Vec<String>> {
+    validate_native_profile(profile)?;
+    if index>=256||name.is_empty()||name.len()>31||!name.bytes().next().is_some_and(|c|c.is_ascii_alphabetic()||c==b'_')||!name.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_') {
+        return invalid("Native player profile needs a safe unique name and an index below 256");
+    }
+    let p=format!("player_starting_profile[{index}]");
+    let mut args=vec!["-I".into(),"player_starting_profile".into(),"1".into(),"end".into()];
+    let mut fields=vec![
+        ("name",name.into()),("starting_health_modifier",profile.health.to_string()),("starting_shield_modifier",profile.shields.to_string()),
+        ("primary_weapon",format!("{}.weapon",profile.primary_weapon.replace('\\',"/"))),
+        ("primary_rounds_loaded",profile.primary_loaded.to_string()),("primary_rounds_reserved",profile.primary_reserved.to_string()),
+        ("starting_fragmentation_grenade_count",profile.fragmentation_grenades.to_string()),("starting_plasma_grenade_count",profile.plasma_grenades.to_string()),
+    ];
+    if let Some(weapon)=&profile.secondary_weapon {
+        fields.extend([("secondary_weapon",format!("{}.weapon",weapon.replace('\\',"/"))),
+            ("secondary_rounds_loaded",profile.secondary_loaded.to_string()),("secondary_rounds_reserved",profile.secondary_reserved.to_string())]);
+    }
+    for(key,value)in fields{args.extend(["-S".into(),format!("{p}.{key}"),value]);}
+    Ok(args)
+}
+/// Resolve weapon identities in independently decoded output, never by datum reuse.
+pub fn verify_native_player_profile(expected:&NativePlayerProfile,name:&str,index:usize,map:&MapInspection)->Result<()> {
+    validate_native_profile(expected)?;
+    let profiles=map.player_starting_profiles.as_ref().ok_or_else(||SparkError::Invalid("Compiled player profiles could not be decoded".into()))?;
+    let actual=profiles.get(index).filter(|profile|profile.name==name).ok_or_else(||SparkError::Invalid("Compiled player profile name/index differs from reviewed source".into()))?;
+    if profiles.iter().filter(|profile|profile.name.eq_ignore_ascii_case(name)).count()!=1{return invalid("Compiled player profile name is ambiguous");}
+    let weapon_id=|path:&str|->Result<u32>{
+        let found=map.tags.iter().filter(|tag|tag.class=="weap"&&tag_key(&tag.path)==tag_key(path)).collect::<Vec<_>>();
+        if found.len()!=1{return invalid(format!("Compiled player weapon is missing or ambiguous: {path}"));}
+        Ok(found[0].id)
+    };
+    let primary=Some(weapon_id(&expected.primary_weapon)?);
+    let secondary=expected.secondary_weapon.as_ref().map(|path|weapon_id(path)).transpose()?;
+    if actual.primary_weapon_tag_id!=primary||actual.secondary_weapon_tag_id!=secondary{return invalid("Compiled player weapon slots differ from authored loadout");}
+    if actual.health!=expected.health||actual.shields!=expected.shields||
+        actual.primary_loaded!=expected.primary_loaded as i16||actual.primary_reserved!=expected.primary_reserved as i16||
+        actual.secondary_loaded!=expected.secondary_loaded as i16||actual.secondary_reserved!=expected.secondary_reserved as i16||
+        actual.fragmentation_grenades!=expected.fragmentation_grenades as i8||actual.plasma_grenades!=expected.plasma_grenades as i8||
+        actual.grenade_type2!=0||actual.grenade_type3!=0{return invalid("Compiled player health, shields, ammunition or grenades differ from authored source");}
+    Ok(())
+}
+
 pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<NativeRoundPlan>> {
     let Some(doc) = &project.quick_forge else { return Ok(None); };
     if !has_native_round_source(doc) { return Ok(None); }
@@ -1442,18 +1497,9 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
     });
     let set = |args:&mut Vec<String>,key:String,value:String|args.extend(["-S".into(),key,value]);
     let vector = |position:[f32;3]|position.map(|value|value.to_string()).join(",");
-    let p="player_starting_profile[0]";
-    let mut loadout=vec!["-I".into(),"player_starting_profile".into(),"1".into(),"end".into()];
-    for (key,value) in [("name","gs_firefight_start".into()),("starting_health_modifier",player.health.to_string()),("starting_shield_modifier",player.shields.to_string()),
-        ("primary_weapon",format!("{}.weapon",primary.tag_path)),("primary_rounds_loaded",player.primary_loaded.to_string()),("primary_rounds_reserved",player.primary_reserved.to_string()),
-        ("starting_fragmentation_grenade_count",player.fragmentation_grenades.to_string()),("starting_plasma_grenade_count",player.plasma_grenades.to_string())] {
-        set(&mut loadout,format!("{p}.{key}"),value);
-    }
+    let mut loadout=native_player_profile_arguments(&plan.player_profile,0,"gs_firefight_start")?;
     plan.dependencies.push(primary);
     plan.dependencies.extend(secondary.iter().cloned());
-    if let Some(weapon)=&secondary {
-        for(key,value)in[("secondary_weapon",format!("{}.weapon",weapon.tag_path)),("secondary_rounds_loaded",player.secondary_loaded.to_string()),("secondary_rounds_reserved",player.secondary_reserved.to_string())] {set(&mut loadout,format!("{p}.{key}"),value);}
-    }
     loadout.push(tag.clone());add(&mut plan,loadout);
     let player_starts=doc.spawns.iter().map(|spawn|spawn.position).collect::<Vec<_>>();
     for (w,wave) in config.waves.iter().enumerate() {
@@ -1529,23 +1575,7 @@ pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection
     if profiles.len()!=1 || profiles[0].name!="gs_firefight_start" {
         return invalid("Compiled Firefight must contain exactly its authored gs_firefight_start player profile");
     }
-    let actual=&profiles[0];
-    let expected=&plan.player_profile;
-    let weapon_id=|path:&str|map.tags.iter().find(|tag|tag.class=="weap"&&tag_key(&tag.path)==tag_key(path)).map(|tag|tag.id);
-    let primary=weapon_id(&expected.primary_weapon);
-    let secondary=expected.secondary_weapon.as_ref().and_then(|path|weapon_id(path));
-    if primary.is_none() || (expected.secondary_weapon.is_some()&&secondary.is_none()) || actual.primary_weapon_tag_id!=primary || actual.secondary_weapon_tag_id!=secondary {
-        return invalid("Compiled Firefight player weapon slots differ from the authored loadout");
-    }
-    if (actual.health-expected.health).abs()>0.0001 || (actual.shields-expected.shields).abs()>0.0001 ||
-        actual.primary_loaded!=expected.primary_loaded as i16 || actual.primary_reserved!=expected.primary_reserved as i16 ||
-        actual.secondary_loaded!=expected.secondary_loaded as i16 || actual.secondary_reserved!=expected.secondary_reserved as i16 ||
-        actual.fragmentation_grenades!=expected.fragmentation_grenades as i8 || actual.plasma_grenades!=expected.plasma_grenades as i8 ||
-        actual.grenade_type2!=0 || actual.grenade_type3!=0 {
-        return invalid(format!("Compiled Firefight player profile differs: health/shields={}/{}, primary ammo={}/{}, secondary ammo={}/{}, grenades={}/{}/{}/{}",
-            actual.health,actual.shields,actual.primary_loaded,actual.primary_reserved,actual.secondary_loaded,actual.secondary_reserved,
-            actual.fragmentation_grenades,actual.plasma_grenades,actual.grenade_type2,actual.grenade_type3));
-    }
+    verify_native_player_profile(&plan.player_profile,"gs_firefight_start",0,map)?;
     for name in &plan.encounter_names {
         let matches = map.encounters.iter().filter(|encounter| &encounter.name == name).collect::<Vec<_>>();
         if matches.len() != 1 || matches[0].squads != ["round_squad"] {
