@@ -540,7 +540,12 @@ impl Store {
     }
     /// Preview only; every destructive UI operation must bind to this exact plan.
     pub fn cleanup_plan(&self) -> Result<CleanupPlan> {
-        let _guard = lock(&self.root.join("catalog.lock"))?;
+        let guard = lock(&self.root.join("catalog.lock"))?;
+        self.cleanup_plan_under_lock(&guard)
+    }
+    // The caller retains this catalog guard through the decision it protects.
+    // Cleanup must not release it between fresh review and entry removal.
+    fn cleanup_plan_under_lock(&self, _guard: &fs::File) -> Result<CleanupPlan> {
         let mut eligible = vec![];
         let mut protected = vec![];
         let age = self.limits()?.abandoned_days as u64 * 86400;
@@ -605,11 +610,16 @@ impl Store {
         if ids.is_empty() {
             return Ok(0);
         }
-        let latest = self.cleanup_plan()?;
+        #[cfg(test)]
+        tests::run_cleanup_review_hook();
+        // An output can become accepted while the confirmation is open or
+        // while waiting for another catalog writer. Revalidate under the same
+        // guard retained for deletion, rather than trusting a pre-lock plan.
+        let guard = lock(&self.root.join("catalog.lock"))?;
+        let latest = self.cleanup_plan_under_lock(&guard)?;
         if latest.token != plan.token {
             return invalid("Storage changed after preview; inspect the new cleanup plan");
         }
-        let _guard = lock(&self.root.join("catalog.lock"))?;
         let mut entries = self.entries()?;
         let mut removed = 0u64;
         for id in ids {
@@ -1357,6 +1367,40 @@ pub fn unique_file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path)
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Deterministically schedule another ordinary catalog owner at the last
+    // pre-lock boundary. Thread-local state cannot affect parallel fixtures.
+    std::thread_local! {
+        static CLEANUP_REVIEW_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+    }
+    pub(super) fn run_cleanup_review_hook() {
+        let hook = CLEANUP_REVIEW_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[test]
+    fn cleanup_preserves_output_accepted_between_review_and_catalog_lock() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("storage")).unwrap();
+        let output = root.path().join("native-output");
+        let lease = store.reserve(&output, None, 65536, Category::Staging, "native fixture").unwrap();
+        fs::create_dir(&output).unwrap();
+        fs::write(output.join("accepted.map"), b"previous-good native output").unwrap();
+        drop(lease);
+        let plan = store.cleanup_plan().unwrap();
+        assert_eq!(plan.eligible.len(), 1);
+        let id = plan.eligible[0].id.clone();
+        let owner = store.clone();
+        let accepted_id = id.clone();
+        CLEANUP_REVIEW_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            owner.update(&accepted_id, "ready", true, Some("accepted-source-revision".into())).unwrap();
+        })));
+        let result = store.cleanup(&plan, &[id.clone()], true);
+        assert!(result.is_err(), "a newly accepted output must never be deleted using the earlier review");
+        assert_eq!(fs::read(output.join("accepted.map")).unwrap(), b"previous-good native output");
+        let entry = store.entries().unwrap().into_iter().find(|entry| entry.id == id).unwrap();
+        assert!(entry.protected);
+        assert_eq!(entry.source_revision.as_deref(), Some("accepted-source-revision"));
+    }
+
     #[test]
     fn stale_native_data_override_cannot_recreate_retired_repository_folder() {
         let root=tempfile::tempdir().unwrap();let repo=root.path().join("Spark");
