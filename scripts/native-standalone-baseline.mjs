@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import {createReadStream} from 'node:fs';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {assertQaOutputPath} from './native-qa-storage.mjs';
 const exec=promisify(execFile),bs=String.fromCharCode(92);
 const hash=async file=>{const h=crypto.createHash('sha256');for await(const b of createReadStream(file))h.update(b);return h.digest('hex');};
 export function nativeTagPath(value){
@@ -25,6 +26,30 @@ export function nextNativeDependencies(paths,archiveIndex,staged,bindings=new Ma
  }return [...result.values()];
 }
 
+/** Reuse only an exact prepared input set within the current disposable owner.
+ * Changed/extra/linked files are conflicts, never grounds for replacement. */
+export async function verifyPreparedSdk(tags,source,ownerRoot,archiveSha256){
+ const [owner,actual]=await Promise.all([fs.realpath(ownerRoot),fs.realpath(tags)]),relative=path.relative(owner,actual);
+ if(!relative||path.isAbsolute(relative)||relative==='..'||relative.startsWith('..'+path.sep))throw Error('Prepared SDK is outside the current disposable owner');
+ if(source?.archiveSha256!==archiveSha256||source.fullSdkCopied!==false||!Array.isArray(source.manifest)||!source.manifest.length||source.manifest.length>4096)throw Error('Prepared SDK source identity differs');
+ if(crypto.createHash('sha256').update(JSON.stringify(source.manifest)).digest('hex')!==source.manifestSha256)throw Error('Prepared SDK manifest identity differs');
+ const expected=new Map();let total=0;
+ for(const row of source.manifest){const tag=nativeTagPath(row.path);if(expected.has(tag)||!Number.isSafeInteger(row.bytes)||row.bytes<1||!/^[a-f0-9]{64}$/.test(row.sha256))throw Error('Invalid prepared SDK row');expected.set(tag,row);total+=row.bytes;}
+ if(total!==source.bytes||expected.size!==source.files||total>384*1024**2)throw Error('Prepared SDK inventory exceeds its exact source bound');
+ const pending=[actual];let directories=0,files=0;
+ while(pending.length){const folder=pending.pop();if(++directories>8192)throw Error('Prepared SDK directory bound exceeded');
+  for await(const entry of await fs.opendir(folder)){
+   const file=path.join(folder,entry.name);if(entry.isSymbolicLink())throw Error('Linked prepared SDK input refused');
+   if(entry.isDirectory()){pending.push(file);continue;}
+   const tag=path.relative(actual,file).split(path.sep).join('/'),row=expected.get(tag);
+   if(!entry.isFile()||!row||++files>4096)throw Error('Unexpected prepared SDK input: '+tag);
+   const info=await fs.lstat(file);if(!info.isFile()||info.isSymbolicLink()||info.size!==row.bytes||await hash(file)!==row.sha256)throw Error('Prepared SDK input changed: '+tag);
+   expected.delete(tag);
+  }
+ }
+ if(expected.size)throw Error('Prepared SDK inputs are missing');return actual;
+}
+
 export async function nativeStandaloneBaseline({context,archive,kit,invader,report,scenario='levels/test/bloodgulch/bloodgulch.scenario',reviewSeconds=120,additionalRoots=[],prepareOnly=false,onPrepared}){
   report.scope='Unmodified owner-installed H1A SDK source baseline; setup/launch diagnostic, not Spark authoring or retail cache acceptance';
   report.visualAcceptance=false;report.gameplayAcceptance=false;report.complete=false;
@@ -32,7 +57,9 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
   const shell=JSON.parse(await fs.readFile(new URL('../docs/fixtures/h1a-standalone-shell-inputs.json',import.meta.url),'utf8'));
   archive=path.resolve(archive);kit=path.resolve(kit);invader=path.resolve(invader);scenario=nativeTagPath(scenario);
   if((await fs.stat(archive)).size!==spec.sourceArchive.bytes||await hash(archive)!==spec.sourceArchive.sha256)throw Error('Selected SDK archive differs from the verified owner-installed source');
-  const root=path.join(context.directory,'standalone-baseline');await fs.mkdir(root);await fs.mkdir(path.join(root,'data'));
+  const preparedTags=process.env.SPARK_BASELINE_PREPARED_TAGS;
+  if(preparedTags&&!prepareOnly)throw Error('Prepared input reuse cannot launch or edit its source tree');
+  let root=path.join(context.directory,'standalone-baseline');if(!preparedTags){await fs.mkdir(root);await fs.mkdir(path.join(root,'data'));}
   const run=async(binary,args,options={})=>{const pending=exec(binary,args,{windowsHide:true,maxBuffer:2*1024**2,timeout:120000,...options});if(pending.child)await context.trackProcess(pending.child);return pending;};
   const listed=await run('tar.exe',['-tf',archive]);const archiveIndex=new Map();
   for(const line of listed.stdout.split(/\r?\n/).filter(value=>value.startsWith('tags/')&&!value.endsWith('/'))){nativeTagPath(line.slice(5));const key=line.toLowerCase();if(archiveIndex.has(key))throw Error('Ambiguous SDK archive path');archiveIndex.set(key,line);}
@@ -41,18 +68,27 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
   const roots=[scenario,'globals/globals.globals',...shell.roots,...additionalRoots];
   // Reuse the already verified dependency-sized authoring/shell manifests.
   // Native recursive queries still discover and validate this scene's closure.
-  let replayRows=[];
+  let replayRows=[],seedPreparation;
   if(process.env.SPARK_BASELINE_SEED_RECEIPT){
     const file=path.resolve(process.env.SPARK_BASELINE_SEED_RECEIPT),info=await fs.lstat(file);
     if(!info.isFile()||info.isSymbolicLink()||info.size>2*1024**2)throw Error('Invalid bounded SDK seed receipt');
     const receipt=JSON.parse(await fs.readFile(file,'utf8'));
-    const prior=receipt.standaloneBaseline?.source??receipt.firefight?.sourcePreparation?.source;
+    seedPreparation=receipt.standaloneBaseline??receipt.firefight?.sourcePreparation??receipt.sourcePreparation;
+    const prior=seedPreparation?.source;
     if(prior?.archiveSha256!==spec.sourceArchive.sha256||!Array.isArray(prior.manifest)||prior.manifest.length>4096)throw Error('SDK seed belongs to another source');
     replayRows=prior.manifest;report.seedReceiptSha256=await hash(file);
   }
   const seeds=[...new Set([...spec.tagFiles,...shell.tagFiles,...replayRows].map(row=>nativeTagPath(row.path)))];
   report.pinnedSeedFiles=seeds.length;
-  const staged=new Set(),bindings=new Map(),manifest=[],queries=[];let wave=nextNativeDependencies([...roots,...seeds],archiveIndex,staged,bindings),bytes=0,drive,child;
+  if(preparedTags){
+    if(!seedPreparation?.originalInputsUnchanged)throw Error('Prepared SDK receipt has no completed input-preservation check');
+    await assertQaOutputPath(preparedTags,{reservationBytes:0});
+    const tags=await verifyPreparedSdk(preparedTags,seedPreparation.source,context.env.SPARK_GENERATED_ROOT, spec.sourceArchive.sha256);
+    if(path.basename(tags)!=='tags')throw Error('Prepared SDK must retain its native tags directory layout');
+    root=path.dirname(tags);report.preparedInputReuse={files:seedPreparation.source.files,bytes:seedPreparation.source.bytes,manifestSha256:seedPreparation.source.manifestSha256,rehashVerified:true};
+  }
+  const manifest=preparedTags?structuredClone(seedPreparation.source.manifest):[],staged=new Set(manifest.map(row=>row.path.toLowerCase())),bindings=new Map(),queries=[];
+  let wave=preparedTags?[]:nextNativeDependencies([...roots,...seeds],archiveIndex,staged,bindings),bytes=preparedTags?seedPreparation.source.bytes:0,drive,child;
   const aliases=await run('subst.exe',[]);report.existingAliases=aliases.stdout.split(/\r?\n/).filter(Boolean).length;
   try{
     for(const letter of 'ZYXWVUTSRQP'){
@@ -80,7 +116,8 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
       }
       wave=nextNativeDependencies(next,archiveIndex,staged,bindings);console.log('STANDALONE_BASELINE_DEPENDENCIES',JSON.stringify({files:staged.size,bytes,next:wave.length}));
     }
-    for(const tag of [scenario,'globals/globals.globals',...shell.roots]){const verified=await run(path.join(invader,'invader-dependency.exe'),['-t',drive+bs+'tags','-r',tag.replaceAll('/',bs)]);if(/ERROR:|Failed to/i.test(verified.stdout+' '+verified.stderr)||nextNativeDependencies(verified.stdout.split(/\r?\n/).filter(Boolean),archiveIndex,staged,bindings).length)throw Error('Complete SDK dependency closure did not validate: '+tag);}
+    const verifiedRoots=new Set([...roots,...bindings.values()]);
+    for(const tag of verifiedRoots){const verified=await run(path.join(invader,'invader-dependency.exe'),['-t',drive+bs+'tags','-r',tag.replaceAll('/',bs)]);if(/ERROR:|Failed to/i.test(verified.stdout+' '+verified.stderr)||nextNativeDependencies(verified.stdout.split(/\r?\n/).filter(Boolean),archiveIndex,staged,bindings).length)throw Error('Complete SDK dependency closure did not validate: '+tag);for(const provider of bindings.values())verifiedRoots.add(provider);}
     for(const [requested,actual] of bindings){const header=Buffer.alloc(64),handle=await fs.open(path.join(root,'tags',actual));try{await handle.read(header,0,64,0);}finally{await handle.close();}if(header.toString('ascii',36,40)!=='mod2'||header.toString('ascii',60,64)!=='blam')throw Error('H1A provider is not the exact native GBX class: '+requested);}
     report.nativeModelClassBindings=Object.fromEntries(bindings);
     manifest.sort((a,b)=>a.path.localeCompare(b.path));report.source={scenario,archiveSha256:spec.sourceArchive.sha256,files:manifest.length,bytes,dependencyQueries:queries.length,manifestSha256:crypto.createHash('sha256').update(JSON.stringify(manifest)).digest('hex'),fullSdkCopied:false,manifest};

@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {useMapState} from '../mapSession';
-import {NATIVE_AI_START_VIEW,nativeAiStartPosition,nativeAiStartMatches} from '../nativeAiStart';
+import {NATIVE_AI_START_VIEW,nativeAiStartPosition,nativeAiStartMatches,nativeAiStartKey} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
 import type {NativeOperation,NativeTagContext} from '../nativeOperations';
 import {Notice} from './ui';
@@ -15,7 +15,7 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
   const rows=context.scenarioStartSquads??[];
   const squad=rows.find(row=>`${row.encounter}:${row.squad}`===squadKey)??rows.find(row=>row.encounter===draft?.encounter&&row.squad===draft.squad)??rows.find(row=>row.starts?.length)??rows[0];
   const point=squad?.starts?.find(point=>String(point.index)===startIndex)??squad?.starts?.find(point=>point.index===draft?.start)??squad?.starts?.[0];
-  const key=JSON.stringify([context.projectId,context.buildId,context.tag,context.tagSha256,squad?.encounter,squad?.squad,point?.index]);
+  const key=nativeAiStartKey(context,squad?.encounter,squad?.squad,point?.index);
   const values=draft?.key===key?draft.values:point?.position.map(String) as [string,string,string]|undefined;
   const position=nativeAiStartPosition(values);
   const valid=!!position;
@@ -23,14 +23,17 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
     Math.abs(value-position[index])>Math.max(1e-6,Math.abs(value)*2**-22));
   const protectedGroup=!!squad&&context.protectedSquadEncounters?.includes(squad.encounterName.replace(/[A-Z]/g,char=>char.toLowerCase()));
   const issue=context.startEditIssue??(protectedGroup?'This group has a preserved source recipe. Move its starts in its original authoring workflow; direct overrides require source reconciliation.':null);
-  const disabled=busy||dirty||!!issue;
+  // Busy belongs to this inspector, not every retained inspector of the map.
+  // Sharing it makes idle and previewing panels fight over the same draft.
+  const sourceLocked=dirty||!!issue;
+  const disabled=busy||sourceLocked;
   useEffect(()=>{
     if(draft&&!nativeAiStartMatches(draft,context))setDraft(null);
   },[context]);
   useEffect(()=>{onDraftChange();},[draft?.key,JSON.stringify(draft?.values)]);
   useEffect(()=>{
-    if(draft?.key===key&&nativeAiStartMatches(draft,context)&&draft.locked!==disabled)setDraft({...draft,locked:disabled});
-  },[disabled,key,draft]);
+    if(draft?.key===key&&nativeAiStartMatches(draft,context)&&draft.locked!==sourceLocked)setDraft({...draft,locked:sourceLocked});
+  },[sourceLocked,key,draft]);
   useEffect(()=>{
     const request=draft?.reviewRequest??0;
     if(!request||lastReview.current===request||!draft||!nativeAiStartMatches(draft,context))return;
@@ -41,7 +44,7 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
     if(!squad||!point||!context.tagSha256)return;
     setDraft({key,projectId:context.projectId,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,
       encounter:squad.encounter,squad:squad.squad,start:point.index,encounterName:squad.encounterName,squadName:squad.name,
-      original:point.position,values:next,active,focus,locked:disabled,reviewRequest:draft?.key===key?draft.reviewRequest:undefined});onDraftChange();
+      original:point.position,values:next,active,focus,locked:sourceLocked,reviewRequest:draft?.key===key?draft.reviewRequest:undefined});onDraftChange();
   }
   function preview() {
     if(disabled||!changed||!squad||!point||!position||!context.tagSha256)return;

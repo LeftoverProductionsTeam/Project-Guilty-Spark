@@ -54,14 +54,38 @@ fn report(id: &str, watch: &Watch) -> WatchReport {
 }
 pub(super) fn baseline(job: &Path) -> Reply<Option<Hashes>> {
     let file = job.join("working-tags-receipt.json");
-    if !file.is_file() {
-        return Ok(None);
-    }
-    let receipt: core::working_tags::WorkingTagsReceipt =
-        serde_json::from_slice(&bounded_read(&file, 4 * 1024 * 1024)?).map_err(error)?;
-    let manifest = receipt
-        .final_tag_hashes
-        .ok_or("Working build has no final tag inventory")?;
+    core::reject_links(job).map_err(error)?;
+    let manifest = if file.is_file() {
+        let receipt: core::working_tags::WorkingTagsReceipt =
+            serde_json::from_slice(&bounded_read(&file, 4 * 1024 * 1024)?).map_err(error)?;
+        receipt.final_tag_hashes.ok_or("Working build has no final tag inventory")?
+    } else {
+        // Recovered MCC source already pins the exact native compiler inputs.
+        // Reuse that existing proof, never today's edited tree as its baseline.
+        let conversion = job.join("conversion-manifest.json");
+        let preservation = job.join("native-tag-preservation.json");
+        if !conversion.is_file() || !preservation.is_file() { return Ok(None); }
+        let conversion: serde_json::Value = serde_json::from_slice(&bounded_read(&conversion, 4 * 1024 * 1024)?).map_err(error)?;
+        let proof: serde_json::Value = serde_json::from_slice(&bounded_read(&preservation, 64 * 1024)?).map_err(error)?;
+        let record: BuildRecord = serde_json::from_slice(&bounded_read(&job.join("receipt.json"), 1024 * 1024)?).map_err(error)?;
+        if record.status != "validated" || record.target != "mcc-cea"
+            || job.file_name().and_then(|v|v.to_str()) != Some(record.id.as_str())
+            || conversion["schemaVersion"] != 1 || conversion["sourcePreserved"] != true
+            || proof["schemaVersion"] != 1 || proof["status"] != "passed" || proof["allInputTagBytesUnchanged"] != true {
+            return Err("Recovered source has no matching validated native preservation receipt".into());
+        }
+        let output = record.output.as_ref().ok_or("Recovered build output is missing")?;
+        core::reject_links(output).map_err(error)?;
+        if output.parent().map(fs::canonicalize).transpose().map_err(error)? != Some(fs::canonicalize(job.join("output")).map_err(error)?)
+            || Some(maps::hash_file(output).map_err(error)?) != record.sha256 {
+            return Err("Recovered source compiled output identity changed".into());
+        }
+        core::working_tags::TagHashManifest {
+            relative_path: "native-tag-input-hashes.json".into(),
+            sha256: proof["inputManifestSha256"].as_str().ok_or("Recovered input inventory identity is missing")?.into(),
+            file_count: proof["nativeFiles"].as_u64().and_then(|n|usize::try_from(n).ok()).filter(|n|*n>0).ok_or("Recovered input inventory count is invalid")?,
+        }
+    };
     let relative = core::safe_relative(&manifest.relative_path).map_err(error)?;
     if relative.components().count() != 1
         || manifest.file_count > core::working_tag_changes::MAX_FILES
@@ -313,6 +337,29 @@ mod tests {
             dirty.load(Ordering::Acquire),
             "native filesystem event was not observed"
         );
+    }
+    #[test]
+    fn recovered_inventory_uses_only_validated_pinned_compiler_inputs() {
+        let root = tempfile::tempdir().unwrap();let id=uuid::Uuid::new_v4().to_string();let job=root.path().join(&id);
+        fs::create_dir_all(job.join("output")).unwrap();let output=job.join("output/fixture.map");
+        fs::write(&output,b"Integrity fixture, not a native Halo cache").unwrap();
+        let tags=Hashes::from([("test.weapon".into(),"a".repeat(64))]);let inventory=job.join("native-tag-input-hashes.json");
+        let bytes=serde_json::to_vec(&tags).unwrap();fs::write(&inventory,&bytes).unwrap();
+        let conversion=job.join("conversion-manifest.json");fs::write(&conversion,br#"{"schemaVersion":1,"sourcePreserved":true}"#).unwrap();
+        let proof=serde_json::json!({"schemaVersion":1,"status":"passed","nativeFiles":1,"allInputTagBytesUnchanged":true,"inputManifestSha256":maps::hash_file(&inventory).unwrap()});
+        let proof_path=job.join("native-tag-preservation.json");fs::write(&proof_path,serde_json::to_vec(&proof).unwrap()).unwrap();
+        let mut receipt=serde_json::json!({"id":id,"timestamp":"fixture","status":"validated","target":"mcc-cea","output":output,"sha256":maps::hash_file(&output).unwrap(),"message":"fixture","projectFingerprint":"b".repeat(64)});
+        let receipt_path=job.join("receipt.json");fs::write(&receipt_path,serde_json::to_vec(&receipt).unwrap()).unwrap();
+        assert_eq!(baseline(&job).unwrap().unwrap(),tags);
+        fs::write(&inventory,b"{}").unwrap();assert!(baseline(&job).is_err());fs::write(&inventory,&bytes).unwrap();
+        for (field,value) in [("nativeFiles",serde_json::json!(2)),("status",serde_json::json!("failed")),("allInputTagBytesUnchanged",serde_json::json!(false))] {
+            let mut invalid=proof.clone();invalid[field]=value;fs::write(&proof_path,serde_json::to_vec(&invalid).unwrap()).unwrap();assert!(baseline(&job).is_err());
+        }
+        fs::write(&proof_path,serde_json::to_vec(&proof).unwrap()).unwrap();
+        receipt["status"]="failed".into();fs::write(&receipt_path,serde_json::to_vec(&receipt).unwrap()).unwrap();assert!(baseline(&job).is_err());
+        receipt["status"]="validated".into();fs::write(&receipt_path,serde_json::to_vec(&receipt).unwrap()).unwrap();
+        fs::write(&output,b"changed output").unwrap();assert!(baseline(&job).is_err());assert_eq!(fs::read(&output).unwrap(),b"changed output");
+        fs::remove_file(conversion).unwrap();assert!(baseline(&job).unwrap().is_none());
     }
     #[test]
     fn compiled_inventory_cannot_be_replaced_or_escape_its_job() {

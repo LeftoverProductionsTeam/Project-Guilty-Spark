@@ -272,7 +272,7 @@ export default function Tags({
   }
   if (!inspection)
     return (
-      project.builds.some(build=>build.status==='validated')?<section className="analysis-card"><h2>Native working tags</h2><p>Choose a tag from this map’s validated build. Native tools edit a separate source revision; Build working tag edits compiles the result.</p><NativeTagOperations project={project} dirty={hasUnsavedChanges}/></section>:
+      project.builds.some(build=>build.status==='validated')?<section className="analysis-card"><h2>Native working tags</h2><p>Choose a tag from this map’s validated build. Native tools edit a separate source revision; Build working tag edits compiles the result.</p><NativeTagOperations project={project} dirty={hasUnsavedChanges} onLevelEditor={onLevelEditor}/></section>:
       <Empty icon={<FileCode2 size={30} />} title="Open a Halo map to browse its tags">
         The tag browser reads the source cache’s real tag index. An asset-only project does not contain Halo
         tags.
@@ -618,7 +618,7 @@ export default function Tags({
               </details>
             <div className="tag-native-tools">
             <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
-            <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
+            <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} onLevelEditor={onLevelEditor} />
             <TagDuplicatePanel
               key={`duplicate:${project.id}:${selectedTag.id}`}
               project={project}

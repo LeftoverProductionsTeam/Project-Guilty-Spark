@@ -11,9 +11,15 @@ export function nativeAiStartPosition(values:unknown):Vec3|null {
   if(!Array.isArray(values)||values.length!==3||values.some(value=>typeof value!=='string'||!value.trim()||!Number.isFinite(Number(value))||Math.abs(Number(value))>1e6))return null;
   return values.map(Number) as Vec3;
 }
+// A native tag's separator spelling differs between default scenario and
+// explicit tag selection. Normalize separators only, never case or segments.
+const tagPath=(tag:string)=>tag.replaceAll('\\','/');
+export function nativeAiStartKey(context:NativeTagContext,encounter?:number,squad?:number,start?:number):string {
+  return JSON.stringify([context.projectId,context.buildId,tagPath(context.tag),context.tagSha256,encounter,squad,start]);
+}
 export function nativeAiStartMatches(view:NativeAiStartView,context:NativeTagContext):boolean {
   if(context.class!=='scnr'||context.startEditIssue||view.projectId!==context.projectId||view.buildId!==context.buildId||
-    view.tag!==context.tag||view.sourceSha256!==context.tagSha256)return false;
+    tagPath(view.tag)!==tagPath(context.tag)||view.sourceSha256!==context.tagSha256)return false;
   const row=context.scenarioStartSquads?.find(row=>row.encounter===view.encounter&&row.squad===view.squad);
   const point=row?.starts?.find(point=>point.index===view.start);
   return !!row&&!!point&&row.encounterName===view.encounterName&&row.name===view.squadName&&

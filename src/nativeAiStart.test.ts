@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {nativeAiStartMatches,nativeAiStartPosition,nativeAiStartDragValues} from './nativeAiStart';
+import {nativeAiStartMatches,nativeAiStartPosition,nativeAiStartDragValues,nativeAiStartKey} from './nativeAiStart';
 import type {NativeAiStartView} from './nativeAiStart';
 import type {NativeTagContext} from './nativeOperations';
 const context=()=>({projectId:'project',buildId:'build',tag:'level.scenario',class:'scnr',tagSha256:'a'.repeat(64),
@@ -13,6 +13,17 @@ it('admits only the reviewed source identity and refuses protected/changed nativ
    expect(nativeAiStartMatches(view,{...source,...patch})).toBe(false);
  for(const patch of [{encounter:1},{squad:1},{start:1},{squadName:'other'},{encounterName:'other'},{original:[1,2,4] as [number,number,number]}])
    expect(nativeAiStartMatches({...view,...patch},source)).toBe(false);
+});
+it('keeps the proposal across native separator aliases without accepting another tag or revision',()=>{
+ const source={...context(),tag:'levels\\a10\\a10.scenario'},view={...draft(),tag:'levels/a10/a10.scenario'};
+ expect(nativeAiStartMatches(view,source)).toBe(true);
+ expect(nativeAiStartKey(source,0,0,0)).toBe(nativeAiStartKey({...source,tag:view.tag},0,0,0));
+ for(const tag of ['levels/A10/a10.scenario','levels/a10/../a10/a10.scenario','levels/a10/other.scenario']) {
+  expect(nativeAiStartMatches({...view,tag},source)).toBe(false);
+  expect(nativeAiStartKey({...source,tag},0,0,0)).not.toBe(nativeAiStartKey(source,0,0,0));
+ }
+ expect(nativeAiStartKey(source,0,0,1)).not.toBe(nativeAiStartKey(source,0,0,0));
+ expect(nativeAiStartKey({...source,tagSha256:'b'.repeat(64)},0,0,0)).not.toBe(nativeAiStartKey(source,0,0,0));
 });
 it('never makes a coordinate handle from missing, nonfinite, excessive or incomplete values',()=>{
  expect(nativeAiStartPosition(['0','-2.5','1e2'])).toEqual([0,-2.5,100]);

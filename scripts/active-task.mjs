@@ -92,11 +92,12 @@ export function writeCheckpoint(root, text) {
   if (fs.existsSync(file)) {
     const previous = read(file);
     parseCheckpoint(previous);
-    atomic(path.join(directory, 'ACTIVE_TASK.previous.md'), previous);
+    // Git retains committed checkpoints. Do not churn or replace legacy recovery.
+    if (previous === text) return state;
   }
   atomic(file, text);
   if (read(file) !== text)
-    throw Error('Checkpoint readback differs; previous valid checkpoint remains available.');
+    throw Error('Checkpoint readback differs; inspect the current file and Git history before continuing.');
   return state;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

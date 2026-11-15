@@ -47,12 +47,18 @@ test('updating or accepting the active task never consumes a deferred request', 
     fs.rmSync(root, { recursive: true });
   }
 });
-test('atomic update retains one valid checkpoint; invalid or oversized writes preserve it', () => {
+test('atomic updates preserve Git-backed continuity without rewriting legacy recovery', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'spark-continuity-'));
   try {
     writeCheckpoint(root, fixture('active'));
+    assert.deepEqual(fs.readdirSync(path.join(root,'docs')),['ACTIVE_TASK.md']);
+    const legacy=fixture('active')+'# Existing unique recovery context\n';
+    fs.writeFileSync(path.join(root,'docs/ACTIVE_TASK.previous.md'),legacy);
     writeCheckpoint(root, fixture('blocked'));
-    assert.equal(fs.readFileSync(path.join(root, 'docs/ACTIVE_TASK.previous.md'), 'utf8'), fixture('active'));
+    assert.equal(fs.readFileSync(path.join(root, 'docs/ACTIVE_TASK.previous.md'), 'utf8'), legacy);
+    const current=path.join(root,'docs/ACTIVE_TASK.md');fs.utimesSync(current,123,123);
+    const unchanged=fs.statSync(current).mtimeMs;writeCheckpoint(root,fixture('blocked'));
+    assert.equal(fs.statSync(current).mtimeMs,unchanged);
     assert.throws(() => writeCheckpoint(root, 'incomplete'));
     assert.throws(() => writeCheckpoint(root, fixture('accepted') + 'x'.repeat(32768)));
     assert.equal(fs.readFileSync(path.join(root, 'docs/ACTIVE_TASK.md'), 'utf8'), fixture('blocked'));

@@ -646,6 +646,13 @@ export default function World({
   const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
   const ortho=!cinematic&&savedOrtho;
   const [fly, setFly] = useMapState(project.id,'world.fly',false);
+  useEffect(()=>{
+    // An explicit source-handle request owns navigation, not a cinematic
+    // camera. Later user flight toggles remain independent of the proposal.
+    if(nativeAiStart?.active&&nativeAiStart.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){
+      setFly(false);setPlayerView(false);
+    }
+  },[nativeAiStart?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [frame, setFrame] = useState(0);
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
   const [startId,setStartId]=useMapState(project.id,'world.start','');

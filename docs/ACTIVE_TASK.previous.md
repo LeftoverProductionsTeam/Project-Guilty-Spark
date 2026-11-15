@@ -4,7 +4,7 @@ Task: Operation110 — native Extraction/campaign creator source; lighting/Linux
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
 Latest verified revision: 8f577e2b0b6ae2adb509ec50504ff05a3f9c9fca — Xbox actor→production CE solo compile/readback, preserving scenario parsing, required UI closure and solo starts; scoped source/tests/evidence committed locally.
-Next action: Resume the highest missing authoring gate: original-campaign viewport→source preview/accept→native rebuild/readback. First inspect existing native UI fixtures and source admission; preserve current generated-group edit restrictions. Xbox cache/current source committed8f577e2; targeted native18083/focused77190 pass, all output deleted.37compiler warnings and actual Windows import/restart, Marine fidelity/AI, Forerunner/game and loose Xbox-root acceptance stay open. No game/Forerunner/push.
+Next action: Use live owned QA terminal1077 (Node REPL, qaContext/qaFinish/qaHold; run-9dhQNY/output) for a no-SDK immediate Workshop Save reproduction. Collect bounded saveFailure diagnostics; repair actual cause without weakening dirty/source assertions, then rerun full recovered-AI variant. All temporary build/native output must be disposed by qaFinish(); await qaHold before exiting.37944 app build passed but initial Save failed before AI steps;2034733006B disposed. WIP navigation/flight/path-alias fixes have TypeScript/frontend checks, not native acceptance.
 
 ## Acceptance
 

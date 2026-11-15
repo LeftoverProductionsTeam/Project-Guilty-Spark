@@ -44,3 +44,25 @@ test('helper explanations render above a clipped drawer',async({page})=>{
   const tip=page.getByRole('tooltip');await expect(tip).toBeVisible();expect(await tip.evaluate(element=>element.parentElement===document.body)).toBe(true);
   const box=(await tip.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(1280);expect(box.y+box.height).toBeLessThanOrEqual(800);
 });
+
+// Retained inspectors share only source ownership, never their local busy flag.
+test('native AI preview remains stable with an idle retained inspector',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(String(error)));
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-ai');
+ const first=page.getByTestId('ai-inspector-0'),second=page.getByTestId('ai-inspector-1');
+ await first.locator('summary').click();await second.locator('summary').click();
+ await first.getByRole('spinbutton',{name:'AI start X',exact:true}).fill('5');
+ await first.getByRole('button',{name:'Show handles in Level Editor',exact:true}).click();
+ const state=()=>page.getByTestId('ai-draft').textContent().then(text=>JSON.parse(text!));
+ await first.getByRole('button',{name:'Preview AI starting position',exact:true}).click();
+ await expect(first.getByRole('spinbutton',{name:'AI start X',exact:true})).toBeDisabled();
+ await expect(second.getByRole('spinbutton',{name:'AI start X',exact:true})).toBeEnabled();
+ expect(await state()).toMatchObject({values:['5','2','3'],locked:false,active:true});
+ await page.getByRole('button',{name:'Finish preview',exact:true}).click();
+ await expect(first.getByRole('spinbutton',{name:'AI start X',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();
+ await expect.poll(async()=>(await state()).locked).toBe(true);
+ await expect(second.getByRole('spinbutton',{name:'AI start X',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();
+ await expect.poll(async()=>(await state()).locked).toBe(false);expect(errors).toEqual([]);
+});

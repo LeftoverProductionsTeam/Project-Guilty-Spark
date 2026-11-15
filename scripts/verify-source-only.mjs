@@ -10,6 +10,7 @@ import { withDevelopmentWorkspace, runDevelopmentCommand, exportDevelopmentBuild
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
+if(stages.includes('firefight')&&process.env.SPARK_NATIVE_WORKSHOP_SAVE_ONLY==='1')throw Error('Save-only reproduction is not Firefight acceptance. Run the focused native harness directly.');
 if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime', 'baseline', 'sparklink', 'firefight'].includes(s)))
   throw Error('Unknown source-only verification stage');
 if (stages.includes('native') && ![sourceMap, kit, tags, invader].every(Boolean))

@@ -1,4 +1,9 @@
 import {useState} from 'react';
+import NativeStartingPositions from '../../../src/components/NativeStartingPositions';
+import {useMapState} from '../../../src/mapSession';
+import {NATIVE_AI_START_VIEW} from '../../../src/nativeAiStart';
+import type {NativeAiStartView} from '../../../src/nativeAiStart';
+import type {NativeTagContext} from '../../../src/nativeOperations';
 import {createRoot} from 'react-dom/client';
 import {Matrix4} from 'three';
 import {NumberField,HelpTip} from '../../../src/components/ui';
@@ -17,4 +22,10 @@ function Fixture(){
     <WorkspacePanel id="inspector" label="Inspector"><div className="forge-live-panel"><p>Compact drawer content</p><div style={{overflow:'hidden',width:260,height:35}}><HelpTip help="This explanation must escape the clipping container and stay above the viewport."/></div></div></WorkspacePanel>
     </WorkspacePanels></div>;
 }
-createRoot(document.getElementById('root')!).render(<Fixture/>);
+function NativeAiDraftFixture(){
+ const [busy,setBusy]=useState(false),[dirty,setDirty]=useState(false);
+ const context={projectId:'ai-panel-fixture',buildId:'source',tag:'levels/test/test.scenario',class:'scnr',tagSha256:'a'.repeat(64),startEditIssue:null,protectedSquadEncounters:[],scenarioStartSquads:[{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1,starts:[{index:0,position:[1,2,3]}]}]} as NativeTagContext;
+ const [draft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
+ return <><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><button onClick={()=>setBusy(false)}>Finish preview</button><output data-testid="ai-draft">{JSON.stringify(draft)}</output>{[true,false].map((active,index)=><section key={index} data-testid={'ai-inspector-'+index}><NativeStartingPositions context={context} busy={active&&busy} dirty={dirty} onPreview={()=>setBusy(true)} onDraftChange={()=>{}}/></section>)}</>;
+}
+createRoot(document.getElementById('root')!).render(location.search==='?native-ai'?<NativeAiDraftFixture/>:<Fixture/>);

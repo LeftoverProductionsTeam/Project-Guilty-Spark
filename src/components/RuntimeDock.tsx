@@ -728,7 +728,7 @@ export default function RuntimeDock({
           {project && report?.workingSource && h1aSource && !authoringPending && <WorkingTagChanges {...toolTags} />}
           {showH1aTools && !authoringPending && <BaboonTools project={project} dirty={dirty} epoch={epoch} />}
           {workingSourceAvailable && project && report?.workingSource && !authoringPending && (
-            <NativeTagOperations project={project} dirty={dirty} epoch={epoch} />
+            <NativeTagOperations project={project} dirty={dirty} epoch={epoch} onLevelEditor={()=>onNavigate('quickforge')} />
           )}
           {project && report?.workingSource && h1aSource && !authoringPending && (
             <BspAudioEditor
