@@ -60,6 +60,7 @@ struct Stage {
     ce_resource_sha256: std::collections::BTreeMap<String,String>,
     executable_name: String,
     staged_sha256: std::collections::BTreeMap<String,String>,
+    forerunner_extraction:bool,
 }
 impl Drop for Stage {
     fn drop(&mut self) {
@@ -150,7 +151,7 @@ pub(crate) fn copy_pin_bounded(source: &Path, target: &Path, expected: &str, tot
     Ok(())
 }
 fn forerunner_registration(state:&AppState,expected:Option<&runtime::RuntimeRegistration>,expected_sha256:Option<&str>)->Reply<runtime::RuntimeRegistration>{
-    if !cfg!(all(windows,target_arch="x86_64")){return Err("The Forerunner solo playtest source currently targets Windows x64 Spark with the recorded x86 engine".into());}
+    if !cfg!(all(windows,target_arch="x86_64")){return Err("The Forerunner solo playtest source currently targets Windows x64 Spark with a reviewed x86 or x64 engine".into());}
     let reg=runtime_registration(state,runtime::RuntimeId::OpenCe)?;
     let plan=runtime::prepare_launch(&reg).map_err(error)?;
     let expected=expected.ok_or("Inspect the selected Forerunner profile before starting its playtest")?;
@@ -161,17 +162,18 @@ fn forerunner_registration(state:&AppState,expected:Option<&runtime::RuntimeRegi
 }
 fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:BuildRecord)->Reply<Stage>{
     let installed=runtime::inspect_registration(reg).map_err(error)?;
-    if installed.executable_sha256.as_deref()!=Some(runtime::FORERUNNER_WINDOWS_X86_SHA256){return Err("Forerunner changed before staging".into());}
+    let executable_sha=installed.executable_sha256.as_deref().ok_or("Forerunner identity is missing")?;
+    let machine=runtime::forerunner_windows_machine(executable_sha).ok_or("Forerunner changed or has no reviewed Windows profile; inspect the build before staging")?;
     let executable=installed.executable.as_deref().ok_or("Forerunner executable is missing")?;
     let package=executable.parent().ok_or("Forerunner package folder is missing")?;
     let library=package.join("SDL3.dll");core::reject_links(&library).map_err(error)?;
     // The reviewed Windows source links one adjacent SDL3 library. Pin the
-    // installed x86 member; never borrow another runtime's DLLs.
+    // installed architecture-matched member; never borrow another runtime's DLLs.
     let bytes=bounded_read(&library,64*1024*1024)?;
-    if bytes.len()<64 || &bytes[..2]!=b"MZ"{return Err("Forerunner needs its own installed x86 SDL3.dll".into());}
+    if bytes.len()<64 || &bytes[..2]!=b"MZ"{return Err("Forerunner needs its own architecture-matched installed SDL3.dll".into());}
     let pe=u32::from_le_bytes(bytes[60..64].try_into().map_err(error)?) as usize;
     let dll_header=bytes.get(pe..pe.saturating_add(24)).ok_or("SDL3.dll has an invalid PE header")?;
-    if &dll_header[..4]!=b"PE\0\0" || dll_header[4..6]!=[0x4c,0x01] || u16::from_le_bytes([dll_header[22],dll_header[23]])&0x2000==0{return Err("Forerunner's SDL3.dll must match the admitted x86 executable".into());}
+    if &dll_header[..4]!=b"PE\0\0" || dll_header[4..6]!=machine.to_le_bytes() || u16::from_le_bytes([dll_header[22],dll_header[23]])&0x2000==0{return Err("Forerunner's SDL3.dll must match the admitted executable architecture".into());}
     let library_sha=core::hex_bytes(sha2::Sha256::digest(&bytes));drop(bytes);
     let output=build.output.as_ref().ok_or("Build output is missing")?;
     let header=maps::inspect_header(output).map_err(error)?;
@@ -182,9 +184,9 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
     fs::create_dir_all(&root).map_err(error)?;lease.mark_owned().map_err(error)?;
     let budget=store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
     let name=executable.file_name().and_then(|n|n.to_str()).ok_or("Invalid Forerunner executable name")?.to_owned();
-    let mut result=Stage{root,lease:Some(lease),budget,build:build.clone(),map:header.name.clone(),ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
+    let mut result=Stage{forerunner_extraction:false,root,lease:Some(lease),budget,build:build.clone(),map:header.name.clone(),ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
     prepare_runtime_roots(&result.root)?;let mut total=0;
-    for(source,relative,sha)in[(executable.to_path_buf(),format!("engine/{name}"),runtime::FORERUNNER_WINDOWS_X86_SHA256.to_owned()),(library,"engine/SDL3.dll".into(),library_sha)]{
+    for(source,relative,sha)in[(executable.to_path_buf(),format!("engine/{name}"),executable_sha.to_owned()),(library,"engine/SDL3.dll".into(),library_sha)]{
         copy_pin(&source,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
     }
     for name in ["ui.map","carousel.map"]{
@@ -210,12 +212,16 @@ fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&S
         let file=stage.root.join(relative);core::reject_links(&file).map_err(error)?;
         if maps::hash_file(&file).map_err(error)?!=*sha{return Err(format!("Private playtest member {relative} changed before launch"));}
     }
+    if stage.staged_sha256.get(&format!("engine/{}",stage.executable_name))!=Some(&original.executable_sha256){return Err("Forerunner executable changed after staging; the private copy was not launched".into());}
     let mut isolated=reg.clone();isolated.root=stage.root.join("engine");isolated.executable=isolated.root.join(&stage.executable_name);isolated.data_root=Some(stage.root.join("data"));
     let plan=runtime::prepare_launch(&isolated).map_err(error)?;
     let mut command=registered_runtime_command_at(state,&isolated,&plan,Some(&stage.root.join("profile")))?;
     // Native HaloScript owns these waves. No debug/test startup or unbuilt
     // HALO_START_MAP request is inherited or invented here.
-    for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_RENDERER","gl"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
+    for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
+    if stage.forerunner_extraction&&runtime::forerunner_windows_machine(&original.executable_sha256)!=Some(0x8664){return Err("This older Forerunner build is not reviewed for native Extraction settlement; select the current verified x64 profile".into());}
+    if stage.forerunner_extraction{command.env("HALO_EXTRACTION","true").env("HALO_NET_COOP_SCRIPT_ADAPTATIONS","false");}
+    if runtime::forerunner_windows_machine(&original.executable_sha256)==Some(0x014c){command.env("HALO_RENDERER","gl");}
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());Ok(command)
 }
 fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecord) -> Reply<Stage> {
@@ -229,7 +235,7 @@ fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecor
     fs::create_dir_all(&root).map_err(error)?;
     lease.mark_owned().map_err(error)?;
     let budget = store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
-    let mut result = Stage { root, lease: Some(lease), budget, build: build.clone(), map: header.name.clone(), ce_resource_sha256: Default::default(), executable_name: String::new(), staged_sha256: Default::default() };
+    let mut result = Stage { forerunner_extraction:false, root, lease: Some(lease), budget, build: build.clone(), map: header.name.clone(), ce_resource_sha256: Default::default(), executable_name: String::new(), staged_sha256: Default::default() };
     prepare_runtime_roots(&result.root)?;
     let mut total = 0;
     let engine_source=installed.executable.as_deref().and_then(Path::parent).ok_or("Runtime executable has no package folder")?;
@@ -389,6 +395,8 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let runtime_id=runtime_id.unwrap_or(runtime::RuntimeId::ChupathingyCe);
         let reg=match runtime_id{runtime::RuntimeId::ChupathingyCe=>registration(&state)?,runtime::RuntimeId::OpenCe=>forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?,_=>return Err("No owned playtest adapter is admitted for this runtime".into())};
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let mission_extraction=project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled"));
+        if mission_extraction&&runtime_id!=runtime::RuntimeId::OpenCe{return Err("This saved mission requires Forerunner native settled extraction; another engine cannot complete its objective".into());}
         let build=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{checked_build(&state,&project,None)?};
         // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
         let mut workbench=lock(&state.runtime_workbench)?;
@@ -396,7 +404,7 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
-        let result=(||{let staged=stage(&state,&reg,build)?;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
+        let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=mission_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
         match result {
             Ok(run)=>{let answer=lock(&session.view)?.clone();std::thread::spawn(move||{let result=drive(app,owner,reg,session.clone(),run);if let Ok(mut view)=session.view.lock(){view.process_id=None;view.game_build_id=None;view.game_sha256=None;view.pending_job_id=None;view.phase=if result.is_ok(){"stopped"}else{"failed"}.into();view.detail=result.err().unwrap_or_else(||"Private playtest stopped; generated runtime scratch disposed. Source and build history remain.".into());}});Ok(answer)}
             Err(problem)=>{let mut view=lock(&session.view)?;view.phase="failed".into();view.error=Some(problem.clone());Err(problem)}

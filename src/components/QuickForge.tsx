@@ -2690,6 +2690,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   )}
                   {tab === 'properties' && (
                     <ForgeProperties
+                      missionGatedExtraction={project.studio?.missions.some(beat=>beat.trigger==='forerunnerExtractionSettled')}
                       document={doc}
                       weaponPaths={project.nativeAssetImports?.filter(binding=>binding.tagClass==='weap').map(binding=>binding.nativePath)}
                       onBakeNative={bakeLighting}
@@ -3352,6 +3353,7 @@ function ForgeProperties({
   notify,
   logicSource,
   onSelectLogic,
+  missionGatedExtraction=false,
 }: {
   document: QuickForgeDocument;
   weaponPaths?: string[];
@@ -3361,6 +3363,7 @@ function ForgeProperties({
   commit: (doc: QuickForgeDocument, description: string) => void;
   notify: Props['notify'];
   logicSource?: NativeLogicSource;
+  missionGatedExtraction?:boolean;
   onSelectLogic: (id: string) => void;
 }) {
   const node = chosen.length === 1 ? chosen[0] : null;
@@ -3407,7 +3410,7 @@ function ForgeProperties({
         <strong>{chosen.length ? `${chosen.length} selected` : 'Map properties'}</strong>
         <Pill>{node ? nodeCategory(node) : doc.gameMode}</Pill>
       </div>
-      <LogicEvents document={doc} node={node} source={logicSource} commit={commit} onSelect={onSelectLogic} />
+      <LogicEvents missionGatedExtraction={missionGatedExtraction} document={doc} node={node} source={logicSource} commit={commit} onSelect={onSelectLogic} />
       {node ? (
         <fieldset disabled={node.value.locked}>
           <label className="forge-field">

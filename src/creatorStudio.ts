@@ -53,9 +53,10 @@ export interface MissionBeat {
   id: string;
   title: string;
   objective: string;
-  trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'escort' | 'deviceActivated' | 'timer';
+  trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'escort' | 'deviceActivated' | 'weaponOwned' | 'forerunnerExtractionSettled' | 'timer';
   encounterName: string;
   triggerRef?: string | null;
+  weaponPath?: string | null;
   timerSeconds?: number | null;
   minimumSurvivors?: number | null;
   escortFailure?: 'stop' | 'continue' | null;
@@ -155,6 +156,17 @@ export function blackEchoMission(nextId:()=>string):MissionBeat[] {
     hudObjective:true,hudText:title,
   }));
 }
+/** Explicitly bind this known blueprint to Forerunner's existing native contract.
+ * Existing objective IDs, authored text, source modules and other beats survive. */
+export function connectBlackEchoObjectives(project:Project,nextId:()=>string):Project {
+ const base=project.studio?.missions.length?project:addBlackEchoDraft(project,nextId),studio=base.studio!,beats=studio.missions;
+ if(beats.length!==7||beats[1].trigger!=='escort'||beats[1].encounterName!=='be_marines'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
+ if(!base.quickForge||base.quickForge.native||base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
+ return {...base,studio:{...studio,missions:beats.map((beat,index)=>index===3?{...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',objective:'Collect the selected native technology weapon. Actual player inventory ownership completes this objective; entering its area does not.'}:index===6?{...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'}:beat)}};
+}
+export function validMissionWeaponPath(value:string):boolean {
+ return value.length>0&&value.length<=240&&/^[A-Za-z0-9_][A-Za-z0-9_ ./-]*$/.test(value)&&value.split('/').every(part=>part!==''&&part!=='.'&&part!=='..')&&!value.endsWith('.weapon');
+}
 /** One project history action; original geometry, bindings and source modules
  * stay intact. Areas are editable source markers, not valid terrain/navigation. */
 export function addBlackEchoDraft(project:Project,nextId:()=>string):Project {
@@ -188,7 +200,7 @@ const commandToken = /^[A-Za-z0-9_-]{1,64}$/;
 const variantToken = /^[A-Za-z0-9_ -]{1,64}$/;
 const recordId = /^[A-Za-z0-9_-]{1,72}$/;
 const scriptIdent = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
-const triggerValues = new Set(['manual', 'triggerVolume', 'encounterCleared', 'escort', 'deviceActivated', 'timer']);
+const triggerValues = new Set(['manual', 'triggerVolume', 'encounterCleared', 'escort', 'deviceActivated', 'weaponOwned', 'forerunnerExtractionSettled', 'timer']);
 const runtimes = new Set<ServerRuntime>(['haloCustomEdition', 'haloPC', 'haloDemo', 'mcc', 'openCE', 'chupathingyCE']);
 const verdicts = new Set<PlaytestVerdict>(['notRun', 'pass', 'fail', 'blocked']);
 const safeText = (s: string, max: number) => typeof s === 'string' && s.length <= max && !/[\x00-\x1f\x7f]/.test(s);
@@ -234,6 +246,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
+      (m.weaponPath!=null&&m.weaponPath!==''&&(typeof m.weaponPath!=='string'||!validMissionWeaponPath(m.weaponPath))) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||

@@ -240,6 +240,8 @@ pub struct CapabilityEvidence {
 }
 #[cfg(test)] mod hosting_context_tests {
     use super::*;
+    #[test]
+    fn forerunner_profiles_keep_exact_binary_and_dependency_architecture(){assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X86_SHA256),Some(0x014c));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(&"0".repeat(64)),None);assert_eq!(shared_content_interface(RuntimeId::OpenCe,FORERUNNER_WINDOWS_X64_SHA256),Some("forerunner"));assert_eq!(shared_content_interface(RuntimeId::ChupathingyCe,FORERUNNER_WINDOWS_X64_SHA256),None);}
     #[test] fn multiplayer_and_campaign_guides_use_their_actual_menu_context(){
         let multiplayer=hosting_plan_for(RuntimeId::MccSteam,HostingAction::HostPrivateOnline,Some(1));
         assert!(multiplayer.steps.iter().any(|step|step.contains("Custom Games")));
@@ -720,8 +722,8 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
         executable=fs::canonicalize(engine)?;executable_sha256=engine_hash;
         diagnostics.push("Reviewed Chupathingy launcher resolved to its exact installed game executable; no launcher configuration was changed.".into());
     }
-    if registration.runtime_id == RuntimeId::OpenCe && executable_sha256 == FORERUNNER_WINDOWS_X86_SHA256 {
-        diagnostics.push("Forerunner firefight-build-002: shared content uses separate Spark-managed settings, saves, logs and caches. Play opens its menus, not the current project; project deployment and Live Rebuild remain unavailable. Spark launch acceptance is pending.".into());
+    if registration.runtime_id == RuntimeId::OpenCe && forerunner_windows_machine(&executable_sha256).is_some() {
+        diagnostics.push("Reviewed Forerunner identity: shared content uses separate Spark-managed settings, saves, logs and caches. Play opens menus; authored solo staging needs validated CE609 content and its own reviewed action. Automatic map revision readback and Live Rebuild remain unavailable; gameplay acceptance is separate.".into());
     }
     if binary_platform != platform() {
         diagnostics.push(format!(
@@ -931,11 +933,17 @@ pub fn activate_registration(registrations: &mut Vec<RuntimeRegistration>, id: &
 pub const FORERUNNER_WINDOWS_X86_SHA256: &str =
     "fb8d204f21e57a4db6ed44f078338a02023c49a3998b6a437e1f4d1d8f8fa4b7";
 
+/// Owner-approved help/discovery,15Nov: build25767db9, Windows/x64,
+/// contract1, runtime.discover only, network45/native44, CE609 solo startup.
+/// This admits the documented path interface, not game/mission acceptance.
+pub const FORERUNNER_WINDOWS_X64_SHA256:&str="9543508eced47d7237d69310915f4f78344b248b83686c7e2cafe82ba9e6b17b";
+pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_SHA256=>Some(0x8664),_=>None}}
+
 /// Reviewed path interfaces only. A declared version or a similarly named executable is insufficient.
 /// Local Faber234/Chupathingy identities are owner-installed, not publisher attestations.
 pub fn shared_content_interface(id: RuntimeId, executable_sha256: &str) -> Option<&'static str> {
     match (id, executable_sha256) {
-        (RuntimeId::OpenCe, FORERUNNER_WINDOWS_X86_SHA256) => Some("forerunner"),
+        (RuntimeId::OpenCe, sha) if forerunner_windows_machine(sha).is_some() => Some("forerunner"),
         (RuntimeId::OpenCe, "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0" |
             "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9" |
             "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3" |

@@ -58,6 +58,8 @@ pub struct MissionBeat {
     pub encounter_name: String,
     #[serde(default)]
     pub trigger_ref: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub weapon_path:Option<String>,
     #[serde(default)]
     pub timer_seconds: Option<u32>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -262,6 +264,16 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
                     return invalid(format!("Mission '{}' references missing source volume '{}'. Name or select a volume in Logic / Events",beat.title,name));
                 }
             },
+            "weaponOwned"=>{
+                let path=beat.weapon_path.as_deref().unwrap_or("");
+                if path.is_empty()||!doc.placements.iter().any(|p|p.tag_class=="weap"&&p.tag_path.replace('\\',"/")==path){return invalid("Mission collection needs a placed native technology weapon");}
+                if doc.starting_profile.as_ref().is_some_and(|p|p.primary_weapon==path||p.secondary_weapon.as_deref()==Some(path)){return invalid("Technology must be absent from authored starting equipment");}
+            },
+            "forerunnerExtractionSettled"=>{
+                if !matches!(doc.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe)||binding.missions.last().is_none_or(|last|last.id!=beat.id)||binding.missions.iter().filter(|b|b.trigger=="forerunnerExtractionSettled").count()!=1||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)||beat.trigger_ref.as_deref()!=Some("extraction_activate"){return invalid("Forerunner settlement must be the final unconditional objective on its CE campaign target");}
+                crate::native_logic::validate_extraction_layout(doc,false)?;
+
+            },
             "deviceActivated"=>{
                 let name=beat.trigger_ref.as_deref().unwrap_or("");
                 let bindings=doc.logic.iter().flat_map(|logic|&logic.devices).filter(|device|device.native_name.as_deref()==Some(name)).collect::<Vec<_>>();
@@ -315,6 +327,7 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
     if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
     for (index,beat) in binding.missions.iter().enumerate() {
         if beat.cinematic_cue.is_some(){expected.push((format!("gs_scene_{}",index+1),3));}
+        if beat.trigger=="forerunnerExtractionSettled"{if map.header.version!=609{return invalid("Forerunner Extraction requires native CE609 output; another cache format is not interchangeable");}expected.push(("forerunner_extraction_complete".into(),1));}
         if beat.trigger=="manual"{expected.push((format!("gs_complete_{}",index+1),3));}
     }
     for (name,kind) in expected {
@@ -324,6 +337,7 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
         }
     }
     for beat in &binding.missions {
+        if beat.trigger=="weaponOwned"{let path=beat.weapon_path.as_deref().unwrap_or("");if map.tags.iter().filter(|tag|tag.class=="weap"&&!tag.external&&tag.path.replace('\\',"/")==path).count()!=1{return invalid("Compiled mission technology weapon is missing, external or ambiguous");}}
         if let Some(cue)=&beat.sound_cue {
             let found=map.tags.iter().filter(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==cue.sound_path).count();
             if found!=1{return invalid(format!("Compiled mission sound is missing or ambiguous: {}",cue.sound_path));}
@@ -411,10 +425,11 @@ impl CreatorStudio {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
-                || !["manual", "triggerVolume", "encounterCleared", "escort", "deviceActivated", "timer"].contains(&beat.trigger.as_str())
+                || !["manual", "triggerVolume", "encounterCleared", "escort", "deviceActivated", "weaponOwned", "forerunnerExtractionSettled", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.sound_cue.as_ref().is_some_and(|cue|!cue.valid())
+                || beat.weapon_path.as_deref().is_some_and(|p|!p.is_empty()&&(p.len()>240||crate::safe_relative(p).is_err()||!p.bytes().all(|c|c.is_ascii_alphanumeric()||b"_ ./-".contains(&c))||p.ends_with(".weapon")))
                 || beat.minimum_survivors.is_some_and(|n|n<1||n>32)
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
@@ -641,6 +656,27 @@ mod tests {
         let mut absent=project.clone();absent.studio.as_mut().unwrap().missions[0].trigger_ref=Some("missing_rally".into());assert!(check(&absent).unwrap_err().to_string().contains("destination volume"));
         let mut duplicate=project.clone();let mut second=binding.missions[0].clone();second.id="duplicate".into();duplicate.studio.as_mut().unwrap().missions.push(second);assert!(check(&duplicate).unwrap_err().to_string().contains("spawn owner"));
         let mut active=project;active.quick_forge.as_mut().unwrap().campaign_encounters[0].start_active=true;assert!(check(&active).unwrap_err().to_string().contains("disable initial actor creation"));
+    }
+
+    #[test]
+    fn forerunner_mission_requires_real_technology_and_gated_safe_hub() {
+        let mut project=crate::project::Project::new("Forerunner objectives");let mut document=studio();
+        document.missions=serde_json::from_value(serde_json::json!([
+            {"id":"collect","title":"Collect","objective":"Actual ownership","trigger":"weaponOwned","weaponPath":"weapons/technology","encounterName":""},
+            {"id":"settle","title":"Return","objective":"Actual settlement","trigger":"forerunnerExtractionSettled","triggerRef":"extraction_activate","encounterName":""}
+        ])).unwrap();document.validate().unwrap();project.studio=Some(document);
+        let mut doc=crate::quickforge::create_arena("Native hub","customBlank").unwrap();doc.game_mode="campaign".into();doc.runtime_id=crate::runtime::RuntimeId::HaloCustomEdition;
+        doc.spawns=serde_json::from_value(serde_json::json!([{"id":"hub_start","name":"Hub start","position":[0,0,0],"facing":0,"team":0,"gameModes":[],"visible":true,"locked":false}])).unwrap();
+        for(id,kind,path,x)in[("technology","weap","weapons/technology",10.),("deploy","ctrl","devices/control",0.),("activate","ctrl","devices/control",20.)]{doc.placements.push(serde_json::from_value(serde_json::json!({"id":id,"name":id,"tagPath":path,"tagClass":kind,"position":[x,0,0],"rotation":[0,0,0],"team":0,"respawnSeconds":0})).unwrap());}
+        doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"rules":[],"devices":[{"placementId":"deploy","nativeName":"extraction_deploy","powered":true,"initialPosition":0},{"placementId":"activate","nativeName":"extraction_activate","powered":false,"initialPosition":0}],"triggers":[{"id":"hub","name":"Hub","nativeName":"extraction_return","position":[0,0,1],"rotation":[0,0,0],"dimensions":[8,8,4],"visible":true,"locked":false},{"id":"field","name":"Field","nativeName":"extraction_zone","position":[20,0,1],"rotation":[0,0,0],"dimensions":[4,4,4],"visible":true,"locked":false}]})).unwrap());
+        let body="; Typed binding fixture only, not native script/gameplay evidence\n";let binding=NativeMissionBinding{schema_version:1,missions:project.studio.as_ref().unwrap().missions.clone(),activation:"startup".into(),source_sha256:crate::studio_native::digest(body.as_bytes()),cinematic:None,cinematic_intro:None};
+        doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
+        native_mission_binding(&project,&doc).unwrap();
+        let mut bad=doc.clone();bad.logic.as_mut().unwrap().devices[1].powered=true;assert!(native_mission_binding(&project,&bad).is_err());
+        let mut bad=doc.clone();bad.spawns[0].position=[20.,0.,0.];bad.spawns[0].visible=false;assert!(native_mission_binding(&project,&bad).unwrap_err().to_string().contains("Every selectable"));
+        let mut bad=doc.clone();bad.placements.remove(0);assert!(native_mission_binding(&project,&bad).unwrap_err().to_string().contains("technology weapon"));
+        let mut bad=doc;bad.runtime_id=crate::runtime::RuntimeId::MccSteam;assert!(native_mission_binding(&project,&bad).is_err());
+        let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(project.studio.as_ref().unwrap()).unwrap()).unwrap();assert_eq!(restored.missions,binding.missions);
     }
 
     #[test]

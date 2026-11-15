@@ -6,7 +6,7 @@ import MissionSourceReview from './MissionSourceReview';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
 import {
-  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, addBlackEchoDraft, missionBranchGroups, missionCinematicShots, missionCameraUsers,
+  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, addBlackEchoDraft, connectBlackEchoObjectives, missionBranchGroups, missionCinematicShots, missionCameraUsers,
 } from '../creatorStudio';
 import type { CameraShot, CreatorStudioDocument, MissionBeat, PlaytestRecord } from '../creatorStudio';
 import { Notice, NumberField, PageTitle, Pill } from './ui';
@@ -97,7 +97,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   ]);
   const bindingChecks = (() => {
     const scripts: ScriptExport[]=[];
-    try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio)); } catch { /* incomplete authoring has no safe export yet */ }
+    try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')})); } catch { /* incomplete authoring has no safe export yet */ }
     try { if(studio.shots.length) scripts.push(exportHaloCeCinematic(studio)); } catch { /* unresolved marker */ }
     try { if(project.firefight&&project.quickForge?.gameMode!=='campaign') scripts.push(exportHaloCeFirefight(project.firefight)); } catch { /* invalid/endless wave authoring */ }
     return inspectScenarioBindings(scripts,sourceInspection,project.quickForge,studio.missions.some(beat=>beat.cinematicCue!=null)?studio.shots.map(cinematicMarker):[]);
@@ -116,7 +116,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   }
   function exportScript(kind: 'mission' | 'cinematic' | 'firefight', manifest = false) {
     try {
-      const exported: ScriptExport = kind === 'mission' ? exportHaloCeMission(studio)
+      const exported: ScriptExport = kind === 'mission' ? exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')})
         : kind === 'cinematic' ? exportHaloCeCinematic(studio)
         : exportHaloCeFirefight(project.firefight ?? (() => { throw new Error('Create Firefight waves first'); })());
       if(manifest) safeDownload(exported.filename + '.manifest.json', scriptManifest(exported), 'application/json');
@@ -128,7 +128,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   function exportSourcePack() {
     try {
       const scripts: ScriptExport[] = [];
-      if (studio.missions.length) scripts.push(exportHaloCeMission(studio));
+      if (studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')}));
       if (studio.shots.length) scripts.push(exportHaloCeCinematic(studio));
       if (project.firefight) scripts.push(exportHaloCeFirefight(project.firefight));
       if (!scripts.length) throw new Error('Create a mission, cinematic, or finite Firefight configuration first.');
@@ -289,6 +289,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       <div className="analysis-actions"><button type="button" disabled={studio.missions.length>0||project.quickForge?.gameMode!=='campaign'||!!project.quickForge?.native}
         title={studio.missions.length?'Use an empty mission in a separate project to preserve this operation.':'Use editable Campaign / scripted solo source. Adds objectives and selectable areas; does not deploy gameplay.'}
         onClick={()=>{try{edit(addBlackEchoDraft(project,freshId),'Create Operation Black Echo blueprint');setError('');notify('Black Echo objectives and five areas added. Move markers onto playable terrain and bind be_marines, enemies and your audio. Native rescue needs gameplay testing; collection, inventory settlement and squad behavior need actual runtime logic.','info');}catch(error){setError(String(error));}}}>Create Black Echo draft</button>
+        <button type="button" disabled={!['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')||project.quickForge?.gameMode!=='campaign'||!!project.quickForge?.native} title="Connect the known Black Echo blueprint to real native weapon ownership and Forerunner's settled-survivor callback. Source modules are preserved; choose a technology weapon and prepare again." onClick={()=>{try{edit(connectBlackEchoObjectives(project,freshId),'Connect Black Echo native objectives');setError('');notify('Native objectives configured. Select the technology weapon; author the deployment/extraction controls, hub and field volumes before preparing. Only Forerunner executes settled extraction.','info');}catch(problem){setError(String(problem));}}}>Connect Forerunner Black Echo objectives</button>
         <button type="button" onClick={()=>exportScript('mission')}><Download size={15}/> Export mission .hsc</button><button type="button" onClick={()=>exportScript('mission',true)}>Export required tags list</button></div>
       <details className="studio-handoff">
         <summary>Native mission build</summary>
@@ -327,12 +328,14 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       {studio.missions.map((beat, i) => <div className="studio-record" key={beat.id}>
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Remove dependent rescue-result conditions first.':undefined} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
-        <label title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Later objectives use this rescue result. Remove those conditions before changing its trigger.':'Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.'}>Trigger<select value={beat.trigger} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'],...(e.target.value!=='escort'?{escortFailure:undefined}:{}) })}>
+        <label title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Later objectives use this rescue result. Remove those conditions before changing its trigger.':'Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.'}>Trigger<select value={beat.trigger} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'],...(e.target.value!=='escort'?{escortFailure:undefined}:{}),...(e.target.value==='forerunnerExtractionSettled'?{triggerRef:'extraction_activate'}:{}) })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
-          <option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
+          <option value="weaponOwned">Native weapon collected (actual ownership)</option><option value="forerunnerExtractionSettled" disabled={!['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')}>Forerunner extraction settled (engine callback)</option><option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
         <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
         {(beat.trigger === 'triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':beat.trigger==='escort'?'Survivor destination volume':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
+        {beat.trigger==='weaponOwned'&&<><label>Technology weapon tag<input aria-label={'Mission collection weapon '+(i+1)} list={'mission-weapon-tags-'+i} maxLength={240} spellCheck={false} value={beat.weaponPath??''} placeholder="Choose a placed, included native weapon" onChange={e=>updateBeat(beat.id,{weaponPath:e.target.value})}/><datalist id={'mission-weapon-tags-'+i}>{[...new Set((project.quickForge?.placements??[]).filter(p=>p.tagClass==='weap').map(p=>p.tagPath))].map(path=><option key={path} value={path}/>)}</datalist></label><p className="studio-hint">Checks one actual native player inventory per tick. Use a placed technology weapon absent from the starting loadout. An area or terminal activation does not satisfy collection. This is shared mission progress, not an independent squad inventory.</p></>}
+        {beat.trigger==='forerunnerExtractionSettled'&&<p className="studio-hint">Forerunner only. The final objective powers extraction_activate after earlier objectives. The engine wakes forerunner_extraction_complete only after living survivors physically return and gear settles. Author extraction_deploy, initially unpowered extraction_activate, extraction_zone, extraction_return and valid hub starts. No mandatory raid timer, loot award or automatic teleport is added. Legacy runtime exports are refused.</p>}
         {beat.trigger==='deviceActivated'&&<>
           <label>Native control terminal<select aria-label={'Mission terminal '+(i+1)} value={beat.triggerRef??''} onChange={event=>updateBeat(beat.id,{triggerRef:event.target.value})}>
             <option value="">Choose an authored native control</option>

@@ -78,10 +78,10 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
  const {withDevelopmentWorkspace,runDevelopmentCommand}=await import('./native-qa-storage.mjs');
  const tools=path.resolve(process.env.SPARK_QA_INVADER??'tools/invader');
  await withDevelopmentWorkspace('frontend-native-mission-audio',async context=>{
-  const tags=path.join(context.directory,'tags'),data=path.join(context.directory,'data'),scenario='levels/radio/radio';
+  const work=await fs.mkdtemp(path.join(context.directory,'native-mission-')),tags=path.join(work,'tags'),data=path.join(work,'data'),scenario='levels/radio/radio';
   await fs.mkdir(path.join(tags,'levels/radio'),{recursive:true});await fs.mkdir(path.join(data,path.dirname(scenario),'scripts'),{recursive:true});await fs.mkdir(path.join(data,'sound/radio'),{recursive:true});
   const run=async(tool,args,capture=false)=>{
-   const output=path.join(context.directory,'readback.txt');let fd;
+   const output=path.join(work,'readback.txt');let fd;
    try{if(capture)fd=sync.openSync(output,'w');await runDevelopmentCommand(path.join(tools,tool+'.exe'),['-t',tags,...args],context,capture?{stdio:['ignore',fd,'inherit']}:{ });}
    finally{if(fd!==undefined)sync.closeSync(fd);}
    return capture?(await fs.readFile(output,'utf8')).trim():'';
@@ -90,15 +90,21 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   for(let i=0;i<samples;i++)wave.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/22050)*1000),44+i*2);
   await fs.writeFile(path.join(data,'sound/radio/tone.wav'),wave);
   await run('invader-sound',['-d',data,'-c','scripted_dialog_force_unspatialized','-F','16-bit_pcm','-j','1','sound/radio']);
-  await run('invader-edit',['-N','-S','type','singleplayer','-I','trigger_volumes','1','end','-S','trigger_volumes[0].name','radio_area','-I','encounters','1','end','-S','encounters[0].name','survivors',scenario+'.scenario']);
-  // Use the same fresh native name/control binding as native_logic source.
-  // This is syntax/readback only; no control tag or usable game map is implied.
-  await run('invader-edit',['-n','-I','controls','1','end','-I','object_names','1','end','-S','object_names[0].name','mission_terminal','-S','controls[0].name','0',scenario+'.scenario']);
+  const template=process.env.SPARK_NATIVE_MISSION_TEMPLATE;if(!template)throw Error('Provide an owned authored scenario containing extraction_activate for this opt-in native compiler test; read-only name-table safeguards remain enabled.');
+  const templateInfo=await fs.lstat(template);assert.ok(templateInfo.isFile()&&!templateInfo.isSymbolicLink()&&templateInfo.size<=2*1024*1024);
+  const templateHash=crypto.createHash('sha256').update(await fs.readFile(template)).digest('hex');
+  await fs.copyFile(template,path.join(tags,scenario+'.scenario'),sync.constants.COPYFILE_EXCL);
+  await run('invader-edit',['-S','type','singleplayer','-I','trigger_volumes','1','end','-S','trigger_volumes[0].name','radio_area','-I','encounters','1','end','-S','encounters[0].name','survivors',scenario+'.scenario']);
+  // Reuse existing authored names; never disable the native table safeguard.
+  const nativeNames=(await run('invader-edit',['-G','object_names[*].name',scenario+'.scenario'],true)).split(/\r?\n/),activationNameIndex=nativeNames.indexOf('extraction_activate');
+  assert.ok(activationNameIndex>=0&&nativeNames.lastIndexOf('extraction_activate')===activationNameIndex);
+  const nativeControls=(await run('invader-edit',['-G','controls[*].name',scenario+'.scenario'],true)).split(/\r?\n/).map(Number),activationControlIndex=nativeControls.indexOf(activationNameIndex);
+  assert.ok(activationControlIndex>=0&&nativeControls.lastIndexOf(activationNameIndex)===activationControlIndex);
   const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',
    soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
    {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue'},
    {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionOutside:true,soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}},
-   {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'mission_terminal'},
+   {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'extraction_activate'},
    {id:'rescue_success',title:'Success path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionResult:{beatId:'escort',failed:false}},
    {id:'rescue_failure',title:'Failure path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionResult:{beatId:'escort',failed:true}}];
   const source=exportHaloCeMission(native).content;await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
@@ -115,6 +121,16 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
    assert.deepEqual(new Set(globals.split(/\r?\n/)),new Set(['gs_branch_1_ready','gs_branch_1_inside','gs_result_2_done','gs_result_2_failed','gs_manual_1_done','gs_manual_3_done','gs_manual_5_done','gs_manual_6_done']));
    results.push({engine,scriptCount:Number(count),names:names.split(/\r?\n/),globals:globals.split(/\r?\n/),scenarioSha256:await hash(path.join(tags,scenario+'.scenario'))});
   }
+  // Same owned native fixture: compile real ownership and the documented dormant callback.
+  await fs.mkdir(path.join(tags,'weapons'),{recursive:true});await run('invader-edit',['-N','weapons/technology.weapon']);
+  const settled=emptyCreatorStudio();settled.missions=[{id:'collect',title:'Collect',objective:'Owned weapon',trigger:'weaponOwned',weaponPath:'weapons/technology',encounterName:''},{id:'return',title:'Return',objective:'Native settlement',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:''}];
+  assert.throws(()=>exportHaloCeMission(settled),/Forerunner/);
+  await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),exportHaloCeMission(settled,{forerunner:true}).content);
+  await run('invader-script',['-d',data,'-E','-g','gbx-custom',scenario]);
+  const settledNames=await run('invader-edit',['-G','scripts[*].name',scenario+'.scenario'],true);assert.deepEqual(new Set(settledNames.split(/\r?\n/)),new Set(['gs_mission','forerunner_extraction_complete']));
+  const settledGlobals=await run('invader-edit',['-G','globals[*].name',scenario+'.scenario'],true);assert.deepEqual(new Set(settledGlobals.split(/\r?\n/)),new Set(['gs_collector_1','gs_collected_1','gs_extraction_armed','gs_settled_2']));
+  console.log('PASS: native CE ownership/settled callback syntax and independent script/global readback',await hash(path.join(tags,scenario+'.scenario')));
+  await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
   // Compile the actual prepared mission body, including its player wait and intro.
   // Reuse this bounded native fixture; no SDK or playable-map claim.
   const introScenario='levels/intro/intro';await fs.mkdir(path.join(tags,'levels/intro'),{recursive:true});await fs.mkdir(path.join(data,'levels/intro/scripts'),{recursive:true});
@@ -156,9 +172,10 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   console.log(JSON.stringify({nativeCombinedSceneSyntax:'pass',sourceSha256:crypto.createHash('sha256').update(combinedSource).digest('hex'),combinedResults,cacheBuilt:false,gameplayVerified:false}));
   console.log(JSON.stringify({nativeObjectiveSceneSyntax:'pass',sourceSha256:crypto.createHash('sha256').update(sceneSource).digest('hex'),sceneResults,cacheBuilt:false,gameplayVerified:false}));
   console.log(JSON.stringify({nativePreparedCinematicSyntax:'pass',introSourceSha256:crypto.createHash('sha256').update(introSource).digest('hex'),introResults,cacheBuilt:false,gameplayVerified:false}));
-  const controlName=await run('invader-edit',['-G','object_names[0].name','-G','controls[0].name',scenario+'.scenario'],true);assert.deepEqual(controlName.split(/\r?\n/),['mission_terminal','0']);
+  const controlName=await run('invader-edit',['-G','object_names['+activationNameIndex+'].name','-G','controls['+activationControlIndex+'].name',scenario+'.scenario'],true);assert.deepEqual(controlName.split(/\r?\n/),['extraction_activate',String(activationNameIndex)]);
   const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');
   const failure=await run('invader-edit',['-G','messages[1].name','levels/radio_messages.hud_message_text'],true);assert.equal(failure,'gs_mission_fail_2');
-  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',nativeTerminalSyntax:'pass',nativeSharedBranchSyntax:'pass',nativeRescueOutcomeSyntax:'pass',controlName,failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
+  assert.equal(crypto.createHash('sha256').update(await fs.readFile(template)).digest('hex'),templateHash);
+  console.log(JSON.stringify({templateHash,nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',nativeTerminalSyntax:'pass',nativeSharedBranchSyntax:'pass',nativeRescueOutcomeSyntax:'pass',controlName,failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }

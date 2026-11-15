@@ -21,12 +21,14 @@ export default function LogicEvents({
   document: doc,
   node,
   source,
+  missionGatedExtraction=false,
   commit,
   onSelect,
 }: {
   document: QuickForgeDocument;
   node: ForgeNode | null;
   source?: NativeLogicSource;
+  missionGatedExtraction?:boolean;
   commit: (doc: QuickForgeDocument, description: string) => void;
   onSelect: (id: string) => void;
 }) {
@@ -47,7 +49,7 @@ export default function LogicEvents({
   const handwritten = logic?.handwrittenSources ?? [];
   const selectedModule = handwritten.find((m) => m.filename === moduleName) ?? handwritten[0];
   const overridden = logic?.manualSource != null;
-  const extraction=useMemo(()=>extractionLayout(doc),[doc]);
+  const extraction=useMemo(()=>extractionLayout(doc,{activationPowered:!missionGatedExtraction}),[doc,missionGatedExtraction]);
   const controlSelected=node?.type==='placement'&&node.value.tagClass==='ctrl';
   const namingNeedsDoorBinding=node?.type==='placement'&&node.value.tagClass==='mach'&&
     !logic?.devices.some(d=>d.placementId===node.value.id);

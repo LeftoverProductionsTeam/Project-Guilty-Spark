@@ -31,6 +31,16 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
         detail:found.length===1?'Name matches an explicitly named authoring volume. Native bounds, compilation and gameplay remain unverified.':
           'Choose an explicitly named volume from Level Editor → Logic / Events. Implicit generated names require native source review.'};
     }
+    if(source?.gameMode==='campaign'&&dependency.startsWith('weapon:')) {
+      const path=dependency.slice('weapon:'.length),present=source.placements.some(p=>p.tagClass==='weap'&&p.tagPath.replaceAll('\\','/')===path);
+      const starting=[source.startingProfile?.primaryWeapon,source.startingProfile?.secondaryWeapon].includes(path);
+      return {dependency,status:present&&!starting?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,detail:!present?'Place the included technology weapon in the map before preparing.':starting?'Choose technology that is absent from all authored starting equipment.':'Placed native weapon source; ownership, pickup reachability and gameplay require native testing.'};
+    }
+    if(source?.gameMode==='campaign'&&dependency.startsWith('forerunner_extraction:')) {
+      const devices=source.logic?.devices??[],control=(name:string,powered:boolean)=>{const rows=devices.filter(d=>d.nativeName===name);return rows.length===1&&rows[0].powered===powered&&rows[0].initialPosition<.5&&source.placements.some(p=>p.id===rows[0].placementId&&p.tagClass==='ctrl');};
+      const present=['haloCustomEdition','chupathingyCe'].includes(source.runtimeId)&&control('extraction_activate',false)&&control('extraction_deploy',true)&&['extraction_zone','extraction_return'].every(name=>source.logic?.triggers.filter(t=>t.nativeName===name).length===1);
+      return {dependency,status:present?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,detail:present?'Forerunner native controls/volumes bound; hub clearance, all starts, gameplay and durable settlement require independent runtime validation.':'Forerunner requires powered extraction_deploy, initially unpowered extraction_activate and unique extraction_zone/extraction_return volumes in standard CE campaign source.'};
+    }
     if(source?.gameMode==='campaign'&&dependency.startsWith('device_control:')) {
       const name=dependency.slice('device_control:'.length),bindings=source.logic?.devices.filter(device=>device.nativeName===name)??[];
       const placements=bindings.flatMap(device=>source.placements.filter(placement=>placement.id===device.placementId));

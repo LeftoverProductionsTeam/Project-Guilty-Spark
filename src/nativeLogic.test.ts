@@ -234,3 +234,5 @@ it('reports missing Extraction starts and does not call unknown hub bindings saf
  doc.logic!.triggers=doc.logic!.triggers.filter(zone=>zone.nativeName!=='extraction_zone');
  expect(extractionLayout(doc).playerStarts.safe).toBeNull();
 });
+
+it('retains the same safe-hub checks while mission objectives gate activation power',()=>{const doc=extractionSource();doc.logic!.devices[1].powered=false;expect(extractionLayout(doc,{activationPowered:false}).issues).toEqual([]);expect(extractionLayout(doc).issues.some(i=>i.message.includes('power'))).toBe(true);doc.spawns[0].position=[20,0,0];expect(extractionLayout(doc,{activationPowered:false}).issues.some(i=>i.objectId==='safe')).toBe(true);});

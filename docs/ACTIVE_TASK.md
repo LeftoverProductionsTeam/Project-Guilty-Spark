@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — original native behavior milestone; patrol/command-list continuation
+Task: Operation110 — CE609 Black Echo to Forerunner breakthrough; patrol WIP preserved
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: b9463f708f71c7daf079949a297f3bfa0c5ca645 plus this source-matched original behavior milestone; exact source/app/cache identities in RUNTIME_INTEGRATION_20261107.
-Next action: Extend original patrol/command-list source editing through existing native inventory/writer/review/Restore/readback and shared viewport. Behavior source milestone passes; game/stock-campaign/full-native-Undo/other-target gates stay open. No Forerunner/game/push.
+Latest verified revision: 1a513db7a64749e15a7f9b08063e04631f3ed791; native squad/start behavior milestone complete within recorded Windows/MCC scope.
+Next action: Complete the recovered CE609 mission handoff using the existing native script/review/HUD writer. Reuse active QA12343 prepared inputs; fix baseline target warnings/Flood start before candidate acceptance. No Forerunner game launch is authorized; capability queries passed. Save37944 remains open.
 
 ## Acceptance
 
@@ -25,7 +25,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Original native behavior milestone: squad initial/return and separate per-start overrides/apply-all connect existing source inventory/writer/review/Restore/Save/restart/readback. All12states preserved; new moving choices need source routes; unknown telemetry unavailable. TypeScript/frontend33/browser4/core14/working-tags14 pass. Native field depth ambiguity repaired. Source pin3add381e/appb235a2 match; actual Windows Preview/Accept/Restore/reaccept/Save/full restart/working-tag MCC13/Invader passes (3normal closes/0errors). Squad/start sleeping+guarding, unchanged actor pose/route/other fields; publisher/original/previous-good hashes preserved. Native Restore is separate from project Undo. Exact identities/failures/scope in RUNTIME_INTEGRATION_20261107; patrol/command lists remain next.
+Black Echo ownership/settlement UI, persistent mission fields, native HSC and exact x64 Forerunner admission are source implemented. Frontend29/core14/runtime-pin1/patrol14 and Windows cargo check pass; native CE ownership/callback2scripts/4globals passes. RUNTIME_INTEGRATION_20261107 records hashes/scope. No complete Spark mission cache/UI/restart/game acceptance yet. Separate original-patrol backend WIP remains in native_operations.rs/native_operations_native.rs (patch e7b772d19ca7881107eaf670c1f95fbe2ac3182d706f0dac1f80cf985f6e5f0d),14native tests pass; no patrol UI/cache/game acceptance. Accepted1a513db7 behavior proof remains unchanged.
 
 
 Original tactical milestone: source firing XYZ/groupA–Z and6squad masks reuse native inventory/reviewer/writer/Restore, shared native point handles and current-source compiled guards. Frontend31/core14/working-tags14/browser3/TypeScript pass. Actual Windows firing X/rotation refusal/Review/Accept/Restore, masks and explicit MCC draft review, Save/full restart pass on app93fcb9; final source-matched appd54aac native working-tag MCC13/Invader point+156bits readback passes. Current-source snapshots retain2combat targets with no historical replay; starts/actor bindings and original/previous-good hashes unchanged. First native test fixed missed World labels, gizmo readiness observation, then the exact new-type build admission. Existing source continuation reused SDK/UI checkpoints. Exact identities/errors/scope in RUNTIME_INTEGRATION_20261107. Original structural/state/patrol/command-list/full native Undo, stock campaign breadth, other targets and actual AI/gameplay remain open.
@@ -103,7 +103,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Original-behavior QA25249/run-dS7cSz terminal: owned apps/compilers/tests closed; entire output disposed4,623,600,744 logicalB, allocated disposal unavailable. Root confirmed absent; no SDK/binary/cache/map/screenshot/archive retained. Previous QA81790 also disposed. Exact evidence in RUNTIME_INTEGRATION_20261107. Originals/475CSV/legacy recovery unchanged; no game/Forerunner/remote writes.
+Previous QA25249 disposed4,623,600,744 logicalB. QA12343/run-IYPKYp ACTIVE: C:/Users/patri/AppData/Local/Temp/GuiltySpark-Development-d49eb02588bf/run-IYPKYp/output. Prepared3307tags/136761260B missing-only from owned CE/native inputs and14selected SDK files; no full SDK copy. Input-only CE609 baseline bf2cc960a2573efcec263473dca251ae0da51393a9dfd9c5a54196aafe557b99 compiles/readbacks but15warnings remain (formats/HUD and outside Flood start); not new Spark mission. Reuse then dispose. Owner explicitly approved --help/--spark-capabilities1 only: exact runtime9543508eced47d7237d69310915f4f78344b248b83686c7e2cafe82ba9e6b17b,build25767db9,x64,contract1,runtime.discover only; both exit0,pre/post hash unchanged. No game/map/control launch authorized or executed, no Forerunner writes/push.
 
 Firing QA29199/run-pzY3cX terminal; all owned apps/compilers/tests closed, complete output disposed4,031,310,998 logicalB (allocated disposal unavailable, no physical-space claim). Evidence/hashes in RUNTIME_INTEGRATION_20261107. No retained SDK/map/binary/screenshot/archive, game/Forerunner/publication; original inputs/475CSV/legacy recovery unchanged.
 

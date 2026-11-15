@@ -77,14 +77,14 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
 
 /** Authoring-space review only. Native collision, use distance, source tags and
  * actual runtime admission still need independent native/game verification. */
-export function extractionLayout(doc:QuickForgeDocument) {
+export function extractionLayout(doc:QuickForgeDocument,options:{activationPowered?:boolean}={}) {
   const logic=doc.logic,issues:{message:string;objectId?:string}[]=[];
-  const terminal=(name:string,label:string)=>{
+  const terminal=(name:string,label:string,requiredPower=true)=>{
     const bindings=logic?.devices.filter(d=>d.nativeName===name)??[];
     const placements=bindings.flatMap(d=>doc.placements.filter(p=>p.id===d.placementId));
     const value=bindings.length===1&&placements.length===1&&placements[0].tagClass==='ctrl'?placements[0]:undefined;
     if(!value)issues.push({message:label+' needs one named native control terminal.',objectId:placements[0]?.id});
-    else if(!bindings[0].powered)issues.push({message:label+' has startup power turned off.',objectId:value.id});
+    else if(bindings[0].powered!==requiredPower)issues.push({message:label+(requiredPower?' has startup power turned off.':' must start unpowered so mission objectives gate evacuation.'),objectId:value.id});
     return value;
   };
   const zone=(name:string,label:string)=>{
@@ -92,7 +92,7 @@ export function extractionLayout(doc:QuickForgeDocument) {
     if(values.length!==1)issues.push({message:label+' needs one named trigger volume.',objectId:values[0]?.id});
     return values.length===1?values[0]:undefined;
   };
-  const deploy=terminal('extraction_deploy','Deployment'),activate=terminal('extraction_activate','Activation');
+  const deploy=terminal('extraction_deploy','Deployment'),activate=terminal('extraction_activate','Activation',options.activationPowered??true);
   const activation=zone('extraction_zone','Activation area'),returnZone=zone('extraction_return','Safe return area');
   const inside=(point:Vec3,volume:LogicTrigger)=>{
     if(point.some(v=>!Number.isFinite(v))||volume.position.some(v=>!Number.isFinite(v))||

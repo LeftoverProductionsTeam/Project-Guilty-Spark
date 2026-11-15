@@ -3,7 +3,7 @@ import type {Project} from './types';
 import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
-import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
+import { connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
 
 describe('Project-integrated Creator Studio', () => {
   it('starts private without fabricated gameplay evidence', () => {
@@ -258,4 +258,33 @@ it('authors per-objective shot ranges without forcing an intro or bypassing cond
  const hud=structuredClone(project.studio!);hud.missions[0].hudObjective=true;hud.missions[0].hudText='Move out';const entry=exportHaloCeMission(hud).content;expect(entry.indexOf('(gs_scene_1)')).toBeLessThan(entry.indexOf('(hud_set_objective_text gs_mission_obj_1)'));
  const source=structuredClone(project.studio!);source.missions[0].conditionVolume='gate';const conditional=exportHaloCeMission(source).content;expect(conditional.indexOf('(if (volume_test_objects gate (players))')).toBeLessThan(conditional.indexOf('(gs_scene_1)'));
  source.missions[0]={...source.missions[0],trigger:'escort',triggerRef:'rally',encounterName:'marines',escortFailure:'continue',cinematicCue:{firstShotId:'approach',lastShotId:'ending',phase:'complete'}};const rescued=exportHaloCeMission(source).content;expect(rescued.indexOf('(if (not gs_result_1_failed) (begin')).toBeLessThan(rescued.indexOf('(gs_scene_1)'));
+});
+
+it('connects Forerunner Black Echo to real ownership and settled-return source without replacing the blueprint or user modules',async()=>{
+ const project=campaignDraft();project.history=[];project.quickForge!.runtimeId='haloCustomEdition';let id=0;const connected=connectBlackEchoObjectives(project,()=> 'native_echo_'+(++id));
+ let history=historyReducer({...initialHistory,current:project},{type:'edit',project:connected,description:'Connect native Black Echo objectives'});history=historyReducer(history,{type:'undo'});expect(history.current?.studio!.missions).toHaveLength(0);history=historyReducer(history,{type:'redo'});expect(history.current?.studio!.missions).toEqual(connected.studio!.missions);
+ expect(project.studio!.missions).toHaveLength(0);expect(connected.studio!.missions[3].trigger).toBe('weaponOwned');expect(connected.studio!.missions[6].trigger).toBe('forerunnerExtractionSettled');
+ expect(connected.quickForge!.logic!.handwrittenSources).toEqual(project.quickForge!.logic!.handwrittenSources);
+ const beats=connected.studio!.missions;expect(()=>exportHaloCeMission(connected.studio!)).toThrow(/Forerunner/);
+ beats[3].weaponPath='weapons/technology';const output=exportHaloCeMission(connected.studio!,{forerunner:true});
+ expect(output.content).toContain('(unit_has_weapon (unit (list_get (players) gs_collector_4)) "weapons\\technology")');
+ expect(output.content).toContain('(script dormant forerunner_extraction_complete');expect(output.content).not.toContain('gs_complete_4');expect(output.content).not.toContain('gs_complete_7');
+ expect(output.content.indexOf('(device_set_power extraction_activate 0)')).toBeLessThan(output.content.indexOf('(ai_place be_marines)'));
+ expect(output.content.indexOf('(device_set_power extraction_activate 1)')).toBeGreaterThan(output.content.indexOf('(ai_place be_defense)'));
+ expect(output.content).not.toContain('(game_won)');expect(output.dependencies).toContain('weapon:weapons/technology');
+ const serialized=JSON.parse(JSON.stringify(connected));expect(validateCreatorStudio(serialized.studio)).toEqual([]);
+ expect(serialized.studio.missions[3].weaponPath).toBe('weapons/technology');
+ connected.quickForge!.campaignEncounters=['be_marines','be_covenant','be_flood','be_defense'].map(name=>({name,actorPath:'characters/grunt/grunt minor plasma pistol',position:[0,0,0],count:1,spacing:1,startActive:false}));
+ connected.quickForge!.placements??=[];connected.quickForge!.placements.push({id:'tech',tagClass:'weap',tagPath:'weapons/technology'} as never);
+ await expect(attachNativeCampaignMission(connected,'startup')).rejects.toThrow(/forerunner_extraction/);
+ for(const [name,powered]of [['extraction_deploy',true],['extraction_activate',false]] as const){connected.quickForge!.placements.push({id:name,tagClass:'ctrl',tagPath:'devices/terminal',position:name==='extraction_deploy'?[2,3,1]:[10,3,1]} as never);connected.quickForge!.logic!.devices.push({placementId:name,nativeName:name,powered,initialPosition:0} as never);}
+ for(const name of ['extraction_zone','extraction_return'])connected.quickForge!.logic!.triggers.push({id:name,nativeName:name,name,position:name==='extraction_return'?[2,3,1]:[10,3,1],rotation:[0,0,0],dimensions:name==='extraction_return'?[8,8,4]:[2,2,3]} as never);
+ const prepared=await attachNativeCampaignMission(connected,'startup'),review=await reviewNativeCampaignMission(JSON.parse(JSON.stringify(prepared)));
+ expect(review.binding.missions[3].weaponPath).toBe('weapons/technology');expect(review.binding.missions[6].trigger).toBe('forerunnerExtractionSettled');
+ const legacy=structuredClone(connected);legacy.quickForge!.runtimeId='mccSteam';await expect(attachNativeCampaignMission(legacy,'startup')).rejects.toThrow(/legacy/);
+ const starting=structuredClone(connected);starting.studio!.missions[3].weaponPath=starting.quickForge!.startingProfile!.primaryWeapon;starting.quickForge!.placements[0].tagPath=starting.studio!.missions[3].weaponPath!;await expect(attachNativeCampaignMission(starting,'startup')).rejects.toThrow(/starting equipment/);
+});
+it('refuses injected collection paths and early or conditional Forerunner settlement',()=>{
+ const studio=emptyCreatorStudio();studio.missions=[{id:'collect',title:'Collect',objective:'Acquire',trigger:'weaponOwned',weaponPath:'bad" ) (ai_erase_all)',encounterName:''}];expect(()=>exportHaloCeMission(studio)).toThrow();
+ studio.missions=[{id:'settle',title:'Return',objective:'Settle',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',conditionVolume:'branch'}];expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow(/unconditional/);
 });
