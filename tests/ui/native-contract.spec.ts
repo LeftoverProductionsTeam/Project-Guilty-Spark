@@ -4044,6 +4044,7 @@ test('Black Echo draft uses one project history action and selects its native ar
  await page.evaluate(()=>{const p=(window as any).__sparkMock.projects.a.project;
   p.quickForge={schemaVersion:1,name:'Synthetic campaign authoring',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[],logic:{schemaVersion:1,triggers:[],devices:[],rules:[]}};
   p.studio={schemaVersion:1,missions:[],shots:[],playtests:[],server:{name:'Private source',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
+  p.nativeAssetImports=[{id:'12345678-1234-4234-8234-123456789012',sourceProjectId:p.id,sourceSha256:'a'.repeat(64),tagId:42,tagClass:'snd!',tagPath:'sound/radio distress',nativePath:'gs_assets_12345678123442348234123456789012/sound/radio distress',receiptSha256:'b'.repeat(64),fileCount:1}];
  });
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  await chooseTool(page,'Creator Studio');const create=page.getByRole('button',{name:'Create Black Echo draft',exact:true,includeHidden:true});await revealPagedControl(create);await create.click();
@@ -4055,6 +4056,18 @@ test('Black Echo draft uses one project history action and selects its native ar
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions.length)).toBe(7);
  const record=page.locator('.studio-record').nth(4);await record.getByLabel('Optional condition 5',{exact:true}).fill('be_artifact');
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[4].conditionVolume)).toBe('be_artifact');
+
+ const first=page.locator('.studio-record').first();await first.locator('summary').filter({hasText:'Radio / sound cue'}).click();
+ await first.getByRole('combobox',{name:'Mission sound 1',exact:true}).selectOption('12345678-1234-4234-8234-123456789012');
+ await first.getByRole('combobox',{name:'Cue timing 1',exact:true}).selectOption('complete');
+ await first.getByLabel('Radio caption 1',{exact:true}).fill('Marine: We need help.');await first.getByLabel('Radio caption 1',{exact:true}).press('Tab');
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[0].soundCue?.caption)).toBe('Marine: We need help.');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[0].soundCue?.phase)).toBe('complete');
+ await first.getByRole('combobox',{name:'Mission sound 1',exact:true}).selectOption('');await expect(first.getByLabel('Radio caption 1',{exact:true})).toHaveCount(0);
+ await page.keyboard.press('Control+z');await expect(first.getByLabel('Radio caption 1',{exact:true})).toHaveValue('Marine: We need help.');
+ await page.keyboard.press('Control+y');await expect(first.getByLabel('Radio caption 1',{exact:true})).toHaveCount(0);
+ await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[0].soundCue?.importId)).toBe('12345678-1234-4234-8234-123456789012');
  await page.locator('.studio-record').first().getByRole('button',{name:'Select objective area in Level Editor',exact:true}).click();
  await expect(page.getByLabel('Current workspace',{exact:true})).toContainText(/Level editor/i);await expect(page.locator('.forge-viewport')).toBeVisible();
 });

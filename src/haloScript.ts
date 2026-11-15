@@ -5,7 +5,7 @@
  *  and never evaluated as arbitrary HaloScript by this application.
  */
 import type { CreatorStudioDocument } from './creatorStudio';
-import { emptyCreatorStudio, validateCreatorStudio } from './creatorStudio.ts';
+import { emptyCreatorStudio, validateCreatorStudio, missionSoundProblems } from './creatorStudio.ts';
 import { inspectScenarioBindings } from './scenarioBindings.ts';
 import { sameJson } from './semanticJson.ts';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight.ts';
@@ -35,6 +35,17 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   const deps:string[]=[], lines=heading('Mission Director');
   const globals:string[]=[];
   const manualSetters:string[]=[];
+  const cueLines=(beat:CreatorStudioDocument['missions'][number],index:number,phase:'start'|'complete'):string[]=>{
+    const cue=beat.soundCue;if(!cue||cue.phase!==phase)return [];
+    deps.push('sound:'+cue.soundPath);
+    const text:string[]=[];
+    if(cue.delayMs)text.push('  (sleep '+ticks(cue.delayMs)+')');
+    if(cue.caption){deps.push('hud_message:gs_mission_cue_'+(index+1));text.push('  (hud_set_help_text gs_mission_cue_'+(index+1)+')','  (show_hud_help_text true)');}
+    text.push('  (sound_impulse_start "'+cue.soundPath+'" none '+cue.gain+')',
+      '  (sleep_until (<= (sound_impulse_time "'+cue.soundPath+'") 0) 1 18000)');
+    if(cue.caption)text.push('  (show_hud_help_text false)');
+    return text;
+  };
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
   studio.missions.forEach((beat,i)=>{
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
@@ -51,6 +62,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
       const name=`gs_mission_obj_${i+1}`;deps.push('hud_message:'+name);
       scripted.push(`  (hud_set_objective_text ${name})`);
     }
+    scripted.push(...cueLines(beat,i,'start'));
     switch(beat.trigger){
       case 'manual':
         const key=`gs_manual_${i+1}_done`;
@@ -77,6 +89,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         scripted.push(`  (sleep_until (= (ai_living_count ${ref}) 0) 15)`);break;
       }
     }
+    scripted.push(...cueLines(beat,i,'complete'));
     scripted.push('  (print "gs objective complete")');
     if(beat.checkpoint===true)scripted.push('  (game_save)');
     if(beat.completeMission===true)scripted.push('  (game_won)');
@@ -88,6 +101,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
     'Optional volume conditions are evaluated once when their step starts; a false condition skips that step. This is shared scenario state, not independent multiplayer squad progress.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
+    ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
   ],generatedOnly:true};
@@ -122,7 +136,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','soundCue'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
@@ -147,7 +161,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,
-    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null}));
+    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,soundCue:beat.soundCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
 export interface NativeMissionReview {
@@ -209,9 +223,10 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   if(doc.logic?.manualSource!=null)throw Error('Generated startup logic is overridden. Preserve handwritten source before returning Native HaloScript to generated logic.');
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
+  const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
   const output=exportHaloCeMission({...emptyCreatorStudio(),missions});
   const bindings=inspectScenarioBindings([output],null,doc);
-  const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource'&&!binding.dependency.startsWith('hud_message:'));
+  const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource'&&!binding.dependency.startsWith('hud_message:')&&!binding.dependency.startsWith('sound:'));
   if(missing.length)throw Error(missing.map(binding=>binding.dependency+': '+binding.detail).join('\n'));
   for(const beat of missions)if(beat.trigger==='encounterCleared') {
     const name=beat.encounterName.split('/')[0];

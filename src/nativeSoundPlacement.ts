@@ -89,3 +89,24 @@ export function includePreparedSound(
     },
   };
 }
+
+/** Mission radio uses the existing recursive import and owned source identity.
+ * Custom WAVs/looping tracks remain in their original editor workflow. */
+export async function prepareMissionSound(project:Project,emitter:SoundEmitter) {
+  if(!project.quickForge||project.quickForge.native||project.quickForge.gameMode!=='campaign'||
+    !['mccSteam','haloCustomEdition','chupathingyCe'].includes(project.quickForge.runtimeId))
+    throw Error('Mission radio needs editable Campaign / scripted solo source.');
+  if(emitter.customSound||emitter.loopingSource)
+    throw Error('Choose a native one-shot sound. Custom recordings need a compiled sound tag; loops stay in Map sounds.');
+  const id=emitter.sourceProjectId??project.id,hash=emitter.sourceSha256??project.source?.sha256;
+  if(!hash)throw Error('Choose a sound from a preserved source map first.');
+  let open=await call<OpenProject>('open_project',{id});
+  if(open.inspection?.header.version===13&&open.project.source&&!open.project.source.audioResources)
+    open=(await call<OpenProject|null>('auto_connect_sound_resources',{projectId:id}))??open;
+  if(open.project.id!==id||open.inspection?.sha256!==hash||open.project.source?.sha256!==hash)
+    throw Error('The sound source changed. Select its current native revision; existing cues are unchanged.');
+  const tag=open.inspection.tags.find(tag=>tag.id===emitter.tagId&&tag.class==='snd!');
+  if(!tag)throw Error('The selected source has no matching native one-shot sound tag.');
+  return prepareAssetImport(project,{key:'mission-audio:'+id+':'+tag.id,name:emitter.name,path:tag.path,class:tag.class,
+    sourceProjectId:id,sourceSha256:hash,tagId:tag.id,cacheVersion:open.inspection.header.version});
+}

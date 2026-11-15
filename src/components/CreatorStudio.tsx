@@ -23,6 +23,10 @@ import PowerupStudio from './PowerupStudio';
 import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
 import {useMapState,readMapSession,writeMapSession} from '../mapSession';
+import SoundAudition from './SoundAudition';
+import {attachAssetImport} from '../nativeAssetImport';
+import {prepareMissionSound} from '../nativeSoundPlacement';
+import type {NativeAssetImport} from '../types';
 import ExternalBrowserLink from './ExternalBrowserLink';
 
 const bindingLabels = {
@@ -71,6 +75,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const activeProject=useRef<string|null>(project.id);
   useEffect(()=>{activeProject.current=project.id;return()=>{activeProject.current=null;};},[project.id]);
   const [error, setError] = useState('');
+  const [includingSound,setIncludingSound]=useState(false);
+  const [cueSources,setCueSources]=useMapState<Record<string,string>>(project.id,'mission-cue-sources',{});
   const studio = project.studio ?? emptyCreatorStudio();
   const encounterChoices=useId(), volumeChoices=useId();
   const sourceInspection=inspection?.sha256&&inspection.sha256===project.source?.sha256?inspection:null;
@@ -167,6 +173,29 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   }
   function updateBeat(id: string, patch: Partial<MissionBeat>) {
     change({ ...studio, missions: studio.missions.map(m => m.id === id ? { ...m, ...patch } : m) }, 'Update mission beat');
+  }
+  function selectMissionSound(beat:MissionBeat,binding:NativeAssetImport){
+    updateBeat(beat.id,{soundCue:{importId:binding.id,soundPath:binding.nativePath.replaceAll('\\','/'),
+      phase:beat.soundCue?.phase??'start',gain:beat.soundCue?.gain??1,delayMs:beat.soundCue?.delayMs??0,caption:beat.soundCue?.caption??''}});
+  }
+  async function includeMissionSound(beatId:string){
+    if(includingSound)return;
+    const input=latestProject.current,beat=input.studio?.missions.find(beat=>beat.id===beatId);
+    const emitter=input.audioPreview?.emitters.find(emitter=>emitter.id===cueSources[beatId]);
+    if(!beat||!emitter){setError('Choose a saved native one-shot sound from Map sounds first.');return;}
+    const release=beginProjectMutation(input.id);setIncludingSound(true);setError('');
+    try{
+      const binding=await prepareMissionSound(input,emitter),latest=latestProject.current;
+      if(activeProject.current!==input.id||latest.id!==input.id||latest.studio!==input.studio||
+        latest.quickForge!==input.quickForge||latest.audioPreview!==input.audioPreview)
+        throw Error('The map, mission or sound changed during inclusion. No older cue was applied; prepared tags remain available for retry.');
+      const cue={importId:binding.id,soundPath:binding.nativePath.replaceAll('\\','/'),phase:'start' as const,
+        gain:Math.max(0,Math.min(1,emitter.gain)),delayMs:0,caption:''};
+      const next=attachAssetImport(latest,binding);
+      edit({...next,studio:{...latest.studio!,missions:latest.studio!.missions.map(row=>row.id===beatId?{...row,soundCue:cue}:row)}},'Include native mission radio sound');
+      notify('Native sound included and linked to this objective. Preview uses the source; Save and prepare mission again before building.','success');
+    }catch(problem){if(activeProject.current===input.id)setError(String(problem));}
+    finally{release();setIncludingSound(false);}
   }
   function updateShot(id: string, patch: Partial<CameraShot>) {
     change({ ...studio, shots: studio.shots.map(s => s.id === id ? { ...s, ...patch } : s) }, 'Update cinematic shot');
@@ -295,6 +324,40 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           {onLevelEditor&&<button type="button" disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.conditionVolume)}
             onClick={()=>selectMissionArea(beat.conditionVolume??'')}>Select optional area in Level Editor</button>}
           <small>False skips this objective, its encounter, HUD update and checkpoint. The condition is checked once, not continuously; this is shared native mission state.</small></div>}
+        <details><summary>Radio / sound cue{beat.soundCue?' · included':''}</summary>
+          <label>Included native sound<select aria-label={'Mission sound '+(i+1)} value={beat.soundCue?.importId??''}
+            onChange={event=>{const binding=project.nativeAssetImports?.find(binding=>binding.id===event.target.value&&binding.tagClass==='snd!');if(binding)selectMissionSound(beat,binding);else updateBeat(beat.id,{soundCue:undefined});}}>
+            <option value="">No cue</option>
+            {beat.soundCue&&!project.nativeAssetImports?.some(binding=>binding.id===beat.soundCue!.importId&&binding.tagClass==='snd!')&&<option value={beat.soundCue.importId}>Missing included sound · choose again</option>}
+            {(project.nativeAssetImports??[]).filter(binding=>binding.tagClass==='snd!').map(binding=><option key={binding.id} value={binding.id}>{binding.tagPath}</option>)}
+          </select></label>
+          <div className="studio-fields"><label>From Map sounds<select aria-label={'Rehearsal sound '+(i+1)} value={cueSources[beat.id]??''}
+            onChange={event=>setCueSources({...cueSources,[beat.id]:event.target.value})}>
+            <option value="">Choose a saved one-shot</option>
+            {(project.audioPreview?.emitters??[]).filter(emitter=>!emitter.loopingSource&&!emitter.customSound).map(emitter=><option key={emitter.id} value={emitter.id}>{emitter.name}</option>)}
+          </select></label><button type="button" disabled={includingSound||!cueSources[beat.id]||!project.quickForge||!!project.quickForge.native||project.quickForge.gameMode!=='campaign'}
+            onClick={()=>void includeMissionSound(beat.id)}>Include sound for objective {i+1}</button></div>
+          <p className="studio-hint">Drag an owned native sound from Asset library into Level Editor → Map sounds first, or choose an already included sound.
+            Creator recordings need native sound tags; importing a WAV for rehearsal alone does not compile it.</p>
+          {beat.soundCue&&<>
+            <div className="studio-fields"><label>Play cue<select aria-label={'Cue timing '+(i+1)} value={beat.soundCue.phase}
+              onChange={event=>updateBeat(beat.id,{soundCue:{...beat.soundCue!,phase:event.target.value as 'start'|'complete'}})}>
+              <option value="start">When objective starts</option><option value="complete">After objective completes</option></select></label>
+              <NumberField label={'Radio gain '+(i+1)} value={beat.soundCue.gain} min={0} max={1} step={.05}
+                onCommit={gain=>updateBeat(beat.id,{soundCue:{...beat.soundCue!,gain}})}/>
+              <NumberField label={'Cue delay milliseconds '+(i+1)} value={beat.soundCue.delayMs} min={0} max={60000} step={100}
+                onCommit={delayMs=>updateBeat(beat.id,{soundCue:{...beat.soundCue!,delayMs:Math.round(delayMs)}})}/>
+            </div>
+            <label>Radio caption · native HUD help text<input aria-label={'Radio caption '+(i+1)} maxLength={254} value={beat.soundCue.caption}
+              onChange={event=>updateBeat(beat.id,{soundCue:{...beat.soundCue!,caption:event.target.value}})}/></label>
+            <SoundAudition label={'Preview objective '+(i+1)+' sound'} volume={beat.soundCue.gain}
+              enabled={!!project.nativeAssetImports?.some(binding=>binding.id===beat.soundCue!.importId&&binding.tagClass==='snd!')}
+              tracks={async()=>{const binding=project.nativeAssetImports?.find(binding=>binding.id===beat.soundCue!.importId&&binding.tagClass==='snd!');
+                if(!binding)throw Error('The source sound is missing.');return [{projectId:binding.sourceProjectId,sourceHash:binding.sourceSha256,tagId:binding.tagId}];}}/>
+            <small>The shared native mission pauses for this unpositioned cue (up to ten minutes). The engine chooses the sound permutation and applies its original sound class.
+              Captions use the HUD help channel, with no percent signs or control characters. Other scripts may replace that channel. Preview is a source audition; native playback and multiplayer delivery need game testing.</small>
+          </>}
+        </details>
         <details><summary>Native objective &amp; completion</summary>
           <label><input type="checkbox" checked={beat.hudObjective===true}
             onChange={event=>updateBeat(beat.id,{hudObjective:event.target.checked?true:undefined,

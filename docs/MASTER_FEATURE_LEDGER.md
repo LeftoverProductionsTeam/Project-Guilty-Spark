@@ -1,6 +1,6 @@
 # Canonical cumulative feature and evidence ledger
 
-Current creator milestone: native encounter source recovery/restart/rebuild/readback passes at1d72dd7; Black Echo draft authoring now has conditional native objectives and named area selection with focused source/browser checks. Full Black Echo rescue/audio/loot/replay/squad/Forerunner gameplay remains incomplete. ACTIVE_TASK, UI_INTERACTION_AUDIT and HUMAN_TEST_PLAN contain exact scope; all475historical CSV records and M1–M6 remain unchanged.
+Current creator milestone: native encounter source recovery/restart/rebuild/readback passes at1d72dd7; Black Echo draft authoring now has conditional native objectives and named area selection with focused source/browser checks. Native radio cue authoring now connects owned import, history/Save, source audition, native HSC/HMT and required readback guards; CE/MCC/Xbox script fixtures pass. Full Black Echo rescue/audio gameplay/loot/replay/squad/Forerunner gameplay remains incomplete. ACTIVE_TASK, UI_INTERACTION_AUDIT and HUMAN_TEST_PLAN contain exact scope; all475historical CSV records and M1–M6 remain unchanged.
 
 ## 14 November 2026 — Recovered Firefight source revision WIP
 

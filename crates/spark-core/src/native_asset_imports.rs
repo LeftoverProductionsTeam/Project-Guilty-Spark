@@ -173,7 +173,10 @@ pub fn is_used(project: &Project, binding: &Binding) -> bool {
             _ => false,
         }
     });
-    firefight || project.scene.iter().any(|object| {
+    let mission=project.quick_forge.as_ref().is_some_and(|doc|doc.game_mode=="campaign")&&
+        project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.sound_cue.as_ref().is_some_and(|cue|
+            cue.import_id==binding.id&&binding.tag_class=="snd!"&&cue.sound_path==binding.native_path.replace('\\',"/"))));
+    firefight || mission || project.scene.iter().any(|object| {
         object.source_model.as_ref().and_then(|source| find(project, source))
             .is_some_and(|value| value.id == binding.id)
     }) || project.quick_forge.as_ref().is_some_and(|document| {
@@ -627,7 +630,9 @@ pub fn verify_compiled(project: &Project, compiled: &maps::MapInspection) -> Res
                     .eq_ignore_ascii_case(&binding.native_path)
         }) {
             // Unplaced sound source tags are retained in the project, not falsely certified as in-game emitters.
-            if matches!(binding.tag_class.as_str(), "snd!" | "lsnd") {
+            let mission=project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|
+                beat.sound_cue.as_ref().is_some_and(|cue|cue.import_id==binding.id)));
+            if matches!(binding.tag_class.as_str(), "snd!" | "lsnd") && !mission {
                 continue;
             }
             return invalid(format!(

@@ -54,3 +54,56 @@ const body=optional.content.split(/\r?\n/).filter(line=>!line.trimStart().starts
 operation.missions[4].conditionVolume='';assert.throws(()=>exportHaloCeMission(operation),/condition volume/);
 operation.missions[4].conditionVolume='be_containment';operation.missions[6].conditionVolume='be_exit_choice';operation.missions[6].completeMission=true;assert.throws(()=>exportHaloCeMission(operation),/final beat/);
 console.log('PASS: Black Echo starter, optional native objective guard, HUD/AI gating, source bindings and safe conditional completion');
+
+// Cues are actual native instructions inside the optional branch. Completion
+// audio must follow its guarded encounter wait and precede native progression.
+const radio=emptyCreatorStudio();radio.missions=[{id:'radio',title:'Evac',objective:'Defend',trigger:'encounterCleared',encounterName:'defense',conditionVolume:'evac',
+ soundCue:{importId:'owned_sound',soundPath:'gs_assets_owned/sound/radio distress',phase:'complete',gain:.5,delayMs:500,caption:'Evac is ready.'}}];
+const cue=exportHaloCeMission(radio),cleared=cue.content.indexOf('(sleep_until (= (ai_living_count defense) 0) 15)'),audio=cue.content.indexOf('(sound_impulse_start "gs_assets_owned/sound/radio distress" none 0.5)');
+assert.ok(audio>cleared);assert.ok(cue.content.indexOf('(hud_set_help_text gs_mission_cue_1)')>cleared);
+assert.ok(cue.content.includes('(sleep 15)'));assert.ok(cue.content.includes('(sleep_until (<= (sound_impulse_time "gs_assets_owned/sound/radio distress") 0) 1 18000)'));
+assert.ok(cue.dependencies.includes('sound:gs_assets_owned/sound/radio distress'));assert.ok(cue.dependencies.includes('hud_message:gs_mission_cue_1'));
+assert.ok(cue.content.indexOf('(show_hud_help_text false)',audio)<cue.content.indexOf('  ))',audio));
+radio.missions[0].soundCue.soundPath='sound/" ) (quit)';assert.throws(()=>exportHaloCeMission(radio),/Invalid mission beat/);
+console.log('PASS: native mission radio timing, captions, optional branch, exact sound dependencies and unsafe-path refusal');
+
+
+// Explicit opt-in native syntax/readback smoke using installed tools and an
+// original generated tone. No SDK, existing tags or game runtime are modified.
+if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
+ const fs=await import('node:fs/promises'),sync=await import('node:fs'),path=await import('node:path'),crypto=await import('node:crypto');
+ const {withDevelopmentWorkspace,runDevelopmentCommand}=await import('./native-qa-storage.mjs');
+ const tools=path.resolve(process.env.SPARK_QA_INVADER??'tools/invader');
+ await withDevelopmentWorkspace('frontend-native-mission-audio',async context=>{
+  const tags=path.join(context.directory,'tags'),data=path.join(context.directory,'data'),scenario='levels/radio/radio';
+  await fs.mkdir(path.join(tags,'levels/radio'),{recursive:true});await fs.mkdir(path.join(data,path.dirname(scenario),'scripts'),{recursive:true});await fs.mkdir(path.join(data,'sound/radio'),{recursive:true});
+  const run=async(tool,args,capture=false)=>{
+   const output=path.join(context.directory,'readback.txt');let fd;
+   try{if(capture)fd=sync.openSync(output,'w');await runDevelopmentCommand(path.join(tools,tool+'.exe'),['-t',tags,...args],context,capture?{stdio:['ignore',fd,'inherit']}:{ });}
+   finally{if(fd!==undefined)sync.closeSync(fd);}
+   return capture?(await fs.readFile(output,'utf8')).trim():'';
+  };
+  const samples=4410,wave=Buffer.alloc(44+samples*2);wave.write('RIFF');wave.writeUInt32LE(wave.length-8,4);wave.write('WAVEfmt ',8);wave.writeUInt32LE(16,16);wave.writeUInt16LE(1,20);wave.writeUInt16LE(1,22);wave.writeUInt32LE(22050,24);wave.writeUInt32LE(44100,28);wave.writeUInt16LE(2,32);wave.writeUInt16LE(16,34);wave.write('data',36);wave.writeUInt32LE(samples*2,40);
+  for(let i=0;i<samples;i++)wave.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/22050)*1000),44+i*2);
+  await fs.writeFile(path.join(data,'sound/radio/tone.wav'),wave);
+  await run('invader-sound',['-d',data,'-c','scripted_dialog_force_unspatialized','-F','16-bit_pcm','-j','1','sound/radio']);
+  await run('invader-edit',['-N','-S','type','singleplayer','-I','trigger_volumes','1','end','-S','trigger_volumes[0].name','radio_area',scenario+'.scenario']);
+  const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',
+   soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
+   {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}}];
+  const source=exportHaloCeMission(native).content;await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
+  await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\n','utf16le')]));
+  await run('invader-string',['-d',data,'-T','hud_message_text','levels/radio_messages']);
+  await run('invader-edit',['-S','hud_messages','levels/radio_messages.hud_message_text',scenario+'.scenario']);
+  const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'),results=[];
+  for(const engine of ['gbx-custom','mcc-cea','xbox-ntsc']){
+   await run('invader-script',['-d',data,'-E','-g',engine,scenario]);
+   const count=await run('invader-edit',['-C','scripts',scenario+'.scenario'],true);assert.equal(count,'3');
+   const names=await run('invader-edit',['-G','scripts[0].name','-G','scripts[1].name','-G','scripts[2].name',scenario+'.scenario'],true);
+   for(const name of ['gs_complete_1','gs_complete_2','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));
+   results.push({engine,scriptCount:Number(count),names:names.split(/\r?\n/),scenarioSha256:await hash(path.join(tags,scenario+'.scenario'))});
+  }
+  const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');
+  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
+ },{reservationBytes:32*1024*1024});
+}

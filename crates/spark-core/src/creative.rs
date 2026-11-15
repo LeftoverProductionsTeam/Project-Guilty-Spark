@@ -25,6 +25,30 @@ pub struct CreatorStudio {
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EngineMachinima{pub enabled:bool,pub playback:String,#[serde(default)]pub camera_id:Option<String>,#[serde(default)]pub auto_start:bool}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct MissionSoundCue {
+    pub import_id:String,
+    pub sound_path:String,
+    pub phase:String,
+    pub gain:f32,
+    pub delay_ms:u32,
+    pub caption:String,
+}
+impl MissionSoundCue {
+    fn valid(&self)->bool {
+        valid_id(&self.import_id)&&!self.sound_path.is_empty()&&self.sound_path.len()<=255&&
+        self.sound_path.bytes().next().is_some_and(|c|c.is_ascii_alphanumeric()||c==b'_')&&
+        self.sound_path.bytes().all(|c|c.is_ascii_alphanumeric()||b"_ ./-".contains(&c))&&
+        self.sound_path.split('/').all(|part|!part.is_empty()&&part!="."&&part!="..")&&
+        matches!(self.phase.as_str(),"start"|"complete")&&self.gain.is_finite()&&(0.0..=1.0).contains(&self.gain)&&
+        self.delay_ms<=60000&&self.caption.encode_utf16().count()<=254&&!self.caption.contains('%')&&!self.caption.chars().any(char::is_control)
+    }
+    fn included(&self,project:&crate::project::Project)->bool {
+        self.valid()&&project.native_asset_imports.iter().filter(|binding|binding.id==self.import_id).count()==1&&
+        project.native_asset_imports.iter().any(|binding|binding.id==self.import_id&&binding.tag_class=="snd!"&&binding.native_path.replace('\\',"/")==self.sound_path)
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MissionBeat {
     pub id: String,
@@ -46,6 +70,8 @@ pub struct MissionBeat {
     pub complete_mission:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub condition_volume:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub sound_cue:Option<MissionSoundCue>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -175,6 +201,9 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)||beat.condition_volume.is_some()) {
             return invalid("Native level completion must be the final beat, without a checkpoint or optional condition on the same beat");
         }
+        if beat.sound_cue.as_ref().is_some_and(|cue|!cue.included(project)) {
+            return invalid(format!("Mission '{}' needs its exact included native sound; choose the imported sound again before preparing",beat.title));
+        }
         if let Some(name)=&beat.condition_volume {
             if !script_ident(name)||!doc.logic.as_ref().is_some_and(|logic|logic.triggers.iter().any(|trigger|crate::native_logic::trigger_name(trigger)==*name)) {
                 return invalid(format!("Mission '{}' references missing optional-condition volume '{}'",beat.title,name));
@@ -224,6 +253,12 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
             return invalid(format!("Compiled mission script is missing, ambiguous or has the wrong native type: {name}"));
         }
     }
+    for beat in &binding.missions {
+        if let Some(cue)=&beat.sound_cue {
+            let found=map.tags.iter().filter(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==cue.sound_path).count();
+            if found!=1{return invalid(format!("Compiled mission sound is missing or ambiguous: {}",cue.sound_path));}
+        }
+    }
     if let Some(hud)=native_mission_hud(binding)? {
         let expected=format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/"));
         let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&expected)).collect::<Vec<_>>();
@@ -240,6 +275,10 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
 pub fn native_mission_hud(binding:&NativeMissionBinding)->Result<Option<crate::firefight::NativeHudAppendPlan>> {
     let mut messages=vec![];
     for (index,beat) in binding.missions.iter().enumerate() {
+        if let Some(cue)=&beat.sound_cue {
+            if !cue.valid(){return invalid("Invalid native mission radio cue");}
+            if !cue.caption.is_empty(){messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_cue_{}",index+1),text:cue.caption.clone()});}
+        }
         if beat.hud_objective!=Some(true){continue;}
         let text=beat.hud_text.clone().unwrap_or_default();
         if text.is_empty()||text.encode_utf16().count()>254||text.contains('%')||text.chars().any(char::is_control) {
@@ -297,6 +336,7 @@ impl CreatorStudio {
                 || !["manual", "triggerVolume", "encounterCleared", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
+                || beat.sound_cue.as_ref().is_some_and(|cue|!cue.valid())
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
@@ -418,6 +458,49 @@ mod tests {
         let saved=serde_json::to_vec(&document).unwrap();let restored:CreatorStudio=serde_json::from_slice(&saved).unwrap();
         assert_eq!(restored.missions[0].condition_volume.as_deref(),Some("be_containment"));
         document.missions[0].condition_volume=Some("unsafe volume".into());assert!(document.validate().is_err());
+    }
+
+    #[test]
+    fn mission_radio_preserves_import_ownership_captions_and_saved_source() {
+        let beat:MissionBeat=serde_json::from_value(serde_json::json!({"id":"radio","title":"Evacuation","objective":"Defend","trigger":"manual","encounterName":"",
+            "soundCue":{"importId":"12345678-1234-4234-8234-123456789012","soundPath":"gs_assets_owned/sound/radio distress","phase":"complete","gain":0.5,"delayMs":500,"caption":"Evacuation ready."}})).unwrap();
+        let mut document=studio();document.missions.push(beat.clone());document.validate().unwrap();
+        let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(restored.missions,document.missions);
+        let mut project=crate::project::Project::new("Radio ownership");
+        let binding=crate::native_asset_imports::Binding{id:beat.sound_cue.as_ref().unwrap().import_id.clone(),source_project_id:uuid::Uuid::new_v4().to_string(),
+            source_sha256:"a".repeat(64),tag_id:42,tag_class:"snd!".into(),tag_path:"sound/radio distress".into(),
+            native_path:beat.sound_cue.as_ref().unwrap().sound_path.clone(),receipt_sha256:"b".repeat(64),file_count:1};
+        project.native_asset_imports.push(binding.clone());project.studio=Some(document.clone());
+        let mut doc=crate::quickforge::create_arena("Radio","customBlank").unwrap();doc.game_mode="campaign".into();
+        project.quick_forge=Some(doc.clone());
+        assert!(beat.sound_cue.as_ref().unwrap().included(&project));assert!(crate::native_asset_imports::is_used(&project,&binding));
+        let body="; source identity only, not compiler evidence\n";
+        let prepared=NativeMissionBinding{schema_version:1,missions:vec![beat.clone()],activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+        let content=format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&prepared).unwrap(),body);
+        doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":content}]})).unwrap());
+        assert!(native_mission_binding(&project,&doc).unwrap().is_some());
+        let hud=native_mission_hud(&prepared).unwrap().unwrap();assert_eq!(hud.messages.len(),1);assert_eq!(hud.messages[0].name,"gs_mission_cue_1");
+        // Synthetic readback guards only, not a compiled audio/gameplay proof.
+        let mut no_caption=prepared.clone();no_caption.missions[0].sound_cue.as_mut().unwrap().caption.clear();
+        let mut map:crate::maps::MapInspection=serde_json::from_value(serde_json::json!({
+            "header":{"version":609,"engine":"test","name":"radio","build":"test","scenarioType":0,"fileSize":0,"declaredSize":0,"tagOffset":0,"tagSize":0,"crc32":0,"flags":0,"demoLayout":false,"compressed":false,"extended":false,"legacyTagSizeRepair":false},
+            "sha256":"a".repeat(64),"tags":[],"objects":[],"mesh":crate::maps::MeshData::default(),"encounters":[],
+            "scripts":[{"name":"gs_mission","scriptType":1,"returnType":4},{"name":"gs_complete_1","scriptType":3,"returnType":4}],"resources":[],"diagnostics":[],"scenarioPath":"levels/test"})).unwrap();
+        let absent=std::path::Path::new("missing-unused-cache");
+        assert!(verify_native_mission(&no_caption,&map,absent).unwrap_err().to_string().contains("sound is missing"));
+        map.tags.push(serde_json::from_value(serde_json::json!({"id":42,"index":0,"class":"snd!","path":binding.native_path,"dataOffset":2048,"external":false,"fields":[],"references":[]})).unwrap());
+        verify_native_mission(&no_caption,&map,absent).unwrap();crate::native_asset_imports::verify_compiled(&project,&map).unwrap();
+        map.tags.push(map.tags[0].clone());assert!(verify_native_mission(&no_caption,&map,absent).is_err());map.tags.clear();
+        assert!(crate::native_asset_imports::verify_compiled(&project,&map).unwrap_err().to_string().contains("omitted imported native asset"));
+        project.native_asset_imports[0].tag_class="lsnd".into();assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("included native sound"));
+        project.native_asset_imports[0]=binding.clone();project.native_asset_imports[0].native_path="sound/other".into();assert!(!crate::native_asset_imports::is_used(&project,&project.native_asset_imports[0]));assert!(native_mission_binding(&project,&doc).is_err());
+        for path in ["../secret","/absolute","sound//radio","sound/./radio","sound/../../other","sound/\" ) (quit)"] {
+            let mut invalid=document.clone();invalid.missions[0].sound_cue.as_mut().unwrap().sound_path=path.into();assert!(invalid.validate().is_err(),"{path}");
+        }
+        for caption in ["100%","unsafe\ntext"]{let mut invalid=document.clone();invalid.missions[0].sound_cue.as_mut().unwrap().caption=caption.into();assert!(invalid.validate().is_err());}
+        let mut invalid=document;invalid.missions[0].sound_cue.as_mut().unwrap().gain=f32::NAN;assert!(invalid.validate().is_err());
+        let old=serde_json::json!({"id":"legacy","title":"Start","objective":"","trigger":"manual","encounterName":""});
+        let legacy:MissionBeat=serde_json::from_value(old).unwrap();assert!(legacy.sound_cue.is_none());assert!(serde_json::to_value(legacy).unwrap().get("soundCue").is_none());
     }
 
 }

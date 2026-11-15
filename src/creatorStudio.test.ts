@@ -2,7 +2,7 @@ import type {Project} from './types';
 import {attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
-import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio } from './creatorStudio';
+import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems } from './creatorStudio';
 
 describe('Project-integrated Creator Studio', () => {
   it('starts private without fabricated gameplay evidence', () => {
@@ -97,4 +97,25 @@ it('keeps native marker bounds and handmade mission sources protected before app
  expect(()=>addBlackEchoDraft(edge,()=> 'beat')).toThrow(/1500/);expect(JSON.stringify(edge)).toBe(before);
  const authored=campaignDraft();authored.quickForge!.logic!.handwrittenSources!.push({filename:'GS_MISSION.HSC',content:'; authored mission, preserve'});
  const preserved=JSON.stringify(authored);expect(()=>addBlackEchoDraft(authored,()=> 'beat')).toThrow(/reconcile/);expect(JSON.stringify(authored)).toBe(preserved);
+});
+
+
+it('prepares a native radio cue with an exact included closure and preserved caption source',async()=>{
+ const project=campaignDraft(),binding={id:'sound_import',nativePath:'gs_assets_source/sound/radio distress',tagClass:'snd!',tagPath:'sound/radio distress'};
+ project.nativeAssetImports=[binding as NonNullable<Project['nativeAssetImports']>[number]];
+ project.studio!.missions=[{id:'radio',title:'Rescue',objective:'Find survivors',trigger:'manual',encounterName:'',
+   soundCue:{importId:binding.id,soundPath:binding.nativePath,phase:'start',gain:.75,delayMs:250,caption:'Marine: We need help.'}}];
+ expect(missionSoundProblems(project)).toEqual([]);expect(validateCreatorStudio(project.studio!)).toEqual([]);
+ const prepared=await attachNativeCampaignMission(project,'manual'),module=prepared.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!;
+ expect(module.content).toContain('(sound_impulse_start "gs_assets_source/sound/radio distress" none 0.75)');
+ expect(module.content).toContain('(hud_set_help_text gs_mission_cue_1)');
+ const restored=JSON.parse(JSON.stringify(prepared));expect((await reviewNativeCampaignMission(restored)).binding.missions[0].soundCue).toEqual(project.studio!.missions[0].soundCue);
+ expect(sameMissionData([{...project.studio!.missions[0],soundCue:undefined}],[{...project.studio!.missions[0],soundCue:null}])).toBe(true);
+ const lost=structuredClone(project);lost.nativeAssetImports=[];await expect(attachNativeCampaignMission(lost,'manual')).rejects.toThrow(/included native sound/);
+ const wrong=structuredClone(project);wrong.nativeAssetImports![0].tagClass='lsnd';expect(missionSoundProblems(wrong)).not.toEqual([]);
+ const mismatch=structuredClone(project);mismatch.studio!.missions[0].soundCue!.soundPath='sound/another';expect(missionSoundProblems(mismatch)).not.toEqual([]);
+ for(const path of ['../secret','/absolute','sound//radio','sound/./radio','sound/../../other','sound/" ) (ai_erase_all)','sound/é']){
+   const draft=structuredClone(project.studio!);draft.missions[0].soundCue!.soundPath=path;expect(validateCreatorStudio(draft)).not.toEqual([]);
+ }
+ const bad=structuredClone(project.studio!);bad.missions[0].soundCue!.caption='%unsafe';expect(validateCreatorStudio(bad)).not.toEqual([]);
 });

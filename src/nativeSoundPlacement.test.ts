@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createEmitter, emptySoundScene } from './spatialAudio';
-import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound } from './nativeSoundPlacement';
+import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound, prepareMissionSound } from './nativeSoundPlacement';
 import { editRevisionKey, changedEditInputs } from './smartEdit';
 import { historyReducer, initialHistory } from './editor';
 import type { NativeAssetImport, Project } from './types';
@@ -171,4 +171,20 @@ it('native intent expires the save plan but rehearsal sliders do not', () => {
       },
     }),
   ).not.toBe(key);
+});
+
+
+it('includes mission radio through the same owned native closure and rejects stale or unsupported audio',async()=>{
+ const {project,emitter}=fixture();project.quickForge!.gameMode='campaign';const radio={...emitter,loopingSource:undefined,tagId:8};
+ const sound={...binding,tagClass:'snd!',tagPath:'sound/radio',nativePath:binding.nativePath.replace('ambient/wind','radio'),tagId:8};
+ api.call.mockImplementation(async(command:string)=>{
+  if(command==='open_project')return {project:{id:sourceId,source:{sha256:hash,audioResources:{}}},inspection:{sha256:hash,header:{version:13},tags:[{id:8,class:'snd!',path:'sound/radio'}]}};
+  if(command==='prepare_native_asset_import')return sound;throw Error(command);
+ });
+ const before=JSON.stringify(project);expect(await prepareMissionSound(project,radio)).toEqual(sound);expect(JSON.stringify(project)).toBe(before);
+ expect(api.call.mock.calls.map(row=>row[0])).toEqual(['open_project','prepare_native_asset_import']);
+ api.call.mockClear();await expect(prepareMissionSound(project,{...radio,sourceSha256:'c'.repeat(64)})).rejects.toThrow(/source changed/);expect(api.call).toHaveBeenCalledTimes(1);
+ await expect(prepareMissionSound(project,{...radio,customSound:{assetId:'wav',sha256:hash}})).rejects.toThrow(/compiled sound tag/);
+ await expect(prepareMissionSound(project,emitter)).rejects.toThrow(/one-shot/);
+ project.quickForge!.gameMode='slayer';await expect(prepareMissionSound(project,radio)).rejects.toThrow(/Campaign/);
 });

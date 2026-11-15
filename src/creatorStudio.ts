@@ -7,6 +7,35 @@
 import {addLogicTrigger,setNativeLogicName} from './nativeLogic.ts';
 import type {Project} from './types';
 import {validMachinimaSettings} from './machinima.ts';
+/** Native radio cue: imported snd! closure, not a separate audio engine. */
+export interface MissionSoundCue {
+  importId: string;
+  soundPath: string;
+  phase: 'start' | 'complete';
+  gain: number;
+  delayMs: number;
+  caption: string;
+}
+export function validMissionSoundCue(cue:MissionSoundCue):boolean {
+  return !!cue&&typeof cue==='object'&&Object.keys(cue).every(key=>['importId','soundPath','phase','gain','delayMs','caption'].includes(key))&&
+    typeof cue.importId==='string'&&/^[a-zA-Z0-9_-]{1,72}$/.test(cue.importId)&&
+    typeof cue.soundPath==='string'&&cue.soundPath.length<=255&&/^[A-Za-z0-9_][A-Za-z0-9_ ./-]*$/.test(cue.soundPath)&&
+    cue.soundPath.split('/').every(part=>part!==''&&part!=='.'&&part!=='..')&&
+    ['start','complete'].includes(cue.phase)&&Number.isFinite(cue.gain)&&cue.gain>=0&&cue.gain<=1&&
+    Number.isInteger(cue.delayMs)&&cue.delayMs>=0&&cue.delayMs<=60000&&
+    typeof cue.caption==='string'&&cue.caption.length<=254&&!/[%\x00-\x1f\x7f]/.test(cue.caption);
+}
+/** Verify selected closures before preparation; the existing importer rechecks
+ * their receipts, bytes and origins during native staging. */
+export function missionSoundProblems(project:Project):string[] {
+  return (project.studio?.missions??[]).flatMap(beat=>{
+    const cue=beat.soundCue;if(!cue)return [];
+    if(!validMissionSoundCue(cue))return ['Invalid radio cue on '+beat.title];
+    const found=project.nativeAssetImports?.filter(binding=>binding.id===cue.importId)??[];
+    return found.length===1&&found[0].tagClass==='snd!'&&found[0].nativePath.replaceAll('\\','/')===cue.soundPath?[]:
+      ['Mission '+beat.title+' needs its exact included native sound. Choose the imported sound again; no missing audio is replaced.'];
+  });
+}
 export interface MissionBeat {
   id: string;
   title: string;
@@ -21,6 +50,7 @@ export interface MissionBeat {
   completeMission?: boolean | null;
   /** Evaluate this native player-volume condition when the beat begins; false skips it. */
   conditionVolume?: string | null;
+  soundCue?: MissionSoundCue | null;
 }
 export interface CameraShot {
   id: string;
@@ -161,6 +191,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
+      (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||
       [m.hudObjective,m.checkpoint,m.completeMission].some(value=>value!=null&&typeof value!=='boolean'))
