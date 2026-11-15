@@ -545,3 +545,32 @@ One3521-file/184203140B SDK subset prepared once; publisher archive/staged input
 | haloTool | `c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa` |
 
 Patrol QA50620/run-d1tK2U terminal; all owned app/compiler/test processes closed and complete temporary output disposed2,949,414,002 logical bytes. Allocated-file disposal unavailable, so no physical-free-space claim. No SDK/map/binary/screenshot/archive retained; original publisher inputs,475CSV and legacy recovery unchanged.
+
+## Campaign firing positions and tactical groups — 15 November
+
+Scoped authored Campaign source milestone, based on master2bcab7f3fa2b6432eecb8ed7cf7c15067332b635 plus the source changes in this commit. Optional independent firing positions and six native squad group masks reuse CampaignEncounters, Forge selection/gizmos/clipboard/history, native_operations append/review/Source Guardian and the existing map reader. No replacement writer, state system or engine interface. Old source keeps start-derived groupA firing positions and native defaults until Customize. Points support XYZ/groupA–Z, Duplicate/Remove, same-map Copy/Paste, hide/lock and explicit Reset; no heading/scale. Group-center translation includes starts, patrol and firing points. Recipe-owned Firefight groups reject independent campaign overrides. Old cached mask telemetry is unavailable, not zero.
+
+Native compiler defect/compatibility finding: initial loose-tag masks [33554433,2,33554432,1,0,33554434] compiled as [33554433,33554435,33554432,1,33554433,33554434]. The pinned MCC Halo Tool ORs attacking groups into both search contexts. The existing strict compiled gate correctly rejected that candidate; it was never accepted. Creator Studio → Firing positions & tactical groups → MCC search-group compatibility now previews the source unions. Include attacking groups in both search contexts explicitly applies them with Undo/Redo. MCC preflight refuses unreconciled source; loose-tag source remains editable. The strict six-mask compiled equality gate is unchanged. No silent source/output normalization and no inference that other compilers share this behavior.
+
+Checks: TypeScript PASS; affected frontend36/36, Rust native_operations14/14 including a real Invader generated-tag round trip/restoration, browser3/3 (starts, patrol, firing). The tag probe independently verifies3firing points/2starts, all6distinct masks, groupZ and an empty context; tagSHA c2d5aeb88087becbb9d45ceb2abb76f5a5b43117fec9a9edd0e0cb91dd1e8dc37, scalarSHA f139266db1b653e34fae8f81a1ddafd2898f4b0289cf00674aedd028fade83b8. Browser initially captured state before the preceding group edit was acknowledged; an exact-source wait fixed the fixture. Native retry initially used an incorrectly nested Playwright locator; the relative selector was fixed. Assertions/preservation checks were retained. One Inspector hint was corrected to distinguish XYZ-only firing positions from start/patrol heading.
+
+QA29199/run-pzY3cX/firing-ui-final: source-frozen actual Windows app → Customize and form edits → real X handle drag → Undo/Redo → E rotation refusal → six tactical selections → compatibility review/Apply/Undo/Redo → hide+lock third point → Prepare → Save/full restart → MCC13 compile → production decoded guards plus independent Invader PASS. Three normal app closes, zero page errors; source unchanged through build/test. Native campaign compilation81621ms. Source and compiled firing points exactly [2,-1,.1]/A, [4,-1,.1]/Z, [6.5,-1,.1]/B; third hidden/locked point retained. All156per-bit reads agree with authored masks [33554433,33554435,33554432,1,33554433,33554434]. Actor starts/references, four1/2difficulty groups, patrol order/fields and baseline Firefight stale-config/previous-good checks remain correct. Screenshot visually inspected at1500x950; this is not all-resolution UI acceptance.
+
+The existing verified3521-file/184203140B SDK subset was prepared once and reused with full rehash (manifest f91e5b3f0cf5d03a1be515b2c1b68567d19c8d34face4694241a5cdf7d4de58f). Original publisher archive and staged input hashes unchanged. Geometry/areas were seeded fixtures. No game, Forerunner, public server, download, installation or publication. Original/recovered native firing/mask editing, other compiler targets, actor tactics/navigation/combat, peers, all-axis UI and human acceptance remain open. Save37944 did not recur and stays unresolved; settlement4/7 remains manual. All475IDs/M1–M6/Operation110 stay open.
+
+| Evidence | SHA256 |
+|---|---|
+| runtimeSourceSha256 | 7f04ce52f659834f1eb6eb36e02b99f410b8ba3d9fab4f24a8b05772364d439d7 |
+| appSha256 | 3fce0b2992814d6700586a43cfb9c305601f5c4ce9005957f79c69cd51f1918e |
+| receiptSha256 | 1aca9f9ffa4870cf7d9b4add4e5555f4208ca12c26ac147d94b08f56a66221d0e |
+| driverSha256 | 62dd0a0c24368e4b9a09b0a036d6050e1659407ef11721b889aa1b46c76c55d0f |
+| cacheSha256 | 6cf5945eafe3ce529756f8cff5dfa6aec7c414c2e32e573a8792535b255290a9 |
+| scenarioSha256 | e07893905b0839ad7e2a85e4a197bf26835129412408afbe21f507f200d274e7 |
+| missionSourceSha256 | dc593be568d03aee6c3c65c62866c6005f3d7d018bce545394210c3b831dfe2c |
+| screenshotSha256 | 4c6032dfe18956fed7a3d4617b644b913c4081906fb9a44db8bbecb3339da1fba |
+| Invader edit | 02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12 |
+| Halo Tool | c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa |
+
+Reproduction: existing test-firefight-native.mjs with matching app/owned H1A kit/archive/Invader, SPARK_NATIVE_BLACK_ECHO_REVIEW=1, SPARK_NATIVE_BLACK_ECHO_DIFFICULTY_REVIEW=1, SPARK_NATIVE_BLACK_ECHO_START_REVIEW=1, SPARK_NATIVE_BLACK_ECHO_PATROL_REVIEW=1 and SPARK_NATIVE_BLACK_ECHO_COMBAT_REVIEW=1. Prepared source reuse uses the existing validated seed-receipt/rehash mechanism. No new harness or retained SDK warehouse.
+
+Firing QA29199/run-pzY3cX is terminal: all owned apps/compilers/tests closed and complete temporary output disposed4,031,310,998 logical bytes. Allocated-file disposal unavailable; no physical reclaimed-space claim. No SDK, binary, map, screenshot or archive retained. Original publisher inputs,475CSV and legacy recovery unchanged.

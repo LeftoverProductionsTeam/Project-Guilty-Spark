@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native campaign patrol authoring milestone
+Task: Operation110 — campaign tactical source milestone; original-source continuation
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 7afd88093d8e00493dca68a3186844413c19131a plus this scoped patrol source/native milestone; exact frozen app/source/cache hashes in RUNTIME_INTEGRATION_20261107.
-Next action: Inspect existing native firing-position and squad group-mask authoring, then connect missing campaign controls through existing source/history/writer/readback. Patrol source/native milestone passes; actual AI navigation/gameplay, original command lists,37944,settlement4/7,Forerunner access,peers and all475/M1–M6 remain open.
+Latest verified revision: 2bcab7f3fa2b6432eecb8ed7cf7c15067332b635 plus this scoped firing-source Windows/native milestone; exact frozen source/app/cache hashes in RUNTIME_INTEGRATION_20261107.
+Next action: Extend existing original/recovered native source controls to firing positions and six squad masks using current review/adopt/Restore/source-hash gates; preserve recipe restrictions. Authored tactical source/native milestone passes. No games/Forerunner/push;37944/settlement4/7/475IDs/M1–M6 remain open.
 
 ## Acceptance
 
@@ -25,7 +25,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Patrol source/native milestone: native squad move_positions reuse campaign editor, Forge selection/gizmos/clipboard/history and existing native writer. XYZ/facing/weight/wait/order/locks/visibility and native moving states are wired; sequence0 preserves eligibility while source array preserves order. TypeScript/frontend33/Rust13/browser3scoped cases pass. Actual Windows X drag/order/Undo/Redo/Save/full restart/MCC13 compile/production decoded movement checks/independent Invader readback pass;3normal closes/0page errors. Patrol [6,2,.1]/90°/weight1/wait0 then[3,2,.1]/0°/weight2.5/wait.25–1.5; hidden locked point remains. Existing4groups/8starts/populations1/2/native start history and stale-Firefight previous-good guards pass. Exact digests/native scope/fixture corrections in RUNTIME_INTEGRATION_20261107. Source authored routes are not navigation, original command-list editing, CE or actual gameplay acceptance. Prior AI pose/behavior milestones ab5cc53/7afd880 remain.
+Campaign tactical source milestone: independent firing positions and6native masks reuse existing history/Forge/clipboard/writer. XYZ-only/groupA–Z/locks/visibility/reset, context selection and source-card navigation are connected. TypeScript/frontend36/Rust14/browser3 pass. Actual Windows X drag, Undo/Redo, tactical/explicit MCC compatibility Apply/history, Save/full restart, MCC13 compilation and independent3points/156flags readback pass;3normal closes/0page errors. Third hidden/locked point retained; actor starts/counts/patrol and baseline previous-good guards unchanged. Initial compiler-expanded masks were correctly rejected; source review/preflight fixes that dependency without normalizing output. Native guards stay strict. Exact hashes/failures/scope in RUNTIME_INTEGRATION_20261107; actual AI gameplay, other targets and original-native firing edits stay open.
 
 Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbox script proof remains in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git; no evidence or requirement removed.
 
@@ -87,7 +87,7 @@ Owner priorities/addenda remain active:
 
 - Mission attachment WIP: all execution/native/game/history/Save/restart gates are unrun. Peer source modules do not by themselves synchronize Creator Studio mission data; explicit reconciliation is the next implementation, not a reason to disable stale binding checks. HUD objectives/checkpoints/ending/AI viewport and combat remain incomplete.
 
-- Campaign encounters WIP: source UI/native writer/readback/SparkLink are unexecuted. Actor viewport previews, generated mission attachment/startup, objectives/checkpoints/ending and real AI/collision/navigation/combat are not accepted or complete. Native and user workflows still need authorized execution.
+- Authored campaign encounter counts/poses/patrol/firing/tactical source now pass scoped Windows Save/restart/native MCC/readback. Original-native structural/squad/command-list editing, actor previews and AI/navigation/combat remain incomplete; source and cache acceptance do not establish gameplay.
 
 - Campaign/loadout WIP: typecheck, compilation, UI Save/Undo/Redo/restart, profile semantics, dependency staging/readback, SparkLink peers and engine application are unrun. No playable Extraction, inventory persistence or new runtime capability was established. Existing native controller and source preservation guards are retained.
 
@@ -100,13 +100,13 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
+Firing QA29199/run-pzY3cX terminal; all owned apps/compilers/tests closed, complete output disposed4,031,310,998 logicalB (allocated disposal unavailable, no physical-space claim). Evidence/hashes in RUNTIME_INTEGRATION_20261107. No retained SDK/map/binary/screenshot/archive, game/Forerunner/publication; original inputs/475CSV/legacy recovery unchanged.
+
 Patrol QA50620/run-d1tK2U terminal; all owned app/compiler/test processes closed and complete temporary output disposed2,949,414,002 logical bytes. Allocated-file disposal unavailable, so no physical-free-space claim. No SDK/map/binary/screenshot/archive retained; original publisher inputs,475CSV and legacy recovery unchanged.
 
 Behavior QA24142/run-Dyart4 is terminal and disposed381,534,231 logical bytes; allocated-file disposal unavailable. Focused unit/browser and initial failed-compile roots also disposed themselves. No active app/compiler or new retained output; original files/475CSV/legacy recovery unchanged.
 
 QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete temporary output disposed3,969,093,068 logical bytes; allocated-file disposal unavailable (not a physical-reclaimed claim). No SDK/map/binary/screenshot/archive retained. Originals and Git recovery unchanged.
-
-QA46827/run-epWsfu active; external bounded owned output, focused source/Rust/native app checks. Close owned children before disposal. Prior35395 terminal/disposed2801381689logicalB. No retained SDK/binary/map/profile/archive, games/Forerunner/push.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 

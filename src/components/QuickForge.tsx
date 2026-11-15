@@ -373,7 +373,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     setBspMode(false);setCameraMode('orbit');setMode(nativeAiStart.mode??'translate');setSelected([]);setSelectedZone(null);setWorkshopSelected(null);
   },[activity.active,nativeAiStart?.key,nativeAiStart?.active,nativeAiStart?.focus]);
   function setMode(next:'translate'|'rotate'|'scale') {
-    if(next==='scale'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&(node.type==='campaignStart'||node.type==='campaignPatrol'))){notify('Campaign AI points support Move and Z-facing rotation; Scale is unavailable for a native AI point.','info');return;}
+    if(next==='rotate'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&node.type==='campaignFiring')){notify('Native firing positions support XYZ movement only.','info');return;}
+    if(next==='scale'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring'))){notify('Native AI points cannot be scaled. Starts and patrol points support Move and Z facing; firing positions support XYZ only.','info');return;}
     if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify('Native AI starts support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.','info');return;}
     setModeState(next);
     if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
@@ -3413,7 +3414,7 @@ function ForgeProperties({
             Name
             <input
               aria-label="Selected object name"
-              readOnly={(node.type==='campaignStart'||node.type==='campaignPatrol')}
+              readOnly={(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring')}
               value={node.value.name}
               maxLength={160}
               onChange={(e) =>
@@ -3446,13 +3447,13 @@ function ForgeProperties({
                   value={(rotation[i] * 180) / Math.PI}
                   min={-36000}
                   max={36000}
-                  disabled={(node.type === 'spawn' || node.type === 'objective' || node.type === 'trigger'||(node.type==='campaignStart'||node.type==='campaignPatrol')) && i !== 2}
+                  disabled={node.type==='campaignFiring'||(node.type === 'spawn' || node.type === 'objective' || node.type === 'trigger'||node.type==='campaignStart'||node.type==='campaignPatrol') && i !== 2}
                   onCommit={(value) => transform(i, value, 'rotation')}
                 />
               </label>
             ))}
           </div>
-          {(node.type==='campaignStart'||node.type==='campaignPatrol')&&<p className="forge-hint">Authored campaign AI point in {node.value.encounterName}. XYZ and Z facing feed the existing native encounter recipe. Visibility/locking affect only this editor; hidden points still compile. This marker is not an actor model or navigation proof.</p>}
+          {(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring')&&<p className="forge-hint">Authored campaign AI point in {node.value.encounterName}. {node.type==='campaignFiring'?'XYZ and the selected native group feed the encounter recipe; firing positions have no heading.':'XYZ and Z facing feed the existing native encounter recipe.'} Visibility/locking affect only this editor; hidden points still compile. This marker is not an actor model or navigation proof.</p>}
           {node.type === 'trigger' && <>
             <h4>Trigger size · world units</h4>
             <div className="forge-vector">{['Width', 'Depth', 'Height'].map((axis, i) => <label key={axis}>

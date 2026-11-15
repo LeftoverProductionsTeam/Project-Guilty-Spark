@@ -179,6 +179,7 @@ fn invader(tools:&ForgeToolchain,name:&str)->Option<PathBuf> {
 // A Chupathingy authoring document emits standard CE tags, never an Xbox/MCC
 // cache relabel. Require the same explicit reviewed CE profile as its build route.
 fn authoring_preflight(project:&Project,tools:&ForgeToolchain,document:&quickforge::QuickForgeDocument)->Result<()> {
+    if document.runtime_id==RuntimeId::MccSteam{for entry in &document.campaign_encounters{entry.require_mcc_search_groups()?;}}
     let selected=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|p|&p.id==id));
     let reviewed=selected.is_some_and(|p|p.ce_compatible_tagset&&p.builder=="invader-ce"&&!p.open_sauce&&matches!(p.runtime_id,RuntimeId::HaloCustomEdition|RuntimeId::ChupathingyCe));
     match document.runtime_id {

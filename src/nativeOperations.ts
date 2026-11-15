@@ -3,14 +3,18 @@ export const campaignAiStates=['sleeping','alert','guarding','searching','fleein
 export type CampaignAiState=typeof campaignAiStates[number];
 export interface NativeEncounterStart {id:string;position:[number,number,number];facingRadians:number;visible?:boolean;locked?:boolean}
 export interface NativePatrolPoint extends NativeEncounterStart {waitSeconds:[number,number];weight:number}
-export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];patrol?:{points:NativePatrolPoint[]};behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
+export const campaignTacticalModes=['attacking','attackingSearch','attackingGuard','defending','defendingSearch','defendingGuard'] as const;
+export type CampaignTacticalMode=typeof campaignTacticalModes[number];
+export interface NativeFiringPoint {id:string;position:[number,number,number];group:string;visible?:boolean;locked?:boolean}
+export interface NativeCombatSource {points:NativeFiringPoint[];groups:Record<CampaignTacticalMode,string[]>}
+export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];patrol?:{points:NativePatrolPoint[]};combat?:NativeCombatSource;behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
 export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
 export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number];facingRadians?:number|null}[]|null}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null}
-  | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
+  | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'|'combat'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;
@@ -93,7 +97,7 @@ export function scaleCampaignDifficulty(entries:NativeEncounterAppend[],normalFa
 
 /** Same f32 native grid for preview; explicit poses become the sole source on edit. */
 export function campaignEncounterStarts(entry:NativeEncounterAppend):NativeEncounterStart[]{
- campaignPatrolPoints(entry);
+ campaignPatrolPoints(entry);campaignCombatPoints(entry);
  if(entry.starts){if(entry.grid||entry.starts.length!==(entry.count??1)||!entry.starts.length||entry.starts.length>32)throw Error('Review the individual campaign start count.');const ids=new Set<string>();for(const point of entry.starts){if(typeof point.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(point.id)||ids.has(point.id)||!Array.isArray(point.position)||point.position.length!==3||point.position.some(v=>!Number.isFinite(v)||Math.abs(v)>2048)||!Number.isFinite(point.facingRadians)||Math.abs(point.facingRadians)>Math.PI*2+1e-6)throw Error('Campaign starts need distinct source IDs, finite XYZ within2048 and facing within one turn.');ids.add(point.id);}return entry.starts;}
  const count=entry.count??1,total=entry.grid?.total??count,offset=entry.grid?.offset??0,side=Math.ceil(Math.sqrt(total)),half=(side-1)/2,spacing=Math.fround(entry.spacing??.75);
  if(!Number.isInteger(count)||count<1||count>32||total<1||total>32||offset<0||offset+count>total)throw Error('Review the campaign starting grid.');
@@ -108,3 +112,14 @@ export function campaignPatrolPoints(entry:NativeEncounterAppend):NativePatrolPo
 }
 export const campaignPatrolId=(encounter:string,point:string)=>'campaignPatrol:'+encounter+':'+point;
 export const campaignStartId=(encounter:string,start:string)=>'campaign:'+encounter+':'+start;
+
+export const campaignFiringId=(encounter:string,id:string)=>'campaignFiring:'+encounter+':'+id;
+export function campaignCombatPoints(entry:NativeEncounterAppend):NativeFiringPoint[]{
+ const points=entry.combat?.points??[];if(!entry.combat)return points;if(!points.length||points.length>512)throw Error('Native combat source needs1–512 firing positions.');
+ for(const mode of campaignTacticalModes){const groups=entry.combat.groups?.[mode];if(!Array.isArray(groups)||groups.length>26||new Set(groups).size!==groups.length||groups.some(g=>typeof g!=='string'||!/^[a-z]$/.test(g)))throw Error('Each tactical mode needs distinct native groups A–Z (or an explicit empty selection).');}
+ const ids=new Set<string>();for(const p of points){if(typeof p.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(p.id)||ids.has(p.id)||!Array.isArray(p.position)||p.position.length!==3||p.position.some(v=>!Number.isFinite(v)||Math.abs(v)>2048)||typeof p.group!=='string'||!/^[a-z]$/.test(p.group))throw Error('Firing points need unique IDs, finite XYZ within2048 and one native group A–Z.');ids.add(p.id);}return points;
+}
+export function customizeCampaignCombat(entry:NativeEncounterAppend):NativeCombatSource{return {points:campaignEncounterStarts(entry).map(p=>({id:p.id,position:[...p.position],group:'a'})),groups:Object.fromEntries(campaignTacticalModes.map(mode=>[mode,['a']])) as NativeCombatSource['groups']};}
+
+/** Explicit source review for the pinned MCC compiler; never modifies input. */
+export function campaignMccSearchReview(combat:NativeCombatSource){const groups={...combat.groups,attackingSearch:[...new Set([...combat.groups.attackingSearch,...combat.groups.attacking])].sort(),defendingSearch:[...new Set([...combat.groups.defendingSearch,...combat.groups.attacking])].sort()};return {groups,changed:groups.attackingSearch.length!==combat.groups.attackingSearch.length||groups.defendingSearch.length!==combat.groups.defendingSearch.length};}

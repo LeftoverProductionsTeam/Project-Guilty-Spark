@@ -1,4 +1,4 @@
-import {campaignEncounterStarts,campaignStartId,campaignPatrolPoints,campaignPatrolId} from './nativeOperations';
+import {campaignEncounterStarts,campaignStartId,campaignPatrolPoints,campaignPatrolId,campaignCombatPoints,campaignFiringId} from './nativeOperations';
 import { pointInsideWorkshop } from './bspWorkshop';
 import type { BuildRecord, OpenProject, RuntimeId, Vec3 } from './types';
 import type { EditorEnvironment } from './environment';
@@ -141,6 +141,7 @@ export interface QuickForgeBuildReceipt {
 export interface CampaignStartNode extends ForgeEntity {encounterName:string;startId:string;facing:number}
 export type ForgeNode =
   | {type:'campaignStart';value:CampaignStartNode}
+  | {type:'campaignFiring';value:CampaignStartNode&{group:string}}
   | {type:'campaignPatrol';value:CampaignStartNode&{waitSeconds:[number,number];weight:number}}
   | { type: 'trigger'; value: LogicTrigger }
   | { type: 'brush'; value: ForgeBrush }
@@ -192,6 +193,7 @@ export function forgeNodes(doc: QuickForgeDocument): ForgeNode[] {
   return [
     ...(doc.gameMode==='campaign'?(doc.campaignEncounters??[]).flatMap(entry=>campaignEncounterStarts(entry).map((point,index)=>({type:'campaignStart' as const,value:{id:campaignStartId(entry.name,point.id),name:entry.name+' / Start '+index,encounterName:entry.name,startId:point.id,position:point.position,facing:point.facingRadians,visible:point.visible!==false,locked:!!point.locked}}))):[]),
     ...(doc.gameMode==='campaign'?(doc.campaignEncounters??[]).flatMap(entry=>campaignPatrolPoints(entry).map((point,index)=>({type:'campaignPatrol' as const,value:{id:campaignPatrolId(entry.name,point.id),name:entry.name+' / Patrol '+index,encounterName:entry.name,startId:point.id,position:point.position,facing:point.facingRadians,waitSeconds:point.waitSeconds,weight:point.weight,visible:point.visible!==false,locked:!!point.locked}}))):[]),
+    ...(doc.gameMode==='campaign'?(doc.campaignEncounters??[]).flatMap(entry=>campaignCombatPoints(entry).map((p,index)=>({type:'campaignFiring' as const,value:{id:campaignFiringId(entry.name,p.id),name:entry.name+' / Firing '+index,encounterName:entry.name,startId:p.id,position:p.position,facing:0,group:p.group,visible:p.visible!==false,locked:!!p.locked}}))):[]),
     ...doc.geometry.map((value) => ({ type: 'brush' as const, value })),
     ...doc.placements.map((value) => ({ type: 'placement' as const, value })),
     ...doc.spawns.map((value) => ({ type: 'spawn' as const, value })),
@@ -205,10 +207,11 @@ export function nodeRotation(node: ForgeNode): Vec3 {
 export function patchForgeNode(node: ForgeNode, patch: Partial<ForgeEntity> & { team?: number }): ForgeNode {
   // These fields are shared by all variants; team is excluded for geometry.
   const { team, ...common } = patch;
-  if (node.type === 'brush' || node.type==='trigger' || (node.type==='campaignStart'||node.type==='campaignPatrol')) return { ...node, value: { ...node.value, ...common } } as ForgeNode;
+  if (node.type === 'brush' || node.type==='trigger' || (node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring')) return { ...node, value: { ...node.value, ...common } } as ForgeNode;
   return { ...node, value: { ...node.value, ...common, ...(team === undefined ? {} : { team }) } } as ForgeNode;
 }
 export function nodeCategory(node: ForgeNode): string {
+  if(node.type==='campaignFiring')return 'Campaign firing positions';
   if(node.type==='campaignPatrol')return 'Campaign patrol points';
   if(node.type==='campaignStart')return 'Campaign AI starts';
   if(node.type==='trigger')return 'Trigger volumes';
@@ -243,7 +246,8 @@ export function mapForgeNodes(
         return {...point,position:v.position,facingRadians:v.facing,visible:v.visible,locked:v.locked};
       });
       const oldPatrol=campaignPatrolPoints(entry),patrol=oldPatrol.map((point,index)=>{const node:ForgeNode={type:'campaignPatrol',value:{id:campaignPatrolId(entry.name,point.id),name:entry.name+' / Patrol '+index,encounterName:entry.name,startId:point.id,position:point.position,facing:point.facingRadians,waitSeconds:point.waitSeconds,weight:point.weight,visible:point.visible!==false,locked:!!point.locked}};const revised=update(node);if(revised.type!=='campaignPatrol'||revised.value.encounterName!==entry.name||revised.value.startId!==point.id)throw Error('Patrol ownership cannot be reassigned.');const v=revised.value;return v.position.every((n,i)=>n===point.position[i])&&v.facing===point.facingRadians&&v.visible===(point.visible!==false)&&v.locked===!!point.locked?point:{...point,position:v.position,facingRadians:v.facing,visible:v.visible,locked:v.locked};});
-      const startChanged=starts.some((p,i)=>p!==old[i]),patrolChanged=patrol.some((p,i)=>p!==oldPatrol[i]);return startChanged||patrolChanged?{...entry,...(startChanged?{starts}:{}),...(patrolChanged?{patrol:{points:patrol}}:{})}:entry;
+      const oldCombat=campaignCombatPoints(entry),firing=oldCombat.map((point,index)=>{const node:ForgeNode={type:'campaignFiring',value:{id:campaignFiringId(entry.name,point.id),name:entry.name+' / Firing '+index,encounterName:entry.name,startId:point.id,position:point.position,facing:0,group:point.group,visible:point.visible!==false,locked:!!point.locked}};const revised=update(node);if(revised.type!=='campaignFiring'||revised.value.encounterName!==entry.name||revised.value.startId!==point.id)throw Error('Firing position ownership cannot be reassigned.');const v=revised.value;return v.position.every((n,i)=>n===point.position[i])&&v.visible===(point.visible!==false)&&v.locked===!!point.locked?point:{...point,position:v.position,visible:v.visible,locked:v.locked};});
+      const firingChanged=firing.some((p,i)=>p!==oldCombat[i]);const startChanged=starts.some((p,i)=>p!==old[i]),patrolChanged=patrol.some((p,i)=>p!==oldPatrol[i]);return startChanged||patrolChanged||firingChanged?{...entry,...(firingChanged?{combat:{...entry.combat!,points:firing}}:{}),...(startChanged?{starts}:{}),...(patrolChanged?{patrol:{points:patrol}}:{})}:entry;
     })}:{}),
     geometry: doc.geometry.map((value) => update({ type: 'brush', value }).value as ForgeBrush),
     placements: doc.placements.map((value) => update({ type: 'placement', value }).value as ForgePlacement),
@@ -265,7 +269,8 @@ export function transformForgeNode(
     scale.some((n) => n <= 0)
   )
     throw new Error('Use finite transforms and positive dimensions within ±2048 world units.');
-  if((node.type==='campaignStart'||node.type==='campaignPatrol')&&(Math.abs(rotation[0])>1e-6||Math.abs(rotation[1])>1e-6||scale.some(value=>Math.abs(value-1)>1e-6)))throw Error('Campaign AI points support XYZ position and Z facing only.');
+  if(node.type==='campaignFiring'&&rotation.some(v=>Math.abs(v)>1e-6))throw Error('Native firing positions support XYZ only.');
+  if((node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring')&&(Math.abs(rotation[0])>1e-6||Math.abs(rotation[1])>1e-6||scale.some(value=>Math.abs(value-1)>1e-6)))throw Error('Campaign AI points support XYZ position and Z facing only.');
   if (node.type === 'brush' || node.type==='trigger') {
     if (node.type === 'trigger' && (position.some(n => Math.abs(n) > 1500) || Math.abs(rotation[0]) > 0.00001 || Math.abs(rotation[1]) > 0.00001))
       throw new Error('Native trigger volumes support yaw rotation within ±1500 world units.');
@@ -275,7 +280,7 @@ export function transformForgeNode(
     return { ...node, value: { ...node.value, position, rotation, dimensions } } as ForgeNode;
   }
   if (node.type === 'placement') return { ...node, value: { ...node.value, position, rotation } };
-  if((node.type==='campaignStart'||node.type==='campaignPatrol'))return {...node,value:{...node.value,position,facing:Math.atan2(Math.sin(rotation[2]),Math.cos(rotation[2]))}} as ForgeNode;
+  if((node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring'))return {...node,value:{...node.value,position,facing:Math.atan2(Math.sin(rotation[2]),Math.cos(rotation[2]))}} as ForgeNode;
   if (node.type === 'spawn') return { ...node, value: { ...node.value, position, facing: rotation[2] } };
   return { ...node, value: { ...node.value, position, facing: rotation[2] } };
 }
@@ -286,7 +291,7 @@ export function removeForgeNodes(doc: QuickForgeDocument, ids: string[]): QuickF
     ...doc,
     ...(doc.gameMode==='campaign'&&doc.campaignEncounters?{campaignEncounters:doc.campaignEncounters.map(entry=>{
       const old=campaignEncounterStarts(entry),starts=old.filter(point=>point.locked||!ids.includes(campaignStartId(entry.name,point.id)));
-      const oldPatrol=campaignPatrolPoints(entry),patrol=oldPatrol.filter(p=>p.locked||!ids.includes(campaignPatrolId(entry.name,p.id)));const revised=patrol.length===oldPatrol.length?entry:{...entry,patrol:patrol.length?{points:patrol}:undefined};campaignPatrolPoints(revised);
+      const oldPatrol=campaignPatrolPoints(entry),patrol=oldPatrol.filter(p=>p.locked||!ids.includes(campaignPatrolId(entry.name,p.id)));let revised=patrol.length===oldPatrol.length?entry:{...entry,patrol:patrol.length?{points:patrol}:undefined};campaignPatrolPoints(revised);const oldFiring=campaignCombatPoints(entry),firing=oldFiring.filter(p=>p.locked||!ids.includes(campaignFiringId(entry.name,p.id)));if(firing.length!==oldFiring.length){if(!firing.length)throw Error('Keep one firing position, or explicitly Reset firing source in Creator Studio.');revised={...revised,combat:{...entry.combat!,points:firing}};}
       if(starts.length===old.length)return revised;
       if(!starts.length||entry.difficulty&&[entry.difficulty.normal,entry.difficulty.insane].some(count=>count>starts.length))throw Error('Keep at least one campaign start and enough for both difficulty populations. Lower overrides first, or Remove encounter in Creator Studio.');
       return {...revised,starts,count:starts.length};
@@ -310,6 +315,7 @@ export function appendForgeNodes(doc:QuickForgeDocument,nodes:ForgeNode[],offset
   const result = structuredClone(doc),
     created: string[] = [];
   for (const node of nodes.filter(n=>!n.value.locked)) {
+    if(node.type==='campaignFiring'){const group=result.campaignEncounters?.find(e=>e.name===node.value.encounterName);if(!group?.combat||result.gameMode!=='campaign')throw Error('Customize the owning encounter firing source first.');const points=campaignCombatPoints(group);if(points.length>=512)throw Error('Native firing position limit512 reached.');const id=crypto.randomUUID(),position=node.value.position.map((v,i)=>v+offset[i]) as Vec3;transformForgeNode(node,position,[0,0,0]);const combat={...group.combat,points:[...points,{id,position,group:node.value.group,visible:node.value.visible,locked:false}]};campaignCombatPoints({...group,combat});group.combat=combat;created.push(campaignFiringId(group.name,id));continue;}
     if(node.type==='campaignPatrol'){
       const group=result.campaignEncounters?.find(e=>e.name===node.value.encounterName);if(!group||result.gameMode!=='campaign')throw Error('Include the owning campaign encounter first.');const points=campaignPatrolPoints(group);if(points.length>=32)throw Error('Native patrol supports32points per group.');const position=node.value.position.map((v,i)=>v+offset[i]) as Vec3;transformForgeNode(node,position,nodeRotation(node));const id=crypto.randomUUID();const patrol={points:[...points,{id,position,facingRadians:node.value.facing,waitSeconds:node.value.waitSeconds,weight:node.value.weight,visible:node.value.visible,locked:false}]};campaignPatrolPoints({...group,patrol});group.patrol=patrol;created.push(campaignPatrolId(group.name,id));continue;
     }

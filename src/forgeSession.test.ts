@@ -1,5 +1,5 @@
 import {forgeNodes,mapForgeNodes,transformForgeNode,duplicateForgeNodes,removeForgeNodes} from './forge';
-import {campaignAiStates,campaignEncounterStarts,campaignPatrolPoints,campaignPatrolId} from './nativeOperations';
+import {campaignMccSearchReview,campaignCombatPoints,customizeCampaignCombat,campaignAiStates,campaignEncounterStarts,campaignPatrolPoints,campaignPatrolId} from './nativeOperations';
 import {scaleCampaignDifficulty} from './nativeOperations';
 import {describe,it,expect} from 'vitest';
 import {mergeForge,portableForge,localForge} from './forgeSession';
@@ -188,4 +188,18 @@ it('native patrol source uses shared nodes, ordered ownership, locks, history an
  for(const state of campaignAiStates)expect(campaignPatrolPoints({...entry,behavior:{initialState:state,returnState:state}})).toHaveLength(2);
  expect(()=>campaignPatrolPoints({...entry,patrol:undefined})).toThrow(/enough patrol points/);expect(()=>campaignPatrolPoints({...entry,patrol:{points:[{...entry.patrol.points[0],waitSeconds:[2,1]}]}})).toThrow(/ordered/);
  expect(()=>campaignPatrolPoints({...entry,patrol:{points:[entry.patrol.points[0],entry.patrol.points[0]]}})).toThrow(/unique/);expect(campaignPatrolId(entry.name,'p0')).toBe(nodes[0].value.id);
+});
+
+
+it('combat source preserves actor starts and carries firing ownership history locks and tactical conflicts',()=>{
+ const doc:QuickForgeDocument={...structuredClone(base),gameMode:'campaign',campaignEncounters:[{name:'guards',actorPath:'characters/grunt',position:[0,0,0],startActive:false,count:2}]};const before=JSON.stringify(doc),entry=doc.campaignEncounters![0],combat=customizeCampaignCombat(entry);expect(combat.points).toHaveLength(2);expect(entry.combat).toBeUndefined();const custom={...doc,campaignEncounters:[{...entry,combat}]};const node=forgeNodes(custom).find(n=>n.type==='campaignFiring')!;
+ const moved=mapForgeNodes(custom,n=>n.value.id===node.value.id?transformForgeNode(n,[4,5,1],[0,0,0]):n);expect(moved.campaignEncounters![0].combat!.points[0].position).toEqual([4,5,1]);expect(moved.campaignEncounters![0].starts).toBeUndefined();expect(JSON.stringify(doc)).toBe(before);expect(()=>transformForgeNode(node,[0,0,0],[0,0,1])).toThrow(/XYZ only/);
+ const duplicate=duplicateForgeNodes(moved,[node.value.id]);expect(campaignCombatPoints(duplicate.document.campaignEncounters![0])).toHaveLength(3);expect(removeForgeNodes(duplicate.document,duplicate.ids).campaignEncounters).toEqual(moved.campaignEncounters);const locked=mapForgeNodes(moved,n=>n.value.id===node.value.id?{...n,value:{...n.value,locked:true,visible:false}} as typeof n:n);expect(removeForgeNodes(locked,[node.value.id]).campaignEncounters).toEqual(locked.campaignEncounters);
+ let h=historyReducer(initialHistory,{type:'load',project:project(custom)});h=historyReducer(h,{type:'edit',project:project(moved),description:'Move firing position'});h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(custom.campaignEncounters);h=historyReducer(h,{type:'redo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(moved.campaignEncounters);expect(mergeForge(custom,custom,moved).campaignEncounters).toEqual(moved.campaignEncounters);const peer=structuredClone(custom);peer.campaignEncounters[0].combat.groups.attacking=['z'];expect(()=>mergeForge(custom,peer,moved)).toThrow(/campaign encounter/i);
+ expect(()=>campaignCombatPoints({...entry,combat:{...combat,points:[]}})).toThrow(/1–512/);expect(()=>campaignCombatPoints({...entry,combat:{...combat,groups:{...combat.groups,attacking:['a','a']}}})).toThrow(/distinct/);expect(()=>campaignCombatPoints({...entry,combat:{...combat,points:[{...combat.points[0],group:'aa'}]}})).toThrow(/native group/);expect(campaignCombatPoints(entry)).toEqual([]);
+});
+
+
+it('MCC search review requires explicit source adoption and retains incompatible drafts for Undo',()=>{
+ const entry={name:'guards',actorPath:'actors/guard',position:[0,0,0] as [number,number,number],startActive:false};const combat=customizeCampaignCombat(entry);combat.groups.attacking=['a','z'];combat.groups.attackingSearch=['b'];combat.groups.defendingSearch=[];const before=JSON.stringify(combat),review=campaignMccSearchReview(combat);expect(review.changed).toBe(true);expect(review.groups.attackingSearch).toEqual(['a','b','z']);expect(review.groups.defendingSearch).toEqual(['a','z']);expect(JSON.stringify(combat)).toBe(before);expect(campaignMccSearchReview({...combat,groups:review.groups}).changed).toBe(false);
 });

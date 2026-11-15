@@ -175,6 +175,7 @@ export interface MapInspection {
   encounters: { name: string; squads: string[]; team: number; details?: {
     flags:number; manualBspIndex:number;
     squads:{name:string;actorPaletteIndex:number;actorVariantTagId:number|null;normalCount:number;insaneCount:number;initialState:number;returnState:number;
+      firingGroups?:Record<'attacking'|'attackingSearch'|'attackingGuard'|'defending'|'defendingSearch'|'defendingGuard',number>|null;
       movePositions?:{position:Vec3;facing:number;weight:number;waitSeconds:[number,number];animation:number;sequenceId:number}[]|null;
       startingLocations:{position:Vec3;facing:number;flags:number;initialState:number;returnState:number;actorPaletteIndex:number;actorVariantTagId:number|null;commandList:number}[];}[];
     firingPositions:{position:Vec3;groupIndex:number;clusterIndex:number;surfaceIndex:number}[];

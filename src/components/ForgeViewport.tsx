@@ -220,7 +220,7 @@ function NodeVisual({
       </mesh>
     );
   }
-  if(greenScreen&&(node.type==='trigger'||node.type==='objective'||(node.type==='campaignStart'||node.type==='campaignPatrol')))return null;
+  if(greenScreen&&(node.type==='trigger'||node.type==='objective'||(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring')))return null;
   if(node.type==='trigger')return <mesh>
     <boxGeometry args={node.value.dimensions}/>
     <meshBasicMaterial color={selected?'#b3ffe5':'#5dd0a7'} transparent opacity={selected?0.12:0.04} depthWrite={false}/>
@@ -228,7 +228,7 @@ function NodeVisual({
     {selected&&<ViewportLabel position={[0,0,node.value.dimensions[2]/2+0.2]} text={node.value.name}/>}
   </mesh>;
   if(node.type==='placement'||node.type==='spawn')return ownedModel?<Mesh greenScreen={greenScreen&&!isChromaSubject(node.type==='placement'?node.value.tagClass:'bipd','')} data={ownedModel.mesh} shaderTextures={ownedModel.shaderTextures} shaderMetadata={ownedModel.shaderMetadata} extraTextures={ownedModel.extraTextures} wireframe={wireframe}/>:null;
-  if((node.type==='campaignStart'||node.type==='campaignPatrol'))return <group><mesh position={[0,0,.15]}><sphereGeometry args={[.13,10,6]}/><meshBasicMaterial color={selected?'#c2fff0':'#70cdb9'}/></mesh><mesh position={[.4,0,.15]} rotation={[0,0,-Math.PI/2]}><coneGeometry args={[.08,.25,6]}/><meshBasicMaterial color="#70cdb9"/></mesh>{selected&&<ViewportLabel position={[0,0,.65]} text={node.value.name+(node.type==='campaignPatrol'?' · patrol point':' · authored AI start')}/>}</group>;
+  if((node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring'))return <group><mesh position={[0,0,.15]}><sphereGeometry args={[.13,10,6]}/><meshBasicMaterial color={selected?'#c2fff0':'#70cdb9'}/></mesh>{node.type!=='campaignFiring'&&<mesh position={[.4,0,.15]} rotation={[0,0,-Math.PI/2]}><coneGeometry args={[.08,.25,6]}/><meshBasicMaterial color="#70cdb9"/></mesh>}{selected&&<ViewportLabel position={[0,0,.65]} text={node.value.name+(node.type==='campaignFiring'?' · firing group '+node.value.group.toUpperCase():node.type==='campaignPatrol'?' · patrol point':' · authored AI start')}/>}</group>;
   const spawn = false, objective = node.type === 'objective';
   const color = error
     ? '#ff9d8d'
@@ -569,6 +569,7 @@ function ForgeScene(props: ForgeViewportProps) {
   }
   const transformable =
     sourceActivity.active&&cameraMode === 'orbit' &&
+    (mode==='translate'||!chosen.some(n=>n.type==='campaignFiring'))&&
     chosen.length > 0 &&
     (mode !== 'scale' || (chosen.length === 1 && (chosen[0].type === 'brush' || chosen[0].type === 'trigger')));
   return (
@@ -631,7 +632,7 @@ function ForgeScene(props: ForgeViewportProps) {
             rotationSnap={snap ? Math.PI / 12 : null}
             scaleSnap={snap ? 0.1 : null}
             onMouseDown={() => {
-              poseDrag.current=chosen.some(node=>(node.type==='campaignStart'||node.type==='campaignPatrol'))?{document:doc,mode,ids:chosen.map(node=>node.value.id).join('|')}:null;
+              poseDrag.current=chosen.some(node=>(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring'))?{document:doc,mode,ids:chosen.map(node=>node.value.id).join('|')}:null;
               if(props.selectionGuard)props.selectionGuard.current=Infinity;
             }}
             onMouseUp={() => {
@@ -640,7 +641,7 @@ function ForgeScene(props: ForgeViewportProps) {
               try {
             const target = group.current;
             const original=poseDrag.current;poseDrag.current=null;
-            if((original||chosen.some(node=>(node.type==='campaignStart'||node.type==='campaignPatrol')))&&(!original||original.document!==doc||original.mode!==mode||original.ids!==chosen.map(node=>node.value.id).join('|'))){target.position.copy(origin);target.rotation.copy(baseRotation);target.scale.set(1,1,1);props.onError('Campaign start drag was canceled because its source or selection changed.');return;}
+            if((original||chosen.some(node=>(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring')))&&(!original||original.document!==doc||original.mode!==mode||original.ids!==chosen.map(node=>node.value.id).join('|'))){target.position.copy(origin);target.rotation.copy(baseRotation);target.scale.set(1,1,1);props.onError('Campaign start drag was canceled because its source or selection changed.');return;}
             if(target.position.distanceTo(origin)<1e-6&&target.quaternion.angleTo(base)<1e-6&&target.scale.distanceTo(new THREE.Vector3(1,1,1))<1e-6)return;
             target.updateMatrix();
             const deltaRotation = target.quaternion.clone().multiply(base.clone().invert());

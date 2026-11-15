@@ -55,6 +55,21 @@ pub struct PatrolPoint {pub id:String,pub position:[f32;3],pub facing_radians:f3
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterPatrol {pub points:Vec<PatrolPoint>}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct FiringPoint {pub id:String,pub position:[f32;3],pub group:String,
+    #[serde(default="visible_start",skip_serializing_if="is_visible_start")] pub visible:bool,
+    #[serde(default,skip_serializing_if="is_unlocked_start")] pub locked:bool}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct FiringGroups {pub attacking:Vec<String>,pub attacking_search:Vec<String>,pub attacking_guard:Vec<String>,pub defending:Vec<String>,pub defending_search:Vec<String>,pub defending_guard:Vec<String>}
+impl FiringGroups {
+    fn fields(&self)->[(&'static str,&[String]);6]{[("attacking",&self.attacking),("attacking_search",&self.attacking_search),("attacking_guard",&self.attacking_guard),("defending",&self.defending),("defending_search",&self.defending_search),("defending_guard",&self.defending_guard)]}
+    fn masks(&self)->Result<[u32;6]>{let mut masks=[0;6];for(i,(_,groups))in self.fields().iter().enumerate(){let mut seen=std::collections::BTreeSet::new();for g in *groups{if g.len()!=1||!g.as_bytes()[0].is_ascii_lowercase()||!seen.insert(g){return invalid("Tactical selections require distinct native groups A–Z");}masks[i]|=1u32<<(g.as_bytes()[0]-b'a');}}Ok(masks)}
+}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EncounterCombat {pub points:Vec<FiringPoint>,pub groups:FiringGroups}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterStart {
@@ -76,10 +91,14 @@ pub struct EncounterAppend {
     #[serde(default,skip_serializing_if="Option::is_none")] pub starts:Option<Vec<EncounterStart>>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub behavior:Option<EncounterBehavior>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub patrol:Option<EncounterPatrol>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub combat:Option<EncounterCombat>,
 }
 impl EncounterAppend {
     fn states(&self)->(CampaignAiState,CampaignAiState){self.behavior.as_ref().map(|b|(b.initial_state,b.return_state)).unwrap_or((CampaignAiState::Alert,CampaignAiState::Alert))}
     pub fn difficulty_counts(&self)->(u16,u16) {self.difficulty.as_ref().map(|value|(value.normal,value.insane)).unwrap_or((self.count,self.count))}
+    pub(crate) fn require_mcc_search_groups(&self)->Result<()>{if let Some(c)=&self.combat{let m=c.groups.masks()?;if m[0]&!m[1]!=0||m[0]&!m[4]!=0{return invalid("MCC Halo Tool includes attacking groups in both search contexts. In Creator Studio → Firing positions & tactical groups → MCC search-group compatibility, review and choose Include attacking groups in both search contexts, then Save/rebuild. Source was not changed automatically");}}Ok(())}
+    fn combat_points(&self)->Result<&[FiringPoint]>{let Some(combat)=&self.combat else{return Ok(&[]);};if combat.points.is_empty()||combat.points.len()>512{return invalid("Native combat source needs1–512 firing positions");}combat.groups.masks()?;let mut ids=std::collections::BTreeSet::new();for p in &combat.points{if p.id.is_empty()||p.id.len()>64||!p.id.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c))||!ids.insert(&p.id)||p.position.iter().any(|v|!v.is_finite()||v.abs()>2048.)||p.group.len()!=1||!p.group.as_bytes()[0].is_ascii_lowercase(){return invalid("Invalid native firing point identity, position or group");}}Ok(&combat.points)}
+    fn firing_points(&self)->Result<Vec<FiringPoint>>{let custom=self.combat_points()?;if self.combat.is_some(){return Ok(custom.to_vec());}Ok(self.poses()?.into_iter().map(|p|FiringPoint{id:p.id,position:p.position,group:"a".into(),visible:true,locked:false}).collect())}
     fn patrol_points(&self)->Result<&[PatrolPoint]> {
         let points=self.patrol.as_ref().map(|p|p.points.as_slice()).unwrap_or(&[]);
         if self.patrol.is_some()&&(points.is_empty()||points.len()>32){return invalid("Native patrol needs1–32 movement points");}
@@ -88,7 +107,7 @@ impl EncounterAppend {
         Ok(points)
     }
     pub fn poses(&self)->Result<Vec<EncounterStart>> {
-        self.patrol_points()?;
+        self.patrol_points()?;self.combat_points()?;
         if let Some(starts)=&self.starts {
             if self.grid.is_some()||self.count==0||self.count>32||starts.len()!=usize::from(self.count){return invalid("Individual campaign starts must match the authored count and cannot override a partitioned wave grid");}
             let mut ids=std::collections::BTreeSet::new();
@@ -122,7 +141,7 @@ impl Operation {
     pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
     pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
         match self {
-            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None,starts:None,behavior:None,patrol:None}]),
+            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None,starts:None,behavior:None,patrol:None,combat:None}]),
             Self::AppendEncounters{encounters,..}=>{
                 if encounters.is_empty()||encounters.len()>16{return invalid("Review 1–16 native encounter groups in one operation");}
                 Ok(encounters.clone())
@@ -172,7 +191,7 @@ impl Operation {
                 if let Some(rules)=source_rules{crate::firefight::validate(rules)?;}
                 let entries=self.encounter_appends()?;let mut names=std::collections::BTreeSet::new();let mut total=0usize;
                 for entry in entries {
-                    if source_rules.is_some()&&(entry.difficulty.is_some()||entry.starts.is_some()||entry.behavior.is_some()||entry.patrol.is_some()){return invalid("Prepared Firefight groups require the exact controller population, starting grid and actor states. Use Firefight wave rules rather than independent campaign overrides");}
+                    if source_rules.is_some()&&(entry.difficulty.is_some()||entry.starts.is_some()||entry.behavior.is_some()||entry.patrol.is_some()||entry.combat.is_some()){return invalid("Prepared Firefight groups require the exact controller population, starting grid and actor states. Use Firefight wave rules rather than independent campaign overrides");}
                     entry.operation().validate(class,tag)?;
                     let _=entry.positions()?;
                     if !names.insert(entry.name.to_ascii_lowercase()){return invalid("Each appended encounter needs a distinct native name");}
@@ -408,18 +427,20 @@ impl Operation {
         let (normal_count,insane_count)=entry.difficulty_counts();let(initial_state,return_state)=entry.states();
         let EncounterAppend{name,actor_path,start_active,count,..}=&entry;
         let e=format!("encounters[{index}]");let squad=format!("{e}.squads[0]");
-        let poses=entry.poses()?;let patrol=entry.patrol_points()?;
+        let poses=entry.poses()?;let patrol=entry.patrol_points()?;let firing=entry.firing_points()?;
         if add_palette {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
-        args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),count.to_string(),"end".into()]);
+        args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),firing.len().to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
             (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),normal_count.to_string()),(format!("{squad}.insane_diff_count"),insane_count.to_string()),(format!("{squad}.initial_state"),initial_state.native().0.into()),(format!("{squad}.return_state"),return_state.native().0.into())] {args.extend(["-S".into(),key,value]);}
+        if let Some(combat)=&entry.combat{let masks=combat.groups.masks()?;for(i,(field,_))in combat.groups.fields().iter().enumerate(){for bit in 0..26{args.extend(["-S".into(),format!("{squad}.{field}.{}",char::from(b'a'+bit)),if masks[i]&(1u32<<bit)!=0{"1"}else{"0"}.into()]);}}}
         if !patrol.is_empty(){args.extend(["-I".into(),format!("{squad}.move_positions"),patrol.len().to_string(),"end".into()]);}
         for(index,point)in patrol.iter().enumerate(){let p=format!("{squad}.move_positions[{index}]");for(key,value)in [("position",point.position.map(|v|v.to_string()).join(",")),("facing",point.facing_radians.to_string()),("weight",point.weight.to_string()),("time",point.wait_seconds.map(|v|v.to_string()).join(",")),("animation","-1".into()),("sequence_id","0".into())]{args.extend(["-S".into(),format!("{p}.{key}"),value]);}}
         for(index,pose)in poses.into_iter().enumerate() {
             let position=pose.position;
-            let start=format!("{squad}.starting_locations[{index}]");let firing=format!("{e}.firing_positions[{index}]");let vector=position.map(|value|value.to_string()).join(",");
-            for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),pose.facing_radians.to_string()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),initial_state.native().0.into()),(format!("{start}.return_state"),return_state.native().0.into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
+            let start=format!("{squad}.starting_locations[{index}]");let vector=position.map(|value|value.to_string()).join(",");
+            for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),pose.facing_radians.to_string()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),initial_state.native().0.into()),(format!("{start}.return_state"),return_state.native().0.into())] {args.extend(["-S".into(),key,value]);}
         }
+        for(index,point)in firing.iter().enumerate(){for(key,value)in [("position",point.position.map(|v|v.to_string()).join(",")),("group_index",point.group.clone())]{args.extend(["-S".into(),format!("{e}.firing_positions[{index}].{key}"),value]);}}
         }
         args.push(tag.into());Ok(args)
     }
@@ -519,13 +540,14 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
         let body=&new.body[start+1..end];
         if body.iter().filter_map(|line|line.strip_prefix("        name (")).filter_map(|tail|tail.split_once(')').map(|pair|pair.0)).filter(|name|*name==entry.name.as_str()).count()!=1{return invalid("Appended encounter group name differs from the reviewed source");}
         if let Some(patrol)=&entry.patrol{let expected=format!("move_positions[{}] array",patrol.points.len());if body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native patrol point count differs from reviewed source");}}
-        for expected in ["squads[1] array".to_string(),format!("starting_locations[{}] array",entry.count),format!("firing_positions[{}] array",entry.count)] {
+        for expected in ["squads[1] array".to_string(),format!("starting_locations[{}] array",entry.count),format!("firing_positions[{}] array",entry.firing_points()?.len())] {
             if body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native encounter group has unexpected squad/start/firing counts");}
         }
         let difficulty=entry.difficulty.as_ref().map(|value|format!("; native normal={}, insane={}",value.normal,value.insane)).unwrap_or_default();
+        let combat=entry.combat.as_ref().map(|c|format!("; {} independent firing points and reviewed squad tactical groups",c.points.len())).unwrap_or_default();
         let patrol=entry.patrol.as_ref().map(|p|format!("; {} native patrol points with facing/weight/wait",p.points.len())).unwrap_or_default();
         let behavior=entry.behavior.as_ref().map(|b|format!("; native initial={}, return={}",b.initial_state.native().0,b.return_state.native().0)).unwrap_or_default();
-        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+&patrol+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
+        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+&patrol+&combat+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
     }
     Ok(differences)
 }
@@ -568,7 +590,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
     for(w,wave)in config.waves.iter().enumerate(){for(g,group)in wave.groups.iter().enumerate(){
         let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||crate::SparkError::Invalid("Saved wave actor is missing".into()))?;
         let layout=crate::firefight::native_group_grid(config,w,g,&players)?;
-        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None,behavior:None,patrol:None});
+        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None,behavior:None,patrol:None,combat:None});
     }}
     let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
     operation.validate("scnr","planned.scenario")?;
@@ -597,7 +619,7 @@ pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::Ma
         let found=map.encounters.iter().filter(|encounter|encounter.name==*name).collect::<Vec<_>>();
         if map.header.scenario_type!=0||found.len()!=1{return invalid("Compiled native encounter is missing, ambiguous or not singleplayer");}
         let details=found[0].details.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled native encounter details are unreadable".into()))?;
-        if (details.flags&1==0)!=*start_active||details.manual_bsp_index!=-1||details.squads.len()!=1||details.firing_positions.len()!=*count as usize{return invalid("Compiled native encounter flags/BSP/squad/firing counts differ from the accepted source append");}
+        if (details.flags&1==0)!=*start_active||details.manual_bsp_index!=-1||details.squads.len()!=1||details.firing_positions.len()!=entry.firing_points()?.len(){return invalid("Compiled native encounter flags/BSP/squad/firing counts differ from the accepted source append");}
         let path=actor_path.replace('\\',"/");
         let actors=map.tags.iter().filter(|tag|tag.class=="actv"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&path)&&!tag.external&&tag.data_offset.is_some()).collect::<Vec<_>>();
         if actors.len()!=1{return invalid("Compiled source actor is missing, ambiguous or has no embedded body");}
@@ -608,18 +630,13 @@ pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::Ma
             if actual.len()!=expected.len(){return invalid("Compiled native patrol count differs from source");}
             for(a,b)in actual.iter().zip(expected){if !positions_close(a.position,b.position)||!facings_close(a.facing,b.facing_radians)||(a.weight-b.weight).abs()>0.0001||a.wait_seconds.iter().zip(b.wait_seconds).any(|(x,y)|(*x-y).abs()>0.0001)||a.sequence_id!=0||a.animation!=-1{return invalid("Compiled native patrol differs from authored order, pose, weight or wait");}}
         }else if squad.move_positions.as_ref().is_some_and(|v|!v.is_empty()){return invalid("Compiled squad has unexpected movement points");}
-        let positions=entry.positions()?;
-        let consume=|remaining:&mut Vec<[f32;3]>,position:[f32;3]|->Result<()> {
-            let index=remaining.iter().position(|expected|expected.iter().zip(position).all(|(a,b)|(*a-b).abs()<=0.0001)).ok_or_else(||crate::SparkError::Invalid("Compiled native start/firing position differs from the accepted grid".into()))?;
-            remaining.remove(index);Ok(())
-        };
         let mut remaining_poses=entry.poses()?;
         for start in &squad.starting_locations {
             if start.actor_variant_tag_id!=actor||start.actor_palette_index!=-1||start.command_list!=-1||start.flags&1==0||start.initial_state!=initial_state.native().1||start.return_state!=return_state.native().1{return invalid("Compiled native actor state differs from the accepted source append");}
             let index=remaining_poses.iter().position(|expected|positions_close(expected.position,start.position)&&facings_close(expected.facing_radians,start.facing)).ok_or_else(||crate::SparkError::Invalid("Compiled native actor pose differs from the accepted source".into()))?;remaining_poses.remove(index);
         }
-        let mut remaining=positions;
-        for firing in &details.firing_positions {if firing.group_index!=0{return invalid("Compiled native firing group differs from the accepted source append");}consume(&mut remaining,firing.position)?;}
+        if let Some(combat)=&entry.combat{let g=squad.firing_groups.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled squad tactical telemetry unavailable; rebuild/reopen".into()))?;let actual=[g.attacking,g.attacking_search,g.attacking_guard,g.defending,g.defending_search,g.defending_guard];let expected=combat.groups.masks()?;if actual!=expected{return invalid(format!("Compiled tactical group selections differ from source: expected{expected:?}, actual{actual:?}. Review target compiler compatibility; no candidate was accepted"));}}
+        let mut remaining=entry.firing_points()?;for p in &details.firing_positions{let i=remaining.iter().position(|v|positions_close(v.position,p.position)&&u16::from(v.group.as_bytes()[0]-b'a')==p.group_index).ok_or_else(||crate::SparkError::Invalid("Compiled firing point coordinate or group differs from source".into()))?;remaining.remove(i);}
         // Cached firing cluster/surface values can deliberately be NULL.
         // Source/cache identity is not navigation, collision or gameplay proof.
         Ok(())
@@ -1152,7 +1169,7 @@ mod tests {
         let original=pose([1.,1.,1.],std::f32::consts::FRAC_PI_4);run(original.arguments_with_fields(&tags,"scnr",tag,&after_pose).unwrap());assert_eq!(before,fields());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let original_bytes=fs::read(&file).unwrap();fs::create_dir_all(tags.join("actors")).unwrap();run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),"actors/behavior.actor_variant".into()]);
         let states=[CampaignAiState::Sleeping,CampaignAiState::Alert,CampaignAiState::Guarding,CampaignAiState::Searching,CampaignAiState::Fleeing];
-        let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]}),patrol:None}).collect();
+        let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]}),patrol:None,combat:None}).collect();
         let behavior=Operation::AppendEncounters{encounters:entries,source_rules:None};run(behavior.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let authored=fields();assert_eq!(reviewed_difference(&before,&authored,&behavior).unwrap().len(),5);let result=run(behavior.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());behavior.verify_readback(&tags,"scnr",tag,&before,&result).unwrap();let authored_sha=crate::maps::hash_file(&file).unwrap();
         // Restore only the generated fixture; production sources are never written by this test.
         fs::write(&file,original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
@@ -1160,6 +1177,8 @@ mod tests {
         let patrol_json=serde_json::json!({"name":"patrol_fixture","actorPath":"actors/behavior","position":[0,0,0],"startActive":false,"count":2,"behavior":{"initialState":"moving_loop","returnState":"moving_loop_back_and_forth"},"patrol":{"points":[{"id":"p0","position":[1,2,3],"facingRadians":0.0,"waitSeconds":[0.25,1.5],"weight":2.5},{"id":"p1","position":[4,5,3],"facingRadians":1.5707964,"waitSeconds":[0.0,0.0],"weight":1.0,"visible":false,"locked":true}]}});
         let entry:EncounterAppend=serde_json::from_value(patrol_json).unwrap();let patrol=Operation::AppendEncounters{encounters:vec![entry],source_rules:None};let prior=fs::read(&file).unwrap();run(patrol.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let after=fields();assert_eq!(reviewed_difference(&before,&after,&patrol).unwrap().len(),1);let values=run(patrol.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());patrol.verify_readback(&tags,"scnr",tag,&before,&values).unwrap();
         println!("Native patrol fixture:2ordered points/loop+back-and-forth/XYZ/facing/weight/wait; tagSHA={}; readbackSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(values.as_bytes())));fs::write(&file,prior).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        let combat_json=serde_json::json!({"name":"combat_fixture","actorPath":"actors/behavior","position":[0,0,0],"startActive":false,"count":2,"combat":{"points":[{"id":"f0","position":[2,1,0.1],"group":"a"},{"id":"f1","position":[4,1,0.1],"group":"z","visible":false,"locked":true},{"id":"f2","position":[6,1,0.1],"group":"b"}],"groups":{"attacking":["a","z"],"attackingSearch":["b"],"attackingGuard":["z"],"defending":["a"],"defendingSearch":[],"defendingGuard":["b","z"]}}});
+        let entry:EncounterAppend=serde_json::from_value(combat_json).unwrap();assert_eq!(entry.combat.as_ref().unwrap().groups.masks().unwrap(),[33554433,2,33554432,1,0,33554434]);let combat=Operation::AppendEncounters{encounters:vec![entry],source_rules:None};let prior=fs::read(&file).unwrap();for batch in combat.argument_batches(combat.arguments_with_fields(&tags,"scnr",tag,&before).unwrap(),false).unwrap(){run(batch);}let after=fields();assert_eq!(reviewed_difference(&before,&after,&combat).unwrap().len(),1);let mut values=vec![];for batch in combat.argument_batches(combat.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap(),true).unwrap(){values.extend(run(batch).lines().map(str::to_owned));}let scalar=values.join("\n");combat.verify_readback(&tags,"scnr",tag,&before,&scalar).unwrap();println!("Native combat fixture:3independent firing points/2starts/6tactical contexts/high groupZ/empty selection; tagSHA={}; scalarSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(scalar.as_bytes())));fs::write(&file,prior).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         println!("Native AI fixture:4squads/8starts; toolSHA={}; beforeSHA={before_sha}; afterSHA={after_sha}; restoredSHA={}",
             crate::maps::hash_file(&executable).unwrap(),crate::maps::hash_file(&file).unwrap());
     }
@@ -1203,7 +1222,7 @@ mod tests {
     fn ai_coordinate_snapshot_rejects_wrong_compiled_values_missing_details_and_legacy_scope_changes(){
         use crate::maps::*;
         let squad=EncounterSquad{name:"squad_a".into(),actor_palette_index:-1,actor_variant_tag_id:None,normal_count:1,insane_count:1,
-            initial_state:2,return_state:2,move_positions:None,starting_locations:vec![AiStartingLocation{position:[1.0,2.0,3.0],facing:std::f32::consts::FRAC_PI_2,flags:0,
+            initial_state:2,return_state:2,firing_groups:None,move_positions:None,starting_locations:vec![AiStartingLocation{position:[1.0,2.0,3.0],facing:std::f32::consts::FRAC_PI_2,flags:0,
                 initial_state:2,return_state:2,actor_palette_index:-1,actor_variant_tag_id:None,command_list:-1}]};
         let mut map=MapInspection{player_starting_profiles:None,header:MapHeader{version:609,engine:"unit fixture".into(),name:"unit".into(),
             build:String::new(),scenario_type:0,file_size:0,declared_size:0,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,
@@ -1246,7 +1265,7 @@ mod tests {
             .replace("script_marker", &format!("{added}script_marker"));
         let operation = Operation::AppendEncounters { encounters: vec![EncounterAppend {
             name: "survivors".into(), actor_path: "actors/grunt".into(), position: [0.;3],
-            start_active: false, difficulty: None, count: 1, spacing: 1., grid: None, starts: None, behavior: None, patrol: None,
+            start_active: false, difficulty: None, count: 1, spacing: 1., grid: None, starts: None, behavior: None, patrol: None, combat: None,
         }], source_rules: None };
         assert_eq!(reviewed_difference(before, &after, &operation).unwrap().len(), 1);
         let identity = owned_encounter_identity(&after, &operation).unwrap();
@@ -1340,6 +1359,14 @@ mod tests {
         let prepared=Operation::AppendEncounters{encounters:operation.encounter_appends().unwrap(),source_rules:Some(rules)};assert!(prepared.validate("scnr","level.scenario").unwrap_err().to_string().contains("exact controller"));
         for state in ["attacking","moving_unknown","inherit",""]{let mut invalid=base.clone();invalid["behavior"]=serde_json::json!({"initialState":state,"returnState":"alert"});assert!(serde_json::from_value::<EncounterAppend>(invalid).is_err());}
         for(state,index)in [(CampaignAiState::Sleeping,1),(CampaignAiState::Alert,2),(CampaignAiState::Guarding,8),(CampaignAiState::Searching,10),(CampaignAiState::Fleeing,11)]{assert_eq!(state.native().1,index);}
+    }
+    #[test]
+    fn combat_source_keeps_legacy_output_and_validates_independent_points_and_masks(){
+        let base=serde_json::json!({"name":"guards","actorPath":"actors/guard","position":[0,0,0],"startActive":false,"count":2});let old:EncounterAppend=serde_json::from_value(base.clone()).unwrap();assert_eq!(old.firing_points().unwrap().len(),2);assert!(serde_json::to_value(&old).unwrap().get("combat").is_none());
+        let mut value=base;value["combat"]=serde_json::json!({"points":[{"id":"f0","position":[5,6,7],"group":"z"}],"groups":{"attacking":["a","z"],"attackingSearch":[],"attackingGuard":["z"],"defending":[],"defendingSearch":[],"defendingGuard":[]}});let entry:EncounterAppend=serde_json::from_value(value.clone()).unwrap();assert_eq!(entry.firing_points().unwrap().len(),1);assert_eq!(entry.combat.as_ref().unwrap().groups.masks().unwrap()[0],33554433);assert!(entry.require_mcc_search_groups().is_err());let mut repaired=entry.clone();let g=&mut repaired.combat.as_mut().unwrap().groups;g.attacking_search=vec!["a".into(),"z".into()];g.defending_search=vec!["a".into(),"z".into()];repaired.require_mcc_search_groups().unwrap();
+        let op=Operation::AppendEncounters{encounters:vec![entry],source_rules:None};let args=op.arguments_with_fields(Path::new("tags"),"scnr","level.scenario",&ai_fields()).unwrap();assert!(args.windows(4).any(|r|r==["-I","encounters[1].firing_positions","1","end"]));assert!(args.windows(3).any(|r|r==["-S","encounters[1].squads[0].attacking.z","1"]));
+        for bad in [serde_json::json!([]),serde_json::json!(["a","a"]),serde_json::json!(["bad"]) ]{let mut invalid=value.clone();if bad.as_array().unwrap().is_empty(){invalid["combat"]["points"]=bad;}else{invalid["combat"]["groups"]["attacking"]=bad;}assert!(serde_json::from_value::<EncounterAppend>(invalid).unwrap().poses().is_err());}
+        let mut bad=value.clone();bad["combat"]["points"][0]["group"]=serde_json::json!("aa");assert!(serde_json::from_value::<EncounterAppend>(bad).unwrap().poses().is_err());let mut bad=value;bad["combat"]["points"][0]["position"]=serde_json::json!([2049,0,0]);assert!(serde_json::from_value::<EncounterAppend>(bad).unwrap().poses().is_err());
     }
     #[test]
     fn patrol_source_rejects_missing_paths_invalid_waits_duplicate_ids_and_recipe_overrides(){
