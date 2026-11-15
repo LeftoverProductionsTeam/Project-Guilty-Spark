@@ -15,6 +15,9 @@ import './nativeTools.css';
 import BaboonTools from './BaboonTools';
 import NativeSquadScaling from './NativeSquadScaling';
 import NativeStartingPositions from './NativeStartingPositions';
+import {useMapState} from '../mapSession';
+import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
+import type {NativeAiStartView} from '../nativeAiStart';
 
 /** Lazy, map-bound native operations. Reading a compiled tag does not grant
  * editing access to its native source; the desktop checks that separately. */
@@ -23,11 +26,13 @@ export default function NativeTagOperations({
   tagId,
   dirty = false,
   epoch = 0,
+  onLevelEditor,
 }: {
   project: Project;
   tagId?: number;
   dirty?: boolean;
   epoch?: number;
+  onLevelEditor?:()=>void;
 }) {
   const [expanded, setExpanded] = useState(false),
     [busy, setBusy] = useState(false),
@@ -68,6 +73,8 @@ export default function NativeTagOperations({
   const [nativeTag, setNativeTag] = useState<number | null>(null),
     [choices, setChoices] = useState<{ id: number; class: string; path: string }[]>([]);
   const selectedTagId = tagId ?? nativeTag;
+  const [aiDraft]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
+  useEffect(()=>{if(tagId===undefined&&aiDraft?.reviewRequest){setNativeTag(null);setExpanded(true);}},[project.id,tagId,aiDraft?.reviewRequest]);
   useEffect(() => {
     setNativeTag(null);
     setChoices([]);
@@ -163,7 +170,7 @@ export default function NativeTagOperations({
     });
   }
   return (
-    <details className="native-tag-operations" onToggle={(e) => setExpanded(e.currentTarget.open)}>
+    <details className="native-tag-operations" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
       <summary>
         Invader · native checks &amp; reviewed edits <Pill>Working source</Pill>
       </summary>
@@ -274,7 +281,7 @@ export default function NativeTagOperations({
             </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
             {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           </details>}
-          {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
+          {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {!!context.hudArrays?.length&&<details className="native-hud-structure">
             <summary>Duplicate native HUD element</summary>
             <p className="subtle">Append a copy of an existing element without moving original indices. Preview checks the copied fields and current dependencies. Accept the source revision, use Build working tag edits, then open the compiled HUD to edit its new layout. Your original tags stay unchanged.</p>

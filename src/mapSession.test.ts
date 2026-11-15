@@ -184,7 +184,7 @@ test('global workspace scroll remains window-local across shared preference upda
 
 test('native AI coordinate proposals stay window-local and never enter restart storage',async()=>{
  const session=await import('./mapSession');session.configureMapViewWindow('main');
- const draft={key:'source-point',values:['1','2','3'],active:true};
+ const draft={key:'source-point',values:['1','2','3'],active:true,reviewRequest:42};
  session.writeMapSession('a','world.ai-start',draft);session.writeMapSession('a','world.grid',true);
  expect(session.readMapSession('a','world.ai-start',null)).toEqual(draft);
  session.configureMapViewWindow('second');expect(session.readMapSession('a','world.ai-start',null)).toBeNull();

@@ -345,7 +345,7 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
         {inspection?.playerStartingProfiles==null&&<p className="subtle">Native loadout details are unavailable. Older inspections need to be refreshed; unreadable native data is reported in map diagnostics.</p>}
         {inspection?.playerStartingProfiles?.length===0&&<p className="subtle">No player starting profiles are stored in this scenario.</p>}
       </details>
-      {project&&project.builds.some(build=>build.status==='validated')&&<NativeTagOperations project={project} dirty={dirty}/>}
+      {project&&project.builds.some(build=>build.status==='validated')&&<NativeTagOperations project={project} dirty={dirty} onLevelEditor={onWorld}/>}
       <div className="scenario-columns">
         <section className="surface">
           <div className="section-heading">

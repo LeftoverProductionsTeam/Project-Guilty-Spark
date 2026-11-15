@@ -524,6 +524,7 @@ export default function World({
   onOpenTag,
   onDetachTags,
   onSelectMap,
+  onReviewAiStart,
   onResourcesConnected,
   onBeforeResources,
   onBakeBuild,
@@ -546,6 +547,7 @@ export default function World({
   onOpenTag?: (tagId: number, sourceProjectId?: string) => void;
   onDetachTags?: (sourceProjectId:string,tagId:number)=>Promise<boolean>;
   onSelectMap?: (id:string)=>void;
+  onReviewAiStart?:()=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: (persist?:boolean) => Promise<void>;
   onBakeBuild?:()=>Promise<void>;
@@ -1567,6 +1569,7 @@ export default function World({
             <span>Unsaved coordinates · review in Native source controls</span>
             <button disabled={fly||cameraLocked||externalCameraAuthority} title="Frame the coordinate proposal. Release fly navigation or camera ownership first."
               onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>Frame AI start</button>
+            {onReviewAiStart&&<button onClick={onReviewAiStart}>Review AI start source</button>}
             <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>
           </div>}
           {!cinematic && chosen && (

@@ -718,7 +718,8 @@ function ForgeScene(props: ForgeViewportProps) {
 }
 export default function ForgeViewport(props: ForgeViewportProps) {
   const activity=useWorkspaceActivity();
-  const selectionGuard=useRef(0);
+  const localSelectionGuard=useRef(0);
+  const selectionGuard=props.selectionGuard??localSelectionGuard;
   const surfacePreview = useWorkshopTextures(props.document, props.materialSource, props.materialBindings);
   const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])],props.resourceScopes);
   const [recording,setRecording]=useState(false),take=useRef<RehearsalFrame[]>([]);

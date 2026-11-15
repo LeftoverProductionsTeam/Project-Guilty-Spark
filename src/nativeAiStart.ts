@@ -5,7 +5,7 @@ export const NATIVE_AI_START_VIEW='world.ai-start';
 export interface NativeAiStartView {
   key:string;projectId:string;buildId:string;tag:string;sourceSha256:string;
   encounter:number;squad:number;start:number;encounterName:string;squadName:string;
-  original:Vec3;values:[string,string,string];active:boolean;focus:number;locked:boolean;
+  original:Vec3;values:[string,string,string];active:boolean;focus:number;locked:boolean;reviewRequest?:number;
 }
 export function nativeAiStartPosition(values:unknown):Vec3|null {
   if(!Array.isArray(values)||values.length!==3||values.some(value=>typeof value!=='string'||!value.trim()||!Number.isFinite(Number(value))||Math.abs(Number(value))>1e6))return null;
@@ -19,4 +19,12 @@ export function nativeAiStartMatches(view:NativeAiStartView,context:NativeTagCon
   return !!row&&!!point&&row.encounterName===view.encounterName&&row.name===view.squadName&&
     !context.protectedSquadEncounters?.includes(row.encounterName.replace(/[A-Z]/g,char=>char.toLowerCase()))&&
     Array.isArray(view.original)&&point.position.every((value,index)=>value===view.original[index]);
+}
+
+/** A drag cannot apply after its source, proposal, ownership or view changes. */
+export function nativeAiStartDragValues(start:NativeAiStartView|null,current:NativeAiStartView|null,next:Vec3|undefined,enabled:boolean):[string,string,string]|null {
+  if(!enabled||!start?.active||!current?.active||start.locked||current.locked||start.key!==current.key||
+    start.values.some((value,index)=>value!==current.values[index])||!next)return null;
+  const values=next.map(String) as [string,string,string];
+  return nativeAiStartPosition(values)?values:null;
 }

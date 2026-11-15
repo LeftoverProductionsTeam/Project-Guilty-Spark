@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {useMapState} from '../mapSession';
 import {NATIVE_AI_START_VIEW,nativeAiStartPosition,nativeAiStartMatches} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
@@ -6,10 +6,11 @@ import type {NativeOperation,NativeTagContext} from '../nativeOperations';
 import {Notice} from './ui';
 
 /** A source-coordinate form; native writes/history stay in NativeTagOperations. */
-export default function NativeStartingPositions({context,busy,dirty,onPreview,onDraftChange}:{
-  context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void;
+export default function NativeStartingPositions({context,busy,dirty,onPreview,onDraftChange,onLevelEditor}:{
+  context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void;onLevelEditor?:()=>void;
 }) {
   const [squadKey,setSquadKey]=useState(''),[startIndex,setStartIndex]=useState('');
+  const detail=useRef<HTMLDetailsElement>(null),lastReview=useRef(0);
   const [draft,setDraft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
   const rows=context.scenarioStartSquads??[];
   const squad=rows.find(row=>`${row.encounter}:${row.squad}`===squadKey)??rows.find(row=>row.encounter===draft?.encounter&&row.squad===draft.squad)??rows.find(row=>row.starts?.length)??rows[0];
@@ -30,18 +31,24 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
   useEffect(()=>{
     if(draft?.key===key&&nativeAiStartMatches(draft,context)&&draft.locked!==disabled)setDraft({...draft,locked:disabled});
   },[disabled,key,draft]);
+  useEffect(()=>{
+    const request=draft?.reviewRequest??0;
+    if(!request||lastReview.current===request||!draft||!nativeAiStartMatches(draft,context))return;
+    lastReview.current=request;setSquadKey(`${draft.encounter}:${draft.squad}`);setStartIndex(String(draft.start));
+    if(detail.current){detail.current.open=true;detail.current.querySelector<HTMLInputElement>('[aria-label="AI start X"]')?.focus();}
+  },[context,draft?.reviewRequest]);
   function coordinateDraft(next:[string,string,string],active=draft?.key===key&&draft.active,focus=draft?.key===key?draft.focus:0){
     if(!squad||!point||!context.tagSha256)return;
     setDraft({key,projectId:context.projectId,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,
       encounter:squad.encounter,squad:squad.squad,start:point.index,encounterName:squad.encounterName,squadName:squad.name,
-      original:point.position,values:next,active,focus,locked:disabled});onDraftChange();
+      original:point.position,values:next,active,focus,locked:disabled,reviewRequest:draft?.key===key?draft.reviewRequest:undefined});onDraftChange();
   }
   function preview() {
     if(disabled||!changed||!squad||!point||!position||!context.tagSha256)return;
     onPreview({kind:'encounterStartPosition',encounter:squad.encounter,squad:squad.squad,start:point.index,
       encounterName:squad.encounterName,squadName:squad.name,position,sourceSha256:context.tagSha256});
   }
-  return <details className="native-ai-starts">
+  return <details className="native-ai-starts" ref={detail}>
     <summary>AI starting positions</summary>
     <p className="subtle">Edit the current native source's XYZ coordinates. Facing, behavior, firing positions and navigation stay unchanged. Rebuild and validate actual spawning and reachability afterward.</p>
     {issue&&<Notice tone="info">{issue}</Notice>}
@@ -66,7 +73,7 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
         <p className="subtle">Current source: {point.position.join(' · ')}. Only this start's position will change.</p>
         {!valid&&<Notice tone="info">Enter three finite coordinates between −1,000,000 and1,000,000.</Notice>}
         <div className="button-row">
-          <button disabled={disabled||!valid||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>coordinateDraft(values,true,Date.now())}>Show handles in Level Editor</button>
+          <button disabled={disabled||!valid||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>{coordinateDraft(values,true,Date.now());onLevelEditor?.();}}>Show handles in Level Editor</button>
           <button disabled={disabled||!changed||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={preview}>Preview AI starting position</button>
           <button disabled={busy||!draft||draft.key!==key} onClick={()=>{setDraft(null);onDraftChange();}}>Reset coordinate draft</button>
         </div>

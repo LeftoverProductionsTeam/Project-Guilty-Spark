@@ -1,3 +1,6 @@
+import NativeAiStartOverlay from './NativeAiStartOverlay';
+import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
+import type {NativeAiStartView} from '../nativeAiStart';
 import {beginProjectMutation} from '../projectMutation';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
@@ -189,6 +192,7 @@ interface Props {
   onRuntimes: () => void;
   onSettings: () => void;
   onLive?: () => void;
+  onReviewAiStart?:()=>void;
   notify: (message: string, tone?: string) => void;
   logs: JobEvent[];
   activeJob: string | null;
@@ -335,6 +339,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
   const [surfaceSelection, setSurfaceSelection] = useMapState<{brushId:string;faceId?:string}|null>(project.id, 'forge.sourceSurface', () => null);
   const [bspBusy, setBspBusy] = useState(false);
+  const [nativeAiStart,setNativeAiStart]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
+  const nativeAiSelectionGuard=useRef(0);
   const [selected, setSelected] = useMapState<string[]>(project.id, 'forge.selection', []),
     [selectedZone, setSelectedZone] = useMapState<string | null>(project.id, 'forge.zone', null);
   const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(
@@ -359,6 +365,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     'palette',
   );
   const [actorId, setActorId] = useState('');
+  useEffect(()=>{
+    nativeAiSelectionGuard.current=0;
+    if(!activity.active||!nativeAiStart?.active)return;
+    // Source proposals use the shared world-coordinate viewport, including
+    // maps whose geometry was authored in the four-view BSP Workshop.
+    setBspMode(false);setCameraMode('orbit');setSelected([]);setSelectedZone(null);setWorkshopSelected(null);
+  },[activity.active,nativeAiStart?.key,nativeAiStart?.active]);
   const [query, setQuery] = useMapState(project.id, 'forge.query', ''),
     [category, setCategory] = useMapState(project.id, 'forge.category', 'all');
   const sources = data.entries.filter((entry) => entry.version !== null);
@@ -866,6 +879,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     );
   }
   function select(id: string | null, additive: boolean) {
+    if(performance.now()<nativeAiSelectionGuard.current)return;
+    if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);
     setSurfaceSelection(null);
     setWorkshopSelected(null);
     setSelectedZone(null);
@@ -961,6 +976,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         remove();
       }
       if (event.key === 'Escape') {
+        setNativeAiStart(value=>value?.active?{...value,active:false}:value);
         setSelected([]);
         setSelectedZone(null);
       }
@@ -974,14 +990,14 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         setMode('scale');
       if (event.key.toLowerCase() === 'f') {
         setWrlFocus(false);
-        setFrame((value) => value + 1);
+        if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else setFrame((value) => value + 1);
       }
       if (event.key.toLowerCase() === 'g') setGridSnap((value) => !value);
       if (event.key.toLowerCase() === 'm') setMeshSnap((value) => !value);
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop,assetBusy,studioRole]);
+  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop,assetBusy,studioRole,nativeAiStart]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
     const usageId = nextFreeUsageId(doc, 'hill');
     if (usageId === null || doc.objectives.length + 4 > 200) {
@@ -1746,6 +1762,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 }}
               >
                 <ForgeViewport
+                  selectionGuard={nativeAiSelectionGuard}
                   materialSource={materialOpen}
                   materialBindings={project.nativeAssetImports}
                   sessionId={project.id}
@@ -1759,6 +1776,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   document={doc}
                   viewportChildren={(textures) => (
                     <>
+                      <NativeAiStartOverlay project={project} enabled={cameraMode==='orbit'&&!assetBusy&&studioRole==null} snap={gridSnap?snap:0}
+                        onSelectScene={()=>{setSelected([]);setSelectedZone(null);setWorkshopSelected(null);}}
+                        onStart={()=>{nativeAiSelectionGuard.current=Infinity;}} onEnd={()=>{nativeAiSelectionGuard.current=performance.now()+250;}}
+                        notify={message=>notify(message,'info')}/>
                       <WorkshopScene
                         textures={textures}
                         project={project}
@@ -1767,6 +1788,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                         meshes={workshopMeshes}
                         selected={workshopSelected}
                         onSelect={(id) => {
+                          setNativeAiStart(value=>value?.active?{...value,active:false}:value);
                           setWorkshopSelected(id);
                           setSelected([]);
                           revealPanel('workshop-object');
@@ -1878,6 +1900,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   }}
                   onError={(message) => notify(message, 'error')}
                 />
+                {nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
+                  <strong>AI start draft · {nativeAiStart.encounterName} / {nativeAiStart.squadName} / {nativeAiStart.start}</strong>
+                  <span>Unsaved coordinates · review in Native source controls</span>
+                  <button disabled={cameraMode!=='orbit'||assetBusy} onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>Frame AI start</button>
+                  {props.onReviewAiStart&&<button onClick={props.onReviewAiStart}>Review AI start source</button>}
+                  <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>
+                </div>}
                 {assetDrag.dragging && (
                   <div className="viewport-asset-drop-hint">
                     Drop a model or sound onto the map · Esc cancels

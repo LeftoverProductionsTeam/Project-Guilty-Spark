@@ -6,19 +6,19 @@ import * as THREE from 'three';
 import TransformControls from './HaloTransformControls';
 import {useMapState} from '../mapSession';
 import {call,native} from '../api';
-import {NATIVE_AI_START_VIEW,nativeAiStartMatches,nativeAiStartPosition} from '../nativeAiStart';
+import {NATIVE_AI_START_VIEW,nativeAiStartMatches,nativeAiStartPosition,nativeAiStartDragValues} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
 import type {NativeTagContext} from '../nativeOperations';
 import type {Project,Vec3} from '../types';
 
 /** A source marker only. All native mutation remains in the reviewed tag writer. */
 export default function NativeAiStartOverlay({project,enabled,snap,onSelectScene,onStart,onEnd,notify}:{
-  project:Project;enabled:boolean;snap:boolean;onSelectScene:()=>void;onStart?:()=>void;onEnd?:()=>void;notify:(message:string)=>void;
+  project:Project;enabled:boolean;snap:boolean|number;onSelectScene:()=>void;onStart?:()=>void;onEnd?:()=>void;notify:(message:string)=>void;
 }) {
   const [draft,setDraft]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
-  const [reviewed,setReviewed]=useState('');const group=useRef<THREE.Group>(null),drag=useRef('');
-  const current=useRef(draft);current.current=draft;
-  const callbacks=useRef({onSelectScene,notify});callbacks.current={onSelectScene,notify};
+  const [reviewed,setReviewed]=useState('');const group=useRef<THREE.Group>(null),drag=useRef<NativeAiStartView|null>(null);
+  const current=useRef({draft,enabled});current.current={draft,enabled};
+  const callbacks=useRef({onSelectScene,notify,onEnd});callbacks.current={onSelectScene,notify,onEnd};
   const {camera,controls}=useThree();
   const scope=draft?.active?draft.key:'';
   useEffect(()=>{
@@ -45,6 +45,7 @@ export default function NativeAiStartOverlay({project,enabled,snap,onSelectScene
     if(camera instanceof THREE.OrthographicCamera){camera.zoom=80;camera.updateProjectionMatrix();}
     const orbit=controls as unknown as {target?:THREE.Vector3;update?:()=>void};orbit?.target?.copy(center);orbit?.update?.();
   },[draft?.focus,ready,enabled,camera,controls]);
+  useEffect(()=>()=>{if(drag.current){drag.current=null;callbacks.current.onEnd?.();}},[scope,ready,enabled,draft?.locked]);
   if(!ready||!draft||!position)return null;
   const writable=enabled&&!draft.locked;
   return <>
@@ -54,17 +55,15 @@ export default function NativeAiStartOverlay({project,enabled,snap,onSelectScene
       <mesh onClick={event=>{event.stopPropagation();onSelectScene();}}><sphereGeometry args={[.14,10,6]}/><meshBasicMaterial color="#82ded0" depthTest={false}/></mesh>
     </group>
     <TransformControls object={group as MutableRefObject<THREE.Group>} mode="translate" space="world" enabled={writable}
-      translationSnap={snap ? .5 : null} size={.85} showX showY showZ
-      onMouseDown={()=>{if(!writable)return;drag.current=JSON.stringify([draft.key,draft.values]);onSelectScene();onStart?.();}}
+      translationSnap={typeof snap==='number' ? snap||null : snap ? 0.5 : null} size={.85} showX showY showZ
+      onMouseDown={()=>{if(!writable)return;drag.current=draft;onSelectScene();onStart?.();}}
       onMouseUp={()=>{
         const latest=current.current,next=group.current?.position.toArray() as Vec3|undefined;
         if(group.current)group.current.position.set(...position);
-        if(writable&&latest?.active&&!latest.locked&&JSON.stringify([latest.key,latest.values])===drag.current&&next){
-          const values=next.map(String) as [string,string,string];
-          if(nativeAiStartPosition(values))setDraft({...latest,values});
-          else notify('AI start coordinates must be finite and within the supported range. The proposal was kept unchanged.');
-        }
-        drag.current='';onEnd?.();
+        const values=nativeAiStartDragValues(drag.current,latest.draft,next,latest.enabled);
+        if(values&&latest.draft)setDraft({...latest.draft,values});
+        else if(next&&!nativeAiStartPosition(next.map(String)))notify('AI start coordinates must be finite and within the supported range. The proposal was kept unchanged.');
+        drag.current=null;onEnd?.();
       }}/>
   </>;
 }
