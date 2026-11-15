@@ -54,12 +54,19 @@ export function runtimeTextureSource(runtimeId: RuntimeId): Promise<OpenProject>
   }
   return pending;
 }
+const DEFAULT_PREVIEW_MATERIALS = [
+  ['surface', 'halo_metal', 'levels/test/bloodgulch/shaders/cap_metal', [0.35, 0.4, 0.42]],
+  ['grass', 'halo_grass', 'levels/test/bloodgulch/shaders/blood ground', [0.3, 0.42, 0.23]],
+] as const;
+/** Factory defaults are a runtime preview, not an imported tag/dependency binding.
+ * Restoring their pixels must never replace an authored shader assignment. */
+export function usesRuntimeDefaultPreview(materials:ForgeMaterial[]):boolean {
+  const surfaces=materials.filter(material=>!material.name.startsWith('+'));
+  return surfaces.length>0&&surfaces.every(material=>DEFAULT_PREVIEW_MATERIALS.some(([id,name,path])=>
+    material.id===id&&material.name===name&&material.shaderPath?.replaceAll('\\','/').toLowerCase()===path));
+}
 export function defaultPreviewMaterials(open: OpenProject): ForgeMaterial[] {
-  const choices = [
-    ['surface', 'halo_metal', 'levels/test/bloodgulch/shaders/cap_metal', [0.35, 0.4, 0.42]],
-    ['grass', 'halo_grass', 'levels/test/bloodgulch/shaders/blood ground', [0.3, 0.42, 0.23]],
-  ] as const;
-  return choices.flatMap(([id, name, path, color]) =>
+  return DEFAULT_PREVIEW_MATERIALS.flatMap(([id, name, path, color]) =>
     open.inspection?.tags.some((t) => t.class === 'senv' && normalized(t.path) === path)
       ? [{ id, name, shaderPath: path, color: [...color] } as ForgeMaterial]
       : [],

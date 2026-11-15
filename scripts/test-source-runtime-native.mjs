@@ -14,7 +14,10 @@ for(let i=2;i<process.argv.length;i+=2){
   if(!['--app','--data','--output','--mcc','--ce','--opence','--chupa','--kit','--invader','--sdk','--scene-lifecycle'].includes(process.argv[i])||!process.argv[i+1]||args.has(process.argv[i]))throw Error('Provide each named argument once');
   args.set(process.argv[i],process.argv[i]==='--scene-lifecycle'?process.argv[i+1]:path.resolve(process.argv[i+1]));
 }
-if(args.size!==(args.has('--scene-lifecycle')?11:10)||args.has('--scene-lifecycle')&&args.get('--scene-lifecycle')!=='true')throw Error('Required: --app --data --output --mcc --ce --opence --chupa --kit --invader --sdk; optional --scene-lifecycle true launches an owned Standalone preview');
+const createOnly=process.env.SPARK_QA_CREATE_MAP_ONLY==='1';
+const required=createOnly?['--app','--data','--output','--chupa','--invader']:['--app','--data','--output','--mcc','--ce','--opence','--chupa','--kit','--invader','--sdk'];
+if(required.some(key=>!args.has(key))||args.size!==required.length+Number(args.has('--scene-lifecycle'))||
+  args.has('--scene-lifecycle')&&(args.get('--scene-lifecycle')!=='true'||createOnly))throw Error('Supply the exact required native acceptance paths; create-only needs --app --data --output --chupa --invader and never launches a game.');
 const output=args.get('--output'),data=args.get('--data');
 await fs.mkdir(await assertQaOutputPath(output));
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -25,7 +28,7 @@ const endpoint=net.createServer();await new Promise(resolve=>endpoint.listen(0,'
 const port=endpoint.address().port;await new Promise(resolve=>endpoint.close(resolve));
 const start=()=>spawn(executable,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:data,WEBVIEW2_USER_DATA_FOLDER:path.join(output,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
 let child=start();
-const result={schemaVersion:1,kind:'native-runtime-source-contract',appSha256:await hash(executable),mockBridge:false,originalFilesUnchanged:false,gameplayVerified:false,maps:[],errors:[]};
+const result={schemaVersion:1,kind:createOnly?'native-library-create-restart':'native-runtime-source-contract',appSha256:await hash(executable),mockBridge:false,originalFilesUnchanged:false,gameplayVerified:false,maps:[],errors:[]};
 let browser,page;
 const invoke=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const originals=[];
@@ -35,14 +38,15 @@ try{
   await expect.poll(()=>{page=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().includes('tauri.localhost'));return !!page;},{timeout:30000}).toBe(true);
   page.setDefaultTimeout(60000);page.on('pageerror',error=>result.errors.push(String(error)));
   const boot=await invoke('bootstrap');
-  await invoke('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,preferredHalo:'mccSteam',mccDirectory:args.get('--mcc'),hekFlavor:'h1aEk',hekDirectory:args.get('--kit'),hekTagsDirectory:args.get('--sdk'),invaderDirectory:args.get('--invader'),resourceDirectory:null}});
+  await invoke('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,preferredHalo:createOnly?'chupathingyCe':'mccSteam',mccDirectory:args.get('--mcc')??null,hekFlavor:createOnly?null:'h1aEk',hekDirectory:args.get('--kit')??null,hekTagsDirectory:args.get('--sdk')??null,invaderDirectory:args.get('--invader'),resourceDirectory:null}});
   for(const [runtimeId,key,name] of [['haloCustomEdition','--ce','haloce.exe'],['openCe','--opence','halo.exe'],['chupathingyCe','--chupa','halo.exe']]){
-    const root=args.get(key);
+    const root=args.get(key);if(!root)continue;
     await invoke('register_runtime',{registration:{id:crypto.randomUUID(),runtimeId,root,executable:path.join(root,name),dataRoot:root,version:null,networkVersion:null}});
   }
-  if(process.env.SPARK_QA_DEFAULT_MATERIALS_ONLY==='1'){
+  if(process.env.SPARK_QA_DEFAULT_MATERIALS_ONLY==='1'||createOnly){
     result.defaultMaterials=[];
-    for(const [runtimeId,file,version] of [['mccSteam',path.join(args.get('--mcc'),'halo1/maps/bloodgulch.map'),13],['haloCustomEdition',path.join(args.get('--ce'),'maps/bloodgulch.map'),609],['openCe',path.join(args.get('--opence'),'maps/bloodgulch.map'),5],['chupathingyCe',path.join(args.get('--chupa'),'maps/bloodgulch.map'),5]]){
+    const defaults=createOnly?[['chupathingyCe',path.join(args.get('--chupa'),'maps/bloodgulch.map'),5]]:[['mccSteam',path.join(args.get('--mcc'),'halo1/maps/bloodgulch.map'),13],['haloCustomEdition',path.join(args.get('--ce'),'maps/bloodgulch.map'),609],['openCe',path.join(args.get('--opence'),'maps/bloodgulch.map'),5],['chupathingyCe',path.join(args.get('--chupa'),'maps/bloodgulch.map'),5]];
+    for(const [runtimeId,file,version] of defaults){
       originals.push({file,sha256:await hash(file)});const open=await invoke('runtime_texture_source',{runtimeId});
       expect(open.inspection.header.version).toBe(version);expect(open.project.source.sha256).toBe(await hash(file));
       for(const suffix of ['/cap_metal','/blood ground'])expect(open.inspection.tags.some(tag=>tag.class==='senv'&&tag.path.replaceAll('\\','/').endsWith(suffix))).toBe(true);
@@ -65,8 +69,21 @@ try{
     child=start();await expect.poll(()=>fetch('http://127.0.0.1:'+port+'/json/version').then(r=>r.ok,()=>false),{timeout:60000}).toBe(true);browser=await chromium.connectOverCDP('http://127.0.0.1:'+port);await expect.poll(()=>{page=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().includes('tauri.localhost'));return !!page;}).toBe(true);
     const reopened=await invoke('open_project',{id:saved.project.id});expect(reopened.project.quickForge.materials).toEqual(saved.project.quickForge.materials);expect((await invoke('bootstrap')).settings.preferredHalo).toBe('chupathingyCe');
     const restored=await invoke('runtime_texture_source',{runtimeId:'chupathingyCe'});expect(restored.inspection.header.version).toBe(5);
-    await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Chupathingy native material defaults',exact:true})}).click();
+    // Record actual native click targets before diagnosing route changes.
+    await page.evaluate(()=>{window.__sparkNativeRouteTrace=[];window.addEventListener('click',event=>{
+      const target=event.target instanceof Element?event.target.closest('button,summary,a'):null;
+      const row={target:target?.getAttribute('aria-label')??target?.textContent?.trim().slice(0,120),project:target?.getAttribute('data-project-id')??null,
+        workspace:document.querySelector('[aria-label="Current workspace"]')?.textContent};
+      window.__sparkNativeRouteTrace.push(row);if(window.__sparkNativeRouteTrace.length>32)window.__sparkNativeRouteTrace.shift();
+    },true);});
+    await chooseTool(page,'Map library');
+    await expect(page.locator('.library-page')).toBeVisible();
+    await page.locator('.library-page .map-card').filter({has:page.getByRole('heading',{name:'Chupathingy native material defaults',exact:true})}).click();
+    result.restartRouteTrace=await page.evaluate(()=>window.__sparkNativeRouteTrace);
+
     const resumedMaterials=page.locator('.forge-viewport [data-native-material-count]');await expect.poll(async()=>Number(await resumedMaterials.getAttribute('data-native-material-count')),{timeout:120000}).toBeGreaterThanOrEqual(2);
+    await page.screenshot({path:path.join(output,'native-default-materials-reopened.png')});
+    result.createdMap.restoredSourceProjectId=await resumedMaterials.getAttribute('data-native-material-source');
     result.createdMap.fullProcessRestart=true;result.createdMap.reopenedThroughLibrary=true;result.createdMap.restoredNativeTextureCount=Number(await resumedMaterials.getAttribute('data-native-material-count'));
   }else{
   // A genuine CE cache in an isolated OpenCE custom_maps directory proves
@@ -149,13 +166,16 @@ try{
     result.sceneLifecycle={executableSha256:preview.executableSha256,resources:plan.resources,launched:true,stoppedWhenOwningWindowClosed:true,gameplayVerified:false};
   }
   }
-  for(const input of originals)expect(await hash(input.file)).toBe(input.sha256);
-  result.originalFilesUnchanged=true;
-}catch(error){result.errors.push(String(error));if(browser)result.browserTargets=browser.contexts().flatMap(c=>c.pages()).map(p=>p.url());process.exitCode=1;}finally{
+}catch(error){result.errors.push(String(error));if(browser)result.browserTargets=browser.contexts().flatMap(c=>c.pages()).map(p=>p.url());if(page)result.restartRouteTrace=await page.evaluate(()=>window.__sparkNativeRouteTrace??[]).catch(()=>[]);process.exitCode=1;if(page)await page.screenshot({path:path.join(output,'native-source-failure.png')}).catch(()=>{});}finally{
+  try {
+    for(const input of originals)expect(await hash(input.file)).toBe(input.sha256);
+    result.originalFilesUnchanged=originals.length>0;
+    result.originalChecks=originals.map(input=>({sha256:input.sha256,unchanged:true}));
+  }catch(error){result.originalFilesUnchanged=false;result.errors.push('Protected source check: '+String(error));process.exitCode=1;}
   result.completedAt=new Date().toISOString();
   await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(result,null,2));
   if(page&&child.exitCode===null){await invoke('plugin:window|close',{label:'main'}).catch(()=>{});await waitForQaExit(child).catch(async()=>{await stopQaProcess(child);});}
   if(browser)await browser.close().catch(()=>{});
   if(child.exitCode===null&&child.signalCode===null)await stopQaProcess(child);
 }
-console.log(JSON.stringify({maps:result.maps.length,originalFilesUnchanged:result.originalFilesUnchanged,gameplayVerified:false,errors:result.errors}));
+console.log(JSON.stringify({createdMap:!!result.createdMap,fullProcessRestart:result.createdMap?.fullProcessRestart??false,maps:result.maps.length,originalFilesUnchanged:result.originalFilesUnchanged,gameplayVerified:false,errors:result.errors}));

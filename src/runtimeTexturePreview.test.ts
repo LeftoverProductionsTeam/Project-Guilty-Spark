@@ -4,7 +4,7 @@ import type { VerifiedBatchImage } from './ownedBitmapBatch';
 const mock = vi.hoisted(() => ({ call: vi.fn(), hosting: vi.fn(()=>'mccSteam') }));
 vi.mock('./api', () => ({ call: mock.call }));
 vi.mock('./mapSession', () => ({ readMapSession: mock.hosting }));
-import { defaultPreviewMaterials, fillRuntimeTexturePreviews, runtimeTextureSource, invalidateRuntimeTextureSources } from './runtimeTexturePreview';
+import { defaultPreviewMaterials, usesRuntimeDefaultPreview, fillRuntimeTexturePreviews, runtimeTextureSource, invalidateRuntimeTextureSources } from './runtimeTexturePreview';
 const sourceHash = 'a'.repeat(64),
   runtimeHash = 'b'.repeat(64),
   packHash = 'c'.repeat(64);
@@ -229,4 +229,14 @@ describe('viewer-only compatible runtime pixels', () => {
     ]);
     expect(defaultPreviewMaterials({ inspection: { tags: [] } } as unknown as OpenProject)).toEqual([]);
   });
+});
+
+
+it('reconnects only untouched factory preview bindings, never imported/custom shader assignments',()=>{
+ const defaults=defaultPreviewMaterials({inspection:{tags:[{class:'senv',path:'levels/test/bloodgulch/shaders/cap_metal'},{class:'senv',path:'levels/test/bloodgulch/shaders/blood ground'}]}} as OpenProject);
+ expect(usesRuntimeDefaultPreview(defaults)).toBe(true);
+ expect(usesRuntimeDefaultPreview([...defaults,{id:'portal',name:'+portal',shaderPath:null,color:[0,0,0]}])).toBe(true);
+ expect(usesRuntimeDefaultPreview([])).toBe(false);
+ for(const patch of [{name:'Authored metal'},{shaderPath:'levels/custom/metal'},{id:'custom'},{shaderPath:null}])
+   expect(usesRuntimeDefaultPreview(defaults.map((material,index)=>index?material:{...material,...patch}))).toBe(false);
 });

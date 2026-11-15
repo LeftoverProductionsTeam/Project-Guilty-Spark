@@ -12,7 +12,7 @@ import { defaultNativePlayerProfile } from '../firefight';
 import { WorkspacePanel, WorkspacePanelAddon, useWorkspaceFileActions, useRevealWorkspacePanel } from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import SmartEditPanel from './SmartEditPanel';
-import { runtimeTextureSource, defaultPreviewMaterials } from '../runtimeTexturePreview';
+import { runtimeTextureSource, defaultPreviewMaterials, usesRuntimeDefaultPreview } from '../runtimeTexturePreview';
 import type { ForgeMaterial } from '../forge';
 import { retainAssetSource } from '../assetSources';
 import RenderFeatures from './RenderFeatures';
@@ -381,6 +381,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const materialResourceScope = useTextureResourceScope(materialSourceId);
   const materialOpen = materialSourceId === sourceId ? sourceOpen : separateMaterialSource;
   const defaultPreviewAttempt = useRef('');
+  const previewSelection=useRef({sourceId,materialSourceId});previewSelection.current={sourceId,materialSourceId};
   const sourceResourceScope = useTextureResourceScope(sourceId);
   const lastLoadedSource = useRef('');
   const [referenceFilter, setReferenceFilter] = useState<Set<number> | null>(null);
@@ -707,40 +708,27 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [expandedBuild, setExpandedBuild] = useState(false);
   const latestProject = useRef(project);
   latestProject.current = project;
+  const needsDefaultBindings=doc.materials.some(material=>!material.shaderPath&&!material.name.startsWith('+'));
+  const runtimeDefaultPreview=!project.source&&!doc.native&&usesRuntimeDefaultPreview(doc.materials)&&!project.nativeAssetImports?.some(binding=>binding.tagClass==='senv');
   useEffect(() => {
-    if (
-      studioRole != null ||
-      !native ||
-      !doc.materials.some((m) => !m.shaderPath && !m.name.startsWith('+')) ||
-      defaultPreviewAttempt.current === project.id
-    )
-      return;
-    defaultPreviewAttempt.current = project.id;
-    const releaseSource = beginProjectMutation(project.id, {history:false});
-    let alive = true;
-    void runtimeTextureSource(doc.runtimeId)
-      .then((open) => {
-        if (!alive) return;
-        const materials = defaultPreviewMaterials(open);
-        const metal = materials.find((m) => m.id === 'surface');
-        if (!metal) return;
-        const latest = latestProject.current;
-        const current = latest.quickForge;
-        if (!current) return;
-        props.onDefaultMaterials(materials);
-        writeMapSession(project.id, 'forge.materialSource', open.project.id);
-        if (!readMapSession(project.id, 'forge.assetSource', ''))
-          writeMapSession(project.id, 'forge.assetSource', open.project.id);
-        retainAssetSource(open);
-      })
-      .catch((reason) => {
-        if (alive) notify('Default materials need an owned runtime map: ' + String(reason), 'info');
-      }).finally(releaseSource);
-    return () => {
-      alive = false;releaseSource();
-      if (defaultPreviewAttempt.current === project.id) defaultPreviewAttempt.current = '';
-    };
-  }, [studioRole, project.id, doc.runtimeId, doc.materials.some((m) => !m.shaderPath && !m.name.startsWith('+'))]);
+    if(!native||(!needsDefaultBindings&&!runtimeDefaultPreview)||(needsDefaultBindings&&studioRole!=null)||defaultPreviewAttempt.current===project.id)return;
+    defaultPreviewAttempt.current=project.id;
+    const releaseSource=needsDefaultBindings?beginProjectMutation(project.id,{history:false}):()=>{};
+    const requestedSelection={...previewSelection.current};let alive=true;
+    void runtimeTextureSource(doc.runtimeId).then(open=>{
+      if(!alive||previewSelection.current.sourceId!==requestedSelection.sourceId||previewSelection.current.materialSourceId!==requestedSelection.materialSourceId)return;
+      const materials=defaultPreviewMaterials(open);if(!materials.some(material=>material.id==='surface'))return;
+      if(!latestProject.current.quickForge)return;
+      // A process-local preview UUID cannot be reopened after restart. Resolve
+      // factory pixels through the existing owned-runtime provider instead.
+      // Authored/imported shader bindings and project history stay untouched.
+      if(needsDefaultBindings)props.onDefaultMaterials(materials);
+      writeMapSession(project.id,'forge.materialSource',open.project.id);
+      if(!requestedSelection.sourceId||(runtimeDefaultPreview&&requestedSelection.sourceId===requestedSelection.materialSourceId))writeMapSession(project.id,'forge.assetSource',open.project.id);
+      retainAssetSource(open);
+    }).catch(reason=>{if(alive)notify('Default material preview needs an owned runtime map: '+String(reason),'info');}).finally(releaseSource);
+    return()=>{alive=false;releaseSource();if(defaultPreviewAttempt.current===project.id)defaultPreviewAttempt.current='';};
+  },[studioRole,project.id,doc.runtimeId,needsDefaultBindings,runtimeDefaultPreview]);
   useEffect(() => {
     let alive = true;
     setSeparateMaterialSource(null);
