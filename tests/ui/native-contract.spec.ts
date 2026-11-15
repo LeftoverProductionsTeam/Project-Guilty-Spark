@@ -4057,6 +4057,16 @@ test('Black Echo draft uses one project history action and selects its native ar
  const record=page.locator('.studio-record').nth(4);await record.getByLabel('Optional condition 5',{exact:true}).fill('be_artifact');
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[4].conditionVolume)).toBe('be_artifact');
 
+
+ await expect(page.locator('.studio-record').nth(3).getByRole('combobox',{name:'Trigger',exact:true})).toHaveValue('manual');
+ const survivor=page.locator('.studio-record').nth(1);await expect(survivor.getByRole('combobox',{name:'Trigger',exact:true})).toHaveValue('escort');
+ const minimum=survivor.getByRole('spinbutton',{name:'Minimum survivors 2',exact:true});await minimum.fill('2');await minimum.press('Tab');
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[1].minimumSurvivors)).toBe(2);
+
+ // Tab moved into the direction textarea. Its Ctrl+Z belongs to text editing;
+ // return by keyboard to the numeric control before requesting project history.
+ await page.keyboard.press('Shift+Tab');await expect(minimum).toBeFocused();
+ await page.keyboard.press('Control+z');await expect(minimum).toHaveValue('1');await page.keyboard.press('Control+y');await expect(minimum).toHaveValue('2');
  const first=page.locator('.studio-record').first();await first.locator('summary').filter({hasText:'Radio / sound cue'}).click();
  await first.getByRole('combobox',{name:'Mission sound 1',exact:true}).selectOption('12345678-1234-4234-8234-123456789012');
  await first.getByRole('combobox',{name:'Cue timing 1',exact:true}).selectOption('complete');

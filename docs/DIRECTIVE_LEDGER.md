@@ -1,6 +1,6 @@
 # Directive completion ledger
 
-Latest94e66e4b MegaWorld Operations/Black Echo extends the existing roadmap. Draft authoring/conditional source/area editing source is integrated with focused checks; complete mission, native audio/game acceptance, survivors, rewards, persistence, squads and Forerunner execution remain open. Exact prompt is preserved in Master Engineering Prompts; ACTIVE_TASK/UI_INTERACTION_AUDIT/HUMAN_TEST_PLAN carry current evidence. Historical priority statements below do not override this latest steering or the full475IDs/M1–M6.
+Latest94e66e4b MegaWorld Operations/Black Echo extends the existing roadmap. Draft authoring/conditional source/area editing source is integrated with focused checks; complete mission, native audio/rescue game acceptance, technology collection, rewards, persistence, squads and Forerunner execution remain open. Exact prompt is preserved in Master Engineering Prompts; ACTIVE_TASK/UI_INTERACTION_AUDIT/HUMAN_TEST_PLAN carry current evidence. Historical priority statements below do not override this latest steering or the full475IDs/M1–M6.
 
 Current checkpoint: public November10 preview5/d832af3 and all5downloads verified;9release gates/native Windows startup-install-uninstall pass. Flagship README is verified on remote0db531b; About links directly to preview5 because prereleases are excluded from Latest. Agent push was refused; remote advanced independently. Local checkpoint-only commits await owner sync. Operation110/M1–M6/475IDs and missing human/peer/platform gates remain OPEN.
 

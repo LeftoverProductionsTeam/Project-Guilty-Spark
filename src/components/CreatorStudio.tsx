@@ -271,7 +271,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           missions: [...studio.missions, { id: freshId(), title: `Beat ${studio.missions.length + 1}`, objective: '', trigger: 'manual', encounterName: '' }] }, 'Add mission beat')}><Plus size={15}/> Add beat</button></div>
       <div className="analysis-actions"><button type="button" disabled={studio.missions.length>0||project.quickForge?.gameMode!=='campaign'||!!project.quickForge?.native}
         title={studio.missions.length?'Use an empty mission in a separate project to preserve this operation.':'Use editable Campaign / scripted solo source. Adds objectives and selectable areas; does not deploy gameplay.'}
-        onClick={()=>{try{edit(addBlackEchoDraft(project,freshId),'Create Operation Black Echo blueprint');setError('');notify('Black Echo objectives and five areas added. Move the starter areas onto playable terrain; bind enemies and your audio, then review Native mission build. Rescue, inventory and squad behavior need runtime integration.','info');}catch(error){setError(String(error));}}}>Create Black Echo draft</button>
+        onClick={()=>{try{edit(addBlackEchoDraft(project,freshId),'Create Operation Black Echo blueprint');setError('');notify('Black Echo objectives and five areas added. Move markers onto playable terrain and bind be_marines, enemies and your audio. Native rescue needs gameplay testing; collection, inventory settlement and squad behavior need actual runtime logic.','info');}catch(error){setError(String(error));}}}>Create Black Echo draft</button>
         <button type="button" onClick={()=>exportScript('mission')}><Download size={15}/> Export mission .hsc</button><button type="button" onClick={()=>exportScript('mission',true)}>Export required tags list</button></div>
       <details className="studio-handoff">
         <summary>Native mission build</summary>
@@ -307,15 +307,23 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
         <label title="Choose when this objective starts. Volumes and encounters must have the same names in your editable scenario.">Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
-          <option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="timer">Timer (needs script binding)</option></select></label>
+          <option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
         <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
-        {(beat.trigger === 'triggerVolume'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
+        {(beat.trigger === 'triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':beat.trigger==='escort'?'Survivor destination volume':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}
-        {onLevelEditor&&(beat.trigger==='triggerVolume'||beat.trigger==='manual'&&beat.triggerRef!=null)&&<button type="button"
+        {onLevelEditor&&(beat.trigger==='triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null)&&<button type="button"
           disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.triggerRef)}
           title="Select the existing native area in the Level Editor. Use its move/scale handles; then return to Mission director."
           onClick={()=>selectMissionArea(beat.triggerRef??'')}>Select objective area in Level Editor</button>}
+        {beat.trigger==='escort'&&<>
+          <NumberField label={'Minimum survivors '+(i+1)} min={1} max={32} step={1} value={beat.minimumSurvivors??1}
+            onCommit={value=>updateBeat(beat.id,{minimumSurvivors:Math.round(value)})}/>
+          <p className="studio-hint">The mission creates this source group, assigns the human team and asks it to follow the closest players.
+            All remaining survivors must reach the selected native volume, with at least this many alive. A player entering alone cannot complete rescue.
+            Below the minimum, this mission script stops and shows failure; the world keeps running. Own this group's spawn in one beat only.
+            Minimum must fit all authored native difficulty populations. Choose real Marine assets and playable AI navigation; pathfinding, co-op and gameplay remain separate tests.</p>
+        </>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
         <label><input type="checkbox" checked={beat.conditionVolume!=null} disabled={beat.completeMission===true}
           onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined})}/>Optional step · run only if a player is in a named area when this step starts</label>

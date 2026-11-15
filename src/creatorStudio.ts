@@ -40,10 +40,11 @@ export interface MissionBeat {
   id: string;
   title: string;
   objective: string;
-  trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'timer';
+  trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'escort' | 'timer';
   encounterName: string;
   triggerRef?: string | null;
   timerSeconds?: number | null;
+  minimumSurvivors?: number | null;
   hudObjective?: boolean | null;
   hudText?: string | null;
   checkpoint?: boolean | null;
@@ -122,16 +123,16 @@ export function emptyCreatorStudio(): CreatorStudioDocument {
 export function blackEchoMission(nextId:()=>string):MissionBeat[] {
   const rows:[string,string,MissionBeat['trigger'],string,string?][]=[
     ['Squad insertion','Reach the insertion area and review the operation briefing.','triggerVolume','be_insert'],
-    ['Rescue stranded Marines','Locate and escort the survivors. This step waits for authored rescue logic to call gs_complete_2; a player entering the reference area alone cannot complete it.','manual','be_survivors'],
+    ['Rescue stranded Marines','Escort the surviving Marines to the rescue rally area. The native mission creates be_marines, assigns the human team and follows the closest players; all remaining survivors must arrive, with at least one alive. Loot settlement is separate.','escort','be_marines'],
     ['Investigate the Covenant facility','Clear the facility defenders and search for the classified package.','encounterCleared','be_covenant'],
-    ['Recover classified technology','Recover the technology using the selected runtime inventory/objective rules; this area marks the native mission handoff.','triggerVolume','be_artifact'],
+    ['Recover classified technology','This step waits for actual technology collection logic to call gs_complete_4. The reference area is an authoring marker; entering it alone cannot acquire or bank equipment.','manual','be_artifact'],
     ['Contain the Flood emergency','Optional containment branch: when this step begins, a player in be_containment requests the Flood encounter. Otherwise continue to extraction defense.','encounterCleared','be_flood','be_containment'],
     ['Defend the extraction point','Clear the forces attacking the evacuation site.','encounterCleared','be_defense'],
     ['Extract survivors and equipment','Reach evacuation. This step waits for actual survivor/loot settlement to call gs_complete_7. The reference area alone cannot bank inventory or complete extraction; the persistent world stays active.','manual','be_extract'],
   ];
   return rows.map(([title,objective,trigger,reference,conditionVolume])=>({
-    id:nextId(),title,objective,trigger,encounterName:trigger==='encounterCleared'?reference:'',
-    ...(trigger!=='encounterCleared'?{triggerRef:reference}:{}),...(conditionVolume?{conditionVolume}:{}),
+    id:nextId(),title,objective,trigger,encounterName:trigger==='encounterCleared'||trigger==='escort'?reference:'',
+    ...(trigger==='escort'?{triggerRef:'be_survivors',minimumSurvivors:1}:trigger!=='encounterCleared'?{triggerRef:reference}:{}),...(conditionVolume?{conditionVolume}:{}),
     hudObjective:true,hudText:title,
   }));
 }
@@ -168,7 +169,7 @@ const commandToken = /^[A-Za-z0-9_-]{1,64}$/;
 const variantToken = /^[A-Za-z0-9_ -]{1,64}$/;
 const recordId = /^[A-Za-z0-9_-]{1,72}$/;
 const scriptIdent = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
-const triggerValues = new Set(['manual', 'triggerVolume', 'encounterCleared', 'timer']);
+const triggerValues = new Set(['manual', 'triggerVolume', 'encounterCleared', 'escort', 'timer']);
 const runtimes = new Set<ServerRuntime>(['haloCustomEdition', 'haloPC', 'haloDemo', 'mcc', 'openCE', 'chupathingyCE']);
 const verdicts = new Set<PlaytestVerdict>(['notRun', 'pass', 'fail', 'blocked']);
 const safeText = (s: string, max: number) => typeof s === 'string' && s.length <= max && !/[\x00-\x1f\x7f]/.test(s);
@@ -192,6 +193,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
+      (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||
       [m.hudObjective,m.checkpoint,m.completeMission].some(value=>value!=null&&typeof value!=='boolean'))

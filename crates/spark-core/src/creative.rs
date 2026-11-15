@@ -61,6 +61,8 @@ pub struct MissionBeat {
     #[serde(default)]
     pub timer_seconds: Option<u32>,
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub minimum_survivors:Option<u16>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub hud_objective:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub hud_text:Option<String>,
@@ -216,13 +218,26 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
                     return invalid(format!("Mission '{}' references missing source volume '{}'. Name or select a volume in Logic / Events",beat.title,name));
                 }
             },
-            "encounterCleared"=>{
+            "encounterCleared"|"escort"=>{
                 let mut parts=beat.encounter_name.split('/');
                 let name=parts.next().unwrap_or("");
                 let squad=parts.next();
                 let group=doc.campaign_encounters.iter().find(|entry|entry.name==name);
                 if parts.next().is_some() || squad.is_some_and(|name|name!="source_squad") || group.is_none() {
                     return invalid(format!("Mission '{}' references missing campaign encounter/squad '{}'",beat.title,beat.encounter_name));
+                }
+                if beat.trigger=="escort" {
+                    let minimum=beat.minimum_survivors.unwrap_or(1);let group=group.unwrap();let (normal,insane)=group.difficulty_counts();
+                    if minimum==0||minimum>32||minimum>group.count||minimum>normal||minimum>insane {
+                        return invalid("Survivor minimum exceeds the authored starts or native difficulty population");
+                    }
+                    let destination=beat.trigger_ref.as_deref().unwrap_or("");
+                    if !script_ident(destination)||!doc.logic.as_ref().is_some_and(|logic|logic.triggers.iter().any(|trigger|crate::native_logic::trigger_name(trigger)==destination)) {
+                        return invalid("Survivor escort needs an existing named destination volume");
+                    }
+                    if binding.missions.iter().filter(|other|matches!(other.trigger.as_str(),"escort"|"encounterCleared")&&other.encounter_name.split('/').next()==Some(name)).count()!=1 {
+                        return invalid("Survivor encounter needs one mission spawn owner; another beat cannot respawn the same survivors");
+                    }
                 }
                 if group.unwrap().start_active {
                     return invalid(format!("Mission '{}' owns ai_place for '{}'; disable initial actor creation before building this mission",beat.title,name));
@@ -275,6 +290,9 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
 pub fn native_mission_hud(binding:&NativeMissionBinding)->Result<Option<crate::firefight::NativeHudAppendPlan>> {
     let mut messages=vec![];
     for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.trigger=="escort" {
+            messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_fail_{}",index+1),text:"Rescue failed: not enough survivors. Restart or revise the operation.".into()});
+        }
         if let Some(cue)=&beat.sound_cue {
             if !cue.valid(){return invalid("Invalid native mission radio cue");}
             if !cue.caption.is_empty(){messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_cue_{}",index+1),text:cue.caption.clone()});}
@@ -333,10 +351,11 @@ impl CreatorStudio {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
-                || !["manual", "triggerVolume", "encounterCleared", "timer"].contains(&beat.trigger.as_str())
+                || !["manual", "triggerVolume", "encounterCleared", "escort", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.sound_cue.as_ref().is_some_and(|cue|!cue.valid())
+                || beat.minimum_survivors.is_some_and(|n|n<1||n>32)
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
@@ -501,6 +520,30 @@ mod tests {
         let mut invalid=document;invalid.missions[0].sound_cue.as_mut().unwrap().gain=f32::NAN;assert!(invalid.validate().is_err());
         let old=serde_json::json!({"id":"legacy","title":"Start","objective":"","trigger":"manual","encounterName":""});
         let legacy:MissionBeat=serde_json::from_value(old).unwrap();assert!(legacy.sound_cue.is_none());assert!(serde_json::to_value(legacy).unwrap().get("soundCue").is_none());
+    }
+
+    #[test]
+    fn native_escort_owns_real_source_group_destination_and_feasible_difficulty() {
+        let mut project=crate::project::Project::new("Survivors");let mut document=studio();
+        document.missions.push(serde_json::from_value(serde_json::json!({"id":"rescue","title":"Rescue","objective":"Escort Marines","trigger":"escort","encounterName":"survivors","triggerRef":"rally","minimumSurvivors":2})).unwrap());
+        project.studio=Some(document);let mut doc=crate::quickforge::create_arena("Rescue","customBlank").unwrap();doc.game_mode="campaign".into();
+        doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[{"id":"rally","nativeName":"rally","name":"Rally","position":[10,0,2],"rotation":[0,0,0],"dimensions":[4,4,3],"visible":true,"locked":false}],"devices":[],"rules":[]})).unwrap());
+        doc.campaign_encounters.push(serde_json::from_value(serde_json::json!({"name":"survivors","actorPath":"characters/marine/marine","position":[0,0,0],"startActive":false,"count":3,"spacing":1,"difficulty":{"normal":2,"insane":3}})).unwrap());
+        project.quick_forge=Some(doc);
+        // Binding validation fixture only; actual source syntax has the separate
+        // installed Invader test. Never treat this body as playable content.
+        let check=|value:&crate::project::Project| {
+            let mut doc=value.quick_forge.clone().unwrap();let body="; binding fixture\n";
+            let binding=NativeMissionBinding{schema_version:1,missions:value.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+            doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
+            native_mission_binding(value,&doc)
+        };
+        let binding=check(&project).unwrap().unwrap();let hud=native_mission_hud(&binding).unwrap().unwrap();assert_eq!(hud.messages.len(),1);assert_eq!(hud.messages[0].name,"gs_mission_fail_1");
+        let restored:crate::project::Project=serde_json::from_slice(&serde_json::to_vec(&project).unwrap()).unwrap();assert_eq!(restored.studio.as_ref().unwrap().missions[0].minimum_survivors,Some(2));check(&restored).unwrap();
+        let mut impossible=project.clone();impossible.studio.as_mut().unwrap().missions[0].minimum_survivors=Some(3);assert!(check(&impossible).unwrap_err().to_string().contains("difficulty population"));
+        let mut absent=project.clone();absent.studio.as_mut().unwrap().missions[0].trigger_ref=Some("missing_rally".into());assert!(check(&absent).unwrap_err().to_string().contains("destination volume"));
+        let mut duplicate=project.clone();let mut second=binding.missions[0].clone();second.id="duplicate".into();duplicate.studio.as_mut().unwrap().missions.push(second);assert!(check(&duplicate).unwrap_err().to_string().contains("spawn owner"));
+        let mut active=project;active.quick_forge.as_mut().unwrap().campaign_encounters[0].start_active=true;assert!(check(&active).unwrap_err().to_string().contains("disable initial actor creation"));
     }
 
 }

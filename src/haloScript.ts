@@ -80,6 +80,17 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         deps.push(`trigger_volume:${ref}`);
         scripted.push(`  (sleep_until (volume_test_objects ${ref} (players)) 15)`);break;
       }
+      case 'escort':{
+        const ref=ensureName(beat.encounterName,'Beat '+(i+1)+' survivor encounter',true),destination=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' survivor destination');
+        const minimum=beat.minimumSurvivors??1;
+        deps.push('ai_encounter:'+ref,'trigger_volume:'+destination,'hud_message:gs_mission_fail_'+(i+1));
+        scripted.push('  (ai_place '+ref+')','  (sleep_until (> (ai_living_count '+ref+') 0) 15 300)',
+          '  (ai_set_team '+ref+' human)','  (ai_follow_target_players '+ref+')',
+          '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') (volume_test_objects_all '+destination+' (ai_actors '+ref+'))) 15)',
+          '  (if (< (ai_living_count '+ref+') '+minimum+') (begin',
+          '    (hud_set_objective_text gs_mission_fail_'+(i+1)+')','    (print "gs survivor objective failed")','    (sleep_until false 15)','  ))');
+        break;
+      }
       case 'encounterCleared':{
         const ref=ensureName(beat.encounterName,`Beat ${i+1} encounter`,true);
         deps.push(`ai_encounter:${ref}`);
@@ -101,6 +112,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
     'Optional volume conditions are evaluated once when their step starts; a false condition skips that step. This is shared scenario state, not independent multiplayer squad progress.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
+    ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Falling below that minimum stops this mission script, not the persistent world; no loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
@@ -136,12 +148,13 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','soundCue'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','soundCue','minimumSurvivors'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||
     (beat.conditionVolume!=null&&typeof beat.conditionVolume!=='string')||
+    (beat.minimumSurvivors!=null&&typeof beat.minimumSurvivors!=='number')||
     (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')||
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
     [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
@@ -160,7 +173,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
-    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,
+    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,soundCue:beat.soundCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
@@ -228,10 +241,18 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const bindings=inspectScenarioBindings([output],null,doc);
   const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource'&&!binding.dependency.startsWith('hud_message:')&&!binding.dependency.startsWith('sound:'));
   if(missing.length)throw Error(missing.map(binding=>binding.dependency+': '+binding.detail).join('\n'));
-  for(const beat of missions)if(beat.trigger==='encounterCleared') {
+  for(const beat of missions)if(beat.trigger==='encounterCleared'||beat.trigger==='escort') {
     const name=beat.encounterName.split('/')[0];
     if(doc.campaignEncounters?.find(group=>group.name===name)?.startActive)
       throw Error('Mission owns ai_place for '+name+'. Disable initial actor creation before preparing its source.');
+    if(beat.trigger==='escort') {
+      const group=doc.campaignEncounters!.find(group=>group.name===name)!;
+      const minimum=beat.minimumSurvivors??1;
+      if(minimum>Math.min(group.count??1,group.difficulty?.normal??group.count??1,group.difficulty?.insane??group.count??1))
+        throw Error('Survivor minimum exceeds the authored starts or difficulty population for '+name+'. Add actors or lower the minimum before preparing.');
+      if(missions.filter(other=>other.encounterName.split('/')[0]===name&&['encounterCleared','escort'].includes(other.trigger)).length!==1)
+        throw Error('Survivor encounter '+name+' needs one mission spawn owner. Do not respawn the same survivors from another beat.');
+    }
   }
   const logic=structuredClone(doc.logic??{schemaVersion:1 as const,triggers:[],devices:[],rules:[]});
   const sources=logic.handwrittenSources??[];

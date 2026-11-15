@@ -60,7 +60,7 @@ it('retains the Black Echo objective bindings through saved-data serialization w
  const restored=JSON.parse(JSON.stringify(studio));expect(validateCreatorStudio(restored)).toEqual([]);
  expect(restored.missions).toEqual(studio.missions);
  expect(studio.missions.some(beat=>beat.trigger==='timer'||beat.completeMission)).toBe(false);
- expect(studio.missions[1].trigger).toBe('manual');expect(studio.missions[6].trigger).toBe('manual');
+ expect(studio.missions[1]).toMatchObject({trigger:'escort',encounterName:'be_marines',triggerRef:'be_survivors',minimumSurvivors:1});expect(studio.missions[3]).toMatchObject({trigger:'manual',triggerRef:'be_artifact'});expect(studio.missions[6].trigger).toBe('manual');
  expect(studio.missions[4]).toMatchObject({conditionVolume:'be_containment',encounterName:'be_flood',trigger:'encounterCleared'});
  restored.missions[4].conditionVolume='unsafe volume';expect(validateCreatorStudio(restored)).not.toEqual([]);
 });
@@ -78,8 +78,8 @@ it('creates one additive operation draft with real named areas, preserving exist
  expect(next.quickForge!.geometry).toEqual(project.quickForge!.geometry);expect(next.quickForge!.logic!.handwrittenSources).toEqual(project.quickForge!.logic!.handwrittenSources);
  expect(next.studio!.missions).toHaveLength(7);expect(validateCreatorStudio(next.studio!)).toEqual([]);
  expect(()=>addBlackEchoDraft(next,()=> 'collision')).toThrow(/current operation/);
- await expect(attachNativeCampaignMission(next,'manual')).rejects.toThrow(/be_covenant/);
- next.quickForge!.campaignEncounters=['be_covenant','be_flood','be_defense'].map((name,index)=>({id:'group_'+index,name,actorPath:'characters/grunt/grunt minor plasma pistol',position:[0,0,0],count:1,spacing:1,startActive:false}));
+ await expect(attachNativeCampaignMission(next,'manual')).rejects.toThrow(/be_marines/);
+ next.quickForge!.campaignEncounters=['be_marines','be_covenant','be_flood','be_defense'].map((name,index)=>({id:'group_'+index,name,actorPath:'characters/grunt/grunt minor plasma pistol',position:[0,0,0],count:1,spacing:1,startActive:false}));
  const prepared=await attachNativeCampaignMission(next,'manual');expect(prepared.quickForge!.logic!.handwrittenSources!.some(source=>source.filename==='gs_mission.hsc')).toBe(true);
  expect((await reviewNativeCampaignMission(prepared)).binding.missions[4].conditionVolume).toBe('be_containment');
  expect(sameMissionData(next.studio!.missions,JSON.parse(JSON.stringify(next.studio!.missions)))).toBe(true);
@@ -118,4 +118,17 @@ it('prepares a native radio cue with an exact included closure and preserved cap
    const draft=structuredClone(project.studio!);draft.missions[0].soundCue!.soundPath=path;expect(validateCreatorStudio(draft)).not.toEqual([]);
  }
  const bad=structuredClone(project.studio!);bad.missions[0].soundCue!.caption='%unsafe';expect(validateCreatorStudio(bad)).not.toEqual([]);
+});
+
+
+it('owns native survivor creation once and rejects impossible population or destination before rebuilding',async()=>{
+ const project=campaignDraft();let index=0;const draft=addBlackEchoDraft(project,()=> 'escort_'+(++index));
+ draft.quickForge!.campaignEncounters=['be_marines','be_covenant','be_flood','be_defense'].map(name=>({name,actorPath:'characters/marine/marine',position:[0,0,0],startActive:false,count:3,spacing:1,difficulty:{normal:2,insane:3}}));
+ draft.studio!.missions[1].minimumSurvivors=2;
+ const prepared=await attachNativeCampaignMission(draft,'manual');expect((await reviewNativeCampaignMission(prepared)).binding.missions[1].minimumSurvivors).toBe(2);
+ const impossible=structuredClone(draft);impossible.studio!.missions[1].minimumSurvivors=3;await expect(attachNativeCampaignMission(impossible,'manual')).rejects.toThrow(/difficulty population/);
+ const absent=structuredClone(draft);absent.studio!.missions[1].triggerRef='missing_rally';await expect(attachNativeCampaignMission(absent,'manual')).rejects.toThrow(/missing_rally/);
+ const duplicate=structuredClone(draft);duplicate.studio!.missions.push({...duplicate.studio!.missions[1],id:'another_spawn'});await expect(attachNativeCampaignMission(duplicate,'manual')).rejects.toThrow(/one mission spawn owner/);
+ const active=structuredClone(draft);active.quickForge!.campaignEncounters![0].startActive=true;await expect(attachNativeCampaignMission(active,'manual')).rejects.toThrow(/initial actor creation/);
+ const before=JSON.stringify(draft);await attachNativeCampaignMission(draft,'manual');expect(JSON.stringify(draft)).toBe(before);
 });

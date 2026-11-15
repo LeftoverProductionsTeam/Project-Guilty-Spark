@@ -47,8 +47,11 @@ const operation=emptyCreatorStudio();let beatId=0;operation.missions=blackEchoMi
 const optional=exportHaloCeMission(operation),gate=optional.content.indexOf('(if (volume_test_objects be_containment (players)) (begin'),spawn=optional.content.indexOf('(ai_place be_flood)'),end=optional.content.indexOf('  ))',spawn),next=optional.content.indexOf('(ai_place be_defense)');
 assert.ok(gate>=0&&gate<spawn&&spawn<end&&end<next);assert.ok(optional.content.indexOf('(hud_set_objective_text gs_mission_obj_5)',gate)<spawn);
 assert.ok(optional.dependencies.includes('trigger_volume:be_containment'));
-assert.ok(optional.content.includes('(sleep_until gs_manual_2_done 15)'));assert.ok(optional.content.includes('(sleep_until gs_manual_7_done 15)'));
-assert.ok(!optional.content.includes('(volume_test_objects be_survivors (players))'));assert.ok(!optional.content.includes('(volume_test_objects be_extract (players))'));
+assert.ok(optional.content.includes('(ai_set_team be_marines human)'));assert.ok(optional.content.includes('(ai_follow_target_players be_marines)'));
+assert.ok(optional.content.includes('(sleep_until (or (< (ai_living_count be_marines) 1) (volume_test_objects_all be_survivors (ai_actors be_marines))) 15)'));
+assert.ok(optional.content.includes('(hud_set_objective_text gs_mission_fail_2)'));assert.ok(optional.content.includes('(sleep_until false 15)'));assert.ok(optional.content.includes('(sleep_until gs_manual_4_done 15)'));assert.ok(optional.content.includes('(sleep_until gs_manual_7_done 15)'));assert.ok(!optional.content.includes('(volume_test_objects be_artifact (players))'));
+assert.ok(!optional.content.includes('(volume_test_objects be_survivors (players))'));
+assert.ok(optional.dependencies.includes('ai_encounter:be_marines'));assert.ok(optional.dependencies.includes('trigger_volume:be_survivors'));assert.ok(!optional.content.includes('(volume_test_objects be_extract (players))'));
 assert.ok(!optional.content.includes('(game_won)'));assert.ok(!optional.content.includes('(sleep 18000)'));
 const body=optional.content.split(/\r?\n/).filter(line=>!line.trimStart().startsWith(';')).join('');assert.equal([...body].filter(c=>c==='(').length,[...body].filter(c=>c===')').length);
 operation.missions[4].conditionVolume='';assert.throws(()=>exportHaloCeMission(operation),/condition volume/);
@@ -87,12 +90,13 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   for(let i=0;i<samples;i++)wave.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*440/22050)*1000),44+i*2);
   await fs.writeFile(path.join(data,'sound/radio/tone.wav'),wave);
   await run('invader-sound',['-d',data,'-c','scripted_dialog_force_unspatialized','-F','16-bit_pcm','-j','1','sound/radio']);
-  await run('invader-edit',['-N','-S','type','singleplayer','-I','trigger_volumes','1','end','-S','trigger_volumes[0].name','radio_area',scenario+'.scenario']);
+  await run('invader-edit',['-N','-S','type','singleplayer','-I','trigger_volumes','1','end','-S','trigger_volumes[0].name','radio_area','-I','encounters','1','end','-S','encounters[0].name','survivors',scenario+'.scenario']);
   const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',
    soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
+   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1},
    {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}}];
   const source=exportHaloCeMission(native).content;await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
-  await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\n','utf16le')]));
+  await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\ngs_mission_fail_2=Rescue failed: not enough survivors. Restart or revise the operation.\r\n','utf16le')]));
   await run('invader-string',['-d',data,'-T','hud_message_text','levels/radio_messages']);
   await run('invader-edit',['-S','hud_messages','levels/radio_messages.hud_message_text',scenario+'.scenario']);
   const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'),results=[];
@@ -100,10 +104,11 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
    await run('invader-script',['-d',data,'-E','-g',engine,scenario]);
    const count=await run('invader-edit',['-C','scripts',scenario+'.scenario'],true);assert.equal(count,'3');
    const names=await run('invader-edit',['-G','scripts[0].name','-G','scripts[1].name','-G','scripts[2].name',scenario+'.scenario'],true);
-   for(const name of ['gs_complete_1','gs_complete_2','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));
+   for(const name of ['gs_complete_1','gs_complete_3','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));
    results.push({engine,scriptCount:Number(count),names:names.split(/\r?\n/),scenarioSha256:await hash(path.join(tags,scenario+'.scenario'))});
   }
   const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');
-  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
+  const failure=await run('invader-edit',['-G','messages[1].name','levels/radio_messages.hud_message_text'],true);assert.equal(failure,'gs_mission_fail_2');
+  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }
