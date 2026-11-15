@@ -353,7 +353,8 @@ pub fn run_prepared_job(
                 let inspected=maps::inspect_map(output,None)?;
                 if !custom.models.is_empty(){custom.inspect_cache(&inspected,output)?;custom.verify_sources()?;}
                 if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected,output)?;}
-                crate::quickforge::verify_starting_profile(document,&inspected)?;
+                crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
+        crate::quickforge::verify_starting_profile(document,&inspected)?;
                 crate::quickforge::verify_campaign_encounters(document,&inspected)?;
                 crate::native_logic::verify_compiled(document,&inspected)?;
                 if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,output)?;}
@@ -592,7 +593,8 @@ pub fn run_prepared_job(
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
-        crate::quickforge::verify_starting_profile(document,&inspected)?;
+        crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
+                crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::quickforge::verify_campaign_encounters(document,&inspected)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
         if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,&output)?;}

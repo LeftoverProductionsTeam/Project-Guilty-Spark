@@ -202,3 +202,24 @@ fn mode_templates_provide_required_starts_and_objectives() {
     let lightmaps = plan.last().unwrap();
     assert_eq!(&lightmaps.args[3..], ["1", "0.01"]);
 }
+
+
+#[test]
+fn compiled_player_starts_reject_extra_missing_changed_and_unreadable_coordinates() {
+    use spark_core::maps::{Diagnostic,SceneObject};
+    let mut doc=arena();doc.spawns[0].visible=false;
+    let starts=doc.spawns.iter().enumerate().map(|(index,spawn)|SceneObject{
+        id:format!("spawn-{index}"),name:String::new(),kind:"Player spawn".into(),tag_id:None,position:spawn.position,
+        rotation:[spawn.facing,0.,0.],scale:[1.;3],visible:true,source_offset:None,rotation_offset:None,asset_id:None,source_model:None,
+    }).collect::<Vec<_>>();
+    quickforge::verify_player_starts(&doc,&starts,&[]).unwrap();
+    let mut changed=starts.clone();changed[0].position[0]+=1.;
+    assert!(quickforge::verify_player_starts(&doc,&changed,&[]).is_err());
+    let mut extra=starts.clone();extra.push(starts[0].clone());
+    assert!(quickforge::verify_player_starts(&doc,&extra,&[]).is_err());
+    assert!(quickforge::verify_player_starts(&doc,&starts[1..],&[]).is_err());
+    assert!(quickforge::verify_player_starts(&doc,&starts,&[Diagnostic::warning("PLAYER_SPAWNS_UNREADABLE","fixture")]).is_err());
+    changed=starts.clone();changed[0].id="spawn-999".into();assert!(quickforge::verify_player_starts(&doc,&changed,&[]).is_err());
+    changed=starts.clone();changed[0].position[0]=f32::NAN;assert!(quickforge::verify_player_starts(&doc,&changed,&[]).is_err());
+    assert_eq!(doc.spawns[0].visible,false,"verification must not modify authored visibility");
+}

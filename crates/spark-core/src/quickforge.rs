@@ -81,6 +81,25 @@ pub fn verify_campaign_encounters(doc:&QuickForgeDocument,map:&maps::MapInspecti
     }
     Ok(())
 }
+/// Fresh scenario source emits every authored spawn in order. Read the compiled
+/// coordinates back before adopting or reusing output; editor visibility and
+/// game-mode filters must not conceal an unexpected selectable solo start.
+/// Preserved native shared-source maps retain their separate source validators.
+pub fn verify_player_starts(doc:&QuickForgeDocument,objects:&[maps::SceneObject],diagnostics:&[maps::Diagnostic])->Result<()> {
+    if doc.native.is_some(){return Ok(());}
+    if diagnostics.iter().any(|issue|issue.code=="PLAYER_SPAWNS_UNREADABLE"){
+        return invalid("Compiled player starts are unreadable; authored spawn parity is unproven");
+    }
+    let starts=objects.iter().filter(|object|object.kind=="Player spawn").collect::<Vec<_>>();
+    if starts.len()!=doc.spawns.len(){return invalid("Compiled player-start count differs from authored source");}
+    for (index,(source,compiled)) in doc.spawns.iter().zip(starts).enumerate(){
+        if compiled.id!=format!("spawn-{index}")||source.position.iter().zip(compiled.position).any(|(a,b)|
+            !a.is_finite()||!b.is_finite()||(f64::from(*a)-f64::from(b)).abs()>0.000001f64.max(f64::from(*a).abs()*f64::from(f32::EPSILON)*2.)) {
+            return invalid(format!("Compiled player start {index} identity/coordinates differ from authored source"));
+        }
+    }
+    Ok(())
+}
 pub fn verify_starting_profile(doc:&QuickForgeDocument,map:&maps::MapInspection)->Result<()> {
     if let Some(profile)=campaign_profile(doc) {
         if map.header.scenario_type != 0 {return invalid("Campaign loadout output is not a native singleplayer scenario");}

@@ -1008,6 +1008,56 @@ pub fn compare_hud_arrays(class:&str,source:&str,compiled:&str)->Result<Vec<HudA
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "Requires the installed Invader editor and an owned disposable development workspace"]
+    fn native_ai_start_coordinates_round_trip() {
+        use std::{fs,process::Command};
+        let executable=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_INVADER_EDIT").expect("Explicit installed Invader path required"));
+        let generated=std::path::PathBuf::from(std::env::var_os("SPARK_GENERATED_ROOT").expect("Owned disposable output required"));
+        let temporary=tempfile::tempdir_in(&generated).unwrap();
+        let tags=temporary.path().join("tags");fs::create_dir_all(tags.join("levels/ai_fixture")).unwrap();
+        let tag="levels/ai_fixture/ai_fixture.scenario";
+        let run=|args:Vec<String>|{
+            let result=Command::new(&executable).args(args).current_dir(temporary.path()).output().unwrap();
+            assert!(result.status.success(),"Native fixture failed: {}",String::from_utf8_lossy(&result.stderr));
+            String::from_utf8(result.stdout).unwrap()
+        };
+        // Native-tool-created fixture only. No map, SDK or actor dependency is copied or invented.
+        let mut create=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),"-I".into(),"encounters".into(),"2".into(),"end".into()];
+        for encounter in 0..2 {
+            create.extend(["-S".into(),format!("encounters[{encounter}].name"),format!("original_{encounter}"),
+                "-I".into(),format!("encounters[{encounter}].squads"),"2".into(),"end".into()]);
+            for squad in 0..2 {
+                let prefix=format!("encounters[{encounter}].squads[{squad}]");
+                for (key,value) in [("name",format!("squad_{squad}")),("normal_diff_count","1".into()),("insane_diff_count","2".into())] {
+                    create.extend(["-S".into(),format!("{prefix}.{key}"),value]);
+                }
+                create.extend(["-I".into(),format!("{prefix}.starting_locations"),"2".into(),"end".into()]);
+                for start in 0..2 {
+                    create.extend(["-S".into(),format!("{prefix}.starting_locations[{start}].position"),format!("{encounter},{squad},{start}")]);
+                }
+            }
+        }
+        create.push(tag.into());run(create);
+        let fields=||run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.into()]);
+        let before=fields();let file=tags.join(tag);let before_sha=crate::maps::hash_file(&file).unwrap();
+        let inventory=scenario_squad_start_choices(&before).unwrap();assert_eq!(inventory.len(),4);
+        assert!(inventory.iter().all(|row|row.starts.as_ref().unwrap().len()==2));
+        let operation=Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),
+            position:[20.25,-8.5,4.125],source_sha256:before_sha.clone()};
+        run(operation.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());
+        let after=fields();assert_eq!(reviewed_difference(&before,&after,&operation).unwrap().len(),1);
+        let readback=run(operation.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());
+        assert_eq!(readback.trim().split(',').map(|value|value.trim().parse::<f32>().unwrap()).collect::<Vec<_>>(),[20.25,-8.5,4.125]);
+        let after_sha=crate::maps::hash_file(&file).unwrap();assert_ne!(before_sha,after_sha);
+        ScenarioSquadReadback{source_sha256:after_sha.clone(),squads:scenario_squad_start_choices(&after).unwrap(),include_starts:true}.validate().unwrap();
+        let restore=Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),
+            position:[1.,1.,1.],source_sha256:after_sha.clone()};
+        run(restore.arguments_with_fields(&tags,"scnr",tag,&after).unwrap());assert_eq!(before,fields());
+        println!("Native AI fixture:4squads/8starts; toolSHA={}; beforeSHA={before_sha}; afterSHA={after_sha}; restoredSHA={}",
+            crate::maps::hash_file(&executable).unwrap(),crate::maps::hash_file(&file).unwrap());
+    }
+
     fn ai_fields()->String {
         "actor_palette[0] array\nencounters[1] array\n    encounters[0] struct\n        name (original) tagstring\n        squads[1] array\n            squads[0] struct\n                name (squad_a) tagstring\n                normal_diff_count (1) int16\n                insane_diff_count (1) int16\n                starting_locations[1] array\n                    starting_locations[0] struct\n                        position (1,2,3) point3d\n                        facing (90) angle\n                return_state (alert) enum\nscript_marker (preserve) tagstring\n".into()
     }
