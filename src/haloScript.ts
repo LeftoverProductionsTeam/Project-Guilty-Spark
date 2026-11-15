@@ -5,7 +5,7 @@
  *  and never evaluated as arbitrary HaloScript by this application.
  */
 import type { CreatorStudioDocument } from './creatorStudio';
-import { emptyCreatorStudio, validateCreatorStudio, missionSoundProblems } from './creatorStudio.ts';
+import { emptyCreatorStudio, missionBranchGroups, validateCreatorStudio, missionSoundProblems } from './creatorStudio.ts';
 import { inspectScenarioBindings } from './scenarioBindings.ts';
 import { sameJson } from './semanticJson.ts';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight.ts';
@@ -35,6 +35,8 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   const deps:string[]=[], lines=heading('Mission Director');
   const globals:string[]=[];
   const manualSetters:string[]=[];
+  const branches=missionBranchGroups(studio.missions);
+  for(const {index} of branches.values())globals.push('(global boolean gs_branch_'+index+'_ready false)','(global boolean gs_branch_'+index+'_inside false)');
   const cueLines=(beat:CreatorStudioDocument['missions'][number],index:number,phase:'start'|'complete'):string[]=>{
     const cue=beat.soundCue;if(!cue||cue.phase!==phase)return [];
     deps.push('sound:'+cue.soundPath);
@@ -51,7 +53,15 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
     if(beat.conditionVolume!=null){
       const volume=ensureName(beat.conditionVolume,`Beat ${i+1} optional condition volume`);deps.push('trigger_volume:'+volume);
-      scripted.push(`  (if (volume_test_objects ${volume} (players)) (begin`);
+      const group=beat.conditionGroup==null?undefined:branches.get(beat.conditionGroup);
+      let condition='(volume_test_objects '+volume+' (players))';
+      if(group){
+        const key='gs_branch_'+group.index;
+        scripted.push('  (if (not '+key+'_ready) (begin','    (sleep_until (> (list_count (players)) 0) 1)','    (set '+key+'_inside '+condition+')','    (set '+key+'_ready true)','  ))');
+        condition=key+'_inside';
+      }
+      if(beat.conditionOutside===true)condition='(not '+condition+')';
+      scripted.push('  (if '+condition+' (begin');
     }
     if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null))
       throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
@@ -118,7 +128,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   lines.push(...globals, '', ...manualSetters, ...scripted);
   return {filename:'gs_mission.hsc',content:lines.join('\r\n'),dependencies:deps,activation:'(wake gs_mission)',warnings:[
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
-    'Optional volume conditions are evaluated once when their step starts; a false condition skips that step. This is shared scenario state, not independent multiplayer squad progress.',
+    'Optional volume conditions run when their step starts. Shared decisions sample once at their first member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
     ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?['Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Falling below that minimum stops this mission script, not the persistent world; no loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
@@ -157,12 +167,14 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','soundCue','minimumSurvivors'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||
     (beat.conditionVolume!=null&&typeof beat.conditionVolume!=='string')||
+    (beat.conditionGroup!=null&&typeof beat.conditionGroup!=='string')||
+    (beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')||
     (beat.minimumSurvivors!=null&&typeof beat.minimumSurvivors!=='number')||
     (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')||
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
@@ -183,7 +195,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,
-    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,soundCue:beat.soundCue??null}));
+    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
 export interface NativeMissionReview {

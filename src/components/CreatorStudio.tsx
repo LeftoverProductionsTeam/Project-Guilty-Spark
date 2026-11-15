@@ -6,7 +6,7 @@ import MissionSourceReview from './MissionSourceReview';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
 import {
-  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, addBlackEchoDraft,
+  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, addBlackEchoDraft, missionBranchGroups,
 } from '../creatorStudio';
 import type { CameraShot, CreatorStudioDocument, MissionBeat, PlaytestRecord } from '../creatorStudio';
 import { Notice, NumberField, PageTitle, Pill } from './ui';
@@ -78,6 +78,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [includingSound,setIncludingSound]=useState(false);
   const [cueSources,setCueSources]=useMapState<Record<string,string>>(project.id,'mission-cue-sources',{});
   const studio = project.studio ?? emptyCreatorStudio();
+  const branchDecisions=(()=>{try{return [...missionBranchGroups(studio.missions)];}catch{return [];}})();
+  function changeConditionVolume(beat:MissionBeat,volume:string){
+    change({...studio,missions:studio.missions.map(row=>row.id===beat.id||beat.conditionGroup!=null&&row.conditionGroup===beat.conditionGroup?{...row,conditionVolume:volume}:row)},'Change mission branch volume');
+  }
   const encounterChoices=useId(), volumeChoices=useId();
   const sourceInspection=inspection?.sha256&&inspection.sha256===project.source?.sha256?inspection:null;
   useWorkspaceFileActions('creator:'+project.id,[
@@ -342,12 +346,22 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         </>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
         <label><input type="checkbox" checked={beat.conditionVolume!=null} disabled={beat.completeMission===true}
-          onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined})}/>Optional step · run only if a player is in a named area when this step starts</label>
+          onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined,conditionGroup:undefined,conditionOutside:undefined})}/>Optional step / branch · condition on a named area</label>
         {beat.conditionVolume!=null&&<div><label>Optional step condition volume<input list={volumeChoices} maxLength={31} spellCheck={false}
-          aria-label={'Optional condition '+(i+1)} value={beat.conditionVolume} onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.value})}/></label>
+          aria-label={'Optional condition '+(i+1)} value={beat.conditionVolume} onChange={event=>changeConditionVolume(beat,event.target.value)}/></label>
           {onLevelEditor&&<button type="button" disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.conditionVolume)}
             onClick={()=>selectMissionArea(beat.conditionVolume??'')}>Select optional area in Level Editor</button>}
-          <small>False skips this objective, its encounter, HUD update and checkpoint. The condition is checked once, not continuously; this is shared native mission state.</small></div>}
+          <label>Decision<select aria-label={'Mission branch decision '+(i+1)} value={beat.conditionGroup==null?'independent':'group:'+beat.conditionGroup}
+            onChange={event=>{const value=event.target.value,group=value==='new'?freshId():value.startsWith('group:')?value.slice(6):undefined;
+              const shared=branchDecisions.find(([id])=>id===group)?.[1];updateBeat(beat.id,{conditionGroup:group,conditionVolume:shared?.volume??beat.conditionVolume});}}>
+            <option value="independent">Check when this step begins</option><option value="new">New shared decision for this step</option>
+            {branchDecisions.map(([id,group])=><option key={id} value={'group:'+id}>{group.firstBeat.title||'Untitled decision'} · {group.volume||'choose area'}</option>)}
+          </select></label>
+          <label>Run this step when<select aria-label={'Mission branch outcome '+(i+1)} value={beat.conditionOutside===true?'outside':'inside'}
+            onChange={event=>updateBeat(beat.id,{conditionOutside:event.target.value==='outside'?true:undefined})}>
+            <option value="inside">A player is inside the area</option><option value="outside">No players are inside the area</option>
+          </select></label>
+          <small>Skipped steps run no encounter, HUD, cue or checkpoint. A shared decision waits for a player, samples once at its first member, then keeps that result for every member even after players move. Editing its area updates every member in one Undo action. This is shared native scenario state; it does not bank loot or provide independent squad/replay state.</small></div>}
         <details><summary>Radio / sound cue{beat.soundCue?' · included':''}</summary>
           <label>Included native sound<select aria-label={'Mission sound '+(i+1)} value={beat.soundCue?.importId??''}
             onChange={event=>{const binding=project.nativeAssetImports?.find(binding=>binding.id===event.target.value&&binding.tagClass==='snd!');if(binding)selectMissionSound(beat,binding);else updateBeat(beat.id,{soundCue:undefined});}}>

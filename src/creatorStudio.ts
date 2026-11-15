@@ -51,6 +51,9 @@ export interface MissionBeat {
   completeMission?: boolean | null;
   /** Evaluate this native player-volume condition when the beat begins; false skips it. */
   conditionVolume?: string | null;
+  /** Shared native volume decision, sampled once at the first member. */
+  conditionGroup?: string | null;
+  conditionOutside?: boolean | null;
   soundCue?: MissionSoundCue | null;
 }
 export interface CameraShot {
@@ -175,6 +178,20 @@ const verdicts = new Set<PlaytestVerdict>(['notRun', 'pass', 'fail', 'blocked'])
 const safeText = (s: string, max: number) => typeof s === 'string' && s.length <= max && !/[\x00-\x1f\x7f]/.test(s);
 const boundedPos = (v: number[]) => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= 4096);
 /** Validates the exact schema persisted in the Rust project. */
+/** Stable editor IDs; native globals use bounded first-occurrence numbers. */
+export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:string;firstBeat:MissionBeat;index:number}> {
+  const groups=new Map<string,{volume:string;firstBeat:MissionBeat;index:number}>();
+  for(const beat of missions){
+    if(beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')throw Error('Invalid mission branch outcome');
+    if((beat.conditionGroup!=null||beat.conditionOutside!=null)&&beat.conditionVolume==null)throw Error('Mission branch decisions need an optional condition volume');
+    if(beat.conditionGroup==null)continue;
+    if(typeof beat.conditionGroup!=='string'||!recordId.test(beat.conditionGroup))throw Error('Invalid shared mission decision');
+    const known=groups.get(beat.conditionGroup);
+    if(known&&known.volume!==beat.conditionVolume)throw Error('Shared mission decisions must use the same native volume');
+    if(!known)groups.set(beat.conditionGroup,{volume:beat.conditionVolume!,firstBeat:beat,index:groups.size+1});
+  }
+  return groups;
+}
 export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   if(doc.engineMachinima){const e=doc.engineMachinima;if(typeof e.enabled!=='boolean'||!['fixed','sequence'].includes(e.playback)||typeof e.autoStart!=='boolean'||(e.cameraId!=null&&!doc.shots?.some(s=>s.id===e.cameraId))||(e.enabled&&(!doc.shots?.length||doc.shots.length>64)))return ['Invalid game-native machinima take: choose 1–64 camera keys and an existing selected camera'];}
   const failures: string[] = [];
@@ -199,6 +216,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       [m.hudObjective,m.checkpoint,m.completeMission].some(value=>value!=null&&typeof value!=='boolean'))
       failures.push(`Invalid mission beat ${m.id?.slice(0, 40) ?? '(unknown)'}`);
   }
+  try{missionBranchGroups(doc.missions);}catch(error){failures.push(String(error));}
   for (const shot of doc.shots) {
     if (!unique(shot.id) || !safeText(shot.name, 120) || !safeText(shot.subtitle, 2048) ||
       !Number.isInteger(shot.durationMs) || shot.durationMs < 100 || shot.durationMs > 600000 ||

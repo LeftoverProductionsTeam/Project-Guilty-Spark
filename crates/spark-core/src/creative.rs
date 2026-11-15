@@ -4,7 +4,7 @@
 //! are a compiled script, game server command, or proof of gameplay.
 use crate::{invalid, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap,HashSet};
 
 pub const STUDIO_SCHEMA_VERSION: u32 = 1;
 
@@ -72,6 +72,10 @@ pub struct MissionBeat {
     pub complete_mission:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub condition_volume:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub condition_group:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub condition_outside:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub sound_cue:Option<MissionSoundCue>,
 }
@@ -356,6 +360,7 @@ impl CreatorStudio {
                 || !m.blur.is_finite() || !(0.0..=1.0).contains(&m.blur)
             { return invalid("Invalid Machinima lens or playback settings"); }
         }
+        let mut branches:HashMap<&str,&str>=HashMap::new();
         for beat in &self.missions {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
@@ -368,6 +373,12 @@ impl CreatorStudio {
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
+            if (beat.condition_group.is_some()||beat.condition_outside.is_some())&&beat.condition_volume.is_none(){return invalid("Mission branch decisions need an optional condition volume");}
+            if let Some(group)=&beat.condition_group {
+                if !valid_id(group){return invalid("Invalid shared mission decision");}
+                let volume=beat.condition_volume.as_deref().unwrap();
+                if branches.insert(group,volume).is_some_and(|previous|previous!=volume){return invalid("Shared mission decisions must use the same native volume");}
+            }
         }
         for shot in &self.shots {
             if !valid_id(&shot.id) || !ids.insert(&shot.id)
@@ -475,6 +486,17 @@ mod tests {
         assert!(doc.validate().is_err());
         doc.playtests[0].evidence="Observed in real Halo CE session".into();
         assert!(doc.validate().is_ok());
+    }
+    #[test]
+    fn shared_mission_paths_preserve_the_decision_and_reject_inconsistent_sources() {
+        let mut document=studio();
+        for (id,outside) in [("inside",false),("outside",true)] {
+            document.missions.push(serde_json::from_value(serde_json::json!({"id":id,"title":"Path","objective":"Native branch","trigger":"timer","timerSeconds":1,"encounterName":"","conditionVolume":"choice","conditionGroup":"decision","conditionOutside":outside})).unwrap());
+        }
+        document.validate().unwrap();let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(document.missions,restored.missions);
+        let mut different=document.clone();different.missions[1].condition_volume=Some("elsewhere".into());assert!(different.validate().is_err());
+        let mut missing=document.clone();missing.missions[1].condition_volume=None;assert!(missing.validate().is_err());
+        let mut invalid=document.clone();invalid.missions[1].condition_group=Some("not a decision id".into());assert!(invalid.validate().is_err());
     }
     #[test]
     fn optional_objective_condition_survives_project_save_without_changing_legacy_fields() {

@@ -167,3 +167,29 @@ it('authors terminal activation through native source bindings and refuses missi
  }
  const unsafe=structuredClone(project.studio!);unsafe.missions[0].triggerRef='unsafe ) (quit';expect(()=>exportHaloCeMission(unsafe)).toThrow();
 });
+
+it('authors stable shared mission paths through history, source review and save without rewriting old modules',async()=>{
+ const base=campaignDraft();base.history=[];const a={id:'take',title:'Contain',objective:'Inside route',trigger:'timer' as const,timerSeconds:1,encounterName:'',conditionVolume:'choice',conditionGroup:'choice_decision'},b={...a,id:'avoid',title:'Bypass',conditionOutside:true};
+ base.quickForge!.logic!.triggers=[{id:'choice',nativeName:'choice',name:'Choice',position:[0,0,0],rotation:[0,0,0],dimensions:[4,4,4],visible:true,locked:false}];
+ const next={...base,studio:{...base.studio!,missions:[a,b]}};let history=historyReducer({...initialHistory,current:base},{type:'edit',project:next,description:'Author alternate mission paths'});
+ expect(validateCreatorStudio(next.studio!)).toEqual([]);
+ history=historyReducer(history,{type:'undo'});expect(history.current?.studio!.missions).toEqual([]);
+ history=historyReducer(history,{type:'redo'});expect(history.current?.studio!.missions).toEqual([a,b]);
+ const saved=JSON.parse(JSON.stringify(history.current));const output=exportHaloCeMission(saved.studio).content;
+ expect(output).toContain('(sleep_until (> (list_count (players)) 0) 1)');
+ expect(output).toContain('(global boolean gs_branch_1_ready false)');expect(output).toContain('(global boolean gs_branch_1_inside false)');
+ expect(output.match(/set gs_branch_1_inside /g)).toHaveLength(2); // one guarded sampling site per member; only the first can run.
+ expect(output).toContain('(if gs_branch_1_inside (begin');expect(output).toContain('(if (not gs_branch_1_inside) (begin');
+ expect(output.split('(if (not gs_branch_1_ready)').length-1).toBe(2);
+ const prepared=await attachNativeCampaignMission(saved,'manual');const reviewed=await reviewNativeCampaignMission(prepared);
+ expect(sameMissionData(reviewed.binding.missions,[a,b])).toBe(true);expect(reviewed.binding.missions[1].conditionOutside).toBe(true);
+ const revised=structuredClone(prepared);revised.studio!.missions=revised.studio!.missions.map(beat=>({...beat,conditionOutside:beat.conditionOutside===true?undefined:true}));
+ const rebuilt=await attachNativeCampaignMission(revised,'manual');const revision=await reviewNativeCampaignMission(rebuilt);
+ expect(revision.binding.missions[0].conditionOutside).toBe(true);expect(revision.binding.missions[1].conditionOutside).toBeUndefined();
+ expect(prepared.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!.content).not.toBe(rebuilt.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!.content);
+ const old=campaignDraft();old.quickForge!.logic!.triggers=structuredClone(base.quickForge!.logic!.triggers);old.studio!.missions=[{...a,conditionGroup:undefined}];const original=await attachNativeCampaignMission(old,'manual');
+ expect((await reviewNativeCampaignMission(original)).binding.missions[0].conditionGroup).toBeUndefined();
+ for(const patch of [{conditionVolume:'other'},{conditionGroup:'unsafe id'},{conditionOutside:'outside'},{conditionVolume:undefined}]) {
+  const broken=structuredClone(next);Object.assign(broken.studio!.missions[1],patch);expect(validateCreatorStudio(broken.studio!)).not.toEqual([]);
+ }
+});

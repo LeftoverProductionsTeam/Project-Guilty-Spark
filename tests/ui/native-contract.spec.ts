@@ -4106,3 +4106,29 @@ test('Black Echo draft uses one project history action and selects its native ar
  await page.locator('.studio-record').first().getByRole('button',{name:'Select objective area in Level Editor',exact:true}).click();
  await expect(page.getByLabel('Current workspace',{exact:true})).toContainText(/Level editor/i);await expect(page.locator('.forge-viewport')).toBeVisible();
 });
+
+test('shared mission decisions bind alternate paths and preserve grouped Undo and saved source',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const p=(window as any).__sparkMock.projects.a.project;
+  p.quickForge={schemaVersion:1,name:'Branch source',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',geometry:[],materials:[],placements:[],spawns:[],objectives:[],logic:{schemaVersion:1,triggers:[],devices:[],rules:[]}};
+  p.studio={schemaVersion:1,missions:[{id:'take',title:'Containment',objective:'Inside route',trigger:'timer',timerSeconds:1,encounterName:'',conditionVolume:'first_area'},{id:'avoid',title:'Bypass',objective:'Alternate route',trigger:'timer',timerSeconds:1,encounterName:'',conditionVolume:'second_area'}],shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
+ });
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
+ const records=page.locator('.studio-record'),first=records.nth(0),second=records.nth(1);
+ await first.getByRole('combobox',{name:'Mission branch decision 1',exact:true}).selectOption('new');
+ const decision=first.getByRole('combobox',{name:'Mission branch decision 1',exact:true});await expect(decision).toHaveValue(/^group:/);const group=(await decision.inputValue()).slice(6);
+ await second.getByRole('combobox',{name:'Mission branch decision 2',exact:true}).selectOption('group:'+group);
+ await expect(second.getByLabel('Optional condition 2',{exact:true})).toHaveValue('first_area');
+ await second.getByRole('combobox',{name:'Mission branch outcome 2',exact:true}).selectOption('outside');
+ await first.getByLabel('Optional condition 1',{exact:true}).fill('new_area');await first.getByLabel('Optional condition 1',{exact:true}).press('Tab');
+ await expect(second.getByLabel('Optional condition 2',{exact:true})).toHaveValue('new_area');
+ await page.keyboard.press('Control+z');await expect(first.getByLabel('Optional condition 1',{exact:true})).toHaveValue('first_area');await expect(second.getByLabel('Optional condition 2',{exact:true})).toHaveValue('first_area');
+ await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions.map((m:any)=>[m.conditionGroup,m.conditionVolume,m.conditionOutside??false]))).toEqual([[group,'new_area',false],[group,'new_area',true]]);
+ await chooseTool(page,'Level editor');await chooseTool(page,'Creator Studio');
+ await expect(second.getByRole('combobox',{name:'Mission branch decision 2',exact:true})).toHaveValue('group:'+group);await expect(second.getByRole('combobox',{name:'Mission branch outcome 2',exact:true})).toHaveValue('outside');
+ await page.getByRole('button',{name:'Close map Synthetic baseline',exact:true}).click();await chooseTool(page,'Map library');
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
+ await expect(page.getByRole('combobox',{name:'Mission branch decision 2',exact:true})).toHaveValue('group:'+group);await expect(page.getByRole('combobox',{name:'Mission branch outcome 2',exact:true})).toHaveValue('outside');
+ await expect(page.getByLabel('Optional condition 2',{exact:true})).toHaveValue('new_area');
+});
