@@ -297,29 +297,7 @@ fn prepare_source(
         .enumerate()
         .map(|(i, _)| format!("gs_{}_cam_{:03}", &project.id[..8], count + i))
         .collect();
-    for (i, shot) in studio.shots.iter().enumerate() {
-        let prefix = format!("cutscene_camera_points[{}]", count + i);
-        let angles = camera_angles(shot)?;
-        let vector = |v: [f32; 3]| format!("{:.8},{:.8},{:.8}", v[0], v[1], v[2]);
-        let mut args = vec![
-            "-t".into(),
-            tags.to_string_lossy().into_owned(),
-            "-I".into(),
-            "cutscene_camera_points".into(),
-            "1".into(),
-            "end".into(),
-        ];
-        for (field, value) in [
-            ("name", names[i].clone()),
-            ("position", vector(shot.camera_position)),
-            ("orientation", vector(angles)),
-            ("field_of_view", format!("{:.8}", shot.fov.to_radians())),
-        ] {
-            args.extend(["-S".into(), format!("{prefix}.{field}"), value]);
-        }
-        args.push(tag.clone());
-        runner.run(edit, &args, workspace, "engine-camera", 50)?;
-    }
+    append_camera_points(&studio.shots,&names,scenario,workspace,edit,runner)?;
     let scenario_path = safe_relative(scenario)?;
     let parent = scenario_path.parent().unwrap_or(Path::new(""));
     let directory = workspace.join("data").join(parent).join("scripts");
@@ -417,6 +395,56 @@ fn prepare_source(
     )?;
     Ok(())
 }
+/// One native camera-point writer for recording takes and reviewed campaign intros.
+/// Append only inside an owned build workspace; existing points/indices are retained.
+pub(crate) fn append_camera_points(shots:&[CameraShot],names:&[String],scenario:&str,workspace:&Path,edit:&Path,runner:&Runner<'_>)->Result<()> {
+    let tags=workspace.join("tags");let tag=format!("{scenario}.scenario");
+    let count=runner.run(edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),"cutscene_camera_points".into(),tag.clone()],workspace,"engine-camera",47)?.trim().parse::<usize>().map_err(|_|SparkError::Invalid("Camera point count unavailable".into()))?;
+    if shots.len()!=names.len()||count+shots.len()>512{return invalid("Native camera point count exceeds the scenario limit");}
+    let existing=if count==0{String::new()}else{runner.run(edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-G".into(),"cutscene_camera_points[*].name".into(),tag.clone()],workspace,"engine-camera",48)?};
+    let mut occupied=existing.lines().map(|name|name.trim().to_ascii_lowercase()).collect::<std::collections::BTreeSet<_>>();
+    for (name,shot) in names.iter().zip(shots) {
+        if !crate::creative::script_ident(name)||!occupied.insert(name.to_ascii_lowercase()) {return invalid(format!("Camera point already exists or has an invalid identity: {name}. Existing points were preserved"));}
+        camera_angles(shot)?;
+        if !shot.fov.is_finite()||!(5.0..=150.0).contains(&shot.fov)||shot.camera_position.iter().any(|v|!v.is_finite()) {return invalid("Invalid native camera position or FOV");}
+    }
+    for (i, shot) in shots.iter().enumerate() {
+        let prefix = format!("cutscene_camera_points[{}]", count + i);
+        let angles = camera_angles(shot)?;
+        let vector = |v: [f32; 3]| format!("{:.8},{:.8},{:.8}", v[0], v[1], v[2]);
+        let mut args = vec![
+            "-t".into(),
+            tags.to_string_lossy().into_owned(),
+            "-I".into(),
+            "cutscene_camera_points".into(),
+            "1".into(),
+            "end".into(),
+        ];
+        for (field, value) in [
+            ("name", names[i].clone()),
+            ("position", vector(shot.camera_position)),
+            ("orientation", vector(angles)),
+            ("field_of_view", format!("{:.8}", shot.fov.to_radians())),
+        ] {
+            args.extend(["-S".into(), format!("{prefix}.{field}"), value]);
+        }
+        args.push(tag.clone());
+        runner.run(edit, &args, workspace, "engine-camera", 50)?;
+    }
+    // Independently query the native writer's result before compiling source.
+    for (index,(name,shot)) in names.iter().zip(shots).enumerate() {
+        let prefix=format!("cutscene_camera_points[{}]",count+index);
+        let read=|field:&str|runner.run(edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-G".into(),format!("{prefix}.{field}"),tag.clone()],workspace,"camera-readback",51);
+        if read("name")?.trim()!=name {return invalid("Native cinematic marker identity differs after preparation");}
+        let angles=camera_angles(shot)?.map(f32::to_degrees);
+        for (field,expected) in [("position",shot.camera_position.to_vec()),("orientation",angles.to_vec()),("field_of_view",vec![shot.fov])] {
+            // Invader -S consumes radians; its human-readable -G reports degrees.
+            let actual=read(field)?.trim().split(',').map(|s|s.trim().parse::<f32>()).collect::<std::result::Result<Vec<_>,_>>().map_err(|_|SparkError::Invalid("Native camera readback is not finite numeric data".into()))?;
+            if actual.len()!=expected.len()||actual.iter().zip(expected).any(|(a,b)|!a.is_finite()||(a-b).abs()>0.0001) {return invalid(format!("Native camera {field} differs after preparation"));}
+        }
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -475,6 +503,23 @@ mod tests {
         assert_eq!(query("cutscene_camera_points[0].position").trim(),"0.000000,0.000000,0.000000");assert_eq!(query("cutscene_camera_points[0].field_of_view").trim().parse::<f32>().unwrap(),70.);
         let receipt:serde_json::Value=serde_json::from_slice(&fs::read(workspace.join("engine-machinima.json")).unwrap()).unwrap();assert_eq!(receipt["sourceMode"],"authored");assert!(receipt["sourceRecoveryToolSha256"].is_null());
         println!("NATIVE_AUTHORED_CAMERA {{\"scenarioSha256\":\"{}\",\"inheritedScripts\":{},\"finalScripts\":{},\"gameplayVerified\":false}}",crate::maps::hash_file(&workspace.join("tags").join(crate::safe_relative(&tag).unwrap())).unwrap(),before.lines().count(),after.lines().count());
+    }
+
+    #[test]
+    #[ignore = "explicit installed Invader native camera writer/readback fixture"]
+    fn campaign_camera_append_preserves_existing_points_and_refuses_collision_before_writing() {
+        let root=std::env::var_os("SPARK_GENERATED_ROOT").expect("owned disposable workspace required");
+        let workspace=Path::new(&root).join("native-campaign-cameras");fs::create_dir_all(workspace.join("tags/levels/intro")).unwrap();
+        let edit=Path::new(&std::env::var_os("SPARK_INVADER_DIRECTORY").expect("installed Invader required")).join(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+        let cancel=std::sync::atomic::AtomicBool::new(false);let event=|_:crate::build::JobEvent|{};let runner=Runner{id:"camera",project:"fixture",cancel:&cancel,event:&event};
+        let scenario="levels/intro/intro";let tag=format!("{scenario}.scenario");let tags=workspace.join("tags").to_string_lossy().into_owned();
+        runner.run(&edit,&["-t".into(),tags.clone(),"-N".into(),"-I".into(),"cutscene_camera_points".into(),"1".into(),"end".into(),"-S".into(),"cutscene_camera_points[0].name".into(),"original_camera".into(),tag.clone()],&workspace,"fixture",0).unwrap();
+        let shots=vec![shot()];append_camera_points(&shots,&["gs_cs_001".into()],scenario,&workspace,&edit,&runner).unwrap();
+        let query=|field:&str|runner.run(&edit,&["-t".into(),tags.clone(),"-G".into(),field.into(),tag.clone()],&workspace,"readback",90).unwrap();
+        assert_eq!(query("cutscene_camera_points[0].name").trim(),"original_camera");let angles=query("cutscene_camera_points[1].orientation");let values=angles.trim().split(',').map(|value|value.parse::<f32>().unwrap()).collect::<Vec<_>>();assert_eq!(values.len(),3);for (actual,expected) in values.iter().zip([90.,0.,90.]){assert!((actual-expected).abs()<0.0001);}
+        let file=workspace.join("tags").join(crate::safe_relative(&tag).unwrap());let hash=crate::maps::hash_file(&file).unwrap();
+        assert!(append_camera_points(&shots,&["ORIGINAL_CAMERA".into()],scenario,&workspace,&edit,&runner).is_err());assert_eq!(crate::maps::hash_file(&file).unwrap(),hash);
+        println!("NATIVE_CAMPAIGN_CAMERAS scenarioSha256={hash} preservedPoints=1 appendedPoints=1 duplicateRefused=true gameplayVerified=false");
     }
     #[test]
     fn game_angles_use_halo_z_up_radians() {

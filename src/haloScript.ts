@@ -4,7 +4,7 @@
  *  Sapien/HEK; no existing Halo files are touched. Names are strictly allowlisted
  *  and never evaluated as arbitrary HaloScript by this application.
  */
-import type { CreatorStudioDocument } from './creatorStudio';
+import type { CameraShot, CreatorStudioDocument } from './creatorStudio';
 import { emptyCreatorStudio, missionBranchGroups, validateCreatorStudio, missionSoundProblems } from './creatorStudio.ts';
 import { inspectScenarioBindings } from './scenarioBindings.ts';
 import { sameJson } from './semanticJson.ts';
@@ -156,6 +156,8 @@ export interface NativeMissionBinding {
   missions:import('./creatorStudio').MissionBeat[];
   activation:'manual'|'startup';
   sourceSha256:string;
+  /** Reviewed snapshot for a native mission intro, not an engine recording take. */
+  cinematic?:CameraShot[];
 }
 
 async function nativeMissionHash(body:string):Promise<string> {
@@ -173,7 +175,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
   let binding:NativeMissionBinding;
   try {binding=JSON.parse(module.content.slice(nativeMissionBinding.length,end).trimEnd());}
   catch {throw Error('Attached mission metadata is invalid. Preserve the source module before reconciling it.');}
-  const fields=['schemaVersion','missions','activation','sourceSha256'];
+  const fields=['schemaVersion','missions','activation','sourceSha256','cinematic'];
   if(!binding||typeof binding!=='object'||Array.isArray(binding)||Object.keys(binding).some(key=>!fields.includes(key))||
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
@@ -191,6 +193,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
     [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
     throw Error('Attached mission contains unsupported beat fields. Keep the original source for explicit review.');
+  if(binding.cinematic!==undefined)validateNativeCinematic(binding.cinematic);
   const errors=validateCreatorStudio({...emptyCreatorStudio(),missions:binding.missions});
   if(errors.length)throw Error(errors.join('; '));
   // Required identifiers/delays use the same exporter validation as preparation.
@@ -198,7 +201,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
   const body=module.content.slice(end+1);
   if((await nativeMissionHash(body)).toLowerCase()!==binding.sourceSha256.toLowerCase())
     throw Error('Attached mission source differs from its checksum. No mission data was adopted or regenerated.');
-  if(body!==nativeMissionBody(binding.missions,binding.activation))
+  if(body!==nativeMissionBody(binding.missions,binding.activation,binding.cinematic))
     throw Error('Attached mission data differs from the current generated source, or uses another generator. Preserve/export the module in Logic / Events before explicit reconciliation.');
   return binding;
 }
@@ -215,6 +218,7 @@ export interface NativeMissionReview {
   module:{filename:string;content:string};
   binding:NativeMissionBinding;
   localMissions:NativeMissionBinding['missions'];
+  localShots:CameraShot[];
 }
 export async function reviewNativeCampaignMission(project:Project):Promise<NativeMissionReview> {
   const document=project.quickForge;
@@ -223,43 +227,66 @@ export async function reviewNativeCampaignMission(project:Project):Promise<Nativ
     throw Error('Review requires one attached gs_mission.hsc binding. Preserve and reconcile missing, renamed or duplicate modules in Logic / Events.');
   const localMissions=structuredClone(project.studio?.missions??[]);
   const module=owned[0],binding=await readNativeMissionModule(module);
-  return {projectId:project.id,document,module,binding,localMissions};
+  return {projectId:project.id,document,module,binding,localMissions,localShots:structuredClone(project.studio?.shots??[])};
 }
 /** Explicit replacement of mission data only. Source modules and unrelated
  * Studio settings remain unchanged; normal project history owns Undo/Redo. */
 export function applyNativeCampaignMission(project:Project,review:NativeMissionReview):Project {
   const document=project.quickForge;
-  if(project.id!==review.projectId||!document||document!==review.document||!sameMissionData(project.studio?.missions??[],review.localMissions))
+  if(project.id!==review.projectId||!document||document!==review.document||!sameMissionData(project.studio?.missions??[],review.localMissions)||review.binding.cinematic!==undefined&&!sameCinematicData(project.studio?.shots??[],review.localShots))
     throw Error('Source or local mission data changed after review. Review again; no stale data was applied.');
   const owned=document.logic?.handwrittenSources?.filter(source=>source.content.startsWith(nativeMissionBinding))??[];
   if(owned.length!==1||owned[0].filename!==review.module.filename||owned[0].content!==review.module.content)
     throw Error('The attached mission changed after review. Existing drafts remain intact.');
-  const studio={...(project.studio??emptyCreatorStudio()),missions:structuredClone(review.binding.missions)};
+  const studio={...(project.studio??emptyCreatorStudio()),missions:structuredClone(review.binding.missions),...(review.binding.cinematic?{shots:structuredClone(review.binding.cinematic)}:{})};
   const errors=validateCreatorStudio(studio);
   if(errors.length)throw Error('Cannot combine attached missions with current Studio data: '+errors.join('; '));
-  if(sameMissionData(project.studio?.missions??[],studio.missions))return project;
+  if(sameMissionData(project.studio?.missions??[],studio.missions)&&sameCinematicData(project.studio?.shots??[],studio.shots))return project;
   return {...project,studio};
 }
 
-function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation']):string {
-  const output=exportHaloCeMission({...emptyCreatorStudio(),missions},{waitForLogic:true});
-  return output.content+(activation==='startup'?[
+export function sameCinematicData(a:CameraShot[],b:CameraShot[]):boolean {
+  const normalize=(shots:CameraShot[])=>shots.map(shot=>({...shot,cameraMarker:shot.cameraMarker??null,roll:shot.roll??null,easing:shot.easing??null}));
+  return sameJson(normalize(a),normalize(b));
+}
+export function cinematicMarker(shot:CameraShot,index:number):string {
+  return ensureName(shot.cameraMarker||('gs_cs_'+String(index+1).padStart(3,'0')),'Cinematic camera point');
+}
+function validateNativeCinematic(shots:CameraShot[]):void {
+  if(!Array.isArray(shots)||!shots.length||shots.length>256)throw Error('Add 1–256 saved camera shots before preparing an intro.');
+  const fields=['id','name','durationMs','cameraPosition','lookAt','fov','subtitle','cameraMarker','roll','easing'];
+  if(shots.some(shot=>!shot||typeof shot!=='object'||Object.keys(shot).some(key=>!fields.includes(key))))throw Error('Unsupported cinematic shot metadata. Existing source is preserved.');
+  const errors=validateCreatorStudio({...emptyCreatorStudio(),shots});if(errors.length)throw Error(errors.join('; '));
+  const names=new Set<string>();
+  shots.forEach((shot,i)=>{
+    const name=cinematicMarker(shot,i).toLowerCase();if(names.has(name))throw Error('Cinematic camera point names must be unique.');names.add(name);
+    if(Math.hypot(...shot.lookAt.map((value,axis)=>value-shot.cameraPosition[axis]))<.001)throw Error('Each cinematic shot needs a distinct look-at target.');
+  });
+}
+function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[]):string {
+  let body=exportHaloCeMission({...emptyCreatorStudio(),missions},{waitForLogic:true}).content;
+  if(cinematic){
+    validateNativeCinematic(cinematic);
+    const sequence=exportHaloCeCinematic({...emptyCreatorStudio(),shots:cinematic.map((shot,i)=>({...shot,cameraMarker:cinematicMarker(shot,i)}))},{prepared:true}).content;
+    body=sequence+'\r\n'+body.replace('  (sleep_until gs_logic_ready 1)','  (sleep_until gs_logic_ready 1)\r\n  (sleep_until (> (list_count (players)) 0) 1)\r\n  (gs_cinematic)');
+  }
+  return body+(activation==='startup'?[
     '', '(script startup gs_mission_bootstrap',
     '  (sleep_until gs_logic_ready 1)', '  (wake gs_mission)', ')', '',
   ].join('\r\n'):'');
 }
-async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation']):Promise<string> {
+async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[]):Promise<string> {
   if(!['manual','startup'].includes(activation))throw Error('Choose manual or startup mission activation.');
-  const body=nativeMissionBody(missions,activation);
+  const body=nativeMissionBody(missions,activation,cinematic);
   const sourceSha256=await nativeMissionHash(body);
-  const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256};
+  const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256,...(cinematic?{cinematic}:{})};
   const header=JSON.stringify(binding).replace(/[\u007f-\uffff]/g,character=>
     '\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'));
   return nativeMissionBinding+header+'\r\n'+body;
 }
 /** Explicit source preparation. Refuse overwriting handwritten/older-generator
  * text; caller owns the existing project mutation/history transaction. */
-export async function attachNativeCampaignMission(project:Project,activation:'manual'|'startup'):Promise<Project> {
+export async function attachNativeCampaignMission(project:Project,activation:'manual'|'startup',includeCinematic?:boolean):Promise<Project> {
   const doc=project.quickForge;
   if(!doc||doc.gameMode!=='campaign'||doc.native||
     !['mccSteam','haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))
@@ -291,19 +318,23 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   if(sources.some(source=>source.filename.toLowerCase()==='gs_firefight.hsc'))
     throw Error('This campaign still has a survival controller. Review it in Logic / Events before explicitly removing it from this build.');
   const existing=sources.find(source=>source.filename.toLowerCase()==='gs_mission.hsc');
+  let previousCinematic=false;
   if(sources.some(source=>source.content.startsWith(nativeMissionBinding)&&source!==existing))
     throw Error('A renamed mission binding is still present. Preserve and reconcile source modules in Logic / Events.');
   if(existing) {
-    const old=await readNativeMissionModule(existing);
+    const old=await readNativeMissionModule(existing);previousCinematic=old.cinematic!==undefined;
     let original:string;
     try {
       if(old.schemaVersion!==1||!['manual','startup'].includes(old.activation)||!Array.isArray(old.missions))throw Error('Invalid binding');
-      original=await nativeMissionModule(old.missions,old.activation);
+      original=await nativeMissionModule(old.missions,old.activation,old.cinematic);
     } catch {throw Error('The existing mission binding cannot be regenerated safely. Preserve/export it before explicitly removing it from the build.');}
     if(existing.content!==original)
       throw Error('Mission source contains edits or uses a different generator. Preserve/export it before explicitly removing and regenerating it.');
   }
-  const module={filename:'gs_mission.hsc',content:await nativeMissionModule(missions,activation)};
+  const cinematic=(includeCinematic??previousCinematic)?project.studio?.shots:undefined;
+  if((includeCinematic??previousCinematic)&&!cinematic?.length)throw Error('Add camera shots or explicitly disable the mission intro before preparing again.');
+  if(cinematic&&project.studio?.engineMachinima?.enabled)throw Error('Disable in-game recording in Machinima before preparing a story intro; both would own the game camera.');
+  const module={filename:'gs_mission.hsc',content:await nativeMissionModule(missions,activation,cinematic)};
   const isMcc=doc.runtimeId==='mccSteam';
   if(module.content.length>(isMcc?1024*1024:256*1024))
     throw Error('Mission source exceeds the selected native target file budget. No text was truncated or replaced.');
@@ -314,21 +345,25 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
 }
 
 /** Actual H1 camera_set/cinematic_start syntax. Position/FOV authoring is metadata. */
-export function exportHaloCeCinematic(studio:CreatorStudioDocument): ScriptExport {
+export function exportHaloCeCinematic(studio:CreatorStudioDocument,options:{prepared?:boolean}={}): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.shots.length)throw new Error('Add at least one cinematic shot.');
   const deps:string[]=[],lines=heading('Cinematic Director');
+  if(options.prepared)validateNativeCinematic(studio.shots);
   lines.push('(script static void gs_cinematic','  (cinematic_start)','  (camera_control true)','  (cinematic_show_letterbox true)');
+  if(options.prepared)lines.push('  (player_enable_input false)');
   studio.shots.forEach((shot,i)=>{
     const ref=ensureName(shot.cameraMarker??undefined,`Shot ${i+1} cutscene camera point`);
     deps.push(`cutscene_camera_point:${ref}`);
     lines.push(`  ; ${i+1}: ${safeComment(shot.name)} | ${safeComment(shot.subtitle)}`);
-    lines.push(`  ; Source camera XYZ=${shot.cameraPosition.join(',')} lookAt=${shot.lookAt.join(',')} FOV=${shot.fov} (place marker in Sapien)`);
-    lines.push(`  (camera_set ${ref} ${ticks(shot.durationMs)})`);
+    lines.push(`  ; Source camera XYZ=${shot.cameraPosition.join(',')} lookAt=${shot.lookAt.join(',')} FOV=${shot.fov} ${options.prepared?'(prepared native marker)':'(place marker in Sapien)'}`);
+    lines.push(`  (camera_set ${ref} ${options.prepared&&(i===0||shot.easing==='cut')?0:ticks(shot.durationMs)})`);
     lines.push(`  (sleep ${ticks(shot.durationMs)})`);
   });
-  lines.push('  (cinematic_show_letterbox false)','  (camera_control false)','  (cinematic_stop)',')','');
-  return {filename:'gs_cinematic.hsc',content:lines.join('\r\n'),dependencies:deps,warnings:[
+  lines.push('  (cinematic_show_letterbox false)','  (camera_control false)','  (cinematic_stop)');
+  if(options.prepared)lines.push('  (player_enable_input true)');
+  lines.push(')','');
+  return {filename:'gs_cinematic.hsc',content:lines.join('\r\n'),dependencies:deps,warnings:options.prepared?['Camera markers, position, orientation and FOV are prepared with the native mission. Subtitles remain rehearsal notes; native playback and camera restoration require game testing. Smooth uses the engine camera interpolation; cut snaps immediately.']:[
     'Place and orient the named cutscene camera points in the editable scenario using the shot metadata.',
     'Camera FOV, subtitle, animation, music and cinematic blending are not compiled by this exporter.',
     'Call gs_cinematic from an existing compatible campaign script; it is not automatically played.',

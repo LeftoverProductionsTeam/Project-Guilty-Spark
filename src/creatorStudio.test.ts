@@ -1,6 +1,6 @@
 import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
-import {attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission} from './haloScript';
+import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
 import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems } from './creatorStudio';
@@ -211,4 +211,27 @@ it('routes a continued rescue failure separately from success and refuses dangli
  for(const patch of [{escortFailure:'stop'},{trigger:'timer'},{escortFailure:'invalid'}]) {const bad=structuredClone(project);Object.assign(bad.studio!.missions[0],patch);expect(validateCreatorStudio(bad.studio!)).not.toEqual([]);}
  const mixed=structuredClone(project);mixed.studio!.missions[1].conditionVolume='rally';mixed.studio!.missions[1].conditionGroup='rally_decision';expect(validateCreatorStudio(mixed.studio!)).toEqual([]);const combined=exportHaloCeMission(mixed.studio!).content;expect(combined.indexOf('(if (and gs_result_1_done (not gs_result_1_failed))')).toBeLessThan(combined.indexOf('(set gs_branch_1_inside'));await attachNativeCampaignMission(mixed,'manual');
  const legacy=emptyCreatorStudio();legacy.missions=[{...project.studio!.missions[0],escortFailure:undefined}];const original=exportHaloCeMission(legacy).content;expect(original).toContain('(sleep_until false 15)');expect(original).not.toContain('gs_result_');
+});
+
+
+it('prepares a source-bound cinematic intro with mission history, review and stale-camera protection',async()=>{
+ const project=campaignDraft();project.history=[];project.studio!.missions=[{id:'begin',title:'Begin',objective:'Move out',trigger:'timer',timerSeconds:1,encounterName:''}];
+ project.studio!.shots=[{id:'approach',name:'Approach',durationMs:1200,cameraPosition:[2,-4,3],lookAt:[4,0,1],fov:60,subtitle:'Rehearsal only',roll:12},
+  {id:'cut',name:'Cut to ridge',durationMs:1800,cameraPosition:[25,0,3],lookAt:[29,0,1],fov:70,subtitle:'',easing:'cut'}];
+ const original=JSON.stringify(project),prepared=await attachNativeCampaignMission(project,'startup',true);
+ expect(JSON.stringify(project)).toBe(original);const review=await reviewNativeCampaignMission(prepared),content=review.module.content;
+ expect(review.binding.cinematic).toEqual(project.studio!.shots);expect(content).toContain('(camera_set gs_cs_001 0)');expect(content).toContain('(camera_set gs_cs_002 0)');
+ expect(content).toContain('(player_enable_input false)');expect(content).toContain('(player_enable_input true)');expect(content.indexOf('(gs_cinematic)')).toBeGreaterThan(content.indexOf('(sleep_until (> (list_count (players)) 0) 1)'));
+ let history=historyReducer({...initialHistory,current:project},{type:'edit',project:prepared,description:'Prepare story intro'});
+ history=historyReducer(history,{type:'undo'});expect(history.current).toEqual(project);history=historyReducer(history,{type:'redo'});
+ const restored=JSON.parse(JSON.stringify(history.current));expect((await reviewNativeCampaignMission(restored)).binding).toEqual(review.binding);
+ restored.studio.shots[0].cameraPosition[0]=8;const revised=await attachNativeCampaignMission(restored,'startup');expect((await reviewNativeCampaignMission(revised)).binding.cinematic![0].cameraPosition[0]).toBe(8);
+ const local=structuredClone(prepared);local.studio!.shots[0].cameraPosition[0]=12;const reconcile=await reviewNativeCampaignMission(local);
+ const accepted=applyNativeCampaignMission(local,reconcile);expect(accepted.studio!.shots).toEqual(project.studio!.shots);expect(accepted.quickForge).toBe(local.quickForge);
+ const stale={...local,studio:structuredClone(local.studio)};stale.studio!.shots[0].cameraPosition[0]=13;expect(()=>applyNativeCampaignMission(stale,reconcile)).toThrow(/changed after review/);
+ const noIntro=await attachNativeCampaignMission(revised,'manual',false);expect((await reviewNativeCampaignMission(noIntro)).binding.cinematic).toBeUndefined();
+ const recording=structuredClone(project);recording.studio!.engineMachinima={enabled:true,playback:'sequence',autoStart:false};await expect(attachNativeCampaignMission(recording,'manual',true)).rejects.toThrow(/both would own/);
+ const duplicate=structuredClone(project);duplicate.studio!.shots.forEach(shot=>shot.cameraMarker='same_camera');await expect(attachNativeCampaignMission(duplicate,'manual',true)).rejects.toThrow(/unique/);
+ const coincident=structuredClone(project);coincident.studio!.shots[0].lookAt=[2,-4,3];await expect(attachNativeCampaignMission(coincident,'manual',true)).rejects.toThrow(/distinct look-at/);
+ const changed=structuredClone(prepared);changed.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!.content+='; handwritten';await expect(attachNativeCampaignMission(changed,'manual',true)).rejects.toThrow(/checksum/);
 });

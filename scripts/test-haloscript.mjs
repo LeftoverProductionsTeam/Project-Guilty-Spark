@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { blackEchoMission, emptyCreatorStudio } from '../src/creatorStudio.ts';
-import { exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
+import { attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
 const studio=emptyCreatorStudio();
 studio.missions=[
   {id:'one',title:'First Contact',objective:'Move to the bridge',trigger:'triggerVolume',triggerRef:'gs_bridge',encounterName:''},
@@ -115,6 +115,28 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
    assert.deepEqual(new Set(globals.split(/\r?\n/)),new Set(['gs_branch_1_ready','gs_branch_1_inside','gs_result_2_done','gs_result_2_failed','gs_manual_1_done','gs_manual_3_done','gs_manual_5_done','gs_manual_6_done']));
    results.push({engine,scriptCount:Number(count),names:names.split(/\r?\n/),globals:globals.split(/\r?\n/),scenarioSha256:await hash(path.join(tags,scenario+'.scenario'))});
   }
+  // Compile the actual prepared mission body, including its player wait and intro.
+  // Reuse this bounded native fixture; no SDK or playable-map claim.
+  const introScenario='levels/intro/intro';await fs.mkdir(path.join(tags,'levels/intro'),{recursive:true});await fs.mkdir(path.join(data,'levels/intro/scripts'),{recursive:true});
+  const shots=[{id:'intro_a',name:'Approach',durationMs:1000,cameraPosition:[1,2,3],lookAt:[4,6,3],fov:60,subtitle:'Rehearsal notes',roll:12},
+   {id:'intro_b',name:'Ridge',durationMs:1500,cameraPosition:[25,0,3],lookAt:[29,0,1],fov:70,subtitle:'',easing:'cut'}];
+  const prepared=await attachNativeCampaignMission({studio:{...emptyCreatorStudio(),shots,missions:[{id:'move',title:'Move out',objective:'Advance',trigger:'timer',timerSeconds:1,encounterName:''}]},
+   quickForge:{gameMode:'campaign',runtimeId:'haloCustomEdition',startingProfile:{},logic:{schemaVersion:1,triggers:[],devices:[],rules:[],handwrittenSources:[]}}},'startup',true);
+  const introSource=prepared.quickForge.logic.handwrittenSources[0].content;
+  await fs.writeFile(path.join(data,'levels/intro/scripts/gs_mission.hsc'),introSource);await fs.writeFile(path.join(data,'levels/intro/scripts/gs_logic.hsc'),'(global boolean gs_logic_ready true)\n');
+  await run('invader-edit',['-N','-S','type','singleplayer',introScenario+'.scenario']);
+  for(const [i,shot] of shots.entries()){
+   const d=shot.lookAt.map((value,axis)=>value-shot.cameraPosition[axis]),length=Math.hypot(...d),angles=[Math.atan2(d[1],d[0]),Math.asin(d[2]/length),(shot.roll??0)*Math.PI/180],prefix='cutscene_camera_points['+i+']';
+   await run('invader-edit',['-I','cutscene_camera_points','1','end','-S',prefix+'.name','gs_cs_'+String(i+1).padStart(3,'0'),'-S',prefix+'.position',shot.cameraPosition.join(','),'-S',prefix+'.orientation',angles.join(','),'-S',prefix+'.field_of_view',String(shot.fov*Math.PI/180),introScenario+'.scenario']);
+  }
+  const introResults=[];
+  for(const engine of ['gbx-custom','mcc-cea','xbox-ntsc']){
+   await run('invader-script',['-d',data,'-E','-g',engine,introScenario]);
+   const names=(await run('invader-edit',['-G','scripts[*].name',introScenario+'.scenario'],true)).split(/\r?\n/);assert.deepEqual(new Set(names),new Set(['gs_cinematic','gs_mission','gs_mission_bootstrap']));
+   const values=await run('invader-edit',['-G','cutscene_camera_points[0].position','-G','cutscene_camera_points[1].position','-G','cutscene_camera_points[0].field_of_view',introScenario+'.scenario'],true);const parts=values.split(/\r?\n/);assert.deepEqual(parts.slice(0,2),['1.000000,2.000000,3.000000','25.000000,0.000000,3.000000']);assert.ok(Math.abs(Number(parts[2])-60)<.0001);
+   introResults.push({engine,names,scenarioSha256:await hash(path.join(tags,introScenario+'.scenario'))});
+  }
+  console.log(JSON.stringify({nativePreparedCinematicSyntax:'pass',introSourceSha256:crypto.createHash('sha256').update(introSource).digest('hex'),introResults,cacheBuilt:false,gameplayVerified:false}));
   const controlName=await run('invader-edit',['-G','object_names[0].name','-G','controls[0].name',scenario+'.scenario'],true);assert.deepEqual(controlName.split(/\r?\n/),['mission_terminal','0']);
   const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');
   const failure=await run('invader-edit',['-G','messages[1].name','levels/radio_messages.hud_message_text'],true);assert.equal(failure,'gs_mission_fail_2');

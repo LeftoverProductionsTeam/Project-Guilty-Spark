@@ -71,6 +71,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [pane, setPane] = useMapState<Pane>(project.id,'creator-studio-pane','mission');
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
   const [missionActivation,setMissionActivation]=useMapState<'manual'|'startup'>(project.id,'native-mission-startup','manual');
+  const [nextCinematic,setNextCinematic]=useMapState<'source'|'enabled'|'disabled'>(project.id,'native-mission-intro','source');
+  const attachedCinematic=project.quickForge?.logic?.handwrittenSources?.some(source=>source.content.startsWith(nativeMissionBinding)&&source.content.split('\n',1)[0].includes('"cinematic":['))??false;
+  const missionCinematic=nextCinematic==='source'?attachedCinematic:nextCinematic==='enabled';
   const [preparingMission,setPreparingMission]=useState(false);
   const latestProject=useRef(project);latestProject.current=project;
   const activeProject=useRef<string|null>(project.id);
@@ -159,7 +162,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     const input=latestProject.current,activation=missionActivation;
     const release=beginProjectMutation(input.id);setPreparingMission(true);setError('');
     try {
-      const candidate=await attachNativeCampaignMission(input,activation);
+      const candidate=await attachNativeCampaignMission(input,activation,missionCinematic);
       if(activeProject.current!==input.id||latestProject.current.id!==input.id||
         latestProject.current.quickForge!==input.quickForge||latestProject.current.studio!==input.studio)
         throw Error('The map or mission changed during preparation. Review again; no older source was reapplied.');
@@ -229,7 +232,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       description="Design original mission beats, cinematic shots, dedicated-server rotations and manual QA evidence—all in your saved project."
       actions={<div className="analysis-actions"><button type="button" onClick={report}><Download size={15}/> Export evidence JSON</button><button className="primary" type="button" onClick={exportSourcePack}><Download size={15}/> Export CE script pack</button></div>} />
     <section className="studio-guide" aria-label="Creator Studio quick start">
-      <div><strong>Start with one objective</strong><ol><li>Add a mission beat or camera shot.</li><li>Use names that exist in your scenario’s AI, trigger volumes or camera points.</li><li>Export the script pack, compile it with your matching editing kit, then playtest.</li></ol></div>
+      <div><strong>Start with one objective</strong><ol><li>Add a mission beat or camera shot.</li><li>Bind existing encounters and areas, or author them below. Prepared intros create their camera points.</li><li>Prepare editable campaign source, Save, then Build & playtest. Use script-pack export for a separate external scenario.</li></ol></div>
       <nav aria-label="HaloScript learning resources"><strong>Learn HaloScript</strong>
         <ExternalBrowserLink href="https://c20.reclaimers.net/general/scripting/">Scripting basics</ExternalBrowserLink>
         <ExternalBrowserLink href="https://c20.reclaimers.net/h1/scripting/">Halo 1 function reference</ExternalBrowserLink>
@@ -292,16 +295,21 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           <option value="manual">Manual — another script starts the mission</option>
           <option value="startup">Startup — after native logic and loadout initialization</option>
         </select></label>
+        <label className="checkbox-label"><input type="checkbox" checked={missionCinematic} disabled={preparingMission}
+          onChange={event=>setNextCinematic(event.target.checked?'enabled':'disabled')}/>Play saved camera shots as the mission intro</label>
+        <p className="studio-hint">{studio.shots.length} saved shots. Preparation snapshots position, look-at, roll and FOV into native camera points.
+          The intro waits for a player, then restores input and camera before objectives. Cut snaps; other moves use native interpolation.
+          Subtitles are rehearsal notes. Disable Machinima in-game recording first; edited shots require preparation again. Native playback still needs game testing.</p>
         <button type="button" disabled={preparingMission||!studio.missions.length}
           onClick={()=>void prepareNativeMission()}> {preparingMission?'Preparing source…':'Prepare mission for native build'} </button>
         <p className="studio-hint">{project.quickForge?.logic?.handwrittenSources?.some(source=>
           source.filename.toLowerCase()==='gs_mission.hsc'&&source.content.startsWith(nativeMissionBinding))
-          ?'A mission binding is attached. Changed mission data requires preparation again; edited source is preserved and blocks automatic replacement.'
+          ?'A mission binding is attached. Changed mission or included intro shots require preparation again; edited source is preserved and blocks automatic replacement.'
           :'No generated mission binding is attached. Separate exported script packs are not attached automatically.'}</p>
         <p className="studio-hint">Save before Build &amp; playtest. The build checks the saved mission binding,
           module hash, encounter/volume names, HUD messages and compiled script identities. Actual HUD display,
           accepted checkpoint restoration and native level progression require separate game acceptance.</p>
-        <MissionSourceReview project={project} edit={edit} onActivation={setMissionActivation} exportLocal={report}/>
+        <MissionSourceReview project={project} edit={edit} onActivation={setMissionActivation} onCinematic={enabled=>setNextCinematic(enabled?'enabled':'disabled')} exportLocal={report}/>
       </details>
       <CampaignEncounters project={project} edit={edit}/>
       <datalist id={encounterChoices}>{[...new Set([
@@ -441,11 +449,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       </div>)}
     </section>}
     {pane === 'cinematic' && <section className="analysis-card">
-      <div className="studio-heading"><div><h2><Camera size={18}/> Cinematic director</h2><p>Camera keyframes and a Halo CE .hsc exporter. Place each named cutscene_camera_point in the scenario first; FOV and subtitles remain editor metadata.</p></div>
+      <div className="studio-heading"><div><h2><Camera size={18}/> Cinematic director</h2><p>Edit saved shots here or in Machinima. For an editable campaign, enable the intro in Mission director → Native mission build and prepare it to include native camera position, orientation and FOV. The separate raw export still requires existing scenario markers; subtitles remain rehearsal notes.</p></div>
         <button className="primary" type="button" disabled={studio.shots.length >= 256} onClick={() => change({ ...studio,
           shots: [...studio.shots, { id: freshId(), name: `Shot ${studio.shots.length + 1}`, durationMs: 3000,
             cameraPosition: [0, -8, 3], lookAt: [0, 0, 1], fov: 60, subtitle: '' }] }, 'Add cinematic shot')}><Plus size={15}/> Add shot</button></div>
-      <div className="analysis-actions">{onMachinima&&<button type="button" onClick={onMachinima} title="Edit the same saved shots in the visual Machinima workspace. Its native camera controls build MCC takes; the named-marker cinematic export stays separate."><Camera size={15}/>Edit cameras visually</button>}<button type="button" onClick={()=>exportScript('cinematic')}><Download size={15}/> Export cinematic .hsc</button><button type="button" onClick={()=>exportScript('cinematic',true)}>Export required camera points</button></div>
+      <div className="analysis-actions">{onMachinima&&<button type="button" onClick={onMachinima} title="Edit the same saved shots in the visual Machinima workspace. Use Mission director to include these shots as a native intro; in-game recording takes remain separate."><Camera size={15}/>Edit cameras visually</button>}<button type="button" onClick={()=>exportScript('cinematic')}><Download size={15}/> Export cinematic .hsc</button><button type="button" onClick={()=>exportScript('cinematic',true)}>Export required camera points</button></div>
       {studio.shots.length === 0 && <p className="studio-empty">No camera shots yet. Create a timeline for your mission's intro or ending.</p>}
       {studio.shots.map((shot, i) => <div className="studio-record" key={shot.id}>
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {shot.name || 'Untitled shot'}</strong><Pill>{(shot.durationMs / 1000).toFixed(1)}s</Pill>
@@ -453,7 +461,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <div className="studio-fields"><label>Name<input maxLength={120} value={shot.name} onChange={e => updateShot(shot.id, { name: e.target.value })}/></label>
           <label>Duration (ms)<NumberField label="Duration" value={shot.durationMs} min={100} max={600000} step={100} onCommit={n => updateShot(shot.id, { durationMs: Math.round(n) })}/></label>
           <label>FOV (degrees)<NumberField label="FOV" value={shot.fov} min={10} max={140} onCommit={n => updateShot(shot.id, { fov: n })}/></label></div>
-        <label className="studio-wide">Sapien cutscene_camera_point name<input maxLength={31} spellCheck={false} placeholder="gs_shot_01" value={shot.cameraMarker ?? ''} onChange={e=>updateShot(shot.id,{cameraMarker:e.target.value})}/></label>
+        <label className="studio-wide">Native camera point name · optional for prepared intro<input maxLength={31} spellCheck={false} placeholder={'gs_cs_'+String(i+1).padStart(3,'0')} value={shot.cameraMarker ?? ''} onChange={e=>updateShot(shot.id,{cameraMarker:e.target.value})}/></label>
         <div className="studio-fields studio-camera"><VectorEditor title="Camera XYZ" value={shot.cameraPosition} onChange={v => updateShot(shot.id, {cameraPosition: v})}/>
           <VectorEditor title="Look at XYZ" value={shot.lookAt} onChange={v => updateShot(shot.id, {lookAt: v})}/></div>
         <label className="studio-wide">Subtitle / dialogue cue<textarea value={shot.subtitle} rows={2} maxLength={2048} onChange={e => updateShot(shot.id, {subtitle: e.target.value})}/></label>

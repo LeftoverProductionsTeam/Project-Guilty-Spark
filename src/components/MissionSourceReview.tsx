@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MissionBeat } from '../creatorStudio';
-import { applyNativeCampaignMission, reviewNativeCampaignMission, sameMissionData } from '../haloScript';
+import { applyNativeCampaignMission, reviewNativeCampaignMission, sameMissionData, sameCinematicData } from '../haloScript';
 import type { NativeMissionReview } from '../haloScript';
 import type { Project } from '../types';
 import { Notice } from './ui';
@@ -19,9 +19,9 @@ function BeatView({side,beat,index}:{side:string;beat?:MissionBeat;index:number}
   </section>;
 }
 /** Explicit data reconciliation, separate from native compilation or game control. */
-export default function MissionSourceReview({project,edit,onActivation,exportLocal}:{
+export default function MissionSourceReview({project,edit,onActivation,onCinematic,exportLocal}:{
   project:Project;edit:(next:Project,description:string)=>void;
-  onActivation:(value:'manual'|'startup')=>void;exportLocal:()=>void;
+  onActivation:(value:'manual'|'startup')=>void;onCinematic:(value:boolean)=>void;exportLocal:()=>void;
 }) {
   const [review,setReview]=useState<NativeMissionReview|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirmed,setConfirmed]=useState(false);
@@ -29,8 +29,8 @@ export default function MissionSourceReview({project,edit,onActivation,exportLoc
   const latest=useRef<Project|null>(project);latest.current=project;
   useEffect(()=>{latest.current=project;return()=>{latest.current=null;};},[project.id]);
   useEffect(()=>{setReview(null);setConfirmed(false);setError('');},[project.id]);
-  const current=!!review&&review.projectId===project.id&&review.document===project.quickForge&&sameMissionData(project.studio?.missions??[],review.localMissions);
-  const differs=!!review&&!sameMissionData(review.localMissions,review.binding.missions);
+  const current=!!review&&review.projectId===project.id&&review.document===project.quickForge&&sameMissionData(project.studio?.missions??[],review.localMissions)&&(!review.binding.cinematic||sameCinematicData(project.studio?.shots??[],review.localShots));
+  const differs=!!review&&(!sameMissionData(review.localMissions,review.binding.missions)||!!review.binding.cinematic&&!sameCinematicData(review.localShots,review.binding.cinematic));
   const identities=review?[...new Set([...review.localMissions,...review.binding.missions].map(beat=>beat.id))]:[];
   const identity=identities.includes(selected)?selected:identities[0];
   const local=review?.localMissions.find(beat=>beat.id===identity),attached=review?.binding.missions.find(beat=>beat.id===identity);
@@ -40,7 +40,7 @@ export default function MissionSourceReview({project,edit,onActivation,exportLoc
     setBusy(true);setError('');setReview(null);setConfirmed(false);
     try {
       const next=await reviewNativeCampaignMission(input),now=latest.current;
-      if(!now||now.id!==input.id||now.quickForge!==next.document||!sameMissionData(now.studio?.missions??[],next.localMissions))
+      if(!now||now.id!==input.id||now.quickForge!==next.document||!sameMissionData(now.studio?.missions??[],next.localMissions)||!!next.binding.cinematic&&!sameCinematicData(now.studio?.shots??[],next.localShots))
         throw Error('Source or local mission data changed during review. Review again; no data was applied.');
       setReview(next);setSelected('');
     } catch(problem) {if(latest.current?.id===input.id)setError(String(problem));}
@@ -52,7 +52,7 @@ export default function MissionSourceReview({project,edit,onActivation,exportLoc
       const now=latest.current;if(!now||now.id!==project.id)throw Error('This project closed. No data was applied.');
       const next=applyNativeCampaignMission(now,review);
       if(next!==now)edit(next,'Use reviewed attached mission data');
-      onActivation(review.binding.activation);
+      onActivation(review.binding.activation);onCinematic(!!review.binding.cinematic);
       setReview(null);setConfirmed(false);setError('');
     } catch(problem) {setError(String(problem));}
   }
@@ -67,6 +67,8 @@ export default function MissionSourceReview({project,edit,onActivation,exportLoc
       <p className="studio-hint">Local: {review.localMissions.length} beats · Attached: {review.binding.missions.length} beats ·
         Attached activation: {review.binding.activation==='startup'?'startup':'manual'}. Source checksum matches;
         native compilation and gameplay are unverified.</p>
+      {review.binding.cinematic&&<div><p>Applying also replaces local camera shots with this reviewed intro ({review.binding.cinematic.length} shots). Undo restores both.</p>
+        <ul>{review.binding.cinematic.map((shot,i)=><li key={shot.id}>{i+1}. {shot.name} · {shot.durationMs} ms · XYZ {shot.cameraPosition.join(', ')} → {shot.lookAt.join(', ')} · FOV {shot.fov}° · roll {shot.roll??0}°</li>)}</ul></div>}
       <label>Compare beat<select aria-label="Compare mission beat" value={identity??''}
         onChange={event=>setSelected(event.target.value)}>{identities.map(id=>{
           const left=review.localMissions.findIndex(beat=>beat.id===id),right=review.binding.missions.findIndex(beat=>beat.id===id);
@@ -80,11 +82,11 @@ export default function MissionSourceReview({project,edit,onActivation,exportLoc
       {!differs?<p>Mission data already matches. No replacement is needed.</p>:<>
         <button type="button" onClick={exportLocal}>Export local creator evidence</button>
         <label><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
-          Replace local mission beats with the reviewed attached data. Undo restores the previous draft.</label>
+          Replace local mission beats and any included intro shots with the reviewed attached data. Undo restores the previous draft.</label>
         <button type="button" disabled={!confirmed} onClick={adopt}>Use attached mission data</button>
       </>}
       <button type="button" onClick={()=>{setReview(null);setConfirmed(false);}}>Keep local mission data</button>
-      <p className="studio-hint">Cameras, server settings, source modules and runtime selection stay unchanged.
+      <p className="studio-hint">Cameras change only when the attached source includes an intro. Server settings, source modules and runtime selection stay unchanged.
         Keeping a different local draft still requires Prepare mission before a build; stale-source checks remain active.</p>
     </>}
   </details>;

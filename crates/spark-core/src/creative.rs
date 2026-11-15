@@ -86,7 +86,7 @@ pub struct MissionBeat {
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct MissionOutcomeCondition {pub beat_id:String,pub failed:bool}
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CameraShot {
     pub id: String,
@@ -182,6 +182,18 @@ pub struct NativeMissionBinding {
     pub missions:Vec<MissionBeat>,
     pub activation:String,
     pub source_sha256:String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub cinematic:Option<Vec<CameraShot>>,
+}
+/// Marker identity is shared with the frontend; standard scenario points only.
+pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
+    let mut names=HashSet::new();
+    shots.iter().enumerate().map(|(index,shot)|{
+        let name=shot.camera_marker.as_deref().filter(|name|!name.is_empty()).map(str::to_owned).unwrap_or_else(||format!("gs_cs_{:03}",index+1));
+        if !script_ident(&name)||!names.insert(name.to_ascii_lowercase()){return invalid("Cinematic camera names must be unique native identifiers");}
+        crate::engine_machinima::camera_angles(shot)?;
+        Ok(name)
+    }).collect()
 }
 /// Validate the generated module's intent and bytes, not a second HSC writer.
 /// Editable mission drafts may be saved while stale; native builds must stop.
@@ -206,6 +218,14 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
     let current=&project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?.missions;
     if binding.missions.is_empty() || &binding.missions!=current {
         return invalid("Mission beats changed after preparing native source. In Creator Studio, prepare the mission again; the old module and previous-good build remain intact");
+    }
+    if let Some(shots)=&binding.cinematic {
+        let studio=project.studio.as_ref().unwrap();
+        if shots.is_empty()||shots.len()>256||shots!=&studio.shots {
+            return invalid("Cinematic shots changed after preparing the mission. Prepare again; the previous-good build remains intact");
+        }
+        if studio.engine_machinima.as_ref().is_some_and(|options|options.enabled){return invalid("Disable in-game recording before preparing a story intro; both would own the game camera");}
+        cinematic_markers(shots)?;
     }
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
@@ -278,6 +298,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
 pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
+    if binding.cinematic.is_some(){expected.push(("gs_cinematic".into(),3));}
     if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
     for (index,beat) in binding.missions.iter().enumerate() {
         if beat.trigger=="manual"{expected.push((format!("gs_complete_{}",index+1),3));}
@@ -334,7 +355,7 @@ fn bounded(s: &str, max: usize) -> bool {
 fn valid_id(s: &str) -> bool {
     !s.is_empty() && s.len() <= 72 && s.bytes().all(|x| x.is_ascii_alphanumeric() || x == b'-' || x == b'_')
 }
-fn script_ident(s:&str) -> bool {
+pub(crate) fn script_ident(s:&str) -> bool {
     !s.is_empty() && s.len() <= 31 && s.bytes().next().is_some_and(|c|c.is_ascii_alphabetic()||c==b'_') &&
     s.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_')
 }
@@ -506,7 +527,7 @@ mod tests {
             {"id":"failure","title":"Failure","objective":"Fallback","trigger":"manual","encounterName":"","conditionResult":{"beatId":"rescue","failed":true}}
         ])).unwrap();document.validate().unwrap();
         let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(restored.missions,document.missions);
-        let binding=NativeMissionBinding{schema_version:1,missions:document.missions.clone(),activation:"manual".into(),source_sha256:"a".repeat(64)};
+        let binding=NativeMissionBinding{schema_version:1,cinematic:None,missions:document.missions.clone(),activation:"manual".into(),source_sha256:"a".repeat(64)};
         assert!(native_mission_hud(&binding).unwrap().unwrap().messages[0].panels.iter().any(|panel|matches!(panel,crate::maps::NativeHudPanel::Text(text) if text.contains("Continuing the operation"))));
         let mut stopped=document.clone();stopped.missions[0].escort_failure=None;assert!(stopped.validate().is_err());
         let mut forward=document.clone();forward.missions[1].condition_result.as_mut().unwrap().beat_id="failure".into();assert!(forward.validate().is_err());
@@ -552,7 +573,7 @@ mod tests {
         project.quick_forge=Some(doc.clone());
         assert!(beat.sound_cue.as_ref().unwrap().included(&project));assert!(crate::native_asset_imports::is_used(&project,&binding));
         let body="; source identity only, not compiler evidence\n";
-        let prepared=NativeMissionBinding{schema_version:1,missions:vec![beat.clone()],activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+        let prepared=NativeMissionBinding{schema_version:1,cinematic:None,missions:vec![beat.clone()],activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
         let content=format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&prepared).unwrap(),body);
         doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":content}]})).unwrap());
         assert!(native_mission_binding(&project,&doc).unwrap().is_some());
@@ -592,7 +613,7 @@ mod tests {
         // installed Invader test. Never treat this body as playable content.
         let check=|value:&crate::project::Project| {
             let mut doc=value.quick_forge.clone().unwrap();let body="; binding fixture\n";
-            let binding=NativeMissionBinding{schema_version:1,missions:value.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+            let binding=NativeMissionBinding{schema_version:1,cinematic:None,missions:value.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
             doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
             native_mission_binding(value,&doc)
         };
@@ -613,7 +634,7 @@ mod tests {
         doc.placements.push(serde_json::from_value(serde_json::json!({"id":"terminal","name":"Terminal","tagPath":"devices/control","tagClass":"ctrl","position":[0,0,0],"rotation":[0,0,0],"team":0,"respawnSeconds":0})).unwrap());
         doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[{"placementId":"terminal","nativeName":"restore_comms","initialPosition":0,"powered":true}],"rules":[]})).unwrap());
         let body="; binding fixture, not native syntax proof\n";
-        let binding=NativeMissionBinding{schema_version:1,missions:project.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+        let binding=NativeMissionBinding{schema_version:1,cinematic:None,missions:project.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
         doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
         native_mission_binding(&project,&doc).unwrap();
         let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(project.studio.as_ref().unwrap()).unwrap()).unwrap();assert_eq!(restored.missions,binding.missions);
@@ -628,6 +649,29 @@ mod tests {
             }
             assert!(native_mission_binding(&project,&bad).unwrap_err().to_string().contains("native control"),"{variant}");
         }
+    }
+
+    #[test]
+    fn cinematic_markers_preserve_native_identities_and_refuse_collisions_or_degenerate_look_at() {
+        let mut camera:CameraShot=serde_json::from_value(serde_json::json!({"id":"intro","name":"Intro","durationMs":1000,"cameraPosition":[1,2,3],"lookAt":[2,3,4],"fov":60,"subtitle":""})).unwrap();
+        assert_eq!(cinematic_markers(&[camera.clone()]).unwrap(),vec!["gs_cs_001"]);
+        camera.camera_marker=Some("Approach".into());let mut duplicate=camera.clone();duplicate.camera_marker=Some("approach".into());
+        assert!(cinematic_markers(&[camera.clone(),duplicate]).is_err());
+        camera.look_at=camera.camera_position;assert!(cinematic_markers(&[camera]).is_err());
+    }
+
+    #[test]
+    fn prepared_cinematic_refuses_stale_shots_and_competing_game_camera_ownership() {
+        let mut project=crate::project::Project::new("Native intro");let mut studio=studio();
+        studio.missions=vec![serde_json::from_value(serde_json::json!({"id":"begin","title":"Begin","objective":"Advance","trigger":"timer","timerSeconds":1,"encounterName":""})).unwrap()];
+        studio.shots=vec![serde_json::from_value(serde_json::json!({"id":"intro","name":"Intro","durationMs":1000,"cameraPosition":[1,2,3],"lookAt":[2,3,4],"fov":60,"subtitle":""})).unwrap()];
+        let binding=NativeMissionBinding{schema_version:1,missions:studio.missions.clone(),cinematic:Some(studio.shots.clone()),activation:"manual".into(),source_sha256:crate::studio_native::digest(b"; fixture source")};
+        let mut doc=crate::quickforge::create_arena("Intro","smallIndoorArena").unwrap();doc.game_mode="campaign".into();
+        doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":format!("{NATIVE_MISSION_BINDING}{}\n; fixture source",serde_json::to_string(&binding).unwrap())}]})).unwrap());
+        project.studio=Some(studio);assert!(native_mission_binding(&project,&doc).unwrap().is_some());
+        project.studio.as_mut().unwrap().shots[0].camera_position[0]=9.;assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("shots changed"));
+        project.studio.as_mut().unwrap().shots=binding.cinematic.unwrap();project.studio.as_mut().unwrap().engine_machinima=Some(EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,auto_start:false});
+        assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("both would own"));
     }
 
 }

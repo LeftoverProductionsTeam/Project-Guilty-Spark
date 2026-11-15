@@ -617,6 +617,12 @@ pub fn run_prepared_job(
         let output_dir=directory.join("output");fs::create_dir(&output_dir)?;
         crate::powerups::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
         crate::native_audio::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
+        if let Ok(Some(binding))=&mission {
+            if let Some(shots)=&binding.cinematic {
+                let names=crate::creative::cinematic_markers(shots)?;
+                crate::engine_machinima::append_camera_points(shots,&names,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner)?;
+            }
+        }
         crate::native_logic::compile(document,workspace,&sources.scenario_path,&invader(tools,"invader-edit").unwrap(),engine,&runner)?;
         let output=output_dir.join(format!("{}.map",sources.bsp_name));
         if document.runtime_id==RuntimeId::MccSteam {
