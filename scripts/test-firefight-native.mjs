@@ -14,6 +14,7 @@ import {nativeStandaloneBaseline} from './native-standalone-baseline.mjs';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
+const terminalReview=process.env.SPARK_NATIVE_TERMINAL_REVIEW==='1',controlTag='levels/b40/devices/holo control/b40_holo control';
 const expect=assertion.configure({timeout:60000});
 const hash=async file=>{const digest=crypto.createHash('sha256');for await(const b of createReadStream(file))digest.update(b);return digest.digest('hex');};
 await fs.mkdir(await assertQaOutputPath(output));
@@ -22,7 +23,7 @@ let browser,page,child,call;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
  const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
  await nativeStandaloneBaseline({context:{...context,directory:fixtureRoot},archive,kit,invader,report:report.sourcePreparation,prepareOnly:true,
-  additionalRoots:['characters/grunt/grunt minor plasma pistol.actor_variant','ui/ui_tags_loaded_solo_scenario_type.tag_collection'],
+  additionalRoots:['characters/grunt/grunt minor plasma pistol.actor_variant','ui/ui_tags_loaded_solo_scenario_type.tag_collection',...(terminalReview?[controlTag+'.device_control']:[])],
   onPrepared:async ({root:sourceRoot,drive,run,tags})=>{
    const library=path.join(output,'library'),webview=path.join(output,'webview');
    async function start(){
@@ -145,6 +146,53 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    await chooseTool(page,'Firefight rules');await page.keyboard.press('Control+z');await save(id);
    expect((await state(id)).project.firefight.title).toBe(p.firefight.title);
    await page.screenshot({path:path.join(output,'firefight-built.png')});
+   if(terminalReview){
+    // Fixture geometry/control placement reuses the verified source baseline.
+    // The workflow under test authors/prepares/saves/builds through actual UI.
+    const base=(await state(id)).project,created=await call('create_quickforge_project',{title:'Native terminal mission fixture',template:'customBlank',target:'mccSteam'});
+    const seed=created.project,doc=seed.quickForge;seed.title='Native terminal mission acceptance';doc.name=seed.title;
+    doc.gameMode='campaign';doc.workshop=structuredClone(base.quickForge.workshop);doc.geometry=structuredClone(base.quickForge.geometry);doc.materials=structuredClone(base.quickForge.materials);doc.skyPath=base.quickForge.skyPath;
+    doc.spawns=structuredClone(base.quickForge.spawns);doc.startingProfile=structuredClone(base.firefight.nativePlayerProfile);
+    const placementId=crypto.randomUUID();doc.placements=[{id:placementId,name:'Mission terminal',tagClass:'ctrl',tagPath:controlTag,position:[0,0,.1],rotation:[0,0,0],team:0,respawnSeconds:0,visible:true,locked:false}];
+    doc.logic={schemaVersion:1,triggers:[],devices:[{placementId,nativeName:'mission_terminal',initialPosition:0,powered:true}],rules:[]};
+    const seedPath=path.join(output,'terminal-campaign.gsproject');await fs.writeFile(seedPath,JSON.stringify(seed),{flag:'wx'});
+    const [candidate]=await call('import_paths',{paths:[seedPath]});const campaignId=candidate.project.id,campaignTitle=candidate.project.title;
+    await page.reload();await chooseTool(page,'Map library');await open(campaignTitle);await chooseTool(page,'Creator Studio');
+    const add=page.getByRole('button',{name:'Add beat',exact:true,includeHidden:true});await revealPagedControl(add);await add.click();
+    const beat=page.locator('.studio-record').first();await beat.getByRole('textbox',{name:'Title',exact:true}).fill('Restore communications');
+    await beat.getByRole('combobox',{name:'Trigger',exact:true}).selectOption('deviceActivated');
+    await beat.getByRole('combobox',{name:'Mission terminal 1',exact:true}).selectOption('mission_terminal');
+    const review=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Native mission build$/})});await revealPagedControl(review.locator(':scope > summary'));await review.locator(':scope > summary').click();
+    await review.getByRole('combobox',{name:'Native mission activation',exact:true}).selectOption('startup');
+    await review.getByRole('button',{name:'Prepare mission for native build',exact:true}).click();
+    const mission=async()=>(await state(campaignId)).project.quickForge.logic.handwrittenSources?.find(source=>source.filename==='gs_mission.hsc')?.content;
+    await expect.poll(mission).toContain('(device_get_position mission_terminal)');const prepared=await mission();
+    await page.keyboard.press('Control+z');await expect.poll(mission).toBeUndefined();await page.keyboard.press('Control+y');await expect.poll(mission).toBe(prepared);await save(campaignId);
+    await close();await start();await chooseTool(page,'Map library');await open(campaignTitle);await expect.poll(mission).toBe(prepared);
+    await chooseTool(page,'Creator Studio');const select=page.getByRole('button',{name:'Select objective terminal in Level Editor',exact:true,includeHidden:true});await revealPagedControl(select);await select.click();
+    await expect(page.getByRole('button',{name:'Build & check playtest',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Build & check playtest',exact:true}).click();
+    let build;await expect.poll(async()=>{build=await call('quickforge_build_report',{projectId:campaignId});report.nativeTerminalBuild=build;if(build&&['failed','blocked'].includes(build.status))throw Error('Terminal campaign native build rejected: '+JSON.stringify(build.blockers));return build?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');
+    const compiledMap=build.build.output,scenarioPath=build.sources.scenarioPath,folder=path.join(output,'terminal-independent-readback');await fs.mkdir(folder);
+    const cacheHash=await hash(compiledMap);expect(cacheHash).toBe(build.build.sha256);
+    await run(path.join(invader,'invader-extract.exe'),['-s',scenarioPath+'.scenario','-t',folder,compiledMap]);
+    const read=async(key,flag='-G')=>(await run(path.join(invader,'invader-edit.exe'),['-t',folder,flag,key,scenarioPath+'.scenario'])).stdout.trim();
+    expect(await read('type')).toBe('singleplayer');expect(Number(await read('controls','-C'))).toBe(1);
+    expect(await read('object_names[0].name')).toBe('mission_terminal');expect(await read('controls[0].name')).toBe('0');
+    const palette=Number(await read('controls[0].type'));expect(Number.isInteger(palette)&&palette>=0).toBe(true);
+    expect((await read('control_palette['+palette+'].name')).replaceAll('\\','/')).toBe(controlTag+'.device_control');
+    const count=Number(await read('scripts','-C')),scriptNames=[];for(let i=0;i<count;i++)scriptNames.push(await read('scripts['+i+'].name'));
+    expect(scriptNames).toContain('gs_mission');expect(scriptNames).toContain('gs_mission_bootstrap');
+    const afterBuild=await state(campaignId),validatedAfterBuild=await call('quickforge_validate',{document:afterBuild.project.quickForge});
+    const expectedSource=build.sourceDocumentSha256??build.sources.sourceSha256;
+    report.terminalSourceAfterBuild={dirty:afterBuild.history.head.dirty,expectedSource,actualSource:validatedAfterBuild.sourceSha256,history:afterBuild.project.history.slice(-5).map(entry=>entry.description)};
+    console.log('TERMINAL_SOURCE_AFTER_BUILD',JSON.stringify(report.terminalSourceAfterBuild));
+    expect(validatedAfterBuild.sourceSha256,'Compilation must not silently change the authored document').toBe(expectedSource);
+    await save(campaignId);expect(await mission()).toBe(prepared);
+    expect((await call('quickforge_validate',{document:(await state(campaignId)).project.quickForge})).sourceSha256).toBe(expectedSource);
+    await page.screenshot({path:path.join(output,'terminal-built.png')});
+    report.nativeTerminalMission={scope:'Owned fixture placement; actual mission objective selection/preparation/Undo/Redo/Save/full restart/native build/independent readback',realUi:true,placementSeeded:true,sourceRestart:true,sourceSha256:crypto.createHash('sha256').update(prepared).digest('hex'),cacheSha256:cacheHash,scenarioSha256:await hash(path.join(folder,scenarioPath+'.scenario')),controlPath:controlTag,controlCount:1,scriptNames,gameplayVerified:false};
+   }
    if(process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'){
     await page.evaluate(()=>{window.__sparkEncounterClicks=[];window.addEventListener('click',event=>{
       const control=event.target instanceof Element?event.target.closest('button,summary,a'):null;
@@ -253,6 +301,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
   }});
  report.complete=true;
 });}catch(error){report.error=String(error);report.stack=error.stack;if(call){const boot=await call('bootstrap').catch(()=>null);report.failedSaveDocuments=boot?.entries?.map(entry=>({id:entry.id,title:entry.title}));}
- if(call&&report.nativeBuild?.jobId){const boot=await call('bootstrap').catch(()=>null);report.nativeCompilerEvents=boot?.logs?.filter(row=>row.jobId===report.nativeBuild.jobId).slice(-300);}
+ const failedJob=report.nativeTerminalBuild?.jobId??report.nativeBuild?.jobId;
+ if(call&&failedJob){const boot=await call('bootstrap').catch(()=>null);report.nativeCompilerEvents=boot?.logs?.filter(row=>row.jobId===failedJob).slice(-300);}
  await page?.screenshot({path:path.join(output,'firefight-failure.png')}).catch(()=>{});throw error;}
 finally{if(child&&child.exitCode===null&&child.signalCode===null){await stopQaProcess(child);}await browser?.close().catch(()=>{});await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(report,null,2));}

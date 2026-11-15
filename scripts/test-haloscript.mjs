@@ -91,10 +91,14 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   await fs.writeFile(path.join(data,'sound/radio/tone.wav'),wave);
   await run('invader-sound',['-d',data,'-c','scripted_dialog_force_unspatialized','-F','16-bit_pcm','-j','1','sound/radio']);
   await run('invader-edit',['-N','-S','type','singleplayer','-I','trigger_volumes','1','end','-S','trigger_volumes[0].name','radio_area','-I','encounters','1','end','-S','encounters[0].name','survivors',scenario+'.scenario']);
+  // Use the same fresh native name/control binding as native_logic source.
+  // This is syntax/readback only; no control tag or usable game map is implied.
+  await run('invader-edit',['-n','-I','controls','1','end','-I','object_names','1','end','-S','object_names[0].name','mission_terminal','-S','controls[0].name','0',scenario+'.scenario']);
   const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',
    soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
    {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1},
-   {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}}];
+   {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}},
+   {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'mission_terminal'}];
   const source=exportHaloCeMission(native).content;await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
   await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\ngs_mission_fail_2=Rescue failed: not enough survivors. Restart or revise the operation.\r\n','utf16le')]));
   await run('invader-string',['-d',data,'-T','hud_message_text','levels/radio_messages']);
@@ -107,8 +111,9 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
    for(const name of ['gs_complete_1','gs_complete_3','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));
    results.push({engine,scriptCount:Number(count),names:names.split(/\r?\n/),scenarioSha256:await hash(path.join(tags,scenario+'.scenario'))});
   }
+  const controlName=await run('invader-edit',['-G','object_names[0].name','-G','controls[0].name',scenario+'.scenario'],true);assert.deepEqual(controlName.split(/\r?\n/),['mission_terminal','0']);
   const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');
   const failure=await run('invader-edit',['-G','messages[1].name','levels/radio_messages.hud_message_text'],true);assert.equal(failure,'gs_mission_fail_2');
-  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
+  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',nativeTerminalSyntax:'pass',controlName,failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }
