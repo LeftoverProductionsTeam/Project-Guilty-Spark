@@ -166,6 +166,9 @@ export default function LogicEvents({
             <p className="forge-hint">Checks use authored terminal origins and yaw-aligned volumes only.
               Native control tags, player clearance, physical routes, runtime configuration and gameplay remain unverified.
               No timer, teleport, inventory award or engine activation is added.</p>
+            <p className="forge-hint">Save, then build from Build &amp; playtest. A successful native build independently checks named device bindings and positions,
+              plus trigger names, rotational basis, corners and dimensions. Read Native marker readback in the build details.
+              This does not enable Forerunner Extraction or prove the physical route; use the supported staged solo test afterward.</p>
           </details>}
           <div className="button-row">
             <button onClick={add}>Add trigger volume</button>

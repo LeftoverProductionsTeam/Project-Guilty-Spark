@@ -433,6 +433,43 @@ fn vector(v: [f32; 3]) -> String {
     v.map(real).join(",")
 }
 /// Invader operates on stock native fields; the sidecar never becomes tag data.
+struct TriggerGeometry {forward:[f32;3],up:[f32;3],corner:[f32;3],dimensions:[f32;3]}
+fn trigger_geometry(trigger:&Trigger)->Result<TriggerGeometry>{
+    if trigger.rotation[0].abs()>0.00001||trigger.rotation[1].abs()>0.00001 {
+        return invalid("Native trigger volumes currently support yaw rotation; X/Y tilt is not implemented");
+    }
+    let (s,c)=trigger.rotation[2].sin_cos();let [x,y,z]=trigger.dimensions.map(|value|-value/2.);
+    Ok(TriggerGeometry{forward:[c,s,0.],up:[0.,0.,1.],corner:[trigger.position[0]+c*x-s*y,trigger.position[1]+s*x+c*y,trigger.position[2]+z],dimensions:trigger.dimensions})
+}
+/// Checks the same basis/corner used by source generation, without executing any script.
+pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::ScenarioLogicReadback)->Result<()> {
+    validate(doc)?;
+    let Some(logic)=effective_logic(doc) else{return Ok(());};
+    if read.names.len()!=logic.devices.len()||read.volumes.len()!=logic.triggers.len(){return invalid("Compiled Logic marker inventory differs from authored source");}
+    for (index,binding) in logic.devices.iter().enumerate(){
+        let source=doc.placements.iter().find(|value|value.id==binding.placement_id).ok_or_else(||crate::SparkError::Invalid("Authored Logic device disappeared".into()))?;
+        let array_index=doc.placements.iter().filter(|value|value.tag_class==source.tag_class).position(|value|value.id==source.id).unwrap();
+        let name=&read.names[index];let native_type=if source.tag_class=="ctrl"{8}else{7};
+        let compiled=read.devices.iter().find(|value|value.class==source.tag_class&&value.index==array_index)
+            .ok_or_else(||crate::SparkError::Invalid("Compiled named device is unavailable".into()))?;
+        if name.name!=device_name(&logic,&binding.placement_id)||name.object_type!=native_type||name.object_index<0||name.object_index as usize!=array_index||
+            compiled.name_index<0||compiled.name_index as usize!=index||!compiled.tag_path.replace('\\',"/").eq_ignore_ascii_case(&source.tag_path.replace('\\',"/"))||
+            !crate::native_operations::positions_close(source.position,compiled.position) {
+            return invalid(format!("Compiled Logic device {} name/index/tag/position differs from source",source.name));
+        }
+    }
+    for (source,compiled) in logic.triggers.iter().zip(&read.volumes){
+        let expected=trigger_geometry(source)?;
+        let actual=compiled.geometry.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled trigger has no oriented geometry; expected native rotational volume".into()))?;
+        if compiled.name!=trigger_name(source)||compiled.kind!=1||
+            ![(expected.forward,actual.forward),(expected.up,actual.up),(expected.corner,actual.corner),(expected.dimensions,actual.dimensions)]
+                .into_iter().all(|(a,b)|crate::native_operations::positions_close(a,b)) {
+            return invalid(format!("Compiled trigger {} name/type/basis/corner/dimensions differ from source",source.name));
+        }
+    }
+    Ok(())
+}
+
 pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec<ForgeCommand>> {
     validate(doc)?;
     let Some(logic) = &doc.logic else {
@@ -507,39 +544,11 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
             format!("{prefix}.name"),
             trigger_name(trigger),
         );
-        // Halo volume basis is forward/up, dimensions positive from one corner.
-        // The editor currently exposes yaw-only volumes; reject tilted volumes
-        // until their full native basis has independent acceptance.
-        if trigger.rotation[0].abs() > 0.00001 || trigger.rotation[1].abs() > 0.00001 {
-            return invalid("Native trigger volumes currently support yaw rotation; X/Y tilt is not implemented");
+        let geometry=trigger_geometry(trigger)?;
+        for (field,value) in [("rotation_vector_forward",geometry.forward),("rotation_vector_up",geometry.up),
+            ("starting_corner",geometry.corner),("ending_corner_offset",geometry.dimensions)] {
+            set(&mut args,format!("{prefix}.{field}"),vector(value));
         }
-        let (s, c) = trigger.rotation[2].sin_cos();
-        let offset = [
-            -trigger.dimensions[0] / 2.,
-            -trigger.dimensions[1] / 2.,
-            -trigger.dimensions[2] / 2.,
-        ];
-        let corner = [
-            trigger.position[0] + c * offset[0] - s * offset[1],
-            trigger.position[1] + s * offset[0] + c * offset[1],
-            trigger.position[2] + offset[2],
-        ];
-        set(
-            &mut args,
-            format!("{prefix}.rotation_vector_forward"),
-            vector([c, s, 0.]),
-        );
-        set(&mut args, format!("{prefix}.rotation_vector_up"), "0,0,1");
-        set(
-            &mut args,
-            format!("{prefix}.starting_corner"),
-            vector(corner),
-        );
-        set(
-            &mut args,
-            format!("{prefix}.ending_corner_offset"),
-            vector(trigger.dimensions),
-        );
         args.push(tag.clone());
         commands.push(command(args));
     }
@@ -854,10 +863,14 @@ pub fn compiler_diagnostic(source: &Source, lines: &[String]) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
-pub fn verify_compiled(doc: &QuickForgeDocument, map: &crate::maps::MapInspection) -> Result<()> {
+pub fn verify_compiled(doc: &QuickForgeDocument, map: &crate::maps::MapInspection, output:&std::path::Path) -> Result<Option<crate::maps::ScenarioLogicReadback>> {
     let Some(source) = generate(doc)? else {
-        return Ok(());
+        return Ok(None);
     };
+    let read=if effective_logic(doc).is_some_and(|logic|!logic.devices.is_empty()||!logic.triggers.is_empty()) {
+        let read=crate::maps::scenario_logic_readback(output,map)?;
+        verify_marker_readback(doc,&read)?;Some(read)
+    }else{None};
     for name in std::iter::once("gs_logic_init")
         .chain(source.regions.iter().map(|r| r.native_name.as_str()))
     {
@@ -867,5 +880,5 @@ pub fn verify_compiled(doc: &QuickForgeDocument, map: &crate::maps::MapInspectio
             ));
         }
     }
-    Ok(())
+    Ok(read)
 }

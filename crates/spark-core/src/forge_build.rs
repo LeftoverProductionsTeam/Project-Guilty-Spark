@@ -356,12 +356,12 @@ pub fn run_prepared_job(
                 crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
                 crate::quickforge::verify_starting_profile(document,&inspected)?;
                 crate::quickforge::verify_campaign_encounters(document,&inspected)?;
-                crate::native_logic::verify_compiled(document,&inspected)?;
+                crate::native_logic::verify_compiled(document,&inspected,output)?;
                 if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,output)?;}
                 Ok(())
             })();
             match readback {
-                Ok(())=>{on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool and compiled tag/map identities match; required model/round/loadout/script readback passed. No new tag tree was copied.",receipt.job_id)});return Ok(receipt);},
+                Ok(())=>{on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool and compiled tag/map identities match; required model/round/loadout/script/native-marker readback passed. No new tag tree was copied.",receipt.job_id)});return Ok(receipt);},
                 Err(problem)=>on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"reuse-readback".into(),severity:"warning".into(),progress:0,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Retained build did not pass current native readback: {problem}. It remains unchanged; the normal build path will validate a new output.")}),
             }
         }
@@ -596,7 +596,13 @@ pub fn run_prepared_job(
         crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
         crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::quickforge::verify_campaign_encounters(document,&inspected)?;
-        crate::native_logic::verify_compiled(document,&inspected)?;
+        if let Some(markers)=crate::native_logic::verify_compiled(document,&inspected,&output)? {
+            project::atomic_write(&workspace.join("native-logic-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
+                "schemaVersion":1,"cacheSha256":inspected.sha256,"markers":markers,
+                "scope":"Compiled marker names, device bindings/positions and rotational volume geometry; not activation, collision or gameplay acceptance."
+            }))?,false)?;
+            emit("verify",format!("Native marker readback passed: {} named devices and {} oriented volumes. Actual use, collision and gameplay still need a runtime test.",markers.names.len(),markers.volumes.len()),94,"info");
+        }
         if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,&output)?;}
         if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}
         crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;

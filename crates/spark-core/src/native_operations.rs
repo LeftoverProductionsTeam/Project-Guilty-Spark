@@ -704,7 +704,7 @@ fn squad_positions_disabled(value:&bool)->bool{!*value}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioStartChoice {pub index:u16,pub position:[f32;3],#[serde(skip)] position_line:usize}
-fn positions_close(a:[f32;3],b:[f32;3])->bool {
+pub(crate) fn positions_close(a:[f32;3],b:[f32;3])->bool {
     a.iter().zip(b).all(|(a,b)|a.is_finite()&&b.is_finite()&&
         (f64::from(*a)-f64::from(b)).abs()<=0.000001f64.max(f64::from(*a).abs()*f64::from(f32::EPSILON)*2.))
 }

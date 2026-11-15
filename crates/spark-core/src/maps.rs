@@ -1,5 +1,8 @@
 //! Original, bounds-checked cache reader. Format references are recorded in docs/RESEARCH.md.
 //! Known field offsets are deliberately a small audited subset, never guessed from tag names.
+#[path = "scenario_logic_readback.rs"]
+mod scenario_logic_readback;
+pub use scenario_logic_readback::{scenario_logic_readback,ScenarioLogicReadback,ScenarioLogicName,ScenarioLogicDevice,ScenarioLogicVolume,ScenarioLogicVolumeGeometry};
 use crate::{binary::Reader, invalid, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

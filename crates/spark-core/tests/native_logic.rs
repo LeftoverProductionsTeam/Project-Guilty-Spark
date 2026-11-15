@@ -288,3 +288,29 @@ fn source_names_encoding_and_native_target_budgets_are_not_silently_repaired() {
         .collect();
     assert!(l::validate(&doc).is_err());
 }
+
+
+#[test]
+fn compiled_extraction_markers_require_exact_names_devices_and_rotated_volumes() {
+    use spark_core::maps::{ScenarioLogicReadback,ScenarioLogicName,ScenarioLogicDevice,ScenarioLogicVolume,ScenarioLogicVolumeGeometry};
+    let mut doc=level();doc.placements[0].tag_class="ctrl".into();
+    let logic=doc.logic.as_mut().unwrap();logic.devices[0].native_name=Some("extraction_deploy".into());
+    logic.triggers[0].native_name=Some("extraction_return".into());logic.triggers[0].rotation[2]=std::f32::consts::FRAC_PI_2;
+    let expected=ScenarioLogicReadback{
+        names:vec![ScenarioLogicName{name:"extraction_deploy".into(),object_type:8,object_index:0}],
+        devices:vec![ScenarioLogicDevice{class:"ctrl".into(),index:0,name_index:0,tag_path:doc.placements[0].tag_path.clone(),position:[14.,0.,0.]}],
+        volumes:vec![ScenarioLogicVolume{name:"extraction_return".into(),kind:1,geometry:Some(ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[13.,-1.5,0.],dimensions:[3.,4.,3.]})}],
+    };
+    l::verify_marker_readback(&doc,&expected).unwrap();
+    for fault in 0..11 {
+        let mut wrong=expected.clone();match fault {
+            0=>wrong.names[0].name="other".into(),1=>wrong.names[0].object_type=7,2=>wrong.names[0].object_index=1,
+            3=>wrong.devices[0].name_index=-1,4=>wrong.devices[0].tag_path="devices/other".into(),5=>wrong.devices[0].position[0]+=1.,
+            6=>wrong.volumes[0].name="other".into(),7=>wrong.volumes[0].kind=0,8=>wrong.volumes[0].geometry.as_mut().unwrap().forward=[1.,0.,0.],
+            9=>wrong.volumes[0].geometry.as_mut().unwrap().corner[2]+=1.,_=>wrong.volumes[0].geometry.as_mut().unwrap().dimensions[0]+=1.,
+        }
+        assert!(l::verify_marker_readback(&doc,&wrong).is_err(),"changed native marker {fault} must fail");
+    }
+    let mut missing=expected.clone();missing.volumes.clear();assert!(l::verify_marker_readback(&doc,&missing).is_err());
+    let mut extra=expected.clone();extra.names.push(expected.names[0].clone());assert!(l::verify_marker_readback(&doc,&extra).is_err());
+}
