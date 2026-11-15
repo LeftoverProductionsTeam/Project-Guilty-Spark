@@ -58,7 +58,7 @@ function VectorEditor({ title, value, onChange }: {
 }
 
 /** Project-backed design tools; none of these controls execute commands in a game. */
-export default function CreatorStudio({ project, inspection, edit, notify, onOpenRuntimes, onBuild, onLevelEditor }: {
+export default function CreatorStudio({ project, inspection, edit, notify, onOpenRuntimes, onBuild, onLevelEditor, onMachinima }: {
   project: Project;
   inspection: MapInspection | null;
   edit: (next: Project, description: string) => void;
@@ -66,6 +66,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   onOpenRuntimes: () => void;
   onBuild: () => void;
   onLevelEditor?:()=>void;
+  onMachinima?:()=>void;
 }) {
   const [pane, setPane] = useMapState<Pane>(project.id,'creator-studio-pane','mission');
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
@@ -444,7 +445,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <button className="primary" type="button" disabled={studio.shots.length >= 256} onClick={() => change({ ...studio,
           shots: [...studio.shots, { id: freshId(), name: `Shot ${studio.shots.length + 1}`, durationMs: 3000,
             cameraPosition: [0, -8, 3], lookAt: [0, 0, 1], fov: 60, subtitle: '' }] }, 'Add cinematic shot')}><Plus size={15}/> Add shot</button></div>
-      <div className="analysis-actions"><button type="button" onClick={()=>exportScript('cinematic')}><Download size={15}/> Export cinematic .hsc</button><button type="button" onClick={()=>exportScript('cinematic',true)}>Export required camera points</button></div>
+      <div className="analysis-actions">{onMachinima&&<button type="button" onClick={onMachinima} title="Edit the same saved shots in the visual Machinima workspace. Its native camera controls build MCC takes; the named-marker cinematic export stays separate."><Camera size={15}/>Edit cameras visually</button>}<button type="button" onClick={()=>exportScript('cinematic')}><Download size={15}/> Export cinematic .hsc</button><button type="button" onClick={()=>exportScript('cinematic',true)}>Export required camera points</button></div>
       {studio.shots.length === 0 && <p className="studio-empty">No camera shots yet. Create a timeline for your mission's intro or ending.</p>}
       {studio.shots.map((shot, i) => <div className="studio-record" key={shot.id}>
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {shot.name || 'Untitled shot'}</strong><Pill>{(shot.durationMs / 1000).toFixed(1)}s</Pill>

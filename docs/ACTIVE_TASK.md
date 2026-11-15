@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — Black Echo combined actor/mission native-cache integration
+Task: Operation110 — authored mission/camera source integration
 Status: automated acceptance incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 14844a4c39e316f27876f0abfc44c78bd99f7713; this scoped commit adds Black Echo native-cache acceptance (app47a09631/runtimec20745c8). Exact hashes/results: RUNTIME_INTEGRATION_20261107.md.
-Next action: Black Echo native actor/mission gate passes; gameplay/manual settlement4/7 remains open. Continue existing campaign cinematic controls/source/Save workflow with focused checks. Keep Save37944 unresolved; no Forerunner access, game control or push.
+Latest verified revision: 96794e3d4739898747e8e0863d3a3c80adb94827 — Black Echo native UI/cache. This commit adds focused authored-camera script/tag and browser checks; full cache/game gates remain open.
+Next action: Extend the existing Black Echo native variant with UI-authored camera controls, then verify combined mission/camera cache/readback and guarded source launch paths in a source-matched app. Camera tag/browser checks pass; all QA disposed. Keep gameplay/settlement4/7, Save37944 and full roadmap open. No Forerunner access/push.
 
 ## Acceptance
 
@@ -27,7 +27,9 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 Black Echo combined milestone: actual Windows controls author4groups/8starts, rescue success/failure and optional Flood AND-area, prepare/Undo/Redo/Save/full restart and MCC13 compile/readback pass. Fixed real277-character HUD compiler path failure; source/ownership checks retained. TypeScript/frontend19/Rust creative10/browser1 and CE/MCC/Xbox script fixtures pass. Cache8cffa4af/scenario836826f4, exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No game/branch/combat/settlement/Forerunner acceptance;37944 unresolved.
 
-Black Echo shared-path milestone: existing optional objectives now share one latched native volume decision with inside/outside outcomes, player-ready sampling, grouped area Undo/Redo and Save/reopen. Reviewed regeneration preserves old modules and rejects inconsistent groups. TypeScript/frontend18/Rust creative9 and two focused browser paths pass; CE/MCC/Xbox native script fixture3scripts/4globals independently reads decision/manual globals (sourceb684dc21). Exact hashes/scopes are in RUNTIME_INTEGRATION_20261107 and UI_INTERACTION_AUDIT. All owned output disposed. No new Windows binary/full cache/game/Forerunner proof; manual technology/extraction settlement, replay, failures/rewards and squads remain open.
+Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbox script proof remains in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git; no evidence or requirement removed.
+
+Authored camera milestone: Cinematic timeline opens the same Machinima shots; browser pose/name roundtrip/history/Save/reopen/native settings pass. Existing camera adapter now reuses exact authored mission/logic modules, keeping recovered-cache guards separate. Native SDK-free probe retains2scripts and adds5; source inventory conflicts refuse changes. Fixed nested launch source via existing resolver. TypeScript/frontend25/Rust camera4(including native)/Windows backend check pass. Scenario809d81ca/test binaryac4c9806; exact hashes/fixture corrections in RUNTIME_INTEGRATION_20261107. Full app/cache/launch/game and actual story cutscenes remain open.
 
 Recovered AI milestone40f84ef: Tags→X drag→accept→Restore/reapply→Save/restart→MCC build/readback passes. Exact app/cache hashes, guard repair and scopes are in RUNTIME_INTEGRATION_20261107. Stock campaign/CE/human/game gates remain open; QA disposed.
 
@@ -100,7 +102,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Current owned QA79208/run-sw4OOf is terminal and confirmed absent:3295500025logicalB disposed; allocated-file disposal total unavailable (no physical-free-space claim). No app/game/compiler left by this run.3521SDKfiles/184203140B rehashed and reused, originals unchanged. Native UI/readback hashes and initial HUD failure are in RUNTIME_INTEGRATION_20261107. No outputs/archives/releases retained. Older operation records below are historical, not active.
+Current owned camera QA9957/run-AWkZt1 is terminal and confirmed absent:1318722640logicalB disposed; allocated-file disposal total unavailable. Earlier failed core335638853B and both browser outputs disposed. Black Echo QA79208 also confirmed absent:3295500025logicalB disposed. No active test/app/game/compiler from this work; no retained SDK/binary/archive. Detailed evidence is in RUNTIME_INTEGRATION_20261107; older records below are historical.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 

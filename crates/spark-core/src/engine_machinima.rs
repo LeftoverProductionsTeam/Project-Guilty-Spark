@@ -151,6 +151,45 @@ pub(crate) fn prepare(
     runner: &Runner,
     original_scripts: usize,
 ) -> Result<()> {
+    prepare_source(project,scenario,workspace,edit,runner,Some(original_scripts))
+}
+/// Fresh authored source already owns its exported logic modules. Reuse those
+/// exact files; recovering over them would discard the source of the mission.
+pub(crate) fn prepare_authored(project:&Project,scenario:&str,workspace:&Path,edit:&Path,runner:&Runner)->Result<()> {
+    prepare_source(project,scenario,workspace,edit,runner,None)
+}
+fn authored_source_hashes(project:&Project,scenario:&str,workspace:&Path,names:&[String])->Result<std::collections::BTreeMap<String,String>> {
+    let doc=project.quick_forge.as_ref().filter(|doc|doc.native.is_none()&&doc.runtime_id==crate::runtime::RuntimeId::MccSteam)
+        .ok_or_else(||SparkError::Invalid("Native authored camera controls need editable MCC source".into()))?;
+    crate::native_logic::verify_exported_sources(doc,workspace,scenario)?;
+    let modules=crate::native_logic::source_modules(doc)?;
+    let mut expected=std::collections::BTreeSet::new();
+    let directory=crate::native_logic::script_path(workspace,scenario)?.parent().unwrap().to_owned();
+    let mut hashes=std::collections::BTreeMap::new();
+    for module in modules {
+        let name=module.filename.strip_suffix(".hsc").ok_or_else(||SparkError::Invalid("Authored camera source has an invalid module name".into()))?.to_owned();
+        if !expected.insert(name) {return invalid("Duplicate authored camera source module");}
+        let relative=directory.join(&module.filename).strip_prefix(workspace).map_err(|_|SparkError::Invalid("Authored camera source escaped its job".into()))?.to_string_lossy().replace('\\',"/");
+        hashes.insert(relative,module.sha256);
+    }
+    if names.len()+1>16 {return invalid("The scenario has no source-module slot for the generated camera source");}
+    let globals=crate::native_logic::ensure_h1a_global_source(workspace)?;
+    if !globals.is_file()||fs::read(&globals)?!=crate::native_logic::H1A_EMPTY_GLOBAL_SOURCE {return invalid("Authored camera merge requires its exact generated global support file; unrelated globals are preserved");}
+    hashes.insert("data/global_scripts.hsc".into(),crate::maps::hash_file(&globals)?);
+    // The native compiler may omit a comment-only globals module. Every actual
+    // level module must still be present exactly once, with no unrelated source.
+    let actual:std::collections::BTreeSet<_>=names.iter().filter(|name|name.as_str()!="global_scripts").cloned().collect();
+    if actual!=expected||names.len()!=actual.len()+usize::from(names.iter().any(|name|name=="global_scripts")) {return invalid("Native authored source-module inventory differs from the exported mission/logic files");}
+    Ok(hashes)
+}
+fn prepare_source(
+    project: &Project,
+    scenario: &str,
+    workspace: &Path,
+    edit: &Path,
+    runner: &Runner,
+    original_scripts: Option<usize>,
+) -> Result<()> {
     let Some(studio) = &project.studio else {
         return Ok(());
     };
@@ -181,7 +220,7 @@ pub(crate) fn prepare(
     let inherited_scripts=read_names("scripts",1024)?;
     let inherited_globals=read_names("globals",512)?;
     let inherited_sources=read_names("source_files",16)?;
-    if inherited_scripts.len()!=original_scripts {
+    if original_scripts.is_some_and(|count|inherited_scripts.len()!=count) {
         return invalid("The staged scenario script inventory differs from the source cache. Reconcile its source before adding camera controls");
     }
     let generated_scripts=if options.playback=="sequence" {5} else {4};
@@ -194,7 +233,9 @@ pub(crate) fn prepare(
     }
     let mut recovered_sources=std::collections::BTreeMap::<String,String>::new();
     let mut source_recovery_tool=None;
-    if !inherited_scripts.is_empty() || !inherited_globals.is_empty() || !inherited_sources.is_empty() {
+    if original_scripts.is_none() {
+        recovered_sources=authored_source_hashes(project,scenario,workspace,&inherited_sources)?;
+    } else if !inherited_scripts.is_empty() || !inherited_globals.is_empty() || !inherited_sources.is_empty() {
         if inherited_sources.is_empty() {
             return invalid("Existing gameplay scripts/globals have no recoverable source modules. Recover and review their source first; Spark will not replace them");
         }
@@ -370,7 +411,7 @@ pub(crate) fn prepare(
     project::atomic_write(
         &workspace.join("engine-machinima.json"),
         &serde_json::to_vec_pretty(
-            &serde_json::json!({"schemaVersion":2,"inheritedScripts":inherited_scripts,"inheritedGlobals":inherited_globals,"recoveredSourceHashes":recovered_sources,"sourceRecoveryToolSha256":source_recovery_tool,"scriptCompilerSha256":compiler_hash,"scenario":scenario,"scenarioSha256":crate::maps::hash_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?,"projectFingerprint":project.fingerprint()?,"cameras":names,"options":options,"hud":"hidden during takes; restored on stop","actorInput":true,"recording":"OBS Game Capture at game resolution; editor capture limits do not apply","runtimeAcceptance":"pending"}),
+            &serde_json::json!({"schemaVersion":2,"sourceMode":if original_scripts.is_none(){"authored"}else{"recovered"},"inheritedScripts":inherited_scripts,"inheritedGlobals":inherited_globals,"recoveredSourceHashes":recovered_sources,"sourceRecoveryToolSha256":source_recovery_tool,"scriptCompilerSha256":compiler_hash,"scenario":scenario,"scenarioSha256":crate::maps::hash_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?,"projectFingerprint":project.fingerprint()?,"cameras":names,"options":options,"hud":"hidden during takes; restored on stop","actorInput":true,"recording":"OBS Game Capture at game resolution; editor capture limits do not apply","runtimeAcceptance":"pending"}),
         )?,
         false,
     )?;
@@ -392,6 +433,48 @@ mod tests {
             roll: Some(90.),
             easing: None,
         }
+    }
+    fn authored_fixture(workspace:&Path)->(Project,String) {
+        let mut doc=crate::quickforge::create_arena("Camera mission","smallIndoorArena").unwrap();
+        doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":"(script dormant gs_mission (sleep 1))\r\n"}]})).unwrap());
+        let source=crate::quickforge::export_sources(&doc,workspace).unwrap();
+        let mut project=Project::new("Authored camera mission");project.quick_forge=Some(doc);
+        project.studio=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"missions":[],"shots":[],"server":{"name":"Camera","runtime":"mcc","maxPlayers":1,"publicListing":false,"rotation":[]},"playtests":[]})).unwrap());
+        let studio=project.studio.as_mut().unwrap();studio.shots.push(shot());studio.engine_machinima=Some(EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:Some("a".into()),auto_start:false});
+        (project,source.scenario_path)
+    }
+    #[test]
+    fn authored_camera_source_reuses_exact_modules_and_refuses_missing_extra_or_changed_input() {
+        let temp=tempfile::tempdir().unwrap();let workspace=temp.path().join("workspace");
+        let (project,scenario)=authored_fixture(&workspace);let names=vec!["gs_logic".into(),"gs_mission".into()];
+        let hashes=authored_source_hashes(&project,&scenario,&workspace,&names).unwrap();assert_eq!(hashes.len(),3);
+        let mut with_globals=names.clone();with_globals.push("global_scripts".into());assert_eq!(authored_source_hashes(&project,&scenario,&workspace,&with_globals).unwrap(),hashes);
+        for wrong in [vec!["gs_logic".into()],vec!["gs_logic".into(),"gs_mission".into(),"foreign".into()],vec!["gs_logic".into(),"gs_mission".into(),"gs_mission".into()]] {assert!(authored_source_hashes(&project,&scenario,&workspace,&wrong).is_err());}
+        let directory=crate::native_logic::script_path(&workspace,&scenario).unwrap().parent().unwrap().to_owned();let mission=directory.join("gs_mission.hsc");
+        fs::write(&mission,b"; user changed mission").unwrap();assert!(authored_source_hashes(&project,&scenario,&workspace,&names).is_err());assert_eq!(fs::read(&mission).unwrap(),b"; user changed mission");
+        let original=crate::native_logic::source_modules(project.quick_forge.as_ref().unwrap()).unwrap().into_iter().find(|module|module.filename=="gs_mission.hsc").unwrap();fs::write(&mission,original.content).unwrap();
+        fs::write(workspace.join("data/global_scripts.hsc"),b"; user globals").unwrap();assert!(authored_source_hashes(&project,&scenario,&workspace,&names).is_err());assert_eq!(fs::read(workspace.join("data/global_scripts.hsc")).unwrap(),b"; user globals");
+    }
+    #[test]
+    #[ignore="Requires pinned installed Invader and owned disposable output; not gameplay acceptance"]
+    fn native_authored_mission_and_camera_merge_preserves_compiled_source() {
+        let invader=std::env::var_os("SPARK_INVADER_DIRECTORY").expect("Select owner-installed Invader");let edit=std::path::PathBuf::from(invader).join(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+        assert_eq!(crate::maps::hash_file(&edit).unwrap(),"02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12");
+        let temp=tempfile::tempdir_in(std::env::var_os("SPARK_GENERATED_ROOT").expect("Use the owned native QA runner")).unwrap();let workspace=temp.path().join("workspace");let (project,scenario)=authored_fixture(&workspace);
+        let cancel=std::sync::atomic::AtomicBool::new(false);let id=uuid::Uuid::new_v4().to_string();let event=|event:crate::build::JobEvent|{if event.severity=="tool"{eprintln!("{}: {}",event.phase,event.message);}};let runner=Runner{id:&id,project:&project.id,cancel:&cancel,event:&event};
+        let tag=format!("{scenario}.scenario");fs::create_dir_all(workspace.join("tags").join(crate::safe_relative(&tag).unwrap()).parent().unwrap()).unwrap();
+        let tags=workspace.join("tags").to_string_lossy().into_owned();
+        runner.run(&edit,&["-t".into(),tags.clone(),"-N".into(),"-S".into(),"type".into(),"singleplayer".into(),tag.clone()],&workspace,"camera-test-source",1).unwrap();
+        crate::native_logic::compile(project.quick_forge.as_ref().unwrap(),&workspace,&scenario,&edit,"mcc-cea",&runner).unwrap();
+        let query=|field:&str|runner.run(&edit,&["-t".into(),tags.clone(),"-G".into(),field.into(),tag.clone()],&workspace,"camera-test-readback",90).unwrap();
+        let before=query("scripts[*].name");assert!(before.lines().any(|name|name=="gs_mission"));
+        let before_globals=query("globals[*].name");
+        prepare_authored(&project,&scenario,&workspace,&edit,&runner).unwrap();
+        let after=query("scripts[*].name");for name in before.lines(){assert!(after.lines().any(|value|value==name));}for name in ["gs_mc_sequence","gs_record_start","gs_record_stop"]{assert!(after.lines().any(|value|value==name));}
+        let globals=query("globals[*].name");for name in before_globals.lines(){assert!(globals.lines().any(|value|value==name));}
+        assert_eq!(query("cutscene_camera_points[0].position").trim(),"0.000000,0.000000,0.000000");assert_eq!(query("cutscene_camera_points[0].field_of_view").trim().parse::<f32>().unwrap(),70.);
+        let receipt:serde_json::Value=serde_json::from_slice(&fs::read(workspace.join("engine-machinima.json")).unwrap()).unwrap();assert_eq!(receipt["sourceMode"],"authored");assert!(receipt["sourceRecoveryToolSha256"].is_null());
+        println!("NATIVE_AUTHORED_CAMERA {{\"scenarioSha256\":\"{}\",\"inheritedScripts\":{},\"finalScripts\":{},\"gameplayVerified\":false}}",crate::maps::hash_file(&workspace.join("tags").join(crate::safe_relative(&tag).unwrap())).unwrap(),before.lines().count(),after.lines().count());
     }
     #[test]
     fn game_angles_use_halo_z_up_radians() {

@@ -570,6 +570,7 @@ pub fn merge(
 /// H1A indexes its conventional globals source even when there are no global
 /// definitions. Never replace authored source. Shared by native authored and
 /// recovered-project preparation; this is a generated compiler support file.
+pub(crate) const H1A_EMPTY_GLOBAL_SOURCE:&[u8]=b"; Spark generated level: no additional global script definitions.\r\n";
 pub fn ensure_h1a_global_source(workspace: &std::path::Path) -> Result<std::path::PathBuf> {
     let globals = workspace.join("data/global_scripts.hsc");
     crate::reject_links(&globals)?;
@@ -577,7 +578,7 @@ pub fn ensure_h1a_global_source(workspace: &std::path::Path) -> Result<std::path
         std::fs::create_dir_all(workspace.join("data"))?;
         crate::project::atomic_write(
             &globals,
-            b"; Spark generated level: no additional global script definitions.\r\n",
+            H1A_EMPTY_GLOBAL_SOURCE,
             false,
         )?;
     }

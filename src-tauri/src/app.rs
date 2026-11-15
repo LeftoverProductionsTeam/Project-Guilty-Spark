@@ -1980,17 +1980,19 @@ fn launch_native(state: State<AppState>) -> Reply<String> {
 }
 #[tauri::command]
 fn launch_engine_take(state:State<AppState>,window:tauri::WebviewWindow,project_id:String,build_id:String,resolution:String)->Reply<String>{
-    check_document_owner(&state,&project_id,window.label())?;let p=lock(&state.library)?.get(&project_id).map_err(error)?;let _build=verified_build(&state,&p,&build_id)?;
-    let job=state.root.join("jobs").join(&build_id);let metadata:serde_json::Value=serde_json::from_slice(&bounded_read(&job.join("engine-machinima.json"),1024*1024)?).map_err(error)?;
+    check_document_owner(&state,&project_id,window.label())?;let p=lock(&state.library)?.get(&project_id).map_err(error)?;let build=verified_build(&state,&p,&build_id)?;
+    let tags=runtime_workbench::compiled_tags(&state,&p,&build)?;
+    let workspace=tags.parent().ok_or("Native camera source workspace is unavailable")?;
+    let metadata:serde_json::Value=serde_json::from_slice(&bounded_read(&workspace.join("engine-machinima.json"),1024*1024)?).map_err(error)?;
     if metadata.get("schemaVersion").and_then(|v|v.as_u64())!=Some(2){return Err("Rebuild this take with the current recording controls before launching; older diagnostic scripts can display console text".into());}
     let scenario=p.scenario_path().map_err(error)?;if metadata.get("scenario").and_then(|v|v.as_str())!=Some(scenario.as_str())||metadata.get("projectFingerprint").and_then(|v|v.as_str())!=Some(p.fingerprint().map_err(error)?.as_str()){return Err("This build does not contain the current native camera take. Save and rebuild it first".into());}
-    let scenario_file=job.join("tags").join(core::safe_relative(&format!("{scenario}.scenario")).map_err(error)?);core::reject_links(&scenario_file).map_err(error)?;
+    let scenario_file=tags.join(core::safe_relative(&format!("{scenario}.scenario")).map_err(error)?);core::reject_links(&scenario_file).map_err(error)?;
     if metadata.get("scenarioSha256").and_then(|v|v.as_str())!=Some(maps::hash_file(&scenario_file).map_err(error)?.as_str()){return Err("The take's scenario tags changed after compilation. Rebuild before launching".into());}
     let tools=project_tools(&state,&p)?;let kit=tools.h1a_directory.ok_or("Select Halo: CE Mod Tools - MCC before launching a native take")?;let exe=kit.join("halo_tag_test.exe");core::reject_links(&exe).map_err(error)?;if !exe.is_file(){return Err("MCC Standalone (halo_tag_test.exe) is missing from the selected editing kit".into());}
     let size=match resolution.as_str(){"1080p"=>(1920,1080),"1440p"=>(2560,1440),"4k"=>(3840,2160),"desktop"=>{let monitor=window.current_monitor().map_err(error)?.ok_or("Monitor resolution unavailable; choose a capture resolution")?;(monitor.size().width,monitor.size().height)},_=>return Err("Choose desktop, 1080p, 1440p or 4k capture resolution".into())};
     if size.0<640||size.1<480||size.0>7680||size.1>4320{return Err("Native capture resolution must be between 640×480 and 7680×4320".into());}
-    let init=job.join("spark-engine-take-init.txt");let variant=if p.source.as_ref().is_some_and(|s|s.cache_version>0){"game_variant slayer\r\n"}else{""};project::atomic_write(&init,format!("; Spark native take. Flashlight toggles camera and HUD.\r\n{variant}map_name \"{scenario}\"\r\n").as_bytes(),false).map_err(error)?;
-    let mut command=std::process::Command::new(&exe);command.current_dir(&kit).args(["-window","-vidmode",&format!("{},{}",size.0,size.1),"-tags_dir"]).arg(job.join("tags")).arg("-data_dir").arg(job.join("data")).arg("-exec").arg(&init).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    let init=workspace.join("spark-engine-take-init.txt");let variant=if p.source.as_ref().is_some_and(|s|s.cache_version>0){"game_variant slayer\r\n"}else{""};project::atomic_write(&init,format!("; Spark native take. Flashlight toggles camera and HUD.\r\n{variant}map_name \"{scenario}\"\r\n").as_bytes(),false).map_err(error)?;
+    let mut command=std::process::Command::new(&exe);command.current_dir(&kit).args(["-window","-vidmode",&format!("{},{}",size.0,size.1),"-tags_dir"]).arg(&tags).arg("-data_dir").arg(workspace.join("data")).arg("-exec").arg(&init).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     #[cfg(windows)]{use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);}
     let child=command.spawn().map_err(error)?;Ok(format!("MCC Standalone take launched at {}×{} (process {}). Toggle your flashlight for camera/HUD controls; record the game window with OBS. Retail MCC load and actor movement still require acceptance.",size.0,size.1,child.id()))
 }

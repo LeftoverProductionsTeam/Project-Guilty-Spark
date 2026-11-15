@@ -620,7 +620,7 @@ pub fn run_prepared_job(
         crate::native_logic::compile(document,workspace,&sources.scenario_path,&invader(tools,"invader-edit").unwrap(),engine,&runner)?;
         let output=output_dir.join(format!("{}.map",sources.bsp_name));
         if document.runtime_id==RuntimeId::MccSteam {
-            crate::engine_machinima::prepare(project,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner,0)?;
+            crate::engine_machinima::prepare_authored(project,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner)?;
             // H1A native tags include model classes/fields which Invader's
             // classic input parser cannot compile. Use the matching SDK Tool.
             let mut args=halo_tool_prefix(tools.hek_flavor.as_deref(),workspace,&stage)?;

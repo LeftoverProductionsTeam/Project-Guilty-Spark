@@ -494,11 +494,11 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     'machinima',
     true,
     [
-      'Capture keys and enable In-engine recording.',
+      'From Creator Studio → Cinematic timeline, choose Edit cameras visually to open the same saved shots in Machinima. Capture keys and open In-game recording.',
       'Choose a fixed camera or sequence, then build the native variant.',
       'Load the scenario and toggle the flashlight to start or stop the take; record with OBS.',
     ],
-    'Private MCC builds use installed Invader-recover to recover existing embedded script modules, then compile those exact modules alongside the camera take. Missing original source, filename/name collisions or lost script/global definitions block adoption. Native game behavior still needs independent acceptance.',
+    'Editable MCC maps retain their exact exported mission/logic modules while adding camera controls. Imported MCC builds use installed Invader-recover to recover existing embedded script modules, then compile those exact modules alongside the camera take. Missing original source, filename/name collisions or lost script/global definitions block adoption. Native game behavior still needs independent acceptance.',
   ),
   f(
     'missions',
