@@ -4,6 +4,8 @@
  * Halo CE server commands are exported ONLY as a validated, user-reviewed
  * plaintext draft. The other runtime families deliberately have no exporter.
  */
+import {addLogicTrigger,setNativeLogicName} from './nativeLogic.ts';
+import type {Project} from './types';
 import {validMachinimaSettings} from './machinima.ts';
 export interface MissionBeat {
   id: string;
@@ -17,6 +19,8 @@ export interface MissionBeat {
   hudText?: string | null;
   checkpoint?: boolean | null;
   completeMission?: boolean | null;
+  /** Evaluate this native player-volume condition when the beat begins; false skips it. */
+  conditionVolume?: string | null;
 }
 export interface CameraShot {
   id: string;
@@ -84,6 +88,51 @@ export function emptyCreatorStudio(): CreatorStudioDocument {
     server: { name: 'Guilty Spark LAN', runtime: 'haloCustomEdition', maxPlayers: 8, publicListing: false, rotation: [], gameTypes: [] },
   };
 }
+/** An editable blueprint using existing native bindings, not a deployed game. */
+export function blackEchoMission(nextId:()=>string):MissionBeat[] {
+  const rows:[string,string,MissionBeat['trigger'],string,string?][]=[
+    ['Squad insertion','Reach the insertion area and review the operation briefing.','triggerVolume','be_insert'],
+    ['Rescue stranded Marines','Locate and escort the survivors. This step waits for authored rescue logic to call gs_complete_2; a player entering the reference area alone cannot complete it.','manual','be_survivors'],
+    ['Investigate the Covenant facility','Clear the facility defenders and search for the classified package.','encounterCleared','be_covenant'],
+    ['Recover classified technology','Recover the technology using the selected runtime inventory/objective rules; this area marks the native mission handoff.','triggerVolume','be_artifact'],
+    ['Contain the Flood emergency','Optional containment branch: when this step begins, a player in be_containment requests the Flood encounter. Otherwise continue to extraction defense.','encounterCleared','be_flood','be_containment'],
+    ['Defend the extraction point','Clear the forces attacking the evacuation site.','encounterCleared','be_defense'],
+    ['Extract survivors and equipment','Reach evacuation. This step waits for actual survivor/loot settlement to call gs_complete_7. The reference area alone cannot bank inventory or complete extraction; the persistent world stays active.','manual','be_extract'],
+  ];
+  return rows.map(([title,objective,trigger,reference,conditionVolume])=>({
+    id:nextId(),title,objective,trigger,encounterName:trigger==='encounterCleared'?reference:'',
+    ...(trigger!=='encounterCleared'?{triggerRef:reference}:{}),...(conditionVolume?{conditionVolume}:{}),
+    hudObjective:true,hudText:title,
+  }));
+}
+/** One project history action; original geometry, bindings and source modules
+ * stay intact. Areas are editable source markers, not valid terrain/navigation. */
+export function addBlackEchoDraft(project:Project,nextId:()=>string):Project {
+  if(project.studio?.missions.length)throw Error('Preserve the current operation; use a campaign project with no mission beats.');
+  let document=project.quickForge;
+  if(!document||document.native||document.gameMode!=='campaign')throw Error('Open editable Campaign / scripted solo source before creating Black Echo.');
+  if(document.logic?.manualSource!=null||document.logic?.handwrittenSources?.some(source=>source.filename.toLowerCase()==='gs_mission.hsc'))
+    throw Error('Preserve and reconcile the existing mission or handwritten logic before adding a generated operation.');
+  const areas:[string,string,number,number,number][]=[
+    ['be_insert','Black Echo · Insertion',0,0,4],['be_survivors','Black Echo · Marine rescue',8,0,4],
+    ['be_artifact','Black Echo · Classified technology',24,0,4],['be_containment','Black Echo · Optional Flood branch',25,1,2],
+    ['be_extract','Black Echo · Evacuation',40,0,6],
+  ];
+  const existing=document.logic?.triggers??[];
+  if(areas.some(([name])=>existing.filter(trigger=>trigger.nativeName===name).length>1))throw Error('Resolve duplicate Black Echo area names before creating this operation.');
+  if(existing.length+areas.filter(([name])=>!existing.some(trigger=>trigger.nativeName===name)).length>64)throw Error('Black Echo needs space in the existing 64-volume native budget. No source was changed.');
+  const base=document.spawns[0]?.position??[0,0,0];
+  if(areas.filter(([name])=>!existing.some(trigger=>trigger.nativeName===name)).some(([, ,x,y])=>[base[0]+x,base[1]+y,base[2]+1.5].some(value=>!Number.isFinite(value)||Math.abs(value)>1500)))
+    throw Error('Move the insertion start so the new areas fit the existing native ±1500 coordinate limit. No source was changed.');
+  for(const [nativeName,label,x,y,width] of areas){
+    if(existing.some(trigger=>trigger.nativeName===nativeName))continue;
+    const added=addLogicTrigger(document,[base[0]+x,base[1]+y,base[2]+1.5]);
+    const trigger=added.document.logic!.triggers.find(trigger=>trigger.id===added.id)!;
+    trigger.name=label;trigger.dimensions=[width,width,3];
+    document=setNativeLogicName(added.document,{type:'trigger',value:trigger},nativeName);
+  }
+  return {...project,quickForge:document,studio:{...(project.studio??emptyCreatorStudio()),missions:blackEchoMission(nextId)}};
+}
 const commandToken = /^[A-Za-z0-9_-]{1,64}$/;
 // Stock Halo CE accepts custom game variants with spaces when safely quoted.
 const variantToken = /^[A-Za-z0-9_ -]{1,64}$/;
@@ -111,6 +160,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   for (const m of doc.missions) {
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
+      (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||
       [m.hudObjective,m.checkpoint,m.completeMission].some(value=>value!=null&&typeof value!=='boolean'))

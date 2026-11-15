@@ -44,6 +44,8 @@ pub struct MissionBeat {
     pub checkpoint:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub complete_mission:Option<bool>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub condition_volume:Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -170,8 +172,13 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
     }
     for (index,beat) in binding.missions.iter().enumerate() {
-        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)) {
-            return invalid("Native level completion must be the final beat, without a checkpoint request on the same beat");
+        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)||beat.condition_volume.is_some()) {
+            return invalid("Native level completion must be the final beat, without a checkpoint or optional condition on the same beat");
+        }
+        if let Some(name)=&beat.condition_volume {
+            if !script_ident(name)||!doc.logic.as_ref().is_some_and(|logic|logic.triggers.iter().any(|trigger|crate::native_logic::trigger_name(trigger)==*name)) {
+                return invalid(format!("Mission '{}' references missing optional-condition volume '{}'",beat.title,name));
+            }
         }
         match beat.trigger.as_str() {
             "triggerVolume"=>{
@@ -289,6 +296,7 @@ impl CreatorStudio {
                 || !bounded(&beat.encounter_name, 128)
                 || !["manual", "triggerVolume", "encounterCleared", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
+                || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
@@ -400,4 +408,16 @@ mod tests {
         doc.playtests[0].evidence="Observed in real Halo CE session".into();
         assert!(doc.validate().is_ok());
     }
+    #[test]
+    fn optional_objective_condition_survives_project_save_without_changing_legacy_fields() {
+        let old=serde_json::json!({"id":"objective","title":"Containment","objective":"Contain the outbreak","trigger":"encounterCleared","encounterName":"be_flood"});
+        let original:MissionBeat=serde_json::from_value(old.clone()).unwrap();
+        assert!(original.condition_volume.is_none());assert!(serde_json::to_value(&original).unwrap().get("conditionVolume").is_none());
+        let mut value=old;value["conditionVolume"]=serde_json::json!("be_containment");
+        let mut document=studio();document.missions.push(serde_json::from_value(value).unwrap());document.validate().unwrap();
+        let saved=serde_json::to_vec(&document).unwrap();let restored:CreatorStudio=serde_json::from_slice(&saved).unwrap();
+        assert_eq!(restored.missions[0].condition_volume.as_deref(),Some("be_containment"));
+        document.missions[0].condition_volume=Some("unsafe volume".into());assert!(document.validate().is_err());
+    }
+
 }

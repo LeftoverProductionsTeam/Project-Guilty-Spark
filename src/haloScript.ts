@@ -6,9 +6,9 @@
  */
 import type { CreatorStudioDocument } from './creatorStudio';
 import { emptyCreatorStudio, validateCreatorStudio } from './creatorStudio.ts';
-import { inspectScenarioBindings } from './scenarioBindings';
-import { sameJson } from './semanticJson';
-import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight';
+import { inspectScenarioBindings } from './scenarioBindings.ts';
+import { sameJson } from './semanticJson.ts';
+import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight.ts';
 import type { Project } from './types';
 import type { NativeOperation } from './nativeOperations';
 export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true; hudMessages?:NativeFirefightHudMessage[]; sourceBinding?:{schemaVersion:1;rules:FirefightConfig;sourceSha256:string;encounters:string[][];groups:{name:string;actorVariantPath:string;count:number}[];activation:'manual'|'startup';loadout:'scenario'|'authored-profile';playerProfileName?:string} }
@@ -38,8 +38,12 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
   studio.missions.forEach((beat,i)=>{
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
-    if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true))
-      throw Error('Native level completion must be the final beat, without a checkpoint request on the same beat.');
+    if(beat.conditionVolume!=null){
+      const volume=ensureName(beat.conditionVolume,`Beat ${i+1} optional condition volume`);deps.push('trigger_volume:'+volume);
+      scripted.push(`  (if (volume_test_objects ${volume} (players)) (begin`);
+    }
+    if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null))
+      throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
     if(beat.hudObjective===true) {
       const text=beat.hudText??'';
       if(!text.length||text.length>254||/[%\x00-\x1f\x7f]/.test(text))
@@ -76,12 +80,14 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     scripted.push('  (print "gs objective complete")');
     if(beat.checkpoint===true)scripted.push('  (game_save)');
     if(beat.completeMission===true)scripted.push('  (game_won)');
+    if(beat.conditionVolume!=null)scripted.push('  ))');
   });
   scripted.push(')', '');
   lines.push(...globals, '', ...manualSetters, ...scripted);
   return {filename:'gs_mission.hsc',content:lines.join('\r\n'),dependencies:deps,activation:'(wake gs_mission)',warnings:[
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
-    'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function.',
+    'Optional volume conditions are evaluated once when their step starts; a false condition skips that step. This is shared scenario state, not independent multiplayer squad progress.',
+    'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
   ],generatedOnly:true};
@@ -116,11 +122,12 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||
+    (beat.conditionVolume!=null&&typeof beat.conditionVolume!=='string')||
     (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')||
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
     [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
@@ -140,7 +147,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,
-    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null}));
+    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null}));
   return sameJson(normalize(a),normalize(b));
 }
 export interface NativeMissionReview {

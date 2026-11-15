@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { emptyCreatorStudio } from '../src/creatorStudio.ts';
+import { blackEchoMission, emptyCreatorStudio } from '../src/creatorStudio.ts';
 import { exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
 const studio=emptyCreatorStudio();
 studio.missions=[
@@ -40,3 +40,17 @@ assert.equal(firefight.activation,'(wake gs_firefight)');
 assert.throws(()=>exportHaloCeFirefight({...config,endless:true}),/Endless/);
 assert.throws(()=>exportHaloCeFirefight({...config,waves:[{...config.waves[0],groups:[{enemyId:'elite',count:9}]}]}),/starting actors/);
 console.log('PASS: CE HaloScript authoring, validated scenario refs, cutscene points, finite AI waves, anti-injection, dependency manifest');
+
+// Optional objectives must gate the actual native AI/HUD/wait instructions,
+// not merely annotate a mission plan. Required native bindings stay explicit.
+const operation=emptyCreatorStudio();let beatId=0;operation.missions=blackEchoMission(()=>`black_echo_${++beatId}`);
+const optional=exportHaloCeMission(operation),gate=optional.content.indexOf('(if (volume_test_objects be_containment (players)) (begin'),spawn=optional.content.indexOf('(ai_place be_flood)'),end=optional.content.indexOf('  ))',spawn),next=optional.content.indexOf('(ai_place be_defense)');
+assert.ok(gate>=0&&gate<spawn&&spawn<end&&end<next);assert.ok(optional.content.indexOf('(hud_set_objective_text gs_mission_obj_5)',gate)<spawn);
+assert.ok(optional.dependencies.includes('trigger_volume:be_containment'));
+assert.ok(optional.content.includes('(sleep_until gs_manual_2_done 15)'));assert.ok(optional.content.includes('(sleep_until gs_manual_7_done 15)'));
+assert.ok(!optional.content.includes('(volume_test_objects be_survivors (players))'));assert.ok(!optional.content.includes('(volume_test_objects be_extract (players))'));
+assert.ok(!optional.content.includes('(game_won)'));assert.ok(!optional.content.includes('(sleep 18000)'));
+const body=optional.content.split(/\r?\n/).filter(line=>!line.trimStart().startsWith(';')).join('');assert.equal([...body].filter(c=>c==='(').length,[...body].filter(c=>c===')').length);
+operation.missions[4].conditionVolume='';assert.throws(()=>exportHaloCeMission(operation),/condition volume/);
+operation.missions[4].conditionVolume='be_containment';operation.missions[6].conditionVolume='be_exit_choice';operation.missions[6].completeMission=true;assert.throws(()=>exportHaloCeMission(operation),/final beat/);
+console.log('PASS: Black Echo starter, optional native objective guard, HUD/AI gating, source bindings and safe conditional completion');

@@ -3,8 +3,8 @@
 Task: Operation110 — native Extraction/campaign creator source; lighting/Linux/outbreak
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: e472e7960c5e74b886fae96e3ceb2d66adaf5fd6 Library restart repair; native encounter backend repair committed with this checkpoint passes current Windows compilation and traced source/recovery/restart/native compile/readback. Authored-map viewport changes remain separately uncommitted/unverified.
-Next action: Implement the received94e66e4b MegaWorld Operations/Operation Black Echo through existing Creator Studio, native mission/Logic Events/audio and Forerunner contract; no competing editor/format. Native encounter append/restore/restart/build/readback is now proven below. Original-campaign XYZ/viewport, recipe reconciliation and intermittent native navigation remain open. Finish or preserve separately labeled UI WIP; Forerunner read-only, no push.
+Latest verified revision: 1d72dd7ee7ebe6a5bb8aef14633792bbacc3eaba — native encounter source/recovery/restart/build/readback verified; Black Echo draft source committed with this checkpoint has focused automated checks only. Three authored-AI viewport source files remain separately uncommitted/unverified.
+Next action: Continue94e66e4b Black Echo within existing Creator Studio: bind real Marine rescue/escort and owned audio/radio/HUD cues, then real loot/extraction settlement through supported Forerunner interfaces. Current7-objective/5-area draft has conditional native source and manual safety gates, not full mission gameplay. Native app/restart/compile/readback of this new draft remains a stabilization gate. Preserve original-campaign XYZ/viewport WIP and intermittent native navigation defect; Forerunner read-only, no push.
 
 ## Acceptance
 
@@ -75,6 +75,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+Forerunner reviewed once, read-only at HEAD8d2cbb07f72ac9738cf9e6f9f631bfdbdb51c471. Root SPARK_INTEGRATION_CONTRACT.md SHA1ed7398de4c256abe69d7ab99b8c8c86cde22bd721d50043665efe04ccf33c2c, clean for that file. Version1 operations still only runtime.discover; ordinary native tags/HaloScript plus supported startup remain the content path. Independent squad mission import and exactly-once inventory settlement are not admitted by that contract. No AGPL engine implementation copied into MIT Spark, no invented supplemental importer, no engine writes/builds/launches. New source/Rust/browser test output disposed; final browser42810 exited0,1/1pass; owned output disposed24,318,648B. No active jobs.
 
 All newly owned operations terminal; no active test/app/game. Final root36441/run-aMCXpM exited0 and disposed3,615,422,165B (peak allocated3,421,368,016B). Initial failed root44809 disposed2,373,490,221B; Library root35481 disposed2,272,377,622B. Focused baseline run6826 disposed378,121,413B; earlier unit compiler run25659 disposed1,314,216,170B, wrong forge_reuse filter selected0 and is not a pass. Only small selected receipts/PNGs retained externally; no binary, map, SDK or archive exported. Original maps/SDK/runtimes/Forerunner/remotes untouched; no game/push/publication. Native followups/probes20439/93320/56728/74983/53123/29810/48805 are terminal; their failures/pass distinctions remain in UI_INTERACTION_AUDIT.md.
 

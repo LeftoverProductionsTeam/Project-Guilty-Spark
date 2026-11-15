@@ -6,7 +6,7 @@ import MissionSourceReview from './MissionSourceReview';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
 import {
-  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio,
+  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, addBlackEchoDraft,
 } from '../creatorStudio';
 import type { CameraShot, CreatorStudioDocument, MissionBeat, PlaytestRecord } from '../creatorStudio';
 import { Notice, NumberField, PageTitle, Pill } from './ui';
@@ -20,7 +20,9 @@ import MultiplayerWorkbench from './MultiplayerWorkbench';
 import {makeFiveModeTestPlan, seedFiveModePlaytests} from '../haloModeTestPlan';
 import {forgeTargets} from '../forge';
 import PowerupStudio from './PowerupStudio';
-import {useMapState} from '../mapSession';
+import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
+import type {NativeAiStartView} from '../nativeAiStart';
+import {useMapState,readMapSession,writeMapSession} from '../mapSession';
 import ExternalBrowserLink from './ExternalBrowserLink';
 
 const bindingLabels = {
@@ -52,13 +54,14 @@ function VectorEditor({ title, value, onChange }: {
 }
 
 /** Project-backed design tools; none of these controls execute commands in a game. */
-export default function CreatorStudio({ project, inspection, edit, notify, onOpenRuntimes, onBuild }: {
+export default function CreatorStudio({ project, inspection, edit, notify, onOpenRuntimes, onBuild, onLevelEditor }: {
   project: Project;
   inspection: MapInspection | null;
   edit: (next: Project, description: string) => void;
   notify: (message: string, tone?: string) => void;
   onOpenRuntimes: () => void;
   onBuild: () => void;
+  onLevelEditor?:()=>void;
 }) {
   const [pane, setPane] = useMapState<Pane>(project.id,'creator-studio-pane','mission');
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
@@ -153,6 +156,15 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     } catch(problem) {if(activeProject.current===input.id)setError(String(problem));}
     finally {release();setPreparingMission(false);}
   }
+  function selectMissionArea(name:string){
+    const area=project.quickForge?.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
+    if(!onLevelEditor||area.length!==1){setError('Select one existing named source area before opening the Level Editor.');return;}
+    const actor=readMapSession<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,null);
+    if(actor?.active)writeMapSession(project.id,NATIVE_AI_START_VIEW,{...actor,active:false});
+    writeMapSession(project.id,'forge.selection',[area[0].id]);writeMapSession(project.id,'forge.zone',null);
+    writeMapSession(project.id,'forge.sourceSurface',null);writeMapSession(project.id,'forge.workshopSelection',null);
+    writeMapSession(project.id,'forge.bspWorkshop',false);onLevelEditor();
+  }
   function updateBeat(id: string, patch: Partial<MissionBeat>) {
     change({ ...studio, missions: studio.missions.map(m => m.id === id ? { ...m, ...patch } : m) }, 'Update mission beat');
   }
@@ -228,7 +240,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       <div className="studio-heading"><div><h2><Flag size={18}/> Mission director</h2><p>Ordered objectives and scenario triggers with a Halo CE .hsc source generator. Every trigger must exist in your editable scenario.</p></div>
         <button className="primary" type="button" disabled={studio.missions.length >= 128} onClick={() => change({ ...studio,
           missions: [...studio.missions, { id: freshId(), title: `Beat ${studio.missions.length + 1}`, objective: '', trigger: 'manual', encounterName: '' }] }, 'Add mission beat')}><Plus size={15}/> Add beat</button></div>
-      <div className="analysis-actions"><button type="button" onClick={()=>exportScript('mission')}><Download size={15}/> Export mission .hsc</button><button type="button" onClick={()=>exportScript('mission',true)}>Export required tags list</button></div>
+      <div className="analysis-actions"><button type="button" disabled={studio.missions.length>0||project.quickForge?.gameMode!=='campaign'||!!project.quickForge?.native}
+        title={studio.missions.length?'Use an empty mission in a separate project to preserve this operation.':'Use editable Campaign / scripted solo source. Adds objectives and selectable areas; does not deploy gameplay.'}
+        onClick={()=>{try{edit(addBlackEchoDraft(project,freshId),'Create Operation Black Echo blueprint');setError('');notify('Black Echo objectives and five areas added. Move the starter areas onto playable terrain; bind enemies and your audio, then review Native mission build. Rescue, inventory and squad behavior need runtime integration.','info');}catch(error){setError(String(error));}}}>Create Black Echo draft</button>
+        <button type="button" onClick={()=>exportScript('mission')}><Download size={15}/> Export mission .hsc</button><button type="button" onClick={()=>exportScript('mission',true)}>Export required tags list</button></div>
       <details className="studio-handoff">
         <summary>Native mission build</summary>
         <p className="studio-hint">Attach generated mission source to this editable campaign.
@@ -266,9 +281,20 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           <option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="timer">Timer (needs script binding)</option></select></label>
         <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
-        {beat.trigger === 'triggerVolume' && <label>Scenario trigger-volume identifier<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
+        {(beat.trigger === 'triggerVolume'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}
+        {onLevelEditor&&(beat.trigger==='triggerVolume'||beat.trigger==='manual'&&beat.triggerRef!=null)&&<button type="button"
+          disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.triggerRef)}
+          title="Select the existing native area in the Level Editor. Use its move/scale handles; then return to Mission director."
+          onClick={()=>selectMissionArea(beat.triggerRef??'')}>Select objective area in Level Editor</button>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
+        <label><input type="checkbox" checked={beat.conditionVolume!=null} disabled={beat.completeMission===true}
+          onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined})}/>Optional step · run only if a player is in a named area when this step starts</label>
+        {beat.conditionVolume!=null&&<div><label>Optional step condition volume<input list={volumeChoices} maxLength={31} spellCheck={false}
+          aria-label={'Optional condition '+(i+1)} value={beat.conditionVolume} onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.value})}/></label>
+          {onLevelEditor&&<button type="button" disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.conditionVolume)}
+            onClick={()=>selectMissionArea(beat.conditionVolume??'')}>Select optional area in Level Editor</button>}
+          <small>False skips this objective, its encounter, HUD update and checkpoint. The condition is checked once, not continuously; this is shared native mission state.</small></div>}
         <details><summary>Native objective &amp; completion</summary>
           <label><input type="checkbox" checked={beat.hudObjective===true}
             onChange={event=>updateBeat(beat.id,{hudObjective:event.target.checked?true:undefined,
@@ -281,9 +307,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
             disabled={beat.completeMission===true&&beat.checkpoint!==true}
             onChange={event=>updateBeat(beat.id,{checkpoint:event.target.checked?true:undefined})}/>Request a safe checkpoint after this beat</label>
           <p className="studio-hint">The engine may refuse or time out a save when unsafe. This does not prove a saved checkpoint.</p>
-          <label title="Only the final beat can request completion; disable its checkpoint first.">
+          <label title="Only the final unconditional beat can request completion; disable its checkpoint and optional condition first.">
             <input type="checkbox" checked={beat.completeMission===true}
-              disabled={beat.completeMission!==true&&(i+1!==studio.missions.length||beat.checkpoint===true)}
+              disabled={beat.completeMission!==true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null)}
               onChange={event=>updateBeat(beat.id,{completeMission:event.target.checked?true:undefined})}/>Request native level completion after this beat
           </label>
           <p className="studio-hint">Completion can advance the campaign according to the selected engine's level configuration.

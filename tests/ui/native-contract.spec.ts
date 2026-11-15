@@ -4037,3 +4037,24 @@ for(const configured of [true,false])test(`QuickForge build paths and configure 
  await expect(paths).toContainText('Source tag root: C:/Map/Updated Tags');
  await page.getByRole('button',{name:'Configure build tools',exact:true}).click();await revealPagedControl(tags);await expect(tags).toHaveValue('C:/Map/Updated Tags');
 });
+
+
+test('Black Echo draft uses one project history action and selects its native area through real controls',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const p=(window as any).__sparkMock.projects.a.project;
+  p.quickForge={schemaVersion:1,name:'Synthetic campaign authoring',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[],logic:{schemaVersion:1,triggers:[],devices:[],rules:[]}};
+  p.studio={schemaVersion:1,missions:[],shots:[],playtests:[],server:{name:'Private source',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
+ });
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await chooseTool(page,'Creator Studio');const create=page.getByRole('button',{name:'Create Black Echo draft',exact:true,includeHidden:true});await revealPagedControl(create);await create.click();
+ await expect(page.locator('.studio-record')).toHaveCount(7);
+ const saved=()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project);
+ await expect.poll(async()=>(await saved()).quickForge.logic.triggers.length).toBe(5);
+ await page.keyboard.press('Control+z');await expect(page.locator('.studio-record')).toHaveCount(0);await expect.poll(async()=>(await saved()).quickForge.logic.triggers.length).toBe(0);
+ await page.keyboard.press('Control+y');await expect(page.locator('.studio-record')).toHaveCount(7);await expect.poll(async()=>(await saved()).quickForge.logic.triggers.length).toBe(5);
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions.length)).toBe(7);
+ const record=page.locator('.studio-record').nth(4);await record.getByLabel('Optional condition 5',{exact:true}).fill('be_artifact');
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[4].conditionVolume)).toBe('be_artifact');
+ await page.locator('.studio-record').first().getByRole('button',{name:'Select objective area in Level Editor',exact:true}).click();
+ await expect(page.getByLabel('Current workspace',{exact:true})).toContainText(/Level editor/i);await expect(page.locator('.forge-viewport')).toBeVisible();
+});
