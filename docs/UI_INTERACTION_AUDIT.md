@@ -608,3 +608,15 @@ Actual Windows app authored four groups/eight starts, successful-rescue objectiv
 ## Shared cinematic/visual camera workflow — 15 November
 
 Cinematic timeline → Edit cameras visually now opens Machinima with the same project/shot data, preserving history and ownership. The tooltip and How To distinguish named-marker cinematic source export from MCC native recording controls. Browser proof covers actual name/position controls, roundtrip, Undo/Redo, Save, native-take settings and close/reopen. Backend source merging now preserves authored mission/logic instead of expecting zero scripts or recovering over their exported files. Native tag/script readback and Windows backend compilation pass; the launch command now uses the existing verified nested-source resolver. Exact evidence and setup corrections are in RUNTIME_INTEGRATION_20261107. Full native app/cache/launch/gameplay acceptance remains Not run for this slice.
+
+
+## Native combined mission/camera workflow and discovered UI defects — 15 November
+
+Actual Windows authoring/Undo/Redo/Save/full restart and a complete Black Echo MCC cache now retain both mission and two-camera source. Independent native readback verifies positions/orientation/FOV, encounter starts, scripts/globals and HUD. Existing verified source resolver finds the matching nested tag workspace. Game launching/control/actors and story-cinematic acceptance remain open; exact hashes/scopes are in RUNTIME_INTEGRATION_20261107.
+
+| Issue/control | Observed behavior | Repair/evidence |
+| --- | --- | --- |
+| In-game recording drawer; machinima.css | Inline long selectors overflowed; legacy30vh nested scroll clipped controls and wasted drawer space | Rows wrap, selects shrink, shared drawer owns scrolling. Browser/native8size matrix at100percent UI scale:0horizontal/nested overflow, no clipped controls. |
+| Actor model source; MachinimaWorkspace.tsx | Persisted unavailable ID appeared as an empty picker; stale source error obscured a valid geometry preview and could not be cleared | Valid cached-map candidates only, explicit unavailable option, working Clear actor source, separate actor/mesh errors. Browser2 and actual native clear/full restart pass; geometry58triangles, Studio/source/history/cache unchanged. |
+
+How To now documents the actual Camera keys source/clear controls. Native size-probe auto-zoom precondition was repaired by reusing the existing100percent Interface Studio setup; no product auto-scaling or assertions were weakened. This is scoped acceptance, not a whole-application UI pass. Physical DPI changes, detached windows, full native actor rendering and game behavior remain separate.

@@ -8,13 +8,15 @@ import crypto from 'node:crypto';
 import {createReadStream} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
-import {chooseTool,openStudioMenu,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
+import {chooseTool,openStudioMenu,openDrawer,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 import {assertQaOutputPath,withDevelopmentWorkspace,waitForQaExit,stopQaProcess} from './native-qa-storage.mjs';
 import {nativeStandaloneBaseline} from './native-standalone-baseline.mjs';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
 const blackEchoReview=process.env.SPARK_NATIVE_BLACK_ECHO_REVIEW==='1',marineTag='characters/marine_armored/marine_armored assault rifle',floodTag='characters/floodcombat_human/floodcombat_human assault rifle';
+const blackEchoCameraReview=process.env.SPARK_NATIVE_BLACK_ECHO_CAMERA_REVIEW==='1';
+if(blackEchoCameraReview&&!blackEchoReview)throw Error('The native camera variant requires the Black Echo native authoring workflow.');
 const saveOnly=process.env.SPARK_NATIVE_WORKSHOP_SAVE_ONLY==='1',terminalReview=process.env.SPARK_NATIVE_TERMINAL_REVIEW==='1',controlTag='levels/b40/devices/holo control/b40_holo control';
 if(blackEchoReview&&(terminalReview||saveOnly||process.env.SPARK_NATIVE_AI_START_RESUME||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run Black Echo native authoring separately from other feature variants.');
 if(process.env.SPARK_NATIVE_AI_START_REVIEW==='1'&&(blackEchoReview||terminalReview||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run the recovered-start UI variant separately from terminal, append and game variants.');
@@ -268,8 +270,20 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     record.stage='prepare save and restart';await review.getByRole('button',{name:'Prepare mission for native build',exact:true}).click();
     const mission=async()=>(await state(campaignId)).project.quickForge.logic.handwrittenSources?.find(source=>source.filename==='gs_mission.hsc')?.content;
     await expect.poll(mission).toContain('(set gs_result_2_failed true)');const prepared=await mission();await page.keyboard.press('Control+z');await expect.poll(mission).toBeUndefined();await page.keyboard.press('Control+y');await expect.poll(mission).toBe(prepared);await save(campaignId);
+    if(blackEchoCameraReview){
+     record.stage='author shared camera take';await page.getByRole('tab',{name:'Cinematic timeline',exact:true}).click();
+     for(const [index,position] of [[0,[0,-4,3]],[1,[25,0,3]]]){
+      await page.getByRole('button',{name:'Add shot',exact:true}).click();const row=page.locator('.studio-record').nth(index);await row.getByRole('textbox',{name:'Name',exact:true}).fill('Black Echo camera '+(index+1));
+      for(const [label,values] of [['Camera XYZ',position],['Look at XYZ',index===0?[4,0,1]:[29,0,1]]])for(const [axisIndex,axis] of ['X','Y','Z'].entries()){const input=row.getByRole('spinbutton',{name:label+' '+axis,exact:true});await input.fill(String(values[axisIndex]));await input.press('Tab');}
+      const fov=row.getByRole('spinbutton',{name:'FOV',exact:true});await fov.fill(String(60+index*10));await fov.press('Tab');
+     }
+     await page.getByRole('button',{name:'Edit cameras visually',exact:true}).click();await openDrawer(page,'Lens & composition');await expect(page.getByRole('textbox',{name:'Camera key name',exact:true})).toHaveValue('Black Echo camera 1');
+     const roll=page.getByRole('spinbutton',{name:'Camera roll (degrees)',exact:true});await roll.fill('12');await roll.press('Tab');await page.getByRole('button',{name:'Level editor',exact:true}).focus();await page.keyboard.press('Control+z');await expect(roll).toHaveValue('0');await page.keyboard.press('Control+y');await expect(roll).toHaveValue('12');
+     await openDrawer(page,'In-game recording');await page.getByRole('checkbox',{name:'Include native engine camera controls in the next MCC build',exact:true}).check();await page.getByRole('combobox',{name:'Engine playback',exact:true}).selectOption('sequence');await save(campaignId);
+    }
     const frozen=(await state(campaignId)).project;expect(frozen.studio.missions).toHaveLength(8);expect(frozen.studio.missions[4].conditionVolume).toBe('be_containment');expect(frozen.studio.missions[4].conditionResult.failed).toBe(false);
     await page.screenshot({path:path.join(output,'black-echo-prepared.png')});await close();await start();await chooseTool(page,'Map library');await open(seed.title);expect((await state(campaignId)).project.studio).toEqual(frozen.studio);await expect.poll(mission).toBe(prepared);
+    if(blackEchoCameraReview){await chooseTool(page,'Machinima');await openDrawer(page,'In-game recording');await expect(page.getByRole('checkbox',{name:'Include native engine camera controls in the next MCC build',exact:true})).toBeChecked();await expect(page.getByRole('combobox',{name:'Engine playback',exact:true})).toHaveValue('sequence');}
     record.stage='native compile';await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Build & check playtest',exact:true}).click();
     let build;await expect.poll(async()=>{build=await call('quickforge_build_report',{projectId:campaignId});report.nativeBlackEchoBuild=build;if(build?.jobId)report.failedNativeJobId=build.jobId;return ['validated','failed','blocked'].includes(build?.status);},{timeout:300000,intervals:[1000,2000]}).toBe(true);expect(build.status,JSON.stringify(build.blockers)).toBe('validated');
     record.stage='independent compiled readback';const map=build.build.output,scenario=build.sources.scenarioPath.replaceAll('\\','/'),folder=path.join(output,'black-echo-readback');await fs.mkdir(folder);await run(path.join(invader,'invader-extract.exe'),['-s',scenario+'.scenario','-t',folder,map]);
@@ -282,6 +296,18 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     }
     const globals=(await read('globals[*].name')).split(/\r?\n/),scripts=(await read('scripts[*].name')).split(/\r?\n/);for(const name of ['gs_result_2_done','gs_result_2_failed','gs_branch_1_ready','gs_branch_1_inside'])expect(globals).toContain(name);for(const name of ['gs_mission','gs_mission_bootstrap','gs_complete_4','gs_complete_7'])expect(scripts).toContain(name);
     const hud=(await read('hud_messages')).replaceAll('\\','/');await run(path.join(invader,'invader-extract.exe'),['-s',hud,'-t',folder,map]);const names=(await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G','messages[*].name',hud])).stdout.trim().split(/\r?\n/);for(const name of ['gs_mission_fail_2',...Array.from({length:8},(_,i)=>'gs_mission_obj_'+(i+1))])expect(names).toContain(name);
+    if(blackEchoCameraReview){
+     record.stage='independent camera and mission readback';const camera=record.nativeCamera={complete:false,gameplayVerified:false,launchTested:false};
+     for(const name of ['gs_record_start','gs_record_stop','gs_mc_initialize','gs_mc_controls','gs_mc_sequence'])expect(scripts).toContain(name);for(const name of ['gs_mc_active','gs_mc_ready','gs_mc_flash'])expect(globals).toContain(name);
+     const metaFile=path.join(build.sources.directory,'engine-machinima.json'),meta=JSON.parse(await fs.readFile(metaFile,'utf8'));expect(meta.sourceMode).toBe('authored');expect(meta.sourceRecoveryToolSha256).toBeNull();expect(meta.projectFingerprint).toBe(build.projectFingerprint);expect(meta.inheritedScripts).toEqual(expect.arrayContaining(['gs_logic_init','gs_mission','gs_mission_bootstrap','gs_complete_4','gs_complete_7']));
+     expect(meta.cameras).toHaveLength(2);const points=[];
+     for(const [index,shot] of frozen.studio.shots.entries()){
+      const prefix='cutscene_camera_points['+index+']';expect(await read(prefix+'.name')).toBe(meta.cameras[index]);const position=(await read(prefix+'.position')).split(',').map(Number);shot.cameraPosition.forEach((value,axis)=>expect(position[axis]).toBeCloseTo(value,5));expect(Number(await read(prefix+'.field_of_view'))).toBeCloseTo(shot.fov,4);
+      const delta=shot.lookAt.map((value,axis)=>value-shot.cameraPosition[axis]),length=Math.hypot(...delta),expected=[Math.atan2(delta[1],delta[0])*180/Math.PI,Math.asin(delta[2]/length)*180/Math.PI,shot.roll??0],orientation=(await read(prefix+'.orientation')).split(',').map(Number);expected.forEach((value,axis)=>expect(orientation[axis]).toBeCloseTo(value,4));points.push({name:meta.cameras[index],position,orientation,fov:shot.fov});
+     }
+     const workbench=await call('runtime_workbench_report',{runtimeId:'mccSteam',projectId:campaignId});expect(workbench.sourceIssue).toBeNull();expect(await fs.realpath(workbench.workingSource.tagsDirectory)).toBe(await fs.realpath(path.join(build.sources.directory,'tags')));expect(meta.scenarioSha256).toBe(await hash(path.join(workbench.workingSource.tagsDirectory,scenario+'.scenario')));
+     Object.assign(camera,{complete:true,points,metadataSha256:await hash(metaFile),sourceHashes:meta.recoveredSourceHashes,verifiedSourceTags:workbench.workingSource.tagsDirectory});
+    }
     expect(await hash(report.nativeBuild.build.output)).toBe(report.nativeBuild.build.sha256);const after=(await state(campaignId)).project;expect(after.studio).toEqual(frozen.studio);expect(await mission()).toBe(prepared);await save(campaignId);await page.screenshot({path:path.join(output,'black-echo-built.png')});
     Object.assign(record,{stage:'passed',complete:true,realUi:true,geometryAndAreasSeeded:true,actorGroupsAuthored:true,undoRedo:true,saveRestart:true,missionSourceSha256:crypto.createHash('sha256').update(prepared).digest('hex'),cacheSha256:await hash(map),scenarioSha256:await hash(path.join(folder,scenario+'.scenario')),groups,globals,scripts,hud,names,manualSettlementGates:[4,7],gameplayVerified:false});console.log('BLACK_ECHO_NATIVE',JSON.stringify(record));
    }

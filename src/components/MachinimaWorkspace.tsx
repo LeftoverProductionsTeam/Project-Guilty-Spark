@@ -71,7 +71,8 @@ export function SourceStage({
 }) {
   const [snapshot, setSnapshot] = useState<ForgeSnapshot | null>(null),
     [spawn, setSpawn] = useState<ForgePlacement | undefined>(),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [sourceError,setSourceError] = useState('');
   const drop = useRef<((x: number, y: number) => Vec3 | null) | null>(null);
   useEffect(() => {
     let alive = true;
@@ -93,6 +94,7 @@ export function SourceStage({
   useEffect(() => {
     let alive = true;
     setSpawn(undefined);
+    setSourceError('');
     if (sourceId)
       void call<OpenProject>('open_project', { id: sourceId })
         .then((open) => {
@@ -101,7 +103,7 @@ export function SourceStage({
           if (alive && asset) setSpawn({ ...placeAsset(asset, [0, 0, 0]), id: 'director-spartan' });
         })
         .catch((e) => {
-          if (alive) setError(String(e));
+          if (alive) setSourceError(String(e));
         });
     return () => {
       alive = false;
@@ -140,11 +142,10 @@ export function SourceStage({
         greenScreen={greenScreen}
         viewportChildren={cinema.rig}
       />
-      {error && (
-        <div className="director-stage-error" role="alert">
-          {error}
-        </div>
-      )}
+      {(error||sourceError)&&<div className="director-stage-error" role="alert">
+        {error&&<p>{error}</p>}
+        {sourceError&&<><p>Actor preview unavailable. Choose another preserved map or clear the actor source in Camera keys.</p><details><summary>Details</summary>{sourceError}</details></>}
+      </div>}
     </>
   );
 }
@@ -183,9 +184,10 @@ export default function MachinimaWorkspace({
     mounted = useRef(true);
   const [animation,setAnimation]=useState<AnimationPreview|null>(null);
   const [nativeResolution,setNativeResolution]=useState('desktop'),[launching,setLaunching]=useState(false);
+  const actorSources=data.entries.filter(entry=>typeof entry.version==='number'&&entry.version>0);
   const [sourceId, setSourceId] = useMapState(project.id,'director.source',
     project.quickForge?.placements[0]?.sourceProjectId ??
-      data.entries.find((e) => e.version !== null)?.id ??
+      actorSources[0]?.id ??
       '',
   );
   const shot = shots.find((s) => s.id === selected),
@@ -443,14 +445,14 @@ export default function MachinimaWorkspace({
                 onChange={(e) => setSourceId(e.target.value)}
               >
                 <option value="">Choose preserved map…</option>
-                {data.entries
-                  .filter((e) => e.version !== null)
-                  .map((e) => (
+                {sourceId&&!actorSources.some(entry=>entry.id===sourceId)&&<option value={sourceId}>Unavailable actor source — choose another map</option>}
+                {actorSources.map((e) => (
                     <option key={e.id} value={e.id}>
                       {e.title}
                     </option>
                   ))}
               </select>
+              {sourceId&&<button type="button" onClick={()=>setSourceId('')}>Clear actor source</button>}
             </>
           )}
           <AnimationStudio project={project} inspection={inspection} edit={edit} onPreview={setAnimation} notify={notify}/>

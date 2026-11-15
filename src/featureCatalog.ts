@@ -463,7 +463,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     'machinima',
     true,
     [
-      'Open a map in Machinima and fly to a view.',
+      'Open a map in Machinima and fly to a view. For an authored map, Camera keys → Actor model source selects a preserved map containing a Spartan. Clear actor source clears the rehearsal selection and retains the map and camera keys.',
       'Capture keys, set lens and framing guides, then preview the take.',
       'Export a frame, camera take or silent WebM.',
     ],

@@ -7,6 +7,24 @@ import {auditPagedSurface} from '../tests/ui/helpers/compactSurfaces.ts';
 // Called by the existing owned native-window harness. Window sizes are native
 // Tauri requests, never browser device-metric emulation. Physical hardware and
 // human mouse/monitor acceptance remain separate from WebView screenshots.
+// Focused recording-drawer verification against an already-open owned project.
+// The caller owns app startup/shutdown and may reuse a completed native fixture.
+export async function nativeRecordingLayout({page,root,invoke,report}) {
+ const label=await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
+ await invoke(page,'plugin:window|unmaximize',{label});
+ await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();const scale=page.getByRole('combobox',{name:'UI scale',exact:true,includeHidden:true});await revealPagedControl(scale);await scale.selectOption('1');await expect(page.locator('html')).toHaveAttribute('data-gs-ui-scale','1');
+ await chooseTool(page,'Machinima');await openDrawer(page,'In-game recording');
+ const controls=page.locator('.engine-machinima-controls'),results=[];
+ report.recordingLayout={results,uiScale:1,devicePixelRatio:await page.evaluate(()=>devicePixelRatio),physicalDpiChangesTested:false,gameLaunched:false};
+ for(const [width,height] of [[800,600],[1280,720],[1366,768],[1500,950],[1920,1080],[2560,1080],[3440,1440],[5120,1440]]) {
+  await invoke(page,'plugin:window|set_size',{label,value:{Logical:{width,height}}});
+  await expect.poll(()=>page.evaluate(()=>[innerWidth,innerHeight])).toEqual([width,height]);
+  let bounds;await expect.poll(async()=>{bounds=await controls.evaluate(root=>{const rect=root.getBoundingClientRect(),controls=[...root.querySelectorAll('button,input,select,summary')].map(node=>node.getBoundingClientRect()).filter(box=>box.width>0&&box.height>0);return {nestedOverflow:root.scrollHeight-root.clientHeight,horizontal:root.scrollWidth-root.clientWidth,clipped:controls.some(box=>box.left<rect.left-1||box.right>rect.right+1)};});return bounds;}).toEqual({nestedOverflow:0,horizontal:0,clipped:false});
+  const screenshot='native-recording-'+width+'x'+height+'.png';await page.screenshot({path:path.join(root,screenshot)});results.push({width,height,...bounds,screenshot});
+ }
+ await invoke(page,'plugin:window|set_size',{label,value:{Logical:{width:1500,height:950}}});await fs.writeFile(path.join(root,'recording-layout.json'),JSON.stringify(report.recordingLayout,null,2));
+}
+
 export async function nativeResponsiveLayout({page,root,invoke,report,step,baseline=false}){
  const label=await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
  const hardware=await invoke(page,'plugin:window|available_monitors');
