@@ -136,6 +136,25 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
    const values=await run('invader-edit',['-G','cutscene_camera_points[0].position','-G','cutscene_camera_points[1].position','-G','cutscene_camera_points[0].field_of_view',introScenario+'.scenario'],true);const parts=values.split(/\r?\n/);assert.deepEqual(parts.slice(0,2),['1.000000,2.000000,3.000000','25.000000,0.000000,3.000000']);assert.ok(Math.abs(Number(parts[2])-60)<.0001);
    introResults.push({engine,names,scenarioSha256:await hash(path.join(tags,introScenario+'.scenario'))});
   }
+  assert.equal(crypto.createHash('sha256').update(introSource).digest('hex'),'cfb4e7abfba97c77d48d8fb6c7821421ba9311fdc61bf9e9727050a473c32be9','Legacy reviewed intro must remain byte-identical');
+  const sceneProject=structuredClone(prepared);sceneProject.studio.missions[0].cinematicCue={firstShotId:'intro_a',lastShotId:'intro_b',phase:'complete'};sceneProject.studio.missions[0].completeMission=true;
+  const scenes=await attachNativeCampaignMission(sceneProject,'startup',false),sceneSource=scenes.quickForge.logic.handwrittenSources[0].content;
+  assert.ok(!sceneSource.includes('(script static void gs_cinematic'));assert.ok(sceneSource.indexOf('(gs_scene_1)')<sceneSource.indexOf('(game_won)'));
+  await fs.writeFile(path.join(data,'levels/intro/scripts/gs_mission.hsc'),sceneSource);const sceneResults=[];
+  for(const engine of ['gbx-custom','mcc-cea','xbox-ntsc']){
+   await run('invader-script',['-d',data,'-E','-g',engine,introScenario]);const names=(await run('invader-edit',['-G','scripts[*].name',introScenario+'.scenario'],true)).split(/\r?\n/);assert.deepEqual(new Set(names),new Set(['gs_scene_1','gs_mission','gs_mission_bootstrap']));
+   sceneResults.push({engine,names,scenarioSha256:await hash(path.join(tags,introScenario+'.scenario'))});
+  }
+  const combinedProject=structuredClone(scenes);combinedProject.studio.shots[0].name='  (sleep_until gs_logic_ready 1)';
+  const combined=await attachNativeCampaignMission(combinedProject,'startup',true),combinedSource=combined.quickForge.logic.handwrittenSources[0].content;
+  assert.ok(combinedSource.slice(combinedSource.indexOf('(script dormant gs_mission')).includes('  (sleep_until gs_logic_ready 1)\r\n  (sleep_until (> (list_count (players)) 0) 1)\r\n  (gs_cinematic)'));
+  await fs.writeFile(path.join(data,'levels/intro/scripts/gs_mission.hsc'),combinedSource);const combinedResults=[];
+  for(const engine of ['gbx-custom','mcc-cea','xbox-ntsc']){
+   await run('invader-script',['-d',data,'-E','-g',engine,introScenario]);const names=(await run('invader-edit',['-G','scripts[*].name',introScenario+'.scenario'],true)).split(/\r?\n/);assert.deepEqual(new Set(names),new Set(['gs_cinematic','gs_scene_1','gs_mission','gs_mission_bootstrap']));
+   combinedResults.push({engine,names,scenarioSha256:await hash(path.join(tags,introScenario+'.scenario'))});
+  }
+  console.log(JSON.stringify({nativeCombinedSceneSyntax:'pass',sourceSha256:crypto.createHash('sha256').update(combinedSource).digest('hex'),combinedResults,cacheBuilt:false,gameplayVerified:false}));
+  console.log(JSON.stringify({nativeObjectiveSceneSyntax:'pass',sourceSha256:crypto.createHash('sha256').update(sceneSource).digest('hex'),sceneResults,cacheBuilt:false,gameplayVerified:false}));
   console.log(JSON.stringify({nativePreparedCinematicSyntax:'pass',introSourceSha256:crypto.createHash('sha256').update(introSource).digest('hex'),introResults,cacheBuilt:false,gameplayVerified:false}));
   const controlName=await run('invader-edit',['-G','object_names[0].name','-G','controls[0].name',scenario+'.scenario'],true);assert.deepEqual(controlName.split(/\r?\n/),['mission_terminal','0']);
   const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');

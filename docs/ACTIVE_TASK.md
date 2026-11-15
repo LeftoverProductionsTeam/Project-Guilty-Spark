@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — reviewed campaign story intro native milestone; cinematic sequencing next
+Task: Operation110 — objective camera scenes native milestone; original AI facing next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 548b1c8595610e9f634b99568f0ec4209db98cd5 source base; this commit scope passes UI/native cache/readback (appa53de640/sourceb17fd21d). Exact hashes in RUNTIME_INTEGRATION_20261107.
-Next action: Extend existing campaign cinematic timing/trigger authoring beyond the reviewed intro; reuse the mission binding/camera writer and focused HSC/history checks. Game input needs renewal; do not revisit it. Save37944, settlement4/7 and all475/M1–M6 remain open. No Forerunner/push.
+Latest verified revision: fb9eadca3e9a6f769d8cf6bca5f5c6a367719403 source base; this commit scope passes scene-only/combined UI/cache/readback (app96177b4d/source9a8e06db). Exact hashes in RUNTIME_INTEGRATION_20261107.
+Next action: Extend original AI start editing to source-backed facing/rotation using existing operation, proposal, preview/accept and readback paths; inspect native inventory first and preserve recipe restrictions. Game input needs renewal. Save37944, settlement4/7 and all475/M1–M6 remain open. No Forerunner/push.
 
 ## Acceptance
 
@@ -29,7 +29,7 @@ Black Echo combined milestone: actual Windows controls author4groups/8starts, re
 
 Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbox script proof remains in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git; no evidence or requirement removed.
 
-Authored camera548b1c8 retains mission/recording source and passes combined MCC cache/readback,8native sizes and stale actor Clear/restart. Reviewed story intros now share that native camera writer: actual Windows two-shot editing/roll/history/preparation/Save/full restart/MCC cache and independent readback pass (6scripts/7globals,4groups/8starts,9HUDmessages). TypeScript/frontend26/browser3/Rust camera5/creative12 and CE/MCC/Xbox intro HSC pass. Fixed resetting intro checkbox, old export instructions and stale-page/null-metadata test assertions. Exact hashes/limits in RUNTIME_INTEGRATION_20261107. No game/peer/Forerunner acceptance; Save37944 remains unresolved.
+Camera548b1c8/fb9eadc native recording/intro,8size and stale actor Clear proof is preserved in RUNTIME_INTEGRATION_20261107. Objective scenes now use saved shot ranges at start/success, with intro optional. Actual Windows scene-only and combined-intro authoring/history/Save/full restart/MCC cache/readback pass (7/8scripts,7globals,4groups/8starts,9HUDmessages). TypeScript/frontend27/browser2/Rust creative13 and CE/MCC/Xbox legacy/scene/combined HSC pass. Fixed preflight shot/marker admission and comment-safe intro insertion; scene boundaries/history/source review stay protected. Exact automatic digests/limits there. No game/peer/Forerunner acceptance;37944 remains open.
 
 Recovered AI milestone40f84ef: Tags→X drag→accept→Restore/reapply→Save/restart→MCC build/readback passes. Exact app/cache hashes, guard repair and scopes are in RUNTIME_INTEGRATION_20261107. Stock campaign/CE/human/game gates remain open; QA disposed.
 
@@ -102,7 +102,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA57988/run-5NVFku is terminal and confirmed absent:3942774864logicalB disposed; allocated-file disposal total unavailable. One3521file/184203140B verified SDK set reused; original archive/subset rehashed unchanged. App/native jobs/browser processes closed; no games, retained binaries/maps/SDK/archive, Forerunner access or publication. Exact intro evidence is in RUNTIME_INTEGRATION_20261107.
+QA40870/run-JJM8jU is terminal and confirmed absent:3655625421logicalB disposed; allocated-file disposal unavailable. One3521file/184203140B SDK reused/rehashed unchanged; no owned app/compiler/browser/game, retained binaries/maps/SDK/archive or publication. Exact source/native cases and failures are in RUNTIME_INTEGRATION_20261107.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 

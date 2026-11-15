@@ -36,6 +36,19 @@ export function missionSoundProblems(project:Project):string[] {
       ['Mission '+beat.title+' needs its exact included native sound. Choose the imported sound again; no missing audio is replaced.'];
   });
 }
+export interface MissionCinematicCue {firstShotId:string;lastShotId:string;phase:'start'|'complete'}
+/** Stable shot IDs retain the selected sequence through rename, history and Save. */
+export function missionCinematicShots(studio:Pick<CreatorStudioDocument,'shots'>,beat:Pick<MissionBeat,'cinematicCue'>):CameraShot[] {
+  const cue=beat.cinematicCue;if(cue==null)return [];
+  if(typeof cue!=='object'||Array.isArray(cue)||Object.keys(cue).some(key=>!['firstShotId','lastShotId','phase'].includes(key))||
+    typeof cue.firstShotId!=='string'||typeof cue.lastShotId!=='string'||!['start','complete'].includes(cue.phase))throw Error('Invalid mission camera scene');
+  const first=studio.shots.findIndex(shot=>shot.id===cue.firstShotId),last=studio.shots.findIndex(shot=>shot.id===cue.lastShotId);
+  if(first<0||last<first)throw Error('Mission camera scene needs an existing first and last shot in timeline order. Select its range again.');
+  return studio.shots.slice(first,last+1);
+}
+export function missionCameraUsers(studio:Pick<CreatorStudioDocument,'missions'>,shotId:string):MissionBeat[] {
+  return studio.missions.filter(beat=>beat.cinematicCue?.firstShotId===shotId||beat.cinematicCue?.lastShotId===shotId);
+}
 export interface MissionBeat {
   id: string;
   title: string;
@@ -57,6 +70,7 @@ export interface MissionBeat {
   conditionOutside?: boolean | null;
   conditionResult?: {beatId:string;failed:boolean} | null;
   soundCue?: MissionSoundCue | null;
+  cinematicCue?: MissionCinematicCue | null;
 }
 export interface CameraShot {
   id: string;
@@ -67,7 +81,7 @@ export interface CameraShot {
   fov: number;
   subtitle: string;
   cameraMarker?: string|null;
-  /** Editor camera interpolation; HaloScript export still uses named markers. */
+  /** Editor interpolation and native prepared roll; raw HaloScript still uses named markers. */
   roll?: number;
   easing?: 'linear' | 'smooth' | 'cut';
 }
@@ -215,6 +229,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
     ids.add(id); return true;
   };
   for (const m of doc.missions) {
+    try{missionCinematicShots(doc,m);}catch(error){failures.push(String(error));}
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||

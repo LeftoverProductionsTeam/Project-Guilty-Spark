@@ -13,6 +13,7 @@ function BeatView({side,beat,index}:{side:string;beat?:MissionBeat;index:number}
         {{id:'Identity',title:'Title',trigger:'Trigger',encounterName:'Encounter',triggerRef:'Volume',timerSeconds:'Delay (seconds)',hudObjective:'Native HUD objective',checkpoint:'Checkpoint request',completeMission:'Level completion request'}[field]}
         <input aria-label={side+' mission '+field} readOnly value={String(beat[field]??'')}/>
       </label>)}
+      {beat.cinematicCue&&<label>Camera scene<input aria-label={side+' mission camera scene'} readOnly value={beat.cinematicCue.phase+' · '+beat.cinematicCue.firstShotId+' → '+beat.cinematicCue.lastShotId}/></label>}
       <label>Objective / direction<textarea aria-label={side+' mission objective'} rows={3} readOnly value={beat.objective}/></label>
       <label>HUD objective text<textarea aria-label={side+' mission HUD text'} rows={2} readOnly value={beat.hudText??''}/></label>
     </>}
@@ -52,7 +53,7 @@ export default function MissionSourceReview({project,edit,onActivation,onCinemat
       const now=latest.current;if(!now||now.id!==project.id)throw Error('This project closed. No data was applied.');
       const next=applyNativeCampaignMission(now,review);
       if(next!==now)edit(next,'Use reviewed attached mission data');
-      onActivation(review.binding.activation);onCinematic(!!review.binding.cinematic);
+      onActivation(review.binding.activation);onCinematic(!!review.binding.cinematic&&review.binding.cinematicIntro!==false);
       setReview(null);setConfirmed(false);setError('');
     } catch(problem) {setError(String(problem));}
   }
@@ -67,8 +68,9 @@ export default function MissionSourceReview({project,edit,onActivation,onCinemat
       <p className="studio-hint">Local: {review.localMissions.length} beats · Attached: {review.binding.missions.length} beats ·
         Attached activation: {review.binding.activation==='startup'?'startup':'manual'}. Source checksum matches;
         native compilation and gameplay are unverified.</p>
-      {review.binding.cinematic&&<div><p>Applying also replaces local camera shots with this reviewed intro ({review.binding.cinematic.length} shots). Undo restores both.</p>
+      {review.binding.cinematic&&<div><p>Applying also replaces local camera shots with the reviewed scenes ({review.binding.cinematic.length} shots). Undo restores both.</p>
         <ul>{review.binding.cinematic.map((shot,i)=><li key={shot.id}>{i+1}. {shot.name} · {shot.durationMs} ms · XYZ {shot.cameraPosition.join(', ')} → {shot.lookAt.join(', ')} · FOV {shot.fov}° · roll {shot.roll??0}°</li>)}</ul></div>}
+      <p className="studio-hint">Prepared intro: {review.binding.cinematic&&review.binding.cinematicIntro!==false?'enabled':'off'} · Objective scenes: {review.binding.missions.filter(beat=>beat.cinematicCue!=null).length}.</p>
       <label>Compare beat<select aria-label="Compare mission beat" value={identity??''}
         onChange={event=>setSelected(event.target.value)}>{identities.map(id=>{
           const left=review.localMissions.findIndex(beat=>beat.id===id),right=review.binding.missions.findIndex(beat=>beat.id===id);
@@ -82,7 +84,7 @@ export default function MissionSourceReview({project,edit,onActivation,onCinemat
       {!differs?<p>Mission data already matches. No replacement is needed.</p>:<>
         <button type="button" onClick={exportLocal}>Export local creator evidence</button>
         <label><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
-          Replace local mission beats and any included intro shots with the reviewed attached data. Undo restores the previous draft.</label>
+          Replace local mission beats and any included camera shots with the reviewed attached data. Undo restores the previous draft.</label>
         <button type="button" disabled={!confirmed} onClick={adopt}>Use attached mission data</button>
       </>}
       <button type="button" onClick={()=>{setReview(null);setConfirmed(false);}}>Keep local mission data</button>

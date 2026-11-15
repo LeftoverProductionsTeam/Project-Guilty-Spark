@@ -5,7 +5,7 @@ import {useWorkspaceActivity} from './WorkspaceActivity';
 import { Camera, Clapperboard, Pause, Play, Plus, Square, Download, Upload, Video } from 'lucide-react';
 import type { Bootstrap, MapInspection, MeshData, OpenProject, Project, Vec3 } from '../types';
 import type { CameraShot } from '../creatorStudio';
-import { emptyCreatorStudio } from '../creatorStudio';
+import { emptyCreatorStudio, validateCreatorStudio, missionCameraUsers } from '../creatorStudio';
 import { call, native } from '../api';
 import { catalogAssets, placeAsset } from '../forge';
 import type { ForgeMesh, ForgePlacement, QuickForgeDocument } from '../forge';
@@ -215,7 +215,9 @@ export default function MachinimaWorkspace({
     if (!shots.some((s) => s.id === selected)) setSelected(shots[0]?.id ?? '');
   }, [shots, selected]);
   function save(next: CameraShot[], description: string, preferences: MachinimaSettings = settings) {
-    edit({ ...project, studio: { ...studio, shots: next, machinima: { ...preferences } } }, description);
+    const updated={...studio,shots:next,machinima:{...preferences}},problems=validateCreatorStudio(updated);
+    if(problems.length){setMessage(problems.join('; '));return;}
+    edit({ ...project, studio: updated }, description);
   }
   function preference<K extends keyof MachinimaSettings>(key: K, value: MachinimaSettings[K]) {
     save(shots, 'Change director ' + key, { ...settings, [key]: value });
@@ -384,7 +386,8 @@ export default function MachinimaWorkspace({
                 Duplicate
               </button>
               <button
-                disabled={playing}
+                disabled={playing||missionCameraUsers(studio,shot.id).length>0}
+                title={missionCameraUsers(studio,shot.id).length?'Change this mission scene boundary in Creator Studio before deleting the key.':undefined}
                 onClick={() => {
                   save(
                     shots.filter((s) => s.id !== shot.id),

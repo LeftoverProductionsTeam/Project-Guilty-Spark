@@ -5,7 +5,7 @@
  *  and never evaluated as arbitrary HaloScript by this application.
  */
 import type { CameraShot, CreatorStudioDocument } from './creatorStudio';
-import { emptyCreatorStudio, missionBranchGroups, validateCreatorStudio, missionSoundProblems } from './creatorStudio.ts';
+import { emptyCreatorStudio, missionBranchGroups, validateCreatorStudio, missionSoundProblems, missionCinematicShots } from './creatorStudio.ts';
 import { inspectScenarioBindings } from './scenarioBindings.ts';
 import { sameJson } from './semanticJson.ts';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight.ts';
@@ -29,10 +29,19 @@ const heading=(title:string):string[]=>[
   '',
 ];
 /** Ordered mission flow; manual beats are callable stubs, not automatically executed. */
-export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitForLogic?:boolean}={}): ScriptExport {
+export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitForLogic?:boolean;preparedCinematics?:boolean}={}): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.missions.length)throw new Error('Add at least one mission beat.');
   const deps:string[]=[], lines=heading('Mission Director');
+  const sceneSources:string[]=[];
+  const sceneCall=(beat:CreatorStudioDocument['missions'][number],index:number,phase:'start'|'complete'):string[]=>
+    beat.cinematicCue?.phase===phase?['  (sleep_until (> (list_count (players)) 0) 1)','  (gs_scene_'+(index+1)+')']:[];
+  studio.missions.forEach((beat,index)=>{
+    const selected=missionCinematicShots(studio,beat);if(!selected.length)return;
+    const shots=selected.map(shot=>({...shot,cameraMarker:cinematicMarker(shot,studio.shots.findIndex(row=>row.id===shot.id))}));
+    const source=exportHaloCeCinematic({...emptyCreatorStudio(),shots},{prepared:options.preparedCinematics,scriptName:'gs_scene_'+(index+1)});
+    sceneSources.push(source.content);deps.push(...source.dependencies);
+  });
   const globals:string[]=[];
   const manualSetters:string[]=[];
   const branches=missionBranchGroups(studio.missions);
@@ -70,6 +79,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     }
     if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null))
       throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
+    scripted.push(...sceneCall(beat,i,'start'));
     if(beat.hudObjective===true) {
       const text=beat.hudText??'';
       if(!text.length||text.length>254||/[%\x00-\x1f\x7f]/.test(text))
@@ -127,7 +137,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         scripted.push(`  (sleep_until (= (ai_living_count ${ref}) 0) 15)`);break;
       }
     }
-    scripted.push(...cueLines(beat,i,'complete'));
+    scripted.push(...cueLines(beat,i,'complete'),...sceneCall(beat,i,'complete'));
     scripted.push('  (print "gs objective complete")');
     if(beat.checkpoint===true)scripted.push('  (game_save)');
     if(beat.completeMission===true)scripted.push('  (game_won)');
@@ -136,7 +146,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     if(beat.conditionResult!=null)scripted.push('  ))');
   });
   scripted.push(')', '');
-  lines.push(...globals, '', ...manualSetters, ...scripted);
+  lines.push(...sceneSources,...globals, '', ...manualSetters, ...scripted);
   return {filename:'gs_mission.hsc',content:lines.join('\r\n'),dependencies:deps,activation:'(wake gs_mission)',warnings:[
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
     'Optional volume conditions run when their step starts. Shared decisions sample once at their first eligible member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
@@ -156,8 +166,10 @@ export interface NativeMissionBinding {
   missions:import('./creatorStudio').MissionBeat[];
   activation:'manual'|'startup';
   sourceSha256:string;
-  /** Reviewed snapshot for a native mission intro, not an engine recording take. */
+  /** Reviewed snapshot for native campaign scenes, not an engine recording take. */
   cinematic?:CameraShot[];
+  /** Absent preserves the original prepared-intro behavior. */
+  cinematicIntro?:boolean;
 }
 
 async function nativeMissionHash(body:string):Promise<string> {
@@ -175,12 +187,12 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
   let binding:NativeMissionBinding;
   try {binding=JSON.parse(module.content.slice(nativeMissionBinding.length,end).trimEnd());}
   catch {throw Error('Attached mission metadata is invalid. Preserve the source module before reconciling it.');}
-  const fields=['schemaVersion','missions','activation','sourceSha256','cinematic'];
+  const fields=['schemaVersion','missions','activation','sourceSha256','cinematic','cinematicIntro'];
   if(!binding||typeof binding!=='object'||Array.isArray(binding)||Object.keys(binding).some(key=>!fields.includes(key))||
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
@@ -193,15 +205,18 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
     [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
     throw Error('Attached mission contains unsupported beat fields. Keep the original source for explicit review.');
+  if(binding.cinematicIntro!==undefined&&(typeof binding.cinematicIntro!=='boolean'||binding.cinematic===undefined))throw Error('Prepared cinematic activation has no valid camera snapshot.');
+  if(binding.cinematic===undefined&&binding.missions.some(beat=>beat.cinematicCue!=null))throw Error('Prepared mission scenes are missing their reviewed camera shots.');
+  if(binding.cinematicIntro===false&&!binding.missions.some(beat=>beat.cinematicCue!=null))throw Error('Prepared shots have no selected mission scene.');
   if(binding.cinematic!==undefined)validateNativeCinematic(binding.cinematic);
-  const errors=validateCreatorStudio({...emptyCreatorStudio(),missions:binding.missions});
+  const errors=validateCreatorStudio({...emptyCreatorStudio(),missions:binding.missions,shots:binding.cinematic??[]});
   if(errors.length)throw Error(errors.join('; '));
   // Required identifiers/delays use the same exporter validation as preparation.
-  exportHaloCeMission({...emptyCreatorStudio(),missions:binding.missions});
+  exportHaloCeMission({...emptyCreatorStudio(),missions:binding.missions,shots:binding.cinematic??[]});
   const body=module.content.slice(end+1);
   if((await nativeMissionHash(body)).toLowerCase()!==binding.sourceSha256.toLowerCase())
     throw Error('Attached mission source differs from its checksum. No mission data was adopted or regenerated.');
-  if(body!==nativeMissionBody(binding.missions,binding.activation,binding.cinematic))
+  if(body!==nativeMissionBody(binding.missions,binding.activation,binding.cinematic,binding.cinematicIntro))
     throw Error('Attached mission data differs from the current generated source, or uses another generator. Preserve/export the module in Logic / Events before explicit reconciliation.');
   return binding;
 }
@@ -209,7 +224,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
-    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null}));
+    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
 export interface NativeMissionReview {
@@ -263,23 +278,23 @@ function validateNativeCinematic(shots:CameraShot[]):void {
     if(Math.hypot(...shot.lookAt.map((value,axis)=>value-shot.cameraPosition[axis]))<.001)throw Error('Each cinematic shot needs a distinct look-at target.');
   });
 }
-function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[]):string {
-  let body=exportHaloCeMission({...emptyCreatorStudio(),missions},{waitForLogic:true}).content;
-  if(cinematic){
+function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[],cinematicIntro=true):string {
+  let body=exportHaloCeMission({...emptyCreatorStudio(),missions,shots:cinematic??[]},{waitForLogic:true,preparedCinematics:!!cinematic}).content;
+  if(cinematic&&cinematicIntro){
     validateNativeCinematic(cinematic);
     const sequence=exportHaloCeCinematic({...emptyCreatorStudio(),shots:cinematic.map((shot,i)=>({...shot,cameraMarker:cinematicMarker(shot,i)}))},{prepared:true}).content;
-    body=sequence+'\r\n'+body.replace('  (sleep_until gs_logic_ready 1)','  (sleep_until gs_logic_ready 1)\r\n  (sleep_until (> (list_count (players)) 0) 1)\r\n  (gs_cinematic)');
+    body=sequence+'\r\n'+body.replace(/^  \(sleep_until gs_logic_ready 1\)(?=\r?$)/m,()=> '  (sleep_until gs_logic_ready 1)\r\n  (sleep_until (> (list_count (players)) 0) 1)\r\n  (gs_cinematic)');
   }
   return body+(activation==='startup'?[
     '', '(script startup gs_mission_bootstrap',
     '  (sleep_until gs_logic_ready 1)', '  (wake gs_mission)', ')', '',
   ].join('\r\n'):'');
 }
-async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[]):Promise<string> {
+async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[],cinematicIntro=true):Promise<string> {
   if(!['manual','startup'].includes(activation))throw Error('Choose manual or startup mission activation.');
-  const body=nativeMissionBody(missions,activation,cinematic);
+  const body=nativeMissionBody(missions,activation,cinematic,cinematicIntro);
   const sourceSha256=await nativeMissionHash(body);
-  const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256,...(cinematic?{cinematic}:{})};
+  const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256,...(cinematic?{cinematic,...(!cinematicIntro?{cinematicIntro:false}:{})}:{})};
   const header=JSON.stringify(binding).replace(/[\u007f-\uffff]/g,character=>
     '\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'));
   return nativeMissionBinding+header+'\r\n'+body;
@@ -296,8 +311,9 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
   const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
-  const output=exportHaloCeMission({...emptyCreatorStudio(),missions});
-  const bindings=inspectScenarioBindings([output],null,doc);
+  const shots=project.studio?.shots??[];
+  const output=exportHaloCeMission({...emptyCreatorStudio(),missions,shots});
+  const bindings=inspectScenarioBindings([output],null,doc,shots.map(cinematicMarker));
   const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource'&&!binding.dependency.startsWith('hud_message:')&&!binding.dependency.startsWith('sound:'));
   if(missing.length)throw Error(missing.map(binding=>binding.dependency+': '+binding.detail).join('\n'));
   for(const beat of missions)if(beat.trigger==='encounterCleared'||beat.trigger==='escort') {
@@ -322,19 +338,20 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   if(sources.some(source=>source.content.startsWith(nativeMissionBinding)&&source!==existing))
     throw Error('A renamed mission binding is still present. Preserve and reconcile source modules in Logic / Events.');
   if(existing) {
-    const old=await readNativeMissionModule(existing);previousCinematic=old.cinematic!==undefined;
+    const old=await readNativeMissionModule(existing);previousCinematic=old.cinematic!==undefined&&old.cinematicIntro!==false;
     let original:string;
     try {
       if(old.schemaVersion!==1||!['manual','startup'].includes(old.activation)||!Array.isArray(old.missions))throw Error('Invalid binding');
-      original=await nativeMissionModule(old.missions,old.activation,old.cinematic);
+      original=await nativeMissionModule(old.missions,old.activation,old.cinematic,old.cinematicIntro);
     } catch {throw Error('The existing mission binding cannot be regenerated safely. Preserve/export it before explicitly removing it from the build.');}
     if(existing.content!==original)
       throw Error('Mission source contains edits or uses a different generator. Preserve/export it before explicitly removing and regenerating it.');
   }
-  const cinematic=(includeCinematic??previousCinematic)?project.studio?.shots:undefined;
+  const cinematicIntro=includeCinematic??previousCinematic;
+  const cinematic=(cinematicIntro||missions.some(beat=>beat.cinematicCue!=null))?project.studio?.shots:undefined;
   if((includeCinematic??previousCinematic)&&!cinematic?.length)throw Error('Add camera shots or explicitly disable the mission intro before preparing again.');
-  if(cinematic&&project.studio?.engineMachinima?.enabled)throw Error('Disable in-game recording in Machinima before preparing a story intro; both would own the game camera.');
-  const module={filename:'gs_mission.hsc',content:await nativeMissionModule(missions,activation,cinematic)};
+  if(cinematic&&project.studio?.engineMachinima?.enabled)throw Error('Disable in-game recording in Machinima before preparing a story scene; both would own the game camera.');
+  const module={filename:'gs_mission.hsc',content:await nativeMissionModule(missions,activation,cinematic,cinematicIntro)};
   const isMcc=doc.runtimeId==='mccSteam';
   if(module.content.length>(isMcc?1024*1024:256*1024))
     throw Error('Mission source exceeds the selected native target file budget. No text was truncated or replaced.');
@@ -344,13 +361,14 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   return {...project,quickForge:{...doc,logic}};
 }
 
-/** Actual H1 camera_set/cinematic_start syntax. Position/FOV authoring is metadata. */
-export function exportHaloCeCinematic(studio:CreatorStudioDocument,options:{prepared?:boolean}={}): ScriptExport {
+/** Actual H1 camera_set/cinematic_start syntax. Raw exports require existing markers; native preparation writes their positions/FOV separately. */
+export function exportHaloCeCinematic(studio:CreatorStudioDocument,options:{prepared?:boolean;scriptName?:string}={}): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.shots.length)throw new Error('Add at least one cinematic shot.');
   const deps:string[]=[],lines=heading('Cinematic Director');
   if(options.prepared)validateNativeCinematic(studio.shots);
-  lines.push('(script static void gs_cinematic','  (cinematic_start)','  (camera_control true)','  (cinematic_show_letterbox true)');
+  const scriptName=ensureName(options.scriptName??'gs_cinematic','Cinematic script name');
+  lines.push('(script static void '+scriptName,'  (cinematic_start)','  (camera_control true)','  (cinematic_show_letterbox true)');
   if(options.prepared)lines.push('  (player_enable_input false)');
   studio.shots.forEach((shot,i)=>{
     const ref=ensureName(shot.cameraMarker??undefined,`Shot ${i+1} cutscene camera point`);

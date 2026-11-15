@@ -82,7 +82,12 @@ pub struct MissionBeat {
     pub condition_result:Option<MissionOutcomeCondition>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub sound_cue:Option<MissionSoundCue>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub cinematic_cue:Option<MissionCinematicCue>,
 }
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct MissionCinematicCue {pub first_shot_id:String,pub last_shot_id:String,pub phase:String}
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct MissionOutcomeCondition {pub beat_id:String,pub failed:bool}
@@ -184,6 +189,8 @@ pub struct NativeMissionBinding {
     pub source_sha256:String,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub cinematic:Option<Vec<CameraShot>>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub cinematic_intro:Option<bool>,
 }
 /// Marker identity is shared with the frontend; standard scenario points only.
 pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
@@ -215,16 +222,22 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         binding.source_sha256.len()!=64 || !binding.source_sha256.bytes().all(|value|value.is_ascii_hexdigit()) {
         return invalid("Unsupported prepared mission binding or source hash");
     }
-    let current=&project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?.missions;
+    let studio=project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?;
+    studio.validate()?;
+    let current=&studio.missions;
     if binding.missions.is_empty() || &binding.missions!=current {
         return invalid("Mission beats changed after preparing native source. In Creator Studio, prepare the mission again; the old module and previous-good build remain intact");
     }
+    if (binding.cinematic_intro.is_some()||binding.missions.iter().any(|beat|beat.cinematic_cue.is_some()))&&binding.cinematic.is_none() {
+        return invalid("Prepared mission scenes are missing their reviewed camera shots");
+    }
+    if binding.cinematic_intro==Some(false)&&!binding.missions.iter().any(|beat|beat.cinematic_cue.is_some()){return invalid("Prepared shots have no selected mission scene; prepare the mission again");}
     if let Some(shots)=&binding.cinematic {
         let studio=project.studio.as_ref().unwrap();
         if shots.is_empty()||shots.len()>256||shots!=&studio.shots {
             return invalid("Cinematic shots changed after preparing the mission. Prepare again; the previous-good build remains intact");
         }
-        if studio.engine_machinima.as_ref().is_some_and(|options|options.enabled){return invalid("Disable in-game recording before preparing a story intro; both would own the game camera");}
+        if studio.engine_machinima.as_ref().is_some_and(|options|options.enabled){return invalid("Disable in-game recording before preparing a story scene; both would own the game camera");}
         cinematic_markers(shots)?;
     }
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
@@ -298,9 +311,10 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
 pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
-    if binding.cinematic.is_some(){expected.push(("gs_cinematic".into(),3));}
+    if binding.cinematic.is_some()&&binding.cinematic_intro!=Some(false){expected.push(("gs_cinematic".into(),3));}
     if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
     for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.cinematic_cue.is_some(){expected.push((format!("gs_scene_{}",index+1),3));}
         if beat.trigger=="manual"{expected.push((format!("gs_complete_{}",index+1),3));}
     }
     for (name,kind) in expected {
@@ -390,6 +404,10 @@ impl CreatorStudio {
         }
         let mut branches:HashMap<&str,&str>=HashMap::new();
         for (index,beat) in self.missions.iter().enumerate() {
+            if let Some(cue)=&beat.cinematic_cue {
+                let first=self.shots.iter().position(|shot|shot.id==cue.first_shot_id);let last=self.shots.iter().position(|shot|shot.id==cue.last_shot_id);
+                if !["start","complete"].contains(&cue.phase.as_str())||first.is_none()||last.is_none()||first>last{return invalid("Mission camera scene needs an existing first and last shot in timeline order");}
+            }
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
@@ -527,7 +545,7 @@ mod tests {
             {"id":"failure","title":"Failure","objective":"Fallback","trigger":"manual","encounterName":"","conditionResult":{"beatId":"rescue","failed":true}}
         ])).unwrap();document.validate().unwrap();
         let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(restored.missions,document.missions);
-        let binding=NativeMissionBinding{schema_version:1,cinematic:None,missions:document.missions.clone(),activation:"manual".into(),source_sha256:"a".repeat(64)};
+        let binding=NativeMissionBinding{schema_version:1,cinematic_intro:None,cinematic:None,missions:document.missions.clone(),activation:"manual".into(),source_sha256:"a".repeat(64)};
         assert!(native_mission_hud(&binding).unwrap().unwrap().messages[0].panels.iter().any(|panel|matches!(panel,crate::maps::NativeHudPanel::Text(text) if text.contains("Continuing the operation"))));
         let mut stopped=document.clone();stopped.missions[0].escort_failure=None;assert!(stopped.validate().is_err());
         let mut forward=document.clone();forward.missions[1].condition_result.as_mut().unwrap().beat_id="failure".into();assert!(forward.validate().is_err());
@@ -573,7 +591,7 @@ mod tests {
         project.quick_forge=Some(doc.clone());
         assert!(beat.sound_cue.as_ref().unwrap().included(&project));assert!(crate::native_asset_imports::is_used(&project,&binding));
         let body="; source identity only, not compiler evidence\n";
-        let prepared=NativeMissionBinding{schema_version:1,cinematic:None,missions:vec![beat.clone()],activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+        let prepared=NativeMissionBinding{schema_version:1,cinematic_intro:None,cinematic:None,missions:vec![beat.clone()],activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
         let content=format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&prepared).unwrap(),body);
         doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":content}]})).unwrap());
         assert!(native_mission_binding(&project,&doc).unwrap().is_some());
@@ -613,7 +631,7 @@ mod tests {
         // installed Invader test. Never treat this body as playable content.
         let check=|value:&crate::project::Project| {
             let mut doc=value.quick_forge.clone().unwrap();let body="; binding fixture\n";
-            let binding=NativeMissionBinding{schema_version:1,cinematic:None,missions:value.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+            let binding=NativeMissionBinding{schema_version:1,cinematic_intro:None,cinematic:None,missions:value.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
             doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
             native_mission_binding(value,&doc)
         };
@@ -634,7 +652,7 @@ mod tests {
         doc.placements.push(serde_json::from_value(serde_json::json!({"id":"terminal","name":"Terminal","tagPath":"devices/control","tagClass":"ctrl","position":[0,0,0],"rotation":[0,0,0],"team":0,"respawnSeconds":0})).unwrap());
         doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[{"placementId":"terminal","nativeName":"restore_comms","initialPosition":0,"powered":true}],"rules":[]})).unwrap());
         let body="; binding fixture, not native syntax proof\n";
-        let binding=NativeMissionBinding{schema_version:1,cinematic:None,missions:project.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+        let binding=NativeMissionBinding{schema_version:1,cinematic_intro:None,cinematic:None,missions:project.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
         doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
         native_mission_binding(&project,&doc).unwrap();
         let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(project.studio.as_ref().unwrap()).unwrap()).unwrap();assert_eq!(restored.missions,binding.missions);
@@ -665,13 +683,30 @@ mod tests {
         let mut project=crate::project::Project::new("Native intro");let mut studio=studio();
         studio.missions=vec![serde_json::from_value(serde_json::json!({"id":"begin","title":"Begin","objective":"Advance","trigger":"timer","timerSeconds":1,"encounterName":""})).unwrap()];
         studio.shots=vec![serde_json::from_value(serde_json::json!({"id":"intro","name":"Intro","durationMs":1000,"cameraPosition":[1,2,3],"lookAt":[2,3,4],"fov":60,"subtitle":""})).unwrap()];
-        let binding=NativeMissionBinding{schema_version:1,missions:studio.missions.clone(),cinematic:Some(studio.shots.clone()),activation:"manual".into(),source_sha256:crate::studio_native::digest(b"; fixture source")};
+        let binding=NativeMissionBinding{schema_version:1,cinematic_intro:None,missions:studio.missions.clone(),cinematic:Some(studio.shots.clone()),activation:"manual".into(),source_sha256:crate::studio_native::digest(b"; fixture source")};
         let mut doc=crate::quickforge::create_arena("Intro","smallIndoorArena").unwrap();doc.game_mode="campaign".into();
         doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":format!("{NATIVE_MISSION_BINDING}{}\n; fixture source",serde_json::to_string(&binding).unwrap())}]})).unwrap());
         project.studio=Some(studio);assert!(native_mission_binding(&project,&doc).unwrap().is_some());
         project.studio.as_mut().unwrap().shots[0].camera_position[0]=9.;assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("shots changed"));
         project.studio.as_mut().unwrap().shots=binding.cinematic.unwrap();project.studio.as_mut().unwrap().engine_machinima=Some(EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,auto_start:false});
         assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("both would own"));
+    }
+
+    #[test]
+    fn mission_scene_ranges_validate_saved_shots_and_require_a_prepared_snapshot() {
+        let mut project=crate::project::Project::new("Mission scenes");let mut studio=studio();
+        studio.shots=vec![serde_json::from_value(serde_json::json!({"id":"first","name":"First","durationMs":1000,"cameraPosition":[0,-4,3],"lookAt":[4,0,1],"fov":60,"subtitle":""})).unwrap(),
+            serde_json::from_value(serde_json::json!({"id":"last","name":"Last","durationMs":1500,"cameraPosition":[25,0,3],"lookAt":[29,0,1],"fov":70,"subtitle":""})).unwrap()];
+        studio.missions=vec![serde_json::from_value(serde_json::json!({"id":"begin","title":"Begin","objective":"Advance","trigger":"timer","timerSeconds":1,"encounterName":"","cinematicCue":{"firstShotId":"first","lastShotId":"last","phase":"complete"}})).unwrap()];
+        studio.validate().unwrap();let mut missing=studio.clone();missing.shots.remove(0);assert!(missing.validate().unwrap_err().to_string().contains("timeline order"));
+        let mut reversed=studio.clone();reversed.missions[0].cinematic_cue.as_mut().unwrap().first_shot_id="last".into();reversed.missions[0].cinematic_cue.as_mut().unwrap().last_shot_id="first".into();assert!(reversed.validate().is_err());
+        let mut unsafe_phase=studio.clone();unsafe_phase.missions[0].cinematic_cue.as_mut().unwrap().phase="unknown".into();assert!(unsafe_phase.validate().is_err());
+        let mut binding=NativeMissionBinding{schema_version:1,cinematic_intro:Some(false),cinematic:None,missions:studio.missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(b"; fixture")};
+        let mut doc=crate::quickforge::create_arena("Scene","smallIndoorArena").unwrap();doc.game_mode="campaign".into();
+        let attach=|doc:&mut crate::quickforge::QuickForgeDocument,binding:&NativeMissionBinding|{doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":format!("{NATIVE_MISSION_BINDING}{}\n; fixture",serde_json::to_string(binding).unwrap())}]})).unwrap());};
+        project.studio=Some(studio);attach(&mut doc,&binding);assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("reviewed camera shots"));
+        binding.cinematic=Some(project.studio.as_ref().unwrap().shots.clone());attach(&mut doc,&binding);native_mission_binding(&project,&doc).unwrap();
+        project.studio.as_mut().unwrap().shots[0].fov=80.;assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("shots changed"));
     }
 
 }

@@ -3,7 +3,7 @@ import type {Project} from './types';
 import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
-import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems } from './creatorStudio';
+import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
 
 describe('Project-integrated Creator Studio', () => {
   it('starts private without fabricated gameplay evidence', () => {
@@ -234,4 +234,28 @@ it('prepares a source-bound cinematic intro with mission history, review and sta
  const duplicate=structuredClone(project);duplicate.studio!.shots.forEach(shot=>shot.cameraMarker='same_camera');await expect(attachNativeCampaignMission(duplicate,'manual',true)).rejects.toThrow(/unique/);
  const coincident=structuredClone(project);coincident.studio!.shots[0].lookAt=[2,-4,3];await expect(attachNativeCampaignMission(coincident,'manual',true)).rejects.toThrow(/distinct look-at/);
  const changed=structuredClone(prepared);changed.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!.content+='; handwritten';await expect(attachNativeCampaignMission(changed,'manual',true)).rejects.toThrow(/checksum/);
+});
+
+
+it('authors per-objective shot ranges without forcing an intro or bypassing conditional success',async()=>{
+ const project=campaignDraft();project.history=[];
+ project.studio!.shots=[{id:'approach',name:'Approach',durationMs:1000,cameraPosition:[0,-4,3],lookAt:[4,0,1],fov:60,subtitle:''},
+  {id:'ending',name:'Ending',durationMs:1500,cameraPosition:[25,0,3],lookAt:[29,0,1],fov:70,subtitle:'',easing:'cut'}];
+ project.studio!.missions=[{id:'first',title:'Insertion',objective:'Move out',trigger:'timer',timerSeconds:1,encounterName:'',cinematicCue:{firstShotId:'approach',lastShotId:'approach',phase:'start'}},
+  {id:'finish',title:'Return',objective:'Finish',trigger:'timer',timerSeconds:1,encounterName:'',completeMission:true,cinematicCue:{firstShotId:'ending',lastShotId:'ending',phase:'complete'}}];
+ expect(validateCreatorStudio(project.studio!)).toEqual([]);expect(missionCinematicShots(project.studio!,project.studio!.missions[0]).map(shot=>shot.id)).toEqual(['approach']);expect(missionCameraUsers(project.studio!,'approach').map(beat=>beat.id)).toEqual(['first']);
+ const original=JSON.stringify(project),prepared=await attachNativeCampaignMission(project,'startup',false),review=await reviewNativeCampaignMission(prepared);expect(JSON.stringify(project)).toBe(original);
+ expect(review.binding.cinematicIntro).toBe(false);expect(review.binding.cinematic).toEqual(project.studio!.shots);const content=review.module.content;
+ expect(content).not.toContain('(script static void gs_cinematic');expect(content).toContain('(script static void gs_scene_1');expect(content).toContain('(camera_set gs_cs_002 0)');expect(content.slice(content.indexOf('(script dormant gs_mission')).indexOf('(gs_scene_1)')).toBeLessThan(content.slice(content.indexOf('(script dormant gs_mission')).indexOf('(sleep 30)'));expect(content.indexOf('(gs_scene_2)')).toBeLessThan(content.indexOf('(game_won)'));
+ let history=historyReducer({...initialHistory,current:project},{type:'edit',project:prepared,description:'Prepare mission scenes'});history=historyReducer(history,{type:'undo'});expect(history.current).toEqual(project);history=historyReducer(history,{type:'redo'});expect((await reviewNativeCampaignMission(JSON.parse(JSON.stringify(history.current)))).binding).toEqual(review.binding);
+ const deleted=structuredClone(project);deleted.studio!.shots.shift();expect(validateCreatorStudio(deleted.studio!).join(';')).toMatch(/existing first and last/);
+ const inverted=structuredClone(project);inverted.studio!.missions[0].cinematicCue!.firstShotId='ending';expect(validateCreatorStudio(inverted.studio!).join(';')).toMatch(/timeline order/);
+ const unsafe=structuredClone(project);(unsafe.studio!.missions[0].cinematicCue as any).phase='(game_won)';expect(validateCreatorStudio(unsafe.studio!).join(';')).toMatch(/Invalid mission camera scene/);
+ const named=structuredClone(project);named.studio!.shots[0].name='  (sleep_until gs_logic_ready 1)';const combined=await attachNativeCampaignMission(named,'startup',true);const generated=(await reviewNativeCampaignMission(combined)).module.content;
+ const flow=generated.slice(generated.indexOf('(script dormant gs_mission'));expect(flow).toContain('  (sleep_until gs_logic_ready 1)\r\n  (sleep_until (> (list_count (players)) 0) 1)\r\n  (gs_cinematic)');
+ expect(generated.split('(script static void gs_scene_1')[1].split('(script static void gs_scene_2')[0]).not.toMatch(/^  \(gs_cinematic\)/m);
+ const recording=structuredClone(project);recording.studio!.engineMachinima={enabled:true,playback:'sequence',autoStart:false};await expect(attachNativeCampaignMission(recording,'manual',false)).rejects.toThrow(/both would own/);
+ const hud=structuredClone(project.studio!);hud.missions[0].hudObjective=true;hud.missions[0].hudText='Move out';const entry=exportHaloCeMission(hud).content;expect(entry.indexOf('(gs_scene_1)')).toBeLessThan(entry.indexOf('(hud_set_objective_text gs_mission_obj_1)'));
+ const source=structuredClone(project.studio!);source.missions[0].conditionVolume='gate';const conditional=exportHaloCeMission(source).content;expect(conditional.indexOf('(if (volume_test_objects gate (players))')).toBeLessThan(conditional.indexOf('(gs_scene_1)'));
+ source.missions[0]={...source.missions[0],trigger:'escort',triggerRef:'rally',encounterName:'marines',escortFailure:'continue',cinematicCue:{firstShotId:'approach',lastShotId:'ending',phase:'complete'}};const rescued=exportHaloCeMission(source).content;expect(rescued.indexOf('(if (not gs_result_1_failed) (begin')).toBeLessThan(rescued.indexOf('(gs_scene_1)'));
 });

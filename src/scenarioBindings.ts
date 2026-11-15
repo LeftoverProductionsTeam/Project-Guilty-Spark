@@ -7,9 +7,14 @@ import type { ScriptExport } from './haloScript';
 import type { QuickForgeDocument } from './forge';
 export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'notInspectable';
 export interface BindingResult { dependency: string; status: BindingStatus; detail: string }
-export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null): BindingResult[] {
+export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[]): BindingResult[] {
   const dependencies=[...new Set(scripts.flatMap(s=>s.dependencies))];
   return dependencies.map(dependency=>{
+    if(source?.gameMode==='campaign'&&!source.native&&dependency.startsWith('cutscene_camera_point:')) {
+      const name=dependency.slice('cutscene_camera_point:'.length),present=plannedCameras.filter(camera=>camera===name).length===1;
+      return {dependency,status:present?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,
+        detail:present?'Planned native camera point from the saved shots. Preparation, native compilation/readback and gameplay remain separate gates.':'No unique planned native camera point matches this scene. Review its saved shots and point names before preparing.'};
+    }
     if(source?.gameMode==='campaign'&&dependency.startsWith('ai_encounter:')) {
       const [name,squad,...extra]=dependency.slice('ai_encounter:'.length).split(':')[0].split('/');
       const found=(source.campaignEncounters??[]).filter(entry=>entry.name===name);
