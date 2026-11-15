@@ -1,3 +1,4 @@
+import {campaignPatrolPoints} from './nativeOperations';
 import { appendForgeNodes, brushNames, forgeNodes, nodeRotation, transformForgeNode } from './forge';
 import type { ForgeNode, ForgeMaterial, ForgeAsset } from './forge';
 import type { Project, NativeAssetImport, RuntimeId } from './types';
@@ -36,7 +37,7 @@ function validate(value: unknown): asserts value is ForgeClipboard {
   for (const node of clip.nodes) {
     if (
       !node ||
-      !['brush', 'placement', 'spawn', 'objective', 'trigger','campaignStart'].includes(node.type) ||
+      !['brush', 'placement', 'spawn', 'objective', 'trigger','campaignStart','campaignPatrol'].includes(node.type) ||
       !node.value ||
       !text(node.value.id, 128) ||
       ids.has(node.value.id) ||
@@ -47,7 +48,8 @@ function validate(value: unknown): asserts value is ForgeClipboard {
       node.value.position.length !== 3
     )
       throw Error('The copied selection contains an invalid or locked object.');
-    if(node.type==='campaignStart'&&(!text(node.value.encounterName,31)||!text(node.value.startId,64)))throw Error('Copied campaign start lacks its source encounter identity.');
+    if((node.type==='campaignStart'||node.type==='campaignPatrol')&&(!text(node.value.encounterName,31)||!text(node.value.startId,64)))throw Error('Copied campaign AI point lacks its source encounter identity.');
+    if(node.type==='campaignPatrol'){const v=node.value;campaignPatrolPoints({name:v.encounterName,actorPath:'clipboard',position:[0,0,0],startActive:false,patrol:{points:[{id:v.startId,position:v.position,facingRadians:v.facing,waitSeconds:v.waitSeconds,weight:v.weight}]}});}
     ids.add(node.value.id);
     transformForgeNode(node, node.value.position, nodeRotation(node), [1, 1, 1]);
     if (node.type === 'brush' && !Object.hasOwn(brushNames, node.value.kind))
@@ -151,7 +153,7 @@ export async function prepareForgePaste(
     bindings: [],
   };
   const sameMap = clip.sourceProjectId === project.id;
-  if(!sameMap&&clip.nodes.some(node=>node.type==='campaignStart'))throw Error('Campaign AI starts belong to their source encounter. Include the actor and create a campaign encounter in the other map first; same-map Copy/Paste and Duplicate remain available.');
+  if(!sameMap&&clip.nodes.some(node=>(node.type==='campaignStart'||node.type==='campaignPatrol')))throw Error('Campaign AI points belong to their source encounter. Include the actor and create a campaign encounter in the other map first; same-map Copy/Paste and Duplicate remain available.');
   let staged = project;
   const resolve = async (asset: Omit<ForgeAsset, 'class'> & { class: string }) => {
     if (

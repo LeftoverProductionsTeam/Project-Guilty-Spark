@@ -1,5 +1,5 @@
 import {forgeNodes,mapForgeNodes,transformForgeNode,duplicateForgeNodes,removeForgeNodes} from './forge';
-import {campaignAiStates,campaignEncounterStarts} from './nativeOperations';
+import {campaignAiStates,campaignEncounterStarts,campaignPatrolPoints,campaignPatrolId} from './nativeOperations';
 import {scaleCampaignDifficulty} from './nativeOperations';
 import {describe,it,expect} from 'vitest';
 import {mergeForge,portableForge,localForge} from './forgeSession';
@@ -173,6 +173,19 @@ it('campaign behavior follows source history and peer conflicts without rewritin
  expect(campaignEncounterStarts(next.campaignEncounters![0])).toEqual(starts);expect(doc.campaignEncounters![0].behavior).toBeUndefined();
  let h=historyReducer(initialHistory,{type:'load',project:project(doc)});h=historyReducer(h,{type:'edit',project:project(next),description:'Author AI behavior'});h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(doc.campaignEncounters);h=historyReducer(h,{type:'redo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(next.campaignEncounters);
  expect(mergeForge(doc,doc,next).campaignEncounters).toEqual(next.campaignEncounters);const peer=structuredClone(next);peer.campaignEncounters![0].behavior!.returnState='searching';expect(()=>mergeForge(doc,peer,next)).toThrow(/campaign encounter/i);
- for(const state of campaignAiStates)expect(campaignEncounterStarts({...doc.campaignEncounters![0],behavior:{initialState:state,returnState:state}})).toEqual(starts);
+ for(const state of campaignAiStates.filter(s=>!s.startsWith('moving_')))expect(campaignEncounterStarts({...doc.campaignEncounters![0],behavior:{initialState:state,returnState:state}})).toEqual(starts);
  expect(()=>campaignEncounterStarts({...doc.campaignEncounters![0],behavior:{initialState:'attacking' as any,returnState:'alert'}})).toThrow(/supported native/);
+});
+
+
+it('native patrol source uses shared nodes, ordered ownership, locks, history and movement prerequisites',()=>{
+ const entry={name:'patrol',actorPath:'characters/grunt',position:[0,0,0] as [number,number,number],startActive:false,count:2,behavior:{initialState:'moving_loop' as const,returnState:'guarding' as const},patrol:{points:[{id:'p0',position:[1,2,3] as [number,number,number],facingRadians:0,waitSeconds:[.5,1] as [number,number],weight:2},{id:'p1',position:[4,5,3] as [number,number,number],facingRadians:1,waitSeconds:[0,0] as [number,number],weight:1}]}};
+ const doc:QuickForgeDocument={...structuredClone(base),gameMode:'campaign',campaignEncounters:[entry]},nodes=forgeNodes(doc).filter(n=>n.type==='campaignPatrol');expect(nodes).toHaveLength(2);
+ const moved=mapForgeNodes(doc,n=>n.value.id===nodes[0].value.id?transformForgeNode(n,[3,2,3],[0,0,Math.PI/2]):n);expect(campaignPatrolPoints(moved.campaignEncounters![0])[0]).toMatchObject({id:'p0',position:[3,2,3],facingRadians:Math.PI/2,waitSeconds:[.5,1],weight:2});expect(entry.patrol.points[0].position).toEqual([1,2,3]);
+ const duplicate=duplicateForgeNodes(moved,[nodes[0].value.id]);expect(campaignPatrolPoints(duplicate.document.campaignEncounters![0])).toHaveLength(3);const removed=removeForgeNodes(duplicate.document,duplicate.ids);expect(removed.campaignEncounters).toEqual(moved.campaignEncounters);expect(()=>removeForgeNodes(doc,[nodes[0].value.id])).toThrow(/enough patrol points/);
+ const locked=mapForgeNodes(doc,n=>n.value.id===nodes[0].value.id?{...n,value:{...n.value,locked:true,visible:false}} as typeof n:n);expect(removeForgeNodes(locked,[nodes[0].value.id]).campaignEncounters).toEqual(locked.campaignEncounters);expect(campaignPatrolPoints(locked.campaignEncounters![0])).toHaveLength(2);
+ let h=historyReducer(initialHistory,{type:'load',project:project(doc)});h=historyReducer(h,{type:'edit',project:project(moved),description:'Move patrol point'});h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(doc.campaignEncounters);h=historyReducer(h,{type:'redo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(moved.campaignEncounters);
+ for(const state of campaignAiStates)expect(campaignPatrolPoints({...entry,behavior:{initialState:state,returnState:state}})).toHaveLength(2);
+ expect(()=>campaignPatrolPoints({...entry,patrol:undefined})).toThrow(/enough patrol points/);expect(()=>campaignPatrolPoints({...entry,patrol:{points:[{...entry.patrol.points[0],waitSeconds:[2,1]}]}})).toThrow(/ordered/);
+ expect(()=>campaignPatrolPoints({...entry,patrol:{points:[entry.patrol.points[0],entry.patrol.points[0]]}})).toThrow(/unique/);expect(campaignPatrolId(entry.name,'p0')).toBe(nodes[0].value.id);
 });

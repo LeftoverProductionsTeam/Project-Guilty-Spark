@@ -515,3 +515,33 @@ TypeScript, frontend22/22, browser2/2 (pose/behavior controls, history, Save/pro
 | .research/scenario.json | `919b5b45bea492dc7923e2837a9ec002356cf3e3c4a75b81865cb25b73ecced4` |
 
 Behavior QA24142/run-Dyart4 is terminal and disposed381,534,231 logical bytes; allocated-file disposal unavailable. Focused unit/browser and initial failed-compile roots also disposed themselves. No active app/compiler or new retained output; original files/475CSV/legacy recovery unchanged.
+
+
+## Native campaign patrol authoring — 15 November 2026
+
+Reuses native squad move_positions, the existing encounter append writer/reviewer, Forge nodes/gizmos/clipboard/history and source build. No competing command-list pipeline. Optional patrol points author XYZ/facing/weight/wait/order and editor-only visibility/locks; native moving initial/return states require valid point counts. Form, viewport selection, Inspector, Duplicate/Remove, same-map Copy/Paste, reorder and Undo/Redo share stable source IDs. Group-center moves include the patrol; locked AI points block group removal/translation. Source limits32points/group match the pinned Invader definition; the bounded native reader accepts up to64 and exposes missing old inspection telemetry as unavailable. Original/recovered command-list and movement-structure editing is not newly accepted by this authored-source workflow.
+
+Native field references: the pinned local Invader scenario definition and [scenario documentation](https://c20.reclaimers.net/h1/tags/scenario/). Sequence IDs filter actor eligibility, not authored point order. All emitted points use unrestricted sequence0 while retaining source array order; no engine implementation was copied. Paths are authoring previews, not generated navigation or guaranteed walkability. Prepared Firefight recipes refuse independent patrol/state overrides. Source Guardian, exact scalar/native compiled validation, original prefixes and actor ownership remain enforced.
+
+Focused TypeScript, frontend33/33, Rust native_operations13/13 (including real Invader generated-tag round trip), and three browser cases pass across scoped runs. Browser first failed because Playwright did not classify an option with disabled=true as disabled, then because a direct backend read preceded history acknowledgement; actual disabled-property and exact committed-source observations corrected those fixtures. Source assertions and preservation guards were retained. Native tag probe writes/reviews/reads two ordered points, both moving states, coordinates, heading, weights and waits, then restores its generated original tag exactly.
+
+QA50620/run-d1tK2U: one source-frozen Windows app build (2m32s), actual controls → add/edit patrol points → real X handle drag → Undo/Redo → reorder/Undo/Redo → moving loop/back-and-forth choices → hide+lock one point → prepare → Save/full normal restart → native MCC13 compile → independent Invader readback PASS. Three normal app closes, zero page errors, current source fingerprint unchanged. Compiled patrol order: [6,2,.1]/1.5707963791547743rad/weight1/wait[0,0], then [3,2,.1]/0rad/weight2.5/wait[.25,1.5], both sequence0/animation-1. Hidden/locked point retained. Four groups/eight starts, authored AI start X/Z history and all native normal1/insane2 populations remain. New compiled-map movement telemetry/count/pose/order/wait/weight gates run in the production builder and independently agree with Invader. Native campaign build 80770ms. Baseline Firefight/source/loadout and stale-config rejection preserve previous-good output without starting a compiler.
+
+One3521-file/184203140B SDK subset prepared once; publisher archive/staged inputs unchanged. No full SDK copy/archive, original-map write, Forerunner access, game launch or publication. Geometry/areas were seeded fixtures. Actual AI traversal, interruptions, combat/rescue/settlement, CE/Chupathingy gameplay, peers and human acceptance remain open; objectives4/7 remain manual callbacks. Save37944 did not recur and remains unresolved. Full475IDs/M1–M6/Operation110 stay open. Reproduce existing test-firefight-native.mjs with SPARK_NATIVE_BLACK_ECHO_REVIEW=1, SPARK_NATIVE_BLACK_ECHO_DIFFICULTY_REVIEW=1, SPARK_NATIVE_BLACK_ECHO_START_REVIEW=1 and SPARK_NATIVE_BLACK_ECHO_PATROL_REVIEW=1, a matching app and owned native tools/output. Screenshot was visually inspected before disposable cleanup.
+
+| Evidence | SHA256 / revision |
+|---|---|
+| sourceRevision | `7afd88093d8e00493dca68a3186844413c19131a` |
+| runtimeSourceSha256 | `e3f397b8773a2bc7b127dd4128af9c0e4f721e27719920e94438d7ec76babe3e` |
+| appSha256 | `be8290e4681c5c15c993521f24d00c4832d5c372d511905f5702eacf18528214` |
+| receiptSha256 | `cff12c13a5552026cb3981517ad4a93257c99bc05b35cc7fc459ff4b7f909b5f` |
+| driverSha256 | `90e16c1ffe976b00a0a757a63800ed8a8e02077f2633e7a9977c3259f494d9cb` |
+| cacheSha256 | `dcf67d4f24fc5215695b4cfe9e55f7193cd39bd375cc5b1118163147cbf94b1e` |
+| scenarioSha256 | `0f7f55a96323c5788dda28e2c256f27214002bc8fff19c389cb53ee85b991ad3` |
+| missionSourceSha256 | `f6fe8b6f2dcfedefa7f40b9c8a66040255c4f71a8ca3c8e0e9e0acb68d381cbd` |
+| screenshotSha256 | `48b216970051e2864b8e12dae3de28e5bdcb7348c09c3cdf4f95442d8a7e9d0d` |
+| sdkManifestSha256 | `f91e5b3f0cf5d03a1be515b2c1b68567d19c8d34face4694241a5cdf7d4de58f` |
+| invaderEdit | `02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12` |
+| haloTool | `c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa` |
+
+Patrol QA50620/run-d1tK2U terminal; all owned app/compiler/test processes closed and complete temporary output disposed2,949,414,002 logical bytes. Allocated-file disposal unavailable, so no physical-free-space claim. No SDK/map/binary/screenshot/archive retained; original publisher inputs,475CSV and legacy recovery unchanged.

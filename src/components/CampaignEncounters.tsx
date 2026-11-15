@@ -5,7 +5,7 @@ import AssetSourceBrowser from './AssetSourceBrowser';
 import {attachAssetImport,prepareCampaignActor} from '../nativeAssetImport';
 import {beginProjectMutation} from '../projectMutation';
 import { useMapState } from '../mapSession';
-import {campaignAiStates,campaignEncounterStarts,campaignStartId,scaleCampaignDifficulty} from '../nativeOperations';
+import {campaignAiStates,campaignAiStateReady,campaignPatrolPoints,campaignPatrolId,campaignEncounterStarts,campaignStartId,scaleCampaignDifficulty} from '../nativeOperations';
 import type { NativeEncounterAppend } from '../nativeOperations';
 import type { OpenProject,Project } from '../types';
 import { Notice, NumberField } from './ui';
@@ -21,6 +21,7 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
 }) {
   const doc=project.quickForge;
   const entries=doc?.campaignEncounters??[];
+  const [patrolId,setPatrolId]=useMapState(project.id,'campaign-patrol','');
   const [startId,setStartId]=useMapState(project.id,'campaign-start','');
   const [selected,setSelected]=useMapState<string>(project.id,'campaign-encounter','');
   const [normalFactor,setNormalFactor]=useState('1'),[insaneFactor,setInsaneFactor]=useState('1'),[scaleScope,setScaleScope]=useState('all');
@@ -48,6 +49,7 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
   let scaling:ReturnType<typeof scaleCampaignDifficulty>|undefined,scalingIssue='';
   if(entries.length)try{scaling=scaleCampaignDifficulty(entries,normalFactor.trim()?Number(normalFactor):NaN,insaneFactor.trim()?Number(insaneFactor):NaN,scaleScope==='selected'?entry?.name:undefined);}catch(problem){scalingIssue=String(problem);}
   const points=entry?campaignEncounterStarts(entry):[],point=points.find(point=>point.id===startId)??points[0];
+  const patrol=entry?campaignPatrolPoints(entry):[],waypoint=patrol.find(p=>p.id===patrolId)??patrol[0];
   const actors=(project.nativeAssetImports??[]).filter(binding=>binding.tagClass==='actv').map(binding=>binding.nativePath);
   const total=entries.reduce((sum,value)=>sum+(value.count??1),0);
   const commit=(values:NativeEncounterAppend[],label:string)=>{
@@ -71,6 +73,9 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
       else {const next=duplicateForgeNodes(doc,[id]);commit(next.document.campaignEncounters??[],'Duplicate campaign starting location');setStartId(next.ids[0]?.slice(('campaign:'+entry.name+':').length)??'');}
     }catch(problem){setError(String(problem));}
   }
+  function updatePatrol(patch:Partial<import('../nativeOperations').NativePatrolPoint>){if(waypoint)update({patrol:{points:patrol.map(p=>p.id===waypoint.id?{...p,...patch}:p)}});}
+  function mutatePatrol(remove=false){if(!entry||!waypoint||!doc)return;try{const id=campaignPatrolId(entry.name,waypoint.id);if(remove)commit(removeForgeNodes(doc,[id]).campaignEncounters??[],'Remove native patrol point');else{const result=duplicateForgeNodes(doc,[id]);commit(result.document.campaignEncounters??[],'Duplicate native patrol point');setPatrolId(result.ids[0]?.slice(('campaignPatrol:'+entry.name+':').length)??'');}}catch(problem){setError(String(problem));}}
+  const routeLabel=(state:string)=>state.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
   return <details className="studio-handoff">
     <summary>Campaign AI encounters · {entries.length} groups · {total} starts</summary>
     {!doc||doc.gameMode!=='campaign'?<p className="studio-hint">
@@ -145,8 +150,8 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
           <label>Spacing<NumberField label="Campaign actor spacing" value={entry.spacing??.75} min={.25} max={16} step={.25}
             disabled={!!entry.starts} onCommit={value=>update({spacing:value})}/></label>
           {(['X','Y','Z'] as const).map((axis,index)=><label key={axis}>Center {axis}<NumberField
-            label={'Campaign encounter '+axis} disabled={points.some(point=>point.locked)} value={entry.position[index]} min={-2000} max={2000} step={.25}
-            onCommit={value=>{const position=[...entry.position] as [number,number,number];const delta=value-position[index];position[index]=value;update({position,...(entry.starts?{starts:entry.starts.map(point=>({...point,position:point.position.map((v,i)=>v+(i===index?delta:0)) as [number,number,number]}))}:{})});}}/></label>)}
+            label={'Campaign encounter '+axis} disabled={[...points,...patrol].some(point=>point.locked)} value={entry.position[index]} min={-2000} max={2000} step={.25}
+            onCommit={value=>{const position=[...entry.position] as [number,number,number];const delta=value-position[index];position[index]=value;update({position,...(entry.starts?{starts:entry.starts.map(point=>({...point,position:point.position.map((v,i)=>v+(i===index?delta:0)) as [number,number,number]}))}:{}),...(entry.patrol?{patrol:{points:patrol.map(p=>({...p,position:p.position.map((v,i)=>v+(i===index?delta:0)) as [number,number,number]}))}}:{})});}}/></label>)}
         </div>
         {point&&<details className="campaign-start-poses"><summary>Individual starting locations · {points.length}</summary>
           <p className="studio-hint">Choose a start to edit XYZ and native Z facing, or select it in Level Editor and use Move(W)/Rotate(E), grid snap and Frame(F). The first pose edit preserves the generated grid as explicit source. Scale, pitch and roll do not apply. These are start markers; native compilation, actor behavior and navigation need separate validation.</p>
@@ -155,7 +160,7 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
           <label>Facing (degrees)<NumberField label="Campaign start facing degrees" value={Number(nativeAiFacingDegrees(point.facingRadians))} min={-360} max={360} step={5} onCommit={value=>updatePoint({facingRadians:value*Math.PI/180})}/></label></div></fieldset>
           <label><input type="checkbox" checked={point.visible!==false} onChange={event=>updatePoint({visible:event.target.checked})}/>Show start marker (editor only)</label>
           <label><input type="checkbox" checked={!!point.locked} onChange={event=>updatePoint({locked:event.target.checked})}/>Lock start editing</label>
-          <p className="studio-hint">Hidden starts still compile and count toward difficulty populations. Locks protect editor changes. Group center moves all explicit starts together; count/spacing controls stay unchanged until Reset to grid, so custom poses cannot be silently dropped.</p>
+          <p className="studio-hint">Hidden starts still compile and count toward difficulty populations. Locks protect editor changes. Group center moves all starts and patrol points together; count/spacing controls stay unchanged until Reset to grid, so custom poses cannot be silently dropped.</p>
           <div className="button-row"><button disabled={!onSelectStart||point.visible===false} title={point.visible===false?'Show the marker first to select it in Level Editor.':'Select this exact authored start; originals and native tags stay unchanged until building.'} onClick={()=>onSelectStart?.(campaignStartId(entry.name,point.id))}>Select AI start in Level Editor</button>
           <button disabled={!!point.locked||points.length>=32||total>=128} onClick={()=>changeStart()}>Duplicate AI start</button>
           <button disabled={!!point.locked||points.length<=1||!!entry.difficulty&&Math.max(entry.difficulty.normal,entry.difficulty.insane)>=points.length} onClick={()=>changeStart(true)}>Remove AI start</button>
@@ -175,13 +180,27 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
           <p className="studio-hint">Authored starts: {entry.count??1} · native normal: {entry.difficulty?.normal??entry.count??1} · native insane: {entry.difficulty?.insane??entry.count??1}.
             Add enough starts first. To remove starts, lower the overrides first. Save, Undo/Redo and source sharing include these values; native and gameplay validation remain required.</p>
         </details>
-        <div className="studio-fields">{(['initialState','returnState'] as const).map(key=><label key={key}>{key==='initialState'?'Initial behavior':'Return behavior'}<select aria-label={key==='initialState'?'Campaign initial AI state':'Campaign return AI state'} value={entry.behavior?.[key]??'alert'} onChange={event=>update({behavior:{initialState:entry.behavior?.initialState??'alert',returnState:entry.behavior?.returnState??'alert',[key]:event.target.value as import('../nativeOperations').CampaignAiState}})}>{campaignAiStates.map(state=><option key={state} value={state}>{state[0].toUpperCase()+state.slice(1)}</option>)}</select></label>)}</div>
-        <p className="studio-hint">Native squad and starting-location states share these settings. Initial applies at creation; return is the authored fallback state. Actor abilities, navigation and scripts determine actual behavior. Movement-loop modes require route authoring and are not offered here. Reprepare the mission after changing source, then Save and build.</p>
+        <details className="campaign-patrol"><summary>Native patrol route · {patrol.length} points</summary>
+          <p className="studio-hint">Movement points are native squad source. Add points, arrange their order, then choose an Initial/Return moving state below. Lines show authored order, not generated navigation or guaranteed walkable paths. Loop modes need at least two points. Random modes use the engine's movement rules; positive weights and wait ranges are native fields.</p>
+          <button disabled={patrol.length>=32} onClick={()=>{const id=crypto.randomUUID(),position=[...(waypoint?.position??point?.position??entry.position)] as [number,number,number];if(waypoint)position[0]=Math.min(2048,position[0]+2);update({patrol:{points:[...patrol,{id,position,facingRadians:waypoint?.facingRadians??0,weight:1,waitSeconds:[0,0]}]}});setPatrolId(id);}}>Add patrol point</button>
+          {waypoint&&<><label>Patrol point<select aria-label="Campaign patrol point" value={waypoint.id} onChange={e=>setPatrolId(e.target.value)}>{patrol.map((p,i)=><option key={p.id} value={p.id}>Point {i} · {p.position.join(', ')}</option>)}</select></label>
+            <fieldset disabled={!!waypoint.locked}><div className="studio-fields">{(['X','Y','Z'] as const).map((axis,i)=><label key={axis}>Patrol {axis}<NumberField label={'Campaign patrol '+axis} value={waypoint.position[i]} min={-2048} max={2048} step={.25} onCommit={value=>{const position=[...waypoint.position] as [number,number,number];position[i]=value;updatePatrol({position});}}/></label>)}
+            <label>Facing (degrees)<NumberField label="Campaign patrol facing degrees" value={Number(nativeAiFacingDegrees(waypoint.facingRadians))} min={-360} max={360} step={5} onCommit={v=>updatePatrol({facingRadians:v*Math.PI/180})}/></label>
+            <label>Weight<NumberField label="Campaign patrol weight" value={waypoint.weight} min={.01} max={100} step={.25} onCommit={weight=>updatePatrol({weight})}/></label>
+            {([0,1] as const).map(i=><label key={i}>{i?'Maximum wait':'Minimum wait'} (seconds)<NumberField label={i?'Campaign patrol maximum wait':'Campaign patrol minimum wait'} value={waypoint.waitSeconds[i]} min={i?waypoint.waitSeconds[0]:0} max={i?3600:waypoint.waitSeconds[1]} step={.5} onCommit={v=>{const waitSeconds=[...waypoint.waitSeconds] as [number,number];waitSeconds[i]=v;updatePatrol({waitSeconds});}}/></label>)}</div></fieldset>
+            <label><input type="checkbox" checked={waypoint.visible!==false} onChange={e=>updatePatrol({visible:e.target.checked})}/>Show patrol marker (editor only)</label><label><input type="checkbox" checked={!!waypoint.locked} onChange={e=>updatePatrol({locked:e.target.checked})}/>Lock patrol point editing</label>
+            <div className="button-row"><button disabled={!onSelectStart||waypoint.visible===false} onClick={()=>onSelectStart?.(campaignPatrolId(entry.name,waypoint.id))}>Select patrol point in Level Editor</button><button disabled={!!waypoint.locked||patrol.length>=32} onClick={()=>mutatePatrol()}>Duplicate patrol point</button><button disabled={!!waypoint.locked||[entry.behavior?.initialState,entry.behavior?.returnState].some(state=>state&&!campaignAiStateReady(state,patrol.length-1))} onClick={()=>mutatePatrol(true)}>Remove patrol point</button>
+            {([-1,1] as const).map(direction=>{const index=patrol.indexOf(waypoint),target=index+direction;return <button key={direction} disabled={!!waypoint.locked||target<0||target>=patrol.length||!!patrol[target]?.locked} onClick={()=>{const points=[...patrol];[points[index],points[target]]=[points[target],points[index]];update({patrol:{points}});}}>{direction<0?'Move patrol point earlier':'Move patrol point later'}</button>;})}</div>
+          </>}
+          <p className="studio-hint">Hidden and locked points still compile. Locks protect editing; paths remain visible. Move/Rotate/Frame, Inspector, Duplicate and same-map Copy/Paste share project Undo/Redo. Select a stationary behavior before deleting points required by a moving state. Save, rebuild and validate navigation in an owned game session.</p>
+        </details>
+        <div className="studio-fields">{(['initialState','returnState'] as const).map(key=><label key={key}>{key==='initialState'?'Initial behavior':'Return behavior'}<select aria-label={key==='initialState'?'Campaign initial AI state':'Campaign return AI state'} value={entry.behavior?.[key]??'alert'} onChange={event=>update({behavior:{initialState:entry.behavior?.initialState??'alert',returnState:entry.behavior?.returnState??'alert',[key]:event.target.value as import('../nativeOperations').CampaignAiState}})}>{campaignAiStates.map(state=><option key={state} value={state} disabled={!campaignAiStateReady(state,patrol.length)}>{routeLabel(state)}{campaignAiStateReady(state,patrol.length)?'':' · add patrol points'}</option>)}</select></label>)}</div>
+        <p className="studio-hint">Native squad and starting-location states share these settings. Initial applies at creation; return is the authored fallback state. Actor abilities, navigation and scripts determine actual behavior. Moving states require the native patrol points above; native navigation still determines reachability. Reprepare the mission after changing source, then Save and build.</p>
         <label><input type="checkbox" checked={entry.startActive}
           onChange={event=>update({startActive:event.target.checked})}/>Create actors when the map starts</label>
         <p className="studio-hint">Leave initial creation off for mission-controlled encounters.
           Starting grids and firing points use the native source recipe; terrain contact, collision and AI navigation require native/game validation.</p>
-        <button type="button" disabled={points.some(point=>point.locked)} title="Unlock this group's start poses before removing the encounter." onClick={()=>commit(entries.filter(value=>value.name!==entry.name),'Remove campaign encounter source')}>
+        <button type="button" disabled={points.some(point=>point.locked)} title="Unlock this group's AI points before removing the encounter." onClick={()=>commit(entries.filter(value=>value.name!==entry.name),'Remove campaign encounter source')}>
           Remove encounter from source
         </button>
       </>}

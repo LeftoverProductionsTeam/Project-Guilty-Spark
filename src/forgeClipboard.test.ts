@@ -261,3 +261,10 @@ it('duplicates campaign starts within the same source group and refuses silent c
  const prepared=await prepareForgePaste(original,clip);const next=applyForgePaste(original,prepared);expect(next.project.quickForge!.campaignEncounters![0].starts).toHaveLength(2);
  await expect(prepareForgePaste({...original,id:'different-map'},clip)).rejects.toThrow(/belong to their source encounter/);expect(original.quickForge!.campaignEncounters![0].starts).toBeUndefined();
 });
+
+
+it('copies native patrol source within its encounter and rejects malformed waits or cross-map ownership',async()=>{
+ const original=project();original.quickForge!.gameMode='campaign';original.quickForge!.campaignEncounters=[{name:'guards',actorPath:'characters/grunt',position:[0,0,0],startActive:false,count:1,patrol:{points:[{id:'p0',position:[1,2,3],facingRadians:1,waitSeconds:[.5,2],weight:3}]}}];
+ const point=forgeNodes(original.quickForge!).find(n=>n.type==='campaignPatrol')!;copyForgeSelection(original,[point.value.id]);const clip=readForgeSelection()!;const next=applyForgePaste(original,await prepareForgePaste(original,clip));expect(next.project.quickForge!.campaignEncounters![0].patrol!.points).toHaveLength(2);expect(next.project.quickForge!.campaignEncounters![0].patrol!.points[1]).toMatchObject({facingRadians:1,waitSeconds:[.5,2],weight:3});await expect(prepareForgePaste({...original,id:'elsewhere'},clip)).rejects.toThrow(/belong to their source encounter/);
+ const raw=JSON.parse(storage.get('guilty-spark:forge-clipboard-v1')!);raw.nodes[0].value.waitSeconds=[4,2];storage.set('guilty-spark:forge-clipboard-v1',JSON.stringify(raw));expect(readForgeSelection()).toBeNull();
+});

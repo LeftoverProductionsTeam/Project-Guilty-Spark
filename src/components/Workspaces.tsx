@@ -395,6 +395,7 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
                     <code className="wrap-code">{actor?.path??'No resolved squad actor; inspect per-start overrides.'}</code>
                     <button disabled={!actor||!onTag} onClick={()=>actor&&onTag?.(actor.id)} title="Open this map's native actor variant in Tag editor.">Inspect squad actor</button>
                     <p className="subtle">Initial: {stateName(s.initialState)} · Return: {stateName(s.returnState)}</p>
+                    <details><summary>Native movement positions · {s.movePositions?.length??'unavailable'}</summary>{s.movePositions?s.movePositions.map((point,index)=><p className="subtle" key={index}>Point {index}: {point.position.map(v=>v.toFixed(3)).join(', ')} · {(point.facing*180/Math.PI).toFixed(1)}° · weight {point.weight} · wait {point.waitSeconds.join('–')}seconds · sequence {point.sequenceId}</p>):<p className="subtle">Movement position telemetry is unavailable in this inspection; reopen the map to read it.</p>}</details>
                     <details><summary>Starting positions · {s.startingLocations.length}</summary>
                       {s.startingLocations.map((location,index)=>{
                         const target=location.actorVariantTagId===null?undefined:tags.get(location.actorVariantTagId);

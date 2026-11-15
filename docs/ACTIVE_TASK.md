@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — campaign AI poses native milestone and behavior authoring
+Task: Operation110 — native campaign patrol authoring milestone
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: ab5cc5364af629b7685d91404813d86e455e04cb (actual Windows AI pose/native cache); this checkpoint adds focused source/browser/native loose-tag behavior proof. Exact identities in RUNTIME_INTEGRATION_20261107.
-Next action: Inspect existing campaign command-list/patrol authoring and complete its missing creator workflow without another writer. Moving AI states remain withheld until valid routes exist. New behavior controls still need native application/cache/game integration at a meaningful milestone. Black Echo settlement4/7,37944,Forerunner access/game/peers,475IDs/M1–M6 remain open.
+Latest verified revision: 7afd88093d8e00493dca68a3186844413c19131a plus this scoped patrol source/native milestone; exact frozen app/source/cache hashes in RUNTIME_INTEGRATION_20261107.
+Next action: Inspect existing native firing-position and squad group-mask authoring, then connect missing campaign controls through existing source/history/writer/readback. Patrol source/native milestone passes; actual AI navigation/gameplay, original command lists,37944,settlement4/7,Forerunner access,peers and all475/M1–M6 remain open.
 
 ## Acceptance
 
@@ -25,9 +25,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Campaign behavior now authors native initial/return Sleeping/Alert/Guarding/Searching/Fleeing through the existing encounter form/history/Save/peer/writer/readback. Defaults absent→Alert; squad+all start fields agree, Firefight recipe overrides refuse, movement modes withheld. TypeScript/frontend22/browser2/Rust12 including real Invader5state source readback pass. Initial Rust compile and invalid empty Firefight fixture failures corrected; no assertion weakening. New behavior Windows/cache/game integration remains unrun; pose milestone above stays source-matched. Existing evidence/How To/Human plan updated.
-
-Authored campaign AI poses: optional per-start XYZ/facing now share form/viewport selection, W/E/F, source history, duplication/removal, locks and editor visibility; legacy grids/Firefight recipes preserved. Frontend30/Rust11/browser1/TypeScript/frozen Windows build pass. Actual Windows X/Z mouse drag, Undo/Redo, hide+lock second start, mission preparation, Save/full restart/MCC13 compile/independent8pose readback pass. QA46827 has3normal closes/0page errors; first Marine[-3.5,-2.375,.1]/3.1415927rad. Exact app/source/cache/scenario/SDK hashes and corrected rendered-picker/Save-observer failures in RUNTIME_INTEGRATION_20261107. Previous d50 population native1/2 milestone remains. No gameplay/Forerunner/settlement4/7/37944 acceptance.
+Patrol source/native milestone: native squad move_positions reuse campaign editor, Forge selection/gizmos/clipboard/history and existing native writer. XYZ/facing/weight/wait/order/locks/visibility and native moving states are wired; sequence0 preserves eligibility while source array preserves order. TypeScript/frontend33/Rust13/browser3scoped cases pass. Actual Windows X drag/order/Undo/Redo/Save/full restart/MCC13 compile/production decoded movement checks/independent Invader readback pass;3normal closes/0page errors. Patrol [6,2,.1]/90°/weight1/wait0 then[3,2,.1]/0°/weight2.5/wait.25–1.5; hidden locked point remains. Existing4groups/8starts/populations1/2/native start history and stale-Firefight previous-good guards pass. Exact digests/native scope/fixture corrections in RUNTIME_INTEGRATION_20261107. Source authored routes are not navigation, original command-list editing, CE or actual gameplay acceptance. Prior AI pose/behavior milestones ab5cc53/7afd880 remain.
 
 Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbox script proof remains in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git; no evidence or requirement removed.
 
@@ -101,6 +99,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+Patrol QA50620/run-d1tK2U terminal; all owned app/compiler/test processes closed and complete temporary output disposed2,949,414,002 logical bytes. Allocated-file disposal unavailable, so no physical-free-space claim. No SDK/map/binary/screenshot/archive retained; original publisher inputs,475CSV and legacy recovery unchanged.
 
 Behavior QA24142/run-Dyart4 is terminal and disposed381,534,231 logical bytes; allocated-file disposal unavailable. Focused unit/browser and initial failed-compile roots also disposed themselves. No active app/compiler or new retained output; original files/475CSV/legacy recovery unchanged.
 

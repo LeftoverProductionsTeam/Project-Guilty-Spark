@@ -1,15 +1,16 @@
 import type { FirefightConfig } from './firefight';
-export const campaignAiStates=['sleeping','alert','guarding','searching','fleeing'] as const;
+export const campaignAiStates=['sleeping','alert','guarding','searching','fleeing','moving_repeat_same_position','moving_loop','moving_loop_back_and_forth','moving_loop_randomly','moving_randomly'] as const;
 export type CampaignAiState=typeof campaignAiStates[number];
 export interface NativeEncounterStart {id:string;position:[number,number,number];facingRadians:number;visible?:boolean;locked?:boolean}
-export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
+export interface NativePatrolPoint extends NativeEncounterStart {waitSeconds:[number,number];weight:number}
+export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];patrol?:{points:NativePatrolPoint[]};behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
 export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
 export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number];facingRadians?:number|null}[]|null}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null}
-  | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
+  | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;
@@ -92,10 +93,18 @@ export function scaleCampaignDifficulty(entries:NativeEncounterAppend[],normalFa
 
 /** Same f32 native grid for preview; explicit poses become the sole source on edit. */
 export function campaignEncounterStarts(entry:NativeEncounterAppend):NativeEncounterStart[]{
- if(entry.behavior&&(!campaignAiStates.includes(entry.behavior.initialState)||!campaignAiStates.includes(entry.behavior.returnState)))throw Error('Choose a supported native initial and return AI state.');
- if(entry.starts){if(entry.grid||entry.starts.length!==(entry.count??1)||!entry.starts.length||entry.starts.length>32)throw Error('Review the individual campaign start count.');const ids=new Set<string>();for(const point of entry.starts){if(!/^[A-Za-z0-9_-]{1,64}$/.test(point.id)||ids.has(point.id)||point.position.length!==3||point.position.some(v=>!Number.isFinite(v)||Math.abs(v)>2048)||!Number.isFinite(point.facingRadians)||Math.abs(point.facingRadians)>Math.PI*2+1e-6)throw Error('Campaign starts need distinct source IDs, finite XYZ within2048 and facing within one turn.');ids.add(point.id);}return entry.starts;}
+ campaignPatrolPoints(entry);
+ if(entry.starts){if(entry.grid||entry.starts.length!==(entry.count??1)||!entry.starts.length||entry.starts.length>32)throw Error('Review the individual campaign start count.');const ids=new Set<string>();for(const point of entry.starts){if(typeof point.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(point.id)||ids.has(point.id)||!Array.isArray(point.position)||point.position.length!==3||point.position.some(v=>!Number.isFinite(v)||Math.abs(v)>2048)||!Number.isFinite(point.facingRadians)||Math.abs(point.facingRadians)>Math.PI*2+1e-6)throw Error('Campaign starts need distinct source IDs, finite XYZ within2048 and facing within one turn.');ids.add(point.id);}return entry.starts;}
  const count=entry.count??1,total=entry.grid?.total??count,offset=entry.grid?.offset??0,side=Math.ceil(Math.sqrt(total)),half=(side-1)/2,spacing=Math.fround(entry.spacing??.75);
  if(!Number.isInteger(count)||count<1||count>32||total<1||total>32||offset<0||offset+count>total)throw Error('Review the campaign starting grid.');
  return Array.from({length:count},(_,index)=>({id:'grid-'+index,position:[Math.fround(Math.fround(entry.position[0])+Math.fround(((offset+index)%side-half)*spacing)),Math.fround(Math.fround(entry.position[1])+Math.fround((Math.floor((offset+index)/side)-half)*spacing)),Math.fround(entry.position[2])],facingRadians:0}));
 }
+export function campaignAiStateReady(state:CampaignAiState,count:number){return !state.startsWith('moving_')||count>=(['moving_loop','moving_loop_back_and_forth','moving_loop_randomly'].includes(state)?2:1);}
+export function campaignPatrolPoints(entry:NativeEncounterAppend):NativePatrolPoint[]{
+ const points=entry.patrol?.points??[];if(entry.patrol&&(!points.length||points.length>32))throw Error('A native patrol needs1–32 movement points.');
+ const ids=new Set<string>();for(const point of points){if(!/^[A-Za-z0-9_-]{1,64}$/.test(point.id)||ids.has(point.id)||point.position.length!==3||point.position.some(v=>!Number.isFinite(v)||Math.abs(v)>2048)||!Number.isFinite(point.facingRadians)||Math.abs(point.facingRadians)>Math.PI*2+1e-6||!Array.isArray(point.waitSeconds)||point.waitSeconds.length!==2||point.waitSeconds.some(v=>!Number.isFinite(v)||v<0||v>3600)||point.waitSeconds[0]>point.waitSeconds[1]||!Number.isFinite(point.weight)||point.weight<=0||point.weight>100)throw Error('Patrol points need unique IDs, finite XYZ/facing, positive weights≤100 and ordered0–3600second waits.');ids.add(point.id);}
+ if(entry.behavior&&[entry.behavior.initialState,entry.behavior.returnState].some(state=>!campaignAiStates.includes(state)||!campaignAiStateReady(state,points.length)))throw Error('Choose a supported native AI state and author enough patrol points before selecting movement behavior.');
+ return points;
+}
+export const campaignPatrolId=(encounter:string,point:string)=>'campaignPatrol:'+encounter+':'+point;
 export const campaignStartId=(encounter:string,start:string)=>'campaign:'+encounter+':'+start;
