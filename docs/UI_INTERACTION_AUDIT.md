@@ -654,3 +654,6 @@ Original squad/start behavior,15Nov: Tags → scenario → Native Output → nat
 
 
 15Nov Black Echo source controls: Connect Forerunner Black Echo objectives, Native weapon collected path, final Forerunner extraction settled and existing mission Prepare source are wired through project edits/history/native generator. Focused frontend29/core14/native HSC pass; see RUNTIME_INTEGRATION_20261107. Imported native-map preparation, actual mouse/keyboard, Save/full restart and game-side objectives are still UNRUN. No UI acceptance claimed. Exact x64 runtime admission has one test and Windows compilation proof, no launch.
+
+
+Imported CE Build target repair,15Nov: Build & playtest advertised CE/Chupathingy, while project_tools rejected ordinary imports as MCC-only. It now dispatches explicit reviewed CE targets through existing native Build/source/dock controls. Matching loose tags are required; pending unsupported project edits refuse. How To and Build inputs explain actual source/module/format scope. Native backend Save/reopen/compile/recovered-script rebuild and source preservation pass; TypeScript/Windows compilation pass. Actual native mouse/keyboard target selection, runtime-dock module editing, Undo/Save/restart and game launch are still UNRUN. See RUNTIME_INTEGRATION_20261107; no UI acceptance promoted.

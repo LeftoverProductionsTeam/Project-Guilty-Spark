@@ -248,7 +248,13 @@ fn working_source_context(state:&AppState,project:&Project,build:BuildRecord)->R
     if build.target!=working_target(project)?{return Err("Native parent and selected source build target differ; rebuild/review that source before editing".into());}
     if build.target=="mcc-cea"{return source_context_for_build(state,project,build);}
     let job=state.root.join("jobs").join(&build.id);
-    if !job.join("quickforge-receipt.json").is_file()&&!job.join("working-tags-receipt.json").is_file(){return Err("CE source editing needs this project's owned native QuickForge/working-tag receipt. A compiled CE map alone is not editable source.".into());}
+    if !job.join("quickforge-receipt.json").is_file()&&!job.join("working-tags-receipt.json").is_file(){
+        let receipt:serde_json::Value=serde_json::from_slice(&bounded_read(&job.join("conversion-manifest.json"),4*1024*1024)?).map_err(error)?;
+        let source=project.source.as_ref().ok_or("CE native source original is missing")?;
+        let tool=build::tool_path(&editing_tools(state,project)?,"invader-build").ok_or("CE compiler is missing")?;
+        core::build::verify_native_source_provenance(&receipt,"gbx-custom",&source.sha256,&maps::hash_file(&tool).map_err(error)?).map_err(error)?;
+        if receipt.get("inputTagsSha256").and_then(|v|v.as_str())!=Some(maps::hash_file(&job.join("input-tags.json")).map_err(error)?.as_str()){return Err("CE native source manifest changed after compilation".into());}
+    }
     let output=build.output.as_ref().ok_or("Validated CE output is missing")?;
     let header=maps::inspect_header(output).map_err(error)?;
     if header.version!=609||header.extended{return Err("This native source route requires a standard CE609 parent cache, not MCC, Xbox or extended content".into());}

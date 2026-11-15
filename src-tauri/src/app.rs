@@ -319,7 +319,7 @@ fn find_local_invader(state:&AppState)->Option<PathBuf>{
     }}None
 }
 fn project_tools(state:&AppState,project:&Project)->Reply<Toolchain>{
-    if core::megaworld_build::selected(project){return editing_tools(state,project);}
+    if core::megaworld_build::selected(project)||build::selected_ce_source(project){return editing_tools(state,project);}
     if let Some(target)=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|t|&t.id==id)){if target.runtime_id!=runtime::RuntimeId::MccSteam||target.builder!="h1a-tool"||target.hek_flavor.as_deref()!=Some("h1aEk"){return Err("Imported map conversion currently targets MCC using H1A Tool. CE source authoring has its own QuickForge target.".into());}}
     editing_tools(state,project)
 }

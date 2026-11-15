@@ -198,6 +198,8 @@ pub fn compatibility(
     inspection: &MapInspection,
     tools: &Toolchain,
 ) -> CompatibilityReport {
+    if selected_ce_source(project){let blockers=ce_source_preflight(project,inspection,tools).err().map(|e|vec![e.to_string()]).unwrap_or_default();return CompatibilityReport{target:"Custom Edition / Chupathingy · CE609".into(),pipeline:"Reviewed matching CE tags → isolated source/module staging → Invader CE build → independent cache/CRC/signature readback".into(),ready:blockers.is_empty(),blockers,warnings:vec!["Native source must match this scenario. The selected tags are compiled without overwriting them; cache edits and gameplay are separate workflows. Stripped HaloScript cannot be reconstructed.".into()],bitmap_dependencies:None};}
+
     let mut blockers = vec![];
     let mut warnings = vec![];
     if let Some(source)=&project.source {
@@ -785,6 +787,104 @@ impl TransientInput {
 #[cfg(test)]
 #[path = "../tests/common/mod.rs"]
 mod lifecycle_fixture;
+/// Shared receipt admission keeps legacy MCC conversion provenance separate from
+/// an explicitly compiled CE source job. A target label cannot grant admission.
+pub fn verify_native_source_provenance(receipt:&serde_json::Value,target:&str,source_sha256:&str,compiler_sha256:&str)->Result<()> {
+    let ce=target=="gbx-custom";
+    if !matches!(target,"mcc-cea"|"gbx-custom")||receipt.get("schemaVersion").and_then(|v|v.as_u64())!=Some(1)||
+        receipt.get("compilerSha256").and_then(|v|v.as_str())!=Some(compiler_sha256)||receipt.get("sourceSha256").and_then(|v|v.as_str())!=Some(source_sha256)||receipt.get("sourcePreserved").and_then(|v|v.as_bool())!=Some(true)||
+        (ce&&(receipt.get("nativeTarget").and_then(|v|v.as_str())!=Some("gbx-custom")||receipt.get("cacheVersion").and_then(|v|v.as_u64())!=Some(609)||receipt.get("selectedEditableSource").and_then(|v|v.as_bool())!=Some(true)))||
+        (!ce&&receipt.get("nativeTarget").and_then(|v|v.as_str()).is_some_and(|t|t!="mcc-cea")) {
+        return invalid("Native source compiler/format/provenance no longer matches its reviewed build");
+    }
+    Ok(())
+}
+/// An imported map can be rebuilt from explicitly reviewed native CE source.
+/// This is the same build entrypoint and job/provenance model, not conversion.
+pub fn selected_ce_source(project:&Project)->bool {
+    project.source.is_some()&&project.quick_forge.is_none()&&project.bsp_assembly.is_none()&&
+    project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|t|&t.id==id))
+        .is_some_and(|t|matches!(t.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe))
+}
+fn ce_source_preflight(project:&Project,inspection:&MapInspection,tools:&Toolchain)->Result<()> {
+    project.validate()?;
+    crate::source_identity::validate(project.source.as_ref().ok_or_else(||SparkError::Invalid("Native source is missing".into()))?,inspection)?;
+    if !selected_ce_source(project){return invalid("Choose an explicit Custom Edition or Chupathingy native source target");}
+    let target=project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).unwrap();
+    if target.builder!="invader-ce"||!target.ce_compatible_tagset||target.open_sauce{return invalid("Native CE source needs the reviewed standard CE tagset and Invader CE builder; extended caches are separate");}
+    let source=project.source.as_ref().unwrap();
+    if source.sha256!=inspection.sha256||source.scenario_path.replace('\\',"/")!=inspection.scenario_path.replace('\\',"/")||source.cache_version!=609||inspection.header.version!=609||inspection.header.extended||inspection.header.scenario_type>1{return invalid("This source rebuild requires the exact standard CE609 campaign or multiplayer map. Other formats need their reviewed conversion workflow");}
+    if project.scene!=inspection.objects||!project.tag_edits.is_empty()||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.native_asset_imports.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.firefight.is_some()||project.conversion_profile.as_ref().is_some_and(|p|p!="faithful")||project.studio.as_ref().and_then(|s|s.engine_machinima.as_ref()).is_some_and(|m|m.enabled){return invalid("This build compiles the selected editable CE tags. Pending cache edits, imports, Firefight rules, recording or conversion changes cannot be silently omitted. Apply them through their supported native source workflow first");}
+    let root=tools.base_tags_directory.as_ref().filter(|p|p.is_dir()).ok_or_else(||SparkError::Invalid("Select this map's complete matching editable CE tags in Engine build targets; a map cache or stock SDK is not a replacement scenario".into()))?;
+    crate::reject_links(root)?;
+    if target.tags_directory.as_ref().map(fs::canonicalize).transpose()?!=Some(fs::canonicalize(root)?){return invalid("The selected CE source root differs from its reviewed target");}
+    for relative in [format!("{}.scenario",inspection.scenario_path),"globals/globals.globals".into()] {
+        let file=root.join(safe_relative(&relative)?);crate::reject_links(&file)?;if !file.is_file(){return invalid(format!("Matching native CE source is missing: {relative}"));}
+    }
+    for name in ["invader-build","invader-info","invader-edit","invader-recover","invader-dependency"] {if tool_path(tools,name).is_none(){return invalid(format!("{name} is required for CE source build and independent source/readback"));}}
+    Ok(())
+}
+fn run_ce_source_build(project:&Project,inspection:&MapInspection,tools:&Toolchain,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{
+    ce_source_preflight(project,inspection,tools)?;
+    let source=project.source.as_ref().unwrap();if maps::hash_file(&source.preserved_path)?!=source.sha256{return invalid("Preserved CE source changed before compilation");}
+    let base=tools.base_tags_directory.as_ref().unwrap();let all=crate::native_staging::inventory(base,&cancel)?;
+    let runner=Runner{id,project:&project.id,cancel:&cancel,event:&event};
+    let dependency=tool_path(tools,"invader-dependency").unwrap();let dependency_sha256=maps::hash_file(&dependency)?;
+    let mut roots=std::collections::BTreeSet::from([format!("{}.scenario",inspection.scenario_path).replace('\\',"/"),"globals/globals.globals".into()]);
+    roots.extend(crate::forge_build::ce_cache_roots(inspection.header.scenario_type)?.into_iter().map(str::to_owned));
+    let (selected,_)=crate::native_staging::collect_dependency_files(base,roots,false,all.files.len().max(1),20000,|tag|runner.run(&dependency,&["-r".into(),"-t".into(),base.to_string_lossy().into(),tag.into()],jobs.parent().ok_or_else(||SparkError::Invalid("Native jobs have no owned library".into()))?,"dependencies",8))?;
+    if maps::hash_file(&dependency)?!=dependency_sha256{return invalid("CE dependency tool changed while planning; no source was staged");}
+    let inventory=crate::native_staging::selected_inventory(&all,&selected)?;
+    let dir=jobs.join(id);let lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(base),crate::storage::estimate_copy(inventory.files.len(),inventory.bytes).saturating_add(inspection.header.declared_size as u64*2).saturating_add(512*1024*1024),crate::storage::Category::Staging,"Native CE source build; isolated matching tags, recovered modules and compiled output")?;
+    crate::reject_links(&dir)?;fs::create_dir_all(jobs)?;fs::create_dir(&dir)?;lease.mark_owned()?;
+    project::save_project(&dir.join("project.gsproject"),project)?;
+    let runner=Runner{id,project:&project.id,cancel:&cancel,event:&event};
+    let executables=["invader-build","invader-info","invader-edit","invader-recover","invader-dependency"].into_iter().map(|name|{let file=tool_path(tools,name).unwrap();crate::reject_links(&file)?;Ok((name,(file.clone(),maps::hash_file(&file)?)))}).collect::<Result<std::collections::BTreeMap<_,_>>>()?;
+    let recheck=||->Result<()>{for (_, (file,hash)) in &executables {if maps::hash_file(file)?!=*hash{return invalid("Native CE tool changed during build");}}Ok(())};
+    let result=(||->Result<(PathBuf,String)>{
+        let tags=dir.join("tags");let hashes=crate::native_staging::copy(base,&tags,&inventory,&cancel,|done,total,_,_|{if done==total{runner.emit("stage",format!("Prepared {total} matching native CE tags; originals unchanged"),20,"info");}})?;
+        project::atomic_write(&dir.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
+        let data=dir.join("data");fs::create_dir(&data)?;
+        let scenario=format!("{}.scenario",inspection.scenario_path);
+        recheck()?;
+        let kind=runner.run(&executables["invader-edit"].0,&["-t".into(),tags.to_string_lossy().into(),"-G".into(),"type".into(),scenario.clone()],&dir,"recovery-readback",22)?;
+        let expected=if inspection.header.scenario_type==0{"singleplayer"}else{"multiplayer"};
+        if kind.trim()!=expected{return invalid("Selected editable scenario has a different native type from the source map");}
+        let modules=runner.run(&executables["invader-edit"].0,&["-t".into(),tags.to_string_lossy().into(),"-C".into(),"source_files".into(),scenario.clone()],&dir,"recovery-readback",23)?.trim().parse::<usize>().map_err(|_|SparkError::Invalid("Native scenario module count is unreadable".into()))?;
+        if modules>16{return invalid("Native scenario exceeds the supported complete16-module source recovery limit");}
+        if modules>0 {
+            let names=runner.run(&executables["invader-edit"].0,&["-t".into(),tags.to_string_lossy().into(),"-G".into(),"source_files[*].name".into(),scenario.clone()],&dir,"recovery-readback",24)?;
+            crate::source_recovery::validate_output_names(&names)?;
+            if names.lines().count()!=modules{return invalid("Native module names differ from their array count");}
+            runner.run(&executables["invader-recover"].0,&["-t".into(),tags.to_string_lossy().into(),"-d".into(),data.to_string_lossy().into(),"-b".into(),scenario.clone()],&dir,"recovery-data",27)?;
+            let files=crate::working_tags::script_source_inventory(Some(&data),&cancel)?.0;
+            if files.len()!=modules{return invalid("Recovered HaloScript modules are incomplete; no native source build was accepted");}
+        }
+        let output_dir=dir.join("output");fs::create_dir(&output_dir)?;recheck()?;
+        runner.run(&executables["invader-build"].0,&["-g".into(),"gbx-custom".into(),"-t".into(),tags.to_string_lossy().into(),"-m".into(),output_dir.to_string_lossy().into(),"--resource-usage".into(),"none".into(),inspection.scenario_path.clone()],&dir,"compile-ce",55)?;
+        let stem=inspection.scenario_path.rsplit(['\\','/']).next().ok_or_else(||SparkError::Invalid("Missing native CE scenario name".into()))?;
+        let output=output_dir.join(format!("{stem}.map"));let compiled=maps::inspect_map(&output,None)?;
+        if compiled.header.version!=609||compiled.header.extended||compiled.header.scenario_type!=inspection.header.scenario_type||compiled.scenario_path.replace('\\',"/").to_lowercase()!=inspection.scenario_path.replace('\\',"/").to_lowercase()||(!inspection.mesh.indices.is_empty()&&compiled.mesh.indices.is_empty()){return invalid("CE source build has the wrong format/scenario/type or lost native collision");}
+        for script in &inspection.scripts {if !compiled.scripts.iter().any(|s|s.name==script.name&&s.script_type==script.script_type&&s.return_type==script.return_type){return invalid("CE source rebuild lost an original script signature; reconcile the source instead of dropping it");}}
+        for check in ["crc32_mismatched","is_protected","stub_count"] {
+            let value=runner.run(&executables["invader-info"].0,&["-T".into(),check.into(),output.to_string_lossy().into()],&dir,"verify",90)?;
+            if !["0","false"].contains(&value.trim()){return invalid(format!("Native CE {check} check failed: {value}"));}
+        }
+        crate::audio_rules::verify(&output,&compiled)?;recheck()?;
+        if serde_json::to_value(crate::native_staging::inventory(base,&cancel)?)?!=serde_json::to_value(&all)?{return invalid("Selected CE source inventory changed during compilation");}
+        for (relative,hash) in &hashes {if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}if maps::hash_file(&base.join(safe_relative(relative)?))?!=*hash{return invalid("Selected CE source changed during compilation");}}
+        if maps::hash_file(&source.preserved_path)?!=source.sha256||maps::hash_file(&output)?!=compiled.sha256{return invalid("Original CE cache or compiled output changed during readback");}
+        project::atomic_write(&dir.join("conversion-manifest.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"nativeTarget":"gbx-custom","sourceSha256":source.sha256,"sourcePreserved":true,"compilerSha256":executables["invader-build"].1,"cacheVersion":609,"selectedEditableSource":true,"inputTagsSha256":maps::hash_file(&dir.join("input-tags.json"))?,"recoveredScriptModules":modules,"selectedTagFiles":inventory.files.len(),"selectedTagBytes":inventory.bytes,"availableTagFiles":all.files.len(),"dependencyToolSha256":dependency_sha256,"gameplayVerified":false}))?,false)?;
+        let semantic=crate::portability::compare(inspection,&compiled)?;project::atomic_write(&dir.join("semantic-changes.json"),&serde_json::to_vec_pretty(&semantic)?,false)?;
+        Ok((output,compiled.sha256))
+    })();
+    let record=match result {Ok((output,hash))=>BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(output),sha256:Some(hash),message:"Selected native CE tags compiled, recovered scripts and independent cache/type/CRC/source checks passed. Native source changes and gameplay require review; this is not an automatic format conversion.".into(),project_fingerprint:project.fingerprint()?},Err(e)=>BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:if cancel.load(Ordering::Relaxed){"cancelled"}else{"failed"}.into(),target:"gbx-custom".into(),output:None,sha256:None,message:e.to_string(),project_fingerprint:project.fingerprint()?}};
+    project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
+    runner.emit(&record.status,&record.message,100,if record.status=="validated"{"success"}else{"error"});
+    if record.status=="validated"{lease.finish(true,Some(record.project_fingerprint.clone()))?;}
+    Ok(record)
+}
+
 pub fn run_build(
     project: &Project,
     inspection: &MapInspection,
@@ -796,6 +896,7 @@ pub fn run_build(
 ) -> Result<BuildRecord> {
     uuid::Uuid::parse_str(job_id)
         .map_err(|_| SparkError::Invalid("Job ID is not a UUID".into()))?;
+    if selected_ce_source(project){return run_ce_source_build(project,inspection,tools,jobs_root,job_id,cancel,on_event);}
     let report = compatibility(project, inspection, tools);
     if !report.ready {
         return invalid(report.blockers.join("\n"));
@@ -1098,6 +1199,48 @@ fn core_check_reused_tag(file:&Path,relative:&str)->Result<()>{crate::reject_lin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_source_provenance_never_relabels_mcc_or_unreviewed_ce_receipts() {
+        let mut receipt=serde_json::json!({"schemaVersion":1,"sourceSha256":"a".repeat(64),"compilerSha256":"b".repeat(64),"sourcePreserved":true});
+        verify_native_source_provenance(&receipt,"mcc-cea",&"a".repeat(64),&"b".repeat(64)).unwrap();
+        assert!(verify_native_source_provenance(&receipt,"gbx-custom",&"a".repeat(64),&"b".repeat(64)).is_err());
+        receipt["nativeTarget"]="gbx-custom".into();receipt["cacheVersion"]=609.into();receipt["selectedEditableSource"]=true.into();
+        verify_native_source_provenance(&receipt,"gbx-custom",&"a".repeat(64),&"b".repeat(64)).unwrap();
+        assert!(verify_native_source_provenance(&receipt,"mcc-cea",&"a".repeat(64),&"b".repeat(64)).is_err());
+        assert!(verify_native_source_provenance(&receipt,"gbx-custom",&"c".repeat(64),&"b".repeat(64)).is_err());
+        assert!(verify_native_source_provenance(&receipt,"gbx-custom",&"a".repeat(64),&"c".repeat(64)).is_err());
+        receipt["sourcePreserved"]=false.into();assert!(verify_native_source_provenance(&receipt,"gbx-custom",&"a".repeat(64),&"b".repeat(64)).is_err());
+    }
+    #[test]
+    #[ignore="Requires explicitly selected owned CE map, matching tags, tools and disposable jobs output"]
+    fn installed_ce_source_build_retains_modules_provenance_and_originals() {
+        let source=PathBuf::from(std::env::var_os("SPARK_NATIVE_CE_SOURCE_CACHE").expect("Owned CE cache required"));
+        let tags=PathBuf::from(std::env::var_os("SPARK_NATIVE_CE_SOURCE_TAGS").expect("Matching CE tags required"));
+        let invader=PathBuf::from(std::env::var_os("SPARK_NATIVE_CE_SOURCE_INVADER").expect("Installed Invader required"));
+        let jobs=PathBuf::from(std::env::var_os("SPARK_NATIVE_CE_SOURCE_JOBS").expect("Owned disposable jobs required"));
+        let before=maps::hash_file(&source).unwrap();let inspection=maps::inspect_map(&source,None).unwrap();assert_eq!(inspection.header.version,609);
+        let mut project=Project::new("Native CE source handoff");project.scene=inspection.objects.clone();
+        project.source=Some(crate::project::Source{original_path:source.clone(),preserved_path:source.clone(),sha256:before.clone(),cache_version:609,engine:inspection.header.engine.clone(),scenario_path:inspection.scenario_path.clone(),archive:None,resource_directory:None,resource_sha256:Default::default(),audio_resources:None});
+        let target=uuid::Uuid::new_v4().to_string();project.active_build_target=Some(target.clone());
+        project.build_targets.push(crate::project::EngineBuildTarget{id:target,name:"Reviewed native CE".into(),runtime_id:crate::runtime::RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:None,hek_flavor:Some("legacyHek".into()),tags_directory:Some(tags.clone()),invader_directory:Some(invader.clone()),ce_compatible_tagset:true,open_sauce:false});
+        let tools=Toolchain{base_tags_directory:Some(tags),invader_directory:Some(invader.clone()),..Default::default()};
+        let report=compatibility(&project,&inspection,&tools);assert!(report.ready,"{:?}",report.blockers);assert!(report.target.contains("609"));
+        let mut pending=project.clone();pending.scene.pop();assert!(!compatibility(&pending,&inspection,&tools).ready,"Native pending edits must not disappear");
+        let id=uuid::Uuid::new_v4().to_string();let build=run_build(&project,&inspection,&tools,&jobs,&id,Arc::new(AtomicBool::new(false)),|e|println!("{}: {}",e.phase,e.message)).unwrap();
+        assert_eq!(build.status,"validated","{}",build.message);assert_eq!(build.target,"gbx-custom");
+        let output=build.output.as_ref().unwrap();let readback=maps::inspect_map(output,None).unwrap();assert_eq!(readback.header.version,609);assert_eq!(readback.header.scenario_type,inspection.header.scenario_type);
+        let receipt:serde_json::Value=serde_json::from_slice(&fs::read(jobs.join(&id).join("conversion-manifest.json")).unwrap()).unwrap();
+        verify_native_source_provenance(&receipt,"gbx-custom",&before,&maps::hash_file(&tool_path(&tools,"invader-build").unwrap()).unwrap()).unwrap();
+        assert!(receipt["selectedTagFiles"].as_u64().unwrap()<=receipt["availableTagFiles"].as_u64().unwrap());
+        let modules=crate::working_tags::script_source_inventory(Some(&jobs.join(&id).join("data")),&AtomicBool::new(false)).unwrap().0;
+        assert_eq!(modules.len() as u64,receipt["recoveredScriptModules"].as_u64().unwrap());
+        assert_eq!(before,maps::hash_file(&source).unwrap());project.builds.push(build.clone());project::save_project(&jobs.join("ce-handoff.gsproject"),&project).unwrap();
+        let reopened=project::load_project(&jobs.join("ce-handoff.gsproject")).unwrap();assert_eq!(reopened.fingerprint().unwrap(),project.fingerprint().unwrap());
+        let input=crate::working_tags::WorkingTagsInput{hud_readback_targets:vec![],scenario_squad_readback:None,encounter_append:None,script_attachment:None,expected_encounter:None,compile_scripts:true,expected_tag_identity:Some(crate::working_tags::source_identity(&jobs.join(&id).join("tags"),&AtomicBool::new(false)).unwrap()),bsp_audio:None,parent_build:build.clone(),tags_directory:jobs.join(&id).join("tags"),scenario_path:inspection.scenario_path.clone(),scenario_type:inspection.header.scenario_type,tool:tool_path(&tools,"invader-build").unwrap(),invader_info:tool_path(&tools,"invader-info").unwrap()};
+        let second=uuid::Uuid::new_v4().to_string();let rebuilt=crate::working_tags::run_build_from_tags(&reopened,&input,&jobs,&second,Arc::new(AtomicBool::new(false)),|e|println!("working {}: {}",e.phase,e.message)).unwrap();
+        assert_eq!(rebuilt.status,"validated","{}",rebuilt.message);assert_eq!(maps::hash_file(&source).unwrap(),before);
+        println!("CE source/Save/reopen/native working-script rebuild PASS: first={}; second={}; originalSHA={before}; modules={}; no app/game acceptance",readback.sha256,rebuilt.sha256.unwrap(),modules.len());
+    }
     fn lifecycle_record(output: &Path) -> BuildRecord {
         let inspection = maps::inspect_map(output, None).unwrap();
         assert_eq!(inspection.header.version, 13);

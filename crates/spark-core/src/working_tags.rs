@@ -461,20 +461,12 @@ fn parent_native_identity(
             .ok_or_else(|| SparkError::Invalid("Parent native source workspace is missing".into()))?
             .directory
     } else if conversion_receipt.exists() {
-        if input.parent_build.target != "mcc-cea" {
-            return invalid("This conversion receipt describes H1A compiler provenance, not a standard CE native source build");
-        }
         let receipt: serde_json::Value = read_receipt(&conversion_receipt)?;
         let source = project.source.as_ref().ok_or_else(|| {
             SparkError::Invalid("Native conversion parent has no preserved source".into())
         })?;
-        if receipt.get("schemaVersion").and_then(|v| v.as_u64()) != Some(1)
-            || receipt.get("compilerSha256").and_then(|v| v.as_str()) != Some(tool_hash)
-            || receipt.get("sourceSha256").and_then(|v| v.as_str()) != Some(source.sha256.as_str())
-            || receipt.get("sourcePreserved").and_then(|v| v.as_bool()) != Some(true)
-        {
-            return invalid("Parent conversion native compiler/source identity no longer matches");
-        }
+        crate::build::verify_native_source_provenance(&receipt,&input.parent_build.target,&source.sha256,tool_hash)?;
+        if input.parent_build.target=="gbx-custom"&&receipt.get("inputTagsSha256").and_then(|v|v.as_str())!=Some(maps::hash_file(&checked_file(&parent.join("input-tags.json"))?)?.as_str()){return invalid("Native CE input source manifest changed after compilation");}
         parent.to_path_buf()
     } else {
         return invalid("Parent has no matching validated native compiler provenance; a target label alone is insufficient");

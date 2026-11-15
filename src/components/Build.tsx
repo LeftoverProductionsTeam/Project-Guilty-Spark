@@ -135,7 +135,7 @@ export default function Build({
       <div className="build-columns" hidden={view!=='build'}>
         <div className="build-main">
           <details className="surface build-conversion" open={inputsOpen} onToggle={event=>setInputsOpen(event.currentTarget.open)}><summary>Build inputs &amp; conversion <small>Source resources and {targetName} toolchain</small></summary>
-            <p>{ceTarget?`Rebuild the original CE regions with their matching editable tags, then compile a standard CE cache for ${targetName}. Native compilation and actual engine loading are checked separately.`:"Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check."}</p>
+            <p>{ceTarget?`${project.bspAssembly?"Rebuild the connected CE regions":"Compile this scenario from its complete matching editable CE tags"}, producing a standard CE cache for ${targetName}. Select and review that tagset in Engine build targets; a stock SDK cannot replace the original scenario. Existing tags and maps stay unchanged. Pending cache edits cannot be silently omitted. Native compilation and actual engine loading are checked separately.`:"Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check."}</p>
             <BuildTargets project={project} defaults={data.settings} onSave={onSave} onChange={next=>edit(next,'Configure map conversion target')}/>
             {!ceTarget&&<>
             <button disabled={!native||preparing||!!activeJob} onClick={()=>{setPreparing(true);void onAction(async()=>{await call('prepare_mcc_conversion_tools',{projectId:project.id});onRefresh();},'MCC tools and editable tags are prepared. Your choices are saved.').finally(()=>setPreparing(false));}}>{preparing?'Preparing installed MCC tools…':'Prepare installed MCC tools'}</button>
@@ -315,7 +315,7 @@ export default function Build({
           </details>
         </div>
         <aside className="build-sidebar">
-          {ceTarget?<section className="surface"><h3>{targetName} playtest</h3><p>Build a standard Custom Edition cache with the selected source tags. Choose {targetName} in the runtime menu and use Online to host or join the compiled map.</p><p>{readiness?.currentBuildMessage??'Save and build before starting a playtest.'}</p><small>Map loading, player movement and vehicle travel need their own game tests.</small></section>:<>
+          {ceTarget?<section className="surface"><h3>{targetName} playtest</h3><p>Build a standard Custom Edition cache with the selected source tags. Recovered scenario modules are available in Runtime & Tools → Details → Edit or attach scenario HaloScript after a validated source build. Draft Save and native source compilation are separate steps. Select the matching runtime profile for testing; multiplayer maps use Online to host or join.</p><p>{readiness?.currentBuildMessage??'Save and build before starting a playtest.'}</p><small>Map loading, player movement and vehicle travel need their own game tests.</small></section>:<>
           <section className="surface">
             <div className="section-heading">
               <h3>
