@@ -1,3 +1,4 @@
+import {scaleCampaignDifficulty} from './nativeOperations';
 import {describe,it,expect} from 'vitest';
 import {mergeForge,portableForge,localForge} from './forgeSession';
 import {historyReducer,initialHistory} from './editor';
@@ -127,4 +128,22 @@ it('preserves complete Undo and Redo snapshots when locally verified native sour
     // First local admission must not relax the immutable-source network merge.
     expect(()=>mergeForge(moved,admitted,moved)).toThrow(/Native source admission changed/);
   }
+});
+
+it('scales campaign native population as one immutable source/history and conflict operation',()=>{
+ const before={...structuredClone(base),gameMode:'campaign' as const,campaignEncounters:[{name:'marines',actorPath:'characters/marine',position:[1,2,3] as [number,number,number],startActive:false,count:4,spacing:1},{name:'flood',actorPath:'characters/flood',position:[5,2,3] as [number,number,number],startActive:false,count:2,spacing:1}]};
+ const original=JSON.stringify(before),proposal=scaleCampaignDifficulty(before.campaignEncounters,.5,4);
+ expect(proposal.changed).toBe(2);expect(proposal.rows.map(row=>row.after)).toEqual([[2,4],[1,2]]);expect(proposal.rows.every(row=>row.clamped)).toBe(true);
+ expect(JSON.stringify(before)).toBe(original);expect(proposal.entries[0].position).toBe(before.campaignEncounters[0].position);
+ const next={...before,campaignEncounters:proposal.entries};let history=historyReducer(initialHistory,{type:'load',project:project(before)});
+ history=historyReducer(history,{type:'edit',project:project(next),description:'Scale campaign populations'});expect(history.past).toHaveLength(1);
+ history=historyReducer(history,{type:'undo'});expect(history.current?.quickForge?.campaignEncounters).toEqual(before.campaignEncounters);
+ history=historyReducer(history,{type:'redo'});expect(history.current?.quickForge?.campaignEncounters).toEqual(proposal.entries);
+ expect(mergeForge(before,before,next).campaignEncounters).toEqual(proposal.entries);
+ const peer={...before,campaignEncounters:scaleCampaignDifficulty(before.campaignEncounters,.25,1).entries};expect(()=>mergeForge(before,peer,next)).toThrow(/campaign encounter/i);
+ const selected=scaleCampaignDifficulty(before.campaignEncounters,0,1,'flood');expect(selected.entries[0]).toBe(before.campaignEncounters[0]);expect(selected.rows).toHaveLength(1);expect(selected.rows[0].after).toEqual([0,2]);
+ expect(scaleCampaignDifficulty(before.campaignEncounters,1,1).changed).toBe(0);
+ for(const bad of [NaN,Infinity,-1,4.01])expect(()=>scaleCampaignDifficulty(before.campaignEncounters,bad,1)).toThrow();
+ expect(()=>scaleCampaignDifficulty(before.campaignEncounters,1,1,'missing')).toThrow();expect(()=>scaleCampaignDifficulty([],1,1)).toThrow();
+ expect(()=>scaleCampaignDifficulty([{...before.campaignEncounters[0],difficulty:{normal:5,insane:4}}],1,1)).toThrow();
 });

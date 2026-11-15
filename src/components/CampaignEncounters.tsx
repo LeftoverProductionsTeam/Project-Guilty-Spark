@@ -3,6 +3,7 @@ import AssetSourceBrowser from './AssetSourceBrowser';
 import {attachAssetImport,prepareCampaignActor} from '../nativeAssetImport';
 import {beginProjectMutation} from '../projectMutation';
 import { useMapState } from '../mapSession';
+import {scaleCampaignDifficulty} from '../nativeOperations';
 import type { NativeEncounterAppend } from '../nativeOperations';
 import type { OpenProject,Project } from '../types';
 import { Notice, NumberField } from './ui';
@@ -19,13 +20,14 @@ export default function CampaignEncounters({project,edit}:{
   const doc=project.quickForge;
   const entries=doc?.campaignEncounters??[];
   const [selected,setSelected]=useMapState<string>(project.id,'campaign-encounter','');
+  const [normalFactor,setNormalFactor]=useState('1'),[insaneFactor,setInsaneFactor]=useState('1'),[scaleScope,setScaleScope]=useState('all');
   const [name,setName]=useState('gs_patrol_1'),[actor,setActor]=useState(''),[error,setError]=useState('');
   const choices=useId();
   const [actorSource,setActorSource]=useState<OpenProject|null>(null),[sourceTag,setSourceTag]=useState(''),[sourceQuery,setSourceQuery]=useState(''),[importing,setImporting]=useState(false);
   const latest=useRef(project);latest.current=project;
   const sourceRef=useRef(actorSource);sourceRef.current=actorSource;
   const scope=useRef({id:project.id,active:true});
-  useEffect(()=>{const life={id:project.id,active:true};scope.current=life;setActorSource(null);setSourceTag('');setImporting(false);return()=>{life.active=false;};},[project.id]);
+  useEffect(()=>{const life={id:project.id,active:true};scope.current=life;setActorSource(null);setSourceTag('');setImporting(false);setNormalFactor('1');setInsaneFactor('1');setScaleScope('all');return()=>{life.active=false;};},[project.id]);
   const candidates=(actorSource?.inspection?.tags??[]).filter(tag=>tag.class==='actv');
   const matches=candidates.filter(tag=>tag.path.toLowerCase().includes(sourceQuery.toLowerCase()));
   async function includeActor(){
@@ -40,6 +42,8 @@ export default function CampaignEncounters({project,edit}:{
     finally{release();if(life.active&&scope.current===life)setImporting(false);}
   }
   const entry=entries.find(value=>value.name===selected)??entries[0];
+  let scaling:ReturnType<typeof scaleCampaignDifficulty>|undefined,scalingIssue='';
+  if(entries.length)try{scaling=scaleCampaignDifficulty(entries,normalFactor.trim()?Number(normalFactor):NaN,insaneFactor.trim()?Number(insaneFactor):NaN,scaleScope==='selected'?entry?.name:undefined);}catch(problem){scalingIssue=String(problem);}
   const actors=(project.nativeAssetImports??[]).filter(binding=>binding.tagClass==='actv').map(binding=>binding.nativePath);
   const total=entries.reduce((sum,value)=>sum+(value.count??1),0);
   const commit=(values:NativeEncounterAppend[],label:string)=>{
@@ -99,6 +103,18 @@ export default function CampaignEncounters({project,edit}:{
           while(entries.some(value=>value.name===`gs_patrol_${index}`)||name===`gs_patrol_${index}`)index++;
           setName(`gs_patrol_${index}`);
         }}>Add encounter</button>
+      {!!entries.length&&<details className="campaign-difficulty-batch"><summary>Scale campaign difficulty populations</summary>
+        <p className="studio-hint">Review native normal/insane population fields together. Counts are rounded and capped by each group's authored starts. Add starting positions separately to support more actors; this changes neither placement, AI damage/health/behavior nor multiplayer authority.</p>
+        <div className="studio-fields">
+          <label>Groups<select aria-label="Campaign difficulty scope" value={scaleScope} onChange={event=>setScaleScope(event.target.value)}><option value="all">All campaign groups</option><option value="selected">Selected encounter</option></select></label>
+          <label>Normal multiplier<input type="number" aria-label="Campaign normal population factor" min={0} max={4} step={.25} value={normalFactor} onChange={event=>setNormalFactor(event.target.value)}/></label>
+          <label>Insane multiplier<input type="number" aria-label="Campaign insane population factor" min={0} max={4} step={.25} value={insaneFactor} onChange={event=>setInsaneFactor(event.target.value)}/></label>
+        </div>
+        {scalingIssue&&<Notice tone="info">{scalingIssue}</Notice>}
+        {scaling&&<table aria-label="Campaign population preview"><thead><tr><th>Group</th><th>Normal</th><th>Insane</th><th>Limit</th></tr></thead><tbody>{scaling.rows.map(row=><tr key={row.name}><th scope="row">{row.name}</th><td>{row.before[0]} → {row.after[0]}</td><td>{row.before[1]} → {row.after[1]}</td><td>{row.clamped?'Capped at authored starts':'Within authored starts'}</td></tr>)}</tbody></table>}
+        <p className="studio-hint">Applying commits all displayed changes as one project Undo/Redo step. Save, prepare the mission again when needed, build and independently inspect both native fields. Lower populations can invalidate a mission's minimum-survivor condition; existing mission preparation/build checks still refuse that mismatch.</p>
+        <button type="button" disabled={!scaling?.changed} onClick={()=>{if(scaling?.changed)commit(scaling.entries,'Scale campaign native difficulty populations');}}>Apply campaign population scaling</button>
+      </details>}
       {entry&&<>
         <label>Encounter<select aria-label="Campaign encounter" value={entry.name} onChange={event=>setSelected(event.target.value)}>
           {entries.map(value=><option key={value.name} value={value.name}>{value.name}</option>)}

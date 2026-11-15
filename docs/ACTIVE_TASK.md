@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native original AI pose milestone; Black Echo next
+Task: Operation110 — Black Echo population milestone; authored start poses next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: e5bc5c1e03f977133c9f791225c97632f6456bd2 plus this original AI pose scope; Windows app8aeec8c5/source450fa8d7, exact hashes in RUNTIME_INTEGRATION_20261107.
-Next action: Continue Black Echo encounter/difficulty and actor-source workflows through existing reviewed native source/build paths. Source pose milestone accepted only for the owned recovered MCC fixture; stock campaign/CE/game/peers open. Game input needs renewal;37944 and all475/M1–M6 remain open. No Forerunner/push.
+Latest verified revision: 1b4e024106d1cf6e7c066c41d7a7a1472d6e166a plus this campaign population batch scope; Windows appffce9a72/sourcef59158fd, exact hashes in RUNTIME_INTEGRATION_20261107.
+Next action: Complete individually authored campaign start poses and viewport placement through the existing append recipe; groups currently use a regular grid/facing0. Preserve original-start1b4e024, actor imports and mission source.37944/game/settlement4/7/Forerunner/475IDs/M1–M6 open.
 
 ## Acceptance
 
@@ -25,7 +25,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Black Echo combined milestone: actual Windows controls author4groups/8starts, rescue success/failure and optional Flood AND-area, prepare/Undo/Redo/Save/full restart and MCC13 compile/readback pass. Fixed real277-character HUD compiler path failure; source/ownership checks retained. TypeScript/frontend19/Rust creative10/browser1 and CE/MCC/Xbox script fixtures pass. Cache8cffa4af/scenario836826f4, exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No game/branch/combat/settlement/Forerunner acceptance;37944 unresolved.
+Black Echo campaign population milestone: all/selected groups now have native normal/insane scale preview, authored-start caps and one Apply/Undo/Redo step. Focused24source tests,1complete browser flow, TypeScript and frozen Windows build pass. Actual Windows4groups/8starts, Apply normal×.5/Undo/Redo, mission prepare/Save/full restart/MCC13 compile/independent readback pass: all4normal1/insane2, source positions/actor references preserved. Reuses existing writer and source/mission/peer guards. Appffce9a72/sourcef59158fd; exact native hashes/scopes and earlier conditional-route/long-path fixes in RUNTIME_INTEGRATION_20261107. Gameplay/settlement4/7/37944 remain open.
 
 Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbox script proof remains in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git; no evidence or requirement removed.
 
@@ -102,7 +102,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA79527/run-IRRsAU terminal PASS and confirmed absent. Disposed3542331406logicalB; allocated-file disposal unavailable. One2676file/146023117B SDK; no owned app/compiler/browser/game or retained binaries/maps/SDK/profile/archive. Exact native cases/digests in RUNTIME_INTEGRATION_20261107. Original inputs,475IDs and previous-checkpoint hash unchanged. No Forerunner/push.
+QA35395/run-2vK5WY terminal PASS and confirmed absent:2801381689logicalB disposed; allocated-file disposal unavailable. One3521file/184203140B SDK. No owned app/compiler/browser/game or retained QA SDK/binary/map/profile/archive. Exact source/native proof in RUNTIME_INTEGRATION_20261107. Originals/475IDs/legacy recovery unchanged; no Forerunner/push.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 

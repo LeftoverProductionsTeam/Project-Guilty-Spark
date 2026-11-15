@@ -67,3 +67,22 @@ export interface NativeDependencies {
 export function notifyNativeSource(projectId: string) {
   window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed', { detail: { projectId } }));
 }
+
+/** Source-only campaign proposal. Native writing and validation remain in the existing append recipe. */
+export function scaleCampaignDifficulty(entries:NativeEncounterAppend[],normalFactor:number,insaneFactor:number,selected?:string){
+ if(!entries.length||[normalFactor,insaneFactor].some(value=>!Number.isFinite(value)||value<0||value>4))throw Error('Choose campaign groups and finite population factors between 0 and 4.');
+ if(selected!==undefined&&!entries.some(entry=>entry.name===selected))throw Error('Select an existing campaign encounter.');
+ const rows:{name:string;before:[number,number];after:[number,number];clamped:boolean}[]=[];
+ let changed=0;
+ const next=entries.map(entry=>{
+  if(selected!==undefined&&entry.name!==selected)return entry;
+  const count=entry.count??1,before:[number,number]=[entry.difficulty?.normal??count,entry.difficulty?.insane??count];
+  if(!Number.isInteger(count)||count<1||count>32||before.some(value=>!Number.isInteger(value)||value<0||value>count))throw Error('Review invalid starting-position or native difficulty counts for '+entry.name+'.');
+  const requested:[number,number]=[Math.round(before[0]*normalFactor),Math.round(before[1]*insaneFactor)];
+  const after=requested.map(value=>Math.min(count,value)) as [number,number];
+  rows.push({name:entry.name,before,after,clamped:requested.some(value=>value>count)});
+  if(before.every((value,index)=>value===after[index]))return entry;
+  changed++;return {...entry,difficulty:{normal:after[0],insane:after[1]}};
+ });
+ return {entries:next,rows,changed};
+}

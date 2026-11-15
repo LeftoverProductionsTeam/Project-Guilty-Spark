@@ -4218,3 +4218,24 @@ test('objective camera scenes select saved ranges and preserve source history wi
  await page.getByRole('button',{name:'Close map Synthetic baseline',exact:true}).click();await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'Creator Studio');await page.getByRole('tab',{name:'Mission director',exact:true}).click();if(!await enabled.isVisible())await scene.locator(':scope > summary').click();await expect(enabled).toBeChecked();await expect(scene.getByRole('combobox',{name:'Mission scene timing 1',exact:true})).toHaveValue('complete');
  await enabled.uncheck();if(!await intro.isVisible())await build.locator(':scope > summary').click();await build.getByRole('button',{name:'Prepare mission for native build',exact:true}).click();await page.keyboard.press('Control+s');await expect.poll(source).not.toContain('(script static void gs_scene_1');
 });
+
+test('campaign population batch previews native bounds and retains source through Undo Save and reopening',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const p=(window as any).__sparkMock.projects.a.project;
+ p.quickForge={schemaVersion:1,name:'Campaign difficulty source',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[],campaignEncounters:[{name:'marines',actorPath:'characters/marine',position:[1,2,3],startActive:false,count:4,spacing:1},{name:'flood',actorPath:'characters/flood',position:[4,2,3],startActive:false,count:2,spacing:1}]};});
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
+ const ai=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Campaign AI encounters/})});await revealPagedControl(ai.locator(':scope > summary'));await ai.locator(':scope > summary').click();
+ const batch=ai.locator('.campaign-difficulty-batch');await batch.locator('summary').click();const apply=batch.getByRole('button',{name:'Apply campaign population scaling',exact:true});await expect(apply).toBeDisabled();
+ await batch.getByRole('spinbutton',{name:'Campaign normal population factor',exact:true}).fill('.5');await batch.getByRole('spinbutton',{name:'Campaign insane population factor',exact:true}).fill('4');
+ const preview=batch.getByRole('table',{name:'Campaign population preview',exact:true});await expect(preview).toContainText('4 → 2');await expect(preview).toContainText('Capped at authored starts');
+ await apply.click();const groups=()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project.quickForge.campaignEncounters);
+ await expect.poll(async()=>(await groups()).map((entry:any)=>entry.difficulty)).toEqual([{normal:2,insane:4},{normal:1,insane:2}]);
+ await page.keyboard.press('Control+z');await expect.poll(async()=>(await groups()).every((entry:any)=>entry.difficulty===undefined)).toBe(true);
+ await page.keyboard.press('Control+y');await expect.poll(async()=>(await groups())[1].difficulty?.normal).toBe(1);await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.campaignEncounters[0].difficulty)).toEqual({normal:2,insane:4});
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
+ if(!await batch.isVisible())await ai.locator(':scope > summary').click();if(!await apply.isVisible())await batch.locator('summary').click();
+ await batch.getByRole('spinbutton',{name:'Campaign normal population factor',exact:true}).fill('');await expect(apply).toBeDisabled();
+ await ai.getByRole('combobox',{name:'Campaign encounter',exact:true}).selectOption('flood');await batch.getByRole('combobox',{name:'Campaign difficulty scope',exact:true}).selectOption('selected');await batch.getByRole('spinbutton',{name:'Campaign normal population factor',exact:true}).fill('0');
+ await expect(preview.getByRole('row')).toHaveCount(2);await expect(preview).toContainText('flood');await expect(preview).not.toContainText('marines');await apply.click();await expect.poll(async()=>(await groups()).map((entry:any)=>entry.difficulty?.normal)).toEqual([2,0]);await page.keyboard.press('Control+z');await expect.poll(async()=>(await groups())[1].difficulty?.normal).toBe(1);
+ await expect.poll(async()=>(await groups()).map((entry:any)=>entry.position)).toEqual([[1,2,3],[4,2,3]]);
+});

@@ -16,6 +16,8 @@ const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
 const blackEchoReview=process.env.SPARK_NATIVE_BLACK_ECHO_REVIEW==='1',marineTag='characters/marine_armored/marine_armored assault rifle',floodTag='characters/floodcombat_human/floodcombat_human assault rifle';
+const blackEchoDifficultyReview=process.env.SPARK_NATIVE_BLACK_ECHO_DIFFICULTY_REVIEW==='1';
+if(blackEchoDifficultyReview&&!blackEchoReview)throw Error('Native campaign population review requires the Black Echo workflow');
 const blackEchoIntroReview=process.env.SPARK_NATIVE_BLACK_ECHO_INTRO_REVIEW==='1';
 const blackEchoSceneReview=process.env.SPARK_NATIVE_BLACK_ECHO_SCENE_REVIEW==='1';
 const blackEchoStoryReview=blackEchoIntroReview||blackEchoSceneReview;
@@ -276,6 +278,14 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      const count=ai.getByRole('spinbutton',{name:'Campaign starting position count',exact:true});await count.fill('2');await count.press('Tab');
      for(const [index,axis] of ['X','Y','Z'].entries()){const input=ai.getByRole('spinbutton',{name:'Campaign encounter '+axis,exact:true});await input.fill(String(position[index]));await input.press('Tab');}
     }
+    if(blackEchoDifficultyReview){
+     record.stage='scale native campaign populations';const batch=ai.locator('.campaign-difficulty-batch');await batch.locator('summary').click();
+     await batch.getByRole('spinbutton',{name:'Campaign normal population factor',exact:true}).fill('.5');
+     await expect(batch.getByRole('table',{name:'Campaign population preview',exact:true})).toContainText('2 → 1');
+     await batch.getByRole('button',{name:'Apply campaign population scaling',exact:true}).click();
+     const counts=async()=>(await state(campaignId)).project.quickForge.campaignEncounters.map(entry=>entry.difficulty?.normal??entry.count);
+     await expect.poll(counts).toEqual([1,1,1,1]);await page.keyboard.press('Control+z');await expect.poll(counts).toEqual([2,2,2,2]);await page.keyboard.press('Control+y');await expect.poll(counts).toEqual([1,1,1,1]);record.populationUndoRedo=true;
+    }
     const rows=page.locator('.studio-record');await rows.nth(1).getByRole('combobox',{name:'On rescue failure 2',exact:true}).selectOption('continue');
     record.stage='author conditional routes';
     for(const index of [2,3,4,5,6]){const row=rows.nth(index);if(index!==4)await row.getByRole('checkbox',{name:/^Optional step/}).check();await row.getByRole('combobox',{name:'Mission condition source '+(index+1),exact:true}).selectOption(index===4?'both':'result');}
@@ -321,9 +331,9 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     const read=async(key,root=folder)=>(await run(path.join(invader,'invader-edit.exe'),['-t',root,'-G',key,scenario+'.scenario'])).stdout.trim();
     expect(await read('type')).toBe('singleplayer');const groups=[];
     for(const [index,[name,actor]] of actors.entries()){
-     const prefix='encounters['+index+'].squads[0]';expect(await read('encounters['+index+'].name')).toBe(name);expect(Number(await read(prefix+'.normal_diff_count'))).toBe(2);expect(Number(await read(prefix+'.insane_diff_count'))).toBe(2);
+     const prefix='encounters['+index+'].squads[0]';expect(await read('encounters['+index+'].name')).toBe(name);expect(Number(await read(prefix+'.normal_diff_count'))).toBe(blackEchoDifficultyReview?1:2);expect(Number(await read(prefix+'.insane_diff_count'))).toBe(2);
      const actorIndex=Number(await read(prefix+'.actor_type'));expect((await read('actor_palette['+actorIndex+'].reference')).replaceAll('\\','/')).toBe(actor+'.actor_variant');
-     const positions=await read(prefix+'.starting_locations[*].position');expect(positions).toBe(await read(prefix+'.starting_locations[*].position',path.join(build.sources.directory,'tags')));groups.push({name,actor,positions});
+     const positions=await read(prefix+'.starting_locations[*].position');expect(positions).toBe(await read(prefix+'.starting_locations[*].position',path.join(build.sources.directory,'tags')));groups.push({name,actor,positions,normalCount:Number(await read(prefix+'.normal_diff_count')),insaneCount:Number(await read(prefix+'.insane_diff_count'))});
     }
     const globals=(await read('globals[*].name')).split(/\r?\n/),scripts=(await read('scripts[*].name')).split(/\r?\n/);for(const name of ['gs_result_2_done','gs_result_2_failed','gs_branch_1_ready','gs_branch_1_inside'])expect(globals).toContain(name);for(const name of ['gs_mission','gs_mission_bootstrap','gs_complete_4','gs_complete_7'])expect(scripts).toContain(name);
     const hud=(await read('hud_messages')).replaceAll('\\','/');await run(path.join(invader,'invader-extract.exe'),['-s',hud,'-t',folder,map]);const names=(await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G','messages[*].name',hud])).stdout.trim().split(/\r?\n/);for(const name of ['gs_mission_fail_2',...Array.from({length:8},(_,i)=>'gs_mission_obj_'+(i+1))])expect(names).toContain(name);
