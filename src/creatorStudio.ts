@@ -40,7 +40,7 @@ export interface MissionBeat {
   id: string;
   title: string;
   objective: string;
-  trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'escort' | 'timer';
+  trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'escort' | 'deviceActivated' | 'timer';
   encounterName: string;
   triggerRef?: string | null;
   timerSeconds?: number | null;
@@ -169,7 +169,7 @@ const commandToken = /^[A-Za-z0-9_-]{1,64}$/;
 const variantToken = /^[A-Za-z0-9_ -]{1,64}$/;
 const recordId = /^[A-Za-z0-9_-]{1,72}$/;
 const scriptIdent = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
-const triggerValues = new Set(['manual', 'triggerVolume', 'encounterCleared', 'escort', 'timer']);
+const triggerValues = new Set(['manual', 'triggerVolume', 'encounterCleared', 'escort', 'deviceActivated', 'timer']);
 const runtimes = new Set<ServerRuntime>(['haloCustomEdition', 'haloPC', 'haloDemo', 'mcc', 'openCE', 'chupathingyCE']);
 const verdicts = new Set<PlaytestVerdict>(['notRun', 'pass', 'fail', 'blocked']);
 const safeText = (s: string, max: number) => typeof s === 'string' && s.length <= max && !/[\x00-\x1f\x7f]/.test(s);

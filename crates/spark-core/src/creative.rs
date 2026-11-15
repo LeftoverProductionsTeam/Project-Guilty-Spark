@@ -218,6 +218,15 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
                     return invalid(format!("Mission '{}' references missing source volume '{}'. Name or select a volume in Logic / Events",beat.title,name));
                 }
             },
+            "deviceActivated"=>{
+                let name=beat.trigger_ref.as_deref().unwrap_or("");
+                let bindings=doc.logic.iter().flat_map(|logic|&logic.devices).filter(|device|device.native_name.as_deref()==Some(name)).collect::<Vec<_>>();
+                let placements=bindings.iter().flat_map(|device|doc.placements.iter().filter(move |placement|placement.id==device.placement_id)).collect::<Vec<_>>();
+                if !script_ident(name)||bindings.len()!=1||placements.len()!=1||placements[0].tag_class!="ctrl"||!bindings[0].powered||
+                    !bindings[0].initial_position.is_finite()||!(0.0..0.5).contains(&bindings[0].initial_position) {
+                    return invalid("Mission terminal needs one explicitly named, powered native control with initial position below0.5; no source was changed");
+                }
+            },
             "encounterCleared"|"escort"=>{
                 let mut parts=beat.encounter_name.split('/');
                 let name=parts.next().unwrap_or("");
@@ -351,7 +360,7 @@ impl CreatorStudio {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
-                || !["manual", "triggerVolume", "encounterCleared", "escort", "timer"].contains(&beat.trigger.as_str())
+                || !["manual", "triggerVolume", "encounterCleared", "escort", "deviceActivated", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.sound_cue.as_ref().is_some_and(|cue|!cue.valid())
@@ -544,6 +553,32 @@ mod tests {
         let mut absent=project.clone();absent.studio.as_mut().unwrap().missions[0].trigger_ref=Some("missing_rally".into());assert!(check(&absent).unwrap_err().to_string().contains("destination volume"));
         let mut duplicate=project.clone();let mut second=binding.missions[0].clone();second.id="duplicate".into();duplicate.studio.as_mut().unwrap().missions.push(second);assert!(check(&duplicate).unwrap_err().to_string().contains("spawn owner"));
         let mut active=project;active.quick_forge.as_mut().unwrap().campaign_encounters[0].start_active=true;assert!(check(&active).unwrap_err().to_string().contains("disable initial actor creation"));
+    }
+
+    #[test]
+    fn mission_terminal_requires_one_inactive_powered_native_control() {
+        let mut project=crate::project::Project::new("Communications");let mut document=studio();
+        document.missions.push(serde_json::from_value(serde_json::json!({"id":"terminal","title":"Restore communications","objective":"Use terminal","trigger":"deviceActivated","encounterName":"","triggerRef":"restore_comms"})).unwrap());
+        document.validate().unwrap();project.studio=Some(document);
+        let mut doc=crate::quickforge::create_arena("Terminal","customBlank").unwrap();doc.game_mode="campaign".into();
+        doc.placements.push(serde_json::from_value(serde_json::json!({"id":"terminal","name":"Terminal","tagPath":"devices/control","tagClass":"ctrl","position":[0,0,0],"rotation":[0,0,0],"team":0,"respawnSeconds":0})).unwrap());
+        doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[{"placementId":"terminal","nativeName":"restore_comms","initialPosition":0,"powered":true}],"rules":[]})).unwrap());
+        let body="; binding fixture, not native syntax proof\n";
+        let binding=NativeMissionBinding{schema_version:1,missions:project.studio.as_ref().unwrap().missions.clone(),activation:"manual".into(),source_sha256:crate::studio_native::digest(body.as_bytes())};
+        doc.logic.as_mut().unwrap().handwritten_sources=serde_json::from_value(serde_json::json!([{"filename":"gs_mission.hsc","content":format!("{}{}\n{}",NATIVE_MISSION_BINDING,serde_json::to_string(&binding).unwrap(),body)}])).unwrap();
+        native_mission_binding(&project,&doc).unwrap();
+        let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(project.studio.as_ref().unwrap()).unwrap()).unwrap();assert_eq!(restored.missions,binding.missions);
+        for variant in ["missing","duplicate","machine","unpowered","active"] {
+            let mut bad=doc.clone();
+            match variant {
+                "missing"=>bad.logic.as_mut().unwrap().devices.clear(),
+                "duplicate"=>{let device=bad.logic.as_ref().unwrap().devices[0].clone();bad.logic.as_mut().unwrap().devices.push(device);},
+                "machine"=>bad.placements[0].tag_class="mach".into(),
+                "unpowered"=>bad.logic.as_mut().unwrap().devices[0].powered=false,
+                _=>bad.logic.as_mut().unwrap().devices[0].initial_position=0.5,
+            }
+            assert!(native_mission_binding(&project,&bad).unwrap_err().to_string().contains("native control"),"{variant}");
+        }
     }
 
 }

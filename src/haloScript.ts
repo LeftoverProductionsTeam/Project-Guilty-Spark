@@ -80,6 +80,14 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         deps.push(`trigger_volume:${ref}`);
         scripted.push(`  (sleep_until (volume_test_objects ${ref} (players)) 15)`);break;
       }
+      case 'deviceActivated':{
+        const ref=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' native control');
+        deps.push('device_control:'+ref);
+        // Arm below the threshold first. An already-active terminal cannot
+        // silently satisfy a later objective; do not reset the player's device.
+        scripted.push('  (sleep_until (< (device_get_position '+ref+') 0.5) 1)',
+          '  (sleep_until (>= (device_get_position '+ref+') 0.5) 1)');break;
+      }
       case 'escort':{
         const ref=ensureName(beat.encounterName,'Beat '+(i+1)+' survivor encounter',true),destination=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' survivor destination');
         const minimum=beat.minimumSurvivors??1;
@@ -112,6 +120,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
     'Optional volume conditions are evaluated once when their step starts; a false condition skips that step. This is shared scenario state, not independent multiplayer squad progress.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
+    ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?['Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Falling below that minimum stops this mission script, not the persistent world; no loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',

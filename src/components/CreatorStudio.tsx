@@ -162,14 +162,17 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     } catch(problem) {if(activeProject.current===input.id)setError(String(problem));}
     finally {release();setPreparingMission(false);}
   }
-  function selectMissionArea(name:string){
-    const area=project.quickForge?.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
-    if(!onLevelEditor||area.length!==1){setError('Select one existing named source area before opening the Level Editor.');return;}
+  function selectMissionArea(name:string,device=false){
+    const doc=project.quickForge;
+    const area=device?(doc?.logic?.devices??[]).filter(binding=>binding.nativeName===name)
+      .flatMap(binding=>doc!.placements.filter(placement=>placement.id===binding.placementId&&placement.tagClass==='ctrl')):
+      doc?.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
+    if(!onLevelEditor||area.length!==1){setError('Select one existing named source area or native control before opening the Level Editor.');return;}
     const actor=readMapSession<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,null);
     if(actor?.active)writeMapSession(project.id,NATIVE_AI_START_VIEW,{...actor,active:false});
     writeMapSession(project.id,'forge.selection',[area[0].id]);writeMapSession(project.id,'forge.zone',null);
     writeMapSession(project.id,'forge.sourceSurface',null);writeMapSession(project.id,'forge.workshopSelection',null);
-    writeMapSession(project.id,'forge.bspWorkshop',false);onLevelEditor();
+    writeMapSession(project.id,'forge.bspWorkshop',false);writeMapSession(project.id,'forge.cameraMode','orbit');onLevelEditor();
   }
   function updateBeat(id: string, patch: Partial<MissionBeat>) {
     change({ ...studio, missions: studio.missions.map(m => m.id === id ? { ...m, ...patch } : m) }, 'Update mission beat');
@@ -305,12 +308,25 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       {studio.missions.map((beat, i) => <div className="studio-record" key={beat.id}>
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
-        <label title="Choose when this objective starts. Volumes and encounters must have the same names in your editable scenario.">Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
+        <label title="Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.">Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
-          <option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
+          <option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
         <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
         {(beat.trigger === 'triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':beat.trigger==='escort'?'Survivor destination volume':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
+        {beat.trigger==='deviceActivated'&&<>
+          <label>Native control terminal<select aria-label={'Mission terminal '+(i+1)} value={beat.triggerRef??''} onChange={event=>updateBeat(beat.id,{triggerRef:event.target.value})}>
+            <option value="">Choose an authored native control</option>
+            {beat.triggerRef&&!project.quickForge?.logic?.devices.some(device=>device.nativeName===beat.triggerRef&&project.quickForge?.placements.some(placement=>placement.id===device.placementId&&placement.tagClass==='ctrl'))&&<option value={beat.triggerRef}>{beat.triggerRef} · missing source binding</option>}
+            {(project.quickForge?.logic?.devices??[]).filter(device=>device.nativeName&&project.quickForge?.placements.some(placement=>placement.id===device.placementId&&placement.tagClass==='ctrl'))
+              .map(device=><option key={device.placementId} value={device.nativeName}>{device.nativeName}</option>)}
+          </select></label>
+          {onLevelEditor&&<button type="button" disabled={!project.quickForge?.logic?.devices.some(device=>device.nativeName===beat.triggerRef&&project.quickForge?.placements.some(placement=>placement.id===device.placementId&&placement.tagClass==='ctrl'))}
+            onClick={()=>selectMissionArea(beat.triggerRef??'',true)}>Select objective terminal in Level Editor</button>}
+          <p className="studio-hint">Place and name a native control in Logic / Events, power it and start below half position. This step waits for inactive → activated.
+            Already-active devices must return inactive first; Spark does not reset them. Scripts can also activate a control.
+            This is a shared native objective condition, not technology pickup, loot settlement or per-squad progress.</p>
+        </>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}
         {onLevelEditor&&(beat.trigger==='triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null)&&<button type="button"
           disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.triggerRef)}

@@ -1,5 +1,6 @@
+import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
-import {attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData} from './haloScript';
+import {attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
 import { addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems } from './creatorStudio';
@@ -131,4 +132,38 @@ it('owns native survivor creation once and rejects impossible population or dest
  const duplicate=structuredClone(draft);duplicate.studio!.missions.push({...duplicate.studio!.missions[1],id:'another_spawn'});await expect(attachNativeCampaignMission(duplicate,'manual')).rejects.toThrow(/one mission spawn owner/);
  const active=structuredClone(draft);active.quickForge!.campaignEncounters![0].startActive=true;await expect(attachNativeCampaignMission(active,'manual')).rejects.toThrow(/initial actor creation/);
  const before=JSON.stringify(draft);await attachNativeCampaignMission(draft,'manual');expect(JSON.stringify(draft)).toBe(before);
+});
+
+
+it('authors terminal activation through native source bindings and refuses missing, active or incompatible controls',async()=>{
+ const project=campaignDraft(),doc=project.quickForge!;project.history=[];
+ doc.placements=[{id:'terminal',name:'Communications terminal',tagClass:'ctrl',tagPath:'devices/control',tagId:7,sourceProjectId:'owned',sourceSha256:'a'.repeat(64),position:[2,0,0],rotation:[0,0,0],team:0,respawnSeconds:0,visible:true,locked:false}];
+ doc.logic!.devices=[{placementId:'terminal',nativeName:'restore_comms',initialPosition:0,powered:true}];
+ project.studio!.missions=[{id:'restore',title:'Restore communications',objective:'Use the terminal',trigger:'deviceActivated',encounterName:'',triggerRef:'restore_comms'}];
+ const before=JSON.stringify(project),prepared=await attachNativeCampaignMission(project,'startup');
+ expect(JSON.stringify(project)).toBe(before);
+ const edited=historyReducer({...initialHistory,current:project},{type:'edit',project:prepared,description:'Prepare terminal objective'});
+ const undone=historyReducer(edited,{type:'undo'});expect(undone.current).toEqual(project);
+ const redone=historyReducer(undone,{type:'redo'});expect(redone.current!.quickForge).toEqual(prepared.quickForge);expect(redone.current!.studio).toEqual(prepared.studio);
+ const reviewed=await reviewNativeCampaignMission(prepared);
+ expect(reviewed.binding.missions[0].trigger).toBe('deviceActivated');
+ expect(sameMissionData(project.studio!.missions,reviewed.binding.missions)).toBe(true);
+ const script=exportHaloCeMission(project.studio!);
+ expect(script.dependencies).toEqual(['device_control:restore_comms']);
+ expect(script.content).toContain('(sleep_until (< (device_get_position restore_comms) 0.5) 1)');
+ expect(script.content).toContain('(sleep_until (>= (device_get_position restore_comms) 0.5) 1)');
+ expect(script.content.indexOf('(< (device_get_position')).toBeLessThan(script.content.indexOf('(>= (device_get_position'));
+ expect(script.content).not.toContain('device_set_position');expect(script.content).not.toContain('gs_complete_1');
+ const saved=JSON.parse(JSON.stringify(prepared));expect((await reviewNativeCampaignMission(saved)).binding.missions).toEqual(project.studio!.missions);
+ for(const kind of ['missing','duplicate','machine','unpowered','active','invalid-position'] as const){
+  const bad=structuredClone(project),source=bad.quickForge!;
+  if(kind==='missing')source.logic!.devices=[];
+  if(kind==='duplicate')source.logic!.devices.push({...source.logic!.devices[0]});
+  if(kind==='machine')source.placements[0].tagClass='mach';
+  if(kind==='unpowered')source.logic!.devices[0].powered=false;
+  if(kind==='active')source.logic!.devices[0].initialPosition=0.5;
+  if(kind==='invalid-position')source.logic!.devices[0].initialPosition=NaN;
+  await expect(attachNativeCampaignMission(bad,'manual')).rejects.toThrow(/native control/);
+ }
+ const unsafe=structuredClone(project.studio!);unsafe.missions[0].triggerRef='unsafe ) (quit';expect(()=>exportHaloCeMission(unsafe)).toThrow();
 });

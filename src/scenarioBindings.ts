@@ -26,6 +26,15 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
         detail:found.length===1?'Name matches an explicitly named authoring volume. Native bounds, compilation and gameplay remain unverified.':
           'Choose an explicitly named volume from Level Editor → Logic / Events. Implicit generated names require native source review.'};
     }
+    if(source?.gameMode==='campaign'&&dependency.startsWith('device_control:')) {
+      const name=dependency.slice('device_control:'.length),bindings=source.logic?.devices.filter(device=>device.nativeName===name)??[];
+      const placements=bindings.flatMap(device=>source.placements.filter(placement=>placement.id===device.placementId));
+      const present=bindings.length===1&&placements.length===1&&placements[0].tagClass==='ctrl'&&bindings[0].powered&&
+        Number.isFinite(bindings[0].initialPosition)&&bindings[0].initialPosition>=0&&bindings[0].initialPosition<0.5;
+      return {dependency,status:present?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,
+        detail:present?'One powered native control starts inactive. Native build verifies its source/name binding; actual use and mission execution still need testing.':
+          'Choose one explicitly named native control in Level Editor → Logic / Events, enable startup power and set initial position below0.5. A machine, missing/duplicate binding or already-active control cannot supply this objective.'};
+    }
     if(dependency.startsWith('sound:'))return {dependency,status:'notInspectable' as const,
       detail:'Mission preparation checks the exact included one-shot sound; native staging rechecks its owned import receipt and compiled tag. Game playback, sound class and multiplayer delivery need separate testing.'};
     if(dependency.startsWith('hud_message:'))return {dependency,status:'notInspectable' as const,
