@@ -45,6 +45,8 @@ export default function NativeTagOperations({
     setNormalCount(squadChoice?.normalCount.toString()??'');setInsaneCount(squadChoice?.insaneCount.toString()??'');
     setNormalScale(1);setInsaneScale(1);
   },[squadChoice]);
+  const squadEditIssue=context?.squadEditIssue??(squadChoice&&context?.protectedSquadEncounters?.some(name=>name===squadChoice.encounterName.replace(/[A-Z]/g,char=>char.toLowerCase()))
+    ?'Direct count edits are unavailable for this recipe-owned group. Change population in its original authoring workflow; manually appended groups require source reconciliation.':null);
   const validCounts=!!squadChoice&&[normalCount,insaneCount].every(value=>value.trim()!==''&&Number.isInteger(Number(value))&&Number(value)>=0&&Number(value)<=32);
   const populationChanged=!!squadChoice&&(Number(normalCount)!==squadChoice.normalCount||Number(insaneCount)!==squadChoice.insaneCount);
   const canScale=!!squadChoice&&squadChoice.normalCount>=0&&squadChoice.insaneCount>=0;
@@ -236,7 +238,7 @@ export default function NativeTagOperations({
           {context.class==='scnr'&&<details className="native-squad-difficulty">
             <summary>Existing squads &amp; difficulty scaling</summary>
             <p className="subtle">Edit the native normal/insane population fields of an existing squad. The engine controls how those fields affect difficulty. AI damage, health and automatic player-count scaling require their own runtime support.</p>
-            {context.squadEditIssue&&<Notice tone="info">{context.squadEditIssue}</Notice>}
+            {squadEditIssue&&<Notice tone="info">{squadEditIssue}</Notice>}
             {!!context.scenarioSquads?.length?<><label>Encounter / squad<select value={squadKey} disabled={busy||dirty}
               onChange={event=>{setSquadKey(event.target.value);if(!accepted)setPreview(null);}}>
               {context.scenarioSquads.map(row=><option key={`${row.encounter}:${row.squad}`} value={`${row.encounter}:${row.squad}`}>
@@ -245,22 +247,22 @@ export default function NativeTagOperations({
             </select></label>
               {squadChoice&&<>
                 <div className="native-field-edit">
-                  <label>Normal field · currently {squadChoice.normalCount}<input type="number" min={0} max={32} step={1} value={normalCount} disabled={busy||dirty||!!context.squadEditIssue}
+                  <label>Normal field · currently {squadChoice.normalCount}<input type="number" min={0} max={32} step={1} value={normalCount} disabled={busy||dirty||!!squadEditIssue}
                     onChange={event=>{setNormalCount(event.target.value);if(!accepted)setPreview(null);}}/></label>
-                  <label>Insane field · currently {squadChoice.insaneCount}<input type="number" min={0} max={32} step={1} value={insaneCount} disabled={busy||dirty||!!context.squadEditIssue}
+                  <label>Insane field · currently {squadChoice.insaneCount}<input type="number" min={0} max={32} step={1} value={insaneCount} disabled={busy||dirty||!!squadEditIssue}
                     onChange={event=>{setInsaneCount(event.target.value);if(!accepted)setPreview(null);}}/></label>
                 </div>
                 <details><summary>Scale squad population</summary>
                   <p className="subtle">Multipliers start from this source revision's counts, round to whole actors and cap each field at32. Review the resulting counts before accepting; this does not change the number of authored starting positions.</p>
                   <label>Normal population × {normalScale.toFixed(2)}<input aria-label="Normal squad population multiplier" type="range" min={0} max={4} step={0.25} value={normalScale}
-                    disabled={busy||dirty||!canScale||!!context.squadEditIssue} onChange={event=>setNormalScale(Number(event.target.value))}/></label>
+                    disabled={busy||dirty||!canScale||!!squadEditIssue} onChange={event=>setNormalScale(Number(event.target.value))}/></label>
                   <label>Insane population × {insaneScale.toFixed(2)}<input aria-label="Insane squad population multiplier" type="range" min={0} max={4} step={0.25} value={insaneScale}
-                    disabled={busy||dirty||!canScale||!!context.squadEditIssue} onChange={event=>setInsaneScale(Number(event.target.value))}/></label>
+                    disabled={busy||dirty||!canScale||!!squadEditIssue} onChange={event=>setInsaneScale(Number(event.target.value))}/></label>
                   {canScale?<p role="status">Normal: {squadChoice.normalCount} → {scaledNormal} · Insane: {squadChoice.insaneCount} → {scaledInsane}</p>
                     :<p className="subtle">This source uses a negative/unset count. Preview and accept explicit native counts first; then scale that source revision.</p>}
-                  <button disabled={busy||dirty||!canScale||!!context.squadEditIssue} onClick={()=>{setNormalCount(String(scaledNormal));setInsaneCount(String(scaledInsane));if(!accepted)setPreview(null);}}>Use scaled counts</button>
+                  <button disabled={busy||dirty||!canScale||!!squadEditIssue} onClick={()=>{setNormalCount(String(scaledNormal));setInsaneCount(String(scaledInsane));if(!accepted)setPreview(null);}}>Use scaled counts</button>
                 </details>
-                <button disabled={busy||dirty||!!context.squadEditIssue||!validCounts||!populationChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
+                <button disabled={busy||dirty||!!squadEditIssue||!validCounts||!populationChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
                   onClick={()=>makePreview({kind:'encounterSquadCounts',encounter:squadChoice.encounter,squad:squadChoice.squad,
                     encounterName:squadChoice.encounterName,squadName:squadChoice.name,normalCount:Number(normalCount),insaneCount:Number(insaneCount),sourceSha256:context.tagSha256!})}>Preview squad counts</button>
                 <p className="subtle">Review below → Accept as new source revision → Build working tag edits (CE source uses Build CE working tag edits). Restore before-edit tag reverses this source revision. Draft count fields are not project edits or a running-game change.</p>

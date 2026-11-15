@@ -17,6 +17,7 @@ export interface NativeTagContext {
   canAppendEncounter?:boolean;
   scenarioSquads?:{encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number}[];
   squadEditIssue?:string|null;
+  protectedSquadEncounters?:string[];
   hudArrays?:{name:string;label:string;count:number|null;maximum:number;issue:string|null}[];
   canDuplicateHud?:boolean;
   hudStructureIssue?:string|null;

@@ -143,6 +143,8 @@ pub struct WorkingTagsInput {
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub scenario_squad_readback:Option<crate::native_operations::ScenarioSquadReadback>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub encounter_append:Option<EncounterAppendRequest>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub script_attachment:Option<ScriptAttachment>,
@@ -170,6 +172,8 @@ pub struct WorkingTagsInput {
 pub struct WorkingTagsReceipt {
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub scenario_squad_readback:Option<crate::native_operations::ScenarioSquadReadback>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub generated_firefight:Option<GeneratedFirefightSource>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
@@ -263,6 +267,7 @@ struct Prepared {
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
     parent_generated_firefight:Option<GeneratedFirefightSource>,
     hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
+    scenario_squad_readback:Option<crate::native_operations::ScenarioSquadReadback>,
     encounter_expectations:Vec<crate::native_operations::Operation>,
     source_project:Project,
     parent_output: PathBuf,
@@ -404,9 +409,9 @@ fn parent_native_identity(
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>)> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>,Option<crate::native_operations::ScenarioSquadReadback>)> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
-    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut hud_readback_targets=vec![];
+    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut hud_readback_targets=vec![];let mut scenario_squad_readback=None;
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -431,6 +436,7 @@ fn parent_native_identity(
             verify_hash_manifest(parent, &receipt.input_script_hashes)?;
         }
         retain_hud_targets(&mut hud_readback_targets,receipt.hud_readback_targets)?;
+        scenario_squad_readback=receipt.scenario_squad_readback;
         controller_binding=receipt.controller_binding;
         generated_firefight=receipt.generated_firefight;
         for expectation in receipt.encounter_expectations.into_iter().chain(receipt.expected_encounter){retain_encounter_expectation(&mut encounter_expectations,expectation)?;}
@@ -483,9 +489,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets))
+        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback))
     } else {
-        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets))
+        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback))
     }
 }
 
@@ -614,7 +620,7 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets,parent_squad_readback) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
     retain_hud_targets(&mut hud_readback_targets,input.hud_readback_targets.clone())?;
     if !hud_readback_targets.is_empty(){
         for (key,name) in [("invaderEdit","invader-edit"),("invaderExtract","invader-extract")] {
@@ -626,6 +632,19 @@ fn prepare(
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
     if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(profile)=&generated.player_profile{profile.verify_map(&parent_inspection)?;}if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
+    if let Some(snapshot)=&parent_squad_readback{snapshot.verify_map(&parent_inspection)?;}
+    if let Some(snapshot)=&input.scenario_squad_readback{
+        snapshot.validate()?;
+        // Parent expectations were verified above. Current source supersedes
+        // only scalar count targets, never append/controller/actor safeguards.
+        encounter_expectations.retain(|expected|!matches!(expected,crate::native_operations::Operation::EncounterSquadCounts{..}));
+    }
+    let scenario_squad_readback=input.scenario_squad_readback.clone().or(parent_squad_readback);
+    if scenario_squad_readback.is_some(){
+        let edit=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"}))?;
+        if fs::metadata(&edit)?.len()>256*1024*1024{return invalid("Native squad reader exceeds its identity limit");}
+        tools.insert("invaderEdit".into(),maps::hash_file(&edit)?);
+    }
     if let Some(expected)=&input.expected_encounter{retain_encounter_expectation(&mut encounter_expectations,expected.clone())?;}
     if input.script_attachment.as_ref().is_some_and(|attachment|attachment.replaces_sha256.is_some()&&parent_generated_firefight.as_ref().is_some_and(|generated|generated.controller.filename.eq_ignore_ascii_case(&attachment.filename))) {
         return invalid("This module is an owned generated Firefight controller. Use its existing reviewed controller-revision workflow instead of manual replacement");
@@ -675,6 +694,7 @@ fn prepare(
         parent_controller_binding,
         parent_generated_firefight,
         hud_readback_targets,
+        scenario_squad_readback,
         encounter_expectations,
         source_project,
         parent_output,
@@ -1169,6 +1189,7 @@ fn run_with(
     let mut receipt = WorkingTagsReceipt {
         generated_firefight:prepared.parent_generated_firefight.clone(),
         hud_readback_targets:prepared.hud_readback_targets.clone(),
+        scenario_squad_readback:prepared.scenario_squad_readback.clone(),
         encounter_expectations:prepared.encounter_expectations.clone(),
         attached_script:None,
         replaced_script:None,
@@ -1229,6 +1250,12 @@ fn run_with(
             return invalid(
                 "Working tags changed during staging; close/save the native editor and try again",
             );
+        }
+        if let Some(snapshot)=&input.scenario_squad_readback{
+            let staged_scenario=tags.join(safe_relative(&format!("{}.scenario",receipt.scenario_path))?);
+            if !maps::hash_file(&staged_scenario)?.eq_ignore_ascii_case(&snapshot.source_sha256){
+                return invalid("Native scenario changed after squad review; no compiler ran. Review the current source before rebuilding");
+            }
         }
         receipt.input_tag_hashes = Some(save_hash_manifest(
             &directory,
@@ -1355,6 +1382,19 @@ fn run_with(
         // Use Runner's existing protected write phase: cancellation/timeout is
         // observed after native Tool exits, never by forcefully killing it.
         let hud_sources=snapshot_hud_sources(input,&prepared,&tags,&workspace,&runner,&invoke)?;
+        if prepared.scenario_squad_readback.is_some(){
+            let native_scenario=format!("{}.scenario",receipt.scenario_path);
+            let source=tags.join(safe_relative(&native_scenario)?);
+            let source_sha256=maps::hash_file(&source)?;
+            let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
+            recheck_tools(input,&prepared.tools)?;
+            let fields=invoke(&runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),native_scenario],&workspace,"squad-readback",49)?;
+            recheck_tools(input,&prepared.tools)?;
+            if fields.len()>1024*1024||maps::hash_file(&source)?!=source_sha256{return invalid("Staged native squad source changed or exceeded its review bound");}
+            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads:crate::native_operations::scenario_squad_choices(&fields)?};
+            snapshot.validate()?;
+            receipt.scenario_squad_readback=Some(snapshot);
+        }
         let log = invoke(&runner, &input.tool, &args, &workspace, "scenario", 50)?;
         if cache_version == 13 && !crate::conversion::native_compile_succeeded(&log) {
             return invalid("H1A Tool did not confirm successful cache compilation; zero exit status is insufficient");
@@ -1397,6 +1437,13 @@ fn run_with(
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
+        if let Some(snapshot)=&receipt.scenario_squad_readback{
+            snapshot.verify_map(&inspected)?;
+            project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
+                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,
+                "scope":"All reviewed current native squad indices, names and normal/insane count fields. This is not AI/gameplay acceptance."
+            }))?,false)?;
+        }
         if let Some(profile)=receipt.generated_firefight.as_ref().and_then(|generated|generated.player_profile.as_ref()){profile.verify_map(&inspected)?;}
         let hud_readback=verify_hud_native_output(input,&prepared,&hud_sources,&tags,&workspace,&output,&inspected,&runner,&invoke)?;
         if !hud_readback.is_empty(){
@@ -1637,6 +1684,7 @@ mod tests {
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
             hud_readback_targets:vec![],
+            scenario_squad_readback:None,
             encounter_append:None,
             script_attachment:None,
             expected_encounter:None,

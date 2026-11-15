@@ -439,13 +439,7 @@ impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
         if let Self::EncounterSquadCounts{encounter,squad,encounter_name,squad_name,normal_count,insane_count,..}=self {
-            let region=map.encounters.get(usize::from(*encounter)).ok_or_else(||crate::SparkError::Invalid("Compiled native encounter index is unavailable".into()))?;
-            let member=region.details.as_ref().and_then(|details|details.squads.get(usize::from(*squad)))
-                .ok_or_else(||crate::SparkError::Invalid("Compiled native squad details are unavailable".into()))?;
-            if region.name!=*encounter_name||member.name!=*squad_name||member.normal_count!=*normal_count as i16||member.insane_count!=*insane_count as i16 {
-                return invalid("Compiled native squad identity/difficulty counts differ from the accepted revision");
-            }
-            return Ok(());
+            return verify_native_squad(map,*encounter,*squad,encounter_name,squad_name,*normal_count as i16,*insane_count as i16);
         }
         if !self.is_encounter_append(){return invalid("Unsupported encounter readback expectation");}
         for entry in self.encounter_appends()?{verify_compiled_append(&entry,map)?;}
@@ -625,8 +619,45 @@ fn array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>
     if starts.len()!=listing.count||(!starts.is_empty()&&starts[0]!=0)||starts.is_empty()&&!listing.body.is_empty(){return invalid("Native element count differs from its field inventory");}
     Ok(starts.iter().enumerate().map(|(index,start)|&listing.body[*start..starts.get(index+1).copied().unwrap_or(listing.body.len())]).collect())
 }
-#[derive(Clone,Debug,Serialize)]
-#[serde(rename_all="camelCase")]
+/// Readback evidence for the current loose scenario, never a native tag group
+/// or authority to replay source edits.
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct ScenarioSquadReadback {pub source_sha256:String,pub squads:Vec<ScenarioSquadChoice>}
+impl ScenarioSquadReadback {
+    pub fn validate(&self)->Result<()> {
+        if self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_hexdigit())||self.squads.len()>4096 {
+            return invalid("Native squad readback needs an exact source SHA256 and bounded inventory");
+        }
+        let mut seen=std::collections::BTreeSet::new();
+        for row in &self.squads {
+            if row.encounter>=128||row.squad>=4096||!seen.insert((row.encounter,row.squad))||
+                [&row.encounter_name,&row.name].iter().any(|name|name.len()>32||name.chars().any(char::is_control)) {
+                return invalid("Native squad readback contains an invalid identity or duplicate index");
+            }
+        }
+        Ok(())
+    }
+    pub fn verify_map(&self,map:&crate::maps::MapInspection)->Result<()> {
+        self.validate()?;
+        let count=map.encounters.iter().try_fold(0usize,|count,encounter|encounter.details.as_ref().map(|details|count+details.squads.len())
+            .ok_or_else(||crate::SparkError::Invalid("Compiled native encounter details are unavailable; squad parity is unproven".into())))?;
+        if count!=self.squads.len(){return invalid("Compiled native squad inventory differs from the reviewed source");}
+        for row in &self.squads {verify_native_squad(map,row.encounter,row.squad,&row.encounter_name,&row.name,row.normal_count,row.insane_count)?;}
+        Ok(())
+    }
+}
+fn verify_native_squad(map:&crate::maps::MapInspection,encounter:u16,squad:u16,encounter_name:&str,squad_name:&str,normal:i16,insane:i16)->Result<()> {
+    let region=map.encounters.get(usize::from(encounter)).ok_or_else(||crate::SparkError::Invalid("Compiled native encounter index is unavailable".into()))?;
+    let member=region.details.as_ref().and_then(|details|details.squads.get(usize::from(squad)))
+        .ok_or_else(||crate::SparkError::Invalid("Compiled native squad details are unavailable".into()))?;
+    if region.name!=encounter_name||member.name!=squad_name||member.normal_count!=normal||member.insane_count!=insane {
+        return invalid("Compiled native squad identity/difficulty counts differ from the accepted source");
+    }
+    Ok(())
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioSquadChoice {
     pub encounter:u16,pub squad:u16,pub encounter_name:String,pub name:String,
     pub normal_count:i16,pub insane_count:i16,
