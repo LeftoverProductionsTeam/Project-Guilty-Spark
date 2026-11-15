@@ -38,6 +38,18 @@ export default function NativeTagOperations({
   const [encounterName,setEncounterName]=useState('gs_source_actor'),[actorPath,setActorPath]=useState(''),
     [actorPosition,setActorPosition]=useState<[string,string,string]>(['0','0','0']),[startActive,setStartActive]=useState(false),
     [actorCount,setActorCount]=useState('1'),[actorSpacing,setActorSpacing]=useState('0.75');
+  const [squadKey,setSquadKey]=useState(''),[normalCount,setNormalCount]=useState(''),[insaneCount,setInsaneCount]=useState('');
+  const [normalScale,setNormalScale]=useState(1),[insaneScale,setInsaneScale]=useState(1);
+  const squadChoice=context?.scenarioSquads?.find(row=>`${row.encounter}:${row.squad}`===squadKey);
+  useEffect(()=>{
+    setNormalCount(squadChoice?.normalCount.toString()??'');setInsaneCount(squadChoice?.insaneCount.toString()??'');
+    setNormalScale(1);setInsaneScale(1);
+  },[squadChoice]);
+  const validCounts=!!squadChoice&&[normalCount,insaneCount].every(value=>value.trim()!==''&&Number.isInteger(Number(value))&&Number(value)>=0&&Number(value)<=32);
+  const populationChanged=!!squadChoice&&(Number(normalCount)!==squadChoice.normalCount||Number(insaneCount)!==squadChoice.insaneCount);
+  const canScale=!!squadChoice&&squadChoice.normalCount>=0&&squadChoice.insaneCount>=0;
+  const scaledNormal=squadChoice&&canScale?Math.min(32,Math.round(squadChoice.normalCount*normalScale)):0;
+  const scaledInsane=squadChoice&&canScale?Math.min(32,Math.round(squadChoice.insaneCount*insaneScale)):0;
   const [hudArray,setHudArray]=useState(''),[hudIndex,setHudIndex]=useState('0');
   const hudGroup=context?.hudArrays?.find(array=>array.name===hudArray);
   const canDuplicateHudDraft=!!context?.canDuplicateHud&&/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&hudIndex.trim()!==''&&!!hudGroup&&hudGroup.count!=null&&hudGroup.count>0&&hudGroup.count<hudGroup.maximum&&Number.isInteger(Number(hudIndex))&&Number(hudIndex)>=0&&Number(hudIndex)<hudGroup.count;
@@ -76,6 +88,7 @@ export default function NativeTagOperations({
       const result = await call<NativeTagContext>('native_tag_context', { projectId, tagId: selectedTagId });
       if (current !== generation.current) return;
       setContext(result);
+      setSquadKey(key=>result.scenarioSquads?.some(row=>`${row.encounter}:${row.squad}`===key)?key:result.scenarioSquads?.[0]?`${result.scenarioSquads[0].encounter}:${result.scenarioSquads[0].squad}`:'');
       setRadius(result.boundingRadius?.toString() ?? '');
       setHudArray(previous=>result.hudArrays?.some(array=>array.name===previous)?previous:result.hudArrays?.find(array=>array.count!=null&&array.count>0&&array.count<array.maximum)?.name??result.hudArrays?.[0]?.name??'');
       setHudIndex('0');
@@ -94,7 +107,7 @@ export default function NativeTagOperations({
     setDependencies(null);
     setError('');
     setBusy(false);
-    setEncounterQueue([]);setHudArray('');setHudIndex('0');
+    setEncounterQueue([]);setHudArray('');setHudIndex('0');setSquadKey('');
     setEncounterName('gs_source_actor');setActorPath('');setActorPosition(['0','0','0']);setStartActive(false);setActorCount('1');setActorSpacing('0.75');
     return () => {
       generation.current++;
@@ -220,6 +233,40 @@ export default function NativeTagOperations({
               Refresh source
             </button>
           </div>
+          {context.class==='scnr'&&<details className="native-squad-difficulty">
+            <summary>Existing squads &amp; difficulty scaling</summary>
+            <p className="subtle">Edit the native normal/insane population fields of an existing squad. The engine controls how those fields affect difficulty. AI damage, health and automatic player-count scaling require their own runtime support.</p>
+            {context.squadEditIssue&&<Notice tone="info">{context.squadEditIssue}</Notice>}
+            {!!context.scenarioSquads?.length?<><label>Encounter / squad<select value={squadKey} disabled={busy||dirty}
+              onChange={event=>{setSquadKey(event.target.value);if(!accepted)setPreview(null);}}>
+              {context.scenarioSquads.map(row=><option key={`${row.encounter}:${row.squad}`} value={`${row.encounter}:${row.squad}`}>
+                {row.encounterName||'Unnamed encounter'} / {row.name||'Unnamed squad'} · {row.encounter}:{row.squad}
+              </option>)}
+            </select></label>
+              {squadChoice&&<>
+                <div className="native-field-edit">
+                  <label>Normal field · currently {squadChoice.normalCount}<input type="number" min={0} max={32} step={1} value={normalCount} disabled={busy||dirty||!!context.squadEditIssue}
+                    onChange={event=>{setNormalCount(event.target.value);if(!accepted)setPreview(null);}}/></label>
+                  <label>Insane field · currently {squadChoice.insaneCount}<input type="number" min={0} max={32} step={1} value={insaneCount} disabled={busy||dirty||!!context.squadEditIssue}
+                    onChange={event=>{setInsaneCount(event.target.value);if(!accepted)setPreview(null);}}/></label>
+                </div>
+                <details><summary>Scale squad population</summary>
+                  <p className="subtle">Multipliers start from this source revision's counts, round to whole actors and cap each field at32. Review the resulting counts before accepting; this does not change the number of authored starting positions.</p>
+                  <label>Normal population × {normalScale.toFixed(2)}<input aria-label="Normal squad population multiplier" type="range" min={0} max={4} step={0.25} value={normalScale}
+                    disabled={busy||dirty||!canScale||!!context.squadEditIssue} onChange={event=>setNormalScale(Number(event.target.value))}/></label>
+                  <label>Insane population × {insaneScale.toFixed(2)}<input aria-label="Insane squad population multiplier" type="range" min={0} max={4} step={0.25} value={insaneScale}
+                    disabled={busy||dirty||!canScale||!!context.squadEditIssue} onChange={event=>setInsaneScale(Number(event.target.value))}/></label>
+                  {canScale?<p role="status">Normal: {squadChoice.normalCount} → {scaledNormal} · Insane: {squadChoice.insaneCount} → {scaledInsane}</p>
+                    :<p className="subtle">This source uses a negative/unset count. Preview and accept explicit native counts first; then scale that source revision.</p>}
+                  <button disabled={busy||dirty||!canScale||!!context.squadEditIssue} onClick={()=>{setNormalCount(String(scaledNormal));setInsaneCount(String(scaledInsane));if(!accepted)setPreview(null);}}>Use scaled counts</button>
+                </details>
+                <button disabled={busy||dirty||!!context.squadEditIssue||!validCounts||!populationChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
+                  onClick={()=>makePreview({kind:'encounterSquadCounts',encounter:squadChoice.encounter,squad:squadChoice.squad,
+                    encounterName:squadChoice.encounterName,squadName:squadChoice.name,normalCount:Number(normalCount),insaneCount:Number(insaneCount),sourceSha256:context.tagSha256!})}>Preview squad counts</button>
+                <p className="subtle">Review below → Accept as new source revision → Build working tag edits (CE source uses Build CE working tag edits). Restore before-edit tag reverses this source revision. Draft count fields are not project edits or a running-game change.</p>
+              </>}
+            </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
+          </details>}
           {!!context.hudArrays?.length&&<details className="native-hud-structure">
             <summary>Duplicate native HUD element</summary>
             <p className="subtle">Append a copy of an existing element without moving original indices. Preview checks the copied fields and current dependencies. Accept the source revision, use Build working tag edits, then open the compiled HUD to edit its new layout. Your original tags stay unchanged.</p>

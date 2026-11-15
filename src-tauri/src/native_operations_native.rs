@@ -63,7 +63,7 @@ pub(super) fn encounter_expectation(state:&AppState,project:&Project,build:&Buil
     let selection=native_source_revisions::current(state,&project.id)?.ok_or("Native source selection disappeared")?;
     let receipt:Receipt=serde_json::from_slice(&bounded_read(&root(state,&selection.job_id)?.join("operation.json"),4*1024*1024)?).map_err(error)?;
     if receipt.schema_version!=1||receipt.id!=selection.job_id||receipt.project_id!=project.id||receipt.fingerprint!=project.fingerprint().map_err(error)? {return Err("Selected encounter receipt differs from its map/build revision".into());}
-    if !receipt.operation.is_encounter_append(){return Ok(None);}
+    if !receipt.operation.is_encounter_append()&&!matches!(receipt.operation,recipes::Operation::EncounterSquadCounts{..}){return Ok(None);}
     receipt.operation.validate(&receipt.class,&receipt.tag).map_err(error)?;
     let file=tags.join(core::safe_relative(&receipt.tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
     let hash=maps::hash_file(&file).map_err(error)?;
@@ -109,6 +109,8 @@ pub(super) struct Context {
     lens_flare_scale: Option<f64>,
     actor_variants:Vec<String>,
     can_append_encounter:bool,
+    scenario_squads:Vec<recipes::ScenarioSquadChoice>,
+    squad_edit_issue:Option<String>,
     hud_arrays:Vec<recipes::HudArrayChoice>,
     can_duplicate_hud:bool,
     hud_structure_issue:Option<String>,
@@ -430,7 +432,7 @@ fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply
         .operation
         .validate(&receipt.class, &receipt.tag)
         .map_err(error)?;
-    if let recipes::Operation::HudDuplicate{source_sha256,..}=&receipt.operation {if !source_sha256.eq_ignore_ascii_case(&receipt.before_sha256){return Err("Retained HUD copy source identity differs from its original revision".into());}}
+    if let recipes::Operation::HudDuplicate{source_sha256,..}|recipes::Operation::EncounterSquadCounts{source_sha256,..}=&receipt.operation {if !source_sha256.eq_ignore_ascii_case(&receipt.before_sha256){return Err("Retained native operation source identity differs from its original revision".into());}}
     if receipt.tool_id != receipt.operation.tool_id() {
         return Err("The native recipe identity changed".into());
     }
@@ -461,10 +463,14 @@ pub(super) async fn native_tag_context(
             }
             actor_variants.sort();actor_variants.dedup();
         }
+        let (scenario_squads,mut squad_edit_issue)=if source.class=="scnr" {
+            match recipes::scenario_squad_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}
+        }else{(vec![],None)};
         let radius = recipes::number(&values, "bounding_radius").ok();
         let flare = recipes::number(&values, "rotation_function_scale").ok();
         let edit_issue = executable(&state, &source.project, "invaderNative").err();
         let repair_issue = executable(&state, &source.project, "invaderRepair").err();
+        if source.class=="scnr"{squad_edit_issue=squad_edit_issue.or_else(||edit_issue.clone()).or_else(||studio_native_source::require_unshared(&state,&source.project.id).err());}
         let hud_arrays=recipes::hud_array_choices(&source.class,&values).map_err(error)?;
         let hud_structure_issue=if hud_arrays.is_empty(){None}else{
             edit_issue.clone().or_else(||executable(&state,&source.project,"invaderDependency").err())
@@ -498,7 +504,7 @@ pub(super) async fn native_tag_context(
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
         Ok(Context {
-            firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,
+            firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,
@@ -569,7 +575,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
-    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::EncounterSquadCounts{..}){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -594,7 +600,7 @@ pub(super) async fn native_operation_preview(
     if matches!(operation,recipes::Operation::LensFlareScaleRepair)&&!recipes::broken_lens_scale(recipes::number(&before_fields,"rotation_function_scale").map_err(error)?){return Err("This lens flare does not have the reviewed 360-to-zero repair precondition. No repair ran.".into());}
     let relative=core::safe_relative(&source.tag).map_err(error)?;let before=bounded_read(&source.tags.join(&relative),MAX_TAG)?;
     let before_sha256=hash_bytes(&before);
-    if let recipes::Operation::HudDuplicate{source_sha256,..}=&operation {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native HUD changed after selection; refresh the source before duplicating. No writer ran.".into());}}
+    if let recipes::Operation::HudDuplicate{source_sha256,..}|recipes::Operation::EncounterSquadCounts{source_sha256,..}=&operation {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native source changed after selection; refresh before editing. No writer ran.".into());}}
     let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
     let candidate=directory.join("candidate/tags");fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;

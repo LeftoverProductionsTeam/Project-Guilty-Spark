@@ -1,6 +1,7 @@
 import type { FirefightConfig } from './firefight';
 export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;grid?:{total:number;offset:number}}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
+  | {kind:'encounterSquadCounts';encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number;sourceSha256:string}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
@@ -14,6 +15,8 @@ export interface NativeTagContext {
   lensFlareScale: number | null;
   actorVariants?:string[];
   canAppendEncounter?:boolean;
+  scenarioSquads?:{encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number}[];
+  squadEditIssue?:string|null;
   hudArrays?:{name:string;label:string;count:number|null;maximum:number;issue:string|null}[];
   canDuplicateHud?:boolean;
   hudStructureIssue?:string|null;
