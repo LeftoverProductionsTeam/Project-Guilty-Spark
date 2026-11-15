@@ -63,6 +63,8 @@ pub struct MissionBeat {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub minimum_survivors:Option<u16>,
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub escort_failure:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub hud_objective:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub hud_text:Option<String>,
@@ -77,8 +79,13 @@ pub struct MissionBeat {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub condition_outside:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub condition_result:Option<MissionOutcomeCondition>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub sound_cue:Option<MissionSoundCue>,
 }
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct MissionOutcomeCondition {pub beat_id:String,pub failed:bool}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CameraShot {
@@ -204,7 +211,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
     }
     for (index,beat) in binding.missions.iter().enumerate() {
-        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)||beat.condition_volume.is_some()) {
+        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)||beat.condition_volume.is_some()||beat.condition_result.is_some()) {
             return invalid("Native level completion must be the final beat, without a checkpoint or optional condition on the same beat");
         }
         if beat.sound_cue.as_ref().is_some_and(|cue|!cue.included(project)) {
@@ -304,7 +311,7 @@ pub fn native_mission_hud(binding:&NativeMissionBinding)->Result<Option<crate::f
     let mut messages=vec![];
     for (index,beat) in binding.missions.iter().enumerate() {
         if beat.trigger=="escort" {
-            messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_fail_{}",index+1),text:"Rescue failed: not enough survivors. Restart or revise the operation.".into()});
+            messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_fail_{}",index+1),text:if beat.escort_failure.as_deref()==Some("continue"){"Rescue failed: not enough survivors. Continuing the operation.".into()}else{"Rescue failed: not enough survivors. Restart or revise the operation.".into()}});
         }
         if let Some(cue)=&beat.sound_cue {
             if !cue.valid(){return invalid("Invalid native mission radio cue");}
@@ -361,7 +368,7 @@ impl CreatorStudio {
             { return invalid("Invalid Machinima lens or playback settings"); }
         }
         let mut branches:HashMap<&str,&str>=HashMap::new();
-        for beat in &self.missions {
+        for (index,beat) in self.missions.iter().enumerate() {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
@@ -373,6 +380,11 @@ impl CreatorStudio {
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
+            if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}
+            if let Some(result)=&beat.condition_result {
+                if beat.condition_volume.is_some()||beat.condition_group.is_some()||beat.condition_outside.is_some(){return invalid("Choose either an area decision or a rescue result");}
+                if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}
+            }
             if (beat.condition_group.is_some()||beat.condition_outside.is_some())&&beat.condition_volume.is_none(){return invalid("Mission branch decisions need an optional condition volume");}
             if let Some(group)=&beat.condition_group {
                 if !valid_id(group){return invalid("Invalid shared mission decision");}
@@ -486,6 +498,22 @@ mod tests {
         assert!(doc.validate().is_err());
         doc.playtests[0].evidence="Observed in real Halo CE session".into();
         assert!(doc.validate().is_ok());
+    }
+    #[test]
+    fn rescue_outcome_conditions_preserve_failure_routes_and_require_an_earlier_continuing_escort() {
+        let mut document=studio();document.missions=serde_json::from_value(serde_json::json!([
+            {"id":"rescue","title":"Rescue","objective":"Escort","trigger":"escort","encounterName":"survivors","triggerRef":"rally","escortFailure":"continue"},
+            {"id":"success","title":"Success","objective":"Normal route","trigger":"manual","encounterName":"","conditionResult":{"beatId":"rescue","failed":false}},
+            {"id":"failure","title":"Failure","objective":"Fallback","trigger":"manual","encounterName":"","conditionResult":{"beatId":"rescue","failed":true}}
+        ])).unwrap();document.validate().unwrap();
+        let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(restored.missions,document.missions);
+        let binding=NativeMissionBinding{schema_version:1,missions:document.missions.clone(),activation:"manual".into(),source_sha256:"a".repeat(64)};
+        assert!(native_mission_hud(&binding).unwrap().unwrap().messages[0].panels.iter().any(|panel|matches!(panel,crate::maps::NativeHudPanel::Text(text) if text.contains("Continuing the operation"))));
+        let mut stopped=document.clone();stopped.missions[0].escort_failure=None;assert!(stopped.validate().is_err());
+        let mut forward=document.clone();forward.missions[1].condition_result.as_mut().unwrap().beat_id="failure".into();assert!(forward.validate().is_err());
+        let mut missing=document.clone();missing.missions[1].condition_result.as_mut().unwrap().beat_id="unknown".into();assert!(missing.validate().is_err());
+        let mut mixed=document.clone();mixed.missions[1].condition_volume=Some("rally".into());assert!(mixed.validate().is_err());
+        let mut wrong=document.clone();wrong.missions[0].trigger="timer".into();assert!(wrong.validate().is_err());
     }
     #[test]
     fn shared_mission_paths_preserve_the_decision_and_reject_inconsistent_sources() {

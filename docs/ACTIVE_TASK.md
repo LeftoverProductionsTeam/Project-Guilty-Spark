@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — Black Echo shared mission paths; native/game follow-through
+Task: Operation110 — Black Echo rescue outcomes; combined native-cache integration next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 40f84efe0dd874ef22db01ae100e111cbdb4e667 — recovered AI Windows/native workflow. Current Black Echo branch source is checked below; no new app/game acceptance.
-Next action: Continue Black Echo mission creation/failure outcomes and actor/native-cache integration in existing systems. Shared decision UI/source/native-script checks pass; full native cache/game/restart remain open. Keep37944 intermittent Save failure open; no live QA jobs.
+Latest verified revision: 10900468963523ef8795045afeb2c8d68ff1808e — shared mission decisions. Rescue-result source checks below extend this; Windows-native AI baseline40f84ef remains separate.
+Next action: Close Black Echo combined actor/mission/native-cache workflow using existing tools and bounded fixtures. Rescue outcomes and source preparation/Save/reopen pass focused checks; actual cache/game/peers remain open. Preserve37944 unresolved Save gate; no live QA jobs.
 
 ## Acceptance
 
@@ -25,9 +25,11 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
+Black Echo rescue-result milestone: explicit continuation after escort failure records success/failure and suppresses its success cue/checkpoint; later conditions select either result, while a skipped escort selects neither. Native/default-stop ownership guards remain; referenced rescues cannot be silently deleted/downgraded. TypeScript/frontend19/Rust creative10 and browser source preparation/immediate Save/close-reopen pass. Existing native fixture compiles5scripts/8globals on CE/MCC/Xbox, independently reading result globals (source11083333); exact hashes/failed-fixture corrections in RUNTIME_INTEGRATION_20261107. All output disposed. Full map/cache/native restart/game/peers remain open;37944 is unresolved.
+
 Black Echo shared-path milestone: existing optional objectives now share one latched native volume decision with inside/outside outcomes, player-ready sampling, grouped area Undo/Redo and Save/reopen. Reviewed regeneration preserves old modules and rejects inconsistent groups. TypeScript/frontend18/Rust creative9 and two focused browser paths pass; CE/MCC/Xbox native script fixture3scripts/4globals independently reads decision/manual globals (sourceb684dc21). Exact hashes/scopes are in RUNTIME_INTEGRATION_20261107 and UI_INTERACTION_AUDIT. All owned output disposed. No new Windows binary/full cache/game/Forerunner proof; manual technology/extraction settlement, replay, failures/rewards and squads remain open.
 
-Recovered-source AI milestone (15Nov): Tags/scnr/Native Output→handles→X drag→review/accept→Restore/reapply→Save/full reopen passes in appc439b814. Inherited dependency guard failure then reproduced without relaxing CRC/parser checks. Existing source-monitor baseline now consumes converter's pinned successful input inventory/output identity. Rust3/3 integrity checks, browser retained-panel1/1, TypeScript and continuity/SDK-reuse10/10 pass. Final appb1257752 resumes the retained project, builds MCC job87b251db and independently reads [4.427971,3,0.1] (before[4,3,0.1]); cache400125f02e8f3b1777418bbe86f54e5fc36dfc71fe1541bdf0edc99b1a4c0acb. Exact source/app/receipt/screenshot hashes and scope are in RUNTIME_INTEGRATION_20261107; stock campaign/CE/human/gameplay gates remain open. Native Restore/reapply is separate from project Undo. Source-only QA is disposed; original inputs unchanged.
+Recovered AI milestone40f84ef: Tags→X drag→accept→Restore/reapply→Save/restart→MCC build/readback passes. Exact app/cache hashes, guard repair and scopes are in RUNTIME_INTEGRATION_20261107. Stock campaign/CE/human/game gates remain open; QA disposed.
 
 Efficiency: reused2676-file/146023117B SDK and accepted UI project; no new archive/SDK warehouse. Both239483B checksum aliases are required by release/archive consumers and share one Git blob. Active-task helper preserves existing legacy recovery and skips unchanged writes; no automatic previous copy. Initial37944 Save failure remains unresolved; later Save-only/native creator passes do not establish its cause.
 

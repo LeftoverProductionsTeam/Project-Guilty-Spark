@@ -96,26 +96,28 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   await run('invader-edit',['-n','-I','controls','1','end','-I','object_names','1','end','-S','object_names[0].name','mission_terminal','-S','controls[0].name','0',scenario+'.scenario']);
   const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',
    soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
-   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1},
+   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue'},
    {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionOutside:true,soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}},
-   {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'mission_terminal'}];
+   {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'mission_terminal'},
+   {id:'rescue_success',title:'Success path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionResult:{beatId:'escort',failed:false}},
+   {id:'rescue_failure',title:'Failure path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionResult:{beatId:'escort',failed:true}}];
   const source=exportHaloCeMission(native).content;await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
-  await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\ngs_mission_fail_2=Rescue failed: not enough survivors. Restart or revise the operation.\r\n','utf16le')]));
+  await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\ngs_mission_fail_2=Rescue failed: not enough survivors. Continuing the operation.\r\n','utf16le')]));
   await run('invader-string',['-d',data,'-T','hud_message_text','levels/radio_messages']);
   await run('invader-edit',['-S','hud_messages','levels/radio_messages.hud_message_text',scenario+'.scenario']);
   const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'),results=[];
   for(const engine of ['gbx-custom','mcc-cea','xbox-ntsc']){
    await run('invader-script',['-d',data,'-E','-g',engine,scenario]);
-   const count=await run('invader-edit',['-C','scripts',scenario+'.scenario'],true);assert.equal(count,'3');
-   const names=await run('invader-edit',['-G','scripts[0].name','-G','scripts[1].name','-G','scripts[2].name',scenario+'.scenario'],true);
-   for(const name of ['gs_complete_1','gs_complete_3','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));
+   const count=await run('invader-edit',['-C','scripts',scenario+'.scenario'],true);assert.equal(count,'5');
+   const names=await run('invader-edit',['-G','scripts[*].name',scenario+'.scenario'],true);
+   for(const name of ['gs_complete_1','gs_complete_3','gs_complete_5','gs_complete_6','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));
    const globals=await run('invader-edit',['-G','globals[*].name',scenario+'.scenario'],true);
-   assert.deepEqual(new Set(globals.split(/\r?\n/)),new Set(['gs_branch_1_ready','gs_branch_1_inside','gs_manual_1_done','gs_manual_3_done']));
+   assert.deepEqual(new Set(globals.split(/\r?\n/)),new Set(['gs_branch_1_ready','gs_branch_1_inside','gs_result_2_done','gs_result_2_failed','gs_manual_1_done','gs_manual_3_done','gs_manual_5_done','gs_manual_6_done']));
    results.push({engine,scriptCount:Number(count),names:names.split(/\r?\n/),globals:globals.split(/\r?\n/),scenarioSha256:await hash(path.join(tags,scenario+'.scenario'))});
   }
   const controlName=await run('invader-edit',['-G','object_names[0].name','-G','controls[0].name',scenario+'.scenario'],true);assert.deepEqual(controlName.split(/\r?\n/),['mission_terminal','0']);
   const caption=await run('invader-edit',['-G','messages[0].name','levels/radio_messages.hud_message_text'],true);assert.equal(caption,'gs_mission_cue_1');
   const failure=await run('invader-edit',['-G','messages[1].name','levels/radio_messages.hud_message_text'],true);assert.equal(failure,'gs_mission_fail_2');
-  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',nativeTerminalSyntax:'pass',nativeSharedBranchSyntax:'pass',controlName,failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
+  console.log(JSON.stringify({nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',nativeTerminalSyntax:'pass',nativeSharedBranchSyntax:'pass',nativeRescueOutcomeSyntax:'pass',controlName,failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }

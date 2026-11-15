@@ -1,4 +1,5 @@
 import {workshopExample} from '../../src/bspWorkshop';
+import {defaultNativePlayerProfile} from '../../src/firefight';
 import {auditPagedSurface,samePagedLayout} from './helpers/compactSurfaces';
 import {chooseTool,openDrawer,openViewMenu,openStudioMenu,revealPagedControl} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
@@ -4131,4 +4132,26 @@ test('shared mission decisions bind alternate paths and preserve grouped Undo an
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
  await expect(page.getByRole('combobox',{name:'Mission branch decision 2',exact:true})).toHaveValue('group:'+group);await expect(page.getByRole('combobox',{name:'Mission branch outcome 2',exact:true})).toHaveValue('outside');
  await expect(page.getByLabel('Optional condition 2',{exact:true})).toHaveValue('new_area');
+});
+
+test('rescue failure routes use reviewed source and preserve result conditions through Save and reopen',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(profile=>{const p=(window as any).__sparkMock.projects.a.project;
+  p.quickForge={schemaVersion:1,name:'Rescue source',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',startingProfile:profile,geometry:[],materials:[],placements:[],spawns:[],objectives:[],campaignEncounters:[{name:'survivors',actorPath:'characters/marine_armored/marine_armored assault rifle',position:[0,0,0],startActive:false,count:2,spacing:1}],logic:{schemaVersion:1,triggers:[{id:'rally',nativeName:'rally',name:'Rally',position:[0,0,0],rotation:[0,0,0],dimensions:[4,4,4],visible:true,locked:false}],devices:[],rules:[]}};
+  p.studio={schemaVersion:1,missions:[{id:'rescue',title:'Rescue',objective:'Escort',trigger:'escort',encounterName:'survivors',triggerRef:'rally',minimumSurvivors:1,checkpoint:true},{id:'success',title:'Continue mission',objective:'Success route',trigger:'manual',encounterName:''},{id:'failure',title:'Recover operation',objective:'Failure route',trigger:'manual',encounterName:''}],shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
+ },defaultNativePlayerProfile());
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
+ const records=page.locator('.studio-record'),rescue=records.nth(0);
+ await rescue.getByRole('combobox',{name:'On rescue failure 1',exact:true}).selectOption('continue');
+ for(const index of [1,2]){const row=records.nth(index);await row.getByRole('checkbox',{name:/^Optional step/}).check();await row.getByRole('combobox',{name:'Mission condition source '+(index+1),exact:true}).selectOption('result');}
+ const outcome=records.nth(2).getByRole('combobox',{name:'Mission rescue outcome 3',exact:true});await outcome.selectOption('failure');
+ await page.keyboard.press('Control+z');await expect(outcome).toHaveValue('success');await page.keyboard.press('Control+y');await expect(outcome).toHaveValue('failure');
+ await expect(rescue.getByRole('button',{name:'Remove beat 1',exact:true})).toBeDisabled();await expect(rescue.getByRole('combobox',{name:'Trigger',exact:true})).toBeDisabled();
+ await expect(rescue.getByRole('option',{name:'Stop this mission · world stays active',exact:true})).toHaveJSProperty('disabled',true);
+ const handling=rescue.getByRole('combobox',{name:'On rescue failure 1',exact:true});await handling.focus();await handling.press('Home');await expect(handling).toHaveValue('continue');
+ await page.getByText('Native mission build',{exact:true}).click();await page.getByRole('button',{name:'Prepare mission for native build',exact:true}).click();await page.keyboard.press('Control+s');
+ try{await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.logic.handwrittenSources?.find((s:any)=>s.filename==='gs_mission.hsc')?.content)).toContain('(set gs_result_1_failed true)');}catch(error){console.log('RESCUE_SOURCE_DIAGNOSTIC',JSON.stringify({notices:(await page.locator('.creator-studio .notice').allTextContents()).map(text=>text.slice(-1500)),binding:await page.getByText('A mission binding is attached.',{exact:false}).count(),saved:await page.evaluate(()=>({missions:(window as any).__sparkMock.saved?.studio.missions,sources:(window as any).__sparkMock.saved?.quickForge.logic.handwrittenSources?.map((s:any)=>s.filename)}))}));throw error;}
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[2].conditionResult)).toEqual({beatId:'rescue',failed:true});
+ await page.getByRole('button',{name:'Close map Synthetic baseline',exact:true}).click();await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Creator Studio');
+ await expect(page.getByRole('combobox',{name:'Mission rescue outcome 3',exact:true})).toHaveValue('failure');await expect(page.getByRole('combobox',{name:'On rescue failure 1',exact:true})).toHaveValue('continue');
 });

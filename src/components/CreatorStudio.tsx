@@ -79,6 +79,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [cueSources,setCueSources]=useMapState<Record<string,string>>(project.id,'mission-cue-sources',{});
   const studio = project.studio ?? emptyCreatorStudio();
   const branchDecisions=(()=>{try{return [...missionBranchGroups(studio.missions)];}catch{return [];}})();
+  const earlierRescues=(index:number)=>studio.missions.slice(0,index).filter(beat=>beat.trigger==='escort'&&beat.escortFailure==='continue');
   function changeConditionVolume(beat:MissionBeat,volume:string){
     change({...studio,missions:studio.missions.map(row=>row.id===beat.id||beat.conditionGroup!=null&&row.conditionGroup===beat.conditionGroup?{...row,conditionVolume:volume}:row)},'Change mission branch volume');
   }
@@ -310,9 +311,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         .map(trigger=><option key={trigger.id} value={trigger.nativeName}>{trigger.name}</option>)}</datalist>
       {studio.missions.length === 0 && <p className="studio-empty">No authored mission beats. Add an objective to start a custom campaign flow.</p>}
       {studio.missions.map((beat, i) => <div className="studio-record" key={beat.id}>
-        <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
+        <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Remove dependent rescue-result conditions first.':undefined} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
-        <label title="Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.">Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
+        <label title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Later objectives use this rescue result. Remove those conditions before changing its trigger.':'Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.'}>Trigger<select value={beat.trigger} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'],...(e.target.value!=='escort'?{escortFailure:undefined}:{}) })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
           <option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
         <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
@@ -339,14 +340,34 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         {beat.trigger==='escort'&&<>
           <NumberField label={'Minimum survivors '+(i+1)} min={1} max={32} step={1} value={beat.minimumSurvivors??1}
             onCommit={value=>updateBeat(beat.id,{minimumSurvivors:Math.round(value)})}/>
+          <label title="Later rescue-result conditions require continuation. Remove those conditions before choosing Stop.">On rescue failure<select aria-label={'On rescue failure '+(i+1)} value={beat.escortFailure??'stop'}
+            onChange={event=>updateBeat(beat.id,{escortFailure:event.target.value==='continue'?'continue':undefined})}>
+            <option value="stop" disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)}>Stop this mission · world stays active</option><option value="continue">Continue to failure handling</option>
+          </select></label>
           <p className="studio-hint">The mission creates this source group, assigns the human team and asks it to follow the closest players.
             All remaining survivors must reach the selected native volume, with at least this many alive. A player entering alone cannot complete rescue.
-            Below the minimum, this mission script stops and shows failure; the world keeps running. Own this group's spawn in one beat only.
+            Below the minimum, the mission shows failure. By default it stops; Continue to failure handling records the result and advances without success cues/checkpoints. Use earlier rescue result conditions on later objectives. The world keeps running. Own this group's spawn in one beat only.
             Minimum must fit all authored native difficulty populations. Choose real Marine assets and playable AI navigation; pathfinding, co-op and gameplay remain separate tests.</p>
         </>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
-        <label><input type="checkbox" checked={beat.conditionVolume!=null} disabled={beat.completeMission===true}
-          onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined,conditionGroup:undefined,conditionOutside:undefined})}/>Optional step / branch · condition on a named area</label>
+        <label><input type="checkbox" checked={beat.conditionVolume!=null||beat.conditionResult!=null} disabled={beat.completeMission===true}
+          onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined,conditionGroup:undefined,conditionOutside:undefined,conditionResult:undefined})}/>Optional step / branch · area or rescue result</label>
+        {(beat.conditionVolume!=null||beat.conditionResult!=null)&&<label>Condition kind<select aria-label={'Mission condition source '+(i+1)} value={beat.conditionResult?'result':'area'}
+          onChange={event=>{if(event.target.value==='result'){const source=earlierRescues(i)[0];if(!source){setError('Configure an earlier survivor escort to continue on failure first.');return;}updateBeat(beat.id,{conditionResult:{beatId:source.id,failed:false},conditionVolume:undefined,conditionGroup:undefined,conditionOutside:undefined});}
+            else updateBeat(beat.id,{conditionResult:undefined,conditionVolume:'',conditionGroup:undefined,conditionOutside:undefined});}}>
+          <option value="area">Named area decision</option><option value="result" disabled={!earlierRescues(i).length}>Earlier rescue result</option>
+        </select></label>}
+        {beat.conditionResult&&<div>
+          <label>Earlier rescue<select aria-label={'Mission rescue result '+(i+1)} value={beat.conditionResult.beatId}
+            onChange={event=>updateBeat(beat.id,{conditionResult:{beatId:event.target.value,failed:beat.conditionResult!.failed}})}>
+            {earlierRescues(i).map(source=><option key={source.id} value={source.id}>{source.title||'Untitled rescue'}</option>)}
+          </select></label>
+          <label>Run this step after<select aria-label={'Mission rescue outcome '+(i+1)} value={beat.conditionResult.failed?'failure':'success'}
+            onChange={event=>updateBeat(beat.id,{conditionResult:{beatId:beat.conditionResult!.beatId,failed:event.target.value==='failure'}})}>
+            <option value="success">Successful rescue</option><option value="failure">Failed rescue</option>
+          </select></label>
+          <small>The earlier rescue must continue on failure. This condition controls entry; this step’s Trigger still controls completion. A skipped rescue has no result, so both paths skip. Failed rescues run no success cue or checkpoint; these routes do not grant loot or reset the world.</small>
+        </div>}
         {beat.conditionVolume!=null&&<div><label>Optional step condition volume<input list={volumeChoices} maxLength={31} spellCheck={false}
           aria-label={'Optional condition '+(i+1)} value={beat.conditionVolume} onChange={event=>changeConditionVolume(beat,event.target.value)}/></label>
           {onLevelEditor&&<button type="button" disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.conditionVolume)}

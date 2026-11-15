@@ -48,6 +48,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     if(cue.caption)text.push('  (show_hud_help_text false)');
     return text;
   };
+  studio.missions.forEach((beat,index)=>{if(beat.escortFailure==='continue')globals.push('(global boolean gs_result_'+(index+1)+'_done false)','(global boolean gs_result_'+(index+1)+'_failed false)');});
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
   studio.missions.forEach((beat,i)=>{
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
@@ -63,7 +64,11 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
       if(beat.conditionOutside===true)condition='(not '+condition+')';
       scripted.push('  (if '+condition+' (begin');
     }
-    if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null))
+    if(beat.conditionResult){
+      const index=studio.missions.findIndex(row=>row.id===beat.conditionResult!.beatId)+1,key='gs_result_'+index;
+      scripted.push('  (if (and '+key+'_done '+(beat.conditionResult.failed?key+'_failed':'(not '+key+'_failed)')+') (begin');
+    }
+    if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null))
       throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
     if(beat.hudObjective===true) {
       const text=beat.hudText??'';
@@ -106,7 +111,11 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
           '  (ai_set_team '+ref+' human)','  (ai_follow_target_players '+ref+')',
           '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') (volume_test_objects_all '+destination+' (ai_actors '+ref+'))) 15)',
           '  (if (< (ai_living_count '+ref+') '+minimum+') (begin',
-          '    (hud_set_objective_text gs_mission_fail_'+(i+1)+')','    (print "gs survivor objective failed")','    (sleep_until false 15)','  ))');
+          '    (hud_set_objective_text gs_mission_fail_'+(i+1)+')','    (print "gs survivor objective failed")');
+        if(beat.escortFailure==='continue')scripted.push('    (set gs_result_'+(i+1)+'_failed true)');
+        else scripted.push('    (sleep_until false 15)');
+        scripted.push('  ))');
+        if(beat.escortFailure==='continue')scripted.push('  (set gs_result_'+(i+1)+'_done true)','  (if (not gs_result_'+(i+1)+'_failed) (begin');
         break;
       }
       case 'encounterCleared':{
@@ -122,7 +131,8 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     scripted.push('  (print "gs objective complete")');
     if(beat.checkpoint===true)scripted.push('  (game_save)');
     if(beat.completeMission===true)scripted.push('  (game_won)');
-    if(beat.conditionVolume!=null)scripted.push('  ))');
+    if(beat.escortFailure==='continue')scripted.push('  ))');
+    if(beat.conditionVolume!=null||beat.conditionResult!=null)scripted.push('  ))');
   });
   scripted.push(')', '');
   lines.push(...globals, '', ...manualSetters, ...scripted);
@@ -131,7 +141,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     'Optional volume conditions run when their step starts. Shared decisions sample once at their first member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
     ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?['Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
-    ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Falling below that minimum stops this mission script, not the persistent world; no loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
+    ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
@@ -167,7 +177,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
@@ -194,7 +204,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
-    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,
+    triggerRef:beat.triggerRef??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null}));
   return sameJson(normalize(a),normalize(b));
 }

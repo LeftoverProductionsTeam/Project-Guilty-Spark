@@ -45,6 +45,7 @@ export interface MissionBeat {
   triggerRef?: string | null;
   timerSeconds?: number | null;
   minimumSurvivors?: number | null;
+  escortFailure?: 'stop' | 'continue' | null;
   hudObjective?: boolean | null;
   hudText?: string | null;
   checkpoint?: boolean | null;
@@ -54,6 +55,7 @@ export interface MissionBeat {
   /** Shared native volume decision, sampled once at the first member. */
   conditionGroup?: string | null;
   conditionOutside?: boolean | null;
+  conditionResult?: {beatId:string;failed:boolean} | null;
   soundCue?: MissionSoundCue | null;
 }
 export interface CameraShot {
@@ -181,7 +183,15 @@ const boundedPos = (v: number[]) => Array.isArray(v) && v.length === 3 && v.ever
 /** Stable editor IDs; native globals use bounded first-occurrence numbers. */
 export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:string;firstBeat:MissionBeat;index:number}> {
   const groups=new Map<string,{volume:string;firstBeat:MissionBeat;index:number}>();
-  for(const beat of missions){
+  for(const [index,beat] of missions.entries()){
+    if(beat.escortFailure!=null&&(beat.trigger!=='escort'||!['stop','continue'].includes(beat.escortFailure)))throw Error('Rescue failure handling requires a survivor escort');
+    if(beat.conditionResult!=null){
+      const result=beat.conditionResult;
+      if(!result||typeof result!=='object'||Array.isArray(result)||Object.keys(result).some(key=>!['beatId','failed'].includes(key))||typeof result.beatId!=='string'||typeof result.failed!=='boolean')throw Error('Invalid mission rescue result');
+      if(beat.conditionVolume!=null||beat.conditionGroup!=null||beat.conditionOutside!=null)throw Error('Choose either an area decision or a rescue result');
+      const target=missions.findIndex(row=>row.id===result.beatId);
+      if(target<0||target>=index||missions[target].trigger!=='escort'||missions[target].escortFailure!=='continue')throw Error('Choose an earlier survivor escort configured to continue on failure');
+    }
     if(beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')throw Error('Invalid mission branch outcome');
     if((beat.conditionGroup!=null||beat.conditionOutside!=null)&&beat.conditionVolume==null)throw Error('Mission branch decisions need an optional condition volume');
     if(beat.conditionGroup==null)continue;
