@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — authored campaign AI start poses and viewport workflow
-Status: awaiting human verification
+Task: Operation110 — campaign AI poses native milestone and behavior authoring
+Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: d50b6fa35c747498036a31ba830670665585aee7 plus the authored-pose source/native milestone in this checkpoint commit; exact frozen source/app/cache hashes in RUNTIME_INTEGRATION_20261107.
-Next action: Continue the next campaign creator gap through existing components. Authored/original AI pose UI/history/Save/restart/native readback milestones pass; AI gameplay/all-axis/CE/peers and Save37944 stay open. Black Echo settlement4/7 needs an actual supported consumer. No Forerunner access/game input/push;475IDs/M1–M6 active.
+Latest verified revision: ab5cc5364af629b7685d91404813d86e455e04cb (actual Windows AI pose/native cache); this checkpoint adds focused source/browser/native loose-tag behavior proof. Exact identities in RUNTIME_INTEGRATION_20261107.
+Next action: Inspect existing campaign command-list/patrol authoring and complete its missing creator workflow without another writer. Moving AI states remain withheld until valid routes exist. New behavior controls still need native application/cache/game integration at a meaningful milestone. Black Echo settlement4/7,37944,Forerunner access/game/peers,475IDs/M1–M6 remain open.
 
 ## Acceptance
 
@@ -24,6 +24,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Campaign behavior now authors native initial/return Sleeping/Alert/Guarding/Searching/Fleeing through the existing encounter form/history/Save/peer/writer/readback. Defaults absent→Alert; squad+all start fields agree, Firefight recipe overrides refuse, movement modes withheld. TypeScript/frontend22/browser2/Rust12 including real Invader5state source readback pass. Initial Rust compile and invalid empty Firefight fixture failures corrected; no assertion weakening. New behavior Windows/cache/game integration remains unrun; pose milestone above stays source-matched. Existing evidence/How To/Human plan updated.
 
 Authored campaign AI poses: optional per-start XYZ/facing now share form/viewport selection, W/E/F, source history, duplication/removal, locks and editor visibility; legacy grids/Firefight recipes preserved. Frontend30/Rust11/browser1/TypeScript/frozen Windows build pass. Actual Windows X/Z mouse drag, Undo/Redo, hide+lock second start, mission preparation, Save/full restart/MCC13 compile/independent8pose readback pass. QA46827 has3normal closes/0page errors; first Marine[-3.5,-2.375,.1]/3.1415927rad. Exact app/source/cache/scenario/SDK hashes and corrected rendered-picker/Save-observer failures in RUNTIME_INTEGRATION_20261107. Previous d50 population native1/2 milestone remains. No gameplay/Forerunner/settlement4/7/37944 acceptance.
 
@@ -99,6 +101,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+Behavior QA24142/run-Dyart4 is terminal and disposed381,534,231 logical bytes; allocated-file disposal unavailable. Focused unit/browser and initial failed-compile roots also disposed themselves. No active app/compiler or new retained output; original files/475CSV/legacy recovery unchanged.
 
 QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete temporary output disposed3,969,093,068 logical bytes; allocated-file disposal unavailable (not a physical-reclaimed claim). No SDK/map/binary/screenshot/archive retained. Originals and Git recovery unchanged.
 

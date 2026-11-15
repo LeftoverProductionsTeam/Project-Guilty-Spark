@@ -37,6 +37,16 @@ pub struct EncounterDifficulty {pub normal:u16,pub insane:u16}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterGrid {pub total:u16,pub offset:u16}
+// Native ScenarioReturnState values; moving states need separately authored routes.
+#[derive(Clone,Copy,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="lowercase")]
+pub enum CampaignAiState {Sleeping,Alert,Guarding,Searching,Fleeing}
+impl CampaignAiState {
+    fn native(self)->(&'static str,u16){match self{Self::Sleeping=>("sleeping",1),Self::Alert=>("alert",2),Self::Guarding=>("guarding",8),Self::Searching=>("searching",10),Self::Fleeing=>("fleeing",11)}}
+}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EncounterBehavior {pub initial_state:CampaignAiState,pub return_state:CampaignAiState}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterStart {
@@ -56,8 +66,10 @@ pub struct EncounterAppend {
     #[serde(default="actor_spacing")] pub spacing:f32,
     #[serde(default,skip_serializing_if="Option::is_none")] pub grid:Option<EncounterGrid>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub starts:Option<Vec<EncounterStart>>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub behavior:Option<EncounterBehavior>,
 }
 impl EncounterAppend {
+    fn states(&self)->(CampaignAiState,CampaignAiState){self.behavior.as_ref().map(|b|(b.initial_state,b.return_state)).unwrap_or((CampaignAiState::Alert,CampaignAiState::Alert))}
     pub fn difficulty_counts(&self)->(u16,u16) {self.difficulty.as_ref().map(|value|(value.normal,value.insane)).unwrap_or((self.count,self.count))}
     pub fn poses(&self)->Result<Vec<EncounterStart>> {
         if let Some(starts)=&self.starts {
@@ -93,7 +105,7 @@ impl Operation {
     pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
     pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
         match self {
-            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None,starts:None}]),
+            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None,starts:None,behavior:None}]),
             Self::AppendEncounters{encounters,..}=>{
                 if encounters.is_empty()||encounters.len()>16{return invalid("Review 1–16 native encounter groups in one operation");}
                 Ok(encounters.clone())
@@ -143,7 +155,7 @@ impl Operation {
                 if let Some(rules)=source_rules{crate::firefight::validate(rules)?;}
                 let entries=self.encounter_appends()?;let mut names=std::collections::BTreeSet::new();let mut total=0usize;
                 for entry in entries {
-                    if source_rules.is_some()&&(entry.difficulty.is_some()||entry.starts.is_some()){return invalid("Prepared Firefight groups require the exact controller population. Use Firefight wave rules rather than independent difficulty overrides");}
+                    if source_rules.is_some()&&(entry.difficulty.is_some()||entry.starts.is_some()||entry.behavior.is_some()){return invalid("Prepared Firefight groups require the exact controller population, starting grid and actor states. Use Firefight wave rules rather than independent campaign overrides");}
                     entry.operation().validate(class,tag)?;
                     let _=entry.positions()?;
                     if !names.insert(entry.name.to_ascii_lowercase()){return invalid("Each appended encounter needs a distinct native name");}
@@ -376,18 +388,18 @@ impl Operation {
         if !self.is_encounter_append(){return self.arguments(tags,class,tag);}
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
         for (entry,index,actor,add_palette) in encounter_append_layouts(before,self)? {
-        let (normal_count,insane_count)=entry.difficulty_counts();
+        let (normal_count,insane_count)=entry.difficulty_counts();let(initial_state,return_state)=entry.states();
         let EncounterAppend{name,actor_path,start_active,count,..}=&entry;
         let e=format!("encounters[{index}]");let squad=format!("{e}.squads[0]");
         let poses=entry.poses()?;
         if add_palette {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
         args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),count.to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
-            (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),normal_count.to_string()),(format!("{squad}.insane_diff_count"),insane_count.to_string()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into())] {args.extend(["-S".into(),key,value]);}
+            (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),normal_count.to_string()),(format!("{squad}.insane_diff_count"),insane_count.to_string()),(format!("{squad}.initial_state"),initial_state.native().0.into()),(format!("{squad}.return_state"),return_state.native().0.into())] {args.extend(["-S".into(),key,value]);}
         for(index,pose)in poses.into_iter().enumerate() {
             let position=pose.position;
             let start=format!("{squad}.starting_locations[{index}]");let firing=format!("{e}.firing_positions[{index}]");let vector=position.map(|value|value.to_string()).join(",");
-            for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),pose.facing_radians.to_string()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),"alert".into()),(format!("{start}.return_state"),"alert".into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
+            for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),pose.facing_radians.to_string()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),initial_state.native().0.into()),(format!("{start}.return_state"),return_state.native().0.into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
         }
         }
         args.push(tag.into());Ok(args)
@@ -491,7 +503,8 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
             if body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native encounter group has unexpected squad/start/firing counts");}
         }
         let difficulty=entry.difficulty.as_ref().map(|value|format!("; native normal={}, insane={}",value.normal,value.insane)).unwrap_or_default();
-        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
+        let behavior=entry.behavior.as_ref().map(|b|format!("; native initial={}, return={}",b.initial_state.native().0,b.return_state.native().0)).unwrap_or_default();
+        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
     }
     Ok(differences)
 }
@@ -534,7 +547,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
     for(w,wave)in config.waves.iter().enumerate(){for(g,group)in wave.groups.iter().enumerate(){
         let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||crate::SparkError::Invalid("Saved wave actor is missing".into()))?;
         let layout=crate::firefight::native_group_grid(config,w,g,&players)?;
-        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None});
+        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None,behavior:None});
     }}
     let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
     operation.validate("scnr","planned.scenario")?;
@@ -556,6 +569,7 @@ impl Operation {
     }
 }
 pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::MapInspection)->Result<()> {
+        let(initial_state,return_state)=entry.states();
         entry.operation().validate("scnr",&format!("{}.scenario",map.scenario_path))?;
         let (normal_count,insane_count)=entry.difficulty_counts();
         let EncounterAppend{name,actor_path,start_active,count,..}=entry;
@@ -567,7 +581,7 @@ pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::Ma
         let actors=map.tags.iter().filter(|tag|tag.class=="actv"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&path)&&!tag.external&&tag.data_offset.is_some()).collect::<Vec<_>>();
         if actors.len()!=1{return invalid("Compiled source actor is missing, ambiguous or has no embedded body");}
         let actor=Some(actors[0].id);let squad=&details.squads[0];
-        if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=normal_count as i16||squad.insane_count!=insane_count as i16||squad.initial_state!=2||squad.return_state!=2||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
+        if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=normal_count as i16||squad.insane_count!=insane_count as i16||squad.initial_state!=initial_state.native().1||squad.return_state!=return_state.native().1||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
         let positions=entry.positions()?;
         let consume=|remaining:&mut Vec<[f32;3]>,position:[f32;3]|->Result<()> {
             let index=remaining.iter().position(|expected|expected.iter().zip(position).all(|(a,b)|(*a-b).abs()<=0.0001)).ok_or_else(||crate::SparkError::Invalid("Compiled native start/firing position differs from the accepted grid".into()))?;
@@ -575,7 +589,7 @@ pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::Ma
         };
         let mut remaining_poses=entry.poses()?;
         for start in &squad.starting_locations {
-            if start.actor_variant_tag_id!=actor||start.actor_palette_index!=-1||start.command_list!=-1||start.flags&1==0||start.initial_state!=2||start.return_state!=2{return invalid("Compiled native actor state differs from the accepted source append");}
+            if start.actor_variant_tag_id!=actor||start.actor_palette_index!=-1||start.command_list!=-1||start.flags&1==0||start.initial_state!=initial_state.native().1||start.return_state!=return_state.native().1{return invalid("Compiled native actor state differs from the accepted source append");}
             let index=remaining_poses.iter().position(|expected|positions_close(expected.position,start.position)&&facings_close(expected.facing_radians,start.facing)).ok_or_else(||crate::SparkError::Invalid("Compiled native actor pose differs from the accepted source".into()))?;remaining_poses.remove(index);
         }
         let mut remaining=positions;
@@ -1110,6 +1124,13 @@ mod tests {
         let rotated=fields();assert_eq!(reviewed_difference(&before,&rotated,&rotation).unwrap().len(),1);let native=run(rotation.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());rotation.verify_readback(&tags,"scnr",tag,&before,&native).unwrap();assert!(native.trim().parse::<f32>().unwrap()< -89.99);
         let combined=pose([2.,3.,4.],std::f32::consts::PI);run(combined.arguments_with_fields(&tags,"scnr",tag,&rotated).unwrap());let after_pose=fields();assert_eq!(reviewed_difference(&rotated,&after_pose,&combined).unwrap().len(),2);let read=run(combined.readback_arguments(&tags,"scnr",tag,&rotated).unwrap().unwrap());combined.verify_readback(&tags,"scnr",tag,&rotated,&read).unwrap();
         let original=pose([1.,1.,1.],std::f32::consts::FRAC_PI_4);run(original.arguments_with_fields(&tags,"scnr",tag,&after_pose).unwrap());assert_eq!(before,fields());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        let original_bytes=fs::read(&file).unwrap();fs::create_dir_all(tags.join("actors")).unwrap();run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),"actors/behavior.actor_variant".into()]);
+        let states=[CampaignAiState::Sleeping,CampaignAiState::Alert,CampaignAiState::Guarding,CampaignAiState::Searching,CampaignAiState::Fleeing];
+        let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]})}).collect();
+        let behavior=Operation::AppendEncounters{encounters:entries,source_rules:None};run(behavior.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let authored=fields();assert_eq!(reviewed_difference(&before,&authored,&behavior).unwrap().len(),5);let result=run(behavior.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());behavior.verify_readback(&tags,"scnr",tag,&before,&result).unwrap();let authored_sha=crate::maps::hash_file(&file).unwrap();
+        // Restore only the generated fixture; production sources are never written by this test.
+        fs::write(&file,original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        println!("Native behavior fixture:5groups/all5initial+return states; authoredSHA={authored_sha}; scalarReadbackSHA={}",Sha256::digest(result.as_bytes()).iter().map(|b|format!("{b:02x}")).collect::<String>());
         println!("Native AI fixture:4squads/8starts; toolSHA={}; beforeSHA={before_sha}; afterSHA={after_sha}; restoredSHA={}",
             crate::maps::hash_file(&executable).unwrap(),crate::maps::hash_file(&file).unwrap());
     }
@@ -1196,7 +1217,7 @@ mod tests {
             .replace("script_marker", &format!("{added}script_marker"));
         let operation = Operation::AppendEncounters { encounters: vec![EncounterAppend {
             name: "survivors".into(), actor_path: "actors/grunt".into(), position: [0.;3],
-            start_active: false, difficulty: None, count: 1, spacing: 1., grid: None, starts: None,
+            start_active: false, difficulty: None, count: 1, spacing: 1., grid: None, starts: None, behavior: None,
         }], source_rules: None };
         assert_eq!(reviewed_difference(before, &after, &operation).unwrap().len(), 1);
         let identity = owned_encounter_identity(&after, &operation).unwrap();
@@ -1278,6 +1299,18 @@ mod tests {
         assert_eq!(r[0].path, "weapons/pistol/pistol.gbxmodel");
         assert!(dependency_lines("../secret.bitmap\n").is_err());
         assert!(dependency_lines("a.bitmap\nA.bitmap\n").is_err());
+    }
+    #[test]
+    fn campaign_behavior_preserves_legacy_source_and_rejects_unsupported_states() {
+        let base=serde_json::json!({"name":"guards","actorPath":"actors/guard","position":[0,0,0],"startActive":false,"count":2});
+        let mut entry:EncounterAppend=serde_json::from_value(base.clone()).unwrap();assert!(entry.behavior.is_none());assert_eq!(entry.states(),(CampaignAiState::Alert,CampaignAiState::Alert));assert!(serde_json::to_value(&entry).unwrap().get("behavior").is_none());
+        entry.behavior=Some(EncounterBehavior{initial_state:CampaignAiState::Sleeping,return_state:CampaignAiState::Searching});
+        let operation=Operation::AppendEncounters{encounters:vec![entry],source_rules:None};let args=operation.arguments_with_fields(Path::new("tags"),"scnr","level.scenario",&ai_fields()).unwrap();
+        assert_eq!(args.windows(3).filter(|a|a[0]=="-S"&&a[1].ends_with(".initial_state")&&a[2]=="sleeping").count(),3);assert_eq!(args.windows(3).filter(|a|a[0]=="-S"&&a[1].ends_with(".return_state")&&a[2]=="searching").count(),3);
+        let mut rules=crate::firefight::default_config();rules.enemies.push(crate::firefight::EnemyType{id:"guard".into(),name:"Guard".into(),actor_variant_path:"actors/guard".into(),points:10});rules.waves.push(crate::firefight::WaveDefinition{id:"wave".into(),name:"Wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![crate::firefight::EnemyGroup{enemy_id:"guard".into(),count:1,spawn_zone_id:None}]});crate::firefight::validate(&rules).unwrap();
+        let prepared=Operation::AppendEncounters{encounters:operation.encounter_appends().unwrap(),source_rules:Some(rules)};assert!(prepared.validate("scnr","level.scenario").unwrap_err().to_string().contains("exact controller"));
+        for state in ["attacking","moving_loop","inherit",""]{let mut invalid=base.clone();invalid["behavior"]=serde_json::json!({"initialState":state,"returnState":"alert"});assert!(serde_json::from_value::<EncounterAppend>(invalid).is_err());}
+        for(state,index)in [(CampaignAiState::Sleeping,1),(CampaignAiState::Alert,2),(CampaignAiState::Guarding,8),(CampaignAiState::Searching,10),(CampaignAiState::Fleeing,11)]{assert_eq!(state.native().1,index);}
     }
     #[test]
     fn authored_campaign_poses_keep_legacy_grid_and_reject_ambiguous_source() {

@@ -1,5 +1,5 @@
 import {forgeNodes,mapForgeNodes,transformForgeNode,duplicateForgeNodes,removeForgeNodes} from './forge';
-import {campaignEncounterStarts} from './nativeOperations';
+import {campaignAiStates,campaignEncounterStarts} from './nativeOperations';
 import {scaleCampaignDifficulty} from './nativeOperations';
 import {describe,it,expect} from 'vitest';
 import {mergeForge,portableForge,localForge} from './forgeSession';
@@ -164,4 +164,15 @@ it('campaign start source shares normal selection transforms, history, identity,
  expect(()=>removeForgeNodes(moved,nodes.map(node=>node.value.id))).toThrow(/at least one/);
  const bound={...moved,campaignEncounters:[{...moved.campaignEncounters![0],difficulty:{normal:2,insane:2}}]};expect(()=>removeForgeNodes(bound,[nodes[0].value.id])).toThrow(/Lower overrides/);
  let history=historyReducer(initialHistory,{type:'load',project:project(doc)});history=historyReducer(history,{type:'edit',project:project(moved),description:'Move authored AI start'});history=historyReducer(history,{type:'undo'});expect(history.current?.quickForge?.campaignEncounters?.[0].starts).toBeUndefined();history=historyReducer(history,{type:'redo'});expect(history.current?.quickForge?.campaignEncounters).toEqual(moved.campaignEncounters);
+});
+
+
+it('campaign behavior follows source history and peer conflicts without rewriting poses or defaults',()=>{
+ const doc:QuickForgeDocument={...structuredClone(base),gameMode:'campaign',campaignEncounters:[{name:'guards',actorPath:'characters/grunt',position:[0,0,0],startActive:false,count:2}]};
+ const starts=campaignEncounterStarts(doc.campaignEncounters![0]);const next=structuredClone(doc);next.campaignEncounters![0].behavior={initialState:'sleeping',returnState:'guarding'};
+ expect(campaignEncounterStarts(next.campaignEncounters![0])).toEqual(starts);expect(doc.campaignEncounters![0].behavior).toBeUndefined();
+ let h=historyReducer(initialHistory,{type:'load',project:project(doc)});h=historyReducer(h,{type:'edit',project:project(next),description:'Author AI behavior'});h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(doc.campaignEncounters);h=historyReducer(h,{type:'redo'});expect(h.current?.quickForge?.campaignEncounters).toEqual(next.campaignEncounters);
+ expect(mergeForge(doc,doc,next).campaignEncounters).toEqual(next.campaignEncounters);const peer=structuredClone(next);peer.campaignEncounters![0].behavior!.returnState='searching';expect(()=>mergeForge(doc,peer,next)).toThrow(/campaign encounter/i);
+ for(const state of campaignAiStates)expect(campaignEncounterStarts({...doc.campaignEncounters![0],behavior:{initialState:state,returnState:state}})).toEqual(starts);
+ expect(()=>campaignEncounterStarts({...doc.campaignEncounters![0],behavior:{initialState:'attacking' as any,returnState:'alert'}})).toThrow(/supported native/);
 });

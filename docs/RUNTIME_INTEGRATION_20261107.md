@@ -497,3 +497,21 @@ Reused one3521-file/184203140B SDK subset across retries, exact rehash checked a
 | invaderString | `f384b5f4b1f02a6d4d7988765e6fd0f7948c28149c2de37de206f016e70ec934` |
 
 QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete temporary output disposed3,969,093,068 logical bytes; allocated-file disposal unavailable (not a physical-reclaimed claim). No SDK/map/binary/screenshot/archive retained. Originals and Git recovery unchanged.
+
+
+## Campaign native behavior authoring — 15 November 2026
+
+Based on ab5cc5364af629b7685d91404813d86e455e04cb. Creator Studio → Campaign AI encounters exposes Initial behavior and Return behavior: Sleeping/Alert/Guarding/Searching/Fleeing. Optional source retains legacy Alert/Alert when absent. The existing native append writer applies both fields to squad and every start; scalar readback compares exact labels and compiled-map verification compares native state indices. Project history/Save, source/mission fingerprints and peer conflicts retain the same source ownership. Prepared Firefight groups reject campaign overrides. Movement-loop modes require route authoring and are withheld. Actual behavior depends on native actor abilities, scripts and navigation.
+
+TypeScript, frontend22/22, browser2/2 (pose/behavior controls, history, Save/project reopen) and Rust native_operations12/12 including installed Invader pass. A native-tool-created scenario/actor fixture independently verifies all five initial and return labels across five appended groups, through real writes, native field review and scalar readback, then exactly restores the generated original tag. No map/SDK copy or engine code was used. Initial Rust missing state bindings/digest formatting failed compilation and were fixed. A negative Firefight test used the empty non-runnable default; it now validates a minimal real wave before asserting ownership refusal. Assertions were retained. Retried checks reused one owned Rust dependency environment. No new desktop build, behavior cache compilation/game/Forerunner/human acceptance; latest actual Windows/cache proof is the preceding pose milestone. Save37944 and475/M1–M6 remain open.
+
+| Evidence | SHA256 |
+|---|---|
+| Generated behavior scenario | `10fb23ae5b7da46ffebfdec99803064c143d66555ba70cf83d0375efc757beaa` |
+| Independent scalar readback | `9040044150b3530efb0ab4080278f2739c6cd8d53e5429eba3ac1c87f88a09bb` |
+| crates/spark-core/src/native_operations.rs | `73e9ef28425a1a6572d3d19750ca0efe1c196282637481e1e2ce6f6c9e872ecb` |
+| src/nativeOperations.ts | `a5c1baaa347ab4863c3b6b82e96b224a10324aaae44ab714394d63c06fd8b9ac` |
+| src/components/CampaignEncounters.tsx | `2a473365bbfc353f2e506b0fc595a382fc3f3be331d6ab12d2669f9f6ebc7e01` |
+| .research/scenario.json | `919b5b45bea492dc7923e2837a9ec002356cf3e3c4a75b81865cb25b73ecced4` |
+
+Behavior QA24142/run-Dyart4 is terminal and disposed381,534,231 logical bytes; allocated-file disposal unavailable. Focused unit/browser and initial failed-compile roots also disposed themselves. No active app/compiler or new retained output; original files/475CSV/legacy recovery unchanged.

@@ -4253,3 +4253,14 @@ test('campaign individual starts share form source, editor selection, pose prope
  await expect(page.getByRole('textbox',{name:'Selected object name',exact:true})).toHaveValue('guards / Start 0');await expect(page.getByRole('spinbutton',{name:'Rotation X',exact:true})).toBeDisabled();await expect(page.getByRole('spinbutton',{name:'Rotation Z',exact:true})).toHaveValue('90');
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.campaignEncounters[0].starts[0].position[0])).toBe(2);
 });
+
+
+test('campaign behavior source has functional controls history Save and reopening',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const p=(window as any).__sparkMock.projects.a.project;p.quickForge={schemaVersion:1,name:'Campaign behavior',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[],campaignEncounters:[{name:'guards',actorPath:'characters/grunt',position:[0,0,0],startActive:false,count:2}]};});
+ const card=()=>page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})});await card().click();await chooseTool(page,'Creator Studio');
+ const ai=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Campaign AI encounters/})});await revealPagedControl(ai.locator(':scope > summary'));await ai.locator(':scope > summary').click();const initial=ai.getByRole('combobox',{name:'Campaign initial AI state',exact:true}),returned=ai.getByRole('combobox',{name:'Campaign return AI state',exact:true});
+ await expect(initial).toHaveValue('alert');await expect(returned).toHaveValue('alert');await initial.selectOption('sleeping');await returned.selectOption('guarding');
+ const group=()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project.quickForge.campaignEncounters[0]);await expect.poll(async()=>(await group()).behavior).toEqual({initialState:'sleeping',returnState:'guarding'});await page.keyboard.press('Control+z');await expect(returned).toHaveValue('alert');await page.keyboard.press('Control+y');await expect(returned).toHaveValue('guarding');
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.campaignEncounters[0].behavior)).toEqual({initialState:'sleeping',returnState:'guarding'});
+ await chooseTool(page,'Map library');await card().click();await chooseTool(page,'Creator Studio');if(!await initial.isVisible())await ai.locator(':scope > summary').click();await expect(initial).toHaveValue('sleeping');await expect(returned).toHaveValue('guarding');expect((await group()).starts).toBeUndefined();
+});

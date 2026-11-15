@@ -5,7 +5,7 @@ import AssetSourceBrowser from './AssetSourceBrowser';
 import {attachAssetImport,prepareCampaignActor} from '../nativeAssetImport';
 import {beginProjectMutation} from '../projectMutation';
 import { useMapState } from '../mapSession';
-import {campaignEncounterStarts,campaignStartId,scaleCampaignDifficulty} from '../nativeOperations';
+import {campaignAiStates,campaignEncounterStarts,campaignStartId,scaleCampaignDifficulty} from '../nativeOperations';
 import type { NativeEncounterAppend } from '../nativeOperations';
 import type { OpenProject,Project } from '../types';
 import { Notice, NumberField } from './ui';
@@ -175,6 +175,8 @@ export default function CampaignEncounters({project,edit,onSelectStart}:{
           <p className="studio-hint">Authored starts: {entry.count??1} · native normal: {entry.difficulty?.normal??entry.count??1} · native insane: {entry.difficulty?.insane??entry.count??1}.
             Add enough starts first. To remove starts, lower the overrides first. Save, Undo/Redo and source sharing include these values; native and gameplay validation remain required.</p>
         </details>
+        <div className="studio-fields">{(['initialState','returnState'] as const).map(key=><label key={key}>{key==='initialState'?'Initial behavior':'Return behavior'}<select aria-label={key==='initialState'?'Campaign initial AI state':'Campaign return AI state'} value={entry.behavior?.[key]??'alert'} onChange={event=>update({behavior:{initialState:entry.behavior?.initialState??'alert',returnState:entry.behavior?.returnState??'alert',[key]:event.target.value as import('../nativeOperations').CampaignAiState}})}>{campaignAiStates.map(state=><option key={state} value={state}>{state[0].toUpperCase()+state.slice(1)}</option>)}</select></label>)}</div>
+        <p className="studio-hint">Native squad and starting-location states share these settings. Initial applies at creation; return is the authored fallback state. Actor abilities, navigation and scripts determine actual behavior. Movement-loop modes require route authoring and are not offered here. Reprepare the mission after changing source, then Save and build.</p>
         <label><input type="checkbox" checked={entry.startActive}
           onChange={event=>update({startActive:event.target.checked})}/>Create actors when the map starts</label>
         <p className="studio-hint">Leave initial creation off for mission-controlled encounters.
