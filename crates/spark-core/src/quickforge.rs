@@ -100,6 +100,22 @@ pub fn verify_player_starts(doc:&QuickForgeDocument,objects:&[maps::SceneObject]
     }
     Ok(())
 }
+/// Extend the existing coordinate check with native solo mode filters. A cache
+/// with multiplayer-only starts can compile successfully but spawn no player.
+pub fn verify_player_starts_in_cache(doc:&QuickForgeDocument,map:&maps::MapInspection,path:&Path)->Result<()> {
+    verify_player_starts(doc,&map.objects,&map.diagnostics)?;
+    if doc.native.is_some()||native_scenario_type(doc)!=0{return Ok(());}
+    let (_,bytes,hash)=maps::read_cache_snapshot(path)?;
+    if hash!=map.sha256{return invalid("Compiled map changed after player-start inspection");}
+    for start in map.objects.iter().filter(|object|object.kind=="Player spawn") {
+        let offset=start.source_offset.and_then(|at|at.checked_add(20)).and_then(|at|usize::try_from(at).ok())
+            .ok_or_else(||SparkError::Invalid("Compiled solo start mode filters are unavailable".into()))?;
+        let filters=bytes.get(offset..offset.checked_add(8).ok_or_else(||SparkError::Invalid("Compiled solo start offset overflow".into()))?)
+            .ok_or_else(||SparkError::Invalid("Compiled solo start mode filters are truncated".into()))?;
+        if filters.iter().any(|byte|*byte!=0){return invalid("Compiled solo player starts retain multiplayer mode filters; no playable solo spawn is established");}
+    }
+    Ok(())
+}
 pub fn verify_starting_profile(doc:&QuickForgeDocument,map:&maps::MapInspection)->Result<()> {
     if let Some(profile)=campaign_profile(doc) {
         if map.header.scenario_type != 0 {return invalid("Campaign loadout output is not a native singleplayer scenario");}
@@ -1858,7 +1874,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             add_set(
                 &mut args,
                 format!("{prefix}.type_{j}"),
-                spawn.game_modes.get(j).map_or("none", |m| spawn_type(m)),
+                if campaign { "none" } else { spawn.game_modes.get(j).map_or("none", |m| spawn_type(m)) },
             );
         }
         edit_command(&mut commands, &scenario_tag, args);

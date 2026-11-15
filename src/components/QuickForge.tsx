@@ -3729,6 +3729,10 @@ function ForgeProperties({
               Spawn game mode
               <select
                 value={node.value.gameModes[0] ?? doc.gameMode}
+                disabled={['campaign','firefight','zombie'].includes(doc.gameMode)}
+                title={['campaign','firefight','zombie'].includes(doc.gameMode)
+                  ? 'Solo maps use unfiltered player starts. Your multiplayer filters are kept for a mode change.'
+                  : 'Choose the multiplayer modes that can use this player start.'}
                 onChange={(e) =>
                   changeNode(
                     (n) =>
@@ -3744,6 +3748,7 @@ function ForgeProperties({
                   </option>
                 ))}
               </select>
+              {['campaign','firefight','zombie'].includes(doc.gameMode)&&<span className="forge-hint">Solo maps use unfiltered starts. Multiplayer filters are kept for a mode change.</span>}
             </label>
           )}
         </fieldset>

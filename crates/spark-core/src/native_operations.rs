@@ -221,6 +221,12 @@ fn array_listing(fields:&str,name:&str)->Result<ArrayListing> {
     }
     Ok(ArrayListing{count,start,end,body})
 }
+// Invader aligns the type column with spaces. Match the exact row path/depth
+// and type without changing any stored field text or preservation identity.
+fn encounter_row(line:&str,index:usize)->bool {
+    line.strip_prefix(&format!("    encounters[{index}]"))
+        .is_some_and(|tail|tail.starts_with(' ')&&tail.trim()=="struct")
+}
 fn encounter_append_layout(fields:&str,name:&str,actor:&str)->Result<(ArrayListing,ArrayListing,usize)> {
     let encounters=array_listing(fields,"encounters")?;let palette=array_listing(fields,"actor_palette")?;
     if encounters.count>=128||palette.count>64{return invalid("The scenario has no checked encounter/palette capacity for an append");}
@@ -270,7 +276,7 @@ fn owned_encounter_rows(fields:&str,operation:&Operation)->Result<Vec<(usize,Vec
     if starts.len()!=array.count{return invalid("Native encounter row count differs from its declaration");}
     let mut rows=vec![];
     for(index,begin)in starts.iter().copied().enumerate(){
-        if array.body[begin]!=format!("    encounters[{index}] struct"){return invalid("Native encounter row order is incomplete or ambiguous");}
+        if !encounter_row(&array.body[begin],index){return invalid("Native encounter row order is incomplete or ambiguous");}
         let end=starts.get(index+1).copied().unwrap_or(array.body.len());let body=&array.body[begin..end];
         let names=body.iter().filter_map(|line|line.strip_prefix("        name (")).filter_map(|tail|tail.split_once(')').map(|pair|pair.0)).collect::<Vec<_>>();
         if names.len()!=1{return invalid("Native encounter name is missing or ambiguous");}
@@ -300,7 +306,7 @@ pub fn encounter_revision_base(fields:&str,existing:&Operation,expected:&str)->R
     let array=array_listing(fields,"encounters")?;let rows=owned_encounter_rows(fields,existing)?;
     let count=array.count.checked_sub(rows.len()).ok_or_else(||crate::SparkError::Invalid("Invalid generated encounter range".into()))?;
     if rows.iter().enumerate().any(|(offset,(index,_))|*index!=count+offset){return invalid("Generated groups are no longer the contiguous final encounter rows. Original indices cannot be shifted; reconcile the native source separately");}
-    let first=array.body.iter().position(|line|line==&format!("    encounters[{count}] struct")).ok_or_else(||crate::SparkError::Invalid("Generated native encounter boundary is missing".into()))?;
+    let first=array.body.iter().position(|line|encounter_row(line,count)).ok_or_else(||crate::SparkError::Invalid("Generated native encounter boundary is missing".into()))?;
     let lines=fields.lines().map(str::to_owned).collect::<Vec<_>>();
     let mut base=lines[..array.start].to_vec();base.push(format!("encounters[{count}] array"));base.extend_from_slice(&array.body[..first]);base.extend_from_slice(&lines[array.end..]);
     Ok((base.join("\n")+"\n",rows.into_iter().map(|(index,_)|index).collect()))
@@ -414,6 +420,16 @@ impl Operation {
         Ok(())
     }
 }
+/// Preserve every native row outside the two explicitly edited arrays. Show
+/// the first bounded difference rather than hiding the field behind a generic
+/// refusal; this never adopts, normalizes or discards the changed source.
+fn compare_scenario_remainder(before:&str,after:&str,old:[&ArrayListing;2],new:[&ArrayListing;2],context:&str)->Result<()> {
+    let remaining=|text:&str,arrays:[&ArrayListing;2]|text.lines().enumerate().filter(|(index,_)|arrays.iter().all(|a|*index<a.start||*index>=a.end)).map(|(_,line)|line.to_string()).collect::<Vec<_>>();
+    let a=remaining(before,old);let b=remaining(after,new);if a==b{return Ok(());}
+    let index=a.iter().zip(&b).position(|(a,b)|a!=b).unwrap_or(a.len().min(b.len()));
+    let snippet=|lines:&Vec<String>|lines.get(index).map(|line|line.chars().take(240).collect::<String>()).unwrap_or_else(||"<end>".into());
+    invalid(format!("{context}: row {index} outside edited arrays, before={:?}, after={:?}; row counts{}→{}. No revision was selected",snippet(&a),snippet(&b),a.len(),b.len()))
+}
 fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
     let Operation::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=operation else{return invalid("Not an encounter append");};
     let (old_encounters,old_palette,actor)=encounter_append_layout(before,name,actor_path)?;
@@ -424,10 +440,7 @@ fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Resul
     for expected in ["squads[1] array".to_string(),format!("starting_locations[{count}] array"),format!("firing_positions[{count}] array")] {
         if added_body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native encounter append has unexpected squad/start/firing array sizes");}
     }
-    let remaining=|text:&str,arrays:[&ArrayListing;2]| {
-        text.lines().enumerate().filter(|(index,_)|arrays.iter().all(|a|*index<a.start||*index>=a.end)).map(|(_,line)|line).collect::<Vec<_>>().join("\n")
-    };
-    if remaining(before,[&old_encounters,&old_palette])!=remaining(after,[&new_encounters,&new_palette]) {return invalid("Native encounter append changed other scenario fields; no revision was selected");}
+    compare_scenario_remainder(before,after,[&old_encounters,&old_palette],[&new_encounters,&new_palette],"Native encounter append changed other scenario fields")?;
     let difficulty=difficulty.as_ref().map(|value|format!("; native normal={}, insane={}",value.normal,value.insane)).unwrap_or_default();
     Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")+&difficulty}])
 }
@@ -439,12 +452,10 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
     let new=array_listing(after,"encounters")?;let new_palette=array_listing(after,"actor_palette")?;
     let added=plans.iter().filter(|row|row.3).count();
     if new.count!=old.count+plans.len()||new_palette.count!=palette.count+added||!new.body.starts_with(&old.body)||!new_palette.body.starts_with(&palette.body)||(added==0&&new_palette.body!=palette.body){return invalid("Native encounter group append changed original rows or unexpected counts");}
-    let remaining=|text:&str,arrays:[&ArrayListing;2]|text.lines().enumerate().filter(|(index,_)|arrays.iter().all(|a|*index<a.start||*index>=a.end)).map(|(_,line)|line).collect::<Vec<_>>().join("\n");
-    if remaining(before,[&old,&palette])!=remaining(after,[&new,&new_palette]){return invalid("Native encounter group append changed other scenario fields");}
+    compare_scenario_remainder(before,after,[&old,&palette],[&new,&new_palette],"Native encounter group append changed other scenario fields")?;
     let mut differences=vec![];
     for (entry,index,_,_) in plans {
-        let row=format!("    encounters[{index}] struct");
-        let start=new.body.iter().position(|line|line==&row).ok_or_else(||crate::SparkError::Invalid("Appended encounter row is missing".into()))?;
+        let start=new.body.iter().position(|line|encounter_row(line,index)).ok_or_else(||crate::SparkError::Invalid("Appended encounter row is missing".into()))?;
         let end=(start+1..new.body.len()).find(|i|new.body[*i].starts_with("    encounters[")).unwrap_or(new.body.len());
         let body=&new.body[start+1..end];
         if body.iter().filter_map(|line|line.strip_prefix("        name (")).filter_map(|tail|tail.split_once(')').map(|pair|pair.0)).filter(|name|*name==entry.name.as_str()).count()!=1{return invalid("Appended encounter group name differs from the reviewed source");}
@@ -1116,6 +1127,46 @@ mod tests {
         assert!(snapshot.verify_map(&map).is_err(),"missing data is unavailable, not zero");
     }
 
+    #[test]
+    fn padded_native_encounter_declarations_preserve_original_rows_and_revision_identity() {
+        let before = concat!(
+            "actor_palette[1] array\n",
+            "    actor_palette[0]                         struct\n",
+            "        reference (actors/grunt.actor_variant) tagref\n",
+            "encounters[1] array\n",
+            "    encounters[0]                           struct\n",
+            "        name (original) tagstring\n",
+            "        squads[0] array\n",
+            "script_marker (preserve) tagstring\n");
+        let added = concat!(
+            "    encounters[1]                           struct\n",
+            "        name (survivors) tagstring\n",
+            "        squads[1] array\n",
+            "            squads[0] struct\n",
+            "                starting_locations[1] array\n",
+            "                firing_positions[1] array\n");
+        let after = before.replace("encounters[1] array", "encounters[2] array")
+            .replace("script_marker", &format!("{added}script_marker"));
+        let operation = Operation::AppendEncounters { encounters: vec![EncounterAppend {
+            name: "survivors".into(), actor_path: "actors/grunt".into(), position: [0.;3],
+            start_active: false, difficulty: None, count: 1, spacing: 1., grid: None,
+        }], source_rules: None };
+        assert_eq!(reviewed_difference(before, &after, &operation).unwrap().len(), 1);
+        let identity = owned_encounter_identity(&after, &operation).unwrap();
+        let (base, indices) = encounter_revision_base(&after, &operation, &identity).unwrap();
+        assert_eq!(indices, [1]);
+        assert_eq!(base, before);
+        for changed in [after.replace("(preserve)", "(foreign)"),
+                        after.replace("name (original)", "name (foreign)")] {
+            assert!(reviewed_difference(before, &changed, &operation).is_err());
+        }
+        let changed_owned = after.replace("name (survivors)", "name (foreign)");
+        assert!(encounter_revision_base(&changed_owned, &operation, &identity).is_err());
+        for wrong in ["        encounters[1] struct", "    encounters[10] struct",
+                      "    encounters[1]struct", "    encounters[1] other"] {
+            assert!(!encounter_row(wrong, 1));
+        }
+    }
     #[test]
     fn lens_repair_distinguishes_raw_radians_from_reader_degrees() {
         assert!(broken_lens_scale(20626.480625));

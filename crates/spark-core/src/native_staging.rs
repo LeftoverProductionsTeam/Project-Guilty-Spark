@@ -646,7 +646,7 @@ mod tests {
         assert!(pc_model_paths(["globals/globals.globals"]).unwrap().is_empty());
     }
     #[test]
-    #[ignore="Requires explicit owner-installed Xbox map, Invader and owned output; not cache/gameplay acceptance"]
+    #[ignore="Requires owner-installed Xbox map/Invader and owned output; optional CE/HEK cache build, never gameplay acceptance"]
     fn native_xbox_actor_to_pc_model_import() {
         let map=std::path::PathBuf::from(std::env::var_os("SPARK_TEST_XBOX_MAP").expect("select owned Xbox source map"));
         let tools_dir=std::path::PathBuf::from(std::env::var_os("SPARK_TEST_INVADER").expect("select installed Invader"));
@@ -663,6 +663,83 @@ mod tests {
         let mut doc=crate::quickforge::create_arena("Xbox creator","smallIndoorArena").unwrap();doc.game_mode="campaign".into();
         doc.campaign_encounters.push(serde_json::from_value(serde_json::json!({"name":"survivors","actorPath":binding.native_path,"position":[0,0,0],"startActive":false,"count":1,"spacing":1})).unwrap());target.quick_forge=Some(doc);target.native_asset_imports.push(binding.clone());
         let imports=crate::native_asset_imports::source_hashes(&managed,&target).unwrap();assert_eq!(imports.len(),binding.file_count);assert!(imports.keys().any(|path|path.ends_with(".model")));
+        if let Some(ce_map)=std::env::var_os("SPARK_TEST_CE_MAP") {
+            // The optional compile gate uses the production QuickForge builder,
+            // not a second converter, scenario writer or cache-build pipeline.
+            let ce_map=std::path::PathBuf::from(ce_map);let resources=ce_map.parent().unwrap();
+            let ce_before=maps::hash_file(&ce_map).unwrap();let resource_hashes=crate::project::resource_hashes(resources).unwrap();
+            let ce_inspection=maps::inspect_map(&ce_map,Some(resources)).unwrap();assert_eq!(ce_inspection.header.version,609);
+            let mut base=crate::project::Project::new("Owned CE source for Xbox assets");
+            base.source=Some(crate::project::Source{original_path:ce_map.clone(),preserved_path:ce_map.clone(),sha256:ce_before.clone(),cache_version:609,engine:ce_inspection.header.engine.clone(),scenario_path:ce_inspection.scenario_path.clone(),archive:None,resource_directory:Some(resources.into()),resource_sha256:resource_hashes.clone(),audio_resources:None});
+            let scenario=ce_inspection.tags.iter().find(|tag|tag.class=="scnr").unwrap();
+            eprintln!("XBOX_CE_NATIVE recovering verified CE source");
+            let ce=crate::tag_exchange::extract_selected_tag(&base,&ce_inspection,&tools,&managed,&uuid::Uuid::new_v4().to_string(),scenario.id,cancel.clone(),|_|{}).unwrap();
+            let kit=std::path::PathBuf::from(std::env::var_os("SPARK_TEST_HEK").expect("select installed structure compiler"));
+            // A recovered multiplayer cache does not supply solo UI. When
+            // explicitly provided, use the existing bounded SDK preparation's
+            // unmodified native closure in a separate owned source tree. Never
+            // overwrite the CE extraction or invent an absent collection.
+            let mut source_support=BTreeMap::new();
+            let ce_tags=if let Some(support)=std::env::var_os("SPARK_TEST_SOLO_SUPPORT_TAGS") {
+                let support=std::path::PathBuf::from(support);let combined=tmp.path().join("ce-solo-inputs");
+                let ce_inventory=inventory(&ce.tag_root,&cancel).unwrap();copy(&ce.tag_root,&combined,&ce_inventory,&cancel,|_,_,_,_|{}).unwrap();
+                let roots=crate::forge_build::ce_cache_roots(0).unwrap().into_iter().filter(|path|!combined.join(path).is_file()).map(str::to_owned).collect();
+                let all=inventory(&support,&cancel).unwrap();
+                let event=|_|{};let runner=crate::build::Runner{id:"solo-support",project:&target.id,cancel:&cancel,event:&event};
+                let edit=tools_dir.join(if cfg!(windows){"invader-dependency.exe"}else{"invader-dependency"});
+                let (selected,_)=collect_dependency_files(&support,roots,true,all.files.len(),20000,|tag|
+                    runner.run(&edit,&["-r".into(),"-t".into(),support.to_string_lossy().into_owned(),tag.into()],tmp.path(),"dependencies",1)).unwrap();
+                for row in selected_inventory(&all,&selected).unwrap().files {
+                    let input=support.join(&row.path);let output=combined.join(&row.path);
+                    if !output.exists(){let hash=maps::hash_file(&input).unwrap();copy_file(&input,&output,row.bytes,Some(&hash),&cancel).unwrap();source_support.insert(row.path,hash);}
+                }
+                eprintln!("XBOX_CE_NATIVE {} unmodified SDK support tags; existing CE tags retained",source_support.len());
+                combined
+            }else{ce.tag_root.clone()};
+            let mut doc=crate::bsp_workshop::example().unwrap();doc.name="Xbox actor CE candidate".into();doc.game_mode="campaign".into();doc.runtime_id=crate::runtime::RuntimeId::ChupathingyCe;doc.spawns.truncate(1);
+            let shader=ce_inspection.tags.iter().find(|tag|tag.class=="senv"&&tag.path.to_ascii_lowercase().contains("metal")&&(tag.path.contains("floor")||tag.path.contains("flat")))
+                .or_else(||ce_inspection.tags.iter().find(|tag|tag.class=="senv"&&tag.path.to_ascii_lowercase().contains("metal"))).expect("owned CE structural metal shader");
+            doc.materials[0].shader_path=Some(shader.path.replace('\\',"/"));
+            doc.sky_path=ce_inspection.tags.iter().find(|tag|tag.class.trim_end()=="sky").map(|tag|tag.path.replace('\\',"/"));
+            doc.starting_profile=Some(crate::firefight::NativePlayerProfile{primary_weapon:"weapons/pistol/pistol".into(),primary_loaded:12,primary_reserved:60,secondary_weapon:None,secondary_loaded:0,secondary_reserved:0,health:1.0,shields:1.0,fragmentation_grenades:0,plasma_grenades:0});
+            let mut group=target.quick_forge.as_ref().unwrap().campaign_encounters[0].clone();group.position=[-4.0,-2.0,0.1];doc.campaign_encounters.push(group);target.quick_forge=Some(doc);
+            let profile_id=uuid::Uuid::new_v4().to_string();target.active_build_target=Some(profile_id.clone());
+            target.build_targets.push(crate::project::EngineBuildTarget{id:profile_id,name:"Verified CE source for Xbox assets".into(),runtime_id:crate::runtime::RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:Some(kit.clone()),hek_flavor:Some("h1aEk".into()),tags_directory:Some(ce_tags.clone()),invader_directory:Some(tools_dir.clone()),ce_compatible_tagset:true,open_sauce:false});
+            let forge_tools=crate::forge_build::tools_for_target(&target,crate::forge_build::ForgeToolchain::default()).unwrap();
+            eprintln!("XBOX_CE_NATIVE production build: {} CE base tags and {} immutable Xbox import tags",ce.files.len(),imports.len());
+            let built=crate::forge_build::run_job(&target,&forge_tools,&managed.join("jobs"),&uuid::Uuid::new_v4().to_string(),false,vec![],cancel.clone(),|event|{
+                if event.severity=="error"||event.severity=="tool"||event.phase=="compile"||event.progress==100 {eprintln!("XBOX_CE_NATIVE {} {}",event.phase,event.message);}
+            }).unwrap();
+            assert_eq!(built.status,"validated","{:?}",built.blockers);
+            let build=built.build.as_ref().unwrap();assert_eq!(build.target,"gbx-custom");let cache=build.output.as_ref().unwrap();
+            let inspected=maps::inspect_map(cache,None).unwrap();assert_eq!(inspected.header.version,609);assert_eq!(inspected.header.scenario_type,0);
+            assert!(!inspected.resources.iter().any(|resource|resource.required));crate::quickforge::verify_campaign_encounters(target.quick_forge.as_ref().unwrap(),&inspected).unwrap();
+            crate::native_asset_imports::verify_compiled(&target,&inspected).unwrap();crate::audio_rules::verify(cache,&inspected).unwrap();
+            // Negative input stays in owned scratch. The successful candidate
+            // is never patched, selected or replaced by this malformed copy.
+            let bad=tmp.path().join("wrong-solo-start.map");fs::copy(cache,&bad).unwrap();
+            let start=inspected.objects.iter().find(|object|object.kind=="Player spawn").unwrap().source_offset.unwrap();
+            let mut bytes=fs::read(&bad).unwrap();bytes[start+20..start+22].copy_from_slice(&2u16.to_le_bytes());fs::write(&bad,bytes).unwrap();
+            let bad_inspected=maps::inspect_map(&bad,None).unwrap();
+            assert!(crate::quickforge::verify_player_starts_in_cache(target.quick_forge.as_ref().unwrap(),&bad_inspected,&bad).unwrap_err().to_string().contains("multiplayer mode filters"));
+            let workspace=&built.sources.as_ref().unwrap().directory;
+            let conversions:serde_json::Value=serde_json::from_slice(&fs::read(workspace.join("xbox-model-adaptation.json")).unwrap()).unwrap();assert_eq!(conversions.as_array().unwrap().len(),4);
+            let readback=tmp.path().join("independent-readback");fs::create_dir(&readback).unwrap();
+            let event=|_|{};let runner=crate::build::Runner{id:"xbox-ce-readback",project:&target.id,cancel:&cancel,event:&event};
+            let binary=|name:&str|tools_dir.join(format!("{name}{}",if cfg!(windows){".exe"}else{""}));
+            let native_scenario=format!("{}.scenario",built.sources.as_ref().unwrap().scenario_path);
+            runner.run(&binary("invader-extract"),&["-s".into(),native_scenario.clone(),"-t".into(),readback.to_string_lossy().into_owned(),cache.to_string_lossy().into_owned()],tmp.path(),"extract",95).unwrap();
+            let fields=runner.run(&binary("invader-edit"),&["-t".into(),readback.to_string_lossy().into_owned(),"-G".into(),"type".into(),"-G".into(),"encounters[0].name".into(),"-G".into(),"actor_palette[0].reference".into(),native_scenario.clone()],tmp.path(),"asset-native-readback",96).unwrap();
+            for filter in 0..4 {
+                let value=runner.run(&binary("invader-edit"),&["-t".into(),readback.to_string_lossy().into_owned(),"-G".into(),format!("player_starting_locations[0].type_{filter}"),native_scenario.clone()],tmp.path(),"player-start-readback",96).unwrap();
+                assert_eq!(value.trim(),"none","Solo starts must not retain inherited multiplayer filters");
+            }
+            let expected_actor=format!("{}.actor_variant",binding.native_path).replace('\\',"/");
+            let lines=fields.lines().map(str::trim).filter(|line|!line.is_empty()).collect::<Vec<_>>();assert_eq!(lines.len(),3);assert_eq!(lines[0],"singleplayer");assert_eq!(lines[1],"survivors");assert_eq!(lines[2].replace('\\',"/"),expected_actor);
+            assert_eq!(crate::native_asset_imports::source_hashes(&managed,&target).unwrap(),imports);assert_eq!(maps::hash_file(&map).unwrap(),before);assert_eq!(maps::hash_file(&ce_map).unwrap(),ce_before);assert_eq!(crate::project::resource_hashes(resources).unwrap(),resource_hashes);
+            let proof=serde_json::json!({"scope":"Real Xbox actor -> production CE source builder -> independent CE609 solo cache/readback; no game acceptance","sourceSha256":before,"ceBaseSha256":ce_before,"sourceCacheVersion":5,"outputCacheVersion":609,"importedFiles":imports.len(),"unmodifiedSdkSupportTags":source_support,"convertedModels":conversions,"cacheSha256":maps::hash_file(cache).unwrap(),"scenarioSha256":maps::hash_file(&readback.join(native_scenario.replace('\\',"/"))).unwrap(),"nativeActorReference":expected_actor,"toolIdentities":built.tool_identities,"originalMapResourcesAndImportsUnchanged":true,"gameplayVerified":false,"forerunnerLoaded":false});
+            fs::write(output.join("xbox-actor-proof.json"),serde_json::to_vec_pretty(&proof).unwrap()).unwrap();println!("{}",proof);return;
+        }
         let stage=tmp.path().join("tags");fs::create_dir(&stage).unwrap();assert_eq!(crate::native_asset_imports::stage(&managed,&target,&stage).unwrap(),imports);
         let event=|_|{};let runner=crate::build::Runner{id:"xbox-native-model-test",project:&target.id,cancel:&cancel,event:&event};
         let binary=|name:&str|tools_dir.join(format!("{name}{}",if cfg!(windows){".exe"}else{""}));

@@ -77,6 +77,20 @@ pub fn h1a_scene_roots(scenario_type:u16)->Result<Vec<&'static str>> {
         "ui/shell/bitmaps/team_icon_slayer.bitmap","ui/shell/bitmaps/team_background.bitmap"]);}
     Ok(roots)
 }
+/// Classic PC/CE cache builders load these roots outside the scenario closure.
+/// These are engine interface paths, not permission to substitute H1A content.
+pub fn ce_cache_roots(scenario_type:u16)->Result<Vec<&'static str>> {
+    let collection=match scenario_type {
+        0=>"ui/ui_tags_loaded_solo_scenario_type.tag_collection",
+        1=>"ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection",
+        2=>"ui/ui_tags_loaded_mainmenu_scenario_type.tag_collection",
+        _=>return invalid("Unsupported CE cache scenario type"),
+    };
+    Ok(vec!["ui/ui_tags_loaded_all_scenario_types.tag_collection",collection,
+        "sound/sfx/ui/cursor.sound","sound/sfx/ui/back.sound","sound/sfx/ui/flag_failure.sound",
+        "ui/shell/main_menu/mp_map_list.unicode_string_list","ui/shell/strings/loading.unicode_string_list",
+        "ui/shell/bitmaps/trouble_brewing.bitmap","ui/shell/bitmaps/background.bitmap"])
+}
 /// Read-only launch preflight, not game or semantic acceptance. Native builds
 /// recursively validate/hash the complete optional closure when it is available.
 pub fn h1a_scene_preflight(tags:&Path,scenario_type:u16)->Result<()> {
@@ -359,7 +373,7 @@ pub fn run_prepared_job(
                 let inspected=maps::inspect_map(output,None)?;
                 if !custom.models.is_empty(){custom.inspect_cache(&inspected,output)?;custom.verify_sources()?;}
                 if let Some(plan)=&round {crate::firefight::verify_native_round(plan,&inspected,output)?;}
-                crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
+                crate::quickforge::verify_player_starts_in_cache(document,&inspected,output)?;
                 crate::quickforge::verify_starting_profile(document,&inspected)?;
                 crate::quickforge::verify_campaign_encounters(document,&inspected)?;
                 crate::native_logic::verify_compiled(document,&inspected,output)?;
@@ -390,6 +404,9 @@ pub fn run_prepared_job(
             let dependency_tool_sha256=maps::hash_file(&dependency_tool)?;
             let (selected,model_class_bindings)=if let Some(expected)=prepared{validate_prepared_inventory(tags,&all,expected)?;(all.clone(),BTreeMap::new())}else{
                 let mut extra=crate::powerups::source_dependencies(project).into_iter().collect::<std::collections::BTreeSet<_>>();
+                if matches!(document.runtime_id,RuntimeId::HaloCustomEdition|RuntimeId::ChupathingyCe) {
+                    extra.extend(ce_cache_roots(quickforge::native_scenario_type(document))?.into_iter().map(str::to_owned));
+                }
                 if tools.hek_flavor.as_deref()==Some("h1aEk")&&h1a_scene_preflight(tags,quickforge::native_scenario_type(document)).is_ok() {
                     extra.extend(h1a_scene_roots(quickforge::native_scenario_type(document))?.into_iter().map(str::to_owned));
                 }
@@ -621,7 +638,7 @@ pub fn run_prepared_job(
             model_readback.push(serde_json::json!({"path":path,"referencedAsPcgBxModel":found.iter().any(|tag|tag.class=="mod2"),"scope":"Native class/path readback only; unused closure models may be omitted by the compiler"}));
         }
         if !converted_models.is_empty(){project::atomic_write(&workspace.join("xbox-model-readback.json"),&serde_json::to_vec_pretty(&model_readback)?,false)?;}
-        crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
+        crate::quickforge::verify_player_starts_in_cache(document,&inspected,&output)?;
         crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::quickforge::verify_campaign_encounters(document,&inspected)?;
         if let Some(markers)=crate::native_logic::verify_compiled(document,&inspected,&output)? {
@@ -805,6 +822,19 @@ mod tool_generation_tests {
         assert!(h1a_scene_roots(0).unwrap().contains(&"ui/ui_tags_loaded_solo_scenario_type.tag_collection"));
         assert!(h1a_scene_roots(2).unwrap().contains(&"ui/ui_tags_loaded_mainmenu_scenario_type.tag_collection"));
         assert!(h1a_scene_roots(7).is_err());
+    }
+    #[test]
+    fn ce_cache_dependencies_include_runtime_roots_for_the_actual_scenario_type() {
+        let solo=ce_cache_roots(0).unwrap();let multi=ce_cache_roots(1).unwrap();
+        assert!(solo.contains(&"ui/ui_tags_loaded_solo_scenario_type.tag_collection"));
+        assert!(!multi.contains(&"ui/ui_tags_loaded_solo_scenario_type.tag_collection"));
+        assert!(multi.contains(&"ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection"));
+        for roots in [solo,multi,ce_cache_roots(2).unwrap()] {
+            assert!(roots.contains(&"ui/ui_tags_loaded_all_scenario_types.tag_collection"));
+            assert!(roots.contains(&"sound/sfx/ui/flag_failure.sound"));
+            assert!(roots.contains(&"ui/shell/main_menu/mp_map_list.unicode_string_list"));
+        }
+        assert!(ce_cache_roots(9).is_err());
     }
     #[test]
     fn native_source_mode_and_scene_launcher_share_the_campaign_decision() {

@@ -503,7 +503,10 @@ impl Runner<'_> {
                                 std::io::copy(&mut reader, &mut std::io::sink()).ok();
                                 break;
                             }
-                            let line = String::from_utf8_lossy(&data).trim().to_string();
+                            // Native field listings use indentation as structure. Only remove
+                            // the stream delimiter; log presentation is trimmed separately.
+                            let line = String::from_utf8_lossy(&data)
+                                .trim_end_matches(['\r', '\n']).to_string();
                             if tx.send((err, line)).is_err() {
                                 break;
                             }
@@ -556,8 +559,9 @@ impl Runner<'_> {
                 if compile_errors.len() < 4 {
                     compile_errors.extend(native_compile_errors(&line));
                 }
-                if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!line.bytes().all(|b|b.is_ascii_digit())){
-                    self.emit(phase, line, progress, if err { "tool" } else { "info" });
+                let display = line.trim();
+                if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())){
+                    self.emit(phase, display, progress, if err { "tool" } else { "info" });
                 }
             }
             // Tool loops forever on EOF at this prompt. It is waiting for
@@ -620,7 +624,10 @@ impl Runner<'_> {
             if compile_errors.len() < 4 {
                 compile_errors.extend(native_compile_errors(&line));
             }
-            if phase!="bsp-detail"||err {self.emit(phase, line, progress, if err { "tool" } else { "info" });}
+            let display = line.trim();
+            if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())) {
+                self.emit(phase, display, progress, if err { "tool" } else { "info" });
+            }
         }
         result?;
         if let Some(budget)=&budget{budget.check()?;}
@@ -633,7 +640,7 @@ impl Runner<'_> {
         if !errors.is_empty() {
             return invalid(format!("Tag extraction was incomplete ({} errors), even though the tool returned exit code 0. Build stopped before compilation.\n{}\nProvide the source runtime's original resources or editing-kit tags. Stock MCC remastered assets are not recoverable from a map header alone.",errors.len(),errors.iter().take(4).cloned().collect::<Vec<_>>().join("\n")));
         }
-        Ok(output.trim().into())
+        Ok(output.trim_end_matches(['\r', '\n']).into())
     }
 }
 pub fn validate_existing_mcc(
@@ -1226,6 +1233,27 @@ mod tests {
         let errors = native_compile_errors("streaming tags...failed to load sound for adding to cache file.\nsuccessfully built cache file.");
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("failed to load sound"));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn runner_preserves_structured_stdout_and_trims_only_log_presentation() {
+        let dir = tempfile::tempdir().unwrap();
+        let cancel = AtomicBool::new(false);
+        let events = std::sync::Mutex::new(Vec::new());
+        let emit = |event: JobEvent| events.lock().unwrap().push(event.message);
+        let runner = Runner { id: "structured-output", project: "test", cancel: &cancel, event: &emit };
+        // The first line and nested rows deliberately begin with spaces. A
+        // field-list consumer must see identical structure after process I/O.
+        let expected = "  native fields  \nactor_palette[1] array\n    actor_palette[0] struct\n        reference tag  ";
+        let output = runner.run(Path::new("powershell.exe"), &[
+            "-NoProfile".into(), "-NonInteractive".into(), "-Command".into(),
+            "[Console]::Out.Write(\"  native fields  \r\nactor_palette[1] array\r\n    actor_palette[0] struct\r\n        reference tag  \"); [Console]::Error.WriteLine('  diagnostic  ')".into(),
+        ], dir.path(), "bsp-fields", 0).unwrap();
+        assert_eq!(output, expected);
+        let events = events.lock().unwrap();
+        assert!(events.iter().any(|line| line == "native fields"));
+        assert!(events.iter().any(|line| line == "diagnostic"));
+        assert!(events.iter().all(|line| line == line.trim()));
     }
     #[cfg(windows)]
     #[test]

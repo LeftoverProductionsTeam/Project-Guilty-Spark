@@ -205,6 +205,26 @@ fn mode_templates_provide_required_starts_and_objectives() {
 
 
 #[test]
+fn solo_source_starts_discard_multiplayer_filters_without_rewriting_the_document() {
+    let mut doc=arena();doc.spawns[0].game_modes=vec!["allGames".into(),"ctf".into()];
+    for mode in ["campaign","firefight","zombie","slayer"] {
+        doc.game_mode=mode.into();
+        let plan=quickforge::scenario_commands(&doc).unwrap();
+        for (index,spawn) in doc.spawns.iter().enumerate() {
+            for filter in 0..4 {
+                let field=format!("player_starting_locations[{index}].type_{filter}");
+                let value=plan.iter().find_map(|command|command.args.windows(3)
+                    .find(|args|args[0]=="-S"&&args[1]==field).map(|args|args[2].clone())).unwrap();
+                if mode!="slayer"{assert_eq!(value,"none");}
+                else if index==0&&filter==0{assert_eq!(value,"all_games");}
+                else if index==0&&filter==1{assert_eq!(value,"ctf");}
+            }
+            assert!(!spawn.game_modes.is_empty());
+        }
+        assert_eq!(doc.spawns[0].game_modes,["allGames","ctf"]);
+    }
+}
+#[test]
 fn compiled_player_starts_reject_extra_missing_changed_and_unreadable_coordinates() {
     use spark_core::maps::{Diagnostic,SceneObject};
     let mut doc=arena();doc.spawns[0].visible=false;
