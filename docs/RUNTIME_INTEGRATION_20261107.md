@@ -465,3 +465,35 @@ QA35395/run-2vK5WY: TypeScript;24focused forgeSession/studioClient/featureWorkfl
 Native groups: be_marines (1/2), be_covenant (1/2), be_flood (1/2), be_defense (1/2). One3521file/184203140B disposable SDK subset, source archive and staged publisher inputs rehashed unchanged; prior baseline map unchanged, owned short alias removed. Reproduce with existing test-firefight-native.mjs, SPARK_NATIVE_BLACK_ECHO_REVIEW=1 and SPARK_NATIVE_BLACK_ECHO_DIFFICULTY_REVIEW=1, a matching freshly built app and approved owned native QA output. Geometry/areas are seeded fixtures; no new world traversal proof. Native Normal/Insane fields are explicit; mapping to each engine difficulty and real actor spawning still require gameplay tests. Combat/rescue/branch failure, actual scoring/rewards, peer AI and Forerunner are not accepted. Objectives4/7 remain manual gs_complete callbacks until a real collection/extraction settlement exists. Save37944 did not recur and remains unresolved. No games/Forerunner/remotes touched. Full475/M1–M6 remain open.
 
 QA35395 finalized: output confirmed absent;2801381689logicalB disposed (allocated-file disposal unavailable). No archive/artifact export. Native report retains its existing informational warning: owner-installed HCEEK/legal tags are required and source export/structural validation is not game-loading or multiplayer proof. No compiler error in this run.
+
+
+## Authored campaign AI starting poses — 15 November 2026
+
+Source based on local master d50b6fa35c747498036a31ba830670665585aee7 plus this scoped patch. Reuses the existing campaign encounter append writer, Forge nodes/handles, source history, native review and compiler. Optional explicit per-start XYZ/facing preserve legacy grids when absent. Stable authoring IDs, visibility and locks stay editor metadata: hidden/locked points still compile. Per-group32/total128 limits, exact pose verification, recipe-owned Firefight restrictions and Source Guardian remain enforced. Count/spacing cannot silently replace custom poses; explicit reset/duplication/removal use Undo. Copy/Paste is same-map only until the destination owns the encounter and actor.
+
+Focused frontend30/30, Rust native_operations11/11 including installed-Invader original-start proof, TypeScript, browser1/1 and a source-frozen Windows build pass. Actual Windows QA46827/run-epWsfu followed Creator Studio → Campaign AI encounters → Individual starting locations → Select AI start in Level Editor; real X drag/E/Z-ring rotation, Undo/Redo, hide+lock second point, prepare mission, Save, full close/reopen, native MCC13 compile and independent Invader XYZ+facing readback pass. Three normal app closes, zero page errors. All four actor groups/eight starts and population1/2 remain. The first Marine start compiled at[-3.5,-2.375,0.1]/3.1415927408562556rad versus saved3.1415927rad; its second hidden/locked point[-3.625,-2.375,0.1]/0rad is retained. Native build duration79158ms; fixture geometry/areas were seeded, not new world creation/traversal. Baseline Firefight source/loadout/readback and stale-config refusal (no compiler, previous-good unchanged) pass.
+
+Earlier native attempts failed the Z-picker observation; live inspection proved correct camera/world transforms and real selectable ring points after rendering. Diagnostics sampled before the newly selected mode updated its matrices. Sampling now runs after rendering and uses triangle interiors; the unchanged real mouse-selection assertion passes. Initial browser failures used incorrect drawer routes, corrected to Inspector → Properties. One retry incorrectly accepted the old clean history head during immediate Workshop Save; its observer now requires a newer clean revision without delaying Ctrl+S. The focused fresh-revision Save-only run and complete native run pass. This does not explain or close intermittent Save37944. No validation or ownership assertion was weakened.
+
+Reused one3521-file/184203140B SDK subset across retries, exact rehash checked and source archive/publisher inputs unchanged. No full SDK regeneration, archive, original-map modification, Forerunner access or game launch. Native camera diagnostics were read-only; no synthetic transform satisfied the mouse test. Actual AI spawning/behavior, navigation, combat, co-op, CE/native game and human acceptance remain open. Technology/extraction objectives4/7 still use manual callbacks. Existing ambient-sound/compiler warnings remain; native success does not establish audio fidelity. Reproduce existing test-firefight-native.mjs with SPARK_NATIVE_BLACK_ECHO_REVIEW=1, SPARK_NATIVE_BLACK_ECHO_DIFFICULTY_REVIEW=1 and SPARK_NATIVE_BLACK_ECHO_START_REVIEW=1, matching app and owned output; prepared-input options reuse a live rehashed subset. Full475/M1–M6/Operation110 remain incomplete.
+
+| Identity | SHA256 / revision |
+|---|---|
+| sourceRevision | `d50b6fa35c747498036a31ba830670665585aee7` |
+| runtimeSourceSha256 | `d28bfb0aa62867d1fe705fcf4e60ded5e13d317bd8187c58438bb6c0be245869` |
+| appSha256 | `b2a06329aa193b7ac700372c06bd1cb2017e064701738ea07fa581b3c526747a` |
+| acceptanceSha256 | `5a57386879b407e3917ac2950788b80ca0af99e06b3823ce21acfd151c7511d0` |
+| nativeDriverSha256 | `92d05f10c98990675e1c70c178091364f93ee69b90a2f1b7a560cf769f9838fd` |
+| cacheSha256 | `890c901623a59a99d0f4aa1761a12351d13f563e2d2679314516cd93b61db530` |
+| scenarioSha256 | `a38734538906aee4d1f4dec3585769291b4a0cdc25a86b55a38f2a3497cf66c2` |
+| missionSourceSha256 | `26ebb156aac3f7f063a4b46026a5e68575569c11d3702f1c64722c728a818dd0` |
+| poseScreenshotSha256 | `44a5c42b883ada74a30dcde3d1f1ed0f29a0c4b060295a5070caa7f0b3b05d08` |
+| sdkManifestSha256 | `f91e5b3f0cf5d03a1be515b2c1b68567d19c8d34face4694241a5cdf7d4de58f` |
+| haloTool | `c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa` |
+| invaderDependency | `727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554` |
+| invaderEdit | `02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12` |
+| invaderInfo | `e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4` |
+| invaderScript | `a998bb84bb38bb71fb9d889c11babdfe142b9b2aa9ee33c6c37b0ef6b0ce0195` |
+| invaderString | `f384b5f4b1f02a6d4d7988765e6fd0f7948c28149c2de37de206f016e70ec934` |
+
+QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete temporary output disposed3,969,093,068 logical bytes; allocated-file disposal unavailable (not a physical-reclaimed claim). No SDK/map/binary/screenshot/archive retained. Originals and Git recovery unchanged.

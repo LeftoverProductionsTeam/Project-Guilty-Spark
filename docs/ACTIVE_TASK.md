@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — Black Echo population milestone; authored start poses next
-Status: implementation incomplete
+Task: Operation110 — authored campaign AI start poses and viewport workflow
+Status: awaiting human verification
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 1b4e024106d1cf6e7c066c41d7a7a1472d6e166a plus this campaign population batch scope; Windows appffce9a72/sourcef59158fd, exact hashes in RUNTIME_INTEGRATION_20261107.
-Next action: Complete individually authored campaign start poses and viewport placement through the existing append recipe; groups currently use a regular grid/facing0. Preserve original-start1b4e024, actor imports and mission source.37944/game/settlement4/7/Forerunner/475IDs/M1–M6 open.
+Latest verified revision: d50b6fa35c747498036a31ba830670665585aee7 plus the authored-pose source/native milestone in this checkpoint commit; exact frozen source/app/cache hashes in RUNTIME_INTEGRATION_20261107.
+Next action: Continue the next campaign creator gap through existing components. Authored/original AI pose UI/history/Save/restart/native readback milestones pass; AI gameplay/all-axis/CE/peers and Save37944 stay open. Black Echo settlement4/7 needs an actual supported consumer. No Forerunner access/game input/push;475IDs/M1–M6 active.
 
 ## Acceptance
 
@@ -25,7 +25,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Black Echo campaign population milestone: all/selected groups now have native normal/insane scale preview, authored-start caps and one Apply/Undo/Redo step. Focused24source tests,1complete browser flow, TypeScript and frozen Windows build pass. Actual Windows4groups/8starts, Apply normal×.5/Undo/Redo, mission prepare/Save/full restart/MCC13 compile/independent readback pass: all4normal1/insane2, source positions/actor references preserved. Reuses existing writer and source/mission/peer guards. Appffce9a72/sourcef59158fd; exact native hashes/scopes and earlier conditional-route/long-path fixes in RUNTIME_INTEGRATION_20261107. Gameplay/settlement4/7/37944 remain open.
+Authored campaign AI poses: optional per-start XYZ/facing now share form/viewport selection, W/E/F, source history, duplication/removal, locks and editor visibility; legacy grids/Firefight recipes preserved. Frontend30/Rust11/browser1/TypeScript/frozen Windows build pass. Actual Windows X/Z mouse drag, Undo/Redo, hide+lock second start, mission preparation, Save/full restart/MCC13 compile/independent8pose readback pass. QA46827 has3normal closes/0page errors; first Marine[-3.5,-2.375,.1]/3.1415927rad. Exact app/source/cache/scenario/SDK hashes and corrected rendered-picker/Save-observer failures in RUNTIME_INTEGRATION_20261107. Previous d50 population native1/2 milestone remains. No gameplay/Forerunner/settlement4/7/37944 acceptance.
 
 Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbox script proof remains in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git; no evidence or requirement removed.
 
@@ -43,9 +43,7 @@ Xbox source milestone: existing actor-source selection/import/history/Save and g
 
 Current checks18083/77190: Rust build10/native operations8/QuickForge9/tool generation15; explicit native coordinate1/cache1; frontend16 and TypeScript pass. Incorrect forge_build::tests filter selected0, not counted. Native cache23dc3274fe752a20317aac1617db7e16a819462b1d233ef7a8f85e933a69a350; extracted scenario3effcbce01bb94a2318072dc773662d33c41454bee0a07645994db600cb110dd. Cache37warnings (Xbox monochrome HUD formats/particles/lens flares), rendering/audio/AI/gameplay pending. Earlier19779/source-browser proof remains in existing evidence; no Windows UI acceptance added.
 
-Survivor-escort source milestone (15Nov): existing MissionBeat/native generator/Creator Studio now supports an escort condition with exact named Marine source group, destination volume and minimum survivors. Mission owns ai_place once, changes the group to native human team, follows closest players, and requires all remaining actors at the destination. It waits at most10sec for initial actors, then parks only the mission on below-minimum failure with a standard HUD objective message. Player arrival alone never counts rescue; world/timer/loot authority unchanged. Source preparation/backend reject missing groups/volumes, initially active or duplicate spawn owners and minima exceeding any authored native normal/insane population. Save/review preserve the optional minimum; existing manual drafts are not migrated. New Black Echo drafts use be_marines escort, while actual technology collection/extraction remain manual gs_complete_4/7 until real settlement exists.
-
-Final focused frontend22/22, Rust creative7/7, browser2172 1/1, TypeScript and offline HSC/ZIP/bindings pass. Installed Invader script smoke now covers escort+radio on CE/MCC/Xbox; all3targets compile3scripts/2globals and read names plus caption/failure HMT keys. Source922e1ba20e87cd6504af5ec4873f64c755e2f8afbf76fd770bc0331b72ca13b5; HMT3cd25420c4680532fd322039006d721980a94fc3a8d783c0d3d72544fd339da6. Exact native fixture hashes/limits are in UI_INTERACTION_AUDIT. The generated empty encounter only binds syntax and never proves Marine creation/navigation. Native cache/game/UI restart/co-op still unrun. All owned runs terminal/disposed; core25803 disposed375050708B; final browser2172 disposed24318648B; final native output428438B. Three existing viewport files remain separate.
+Earlier survivor-escort/native three-target script and source/browser evidence is retained in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git. Real Marine behavior/rescue, gameplay and settlement4/7 remain open; no acceptance is removed.
 
 Mission-radio source milestone (15Nov): Creator Studio objective Radio / sound cue uses existing native sound imports and window-owned SoundAudition, with start/completion, bounded delay, gain and native HUD-help caption. Async inclusion validates original map/hash and refuses changed mission/source; existing edit/history/Save own both cue and receipt. Native staging selects the exact required snd! closure, checks source/receipt hashes and refuses missing compiled sound; existing HMT writer/readback handles caption keys. No new audio engine/native writer/Forerunner format. One native cue per objective is shared/unpositioned, waits at most10min, engine sound class/permutation applies; custom WAV/loops remain separate rehearsal/source workflows.
 
@@ -78,7 +76,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-- Squad difficulty/start WIP: source implementation and focused automated checks now pass; full UI/native/game execution remains open. UI field limits/reset/default behavior, source Undo/Save/restart, optional-field peer conflicts, Firefight refusal, native staging/compile/readback and actual difficulty-driven actor spawning remain unrun. Runtime mappings across all difficulties, health/damage/tactics/player-count/dynamic-director scaling are not established. Starting-position/state/cinematic editing remains incomplete.
+- Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
 - Recovered campaign source WIP: draft persistence/history129ecbe and direct recovered-module selection5a06bf0 are source implemented, not executed. No tests/typecheck/builds/native tools/apps/games were run. Real menu/search/file selection, project/window Undo/Redo, Save/restart/recovery and stale-source/cancel/native failure paths need final authorized UI proof. Native revisions are not reversed by draft Undo. Existing encounter/squad/global/visual-cinematic structural editing remains incomplete. Follow actual controls through native compile/readback and gameplay; source wiring is not acceptance.
 
@@ -102,7 +100,9 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA35395/run-2vK5WY terminal PASS and confirmed absent:2801381689logicalB disposed; allocated-file disposal unavailable. One3521file/184203140B SDK. No owned app/compiler/browser/game or retained QA SDK/binary/map/profile/archive. Exact source/native proof in RUNTIME_INTEGRATION_20261107. Originals/475IDs/legacy recovery unchanged; no Forerunner/push.
+QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete temporary output disposed3,969,093,068 logical bytes; allocated-file disposal unavailable (not a physical-reclaimed claim). No SDK/map/binary/screenshot/archive retained. Originals and Git recovery unchanged.
+
+QA46827/run-epWsfu active; external bounded owned output, focused source/Rust/native app checks. Close owned children before disposal. Prior35395 terminal/disposed2801381689logicalB. No retained SDK/binary/map/profile/archive, games/Forerunner/push.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 
@@ -114,7 +114,7 @@ Current native proof: H1A source manual encounter append, exact Restore/reaccept
 
 Repairs: reuse native reader path canonicalization for writer; normalize inventory keys without changing tag receipts or one-file/hash safety; reuse existing validated forge_reuse compiled_tags contract for managed native baseline (parent tags/data/project rechecked, exact selected source ownership, changed corruption still blocks). Focused core1+6 pass; TypeScript/native build pass. Frontend runtime-preview/mapSession25 and native-start/mapSession17 suites pass (overlapping cases, not42unique). All475CSV SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 unchanged.
 
-Uncommitted authored viewport WIP: QuickForge reuses NativeAiStartOverlay, opens the source coordinate view from BSP Workshop, shares selection guards, F/Escape/frame/hide and numeric grid snap. Source compiled; actual original-campaign drag/history/Save/restart/native readback is unverified. Manual appended groups deliberately retain recipe protection and cannot serve as that fixture. Preserve these three UI source files separately; do not call their viewport workflow accepted.
+Historical original-viewport WIP is completed by the scoped original AI position/facing milestone above. Authored campaign pose milestone extends the existing source/viewport; original recipe protections remain. Neither establishes gameplay acceptance.
 
 New94e66e4b full prompt preserved exactly in Master Engineering Prompts/GS_2026-11-14_MegaWorld_Operations_Creator.txt. Reuse Creator Studio/Mission Director/Logic Events/audio/native source; original Operation Black Echo needs deployment→Marine rescue→Covenant facility→technology recovery→optional Flood emergency→extraction defense→survivor/equipment extraction with branches, rewards and radio/HUD cues. 6-player squads/128players/19regions and Forerunner runtime execution are separate unproven capabilities. No invented runtime importer or source tag extensions.
 

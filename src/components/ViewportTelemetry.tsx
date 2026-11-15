@@ -1,12 +1,12 @@
 import {addAfterEffect,useFrame,useThree} from '@react-three/fiber';
 import {useEffect,useRef} from 'react';
 import {Box3,Vector3} from 'three';
-import type {Object3D,BufferGeometry} from 'three';
-type GizmoControl=Object3D&{enabled:boolean;object?:Object3D;space:string;mode:string;axis?:string|null;dragging?:boolean;getHelper?:()=>Object3D;gizmo?:{picker?:Record<string,Object3D>}};
+import type {Object3D,BufferGeometry,Camera} from 'three';
+type GizmoControl=Object3D&{enabled:boolean;worldPosition?:Vector3;camera?:Camera;object?:Object3D;space:string;mode:string;axis?:string|null;dragging?:boolean;getHelper?:()=>Object3D;_gizmo?:{picker?:Record<string,Object3D>};gizmo?:{picker?:Record<string,Object3D>}};
 /** Read-only canvas diagnostics used to verify actual camera/render behavior. */
 export default function ViewportTelemetry(){
   const {gl,camera,controls,scene}=useThree();const previous=useRef('');
-  const box=useRef(new Box3()),point=useRef(new Vector3());
+  const box=useRef(new Box3()),point=useRef(new Vector3()),vertex=useRef(new Vector3());
   const sample=useRef({seconds:0,frames:0,gizmo:'',decals:''});
   const rendered=useRef<{fps:number;frameMs:number}|null>(null);
   useEffect(()=>addAfterEffect(()=>{
@@ -14,18 +14,10 @@ export default function ViewportTelemetry(){
     // GPU counters before gl.render describe the previous frame and can omit
     // the final resource upload when a demand-rendered viewport goes idle.
     gl.domElement.dataset.gsPerformance=JSON.stringify({...timing,drawCalls:gl.info.render.calls,triangles:gl.info.render.triangles,geometries:gl.info.memory.geometries,textures:gl.info.memory.textures,sampledAt:Date.now()});
-  }),[gl]);
-  useFrame((_,delta)=>{
-    const stats=sample.current;stats.seconds+=delta;stats.frames++;
-    rendered.current={fps:stats.seconds>0?stats.frames/stats.seconds:0,frameMs:stats.seconds*1000/stats.frames};
-    const target=(controls as unknown as {target?:Vector3}|null)?.target;
-    const state=JSON.stringify({position:camera.position.toArray().map(v=>+v.toFixed(5)),
-      quaternion:camera.quaternion.toArray().map(v=>+v.toFixed(5)),target:target?.toArray().map(v=>+v.toFixed(5)),
-      textures:gl.info.memory.textures});
-    if(state!==previous.current){gl.domElement.dataset.gsCamera=state;previous.current=state;}
-    // A demand-rendered scene may not draw again after its final upload. Sample
-    // its content on every rendered frame, never wait for a future idle frame.
-    stats.seconds=0;stats.frames=0;
+    sampleRenderedScene();
+  }),[gl,camera,scene]);
+  function sampleRenderedScene(){
+    const stats=sample.current;
     let decalState:{source:number;rendered:number;omitted:number}|undefined;
     let active:GizmoControl|undefined;
     scene.traverse(object=>{const root=object as Object3D&{isTransformControlsRoot?:boolean;isTransformControls?:boolean;controls?:GizmoControl};
@@ -35,22 +27,36 @@ export default function ViewportTelemetry(){
     const decals=decalState?JSON.stringify(decalState):'';
     if(decals!==stats.decals){if(decals)gl.domElement.dataset.gsDecals=decals;else delete gl.domElement.dataset.gsDecals;stats.decals=decals;}
     if(active){
-      const helper=active.gizmo?.picker?.[active.mode]??active.getHelper?.()??active,handles:Record<string,number[]>={},rotationHandles:Record<string,number[][]>={};
+      const helper=(active._gizmo??active.gizmo)?.picker?.[active.mode]??active.getHelper?.()??active,handles:Record<string,number[]>={},rotationHandles:Record<string,number[][]>={},pickerOrigins:Record<string,number[]>={};
       helper.updateWorldMatrix(true,true);
       helper.traverse(object=>{
         if(!['X','Y','Z'].includes(object.name)||handles[object.name])return;
         box.current.setFromObject(object);if(box.current.isEmpty())return;
+        pickerOrigins[object.name]=object.matrixWorld.elements.slice(12,15);
         const p=box.current.getCenter(point.current).project(camera);handles[object.name]=[p.x,p.y];
         if(active?.mode==='rotate'){
-          const positions=(object as Object3D&{geometry?:BufferGeometry}).geometry?.getAttribute('position');
-          if(positions){const samples:number[][]=[];for(let i=0;i<positions.count;i+=Math.max(1,Math.floor(positions.count/12))){
-            const position=point.current.fromBufferAttribute(positions,i).applyMatrix4(object.matrixWorld).project(camera);if(position.z>=-1&&position.z<=1)samples.push([position.x,position.y]);
+          const geometry=(object as Object3D&{geometry?:BufferGeometry}).geometry,positions=geometry?.getAttribute('position'),indices=geometry?.getIndex();
+          if(positions){const samples:number[][]=[],triangles=Math.floor((indices?.count??positions.count)/3);for(let i=0;i<triangles;i+=Math.max(1,Math.floor(triangles/12))){
+            point.current.set(0,0,0);for(let corner=0;corner<3;corner++){const index=indices?indices.getX(i*3+corner):i*3+corner;point.current.add(vertex.current.fromBufferAttribute(positions,index));}
+            const position=point.current.multiplyScalar(1/3).applyMatrix4(object.matrixWorld).project(camera);if(position.z>=-1&&position.z<=1)samples.push([position.x,position.y]);
           }rotationHandles[object.name]=samples;}
         }
       });
       const origin=active.object!.getWorldPosition(point.current).project(camera);
-      const value=JSON.stringify({space:active.space,mode:active.mode,axis:active.axis,dragging:active.dragging,objectPosition:active.object!.position.toArray(),objectRotation:active.object!.rotation.toArray().slice(0,3),rotationHandles,origin:[origin.x,origin.y],handles});
+      const value=JSON.stringify({controlWorldPosition:active.worldPosition?.toArray(),objectWorldOrigin:active.object!.matrixWorld.elements.slice(12,15),pickerOrigins,viewportCamera:camera.uuid,controlCamera:active.camera?.uuid,space:active.space,mode:active.mode,axis:active.axis,dragging:active.dragging,objectPosition:active.object!.position.toArray(),objectRotation:active.object!.rotation.toArray().slice(0,3),rotationHandles,origin:[origin.x,origin.y],handles});
       if(value!==stats.gizmo){gl.domElement.dataset.gsGizmo=value;stats.gizmo=value;}
     }else if(stats.gizmo){delete gl.domElement.dataset.gsGizmo;stats.gizmo='';}
+  }
+  useFrame((_,delta)=>{
+    const stats=sample.current;stats.seconds+=delta;stats.frames++;
+    rendered.current={fps:stats.seconds>0?stats.frames/stats.seconds:0,frameMs:stats.seconds*1000/stats.frames};
+    const target=(controls as unknown as {target?:Vector3}|null)?.target;
+    const state=JSON.stringify({position:camera.position.toArray().map(v=>+v.toFixed(5)),
+      quaternion:camera.quaternion.toArray().map(v=>+v.toFixed(5)),target:target?.toArray().map(v=>+v.toFixed(5)),
+      textures:gl.info.memory.textures});
+    if(state!==previous.current){gl.domElement.dataset.gsCamera=state;previous.current=state;}
+    // Demand rendering can stop here. The after-effect samples the actual
+    // rendered picker matrices, including a mode that became visible this frame.
+    stats.seconds=0;stats.frames=0;
   });return null;
 }

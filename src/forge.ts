@@ -1,3 +1,4 @@
+import {campaignEncounterStarts,campaignStartId} from './nativeOperations';
 import { pointInsideWorkshop } from './bspWorkshop';
 import type { BuildRecord, OpenProject, RuntimeId, Vec3 } from './types';
 import type { EditorEnvironment } from './environment';
@@ -137,7 +138,9 @@ export interface QuickForgeBuildReceipt {
   build: BuildRecord | null;
   toolIdentities: Record<string, string>;
 }
+export interface CampaignStartNode extends ForgeEntity {encounterName:string;startId:string;facing:number}
 export type ForgeNode =
+  | {type:'campaignStart';value:CampaignStartNode}
   | { type: 'trigger'; value: LogicTrigger }
   | { type: 'brush'; value: ForgeBrush }
   | { type: 'placement'; value: ForgePlacement }
@@ -186,6 +189,7 @@ export const brushNames: Record<BrushKind, string> = {
 };
 export function forgeNodes(doc: QuickForgeDocument): ForgeNode[] {
   return [
+    ...(doc.gameMode==='campaign'?(doc.campaignEncounters??[]).flatMap(entry=>campaignEncounterStarts(entry).map((point,index)=>({type:'campaignStart' as const,value:{id:campaignStartId(entry.name,point.id),name:entry.name+' / Start '+index,encounterName:entry.name,startId:point.id,position:point.position,facing:point.facingRadians,visible:point.visible!==false,locked:!!point.locked}}))):[]),
     ...doc.geometry.map((value) => ({ type: 'brush' as const, value })),
     ...doc.placements.map((value) => ({ type: 'placement' as const, value })),
     ...doc.spawns.map((value) => ({ type: 'spawn' as const, value })),
@@ -199,10 +203,11 @@ export function nodeRotation(node: ForgeNode): Vec3 {
 export function patchForgeNode(node: ForgeNode, patch: Partial<ForgeEntity> & { team?: number }): ForgeNode {
   // These fields are shared by all variants; team is excluded for geometry.
   const { team, ...common } = patch;
-  if (node.type === 'brush' || node.type==='trigger') return { ...node, value: { ...node.value, ...common } } as ForgeNode;
+  if (node.type === 'brush' || node.type==='trigger' || node.type==='campaignStart') return { ...node, value: { ...node.value, ...common } } as ForgeNode;
   return { ...node, value: { ...node.value, ...common, ...(team === undefined ? {} : { team }) } } as ForgeNode;
 }
 export function nodeCategory(node: ForgeNode): string {
+  if(node.type==='campaignStart')return 'Campaign AI starts';
   if(node.type==='trigger')return 'Trigger volumes';
   return node.type === 'brush'
     ? 'Geometry'
@@ -227,6 +232,14 @@ export function mapForgeNodes(
 ): QuickForgeDocument {
   return {
     ...doc,
+    ...(doc.gameMode==='campaign'&&doc.campaignEncounters?{campaignEncounters:doc.campaignEncounters.map(entry=>{
+      const old=campaignEncounterStarts(entry),starts=old.map((point,index)=>{
+        const node:ForgeNode={type:'campaignStart',value:{id:campaignStartId(entry.name,point.id),name:entry.name+' / Start '+index,encounterName:entry.name,startId:point.id,position:point.position,facing:point.facingRadians,visible:point.visible!==false,locked:!!point.locked}};
+        const revised=update(node);if(revised.type!=='campaignStart'||revised.value.encounterName!==entry.name||revised.value.startId!==point.id)throw Error('Campaign start ownership cannot be reassigned by a transform.');
+        const v=revised.value;if(v.position.every((value,i)=>value===point.position[i])&&v.facing===point.facingRadians&&v.visible===(point.visible!==false)&&v.locked===!!point.locked)return point;
+        return {...point,position:v.position,facingRadians:v.facing,visible:v.visible,locked:v.locked};
+      });return starts.some((point,index)=>point!==old[index])?{...entry,starts}:entry;
+    })}:{}),
     geometry: doc.geometry.map((value) => update({ type: 'brush', value }).value as ForgeBrush),
     placements: doc.placements.map((value) => update({ type: 'placement', value }).value as ForgePlacement),
     spawns: doc.spawns.map((value) => update({ type: 'spawn', value }).value as ForgeSpawn),
@@ -247,6 +260,7 @@ export function transformForgeNode(
     scale.some((n) => n <= 0)
   )
     throw new Error('Use finite transforms and positive dimensions within ±2048 world units.');
+  if(node.type==='campaignStart'&&(Math.abs(rotation[0])>1e-6||Math.abs(rotation[1])>1e-6||scale.some(value=>Math.abs(value-1)>1e-6)))throw Error('Campaign AI starts support XYZ position and Z facing only.');
   if (node.type === 'brush' || node.type==='trigger') {
     if (node.type === 'trigger' && (position.some(n => Math.abs(n) > 1500) || Math.abs(rotation[0]) > 0.00001 || Math.abs(rotation[1]) > 0.00001))
       throw new Error('Native trigger volumes support yaw rotation within ±1500 world units.');
@@ -256,6 +270,7 @@ export function transformForgeNode(
     return { ...node, value: { ...node.value, position, rotation, dimensions } } as ForgeNode;
   }
   if (node.type === 'placement') return { ...node, value: { ...node.value, position, rotation } };
+  if(node.type==='campaignStart')return {...node,value:{...node.value,position,facing:Math.atan2(Math.sin(rotation[2]),Math.cos(rotation[2]))}};
   if (node.type === 'spawn') return { ...node, value: { ...node.value, position, facing: rotation[2] } };
   return { ...node, value: { ...node.value, position, facing: rotation[2] } };
 }
@@ -264,6 +279,12 @@ export function removeForgeNodes(doc: QuickForgeDocument, ids: string[]): QuickF
   const removed=new Set(forgeNodes(doc).filter(n=>!keep(n.value)).map(n=>n.value.id));
   return {
     ...doc,
+    ...(doc.gameMode==='campaign'&&doc.campaignEncounters?{campaignEncounters:doc.campaignEncounters.map(entry=>{
+      const old=campaignEncounterStarts(entry),starts=old.filter(point=>point.locked||!ids.includes(campaignStartId(entry.name,point.id)));
+      if(starts.length===old.length)return entry;
+      if(!starts.length||entry.difficulty&&[entry.difficulty.normal,entry.difficulty.insane].some(count=>count>starts.length))throw Error('Keep at least one campaign start and enough for both difficulty populations. Lower overrides first, or Remove encounter in Creator Studio.');
+      return {...entry,starts,count:starts.length};
+    })}:{}),
     geometry: doc.geometry.filter(keep),
     placements: doc.placements.filter(keep),
     spawns: doc.spawns.filter(keep),
@@ -283,6 +304,12 @@ export function appendForgeNodes(doc:QuickForgeDocument,nodes:ForgeNode[],offset
   const result = structuredClone(doc),
     created: string[] = [];
   for (const node of nodes.filter(n=>!n.value.locked)) {
+    if(node.type==='campaignStart'){
+      const group=result.campaignEncounters?.find(entry=>entry.name===node.value.encounterName);if(!group||result.gameMode!=='campaign')throw Error('Include this encounter and its actor in the destination campaign first.');
+      const starts=campaignEncounterStarts(group);if(starts.length>=32||(result.campaignEncounters??[]).reduce((sum,entry)=>sum+(entry.count??1),0)>=128)throw Error('Campaign start capacity reached (32 per group,128 total).');
+      const position=node.value.position.map((value,i)=>value+offset[i]) as Vec3;transformForgeNode(node,position,nodeRotation(node));
+      const id=crypto.randomUUID();group.starts=[...starts,{id,position,facingRadians:node.value.facing,visible:node.value.visible,locked:false}];group.count=group.starts.length;created.push(campaignStartId(group.name,id));continue;
+    }
     const copy = structuredClone(node);
     copy.value.id = crypto.randomUUID();
     copy.value.name = `${copy.value.name || nodeCategory(node)} copy`;

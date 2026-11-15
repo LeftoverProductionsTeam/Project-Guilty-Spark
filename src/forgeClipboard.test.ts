@@ -254,3 +254,10 @@ it('refuses corrupt transforms and foreign material paths rather than substituti
   storage.set('guilty-spark:forge-clipboard-v1', JSON.stringify(raw));
   expect(readForgeSelection()).toBeNull();
 });
+
+it('duplicates campaign starts within the same source group and refuses silent cross-map actor ownership',async()=>{
+ const original=project();original.quickForge!.gameMode='campaign';original.quickForge!.campaignEncounters=[{name:'guards',actorPath:'characters/grunt',position:[0,0,0],startActive:false,count:1}];
+ const start=forgeNodes(original.quickForge!).find(node=>node.type==='campaignStart')!;expect(copyForgeSelection(original,[start.value.id])).toBe(1);const clip=readForgeSelection()!;
+ const prepared=await prepareForgePaste(original,clip);const next=applyForgePaste(original,prepared);expect(next.project.quickForge!.campaignEncounters![0].starts).toHaveLength(2);
+ await expect(prepareForgePaste({...original,id:'different-map'},clip)).rejects.toThrow(/belong to their source encounter/);expect(original.quickForge!.campaignEncounters![0].starts).toBeUndefined();
+});

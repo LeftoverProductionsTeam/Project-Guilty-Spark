@@ -177,10 +177,15 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       .flatMap(binding=>doc!.placements.filter(placement=>placement.id===binding.placementId&&placement.tagClass==='ctrl')):
       doc?.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
     if(!onLevelEditor||area.length!==1){setError('Select one existing named source area or native control before opening the Level Editor.');return;}
+    selectSourceObject(area[0].id);
+  }
+  function selectSourceObject(id:string){
+    if(!onLevelEditor)return;
     const actor=readMapSession<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,null);
     if(actor?.active)writeMapSession(project.id,NATIVE_AI_START_VIEW,{...actor,active:false});
-    writeMapSession(project.id,'forge.selection',[area[0].id]);writeMapSession(project.id,'forge.zone',null);
+    writeMapSession(project.id,'forge.selection',[id]);writeMapSession(project.id,'forge.zone',null);
     writeMapSession(project.id,'forge.sourceSurface',null);writeMapSession(project.id,'forge.workshopSelection',null);
+    writeMapSession(project.id,'forge.mode','translate');writeMapSession(project.id,'forge.frame',readMapSession<number>(project.id,'forge.frame',0)+1);
     writeMapSession(project.id,'forge.bspWorkshop',false);writeMapSession(project.id,'forge.cameraMode','orbit');onLevelEditor();
   }
   function updateBeat(id: string, patch: Partial<MissionBeat>) {
@@ -311,7 +316,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           accepted checkpoint restoration and native level progression require separate game acceptance.</p>
         <MissionSourceReview project={project} edit={edit} onActivation={setMissionActivation} onCinematic={enabled=>setNextCinematic(enabled?'enabled':'disabled')} exportLocal={report}/>
       </details>
-      <CampaignEncounters project={project} edit={edit}/>
+      <CampaignEncounters project={project} edit={edit} onSelectStart={onLevelEditor?selectSourceObject:undefined}/>
       <datalist id={encounterChoices}>{[...new Set([
         ...(project.quickForge?.gameMode==='campaign'?project.quickForge.campaignEncounters??[]:[]).map(entry=>entry.name),
         ...(sourceInspection?.encounters??[]).map(entry=>entry.name),

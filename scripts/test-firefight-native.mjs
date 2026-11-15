@@ -11,11 +11,14 @@ import {chromium,expect as assertion} from '@playwright/test';
 import {chooseTool,openStudioMenu,openDrawer,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 import {assertQaOutputPath,withDevelopmentWorkspace,waitForQaExit,stopQaProcess} from './native-qa-storage.mjs';
 import {nativeStandaloneBaseline} from './native-standalone-baseline.mjs';
+import {campaignEncounterStarts} from '../src/nativeOperations.ts';
 import {sameCinematicData} from '../src/haloScript.ts';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
 const blackEchoReview=process.env.SPARK_NATIVE_BLACK_ECHO_REVIEW==='1',marineTag='characters/marine_armored/marine_armored assault rifle',floodTag='characters/floodcombat_human/floodcombat_human assault rifle';
+const blackEchoStartReview=process.env.SPARK_NATIVE_BLACK_ECHO_START_REVIEW==='1';
+if(blackEchoStartReview&&!blackEchoReview)throw Error('Native authored poses require the Black Echo workflow');
 const blackEchoDifficultyReview=process.env.SPARK_NATIVE_BLACK_ECHO_DIFFICULTY_REVIEW==='1';
 if(blackEchoDifficultyReview&&!blackEchoReview)throw Error('Native campaign population review requires the Black Echo workflow');
 const blackEchoIntroReview=process.env.SPARK_NATIVE_BLACK_ECHO_INTRO_REVIEW==='1';
@@ -59,12 +62,13 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    }
    async function close(){
     await page.getByRole('button',{name:'Close window',exact:true}).click();
+    const saveChanges=page.getByRole('button',{name:'Save changes',exact:true});await expect.poll(async()=>child.exitCode!==null||child.signalCode!==null?'exited':await saveChanges.isVisible().catch(()=>false)?'save':'waiting').not.toBe('waiting');if(child.exitCode===null&&child.signalCode===null&&await saveChanges.isVisible())await saveChanges.click();
     await waitForQaExit(child);expect(child.exitCode).toBe(0);await browser.close();browser=null;child=null;report.normalRestarts++;
    }
    const state=async id=>{const status=await call('read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(snapshot=>snapshot.key===status.history.head.current)?.project};};
-   const save=async id=>{
+   const save=async (id,afterRevision)=>{
     await page.evaluate(()=>{window.__sparkSaveFrame={ran:false};requestAnimationFrame(()=>{window.__sparkSaveFrame.ran=true;});});
-    try{await page.keyboard.press('Control+s');await expect.poll(async()=>(await state(id)).history?.head.dirty).toBe(false);}
+    try{await page.keyboard.press('Control+s');await expect.poll(async()=>{const head=(await state(id)).history?.head;return !!head&&!head.dirty&&(afterRevision===undefined||head.current!==afterRevision);}).toBe(true);}
     catch(error){
      const current=await state(id),stored=await call('open_project',{id});
      report.saveFailure={projectId:id,head:current.history?.head,history:current.project?.history?.slice(-5),currentMaterials:current.project?.quickForge?.materials,storedMaterials:stored.project?.quickForge?.materials,
@@ -73,6 +77,14 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     }
    };
    const open=async title=>{await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();};
+   async function dragYawRing(canvas){
+    await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).mode)).toBe('rotate');
+    const ring=await canvas.evaluate(element=>{const r=element.getBoundingClientRect(),g=JSON.parse(element.dataset.gsGizmo);return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},points:g.rotationHandles.Z,origin:g.origin,gizmo:g};});
+    expect(ring.points?.length).toBeGreaterThan(2);let selected;const trials=[];
+    for(const point of ring.points){const x=ring.rect.x+(point[0]+1)*ring.rect.width/2,y=ring.rect.y+(1-point[1])*ring.rect.height/2;if(x<ring.rect.x||y<ring.rect.y||x>ring.rect.x+ring.rect.width||y>ring.rect.y+ring.rect.height)continue;await page.mouse.move(x,y);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const axis=await canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).axis);trials.push({x,y,axis});if(axis==='Z'){selected={x,y};break;}}
+    (report.gizmoPicking??=[]).push({ring,trials});expect(selected,'the actual projected Z rotation picker must be selectable').toBeTruthy();await page.mouse.down();const cx=ring.rect.x+(ring.origin[0]+1)*ring.rect.width/2,cy=ring.rect.y+(1-ring.origin[1])*ring.rect.height/2,dx=selected.x-cx,dy=selected.y-cy;
+    for(let step=1;step<=12;step++){const angle=step*Math.PI/36;await page.mouse.move(cx+dx*Math.cos(angle)-dy*Math.sin(angle),cy+dx*Math.sin(angle)+dy*Math.cos(angle));}await page.mouse.up();
+   }
    async function compileAiStart(fork,record,scenario,map,parent,proposal,acceptedHash,squad,point){
     const beforeBuilds=(await call('open_project',{id:fork.id})).project.builds.map(row=>row.id);
     await openStudioMenu(page);const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('mccSteam');await page.keyboard.press('Escape');
@@ -112,7 +124,8 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const created=await call('create_quickforge_project',{title:'Native solo Firefight fixture',template:'customBlank',target:'mccSteam'});
    await page.reload();await open(created.project.title);
    await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();
-   await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();await save(created.project.id);
+   const beforeWorkshop=(await state(created.project.id)).history.head.current;
+   await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();await save(created.project.id,beforeWorkshop);
    const p=(await state(created.project.id)).project;
    expect(p.quickForge.workshop.brushes).toHaveLength(4);
    report.immediateWorkshopSave={realUi:true,brushes:p.quickForge.workshop.brushes.length,dirty:(await state(created.project.id)).history.head.dirty};
@@ -237,13 +250,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     record.stage='drag native X handle';await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx/length*55,y+dy/length*55,{steps:12});await page.mouse.up();
     if(aiFacingReview){
      expect(Number.isFinite(point.facingRadians)).toBe(true);record.beforeFacingRadians=point.facingRadians;record.stage='rotate native Z facing handle';
-     await page.keyboard.press('e');await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).mode)).toBe('rotate');
-     const ring=await canvas.evaluate(element=>{const r=element.getBoundingClientRect(),g=JSON.parse(element.dataset.gsGizmo);return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},points:g.rotationHandles.Z,origin:g.origin};});
-     expect(ring.points?.length).toBeGreaterThan(2);let selected;
-     for(const candidate of ring.points){const x=ring.rect.x+(candidate[0]+1)*ring.rect.width/2,y=ring.rect.y+(1-candidate[1])*ring.rect.height/2;if(x<ring.rect.x||y<ring.rect.y||x>ring.rect.x+ring.rect.width||y>ring.rect.y+ring.rect.height)continue;await page.mouse.move(x,y);if(await canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).axis)==='Z'){selected={x,y};break;}}
-     expect(selected,'an actual projected native Z rotation picker must be selectable').toBeTruthy();await page.mouse.down();
-     const cx=ring.rect.x+(ring.origin[0]+1)*ring.rect.width/2,cy=ring.rect.y+(1-ring.origin[1])*ring.rect.height/2,dx=selected.x-cx,dy=selected.y-cy;
-     for(let step=1;step<=12;step++){const angle=step*Math.PI/36;await page.mouse.move(cx+dx*Math.cos(angle)-dy*Math.sin(angle),cy+dx*Math.sin(angle)+dy*Math.cos(angle));}await page.mouse.up();record.mouseRotation=true;
+     await page.keyboard.press('e');await dragYawRing(canvas);record.mouseRotation=true;
     }
     expect((await context()).tagSha256).toBe(baseline.tagSha256);
     await page.screenshot({path:path.join(output,'ai-start-dragged.png')});await page.getByRole('button',{name:'Review AI start source',exact:true}).click();
@@ -286,6 +293,21 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      const counts=async()=>(await state(campaignId)).project.quickForge.campaignEncounters.map(entry=>entry.difficulty?.normal??entry.count);
      await expect.poll(counts).toEqual([1,1,1,1]);await page.keyboard.press('Control+z');await expect.poll(counts).toEqual([2,2,2,2]);await page.keyboard.press('Control+y');await expect.poll(counts).toEqual([1,1,1,1]);record.populationUndoRedo=true;
     }
+    if(blackEchoStartReview){
+     record.stage='author individual start source';await ai.getByRole('combobox',{name:'Campaign encounter',exact:true}).selectOption('be_marines');const poses=ai.locator('.campaign-start-poses');await poses.locator('summary').click();
+     const input=poses.getByRole('spinbutton',{name:'Campaign start X',exact:true});await input.fill('-4.5');await input.press('Tab');const facing=poses.getByRole('spinbutton',{name:'Campaign start facing degrees',exact:true});await facing.fill('90');await facing.press('Tab');
+     const current=async()=>campaignEncounterStarts((await state(campaignId)).project.quickForge.campaignEncounters.find(entry=>entry.name==='be_marines'));
+     await expect.poll(async()=>(await current())[0].position[0]).toBe(-4.5);await poses.getByRole('button',{name:'Select AI start in Level Editor',exact:true}).click();
+     const canvas=page.locator('canvas[data-gs-gizmo]');await expect(canvas).toHaveCount(1);await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).mode)).toBe('translate');
+     const geometry=await canvas.evaluate(element=>{const r=element.getBoundingClientRect();return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},gizmo:JSON.parse(element.dataset.gsGizmo)};});const handle=geometry.gizmo.handles.X,origin=geometry.gizmo.origin;expect(handle).toBeTruthy();
+     const x=geometry.rect.x+(handle[0]+1)*geometry.rect.width/2,y=geometry.rect.y+(1-handle[1])*geometry.rect.height/2,dx=(handle[0]-origin[0])*geometry.rect.width/2,dy=-(handle[1]-origin[1])*geometry.rect.height/2,length=Math.hypot(dx,dy);expect(length).toBeGreaterThan(1);
+     record.stage='drag authored start X and Z yaw';await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx/length*55,y+dy/length*55,{steps:12});await page.mouse.up();await expect.poll(async()=>(await current())[0].position[0]).not.toBe(-4.5);
+     const moved=await current();await page.keyboard.press('e');await dragYawRing(canvas);await expect.poll(async()=>Math.abs((await current())[0].facingRadians-Math.PI/2)).toBeGreaterThan(.01);const rotated=await current();
+     await page.keyboard.press('Control+z');await expect.poll(async()=>(await current())[0].facingRadians).toBeCloseTo(moved[0].facingRadians,6);await page.keyboard.press('Control+y');await expect.poll(async()=>(await current())[0].facingRadians).toBeCloseTo(rotated[0].facingRadians,6);
+     await page.screenshot({path:path.join(output,'black-echo-ai-poses.png')});await chooseTool(page,'Creator Studio');if(!await poses.isVisible())await ai.locator(':scope > summary').click();if(!await facing.isVisible())await poses.locator('summary').click();
+     await poses.getByRole('combobox',{name:'Campaign starting location',exact:true}).selectOption('grid-1');await poses.getByRole('checkbox',{name:'Show start marker (editor only)',exact:true}).uncheck();await poses.getByRole('checkbox',{name:'Lock start editing',exact:true}).check();await expect(input).toBeDisabled();await expect(poses.getByRole('button',{name:'Reset AI starts to grid',exact:true})).toBeDisabled();
+     record.authoredStartPoses={realMouseTranslation:true,realMouseRotation:true,poseUndoRedo:true,hiddenLockedStartRetained:true,sourcePoses:await current()};
+    }
     const rows=page.locator('.studio-record');await rows.nth(1).getByRole('combobox',{name:'On rescue failure 2',exact:true}).selectOption('continue');
     record.stage='author conditional routes';
     for(const index of [2,3,4,5,6]){const row=rows.nth(index);if(index!==4)await row.getByRole('checkbox',{name:/^Optional step/}).check();await row.getByRole('combobox',{name:'Mission condition source '+(index+1),exact:true}).selectOption(index===4?'both':'result');}
@@ -322,7 +344,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      await save(campaignId);
     }
     const frozen=(await state(campaignId)).project;expect(frozen.studio.missions).toHaveLength(8);expect(frozen.studio.missions[4].conditionVolume).toBe('be_containment');expect(frozen.studio.missions[4].conditionResult.failed).toBe(false);
-    await page.screenshot({path:path.join(output,'black-echo-prepared.png')});await close();await start();await chooseTool(page,'Map library');await open(seed.title);expect((await state(campaignId)).project.studio).toEqual(frozen.studio);await expect.poll(mission).toBe(prepared);
+    await page.screenshot({path:path.join(output,'black-echo-prepared.png')});await close();await start();await chooseTool(page,'Map library');await open(seed.title);expect((await state(campaignId)).project.studio).toEqual(frozen.studio);if(blackEchoStartReview)expect((await state(campaignId)).project.quickForge.campaignEncounters).toEqual(frozen.quickForge.campaignEncounters);await expect.poll(mission).toBe(prepared);
     if(blackEchoStoryReview){await chooseTool(page,'Creator Studio');await page.getByRole('tab',{name:'Mission director',exact:true}).click();const currentReview=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Native mission build$/})});const intro=currentReview.getByRole('checkbox',{name:'Play saved camera shots as the mission intro',exact:true});if(!await intro.isVisible())await currentReview.locator(':scope > summary').click();if(blackEchoIntroReview)await expect(intro).toBeChecked();else await expect(intro).not.toBeChecked();if(blackEchoSceneReview){const reopened=(await state(campaignId)).project;expect(reopened.studio.missions[1].cinematicCue.phase).toBe('complete');expect(reopened.studio.missions[4].cinematicCue.phase).toBe('start');}}
     if(blackEchoCameraReview&&!blackEchoStoryReview){await chooseTool(page,'Machinima');await openDrawer(page,'In-game recording');await expect(page.getByRole('checkbox',{name:'Include native engine camera controls in the next MCC build',exact:true})).toBeChecked();await expect(page.getByRole('combobox',{name:'Engine playback',exact:true})).toHaveValue('sequence');}
     record.stage='native compile';await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Build & check playtest',exact:true}).click();
@@ -333,7 +355,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     for(const [index,[name,actor]] of actors.entries()){
      const prefix='encounters['+index+'].squads[0]';expect(await read('encounters['+index+'].name')).toBe(name);expect(Number(await read(prefix+'.normal_diff_count'))).toBe(blackEchoDifficultyReview?1:2);expect(Number(await read(prefix+'.insane_diff_count'))).toBe(2);
      const actorIndex=Number(await read(prefix+'.actor_type'));expect((await read('actor_palette['+actorIndex+'].reference')).replaceAll('\\','/')).toBe(actor+'.actor_variant');
-     const positions=await read(prefix+'.starting_locations[*].position');expect(positions).toBe(await read(prefix+'.starting_locations[*].position',path.join(build.sources.directory,'tags')));groups.push({name,actor,positions,normalCount:Number(await read(prefix+'.normal_diff_count')),insaneCount:Number(await read(prefix+'.insane_diff_count'))});
+     const positions=await read(prefix+'.starting_locations[*].position');expect(positions).toBe(await read(prefix+'.starting_locations[*].position',path.join(build.sources.directory,'tags')));const expectedPoses=campaignEncounterStarts(frozen.quickForge.campaignEncounters[index]),compiledPoses=[];for(const [start,expected]of expectedPoses.entries()){const point=prefix+'.starting_locations['+start+']';const position=(await read(point+'.position')).split(',').map(Number),degrees=Number(await read(point+'.facing')),radians=degrees*Math.PI/180;expected.position.forEach((value,axis)=>expect(position[axis]).toBeCloseTo(value,4));expect(Math.abs(Math.atan2(Math.sin(radians-expected.facingRadians),Math.cos(radians-expected.facingRadians)))).toBeLessThan(.000002);compiledPoses.push({position,facingRadians:radians});}groups.push({name,actor,positions,compiledPoses,normalCount:Number(await read(prefix+'.normal_diff_count')),insaneCount:Number(await read(prefix+'.insane_diff_count'))});
     }
     const globals=(await read('globals[*].name')).split(/\r?\n/),scripts=(await read('scripts[*].name')).split(/\r?\n/);for(const name of ['gs_result_2_done','gs_result_2_failed','gs_branch_1_ready','gs_branch_1_inside'])expect(globals).toContain(name);for(const name of ['gs_mission','gs_mission_bootstrap','gs_complete_4','gs_complete_7'])expect(scripts).toContain(name);
     const hud=(await read('hud_messages')).replaceAll('\\','/');await run(path.join(invader,'invader-extract.exe'),['-s',hud,'-t',folder,map]);const names=(await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G','messages[*].name',hud])).stdout.trim().split(/\r?\n/);for(const name of ['gs_mission_fail_2',...Array.from({length:8},(_,i)=>'gs_mission_obj_'+(i+1))])expect(names).toContain(name);

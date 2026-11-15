@@ -1,3 +1,5 @@
+import {forgeNodes,mapForgeNodes,transformForgeNode,duplicateForgeNodes,removeForgeNodes} from './forge';
+import {campaignEncounterStarts} from './nativeOperations';
 import {scaleCampaignDifficulty} from './nativeOperations';
 import {describe,it,expect} from 'vitest';
 import {mergeForge,portableForge,localForge} from './forgeSession';
@@ -146,4 +148,20 @@ it('scales campaign native population as one immutable source/history and confli
  for(const bad of [NaN,Infinity,-1,4.01])expect(()=>scaleCampaignDifficulty(before.campaignEncounters,bad,1)).toThrow();
  expect(()=>scaleCampaignDifficulty(before.campaignEncounters,1,1,'missing')).toThrow();expect(()=>scaleCampaignDifficulty([],1,1)).toThrow();
  expect(()=>scaleCampaignDifficulty([{...before.campaignEncounters[0],difficulty:{normal:5,insane:4}}],1,1)).toThrow();
+});
+
+it('campaign start source shares normal selection transforms, history, identity, hiding and native counts',()=>{
+ const doc:QuickForgeDocument={...structuredClone(base),gameMode:'campaign',campaignEncounters:[{name:'guards',actorPath:'characters/grunt',position:[4,3,.1],startActive:false,count:2,spacing:.75}]};
+ const old=JSON.stringify(doc),nodes=forgeNodes(doc).filter(node=>node.type==='campaignStart');expect(nodes).toHaveLength(2);expect(nodes[0].value.position).toEqual([3.625,2.625,Math.fround(.1)]);
+ const moved=mapForgeNodes(doc,node=>node.value.id===nodes[0].value.id?transformForgeNode(node,[5,4,.1],[0,0,Math.PI/2]):node);
+ expect(JSON.stringify(doc)).toBe(old);expect(moved.campaignEncounters![0].starts![0]).toMatchObject({id:'grid-0',position:[5,4,.1],facingRadians:Math.PI/2});expect(campaignEncounterStarts(moved.campaignEncounters![0])[1]).toEqual(campaignEncounterStarts(doc.campaignEncounters![0])[1]);
+ expect(forgeNodes(moved).find(node=>node.value.id===nodes[0].value.id)?.value.position).toEqual([5,4,.1]);
+ const hidden=mapForgeNodes(moved,node=>node.value.id===nodes[1].value.id?{...node,value:{...node.value,visible:false,locked:true}} as typeof node:node);expect(hidden.campaignEncounters![0].count).toBe(2);expect(campaignEncounterStarts(hidden.campaignEncounters![0])).toHaveLength(2);
+ expect(removeForgeNodes(hidden,[nodes[1].value.id]).campaignEncounters).toEqual(hidden.campaignEncounters);
+ for(const [rotation,scale]of [[[1,0,0],[1,1,1]],[[0,0,0],[2,1,1]]] as [[number,number,number],[number,number,number]][])expect(()=>transformForgeNode(nodes[0],[0,0,0],rotation,scale)).toThrow(/XYZ position and Z/);
+ const copied=duplicateForgeNodes(moved,[nodes[0].value.id]);expect(copied.document.campaignEncounters![0].starts).toHaveLength(3);expect(copied.ids[0]).not.toBe(nodes[0].value.id);expect(copied.document.campaignEncounters![0].starts![2].position).toEqual([6,5,.1]);
+ const removed=removeForgeNodes(copied.document,copied.ids);expect(removed.campaignEncounters![0].starts).toEqual(moved.campaignEncounters![0].starts);
+ expect(()=>removeForgeNodes(moved,nodes.map(node=>node.value.id))).toThrow(/at least one/);
+ const bound={...moved,campaignEncounters:[{...moved.campaignEncounters![0],difficulty:{normal:2,insane:2}}]};expect(()=>removeForgeNodes(bound,[nodes[0].value.id])).toThrow(/Lower overrides/);
+ let history=historyReducer(initialHistory,{type:'load',project:project(doc)});history=historyReducer(history,{type:'edit',project:project(moved),description:'Move authored AI start'});history=historyReducer(history,{type:'undo'});expect(history.current?.quickForge?.campaignEncounters?.[0].starts).toBeUndefined();history=historyReducer(history,{type:'redo'});expect(history.current?.quickForge?.campaignEncounters).toEqual(moved.campaignEncounters);
 });

@@ -220,7 +220,7 @@ function NodeVisual({
       </mesh>
     );
   }
-  if(greenScreen&&(node.type==='trigger'||node.type==='objective'))return null;
+  if(greenScreen&&(node.type==='trigger'||node.type==='objective'||node.type==='campaignStart'))return null;
   if(node.type==='trigger')return <mesh>
     <boxGeometry args={node.value.dimensions}/>
     <meshBasicMaterial color={selected?'#b3ffe5':'#5dd0a7'} transparent opacity={selected?0.12:0.04} depthWrite={false}/>
@@ -228,6 +228,7 @@ function NodeVisual({
     {selected&&<ViewportLabel position={[0,0,node.value.dimensions[2]/2+0.2]} text={node.value.name}/>}
   </mesh>;
   if(node.type==='placement'||node.type==='spawn')return ownedModel?<Mesh greenScreen={greenScreen&&!isChromaSubject(node.type==='placement'?node.value.tagClass:'bipd','')} data={ownedModel.mesh} shaderTextures={ownedModel.shaderTextures} shaderMetadata={ownedModel.shaderMetadata} extraTextures={ownedModel.extraTextures} wireframe={wireframe}/>:null;
+  if(node.type==='campaignStart')return <group><mesh position={[0,0,.15]}><sphereGeometry args={[.13,10,6]}/><meshBasicMaterial color={selected?'#c2fff0':'#70cdb9'}/></mesh><mesh position={[.4,0,.15]} rotation={[0,0,-Math.PI/2]}><coneGeometry args={[.08,.25,6]}/><meshBasicMaterial color="#70cdb9"/></mesh>{selected&&<ViewportLabel position={[0,0,.65]} text={node.value.name+' · authored AI start'}/>}</group>;
   const spawn = false, objective = node.type === 'objective';
   const color = error
     ? '#ff9d8d'
@@ -319,16 +320,18 @@ function NetgameRoutes({objectives}:{objectives:QuickForgeDocument['objectives']
     </group>)}
   </group>;
 }
-function CameraFrame({ document, frame, mode, diagnosticBounds }: { document: QuickForgeDocument; frame: number; mode: ForgeCamera; diagnosticBounds?: WrlDiagnostics['bounds'] | null }) {
+function CameraFrame({ document, frame, mode, diagnosticBounds, selected }: { document: QuickForgeDocument; frame: number; mode: ForgeCamera;selected:string[]; diagnosticBounds?: WrlDiagnostics['bounds'] | null }) {
   const { camera, controls } = useThree();
   useEffect(() => {
     if (mode === 'walk') { const start = document.spawns[0]; camera.up.set(0, 0, 1); camera.position.set(...(start?.position ?? [0, 0, 0])); camera.position.z += 1.6; camera.lookAt(camera.position.clone().add(new THREE.Vector3(Math.cos(start?.facing ?? 0), Math.sin(start?.facing ?? 0), 0))); return; }
     const bounds = new THREE.Box3();
+    const selection=diagnosticBounds?[]:forgeNodes(document).filter(node=>selected.includes(node.value.id)&&node.value.visible);
+    for(const node of selection){const point=new THREE.Vector3(...node.value.position),half=node.type==='brush'||node.type==='trigger'?new THREE.Vector3(...node.value.dimensions).multiplyScalar(.5):new THREE.Vector3(.5,.5,.5);bounds.expandByPoint(point.clone().sub(half));bounds.expandByPoint(point.clone().add(half));}
     if (diagnosticBounds) {
       bounds.expandByPoint(new THREE.Vector3(...diagnosticBounds.min));
       bounds.expandByPoint(new THREE.Vector3(...diagnosticBounds.max));
     }
-    for (const brush of (diagnosticBounds ? [] : document.geometry)) {
+    for (const brush of (diagnosticBounds||selection.length ? [] : document.geometry)) {
       const p = new THREE.Vector3(...brush.position),
         half = new THREE.Vector3(...brush.dimensions).multiplyScalar(0.5);
       bounds.expandByPoint(p.clone().add(half));
@@ -478,6 +481,10 @@ function ForgeScene(props: ForgeViewportProps) {
   useEffect(()=>{const begin=(event:PointerEvent)=>{altDrag.current=event.altKey;};gl.domElement.addEventListener('pointerdown',begin,true);return()=>gl.domElement.removeEventListener('pointerdown',begin,true);},[gl]);
   const group = useRef<THREE.Group>(null);
   const zoneGroup = useRef<THREE.Group>(null);
+  const sourceActivity=useWorkspaceActivity();
+  const poseDrag=useRef<{document:QuickForgeDocument;mode:string;ids:string}|null>(null);
+  useEffect(()=>()=>{if(poseDrag.current){poseDrag.current=null;if(props.selectionGuard)props.selectionGuard.current=performance.now()+250;}},[doc,mode,cameraMode,selected.join('|'),sourceActivity.active]);
+  useEffect(()=>{const cancel=()=>{if(!poseDrag.current)return;poseDrag.current=null;if(props.selectionGuard)props.selectionGuard.current=performance.now()+250;if(group.current){group.current.position.copy(origin);group.current.rotation.copy(baseRotation);group.current.scale.set(1,1,1);}};window.addEventListener('blur',cancel);gl.domElement.addEventListener('pointercancel',cancel);return()=>{window.removeEventListener('blur',cancel);gl.domElement.removeEventListener('pointercancel',cancel);};},[doc,mode,cameraMode,selected.join('|'),gl]);
   const nodes = forgeNodes(doc).filter((node) => node.value.visible);
   const chosen = nodes.filter((node) => selected.includes(node.value.id) && !node.value.locked);
   const geometryCurrent=!!snapshot && forgeGeometryKey(snapshot.document)===forgeGeometryKey(doc);
@@ -561,7 +568,7 @@ function ForgeScene(props: ForgeViewportProps) {
     );
   }
   const transformable =
-    cameraMode === 'orbit' &&
+    sourceActivity.active&&cameraMode === 'orbit' &&
     chosen.length > 0 &&
     (mode !== 'scale' || (chosen.length === 1 && (chosen[0].type === 'brush' || chosen[0].type === 'trigger')));
   return (
@@ -624,6 +631,7 @@ function ForgeScene(props: ForgeViewportProps) {
             rotationSnap={snap ? Math.PI / 12 : null}
             scaleSnap={snap ? 0.1 : null}
             onMouseDown={() => {
+              poseDrag.current=chosen.some(node=>node.type==='campaignStart')?{document:doc,mode,ids:chosen.map(node=>node.value.id).join('|')}:null;
               if(props.selectionGuard)props.selectionGuard.current=Infinity;
             }}
             onMouseUp={() => {
@@ -631,6 +639,8 @@ function ForgeScene(props: ForgeViewportProps) {
               if (!group.current) return;
               try {
             const target = group.current;
+            const original=poseDrag.current;poseDrag.current=null;
+            if((original||chosen.some(node=>node.type==='campaignStart'))&&(!original||original.document!==doc||original.mode!==mode||original.ids!==chosen.map(node=>node.value.id).join('|'))){target.position.copy(origin);target.rotation.copy(baseRotation);target.scale.set(1,1,1);props.onError('Campaign start drag was canceled because its source or selection changed.');return;}
             if(target.position.distanceTo(origin)<1e-6&&target.quaternion.angleTo(base)<1e-6&&target.scale.distanceTo(new THREE.Vector3(1,1,1))<1e-6)return;
             target.updateMatrix();
             const deltaRotation = target.quaternion.clone().multiply(base.clone().invert());
@@ -708,6 +718,7 @@ function ForgeScene(props: ForgeViewportProps) {
       {!props.externalCameraAuthority && (
         <CameraFrame
           document={doc}
+          selected={selected}
           frame={props.frame}
           mode={cameraMode}
           diagnosticBounds={props.focusWrlOverlay ? props.wrlOverlay?.bounds : null}
