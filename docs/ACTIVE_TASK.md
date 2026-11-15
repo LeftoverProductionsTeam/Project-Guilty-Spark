@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — original native tactical milestone; squad behavior/patrol continuation
+Task: Operation110 — original native behavior milestone; patrol/command-list continuation
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 44146503583d64b4e667daf1568665dc5e69322b plus this original/recovered tactical source/native milestone; exact source/app/cache/linked UI evidence in RUNTIME_INTEGRATION_20261107.
-Next action: Extend existing original/native squad behavior and patrol/command-list editing through current inventory, source review/adopt/Restore and readback; inspect existing implementation first. Firing/tactics scoped milestone passes. No game/Forerunner/push;475IDs/M1–M6/37944/settlement4/7 remain open.
+Latest verified revision: b9463f708f71c7daf079949a297f3bfa0c5ca645 plus this source-matched original behavior milestone; exact source/app/cache identities in RUNTIME_INTEGRATION_20261107.
+Next action: Extend original patrol/command-list source editing through existing native inventory/writer/review/Restore/readback and shared viewport. Behavior source milestone passes; game/stock-campaign/full-native-Undo/other-target gates stay open. No Forerunner/game/push.
 
 ## Acceptance
 
@@ -24,6 +24,9 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Original native behavior milestone: squad initial/return and separate per-start overrides/apply-all connect existing source inventory/writer/review/Restore/Save/restart/readback. All12states preserved; new moving choices need source routes; unknown telemetry unavailable. TypeScript/frontend33/browser4/core14/working-tags14 pass. Native field depth ambiguity repaired. Source pin3add381e/appb235a2 match; actual Windows Preview/Accept/Restore/reaccept/Save/full restart/working-tag MCC13/Invader passes (3normal closes/0errors). Squad/start sleeping+guarding, unchanged actor pose/route/other fields; publisher/original/previous-good hashes preserved. Native Restore is separate from project Undo. Exact identities/failures/scope in RUNTIME_INTEGRATION_20261107; patrol/command lists remain next.
+
 
 Original tactical milestone: source firing XYZ/groupA–Z and6squad masks reuse native inventory/reviewer/writer/Restore, shared native point handles and current-source compiled guards. Frontend31/core14/working-tags14/browser3/TypeScript pass. Actual Windows firing X/rotation refusal/Review/Accept/Restore, masks and explicit MCC draft review, Save/full restart pass on app93fcb9; final source-matched appd54aac native working-tag MCC13/Invader point+156bits readback passes. Current-source snapshots retain2combat targets with no historical replay; starts/actor bindings and original/previous-good hashes unchanged. First native test fixed missed World labels, gizmo readiness observation, then the exact new-type build admission. Existing source continuation reused SDK/UI checkpoints. Exact identities/errors/scope in RUNTIME_INTEGRATION_20261107. Original structural/state/patrol/command-list/full native Undo, stock campaign breadth, other targets and actual AI/gameplay remain open.
 
@@ -100,7 +103,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Original-combat QA81790/run-xd1qyG terminal; owned apps/compilers/tests closed and complete output disposed6,423,549,420 logicalB. Allocated disposal unavailable; no physical-space claim. No retained SDK/binary/map/screenshot/archive. Exact evidence in RUNTIME_INTEGRATION_20261107; originals/475CSV/legacy recovery unchanged. No game/Forerunner/remote writes.
+Original-behavior QA25249/run-dS7cSz terminal: owned apps/compilers/tests closed; entire output disposed4,623,600,744 logicalB, allocated disposal unavailable. Root confirmed absent; no SDK/binary/cache/map/screenshot/archive retained. Previous QA81790 also disposed. Exact evidence in RUNTIME_INTEGRATION_20261107. Originals/475CSV/legacy recovery unchanged; no game/Forerunner/remote writes.
 
 Firing QA29199/run-pzY3cX terminal; all owned apps/compilers/tests closed, complete output disposed4,031,310,998 logicalB (allocated disposal unavailable, no physical-space claim). Evidence/hashes in RUNTIME_INTEGRATION_20261107. No retained SDK/map/binary/screenshot/archive, game/Forerunner/publication; original inputs/475CSV/legacy recovery unchanged.
 

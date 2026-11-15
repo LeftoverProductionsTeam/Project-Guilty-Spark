@@ -10,11 +10,19 @@ export interface NativeCombatSource {points:NativeFiringPoint[];groups:Record<Ca
 export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];patrol?:{points:NativePatrolPoint[]};combat?:NativeCombatSource;behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
 export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
 export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number];facingRadians?:number|null}[]|null}
-export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups']}[]}
+export const nativeSourceAiStates=['none','sleeping','alert','moving_repeat_same_position','moving_loop','moving_loop_back_and_forth','moving_loop_randomly','moving_randomly','guarding','guarding_at_guard_position','searching','fleeing'] as const;
+export interface NativeSquadBehavior {initialState:string;returnState:string;starts:{index:number;initialState:string;returnState:string}[];patrolCount:number}
+export function nativeSourceStateReady(state:string,count:number){const index=nativeSourceAiStates.indexOf(state as typeof nativeSourceAiStates[number]);return index>=0&&count>=([4,5,6].includes(index)?2:[3,7].includes(index)?1:0);}
+export function nativeBehaviorIssue(draft:NativeSquadBehavior,source:NativeSquadBehavior):string|null{
+ if(draft.patrolCount!==source.patrolCount||draft.starts.length!==source.starts.length||draft.starts.some((p,i)=>p.index!==source.starts[i].index))return 'Refresh the source; starting-location or route indices changed.';
+ const pairs=[[draft,source],...draft.starts.map((p,i)=>[p,source.starts[i]])];for(const [next,before]of pairs)for(const f of ['initialState','returnState'] as const){if(!nativeSourceAiStates.includes(next[f] as typeof nativeSourceAiStates[number]))return 'Native state is unavailable.';if(next[f]!==before[f]&&!nativeSourceStateReady(next[f],source.patrolCount))return 'A new moving state needs an authored source route. Restore this draft choice or prepare the native route first.';}return null;
+}
+export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null}[]}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null}
+  | {kind:'encounterSquadBehavior';encounter:number;squad:number;encounterName:string;squadName:string;behavior:NativeSquadBehavior;sourceSha256:string}
   | {kind:'encounterFiringPosition';encounter:number;point:number;encounterName:string;position:[number,number,number];group:string;sourceSha256:string}
   | {kind:'encounterSquadFiringGroups';encounter:number;squad:number;encounterName:string;squadName:string;groups:NativeCombatSource['groups'];sourceSha256:string}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'|'combat'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};

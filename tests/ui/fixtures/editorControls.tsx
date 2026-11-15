@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import NativeSquadBehaviorEditor from '../../../src/components/NativeSquadBehavior';
 import NativeStartingPositions from '../../../src/components/NativeStartingPositions';
 import {useMapState} from '../../../src/mapSession';
 import {NATIVE_AI_START_VIEW} from '../../../src/nativeAiStart';
@@ -29,4 +30,10 @@ function NativeAiDraftFixture(){
  const [draft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
  return <><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><button onClick={()=>setBusy(false)}>Finish preview</button><output data-testid="ai-operation">{JSON.stringify(operation)}</output><output data-testid="ai-draft">{JSON.stringify(draft)}</output>{[true,false].map((active,index)=><section key={index} data-testid={'ai-inspector-'+index}><NativeStartingPositions kind={firing?'firing':'start'} context={context} busy={active&&busy} dirty={dirty} onPreview={value=>{setOperation(value);setBusy(true);}} onDraftChange={()=>{}}/></section>)}</>;
 }
-createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);
+function NativeBehaviorFixture(){
+ const [dirty,setDirty]=useState(false),[revision,setRevision]=useState(0),[operation,setOperation]=useState<unknown>(null);
+ const source={initialState:'none',returnState:'alert',patrolCount:0,starts:[{index:0,initialState:'alert',returnState:'none'},{index:1,initialState:'none',returnState:'none'}]};
+ const context={projectId:'behavior-fixture',buildId:'build',class:'scnr',tag:'level.scenario',tagSha256:(revision?'b':'a').repeat(64)} as NativeTagContext;
+ return <><button onClick={()=>setDirty(!dirty)}>Toggle project dirty</button><button onClick={()=>setRevision(revision+1)}>Refresh source revision</button><output data-testid="behavior-original">{JSON.stringify(source)}</output><output data-testid="behavior-operation">{JSON.stringify(operation)}</output><NativeSquadBehaviorEditor context={context} squadChoice={{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1}} source={source} issue={null} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)}/></>;
+}
+createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);

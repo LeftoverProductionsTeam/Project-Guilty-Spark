@@ -15,6 +15,7 @@ import { Notice, Pill } from './ui';
 import './nativeTools.css';
 import BaboonTools from './BaboonTools';
 import NativeSquadScaling from './NativeSquadScaling';
+import NativeSquadBehaviorEditor from './NativeSquadBehavior';
 import NativeStartingPositions from './NativeStartingPositions';
 import {useMapState} from '../mapSession';
 import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
@@ -285,6 +286,7 @@ export default function NativeTagOperations({
                 <button disabled={busy||dirty||!!squadEditIssue||!validCounts||!populationChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
                   onClick={()=>makePreview({kind:'encounterSquadCounts',encounter:squadChoice.encounter,squad:squadChoice.squad,
                     encounterName:squadChoice.encounterName,squadName:squadChoice.name,normalCount:Number(normalCount),insaneCount:Number(insaneCount),sourceSha256:context.tagSha256!})}>Preview squad counts</button>
+                <NativeSquadBehaviorEditor context={context} squadChoice={squadChoice} source={tacticalSource?.behavior} issue={tacticalSource?.behaviorIssue??context.combatEditIssue??squadEditIssue} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>
                 <details className="native-tactical-groups"><summary>Native tactical firing groups</summary>
                   <p className="subtle">Choose which existing encounter firing groups this squad may use when attacking/searching/guarding/defending. This does not create positions or force movement, cover or line of sight.</p>
                   {tacticalIssue&&<Notice tone="info">{tacticalIssue}</Notice>}
