@@ -343,7 +343,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const nativeAiSelectionGuard=useRef(0);
   const [selected, setSelected] = useMapState<string[]>(project.id, 'forge.selection', []),
     [selectedZone, setSelectedZone] = useMapState<string | null>(project.id, 'forge.zone', null);
-  const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(
+  const [mode, setModeState] = useMapState<'translate' | 'rotate' | 'scale'>(
       project.id,
       'forge.mode',
       'translate',
@@ -370,8 +370,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     if(!activity.active||!nativeAiStart?.active)return;
     // Source proposals use the shared world-coordinate viewport, including
     // maps whose geometry was authored in the four-view BSP Workshop.
-    setBspMode(false);setCameraMode('orbit');setSelected([]);setSelectedZone(null);setWorkshopSelected(null);
-  },[activity.active,nativeAiStart?.key,nativeAiStart?.active]);
+    setBspMode(false);setCameraMode('orbit');setMode(nativeAiStart.mode??'translate');setSelected([]);setSelectedZone(null);setWorkshopSelected(null);
+  },[activity.active,nativeAiStart?.key,nativeAiStart?.active,nativeAiStart?.focus]);
+  function setMode(next:'translate'|'rotate'|'scale') {
+    if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify('Native AI starts support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.','info');return;}
+    setModeState(next);
+    if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
+  }
   const [query, setQuery] = useMapState(project.id, 'forge.query', ''),
     [category, setCategory] = useMapState(project.id, 'forge.category', 'all');
   const sources = data.entries.filter((entry) => entry.version !== null);
@@ -1581,13 +1586,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 >
                   <Move3D size={17} />
                 </IconButton>
-                <IconButton label="Rotate (E)" active={mode === 'rotate'} onClick={() => setMode('rotate')}>
+                <IconButton label="Rotate (E)" active={mode === 'rotate'} disabled={!!nativeAiStart?.active&&!Number.isFinite(nativeAiStart.originalFacingRadians)} onClick={() => setMode('rotate')}>
                   <Rotate3D size={17} />
                 </IconButton>
                 <IconButton
                   label="Resize brush (R)"
                   active={mode === 'scale'}
-                  disabled={mutableNodes.length !== 1 || mutableNodes[0]?.type !== 'brush'}
+                  disabled={!!nativeAiStart?.active||mutableNodes.length !== 1 || mutableNodes[0]?.type !== 'brush'}
                   onClick={() => setMode('scale')}
                 >
                   <Scaling size={17} />
@@ -1776,7 +1781,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   document={doc}
                   viewportChildren={(textures) => (
                     <>
-                      <NativeAiStartOverlay project={project} enabled={cameraMode==='orbit'&&!assetBusy&&studioRole==null} snap={gridSnap?snap:0}
+                      <NativeAiStartOverlay project={project} mode={mode} enabled={cameraMode==='orbit'&&!assetBusy&&studioRole==null} snap={gridSnap?snap:0}
                         onSelectScene={()=>{setSelected([]);setSelectedZone(null);setWorkshopSelected(null);}}
                         onStart={()=>{nativeAiSelectionGuard.current=Infinity;}} onEnd={()=>{nativeAiSelectionGuard.current=performance.now()+250;}}
                         notify={message=>notify(message,'info')}/>
@@ -1902,7 +1907,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 />
                 {nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
                   <strong>AI start draft · {nativeAiStart.encounterName} / {nativeAiStart.squadName} / {nativeAiStart.start}</strong>
-                  <span>Unsaved coordinates · review in Native source controls</span>
+                  <span>Unsaved pose · Move (W) / Rotate (E), then review in Native source controls</span>
                   <button disabled={cameraMode!=='orbit'||assetBusy} onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>Frame AI start</button>
                   {props.onReviewAiStart&&<button onClick={props.onReviewAiStart}>Review AI start source</button>}
                   <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>

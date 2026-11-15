@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {nativeAiStartMatches,nativeAiStartPosition,nativeAiStartDragValues,nativeAiStartKey} from './nativeAiStart';
+import {nativeAiStartMatches,nativeAiStartPosition,nativeAiStartDragValues,nativeAiStartKey,nativeAiStartFacing,nativeAiFacingDegrees,nativeAiFacingClose,nativeAiStartDragFacing} from './nativeAiStart';
 import type {NativeAiStartView} from './nativeAiStart';
 import type {NativeTagContext} from './nativeOperations';
 const context=()=>({projectId:'project',buildId:'build',tag:'level.scenario',class:'scnr',tagSha256:'a'.repeat(64),
@@ -43,4 +43,16 @@ it('commits a completed coordinate drag only for its unchanged writable source p
  for(const point of [[NaN,0,0],[0,Infinity,0],[1e6+1,0,0]] as [number,number,number][])
   expect(nativeAiStartDragValues(start,current,point,true)).toBeNull();
  expect(JSON.stringify(start)).toBe(original);expect(current).toEqual(start);
+});
+
+it('keeps native facing unavailable until the exact source exposes it, and converts only UI degrees',()=>{
+ const source=context();source.scenarioStartSquads![0].starts![0].facingRadians=Math.PI/2;
+ const view={...draft(),originalFacingRadians:Math.PI/2,facingDegrees:'90',mode:'rotate' as const};expect(nativeAiStartMatches(view,source)).toBe(true);
+ for(const facingRadians of [undefined,null,NaN,0]){const changed=structuredClone(source);changed.scenarioStartSquads![0].starts![0].facingRadians=facingRadians;expect(nativeAiStartMatches(view,changed)).toBe(false);}
+ expect(nativeAiStartFacing('90')).toBeCloseTo(Math.PI/2,12);expect(nativeAiFacingDegrees(3*Math.PI/2)).toBe('-90');expect(nativeAiFacingClose(0,Math.PI*2)).toBe(true);
+ for(const value of ['',undefined,null,'NaN','Infinity','361','-361',90])expect(nativeAiStartFacing(value)).toBeNull();
+ expect(nativeAiStartDragFacing(view,view,Math.PI,true)).toBe('180');
+ for(const patch of [{active:false},{locked:true},{key:'other'},{facingDegrees:'95'},{values:['5','5','6'] as [string,string,string]},{originalFacingRadians:0}])expect(nativeAiStartDragFacing(view,{...view,...patch},Math.PI,true)).toBeNull();
+ for(const value of [undefined,NaN,Infinity])expect(nativeAiStartDragFacing(view,view,value,true)).toBeNull();expect(nativeAiStartDragFacing(draft(),draft(),0,true)).toBeNull();expect(nativeAiStartDragFacing(view,view,0,false)).toBeNull();
+ expect(nativeAiStartDragValues(view,{...view,facingDegrees:'80'},[1,2,3],true)).toBeNull();
 });

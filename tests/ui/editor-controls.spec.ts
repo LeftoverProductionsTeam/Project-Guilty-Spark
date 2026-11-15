@@ -66,3 +66,22 @@ test('native AI preview remains stable with an idle retained inspector',async({p
  await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();
  await expect.poll(async()=>(await state()).locked).toBe(false);expect(errors).toEqual([]);
 });
+
+// Source pose proposals must preserve units, unknown telemetry and retained ownership.
+test('native AI facing reuses reviewed source pose editing and refuses unavailable heading',async({page})=>{
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-ai-facing');
+ const panel=page.getByTestId('ai-inspector-0');await panel.locator('summary').click();
+ const heading=panel.getByRole('spinbutton',{name:'AI start facing degrees',exact:true});await expect(heading).toHaveValue('90');
+ await panel.getByRole('combobox',{name:'AI start handle mode',exact:true}).selectOption('rotate');
+ await heading.fill('-90');await panel.getByRole('button',{name:'Show handles in Level Editor',exact:true}).click();
+ await expect.poll(()=>page.getByTestId('ai-draft').textContent().then(text=>JSON.parse(text!).mode)).toBe('rotate');
+ await panel.getByRole('button',{name:'Preview AI facing',exact:true}).click();
+ const operation=JSON.parse((await page.getByTestId('ai-operation').textContent())!);
+ expect(operation).toMatchObject({kind:'encounterStartPosition',position:[1,2,3],sourceSha256:'a'.repeat(64)});expect(operation.facingRadians).toBeCloseTo(-Math.PI/2,7);
+ await page.getByRole('button',{name:'Finish preview',exact:true}).click();await heading.fill('361');
+ await expect(panel.getByRole('button',{name:/^Preview AI /})).toBeDisabled();
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-ai');await page.getByTestId('ai-inspector-0').locator('summary').click();
+ await expect(page.getByTestId('ai-inspector-0').getByRole('spinbutton',{name:'AI start facing degrees',exact:true})).toHaveCount(0);
+ const unavailable=page.getByTestId('ai-inspector-0');await expect(unavailable.getByRole('option',{name:/Rotate facing/})).toHaveAttribute('disabled','');
+ const mode=unavailable.getByRole('combobox',{name:'AI start handle mode',exact:true});await mode.focus();await mode.press('End');await expect(mode).toHaveValue('translate');
+});

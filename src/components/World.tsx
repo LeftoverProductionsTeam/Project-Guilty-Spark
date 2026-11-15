@@ -639,18 +639,23 @@ export default function World({
   const assetDrag=useViewportAssetDrop(project.id,viewportElement,dropPoint,(key,position)=>void dropAsset(key,position),library?(paths,position)=>void dropFiles(paths,position):undefined);
   const viewPoint=()=>{const rect=viewportElement.current?.getBoundingClientRect();return rect?dropPoint.current?.(rect.x+rect.width/2,rect.y+rect.height/2)??undefined:undefined;};
   const [query, setQuery] = useMapState(project.id,'world.query','');
-  const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'world.mode','translate');
+  const [mode, setModeState] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'world.mode','translate');
   const [snap, setSnap] = useMapState(project.id,'world.snap',false);
   const [grid, setGrid] = useMapState(project.id,'world.grid',false);
   const [viewMode, setViewMode] = useMapState<ViewMode>(project.id,cinematic?'director.view':'world.view',hasRenderGeometry(inspection)?'render':'smooth');
   const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
   const ortho=!cinematic&&savedOrtho;
+  function setMode(next:'translate'|'rotate'|'scale') {
+    if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify('Native AI starts support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.');return;}
+    setModeState(next);
+    if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
+  }
   const [fly, setFly] = useMapState(project.id,'world.fly',false);
   useEffect(()=>{
     // An explicit source-handle request owns navigation, not a cinematic
     // camera. Later user flight toggles remain independent of the proposal.
     if(nativeAiStart?.active&&nativeAiStart.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){
-      setFly(false);setPlayerView(false);
+      setFly(false);setPlayerView(false);setMode(nativeAiStart.mode??'translate');
     }
   },[nativeAiStart?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [frame, setFrame] = useState(0);
@@ -1395,10 +1400,10 @@ export default function World({
             >
               <Move3D size={17} />
             </IconButton>
-            <IconButton label="Rotate (E)" active={mode === 'rotate'} onClick={() => setMode('rotate')}>
+            <IconButton label="Rotate (E)" active={mode === 'rotate'} disabled={!!nativeAiStart?.active&&!Number.isFinite(nativeAiStart.originalFacingRadians)} onClick={() => setMode('rotate')}>
               <Rotate3D size={17} />
             </IconButton>
-            <IconButton label="Scale (R)" active={mode === 'scale'} onClick={() => setMode('scale')}>
+            <IconButton label="Scale (R)" active={mode === 'scale'} disabled={!!nativeAiStart?.active} onClick={() => setMode('scale')}>
               <Scaling size={17} />
             </IconButton>
           </div>
@@ -1565,7 +1570,7 @@ export default function World({
                     onSceneDragEnd={onSceneDragEnd}
                   />
                 )}
-                {!cinematic&&!externalCameraAuthority&&<NativeAiStartOverlay project={project} enabled={!fly&&!cameraLocked&&!pickTarget} snap={snap}
+                {!cinematic&&!externalCameraAuthority&&<NativeAiStartOverlay project={project} mode={mode} enabled={!fly&&!cameraLocked&&!pickTarget} snap={snap}
                   onSelectScene={()=>{setPlayerView(false);setSelected(null);setZoneSelection(null);}} onStart={onSceneDragStart} onEnd={onSceneDragEnd} notify={notify}/>}
                 {viewportChildren}
               </Canvas>}
@@ -1573,7 +1578,7 @@ export default function World({
           </ViewportBoundary>
           {!cinematic&&nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
             <strong>AI start draft · {nativeAiStart.encounterName} / {nativeAiStart.squadName} / {nativeAiStart.start}</strong>
-            <span>Unsaved coordinates · review in Native source controls</span>
+            <span>Unsaved pose · Move (W) / Rotate (E), then review in Native source controls</span>
             <button disabled={fly||cameraLocked||externalCameraAuthority} title="Frame the coordinate proposal. Release fly navigation or camera ownership first."
               onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>Frame AI start</button>
             {onReviewAiStart&&<button onClick={onReviewAiStart}>Review AI start source</button>}

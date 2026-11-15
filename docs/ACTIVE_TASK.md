@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — objective camera scenes native milestone; original AI facing next
+Task: Operation110 — native original AI pose milestone; Black Echo next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: fb9eadca3e9a6f769d8cf6bca5f5c6a367719403 source base; this commit scope passes scene-only/combined UI/cache/readback (app96177b4d/source9a8e06db). Exact hashes in RUNTIME_INTEGRATION_20261107.
-Next action: Extend original AI start editing to source-backed facing/rotation using existing operation, proposal, preview/accept and readback paths; inspect native inventory first and preserve recipe restrictions. Game input needs renewal. Save37944, settlement4/7 and all475/M1–M6 remain open. No Forerunner/push.
+Latest verified revision: e5bc5c1e03f977133c9f791225c97632f6456bd2 plus this original AI pose scope; Windows app8aeec8c5/source450fa8d7, exact hashes in RUNTIME_INTEGRATION_20261107.
+Next action: Continue Black Echo encounter/difficulty and actor-source workflows through existing reviewed native source/build paths. Source pose milestone accepted only for the owned recovered MCC fixture; stock campaign/CE/game/peers open. Game input needs renewal;37944 and all475/M1–M6 remain open. No Forerunner/push.
 
 ## Acceptance
 
@@ -31,7 +31,7 @@ Historical shared-path1090046 and rescue-result14844a4 source/browser/CE-MCC-Xbo
 
 Camera548b1c8/fb9eadc native recording/intro,8size and stale actor Clear proof is preserved in RUNTIME_INTEGRATION_20261107. Objective scenes now use saved shot ranges at start/success, with intro optional. Actual Windows scene-only and combined-intro authoring/history/Save/full restart/MCC cache/readback pass (7/8scripts,7globals,4groups/8starts,9HUDmessages). TypeScript/frontend27/browser2/Rust creative13 and CE/MCC/Xbox legacy/scene/combined HSC pass. Fixed preflight shot/marker admission and comment-safe intro insertion; scene boundaries/history/source review stay protected. Exact automatic digests/limits there. No game/peer/Forerunner acceptance;37944 remains open.
 
-Recovered AI milestone40f84ef: Tags→X drag→accept→Restore/reapply→Save/restart→MCC build/readback passes. Exact app/cache hashes, guard repair and scopes are in RUNTIME_INTEGRATION_20261107. Stock campaign/CE/human/game gates remain open; QA disposed.
+Recovered AI40f84ef XYZ milestone is extended here to exposed native facing. Tags→actual X drag→E/Z mouse rotation→review heading→Accept→Restore/reapply→Save/full reopen→MCC13 build/independent pose readback passes. Before[4,3,.1]/0rad; compiled[4.427971,3,.1]/75.775293°. TypeScript/frontend20/browser2/Rust native10/frozen Windows build pass. Unknown heading unavailable; recipes preserved. Exact hashes/initial corrected fixture failures/scopes in RUNTIME_INTEGRATION_20261107. Project history is distinct from native Restore/reapply. Stock campaign/CE/game/peers and37944 remain open.
 
 Efficiency: reused2676-file/146023117B SDK and accepted UI project; no new archive/SDK warehouse. Both239483B checksum aliases are required by release/archive consumers and share one Git blob. Active-task helper preserves existing legacy recovery and skips unchanged writes; no automatic previous copy. Initial37944 Save failure remains unresolved; later Save-only/native creator passes do not establish its cause.
 
@@ -102,7 +102,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA40870/run-JJM8jU is terminal and confirmed absent:3655625421logicalB disposed; allocated-file disposal unavailable. One3521file/184203140B SDK reused/rehashed unchanged; no owned app/compiler/browser/game, retained binaries/maps/SDK/archive or publication. Exact source/native cases and failures are in RUNTIME_INTEGRATION_20261107.
+QA79527/run-IRRsAU terminal PASS and confirmed absent. Disposed3542331406logicalB; allocated-file disposal unavailable. One2676file/146023117B SDK; no owned app/compiler/browser/game or retained binaries/maps/SDK/profile/archive. Exact native cases/digests in RUNTIME_INTEGRATION_20261107. Original inputs,475IDs and previous-checkpoint hash unchanged. No Forerunner/push.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 

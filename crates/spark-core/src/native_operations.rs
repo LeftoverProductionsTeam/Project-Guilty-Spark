@@ -16,7 +16,8 @@ pub enum Operation {
     EncounterSquadCounts { encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,#[serde(rename="normalCount")] normal_count:u16,#[serde(rename="insaneCount")] insane_count:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     EncounterSquadCountsBatch { edits:Vec<SquadCountEdit>,#[serde(rename="sourceSha256")] source_sha256:String },
     EncounterStartPosition {encounter:u16,squad:u16,start:u16,#[serde(rename="encounterName")] encounter_name:String,
-        #[serde(rename="squadName")] squad_name:String,position:[f32;3],#[serde(rename="sourceSha256")] source_sha256:String},
+        #[serde(rename="squadName")] squad_name:String,position:[f32;3],#[serde(rename="sourceSha256")] source_sha256:String,
+        #[serde(rename="facingRadians",default,skip_serializing_if="Option::is_none")] facing_radians:Option<f32>},
     BoundingRadius { value: f64 },
     HudDuplicate { array:String,index:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     LensFlareScaleRepair,
@@ -130,10 +131,10 @@ impl Operation {
                 }
                 if total>128{return invalid("One reviewed encounter group operation supports at most 128 starting locations");}
             }
-            Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,source_sha256}=>{
+            Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,source_sha256,facing_radians}=>{
                 if class!="scnr"||*encounter>=128||*squad>=4096||*start>=4096||
                     [encounter_name,squad_name].iter().any(|name|name.len()>32||name.chars().any(char::is_control))||
-                    position.iter().any(|value|!value.is_finite()||value.abs()>1e6)||
+                    position.iter().any(|value|!value.is_finite()||value.abs()>1e6)||facing_radians.is_some_and(|value|!value.is_finite()||value.abs()>std::f32::consts::TAU+1e-6)||
                     source_sha256.len()!=64||!source_sha256.bytes().all(|value|value.is_ascii_hexdigit()){
                     return invalid("AI start editing needs exact scenario/source identities and finite supported coordinates");
                 }
@@ -320,13 +321,17 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
-        if let Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,..}=self{
+        if let Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,facing_radians,..}=self{
             let (row,point)=selected_native_start(before,*encounter,*squad,*start)?;
             if row.encounter_name!=*encounter_name||row.name!=*squad_name{return invalid("Native encounter/squad identity changed before start editing");}
-            if positions_close(point.position,*position){return invalid("The AI starting position already matches; no candidate was written");}
-            let value=position.map(|value|value.to_string()).join(",");
-            return Ok(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-S".into(),
-                format!("encounters[{encounter}].squads[{squad}].starting_locations[{start}].position"),value,tag.into()]);
+            let heading_changed=if let Some(value)=facing_radians {let original=point.facing_radians.ok_or_else(||crate::SparkError::Invalid("Native starting facing is unavailable; only position editing is supported for this source".into()))?;!facings_close(original,*value)}else{false};
+            let position_changed=!positions_close(point.position,*position);
+            if !position_changed&&!heading_changed{return invalid("The AI starting position/facing already matches; no candidate was written");}
+            let prefix=format!("encounters[{encounter}].squads[{squad}].starting_locations[{start}]");
+            let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+            if position_changed {args.extend(["-S".into(),format!("{prefix}.position"),position.map(|value|value.to_string()).join(",")]);}
+            if heading_changed {args.extend(["-S".into(),format!("{prefix}.facing"),facing_radians.unwrap().to_string()]);}
+            args.push(tag.into());return Ok(args);
         }
         if self.is_squad_count_edit() {
             let rows=scenario_squad_choices(before)?;
@@ -410,7 +415,9 @@ impl Operation {
         while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{expected.push((&written[i+1],&written[i+2]));i+=3;},_=>return invalid("Unexpected native append recipe")}}
         let actual=output.lines().collect::<Vec<_>>();if actual.len()!=expected.len(){return invalid("Native encounter scalar readback count differs from the append recipe");}
         for ((key,value),actual) in expected.into_iter().zip(actual) {
-            let same=if key.ends_with(".position")||key.ends_with(".facing") {
+            let same=if key.ends_with(".facing"){
+                match(value.parse::<f32>(),actual.parse::<f32>()){(Ok(expected),Ok(degrees))=>facings_close(expected,degrees.to_radians()),_=>false}
+            }else if key.ends_with(".position") {
                 let parse=|s:&str|s.split(',').map(|v|v.trim().parse::<f64>().ok().filter(|v|v.is_finite())).collect::<Option<Vec<_>>>();
                 match(parse(value),parse(actual)){(Some(a),Some(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|(a-b).abs()<=0.000001f64.max(a.abs()*f64::from(f32::EPSILON)*2.)),_=>false}
             }else if key.ends_with(".reference"){actual.replace('\\',"/").eq_ignore_ascii_case(&value.replace('\\',"/"))}
@@ -517,7 +524,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
 impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
-        if let Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,..}=self{return verify_native_start(map,*encounter,*squad,*start,encounter_name,squad_name,*position);}
+        if let Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,facing_radians,..}=self{return verify_native_start(map,*encounter,*squad,*start,encounter_name,squad_name,*position,*facing_radians);}
         if self.is_squad_count_edit(){
             for edit in self.squad_count_edits()?{verify_native_squad(map,edit.encounter,edit.squad,&edit.encounter_name,&edit.squad_name,edit.normal_count as i16,edit.insane_count as i16)?;}
             return Ok(());
@@ -714,7 +721,13 @@ pub struct ScenarioSquadReadback {
 fn squad_positions_disabled(value:&bool)->bool{!*value}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct ScenarioStartChoice {pub index:u16,pub position:[f32;3],#[serde(skip)] position_line:usize}
+pub struct ScenarioStartChoice {pub index:u16,pub position:[f32;3],
+    #[serde(rename="facingRadians",default,skip_serializing_if="Option::is_none")] pub facing_radians:Option<f32>,
+    #[serde(skip)] position_line:usize,#[serde(skip)] facing_line:Option<usize>}
+/// Native yaw is periodic. Invader's text angle is degrees; tag/cache values are radians.
+pub(crate) fn facings_close(a:f32,b:f32)->bool {
+    a.is_finite()&&b.is_finite()&&((f64::from(a)-f64::from(b)+std::f64::consts::PI).rem_euclid(std::f64::consts::TAU)-std::f64::consts::PI).abs()<=0.000002
+}
 pub(crate) fn positions_close(a:[f32;3],b:[f32;3])->bool {
     a.iter().zip(b).all(|(a,b)|a.is_finite()&&b.is_finite()&&
         (f64::from(*a)-f64::from(b)).abs()<=0.000001f64.max(f64::from(*a).abs()*f64::from(f32::EPSILON)*2.))
@@ -735,7 +748,7 @@ impl ScenarioSquadReadback {
                 starts+=points.len();
                 if starts>4096{return invalid("Native starting-position review exceeds4096points");}
                 for (index,point) in points.iter().enumerate(){
-                    if usize::from(point.index)!=index||point.position.iter().any(|value|!value.is_finite()||value.abs()>1e6){
+                    if usize::from(point.index)!=index||point.position.iter().any(|value|!value.is_finite()||value.abs()>1e6)||point.facing_radians.is_some_and(|value|!value.is_finite()||value.abs()>20000.){
                         return invalid("Native starting-position inventory is incomplete or outside supported coordinates");
                     }
                 }
@@ -755,7 +768,8 @@ impl ScenarioSquadReadback {
                     .and_then(|details|details.squads.get(usize::from(row.squad))).ok_or_else(||crate::SparkError::Invalid("Compiled AI starting locations are unavailable".into()))?;
                 if native.starting_locations.len()!=starts.len(){return invalid("Compiled AI starting-location inventory differs from the source");}
                 for point in starts{
-                    if !positions_close(point.position,native.starting_locations[usize::from(point.index)].position){return invalid("Compiled AI starting position differs from the reviewed native source");}
+                    let actual=&native.starting_locations[usize::from(point.index)];
+                    if !positions_close(point.position,actual.position)||point.facing_radians.is_some_and(|expected|!facings_close(expected,actual.facing)){return invalid("Compiled AI starting position/facing differs from the reviewed native source");}
                 }
             }
         }
@@ -828,8 +842,10 @@ fn scenario_squad_inventory(fields:&str,include_starts:bool)->Result<Vec<Scenari
                 total_starts+=locations.count;if total_starts>4096{return invalid("Native starting-position review exceeds4096points");}
                 let mut start_line=squad_line+1+locations.start+1;let mut points=vec![];
                 for (index,item) in array_items(&locations,"starting_locations")?.iter().enumerate(){
-                    let (position,line)=native_position(&direct_struct_fields(item)?)?;
-                    points.push(ScenarioStartChoice{index:index as u16,position,position_line:start_line+1+line});
+                    let fields=direct_struct_fields(item)?;let (position,line)=native_position(&fields)?;
+                    let facing_line=fields.lines().position(|line|line.starts_with("facing ("));
+                    let facing_radians=if facing_line.is_some(){if !fields.lines().nth(facing_line.unwrap()).is_some_and(|line|line.split_once(')').is_some_and(|(_,kind)|matches!(kind.trim(),"angle"|"angle (float32)"))){return invalid("Unknown native AI facing field type");}let degrees=number(&fields,"facing")?;if degrees.abs()>1e6{return invalid("Native AI facing exceeds the supported reader bound");}Some(degrees.to_radians() as f32)}else{None};
+                    points.push(ScenarioStartChoice{index:index as u16,position,facing_radians,position_line:start_line+1+line,facing_line:facing_line.map(|line|start_line+1+line)});
                     start_line+=item.len();
                 }
                 Some(points)
@@ -849,30 +865,32 @@ fn selected_native_start(fields:&str,encounter:u16,squad:u16,start:u16)->Result<
         .ok_or_else(||crate::SparkError::Invalid("Native AI starting location is unavailable".into()))?;
     Ok((row,point))
 }
-fn verify_native_start(map:&crate::maps::MapInspection,encounter:u16,squad:u16,start:u16,encounter_name:&str,squad_name:&str,position:[f32;3])->Result<()>{
+fn verify_native_start(map:&crate::maps::MapInspection,encounter:u16,squad:u16,start:u16,encounter_name:&str,squad_name:&str,position:[f32;3],facing_radians:Option<f32>)->Result<()>{
     let region=map.encounters.get(usize::from(encounter)).ok_or_else(||crate::SparkError::Invalid("Compiled AI encounter is unavailable".into()))?;
     let member=region.details.as_ref().and_then(|details|details.squads.get(usize::from(squad)))
         .ok_or_else(||crate::SparkError::Invalid("Compiled AI squad is unavailable".into()))?;
     let point=member.starting_locations.get(usize::from(start)).ok_or_else(||crate::SparkError::Invalid("Compiled AI starting location is unavailable".into()))?;
-    if region.name!=encounter_name||member.name!=squad_name||!positions_close(position,point.position){return invalid("Compiled AI starting position/identity differs from the reviewed edit");}
+    if region.name!=encounter_name||member.name!=squad_name||!positions_close(position,point.position)||facing_radians.is_some_and(|expected|!facings_close(expected,point.facing)){return invalid("Compiled AI starting position/identity differs from the reviewed edit");}
     Ok(())
 }
 fn reviewed_start_position(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>>{
-    let Operation::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,..}=operation else{return invalid("Not a native AI start edit");};
-    let (old,original)=selected_native_start(before,*encounter,*squad,*start)?;
-    let (new,revised)=selected_native_start(after,*encounter,*squad,*start)?;
+    let Operation::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,facing_radians,..}=operation else{return invalid("Not a native AI start edit");};
+    let (old,original)=selected_native_start(before,*encounter,*squad,*start)?;let (new,revised)=selected_native_start(after,*encounter,*squad,*start)?;
     if old.encounter_name!=*encounter_name||new.encounter_name!=*encounter_name||old.name!=*squad_name||new.name!=*squad_name||
-        original.position_line!=revised.position_line||!positions_close(revised.position,*position){return invalid("Native AI starting position or structure differs from the reviewed edit");}
-    let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();
-    if a.len()!=b.len(){return invalid("AI start edit changed native field structure");}
-    let mut differences=vec![];
-    for(index,(old,new))in a.iter().zip(&b).enumerate(){
-        if old==new{continue;}
-        if index!=original.position_line{return invalid("AI start edit changed an unrelated native field");}
+        original.position_line!=revised.position_line||original.facing_line!=revised.facing_line||!positions_close(revised.position,*position)||
+        facing_radians.is_some_and(|expected|revised.facing_radians.is_none_or(|actual|!facings_close(expected,actual))){return invalid("Native AI starting pose or structure differs from the reviewed edit");}
+    let mut allowed=std::collections::BTreeSet::new();
+    if !positions_close(original.position,*position){allowed.insert(original.position_line);}
+    if let Some(expected)=facing_radians {
+        let old=original.facing_radians.ok_or_else(||crate::SparkError::Invalid("Native facing was unavailable before review".into()))?;
+        if !facings_close(old,*expected){allowed.insert(original.facing_line.ok_or_else(||crate::SparkError::Invalid("Native facing field is unavailable".into()))?);}
+    }
+    let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();if a.len()!=b.len(){return invalid("AI start edit changed native field structure");}
+    let mut differences=vec![];for(index,(old,new))in a.iter().zip(&b).enumerate(){
+        if old==new{continue;}if !allowed.remove(&index){return invalid("AI start edit changed an unrelated native field");}
         differences.push(FieldDifference{before:(*old).into(),after:(*new).into()});
     }
-    if differences.len()!=1{return invalid("Native reader cannot certify exactly the selected AI starting position");}
-    Ok(differences)
+    if !allowed.is_empty()||differences.is_empty(){return invalid("Native reader cannot certify exactly the requested AI starting pose");}Ok(differences)
 }
 fn reviewed_squad_counts(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
     let edits=operation.squad_count_edits()?;
@@ -1049,13 +1067,14 @@ mod tests {
                 }
             }
         }
+        create.extend(["-S".into(),"encounters[1].squads[1].starting_locations[1].facing".into(),std::f32::consts::FRAC_PI_4.to_string()]);
         create.push(tag.into());run(create);
         let fields=||run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.into()]);
         let before=fields();let file=tags.join(tag);let before_sha=crate::maps::hash_file(&file).unwrap();
         let inventory=scenario_squad_start_choices(&before).unwrap();assert_eq!(inventory.len(),4);
         assert!(inventory.iter().all(|row|row.starts.as_ref().unwrap().len()==2));
         let operation=Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),
-            position:[20.25,-8.5,4.125],source_sha256:before_sha.clone()};
+            position:[20.25,-8.5,4.125],source_sha256:before_sha.clone(),facing_radians:None};
         run(operation.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());
         let after=fields();assert_eq!(reviewed_difference(&before,&after,&operation).unwrap().len(),1);
         let readback=run(operation.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());
@@ -1063,8 +1082,13 @@ mod tests {
         let after_sha=crate::maps::hash_file(&file).unwrap();assert_ne!(before_sha,after_sha);
         ScenarioSquadReadback{source_sha256:after_sha.clone(),squads:scenario_squad_start_choices(&after).unwrap(),include_starts:true}.validate().unwrap();
         let restore=Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),
-            position:[1.,1.,1.],source_sha256:after_sha.clone()};
+            position:[1.,1.,1.],source_sha256:after_sha.clone(),facing_radians:None};
         run(restore.arguments_with_fields(&tags,"scnr",tag,&after).unwrap());assert_eq!(before,fields());
+        let pose=|position:[f32;3],facing:f32|Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),position,source_sha256:crate::maps::hash_file(&file).unwrap(),facing_radians:Some(facing)};
+        let rotation=pose([1.,1.,1.],-std::f32::consts::FRAC_PI_2);let args=rotation.arguments_with_fields(&tags,"scnr",tag,&before).unwrap();assert_eq!(args.iter().filter(|arg|arg.as_str()=="-S").count(),1);run(args);
+        let rotated=fields();assert_eq!(reviewed_difference(&before,&rotated,&rotation).unwrap().len(),1);let native=run(rotation.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());rotation.verify_readback(&tags,"scnr",tag,&before,&native).unwrap();assert!(native.trim().parse::<f32>().unwrap()< -89.99);
+        let combined=pose([2.,3.,4.],std::f32::consts::PI);run(combined.arguments_with_fields(&tags,"scnr",tag,&rotated).unwrap());let after_pose=fields();assert_eq!(reviewed_difference(&rotated,&after_pose,&combined).unwrap().len(),2);let read=run(combined.readback_arguments(&tags,"scnr",tag,&rotated).unwrap().unwrap());combined.verify_readback(&tags,"scnr",tag,&rotated,&read).unwrap();
+        let original=pose([1.,1.,1.],std::f32::consts::FRAC_PI_4);run(original.arguments_with_fields(&tags,"scnr",tag,&after_pose).unwrap());assert_eq!(before,fields());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         println!("Native AI fixture:4squads/8starts; toolSHA={}; beforeSHA={before_sha}; afterSHA={after_sha}; restoredSHA={}",
             crate::maps::hash_file(&executable).unwrap(),crate::maps::hash_file(&file).unwrap());
     }
@@ -1074,7 +1098,7 @@ mod tests {
     }
     fn start_edit()->Operation {
         Operation::EncounterStartPosition{encounter:0,squad:0,start:0,encounter_name:"original".into(),squad_name:"squad_a".into(),
-            position:[4.0,5.0,6.0],source_sha256:"a".repeat(64)}
+            position:[4.0,5.0,6.0],source_sha256:"a".repeat(64),facing_radians:None}
     }
     #[test]
     fn ai_start_review_rejects_adjacent_fields_stale_identity_and_unavailable_coordinates(){
@@ -1108,7 +1132,7 @@ mod tests {
     fn ai_coordinate_snapshot_rejects_wrong_compiled_values_missing_details_and_legacy_scope_changes(){
         use crate::maps::*;
         let squad=EncounterSquad{name:"squad_a".into(),actor_palette_index:-1,actor_variant_tag_id:None,normal_count:1,insane_count:1,
-            initial_state:2,return_state:2,starting_locations:vec![AiStartingLocation{position:[1.0,2.0,3.0],facing:0.0,flags:0,
+            initial_state:2,return_state:2,starting_locations:vec![AiStartingLocation{position:[1.0,2.0,3.0],facing:std::f32::consts::FRAC_PI_2,flags:0,
                 initial_state:2,return_state:2,actor_palette_index:-1,actor_variant_tag_id:None,command_list:-1}]};
         let mut map=MapInspection{player_starting_profiles:None,header:MapHeader{version:609,engine:"unit fixture".into(),name:"unit".into(),
             build:String::new(),scenario_type:0,file_size:0,declared_size:0,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,
@@ -1118,6 +1142,8 @@ mod tests {
             scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"level".into()};
         let snapshot=ScenarioSquadReadback{source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&ai_fields()).unwrap(),include_starts:true};
         snapshot.verify_map(&map).unwrap();
+        map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].facing=0.;assert!(snapshot.verify_map(&map).is_err());
+        map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].facing=std::f32::consts::FRAC_PI_2;
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].position[0]=9.0;
         assert!(snapshot.verify_map(&map).is_err());
         let legacy=ScenarioSquadReadback{source_sha256:"a".repeat(64),squads:scenario_squad_choices(&ai_fields()).unwrap(),include_starts:false};
@@ -1232,4 +1258,18 @@ mod tests {
         assert!(dependency_lines("../secret.bitmap\n").is_err());
         assert!(dependency_lines("a.bitmap\nA.bitmap\n").is_err());
     }
+    #[test]
+    fn native_start_pose_changes_only_requested_position_and_heading_with_degree_readback() {
+        let before=ai_fields();let mut operation=start_edit();if let Operation::EncounterStartPosition{position,facing_radians,..}=&mut operation{*position=[1.,2.,3.];*facing_radians=Some(0.);}
+        let args=operation.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&before).unwrap();assert_eq!(args.iter().filter(|arg|arg.as_str()=="-S").count(),1);assert!(args.iter().any(|arg|arg.ends_with(".facing")));
+        let after=before.replace("facing (90)","facing (0)");assert_eq!(reviewed_difference(&before,&after,&operation).unwrap().len(),1);operation.verify_readback(Path::new("owned-tags"),"scnr","level.scenario",&before,"0").unwrap();assert!(reviewed_difference(&before,&after.replace("return_state (alert)","return_state (guarding)"),&operation).is_err());
+        if let Operation::EncounterStartPosition{facing_radians,..}=&mut operation{*facing_radians=Some(-std::f32::consts::FRAC_PI_2);}
+        operation.verify_readback(Path::new("owned-tags"),"scnr","level.scenario",&before,"-90.000003").unwrap();assert!(operation.verify_readback(Path::new("owned-tags"),"scnr","level.scenario",&before,"-1.570796").is_err());
+        let actual_type=before.replace("facing (90) angle","facing (90)                       angle (float32)");assert_eq!(scenario_squad_start_choices(&actual_type).unwrap()[0].starts.as_ref().unwrap()[0].facing_radians,Some(std::f32::consts::FRAC_PI_2));
+        let absent=before.replace("                        facing (90) angle\n","");assert!(scenario_squad_start_choices(&absent).unwrap()[0].starts.as_ref().unwrap()[0].facing_radians.is_none());assert!(operation.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&absent).is_err());
+        assert!(scenario_squad_start_choices(&before.replace("facing (90) angle","facing (90) float32")).is_err());
+        for value in [f32::NAN,f32::INFINITY,7.] {let mut invalid=operation.clone();if let Operation::EncounterStartPosition{facing_radians,..}=&mut invalid{*facing_radians=Some(value);}assert!(invalid.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&before).is_err());}
+        let legacy=serde_json::json!({"index":0,"position":[1.0,2.0,3.0]});let point:ScenarioStartChoice=serde_json::from_value(legacy.clone()).unwrap();assert!(point.facing_radians.is_none());assert_eq!(serde_json::to_value(point).unwrap(),legacy);
+    }
+
 }

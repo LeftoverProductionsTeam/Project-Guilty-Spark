@@ -23,9 +23,10 @@ function Fixture(){
     </WorkspacePanels></div>;
 }
 function NativeAiDraftFixture(){
- const [busy,setBusy]=useState(false),[dirty,setDirty]=useState(false);
- const context={projectId:'ai-panel-fixture',buildId:'source',tag:'levels/test/test.scenario',class:'scnr',tagSha256:'a'.repeat(64),startEditIssue:null,protectedSquadEncounters:[],scenarioStartSquads:[{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1,starts:[{index:0,position:[1,2,3]}]}]} as NativeTagContext;
+ const [busy,setBusy]=useState(false),[dirty,setDirty]=useState(false),[operation,setOperation]=useState<unknown>(null);
+ const facing=location.search.includes('facing');
+ const context={projectId:'ai-panel-fixture',buildId:'source',tag:'levels/test/test.scenario',class:'scnr',tagSha256:'a'.repeat(64),startEditIssue:null,protectedSquadEncounters:[],scenarioStartSquads:[{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1,starts:[{index:0,position:[1,2,3],...(facing?{facingRadians:Math.PI/2}:{})}]}]} as NativeTagContext;
  const [draft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
- return <><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><button onClick={()=>setBusy(false)}>Finish preview</button><output data-testid="ai-draft">{JSON.stringify(draft)}</output>{[true,false].map((active,index)=><section key={index} data-testid={'ai-inspector-'+index}><NativeStartingPositions context={context} busy={active&&busy} dirty={dirty} onPreview={()=>setBusy(true)} onDraftChange={()=>{}}/></section>)}</>;
+ return <><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><button onClick={()=>setBusy(false)}>Finish preview</button><output data-testid="ai-operation">{JSON.stringify(operation)}</output><output data-testid="ai-draft">{JSON.stringify(draft)}</output>{[true,false].map((active,index)=><section key={index} data-testid={'ai-inspector-'+index}><NativeStartingPositions context={context} busy={active&&busy} dirty={dirty} onPreview={value=>{setOperation(value);setBusy(true);}} onDraftChange={()=>{}}/></section>)}</>;
 }
-createRoot(document.getElementById('root')!).render(location.search==='?native-ai'?<NativeAiDraftFixture/>:<Fixture/>);
+createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);

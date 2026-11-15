@@ -24,6 +24,8 @@ if(blackEchoCameraReview&&!blackEchoReview)throw Error('The native camera varian
 const saveOnly=process.env.SPARK_NATIVE_WORKSHOP_SAVE_ONLY==='1',terminalReview=process.env.SPARK_NATIVE_TERMINAL_REVIEW==='1',controlTag='levels/b40/devices/holo control/b40_holo control';
 if(blackEchoReview&&(terminalReview||saveOnly||process.env.SPARK_NATIVE_AI_START_RESUME||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run Black Echo native authoring separately from other feature variants.');
 if(process.env.SPARK_NATIVE_AI_START_REVIEW==='1'&&(blackEchoReview||terminalReview||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run the recovered-start UI variant separately from terminal, append and game variants.');
+const aiFacingReview=process.env.SPARK_NATIVE_AI_FACING_REVIEW==='1';
+if(aiFacingReview&&process.env.SPARK_NATIVE_AI_START_REVIEW!=='1')throw Error('Native facing review requires the original AI start source workflow');
 const expect=assertion.configure({timeout:60000});
 const hash=async file=>{const digest=crypto.createHash('sha256');for await(const b of createReadStream(file))digest.update(b);return digest.digest('hex');};
 await fs.mkdir(await assertQaOutputPath(output));
@@ -77,9 +79,10 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     let changed,compileIssue;await expect.poll(async()=>{changed=(await call('open_project',{id:fork.id})).project.builds.find(row=>!beforeBuilds.includes(row.id));if(changed)report.failedNativeJobId=changed.id;if(!changed)compileIssue=(await page.locator('.toast').allTextContents()).find(text=>text.includes('Native tag integrity check blocked compilation:'))?.slice(-1800);return !!compileIssue||['validated','failed','blocked'].includes(changed?.status);},{timeout:300000,intervals:[1000,2000]}).toBe(true);
     if(compileIssue){record.compilerIssue=compileIssue;throw Error(compileIssue);}expect(changed.status).toBe('validated');
     const folder=path.join(output,'ai-start-independent-readback');await fs.mkdir(folder);await run(path.join(invader,'invader-extract.exe'),['-s',scenario+'.scenario','-t',folder,changed.output]);
-    const key='encounters['+squad.encounter+'].squads['+squad.squad+'].starting_locations['+point.index+'].position';
+    const startKey='encounters['+squad.encounter+'].squads['+squad.squad+'].starting_locations['+point.index+']',key=startKey+'.position';
     const query=await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G',key,scenario+'.scenario']);const compiledPosition=query.stdout.trim().split(',').map(Number);
-    proposal.forEach((value,index)=>expect(compiledPosition[index]).toBeCloseTo(value,5));expect(await hash(map)).toBe(record.originalCacheSha256);expect(await hash(parent.output)).toBe(record.parentCacheSha256);
+    proposal.forEach((value,index)=>expect(compiledPosition[index]).toBeCloseTo(value,5));
+    if(record.proposedFacingRadians!==undefined){const result=await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G',startKey+'.facing',scenario+'.scenario']);const degrees=Number(result.stdout.trim()),radians=degrees*Math.PI/180;expect(Math.abs(Math.atan2(Math.sin(radians-record.proposedFacingRadians),Math.cos(radians-record.proposedFacingRadians)))).toBeLessThan(.000002);record.compiledFacingDegrees=degrees;record.compiledFacingRadians=radians;}expect(await hash(map)).toBe(record.originalCacheSha256);expect(await hash(parent.output)).toBe(record.parentCacheSha256);
     Object.assign(record,{stage:'passed',complete:true,realUi:true,mouseAxisDrag:true,flightReleased:true,reviewNavigation:true,previewAcceptRestore:true,saveRestart:true,beforePosition:record.beforePosition,proposal,compiledPosition,sourceTagSha256:acceptedHash,cacheSha256:await hash(changed.output),scenarioSha256:await hash(path.join(folder,scenario+'.scenario')),originalAndPreviousGoodUnchanged:true});
     await page.screenshot({path:path.join(output,'ai-start-accepted.png')});await save(fork.id);console.log('ORIGINAL_AI_START_NATIVE',JSON.stringify(record));
    }
@@ -214,7 +217,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     let parent;await expect.poll(async()=>{parent=(await call('open_project',{id:fork.id})).project.builds.at(-1);if(parent)report.failedNativeJobId=parent.id;if(parent?.status==='failed')throw Error('Recovered source rebuild failed: '+JSON.stringify(parent));return parent?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');
     report.nativeSourceForkBuild=parent;record.parentCacheSha256=await hash(parent.output);
     const context=()=>call('native_tag_context',{projectId:fork.id});const baseline=await context();
-    expect(baseline.startEditIssue).toBeNull();expect(baseline.protectedSquadEncounters).not.toContain('gs_w01_g01');
+    record.beforeSourceTagSha256=baseline.tagSha256;expect(baseline.startEditIssue).toBeNull();expect(baseline.protectedSquadEncounters).not.toContain('gs_w01_g01');
     const squad=baseline.scenarioStartSquads.find(row=>row.encounterName==='gs_w01_g01'),point=squad?.starts?.[0];expect(point).toBeTruthy();
     record.stage='show handles from Tags while flight is enabled';
     await chooseTool(page,'Level editor');await page.getByRole('button',{name:'RMB flight · orbit on',exact:true}).click();
@@ -230,12 +233,23 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     const x=geometry.rect.x+(handle[0]+1)*geometry.rect.width/2,y=geometry.rect.y+(1-handle[1])*geometry.rect.height/2;
     const dx=(handle[0]-origin[0])*geometry.rect.width/2,dy=-(handle[1]-origin[1])*geometry.rect.height/2,length=Math.hypot(dx,dy);expect(length).toBeGreaterThan(1);
     record.stage='drag native X handle';await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx/length*55,y+dy/length*55,{steps:12});await page.mouse.up();
+    if(aiFacingReview){
+     expect(Number.isFinite(point.facingRadians)).toBe(true);record.beforeFacingRadians=point.facingRadians;record.stage='rotate native Z facing handle';
+     await page.keyboard.press('e');await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).mode)).toBe('rotate');
+     const ring=await canvas.evaluate(element=>{const r=element.getBoundingClientRect(),g=JSON.parse(element.dataset.gsGizmo);return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},points:g.rotationHandles.Z,origin:g.origin};});
+     expect(ring.points?.length).toBeGreaterThan(2);let selected;
+     for(const candidate of ring.points){const x=ring.rect.x+(candidate[0]+1)*ring.rect.width/2,y=ring.rect.y+(1-candidate[1])*ring.rect.height/2;if(x<ring.rect.x||y<ring.rect.y||x>ring.rect.x+ring.rect.width||y>ring.rect.y+ring.rect.height)continue;await page.mouse.move(x,y);if(await canvas.evaluate(element=>JSON.parse(element.dataset.gsGizmo).axis)==='Z'){selected={x,y};break;}}
+     expect(selected,'an actual projected native Z rotation picker must be selectable').toBeTruthy();await page.mouse.down();
+     const cx=ring.rect.x+(ring.origin[0]+1)*ring.rect.width/2,cy=ring.rect.y+(1-ring.origin[1])*ring.rect.height/2,dx=selected.x-cx,dy=selected.y-cy;
+     for(let step=1;step<=12;step++){const angle=step*Math.PI/36;await page.mouse.move(cx+dx*Math.cos(angle)-dy*Math.sin(angle),cy+dx*Math.sin(angle)+dy*Math.cos(angle));}await page.mouse.up();record.mouseRotation=true;
+    }
     expect((await context()).tagSha256).toBe(baseline.tagSha256);
     await page.screenshot({path:path.join(output,'ai-start-dragged.png')});await page.getByRole('button',{name:'Review AI start source',exact:true}).click();
-    panel=page.locator('.native-tag-operations');const input=panel.getByRole('spinbutton',{name:'AI start X',exact:true});await expect(input).toBeFocused();
+    panel=page.locator('.native-tag-operations');const input=panel.getByRole('spinbutton',{name:aiFacingReview?'AI start facing degrees':'AI start X',exact:true});await expect(input).toBeFocused();
+    if(aiFacingReview){record.proposedFacingRadians=Number(await input.inputValue())*Math.PI/180;expect(Math.abs(Math.atan2(Math.sin(record.proposedFacingRadians-point.facingRadians),Math.cos(record.proposedFacingRadians-point.facingRadians)))).toBeGreaterThan(.01);}
     const proposal=await Promise.all(['X','Y','Z'].map(axis=>panel.getByRole('spinbutton',{name:'AI start '+axis,exact:true}).inputValue().then(Number)));
     expect(Math.abs(proposal[0]-point.position[0])).toBeGreaterThan(.001);expect(proposal[1]).toBeCloseTo(point.position[1],5);expect(proposal[2]).toBeCloseTo(point.position[2],5);
-    record.stage='review accept restore and reaccept';await panel.getByRole('button',{name:'Preview AI starting position',exact:true}).click();
+    record.stage='review accept restore and reaccept';await panel.getByRole('button',{name:aiFacingReview?'Preview AI starting pose':'Preview AI starting position',exact:true}).click();
     const accept=()=>panel.getByRole('button',{name:'Accept as new source revision',exact:true});await expect(accept()).toBeEnabled();await accept().click();
     await expect.poll(async()=>(await context()).tagSha256).not.toBe(baseline.tagSha256);const accepted=await context();
     await panel.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(async()=>(await context()).tagSha256).toBe(baseline.tagSha256);

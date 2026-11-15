@@ -172,3 +172,5 @@ Owner addendum: full in-game HUD editor is required, not just Firefight text or 
 
 
 14Nov selected HUD artwork source continuation: original sprite artwork can now be placed in the existing HUD view using the existing bitmap preview canvas, authored native anchors/scales and source/sequence identities (untested source). Source review also corrected outward corner signs in marker/drag/nudge math and retained unknown-anchor/scales refusal. No duplicate decoder/cache/writer or runtime adapter. Full layered/stateful HUD rendering, structural/native source output and UI/native/game/peer acceptance remain open; no tests/builds/apps/games executed. All475IDs/M1–M6/Operation110 unchanged.
+
+15Nov original AI pose milestone: recovered-source start XYZ plus exposed facing now passes actual Windows viewport/review/restore/Save/restart/MCC13 rebuild and independent pose readback. Exact scope/digests in RUNTIME_INTEGRATION_20261107; recipe restrictions unchanged. Stock campaign/CE/game/peers and all475/M1–M6 remain open.

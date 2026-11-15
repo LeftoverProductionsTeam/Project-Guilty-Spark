@@ -1,7 +1,7 @@
 import {addAfterEffect,useFrame,useThree} from '@react-three/fiber';
 import {useEffect,useRef} from 'react';
 import {Box3,Vector3} from 'three';
-import type {Object3D} from 'three';
+import type {Object3D,BufferGeometry} from 'three';
 type GizmoControl=Object3D&{enabled:boolean;object?:Object3D;space:string;mode:string;axis?:string|null;dragging?:boolean;getHelper?:()=>Object3D;gizmo?:{picker?:Record<string,Object3D>}};
 /** Read-only canvas diagnostics used to verify actual camera/render behavior. */
 export default function ViewportTelemetry(){
@@ -35,15 +35,21 @@ export default function ViewportTelemetry(){
     const decals=decalState?JSON.stringify(decalState):'';
     if(decals!==stats.decals){if(decals)gl.domElement.dataset.gsDecals=decals;else delete gl.domElement.dataset.gsDecals;stats.decals=decals;}
     if(active){
-      const helper=active.gizmo?.picker?.[active.mode]??active.getHelper?.()??active,handles:Record<string,number[]>={};
+      const helper=active.gizmo?.picker?.[active.mode]??active.getHelper?.()??active,handles:Record<string,number[]>={},rotationHandles:Record<string,number[][]>={};
       helper.updateWorldMatrix(true,true);
       helper.traverse(object=>{
         if(!['X','Y','Z'].includes(object.name)||handles[object.name])return;
         box.current.setFromObject(object);if(box.current.isEmpty())return;
         const p=box.current.getCenter(point.current).project(camera);handles[object.name]=[p.x,p.y];
+        if(active?.mode==='rotate'){
+          const positions=(object as Object3D&{geometry?:BufferGeometry}).geometry?.getAttribute('position');
+          if(positions){const samples:number[][]=[];for(let i=0;i<positions.count;i+=Math.max(1,Math.floor(positions.count/12))){
+            const position=point.current.fromBufferAttribute(positions,i).applyMatrix4(object.matrixWorld).project(camera);if(position.z>=-1&&position.z<=1)samples.push([position.x,position.y]);
+          }rotationHandles[object.name]=samples;}
+        }
       });
       const origin=active.object!.getWorldPosition(point.current).project(camera);
-      const value=JSON.stringify({space:active.space,mode:active.mode,axis:active.axis,dragging:active.dragging,objectPosition:active.object!.position.toArray(),origin:[origin.x,origin.y],handles});
+      const value=JSON.stringify({space:active.space,mode:active.mode,axis:active.axis,dragging:active.dragging,objectPosition:active.object!.position.toArray(),objectRotation:active.object!.rotation.toArray().slice(0,3),rotationHandles,origin:[origin.x,origin.y],handles});
       if(value!==stats.gizmo){gl.domElement.dataset.gsGizmo=value;stats.gizmo=value;}
     }else if(stats.gizmo){delete gl.domElement.dataset.gsGizmo;stats.gizmo='';}
   });return null;

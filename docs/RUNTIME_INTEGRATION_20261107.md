@@ -424,3 +424,26 @@ Discovered and fixed: preflight initially dropped shots when validating mission 
 One 3521-file/184203140B SDK subset, manifest f91e5b3f0cf5d03a1be515b2c1b68567d19c8d34face4694241a5cdf7d4de58f, served both native variants. The second Windows build was needed for the observed shared-generator defect; compiler dependencies and SDK were reused. The existing stale-Firefight negative control starts no compiler and preserves previous-good output; new scene snapshots/recording ownership/range validation are covered by focused source/backend checks. Save37944 was not reproduced and remains unresolved. All475 IDs/M1–M6, physical peers, camera/input restoration, full campaign endings/combat, settlement4/7 and other gameplay remain open. Temporary images/maps/binaries are disposable evidence, not release assets.
 
 QA40870 completed disposal: run-JJM8jU/output confirmed absent;3655625421logical bytes removed. Allocated-file disposal total is unavailable; no physical-free-space claim. No owned application/compiler/browser/game remains. Legacy ACTIVE_TASK.previous and the475CSV requirement records remain byte-identical.
+
+## Original AI position and facing — native Windows milestone, 15 November
+
+Source base `e5bc5c1e03f977133c9f791225c97632f6456bd2` plus this commit. The existing original-start operation now carries optional native radians, while the UI exposes degrees and a Z-only viewport rotation ring. Unknown facing stays unavailable, old position-only receipts remain readable, recipe-owned groups remain refused, and position-only writes preserve original heading. A review admits only the explicitly requested one/two field differences; compiled inventory/readback now checks exposed heading as well as XYZ. No new source writer, state store or game adapter.
+
+QA79527/run-IRRsAU: source-matched actual Windows app; Tags/scnr/Native Output → original start → actual X mouse drag and E/Z mouse rotation → Review focuses facing → Preview pose/Accept → exact before-source Restore/reapply → Save → full close/reopen → Build working tag edits → independent Invader extraction/-G. Before XYZ [4,3,0.1], proposed [4.427970907018198,3,0.1], compiled [4.427971,3,0.1]; before facing 0rad, proposed 1.322528406873289rad, independently compiled 75.775293° (1.3225283545134117rad). Three normal app closes; zero page errors. Baseline Firefight project preparation/Undo/Redo/Save/restart/native compile and stale-config refusal also pass. Native source Restore/reapply is separate from project Ctrl+Z/Y. No Save failure in this run;37944 remains unresolved, not disproved.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| runtimeSource | `450fa8d759acbf5f79340a45d15311fc822500e765de08ba7b355eb9a924dc9e` |
+| app | `8aeec8c50fd56b66088af3b5d7f3cbc0a0da54f505bc5a86a8ae8bfa6841772c` |
+| beforeTag | `6305c075f5ac889e3ae2304ebb69d75ef3239ec41f81e5518b7b748b8f77d8a2` |
+| acceptedTag | `2ab57f8371a2555549c8e1dc06373ed61a7c0db70f279ef0fbf7d2e7fafc4a64` |
+| cache | `678ba743ebf470962a27f596e9f892e91503272c15614f08f2b8a3824bdb395c` |
+| extractedScenario | `afc26ace278fa2c0117ea531c57e39b674085cb789fba351640909e72e017ddb` |
+| originalCache | `7de861380192a61346b54776a185fa1d80f850382300b1b3b37064c9f9255fe6` |
+| parentCache | `0f187607e281d7b0613d190763fb48c499cd3bb0a025456e514b307d18f9ffbf` |
+
+Checks: TypeScript;20frontend tests (nativeAiStart/mapSession);2focused editor browser workflows;10Rust native-operation tests including the explicitly enabled installed-Invader fixture; frozen Windows frontend/backend release build. Native fixture proves heading-only and combined pose differences and byte-identical tag restoration. Initial new JSON assertion distinguished integer from float literals; fixture corrected. Native type check initially refused installed `angle (float32)`; exact declaration support and negative wrong-type test now pass. Browser option disabled check used an unreliable role assertion despite a disabled DOM option; final test checks the attribute and actual keyboard inability to select it. No assertion or Source Guardian/ownership/hash/restoration protection was removed.
+
+One2676-file/146023117B disposable SDK closure; originals/archive and both previous-good caches rehashed unchanged, owned short alias removed. Reproduction: existing `test-firefight-native.mjs` with SPARK_NATIVE_AI_START_REVIEW=1 and SPARK_NATIVE_AI_FACING_REVIEW=1, installed tools and a matching fresh app in an approved owned QA scope. Source/test recipes and these digests are retained; generated SDK/maps/binaries/browser profiles/screenshots are disposable, not release deliverables. This is an independently recovered owned fixture, not stock campaign, CE gameplay, actual actor direction/navigation/combat, peer or human acceptance. No games, original installations, Forerunner or remotes touched. Full475/M1–M6 remain open.
+
+QA79527 finalized: owned app/compilers/browser terminal; output confirmed absent,3542331406logicalB disposed (allocated-file disposal unavailable). No artifact export or replacement archive. Both manifest aliases remain required and byte-identical, one Git blob; ACTIVE_TASK.previous unchanged.
