@@ -56,3 +56,10 @@ it('keeps native facing unavailable until the exact source exposes it, and conve
  for(const value of [undefined,NaN,Infinity])expect(nativeAiStartDragFacing(view,view,value,true)).toBeNull();expect(nativeAiStartDragFacing(draft(),draft(),0,true)).toBeNull();expect(nativeAiStartDragFacing(view,view,0,false)).toBeNull();
  expect(nativeAiStartDragValues(view,{...view,facingDegrees:'80'},[1,2,3],true)).toBeNull();
 });
+
+it('reuses source-bound position drafts for encounter firing points without inventing squad or heading telemetry',()=>{
+ const source=context();source.startEditIssue='No start inventory';source.combatEditIssue=null;source.scenarioCombat=[{encounter:0,name:'original',points:[{index:0,position:[1,2,3],group:'z'}],squads:[]}];const view:NativeAiStartView={...draft(),kind:'firing',squad:-1,squadName:'Firing positions',originalGroup:'z',group:'b'};
+ expect(nativeAiStartMatches(view,source)).toBe(true);expect(nativeAiStartKey(source,0,-1,0,'firing')).not.toBe(nativeAiStartKey(source,0,-1,0));
+ for(const patch of [{combatEditIssue:'Unavailable'},{scenarioCombat:[]},{protectedSquadEncounters:['original']},{tagSha256:'b'.repeat(64)}])expect(nativeAiStartMatches(view,{...source,...patch})).toBe(false);
+ const changed=structuredClone(source);changed.scenarioCombat![0].points[0].group='a';expect(nativeAiStartMatches(view,changed)).toBe(false);expect(nativeAiStartMatches({...view,facingDegrees:'0'},source)).toBe(false);expect(nativeAiStartDragFacing(view,view,0,true)).toBeNull();expect(nativeAiStartDragValues(view,{...view,group:'a'},[4,5,6],true)).toBeNull();expect(nativeAiStartDragValues(view,view,[4,5,6],true)).toEqual(['4','5','6']);
+});

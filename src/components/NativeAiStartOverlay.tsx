@@ -29,8 +29,8 @@ export default function NativeAiStartOverlay({project,enabled,snap,mode,onSelect
     void call<NativeTagContext>('native_tag_context',{projectId:project.id}).then(context=>{
       if(!live)return;
       if(nativeAiStartMatches(requested,context)){setReviewed(scope);callbacks.current.onSelectScene();}
-      else {setDraft(previous=>previous?.key===scope?{...previous,active:false}:previous);callbacks.current.notify('AI start handles were hidden because their native source changed. Refresh AI starting positions before reviewing another edit.');}
-    }).catch(error=>{if(live){setDraft(previous=>previous?.key===scope?{...previous,active:false}:previous);callbacks.current.notify('AI start handles could not verify their source: '+String(error));}});
+      else {setDraft(previous=>previous?.key===scope?{...previous,active:false}:previous);callbacks.current.notify('Native AI point handles were hidden because their source changed. Refresh native source controls before reviewing another edit.');}
+    }).catch(error=>{if(live){setDraft(previous=>previous?.key===scope?{...previous,active:false}:previous);callbacks.current.notify('Native AI point handles could not verify their source: '+String(error));}});
     return()=>{live=false;};
   },[scope,project.id]);
   useEffect(()=>{

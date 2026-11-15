@@ -10,10 +10,13 @@ export interface NativeCombatSource {points:NativeFiringPoint[];groups:Record<Ca
 export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];patrol?:{points:NativePatrolPoint[]};combat?:NativeCombatSource;behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
 export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
 export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number];facingRadians?:number|null}[]|null}
+export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups']}[]}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null}
+  | {kind:'encounterFiringPosition';encounter:number;point:number;encounterName:string;position:[number,number,number];group:string;sourceSha256:string}
+  | {kind:'encounterSquadFiringGroups';encounter:number;squad:number;encounterName:string;squadName:string;groups:NativeCombatSource['groups'];sourceSha256:string}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'|'combat'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
@@ -29,6 +32,8 @@ export interface NativeTagContext {
   canAppendEncounter?:boolean;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
+  scenarioCombat?:NativeScenarioCombat[];
+  combatEditIssue?:string|null;
   startEditIssue?:string|null;
   squadEditIssue?:string|null;
   protectedSquadEncounters?:string[];
@@ -122,4 +127,4 @@ export function campaignCombatPoints(entry:NativeEncounterAppend):NativeFiringPo
 export function customizeCampaignCombat(entry:NativeEncounterAppend):NativeCombatSource{return {points:campaignEncounterStarts(entry).map(p=>({id:p.id,position:[...p.position],group:'a'})),groups:Object.fromEntries(campaignTacticalModes.map(mode=>[mode,['a']])) as NativeCombatSource['groups']};}
 
 /** Explicit source review for the pinned MCC compiler; never modifies input. */
-export function campaignMccSearchReview(combat:NativeCombatSource){const groups={...combat.groups,attackingSearch:[...new Set([...combat.groups.attackingSearch,...combat.groups.attacking])].sort(),defendingSearch:[...new Set([...combat.groups.defendingSearch,...combat.groups.attacking])].sort()};return {groups,changed:groups.attackingSearch.length!==combat.groups.attackingSearch.length||groups.defendingSearch.length!==combat.groups.defendingSearch.length};}
+export function campaignMccSearchReview(combat:Pick<NativeCombatSource,'groups'>){const groups={...combat.groups,attackingSearch:[...new Set([...combat.groups.attackingSearch,...combat.groups.attacking])].sort(),defendingSearch:[...new Set([...combat.groups.defendingSearch,...combat.groups.attacking])].sort()};return {groups,changed:groups.attackingSearch.length!==combat.groups.attackingSearch.length||groups.defendingSearch.length!==combat.groups.defendingSearch.length};}

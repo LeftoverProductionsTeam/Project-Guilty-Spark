@@ -637,7 +637,7 @@ fn prepare(
         snapshot.validate()?;
         // Parent expectations were verified above. Current source supersedes
         // only scalar count targets, never append/controller/actor safeguards.
-        encounter_expectations.retain(|expected|!expected.is_squad_count_edit()&&!(snapshot.include_starts&&expected.is_squad_start_edit()));
+        encounter_expectations.retain(|expected|!expected.is_squad_count_edit()&&!(snapshot.include_starts&&expected.is_squad_start_edit())&&!snapshot.combat.iter().any(|op|op.combat_target_key()==expected.combat_target_key()&&op.combat_target_key().is_some()));
     }
     let scenario_squad_readback=input.scenario_squad_readback.clone().or(parent_squad_readback);
     if scenario_squad_readback.is_some(){
@@ -1055,6 +1055,10 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
 // definition is a source-review failure, never permission to drop an old check.
 fn retain_encounter_expectation(values:&mut Vec<crate::native_operations::Operation>,value:crate::native_operations::Operation)->Result<()> {
     value.validate("scnr","review.scenario")?;
+    if let Some(key)=value.combat_target_key(){
+        if let Some(index)=values.iter().position(|old|old.combat_target_key()==Some(key)){values[index]=value;return Ok(());}
+        if values.len()>=32{return invalid("Native encounter expectation history exceeds32reviewed operations");}values.push(value);return Ok(());
+    }
     if let crate::native_operations::Operation::EncounterStartPosition{encounter,squad,start,..}=&value{
         if let Some(index)=values.iter().position(|old|matches!(old,crate::native_operations::Operation::EncounterStartPosition{encounter:e,squad:s,start:p,..} if e==encounter&&s==squad&&p==start)){
             values[index]=value;return Ok(());
@@ -1405,7 +1409,8 @@ fn run_with(
             if fields.len()>1024*1024||maps::hash_file(&source)?!=source_sha256{return invalid("Staged native squad source changed or exceeded its review bound");}
             let include_starts=prepared.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
             let squads=if include_starts{crate::native_operations::scenario_squad_start_choices(&fields)?}else{crate::native_operations::scenario_squad_choices(&fields)?};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts};
+            let combat=crate::native_operations::current_combat_targets(&fields,&source_sha256,&prepared.scenario_squad_readback.as_ref().unwrap().combat)?;
+            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
@@ -1454,7 +1459,7 @@ fn run_with(
         if let Some(snapshot)=&receipt.scenario_squad_readback{
             snapshot.verify_map(&inspected)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
-                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,
+                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,
                 "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. This is not AI/gameplay acceptance."
             }))?,false)?;
         }
@@ -1626,6 +1631,11 @@ mod test_fixture;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reviewed_combat_expectations_keep_distinct_targets_and_replace_only_the_same_source_field(){
+        use crate::native_operations::Operation;let point=|e,p,x|Operation::EncounterFiringPosition{encounter:e,point:p,encounter_name:format!("encounter_{e}"),position:[x,0.,0.],group:"z".into(),source_sha256:"a".repeat(64)};let mut values=vec![];retain_encounter_expectation(&mut values,point(0,0,1.)).unwrap();retain_encounter_expectation(&mut values,point(0,1,2.)).unwrap();retain_encounter_expectation(&mut values,point(0,0,3.)).unwrap();assert_eq!(values.len(),2);assert_eq!(values[0],point(0,0,3.));let groups=serde_json::from_value(serde_json::json!({"attacking":["z"],"attackingSearch":[],"attackingGuard":[],"defending":[],"defendingSearch":[],"defendingGuard":[]})).unwrap();let op=Operation::EncounterSquadFiringGroups{encounter:0,squad:0,encounter_name:"encounter_0".into(),squad_name:"guards".into(),groups,source_sha256:"a".repeat(64)};retain_encounter_expectation(&mut values,op.clone()).unwrap();assert_eq!(values.len(),3);retain_encounter_expectation(&mut values,op).unwrap();assert_eq!(values.len(),3);assert!(retain_encounter_expectation(&mut values,Operation::BoundingRadius{value:1.}).is_err());let mut invalid=point(0,0,4.);if let Operation::EncounterFiringPosition{source_sha256,..}=&mut invalid{*source_sha256="bad".into();}assert!(retain_encounter_expectation(&mut values,invalid).is_err());
+    }
+
     use super::*;
     struct Case {
         _root: tempfile::TempDir,

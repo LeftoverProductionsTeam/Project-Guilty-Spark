@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { Project } from '../types';
 import {
-  notifyNativeSource,
+  notifyNativeSource, campaignTacticalModes,campaignMccSearchReview,
+  type NativeCombatSource,
   type NativeOperation,
   type NativeEncounterAppend,
   type NativeTagContext,
@@ -47,6 +48,7 @@ export default function NativeTagOperations({
     [actorCount,setActorCount]=useState('1'),[actorSpacing,setActorSpacing]=useState('0.75');
   const [squadKey,setSquadKey]=useState(''),[normalCount,setNormalCount]=useState(''),[insaneCount,setInsaneCount]=useState('');
   const [normalScale,setNormalScale]=useState(1),[insaneScale,setInsaneScale]=useState(1);
+  const [tacticalGroups,setTacticalGroups]=useState<NativeCombatSource['groups']|null>(null),[tacticalMode,setTacticalMode]=useState<typeof campaignTacticalModes[number]>('attacking');
   const squadChoice=context?.scenarioSquads?.find(row=>`${row.encounter}:${row.squad}`===squadKey);
   useEffect(()=>{
     setNormalCount(squadChoice?.normalCount.toString()??'');setInsaneCount(squadChoice?.insaneCount.toString()??'');
@@ -59,6 +61,13 @@ export default function NativeTagOperations({
   const canScale=!!squadChoice&&squadChoice.normalCount>=0&&squadChoice.insaneCount>=0;
   const scaledNormal=squadChoice&&canScale?Math.min(32,Math.round(squadChoice.normalCount*normalScale)):0;
   const scaledInsane=squadChoice&&canScale?Math.min(32,Math.round(squadChoice.insaneCount*insaneScale)):0;
+  const tacticalSource=context?.scenarioCombat?.find(row=>row.encounter===squadChoice?.encounter)?.squads.find(row=>row.index===squadChoice?.squad&&row.name===squadChoice?.name);
+  useEffect(()=>{setTacticalGroups(tacticalSource?structuredClone(tacticalSource.groups):null);},[context?.tagSha256,squadKey,JSON.stringify(tacticalSource?.groups)]);
+  const tacticalReview=tacticalGroups?campaignMccSearchReview({groups:tacticalGroups}):null;
+  const tacticalChanged=!!tacticalGroups&&!!tacticalSource&&JSON.stringify(tacticalGroups)!==JSON.stringify(tacticalSource.groups);
+  const tacticalIssue=context?.combatEditIssue??squadEditIssue;
+  const tacticalBlocked=busy||dirty||!!tacticalIssue;
+  const tacticalLabel=(s:string)=>s.replace(/[A-Z]/g,c=>' '+c.toLowerCase()).replace(/^./,c=>c.toUpperCase());
   const [hudArray,setHudArray]=useState(''),[hudIndex,setHudIndex]=useState('0');
   const hudGroup=context?.hudArrays?.find(array=>array.name===hudArray);
   const canDuplicateHudDraft=!!context?.canDuplicateHud&&/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&hudIndex.trim()!==''&&!!hudGroup&&hudGroup.count!=null&&hudGroup.count>0&&hudGroup.count<hudGroup.maximum&&Number.isInteger(Number(hudIndex))&&Number(hudIndex)>=0&&Number(hudIndex)<hudGroup.count;
@@ -247,10 +256,10 @@ export default function NativeTagOperations({
             </button>
           </div>
           {context.class==='scnr'&&<details className="native-squad-difficulty">
-            <summary>Existing squads &amp; difficulty scaling</summary>
+            <summary>Existing squads, difficulty &amp; tactics</summary>
             <p className="subtle">Edit the native normal/insane population fields of an existing squad. The engine controls how those fields affect difficulty. AI damage, health and automatic player-count scaling require their own runtime support.</p>
             {squadEditIssue&&<Notice tone="info">{squadEditIssue}</Notice>}
-            {!!context.scenarioSquads?.length?<><label>Encounter / squad<select value={squadKey} disabled={busy||dirty}
+            {!!context.scenarioSquads?.length?<><label>Encounter / squad<select aria-label="Native source squad" value={squadKey} disabled={busy||dirty}
               onChange={event=>{setSquadKey(event.target.value);if(!accepted)setPreview(null);}}>
               {context.scenarioSquads.map(row=><option key={`${row.encounter}:${row.squad}`} value={`${row.encounter}:${row.squad}`}>
                 {row.encounterName||'Unnamed encounter'} / {row.name||'Unnamed squad'} · {row.encounter}:{row.squad}
@@ -276,12 +285,25 @@ export default function NativeTagOperations({
                 <button disabled={busy||dirty||!!squadEditIssue||!validCounts||!populationChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
                   onClick={()=>makePreview({kind:'encounterSquadCounts',encounter:squadChoice.encounter,squad:squadChoice.squad,
                     encounterName:squadChoice.encounterName,squadName:squadChoice.name,normalCount:Number(normalCount),insaneCount:Number(insaneCount),sourceSha256:context.tagSha256!})}>Preview squad counts</button>
+                <details className="native-tactical-groups"><summary>Native tactical firing groups</summary>
+                  <p className="subtle">Choose which existing encounter firing groups this squad may use when attacking/searching/guarding/defending. This does not create positions or force movement, cover or line of sight.</p>
+                  {tacticalIssue&&<Notice tone="info">{tacticalIssue}</Notice>}
+                  {tacticalGroups&&tacticalSource?<><label>Tactical context<select aria-label="Native tactical context" value={tacticalMode} disabled={tacticalBlocked} onChange={e=>setTacticalMode(e.target.value as typeof tacticalMode)}>{campaignTacticalModes.map(mode=><option key={mode} value={mode}>{tacticalLabel(mode)}</option>)}</select></label>
+                    <fieldset disabled={tacticalBlocked}><legend>Eligible native groups</legend><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(2.3rem,1fr))',gap:4}}>{Array.from({length:26},(_,i)=>String.fromCharCode(97+i)).map(g=><label key={g} style={{display:'flex',alignItems:'center',gap:3}}><input type="checkbox" aria-label={'Native firing group '+g.toUpperCase()+' for '+tacticalLabel(tacticalMode)} checked={tacticalGroups[tacticalMode].includes(g)} onChange={e=>{const values=tacticalGroups[tacticalMode];setTacticalGroups({...tacticalGroups,[tacticalMode]:e.target.checked?[...values,g].sort():values.filter(v=>v!==g)});invalidateProposal();}}/>{g.toUpperCase()}</label>)}</div></fieldset>
+                    <p className="subtle">{tacticalGroups[tacticalMode].length?tacticalGroups[tacticalMode].join(', ').toUpperCase():'No groups eligible'}. Draft selections are not accepted native source.</p>
+                    <details><summary>MCC search-group compatibility</summary><p className="subtle">The pinned MCC compiler includes attacking groups in both search contexts. Proposed attacking search: {tacticalReview?.groups.attackingSearch.join(', ').toUpperCase()||'none'}; defending search: {tacticalReview?.groups.defendingSearch.join(', ').toUpperCase()||'none'}. Apply to this draft explicitly; source changes only after Preview and Accept. Other compilers require separate verification.</p><button disabled={tacticalBlocked||!tacticalReview?.changed} onClick={()=>{if(tacticalReview){setTacticalGroups(tacticalReview.groups);invalidateProposal();}}}>Include attacking groups in both search contexts</button></details>
+                    <div className="button-row"><button disabled={tacticalBlocked||!tacticalChanged||context.sourceTarget==='mcc-cea'&&!!tacticalReview?.changed||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>makePreview({kind:'encounterSquadFiringGroups',encounter:squadChoice.encounter,squad:squadChoice.squad,encounterName:squadChoice.encounterName,squadName:squadChoice.name,groups:structuredClone(tacticalGroups),sourceSha256:context.tagSha256!})}>Preview native tactical groups</button><button disabled={busy||!tacticalChanged} onClick={()=>{setTacticalGroups(structuredClone(tacticalSource.groups));invalidateProposal();}}>Reset tactical draft</button></div>
+                    {context.sourceTarget==='mcc-cea'&&tacticalReview?.changed&&<p className="subtle">Review MCC search-group compatibility before previewing this target's changes.</p>}
+                    <p className="subtle">Preview → inspect exact changed bits → Accept as new source revision. Restore before-edit tag restores that revision's original source. Save/restart and build working tag edits; compiled masks must match. Project Undo does not reverse an accepted native revision.</p>
+                  </>:!tacticalIssue&&<p className="subtle">Tactical source telemetry unavailable. Refresh native source controls; no zero masks are assumed.</p>}
+                </details>
                 <p className="subtle">Review below → Accept as new source revision → Build working tag edits (CE source uses Build CE working tag edits). Restore before-edit tag reverses this source revision. Draft count fields are not project edits or a running-game change.</p>
               </>}
             </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
             {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           </details>}
           {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
+          {context.class==='scnr'&&<NativeStartingPositions kind="firing" context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {!!context.hudArrays?.length&&<details className="native-hud-structure">
             <summary>Duplicate native HUD element</summary>
             <p className="subtle">Append a copy of an existing element without moving original indices. Preview checks the copied fields and current dependencies. Accept the source revision, use Build working tag edits, then open the compiled HUD to edit its new layout. Your original tags stay unchanged.</p>
@@ -432,7 +454,7 @@ export default function NativeTagOperations({
             {preview.changedBytes} binary bytes differ. Writer: {preview.toolId}; the accepted revision
             retains the complete native file. Unexposed fields still require native review.
           </p>
-          {!!preview.actorPositions?.length&&<details><summary>{preview.actorPositions.length} reviewed source starting positions</summary>
+          {!!preview.actorPositions?.length&&<details><summary>{preview.actorPositions.length} reviewed source positions</summary>
             <p className="subtle">These positions passed the native source scalar comparison. Game collision, navigation and spawning remain unverified.</p>
             <ol className="native-encounter-readback">{preview.actorPositions.map((position,index)=><li key={index}><code>{position.map(value=>value.toFixed(4)).join(' · ')}</code></li>)}</ol>
           </details>}
