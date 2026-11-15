@@ -14,8 +14,10 @@ import {nativeStandaloneBaseline} from './native-standalone-baseline.mjs';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
+const blackEchoReview=process.env.SPARK_NATIVE_BLACK_ECHO_REVIEW==='1',marineTag='characters/marine_armored/marine_armored assault rifle',floodTag='characters/floodcombat_human/floodcombat_human assault rifle';
 const saveOnly=process.env.SPARK_NATIVE_WORKSHOP_SAVE_ONLY==='1',terminalReview=process.env.SPARK_NATIVE_TERMINAL_REVIEW==='1',controlTag='levels/b40/devices/holo control/b40_holo control';
-if(process.env.SPARK_NATIVE_AI_START_REVIEW==='1'&&(terminalReview||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run the recovered-start UI variant separately from terminal, append and game variants.');
+if(blackEchoReview&&(terminalReview||saveOnly||process.env.SPARK_NATIVE_AI_START_RESUME||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run Black Echo native authoring separately from other feature variants.');
+if(process.env.SPARK_NATIVE_AI_START_REVIEW==='1'&&(blackEchoReview||terminalReview||process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'))throw Error('Run the recovered-start UI variant separately from terminal, append and game variants.');
 const expect=assertion.configure({timeout:60000});
 const hash=async file=>{const digest=crypto.createHash('sha256');for await(const b of createReadStream(file))digest.update(b);return digest.digest('hex');};
 await fs.mkdir(await assertQaOutputPath(output));
@@ -237,6 +239,52 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     Object.assign(record,{beforePosition:point.position,proposal,sourceTagSha256:restarted.tagSha256,previewAcceptRestore:true,saveRestart:true});
     await compileAiStart(fork,record,scenario,map,parent,proposal,restarted.tagSha256,squad,point);
    }
+   if(blackEchoReview){
+    const record=report.nativeBlackEcho={stage:'create source fixture',scope:'Actual native authoring/cache/readback; geometry/area fixture seeded, no gameplay or Forerunner acceptance',gameplayVerified:false};
+    const base=(await state(id)).project,created=await call('create_quickforge_project',{title:'Black Echo native fixture',template:'customBlank',target:'mccSteam'}),seed=created.project,doc=seed.quickForge;
+    seed.title='Operation Black Echo native acceptance';doc.name=seed.title;doc.gameMode='campaign';
+    for(const field of ['workshop','geometry','materials','skyPath','spawns'])doc[field]=structuredClone(base.quickForge[field]);doc.startingProfile=structuredClone(base.firefight.nativePlayerProfile);doc.placements=[];doc.campaignEncounters=[];
+    doc.logic={schemaVersion:1,triggers:[['be_insert',-5,-4],['be_survivors',3,-4],['be_artifact',24,-2],['be_containment',28,2],['be_extract',32,0]].map(([name,x,y])=>({id:crypto.randomUUID(),name,nativeName:name,position:[x,y,1.6],rotation:[0,0,0],dimensions:[2,2,3],visible:true,locked:false})),devices:[],rules:[]};
+    const file=path.join(output,'black-echo-campaign.gsproject');await fs.writeFile(file,JSON.stringify(seed),{flag:'wx'});const [candidate]=await call('import_paths',{paths:[file]}),campaignId=candidate.project.id;
+    await page.reload();await chooseTool(page,'Map library');await open(seed.title);await chooseTool(page,'Creator Studio');
+    const create=page.getByRole('button',{name:'Create Black Echo draft',exact:true,includeHidden:true});await revealPagedControl(create);await create.click();await expect(page.locator('.studio-record')).toHaveCount(7);
+    const ai=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Campaign AI encounters/})});await ai.locator(':scope > summary').click();
+    const actors=[['be_marines',marineTag,[-4,-2,.1]],['be_covenant','characters/grunt/grunt minor plasma pistol',[4,3,.1]],['be_flood',floodTag,[26,2,.1]],['be_defense','characters/grunt/grunt minor plasma pistol',[30,-2,.1]]];
+    record.stage='author actor groups';
+    for(const [name,actor,position] of actors){
+     await ai.getByRole('textbox',{name:'New campaign encounter name',exact:true}).fill(name);await ai.getByRole('combobox',{name:'New campaign actor tag',exact:true}).fill(actor);await ai.getByRole('button',{name:'Add encounter',exact:true}).click();
+     const count=ai.getByRole('spinbutton',{name:'Campaign starting position count',exact:true});await count.fill('2');await count.press('Tab');
+     for(const [index,axis] of ['X','Y','Z'].entries()){const input=ai.getByRole('spinbutton',{name:'Campaign encounter '+axis,exact:true});await input.fill(String(position[index]));await input.press('Tab');}
+    }
+    const rows=page.locator('.studio-record');await rows.nth(1).getByRole('combobox',{name:'On rescue failure 2',exact:true}).selectOption('continue');
+    record.stage='author conditional routes';
+    for(const index of [2,3,4,5,6]){const row=rows.nth(index);if(index!==4)await row.getByRole('checkbox',{name:/^Optional step/}).check();await row.getByRole('combobox',{name:'Mission condition source '+(index+1),exact:true}).selectOption(index===4?'both':'result');}
+    await rows.nth(4).getByRole('combobox',{name:'Mission branch decision 5',exact:true}).selectOption('new');
+    const add=page.getByRole('button',{name:'Add beat',exact:true,includeHidden:true});await revealPagedControl(add);await add.click();
+    const fallback=rows.nth(7);await fallback.getByRole('textbox',{name:'Title',exact:true}).fill('Fall back to evacuation');await fallback.getByRole('combobox',{name:'Trigger',exact:true}).selectOption('triggerVolume');await fallback.getByLabel('Scenario trigger-volume identifier',{exact:true}).fill('be_extract');
+    await fallback.getByRole('checkbox',{name:/^Optional step/}).check();await fallback.getByRole('combobox',{name:'Mission condition source 8',exact:true}).selectOption('result');await fallback.getByRole('combobox',{name:'Mission rescue outcome 8',exact:true}).selectOption('failure');
+    await fallback.locator('summary').filter({hasText:'Native objective & completion'}).click();await fallback.getByRole('checkbox',{name:'Show native HUD objective while this beat is active',exact:true}).check();
+    const review=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Native mission build$/})});await revealPagedControl(review.locator(':scope > summary'));await review.locator(':scope > summary').click();await review.getByRole('combobox',{name:'Native mission activation',exact:true}).selectOption('startup');
+    record.stage='prepare save and restart';await review.getByRole('button',{name:'Prepare mission for native build',exact:true}).click();
+    const mission=async()=>(await state(campaignId)).project.quickForge.logic.handwrittenSources?.find(source=>source.filename==='gs_mission.hsc')?.content;
+    await expect.poll(mission).toContain('(set gs_result_2_failed true)');const prepared=await mission();await page.keyboard.press('Control+z');await expect.poll(mission).toBeUndefined();await page.keyboard.press('Control+y');await expect.poll(mission).toBe(prepared);await save(campaignId);
+    const frozen=(await state(campaignId)).project;expect(frozen.studio.missions).toHaveLength(8);expect(frozen.studio.missions[4].conditionVolume).toBe('be_containment');expect(frozen.studio.missions[4].conditionResult.failed).toBe(false);
+    await page.screenshot({path:path.join(output,'black-echo-prepared.png')});await close();await start();await chooseTool(page,'Map library');await open(seed.title);expect((await state(campaignId)).project.studio).toEqual(frozen.studio);await expect.poll(mission).toBe(prepared);
+    record.stage='native compile';await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Build & check playtest',exact:true}).click();
+    let build;await expect.poll(async()=>{build=await call('quickforge_build_report',{projectId:campaignId});report.nativeBlackEchoBuild=build;if(build?.jobId)report.failedNativeJobId=build.jobId;return ['validated','failed','blocked'].includes(build?.status);},{timeout:300000,intervals:[1000,2000]}).toBe(true);expect(build.status,JSON.stringify(build.blockers)).toBe('validated');
+    record.stage='independent compiled readback';const map=build.build.output,scenario=build.sources.scenarioPath.replaceAll('\\','/'),folder=path.join(output,'black-echo-readback');await fs.mkdir(folder);await run(path.join(invader,'invader-extract.exe'),['-s',scenario+'.scenario','-t',folder,map]);
+    const read=async(key,root=folder)=>(await run(path.join(invader,'invader-edit.exe'),['-t',root,'-G',key,scenario+'.scenario'])).stdout.trim();
+    expect(await read('type')).toBe('singleplayer');const groups=[];
+    for(const [index,[name,actor]] of actors.entries()){
+     const prefix='encounters['+index+'].squads[0]';expect(await read('encounters['+index+'].name')).toBe(name);expect(Number(await read(prefix+'.normal_diff_count'))).toBe(2);expect(Number(await read(prefix+'.insane_diff_count'))).toBe(2);
+     const actorIndex=Number(await read(prefix+'.actor_type'));expect((await read('actor_palette['+actorIndex+'].reference')).replaceAll('\\','/')).toBe(actor+'.actor_variant');
+     const positions=await read(prefix+'.starting_locations[*].position');expect(positions).toBe(await read(prefix+'.starting_locations[*].position',path.join(build.sources.directory,'tags')));groups.push({name,actor,positions});
+    }
+    const globals=(await read('globals[*].name')).split(/\r?\n/),scripts=(await read('scripts[*].name')).split(/\r?\n/);for(const name of ['gs_result_2_done','gs_result_2_failed','gs_branch_1_ready','gs_branch_1_inside'])expect(globals).toContain(name);for(const name of ['gs_mission','gs_mission_bootstrap','gs_complete_4','gs_complete_7'])expect(scripts).toContain(name);
+    const hud=(await read('hud_messages')).replaceAll('\\','/');await run(path.join(invader,'invader-extract.exe'),['-s',hud,'-t',folder,map]);const names=(await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G','messages[*].name',hud])).stdout.trim().split(/\r?\n/);for(const name of ['gs_mission_fail_2',...Array.from({length:8},(_,i)=>'gs_mission_obj_'+(i+1))])expect(names).toContain(name);
+    expect(await hash(report.nativeBuild.build.output)).toBe(report.nativeBuild.build.sha256);const after=(await state(campaignId)).project;expect(after.studio).toEqual(frozen.studio);expect(await mission()).toBe(prepared);await save(campaignId);await page.screenshot({path:path.join(output,'black-echo-built.png')});
+    Object.assign(record,{stage:'passed',complete:true,realUi:true,geometryAndAreasSeeded:true,actorGroupsAuthored:true,undoRedo:true,saveRestart:true,missionSourceSha256:crypto.createHash('sha256').update(prepared).digest('hex'),cacheSha256:await hash(map),scenarioSha256:await hash(path.join(folder,scenario+'.scenario')),groups,globals,scripts,hud,names,manualSettlementGates:[4,7],gameplayVerified:false});console.log('BLACK_ECHO_NATIVE',JSON.stringify(record));
+   }
    if(terminalReview){
     // Fixture geometry/control placement reuses the verified source baseline.
     // The workflow under test authors/prepares/saves/builds through actual UI.
@@ -365,6 +413,9 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    expect(report.errors).toEqual([]);await close();
    }catch(error){
     report.error=String(error);report.stack=error.stack;
+    // Capture while the owned app is alive; shutdown below closes its IPC.
+    const failedJob=report.failedNativeJobId??report.nativeTerminalBuild?.jobId??report.nativeBuild?.jobId;
+    if(call&&failedJob){const boot=await call("bootstrap").catch(()=>null);report.nativeCompilerEvents=boot?.logs?.filter(row=>row.jobId===failedJob).slice(-300);}
     report.nativeInputTrace=await page?.evaluate(()=>window.__sparkEncounterClicks??[]).catch(()=>[]);
     report.nativePanelDiagnostic=await page?.locator('.native-tag-operations').innerText().then(text=>text.slice(-16384),()=>null);
     await page?.screenshot({path:path.join(output,'firefight-failure.png')}).catch(()=>{});
@@ -392,10 +443,10 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
   };
  if(saveOnly)await exercise({root:fixtureRoot,tags:null});
  else await nativeStandaloneBaseline({context:{...context,directory:fixtureRoot},archive,kit,invader,report:report.sourcePreparation,prepareOnly:true,
-  additionalRoots:['characters/grunt/grunt minor plasma pistol.actor_variant','ui/ui_tags_loaded_solo_scenario_type.tag_collection',...(terminalReview?[controlTag+'.device_control']:[])],onPrepared:exercise});
+  additionalRoots:['characters/grunt/grunt minor plasma pistol.actor_variant','ui/ui_tags_loaded_solo_scenario_type.tag_collection',...(terminalReview?[controlTag+'.device_control']:[]),...(blackEchoReview?[marineTag+'.actor_variant',floodTag+'.actor_variant']:[])],onPrepared:exercise});
  report.complete=true;
 });}catch(error){report.error=String(error);report.stack=error.stack;if(call){const boot=await call('bootstrap').catch(()=>null);report.failedSaveDocuments=boot?.entries?.map(entry=>({id:entry.id,title:entry.title}));}
  const failedJob=report.failedNativeJobId??report.nativeTerminalBuild?.jobId??report.nativeBuild?.jobId;
- if(call&&failedJob){const boot=await call('bootstrap').catch(()=>null);report.nativeCompilerEvents=boot?.logs?.filter(row=>row.jobId===failedJob).slice(-300);}
+ if(call&&failedJob&&!report.nativeCompilerEvents){const boot=await call('bootstrap').catch(()=>null);report.nativeCompilerEvents=boot?.logs?.filter(row=>row.jobId===failedJob).slice(-300);}
  await page?.screenshot({path:path.join(output,'firefight-failure.png')}).catch(()=>{});throw error;}
 finally{if(child&&child.exitCode===null&&child.signalCode===null){await stopQaProcess(child);}await browser?.close().catch(()=>{});await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(report,null,2));}

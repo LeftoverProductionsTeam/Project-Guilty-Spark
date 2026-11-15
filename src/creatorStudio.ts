@@ -188,7 +188,6 @@ export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:s
     if(beat.conditionResult!=null){
       const result=beat.conditionResult;
       if(!result||typeof result!=='object'||Array.isArray(result)||Object.keys(result).some(key=>!['beatId','failed'].includes(key))||typeof result.beatId!=='string'||typeof result.failed!=='boolean')throw Error('Invalid mission rescue result');
-      if(beat.conditionVolume!=null||beat.conditionGroup!=null||beat.conditionOutside!=null)throw Error('Choose either an area decision or a rescue result');
       const target=missions.findIndex(row=>row.id===result.beatId);
       if(target<0||target>=index||missions[target].trigger!=='escort'||missions[target].escortFailure!=='continue')throw Error('Choose an earlier survivor escort configured to continue on failure');
     }

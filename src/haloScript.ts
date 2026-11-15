@@ -52,6 +52,10 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
   studio.missions.forEach((beat,i)=>{
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
+    if(beat.conditionResult){
+      const index=studio.missions.findIndex(row=>row.id===beat.conditionResult!.beatId)+1,key='gs_result_'+index;
+      scripted.push('  (if (and '+key+'_done '+(beat.conditionResult.failed?key+'_failed':'(not '+key+'_failed)')+') (begin');
+    }
     if(beat.conditionVolume!=null){
       const volume=ensureName(beat.conditionVolume,`Beat ${i+1} optional condition volume`);deps.push('trigger_volume:'+volume);
       const group=beat.conditionGroup==null?undefined:branches.get(beat.conditionGroup);
@@ -63,10 +67,6 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
       }
       if(beat.conditionOutside===true)condition='(not '+condition+')';
       scripted.push('  (if '+condition+' (begin');
-    }
-    if(beat.conditionResult){
-      const index=studio.missions.findIndex(row=>row.id===beat.conditionResult!.beatId)+1,key='gs_result_'+index;
-      scripted.push('  (if (and '+key+'_done '+(beat.conditionResult.failed?key+'_failed':'(not '+key+'_failed)')+') (begin');
     }
     if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null))
       throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
@@ -132,13 +132,14 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     if(beat.checkpoint===true)scripted.push('  (game_save)');
     if(beat.completeMission===true)scripted.push('  (game_won)');
     if(beat.escortFailure==='continue')scripted.push('  ))');
-    if(beat.conditionVolume!=null||beat.conditionResult!=null)scripted.push('  ))');
+    if(beat.conditionVolume!=null)scripted.push('  ))');
+    if(beat.conditionResult!=null)scripted.push('  ))');
   });
   scripted.push(')', '');
   lines.push(...globals, '', ...manualSetters, ...scripted);
   return {filename:'gs_mission.hsc',content:lines.join('\r\n'),dependencies:deps,activation:'(wake gs_mission)',warnings:[
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
-    'Optional volume conditions run when their step starts. Shared decisions sample once at their first member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
+    'Optional volume conditions run when their step starts. Shared decisions sample once at their first eligible member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
     'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
     ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?['Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),

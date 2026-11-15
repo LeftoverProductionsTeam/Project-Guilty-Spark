@@ -209,6 +209,6 @@ it('routes a continued rescue failure separately from success and refuses dangli
   const bad=structuredClone(project);bad.studio!.missions[1].conditionResult=patch as any;expect(validateCreatorStudio(bad.studio!)).not.toEqual([]);
  }
  for(const patch of [{escortFailure:'stop'},{trigger:'timer'},{escortFailure:'invalid'}]) {const bad=structuredClone(project);Object.assign(bad.studio!.missions[0],patch);expect(validateCreatorStudio(bad.studio!)).not.toEqual([]);}
- const mixed=structuredClone(project);mixed.studio!.missions[1].conditionVolume='rally';expect(validateCreatorStudio(mixed.studio!)).not.toEqual([]);
+ const mixed=structuredClone(project);mixed.studio!.missions[1].conditionVolume='rally';mixed.studio!.missions[1].conditionGroup='rally_decision';expect(validateCreatorStudio(mixed.studio!)).toEqual([]);const combined=exportHaloCeMission(mixed.studio!).content;expect(combined.indexOf('(if (and gs_result_1_done (not gs_result_1_failed))')).toBeLessThan(combined.indexOf('(set gs_branch_1_inside'));await attachNativeCampaignMission(mixed,'manual');
  const legacy=emptyCreatorStudio();legacy.missions=[{...project.studio!.missions[0],escortFailure:undefined}];const original=exportHaloCeMission(legacy).content;expect(original).toContain('(sleep_until false 15)');expect(original).not.toContain('gs_result_');
 });

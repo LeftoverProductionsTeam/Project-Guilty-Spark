@@ -99,7 +99,7 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
    {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue'},
    {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionOutside:true,soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}},
    {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'mission_terminal'},
-   {id:'rescue_success',title:'Success path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionResult:{beatId:'escort',failed:false}},
+   {id:'rescue_success',title:'Success path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionResult:{beatId:'escort',failed:false}},
    {id:'rescue_failure',title:'Failure path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionResult:{beatId:'escort',failed:true}}];
   const source=exportHaloCeMission(native).content;await fs.writeFile(path.join(data,path.dirname(scenario),'scripts/gs_mission.hsc'),source);
   await fs.writeFile(path.join(data,'levels/radio_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from('gs_mission_cue_1=Radio: native cue.\r\ngs_mission_fail_2=Rescue failed: not enough survivors. Continuing the operation.\r\n','utf16le')]));

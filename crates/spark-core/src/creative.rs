@@ -382,7 +382,6 @@ impl CreatorStudio {
             { return invalid("Invalid Creator Studio mission beat"); }
             if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}
             if let Some(result)=&beat.condition_result {
-                if beat.condition_volume.is_some()||beat.condition_group.is_some()||beat.condition_outside.is_some(){return invalid("Choose either an area decision or a rescue result");}
                 if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}
             }
             if (beat.condition_group.is_some()||beat.condition_outside.is_some())&&beat.condition_volume.is_none(){return invalid("Mission branch decisions need an optional condition volume");}
@@ -512,7 +511,7 @@ mod tests {
         let mut stopped=document.clone();stopped.missions[0].escort_failure=None;assert!(stopped.validate().is_err());
         let mut forward=document.clone();forward.missions[1].condition_result.as_mut().unwrap().beat_id="failure".into();assert!(forward.validate().is_err());
         let mut missing=document.clone();missing.missions[1].condition_result.as_mut().unwrap().beat_id="unknown".into();assert!(missing.validate().is_err());
-        let mut mixed=document.clone();mixed.missions[1].condition_volume=Some("rally".into());assert!(mixed.validate().is_err());
+        let mut mixed=document.clone();mixed.missions[1].condition_volume=Some("rally".into());mixed.validate().unwrap();
         let mut wrong=document.clone();wrong.missions[0].trigger="timer".into();assert!(wrong.validate().is_err());
     }
     #[test]

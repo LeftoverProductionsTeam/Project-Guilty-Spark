@@ -564,6 +564,13 @@ pub fn run_prepared_job(
                 other=>return invalid(format!("Unsupported compiler command {other}")),
             };
             let mut native_args=command.args.clone();
+            // Windows extended-length roots reject forward slashes when the
+            // string compiler appends its tag path to the native data root.
+            // Keep source/receipt paths portable; normalize only tool arguments.
+            #[cfg(windows)]
+            if command.tool=="invaderString" {
+                for arg in &mut native_args {*arg=arg.replace('/',"\\");}
+            }
             if command.phase=="lightmaps" {
                 crate::native_lighting::apply(project,&stage,&sources.scenario_path,&invader(tools,"invader-edit").unwrap(),&runner,workspace)?;
                 if let Some(lighting)=crate::native_lighting::request(project){let quality=lighting.lightmap_quality();if native_args.len()!=5||native_args[0]!="lightmaps"{return invalid("Unexpected native lightmap command");}native_args[3]=quality[0].into();native_args[4]=quality[1].into();}

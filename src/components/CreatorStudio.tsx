@@ -352,10 +352,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
         <label><input type="checkbox" checked={beat.conditionVolume!=null||beat.conditionResult!=null} disabled={beat.completeMission===true}
           onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined,conditionGroup:undefined,conditionOutside:undefined,conditionResult:undefined})}/>Optional step / branch · area or rescue result</label>
-        {(beat.conditionVolume!=null||beat.conditionResult!=null)&&<label>Condition kind<select aria-label={'Mission condition source '+(i+1)} value={beat.conditionResult?'result':'area'}
-          onChange={event=>{if(event.target.value==='result'){const source=earlierRescues(i)[0];if(!source){setError('Configure an earlier survivor escort to continue on failure first.');return;}updateBeat(beat.id,{conditionResult:{beatId:source.id,failed:false},conditionVolume:undefined,conditionGroup:undefined,conditionOutside:undefined});}
-            else updateBeat(beat.id,{conditionResult:undefined,conditionVolume:'',conditionGroup:undefined,conditionOutside:undefined});}}>
-          <option value="area">Named area decision</option><option value="result" disabled={!earlierRescues(i).length}>Earlier rescue result</option>
+        {(beat.conditionVolume!=null||beat.conditionResult!=null)&&<label>Condition kind<select aria-label={'Mission condition source '+(i+1)} value={beat.conditionResult?(beat.conditionVolume!=null?'both':'result'):'area'}
+          onChange={event=>{const mode=event.target.value;if(mode!=='area'){const source=earlierRescues(i).find(row=>row.id===beat.conditionResult?.beatId)??earlierRescues(i)[0];if(!source){setError('Configure an earlier survivor escort to continue on failure first.');return;}updateBeat(beat.id,{conditionResult:beat.conditionResult??{beatId:source.id,failed:false},conditionVolume:mode==='both'?(beat.conditionVolume??''):undefined,conditionGroup:mode==='both'?beat.conditionGroup:undefined,conditionOutside:mode==='both'?beat.conditionOutside:undefined});}
+            else updateBeat(beat.id,{conditionResult:undefined,conditionVolume:beat.conditionVolume??''});}}>
+          <option value="area">Named area decision</option><option value="result" disabled={!earlierRescues(i).length}>Earlier rescue result</option><option value="both" disabled={!earlierRescues(i).length}>Area and earlier rescue result</option>
         </select></label>}
         {beat.conditionResult&&<div>
           <label>Earlier rescue<select aria-label={'Mission rescue result '+(i+1)} value={beat.conditionResult.beatId}
@@ -366,7 +366,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
             onChange={event=>updateBeat(beat.id,{conditionResult:{beatId:beat.conditionResult!.beatId,failed:event.target.value==='failure'}})}>
             <option value="success">Successful rescue</option><option value="failure">Failed rescue</option>
           </select></label>
-          <small>The earlier rescue must continue on failure. This condition controls entry; this step’s Trigger still controls completion. A skipped rescue has no result, so both paths skip. Failed rescues run no success cue or checkpoint; these routes do not grant loot or reset the world.</small>
+          <small>The earlier rescue must continue on failure. This condition controls entry; this step’s Trigger still controls completion. When an area is also configured, both conditions must pass; an ineligible rescue route never samples the area decision. A skipped rescue has no result, so both paths skip. Failed rescues run no success cue or checkpoint; these routes do not grant loot or reset the world.</small>
         </div>}
         {beat.conditionVolume!=null&&<div><label>Optional step condition volume<input list={volumeChoices} maxLength={31} spellCheck={false}
           aria-label={'Optional condition '+(i+1)} value={beat.conditionVolume} onChange={event=>changeConditionVolume(beat,event.target.value)}/></label>
@@ -382,7 +382,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
             onChange={event=>updateBeat(beat.id,{conditionOutside:event.target.value==='outside'?true:undefined})}>
             <option value="inside">A player is inside the area</option><option value="outside">No players are inside the area</option>
           </select></label>
-          <small>Skipped steps run no encounter, HUD, cue or checkpoint. A shared decision waits for a player, samples once at its first member, then keeps that result for every member even after players move. Editing its area updates every member in one Undo action. This is shared native scenario state; it does not bank loot or provide independent squad/replay state.</small></div>}
+          <small>Skipped steps run no encounter, HUD, cue or checkpoint. A shared decision waits for a player, samples once at its first eligible member, then keeps that result for every member even after players move. Editing its area updates every member in one Undo action. This is shared native scenario state; it does not bank loot or provide independent squad/replay state.</small></div>}
         <details><summary>Radio / sound cue{beat.soundCue?' · included':''}</summary>
           <label>Included native sound<select aria-label={'Mission sound '+(i+1)} value={beat.soundCue?.importId??''}
             onChange={event=>{const binding=project.nativeAssetImports?.find(binding=>binding.id===event.target.value&&binding.tagClass==='snd!');if(binding)selectMissionSound(beat,binding);else updateBeat(beat.id,{soundCue:undefined});}}>
@@ -431,7 +431,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           <p className="studio-hint">The engine may refuse or time out a save when unsafe. This does not prove a saved checkpoint.</p>
           <label title="Only the final unconditional beat can request completion; disable its checkpoint and optional condition first.">
             <input type="checkbox" checked={beat.completeMission===true}
-              disabled={beat.completeMission!==true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null)}
+              disabled={beat.completeMission!==true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null)}
               onChange={event=>updateBeat(beat.id,{completeMission:event.target.checked?true:undefined})}/>Request native level completion after this beat
           </label>
           <p className="studio-hint">Completion can advance the campaign according to the selected engine's level configuration.

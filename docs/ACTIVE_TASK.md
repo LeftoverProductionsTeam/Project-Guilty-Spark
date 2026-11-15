@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — Black Echo rescue outcomes; combined native-cache integration next
-Status: implementation incomplete
+Task: Operation110 — Black Echo combined actor/mission native-cache integration
+Status: automated acceptance incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 10900468963523ef8795045afeb2c8d68ff1808e — shared mission decisions. Rescue-result source checks below extend this; Windows-native AI baseline40f84ef remains separate.
-Next action: Close Black Echo combined actor/mission/native-cache workflow using existing tools and bounded fixtures. Rescue outcomes and source preparation/Save/reopen pass focused checks; actual cache/game/peers remain open. Preserve37944 unresolved Save gate; no live QA jobs.
+Latest verified revision: 14844a4c39e316f27876f0abfc44c78bd99f7713; this scoped commit adds Black Echo native-cache acceptance (app47a09631/runtimec20745c8). Exact hashes/results: RUNTIME_INTEGRATION_20261107.md.
+Next action: Black Echo native actor/mission gate passes; gameplay/manual settlement4/7 remains open. Continue existing campaign cinematic controls/source/Save workflow with focused checks. Keep Save37944 unresolved; no Forerunner access, game control or push.
 
 ## Acceptance
 
@@ -25,7 +25,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Black Echo rescue-result milestone: explicit continuation after escort failure records success/failure and suppresses its success cue/checkpoint; later conditions select either result, while a skipped escort selects neither. Native/default-stop ownership guards remain; referenced rescues cannot be silently deleted/downgraded. TypeScript/frontend19/Rust creative10 and browser source preparation/immediate Save/close-reopen pass. Existing native fixture compiles5scripts/8globals on CE/MCC/Xbox, independently reading result globals (source11083333); exact hashes/failed-fixture corrections in RUNTIME_INTEGRATION_20261107. All output disposed. Full map/cache/native restart/game/peers remain open;37944 is unresolved.
+Black Echo combined milestone: actual Windows controls author4groups/8starts, rescue success/failure and optional Flood AND-area, prepare/Undo/Redo/Save/full restart and MCC13 compile/readback pass. Fixed real277-character HUD compiler path failure; source/ownership checks retained. TypeScript/frontend19/Rust creative10/browser1 and CE/MCC/Xbox script fixtures pass. Cache8cffa4af/scenario836826f4, exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No game/branch/combat/settlement/Forerunner acceptance;37944 unresolved.
 
 Black Echo shared-path milestone: existing optional objectives now share one latched native volume decision with inside/outside outcomes, player-ready sampling, grouped area Undo/Redo and Save/reopen. Reviewed regeneration preserves old modules and rejects inconsistent groups. TypeScript/frontend18/Rust creative9 and two focused browser paths pass; CE/MCC/Xbox native script fixture3scripts/4globals independently reads decision/manual globals (sourceb684dc21). Exact hashes/scopes are in RUNTIME_INTEGRATION_20261107 and UI_INTERACTION_AUDIT. All owned output disposed. No new Windows binary/full cache/game/Forerunner proof; manual technology/extraction settlement, replay, failures/rewards and squads remain open.
 
@@ -100,7 +100,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Native creator verification15Nov:37189 terminal PASS,3normal app closes/restarts, exact native source SHA agreement and no page errors. First37643 compiled/read back both maps but ended RED on an unsaved-close prompt; not reproduced by stronger source-hash/post-build-Save recheck and not claimed as a production bug repair. Both owned roots disposed (first2540714476B/final2538124025B); no test executable/map/SDK copy retained. Exact app/source/cache/scenario/control/script hashes and scoped UI evidence are in UI_INTERACTION_AUDIT. No native jobs remain live.
+Current owned QA79208/run-sw4OOf is terminal and confirmed absent:3295500025logicalB disposed; allocated-file disposal total unavailable (no physical-free-space claim). No app/game/compiler left by this run.3521SDKfiles/184203140B rehashed and reused, originals unchanged. Native UI/readback hashes and initial HUD failure are in RUNTIME_INTEGRATION_20261107. No outputs/archives/releases retained. Older operation records below are historical, not active.
 
 15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
 
@@ -116,7 +116,7 @@ Uncommitted authored viewport WIP: QuickForge reuses NativeAiStartOverlay, opens
 
 New94e66e4b full prompt preserved exactly in Master Engineering Prompts/GS_2026-11-14_MegaWorld_Operations_Creator.txt. Reuse Creator Studio/Mission Director/Logic Events/audio/native source; original Operation Black Echo needs deployment→Marine rescue→Covenant facility→technology recovery→optional Flood emergency→extraction defense→survivor/equipment extraction with branches, rewards and radio/HUD cues. 6-player squads/128players/19regions and Forerunner runtime execution are separate unproven capabilities. No invented runtime importer or source tag extensions.
 
-Interrupted legacy run-8Ak6hz remains protected. PID11588 was reused by unrelated conhost; do not kill/recover it. SOURCE_SHA256SUMS/SOURCE_MANIFEST remain required byte-identical compatibility aliases; package verifier/tests depend on both. One bounded ACTIVE_TASK.previous remains required by atomic recovery. Historical evidence remains in Git; no replacement tracking system/archive. Full Operation110/M1–M6/475IDs/master Goal remain incomplete.
+Interrupted legacy run-8Ak6hz remains protected. PID11588 was reused by unrelated conhost; do not kill/recover it. SOURCE_SHA256SUMS/SOURCE_MANIFEST remain required byte-identical compatibility aliases; package verifier/tests depend on both. Legacy ACTIVE_TASK.previous stays unchanged; current updates never duplicate it. Historical evidence remains in Git; no replacement tracking system/archive. Full Operation110/M1–M6/475IDs/master Goal remain incomplete.
 
 ## Deferred requests
 
