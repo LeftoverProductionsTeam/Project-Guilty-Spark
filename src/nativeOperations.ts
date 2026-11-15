@@ -1,7 +1,9 @@
 import type { FirefightConfig } from './firefight';
 export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;grid?:{total:number;offset:number}}
+export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
-  | {kind:'encounterSquadCounts';encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number;sourceSha256:string}
+  | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
+  | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';

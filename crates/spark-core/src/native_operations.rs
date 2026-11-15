@@ -13,9 +13,19 @@ pub enum Operation {
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32 },
     AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     EncounterSquadCounts { encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,#[serde(rename="normalCount")] normal_count:u16,#[serde(rename="insaneCount")] insane_count:u16,#[serde(rename="sourceSha256")] source_sha256:String },
+    EncounterSquadCountsBatch { edits:Vec<SquadCountEdit>,#[serde(rename="sourceSha256")] source_sha256:String },
     BoundingRadius { value: f64 },
     HudDuplicate { array:String,index:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     LensFlareScaleRepair,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct SquadCountEdit {
+    pub encounter:u16,pub squad:u16,pub encounter_name:String,pub squad_name:String,pub normal_count:u16,pub insane_count:u16,
+}
+impl SquadCountEdit {
+    fn operation(&self,source_sha256:&str)->Operation {Operation::EncounterSquadCounts{encounter:self.encounter,squad:self.squad,
+        encounter_name:self.encounter_name.clone(),squad_name:self.squad_name.clone(),normal_count:self.normal_count,insane_count:self.insane_count,source_sha256:source_sha256.into()}}
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -38,6 +48,17 @@ impl EncounterAppend {
 fn single_actor()->u16{1}
 fn actor_spacing()->f32{0.75}
 impl Operation {
+    pub fn is_squad_count_edit(&self)->bool {matches!(self,Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..})}
+    pub fn squad_count_edits(&self)->Result<Vec<SquadCountEdit>> {
+        match self {
+            Self::EncounterSquadCounts{encounter,squad,encounter_name,squad_name,normal_count,insane_count,..}=>Ok(vec![SquadCountEdit{
+                encounter:*encounter,squad:*squad,encounter_name:encounter_name.clone(),squad_name:squad_name.clone(),normal_count:*normal_count,insane_count:*insane_count}]),
+            Self::EncounterSquadCountsBatch{edits,..}=>{
+                if edits.is_empty()||edits.len()>128{return invalid("Select 1–128 squads per reviewed population operation");}
+                Ok(edits.clone())
+            },_=>Ok(vec![])
+        }
+    }
     pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
     pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
         match self {
@@ -52,20 +73,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::EncounterSquadCounts { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::EncounterSquadCounts { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::EncounterSquadCounts { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -94,6 +115,13 @@ impl Operation {
                     total+=usize::from(entry.count);
                 }
                 if total>128{return invalid("One reviewed encounter group operation supports at most 128 starting locations");}
+            }
+            Self::EncounterSquadCountsBatch{source_sha256,..}=>{
+                let mut seen=std::collections::BTreeSet::new();
+                for edit in self.squad_count_edits()?{
+                    edit.operation(source_sha256).validate(class,tag)?;
+                    if !seen.insert((edit.encounter,edit.squad)){return invalid("A squad can appear only once in a population operation");}
+                }
             }
             Self::EncounterSquadCounts{encounter,squad,encounter_name,squad_name,normal_count,insane_count,source_sha256}=>{
                 if class!="scnr"||*encounter>=128||*squad>=4096||*normal_count>32||*insane_count>32||
@@ -134,7 +162,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::EncounterSquadCounts{..}=>return invalid("Squad editing requires the original native encounter inventory"),
+            Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("Squad editing requires the original native encounter inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -264,14 +292,20 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
-        if let Self::EncounterSquadCounts{encounter,squad,encounter_name,squad_name,normal_count,insane_count,..}=self {
-            let selected=scenario_squad_choices(before)?.into_iter().find(|row|row.encounter==*encounter&&row.squad==*squad)
-                .ok_or_else(||crate::SparkError::Invalid("The selected native squad is missing; refresh the source".into()))?;
-            if selected.encounter_name!=*encounter_name||selected.name!=*squad_name{return invalid("The native encounter/squad identity changed; refresh before editing");}
-            if selected.normal_count==*normal_count as i16&&selected.insane_count==*insane_count as i16{return invalid("The native squad counts already match; no candidate was written");}
-            let prefix=format!("encounters[{encounter}].squads[{squad}]");
-            return Ok(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-S".into(),format!("{prefix}.normal_diff_count"),normal_count.to_string(),
-                "-S".into(),format!("{prefix}.insane_diff_count"),insane_count.to_string(),tag.into()]);
+        if self.is_squad_count_edit() {
+            let rows=scenario_squad_choices(before)?;
+            let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+            for edit in self.squad_count_edits()?{
+                let selected=rows.iter().find(|row|row.encounter==edit.encounter&&row.squad==edit.squad)
+                    .ok_or_else(||crate::SparkError::Invalid("A selected native squad is missing; refresh the source".into()))?;
+                if selected.encounter_name!=edit.encounter_name||selected.name!=edit.squad_name{return invalid("A native encounter/squad identity changed; refresh before editing");}
+                if selected.normal_count==edit.normal_count as i16&&selected.insane_count==edit.insane_count as i16{continue;}
+                let prefix=format!("encounters[{}].squads[{}]",edit.encounter,edit.squad);
+                args.extend(["-S".into(),format!("{prefix}.normal_diff_count"),edit.normal_count.to_string(),
+                    "-S".into(),format!("{prefix}.insane_diff_count"),edit.insane_count.to_string()]);
+            }
+            if args.len()==2{return invalid("All selected native counts already match; no candidate was written");}
+            args.push(tag.into());return Ok(args);
         }
         if let Self::HudDuplicate{array,index,..}=self {
             let listing=array_listing(before,array)?;let _=array_items(&listing,array)?;
@@ -304,7 +338,7 @@ impl Operation {
     /// Keep reviewed command actions intact while respecting Windows argument
     /// length. All batches edit the same isolated candidate; acceptance is atomic.
     pub fn argument_batches(&self,args:Vec<String>,readback:bool)->Result<Vec<Vec<String>>> {
-        if !self.is_encounter_append(){return Ok(vec![args]);}
+        if !self.is_encounter_append()&&!self.is_squad_count_edit(){return Ok(vec![args]);}
         if args.len()<3||args[0]!="-t"{return invalid("Malformed native argument envelope");}
         let cost=|value:&str|value.encode_utf16().count()+value.chars().filter(|c|*c=='\\'||*c=='"').count()+3;
         let end=args.len()-1;let tag=args[end].clone();let base=args[..2].to_vec();
@@ -326,7 +360,7 @@ impl Operation {
     }
     /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
-        if !self.is_encounter_append()&&!matches!(self,Self::EncounterSquadCounts{..}) {return Ok(None);}
+        if !self.is_encounter_append()&&!self.is_squad_count_edit() {return Ok(None);}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut i=2;
         while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{args.extend(["-G".into(),written[i+1].clone()]);i+=3;},_=>return invalid("Unexpected native append recipe")}}
@@ -438,8 +472,9 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
 impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
-        if let Self::EncounterSquadCounts{encounter,squad,encounter_name,squad_name,normal_count,insane_count,..}=self {
-            return verify_native_squad(map,*encounter,*squad,encounter_name,squad_name,*normal_count as i16,*insane_count as i16);
+        if self.is_squad_count_edit(){
+            for edit in self.squad_count_edits()?{verify_native_squad(map,edit.encounter,edit.squad,&edit.encounter_name,&edit.squad_name,edit.normal_count as i16,edit.insane_count as i16)?;}
+            return Ok(());
         }
         if !self.is_encounter_append(){return invalid("Unsupported encounter readback expectation");}
         for entry in self.encounter_appends()?{verify_compiled_append(&entry,map)?;}
@@ -505,7 +540,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
-    if matches!(operation,Operation::EncounterSquadCounts{..}) {return reviewed_squad_counts(before,after,operation);}
+    if operation.is_squad_count_edit() {return reviewed_squad_counts(before,after,operation);}
     if matches!(operation,Operation::HudDuplicate{..}) {return reviewed_hud_duplicate(before,after,operation);}
     if matches!(operation,Operation::AppendEncounters{..}) {return reviewed_encounter_group_append(before,after,operation);}
     if matches!(operation,Operation::AppendEncounter{..}) {return reviewed_encounter_append(before,after,operation);}
@@ -704,20 +739,29 @@ pub fn scenario_squad_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {
     Ok(choices)
 }
 fn reviewed_squad_counts(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
-    let Operation::EncounterSquadCounts{encounter,squad,normal_count,insane_count,..}=operation else{return invalid("Not a squad count revision");};
-    let pick=|fields:&str|->Result<ScenarioSquadChoice>{scenario_squad_choices(fields)?.into_iter().find(|row|row.encounter==*encounter&&row.squad==*squad)
-        .ok_or_else(||crate::SparkError::Invalid("Selected native squad is unavailable".into()))};
-    let original=pick(before)?;let revised=pick(after)?;
-    if original.normal_line!=revised.normal_line||original.insane_line!=revised.insane_line||
-        revised.normal_count!=*normal_count as i16||revised.insane_count!=*insane_count as i16{
-        return invalid("Native squad structure or saved counts differ from the reviewed edit");
+    let edits=operation.squad_count_edits()?;
+    if edits.is_empty(){return invalid("Not a squad population revision");}
+    let old=scenario_squad_choices(before)?;let new=scenario_squad_choices(after)?;
+    let mut allowed=std::collections::BTreeSet::new();
+    for edit in edits {
+        let original=old.iter().find(|row|row.encounter==edit.encounter&&row.squad==edit.squad)
+            .ok_or_else(||crate::SparkError::Invalid("Selected original native squad is unavailable".into()))?;
+        let revised=new.iter().find(|row|row.encounter==edit.encounter&&row.squad==edit.squad)
+            .ok_or_else(||crate::SparkError::Invalid("Selected revised native squad is unavailable".into()))?;
+        if original.encounter_name!=edit.encounter_name||original.name!=edit.squad_name||
+            original.normal_line!=revised.normal_line||original.insane_line!=revised.insane_line||
+            revised.encounter_name!=edit.encounter_name||revised.name!=edit.squad_name||
+            revised.normal_count!=edit.normal_count as i16||revised.insane_count!=edit.insane_count as i16{
+            return invalid("Native squad structure, identity or saved counts differ from the reviewed edit");
+        }
+        allowed.extend([original.normal_line,original.insane_line]);
     }
     let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();
     if a.len()!=b.len(){return invalid("Native squad edit changed field structure; no source was selected");}
     let mut differences=vec![];
     for (index,(old,new)) in a.iter().zip(&b).enumerate() {
         if old==new{continue;}
-        if index!=original.normal_line&&index!=original.insane_line{return invalid("Native squad edit changed an unrelated field; no source was selected");}
+        if !allowed.contains(&index){return invalid("Native population edit changed an unrelated field; no source was selected");}
         differences.push(FieldDifference{before:(*old).into(),after:(*new).into()});
     }
     if differences.is_empty(){return invalid("No native squad count changed");}

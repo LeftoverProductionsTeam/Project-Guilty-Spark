@@ -557,7 +557,7 @@ fn prepare(
     }
     if let Some(expected)=&input.expected_encounter {
         expected.validate("scnr",&format!("{scenario}.scenario"))?;
-        if !expected.is_encounter_append()&&!matches!(expected,crate::native_operations::Operation::EncounterSquadCounts{..}){return invalid("Working-tag encounter expectation is not a reviewed native encounter edit");}
+        if !expected.is_encounter_append()&&!expected.is_squad_count_edit(){return invalid("Working-tag encounter expectation is not a reviewed native encounter edit");}
     }
     let scenario_file = checked_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?;
     let globals = checked_file(&tags.join("globals/globals.globals"))?;
@@ -637,7 +637,7 @@ fn prepare(
         snapshot.validate()?;
         // Parent expectations were verified above. Current source supersedes
         // only scalar count targets, never append/controller/actor safeguards.
-        encounter_expectations.retain(|expected|!matches!(expected,crate::native_operations::Operation::EncounterSquadCounts{..}));
+        encounter_expectations.retain(|expected|!expected.is_squad_count_edit());
     }
     let scenario_squad_readback=input.scenario_squad_readback.clone().or(parent_squad_readback);
     if scenario_squad_readback.is_some(){
@@ -1055,6 +1055,11 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
 // definition is a source-review failure, never permission to drop an old check.
 fn retain_encounter_expectation(values:&mut Vec<crate::native_operations::Operation>,value:crate::native_operations::Operation)->Result<()> {
     value.validate("scnr","review.scenario")?;
+    if matches!(value,crate::native_operations::Operation::EncounterSquadCountsBatch{..}){
+        if values.iter().any(|old|old==&value){return Ok(());}
+        if values.len()>=32{return invalid("Native encounter expectation history exceeds32reviewed operations");}
+        values.push(value);return Ok(());
+    }
     if let crate::native_operations::Operation::EncounterSquadCounts{encounter,squad,..}=&value {
         if let Some(index)=values.iter().position(|old|matches!(old,crate::native_operations::Operation::EncounterSquadCounts{encounter:e,squad:s,..} if e==encounter&&s==squad)) {
             values[index]=value;return Ok(());
