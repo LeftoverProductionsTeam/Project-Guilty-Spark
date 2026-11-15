@@ -144,6 +144,8 @@ export default function LogicEvents({
             Place the activation terminal inside its zone. Keep a physical route between both areas; no raid timer or teleport is authored here.</p>}
           {extraction.present&&<details className="forge-details">
             <summary>Extraction layout · {extraction.bindings}/4 native bindings</summary>
+            <p className="forge-hint">Hub starts: {extraction.playerStarts.safe==null?'Unavailable until both zones are bound':extraction.playerStarts.safe+' / '+extraction.playerStarts.total+' inside the hub and outside activation'}.
+              Every authored start is checked, including hidden starts and other game-mode filters. Use Select beside an issue to edit that start; no starts are moved automatically.</p>
             <div className="button-row">
               <button disabled={!extraction.activate||!!extraction.activation}
                 title="Create one editable 6 × 6 × 4 activation volume around the named terminal. Existing objects stay in place."

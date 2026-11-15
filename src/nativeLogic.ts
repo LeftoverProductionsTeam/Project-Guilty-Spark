@@ -117,8 +117,14 @@ export function extractionLayout(doc:QuickForgeDocument) {
     ] as Vec3)));
     if(corners.every(p=>inside(p,activation)))
       issues.push({message:'The return volume is entirely inside activation; Forerunner requires a return outside activation.',objectId:returnZone.id});
-    if(!doc.spawns.some(p=>inside(p.position,returnZone)&&!inside(p.position,activation)))
-      issues.push({message:'No authored player start is inside the hub and outside activation.',objectId:returnZone.id});
+    // Every authored start is emitted into the native scenario, including hidden
+    // rows. Forerunner's solo fallback can select starts with multiplayer modes;
+    // neither visibility nor team/game-mode metadata proves a row unreachable.
+    if(!doc.spawns.length)issues.push({message:'Author at least one player start inside the safe hub and outside activation.',objectId:returnZone.id});
+    for(const spawn of doc.spawns){
+      if(!inside(spawn.position,returnZone))issues.push({message:'Player start '+(spawn.name||spawn.id)+' is outside the safe hub return volume.',objectId:spawn.id});
+      if(inside(spawn.position,activation))issues.push({message:'Player start '+(spawn.name||spawn.id)+' is inside activation; move it into the safe hub outside activation.',objectId:spawn.id});
+    }
   }
   if(logic?.manualSource!=null)issues.push({message:'Handwritten HaloScript owns startup behavior; metadata power settings need native review.'});
   if(!['haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))
@@ -132,7 +138,9 @@ export function extractionLayout(doc:QuickForgeDocument) {
   else issues.push({message:'This solo route includes survival authoring. An independent Extraction campaign must not start a second Firefight controller.'});
   const bindings=[deploy,activate,activation,returnZone].filter(Boolean).length;
   const present=[...(logic?.devices??[]),...(logic?.triggers??[])].some(t=>t.nativeName?.startsWith('extraction_'));
-  return {present,bindings,deploy,activate,activation,returnZone,issues};
+  const playerStarts={total:doc.spawns.length,safe:returnZone&&activation
+    ?doc.spawns.filter(spawn=>inside(spawn.position,returnZone)&&!inside(spawn.position,activation)).length:null};
+  return {present,bindings,deploy,activate,activation,returnZone,playerStarts,issues};
 }
 
 /** Create just the missing standard volume, through the existing authoring

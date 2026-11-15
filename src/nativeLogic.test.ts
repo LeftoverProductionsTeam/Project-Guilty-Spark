@@ -1,3 +1,4 @@
+import {defaultNativePlayerProfile} from './firefight';
 import { expect, it } from 'vitest';
 import {
   addLogicTrigger,
@@ -5,6 +6,7 @@ import {
   centerDoorTrigger,
   connectDoor,
   copyDeviceBehavior,
+  extractionLayout,
 } from './nativeLogic';
 import {
   appendForgeNodes,
@@ -200,4 +202,35 @@ it('preserves handwritten source bytes and refuses ambiguous imports or invisibl
   const own = structuredClone(added);
   own.logic!.rules[0].once = true;
   expect(() => mergeForge(added, own, peer)).toThrow(/Logic/);
+});
+
+
+function extractionSource():QuickForgeDocument {
+ const terminal=(id:string,x:number)=>({...base.placements[0],id,name:id,tagClass:'ctrl' as const,position:[x,0,0] as [number,number,number]});
+ const zone=(id:string,x:number,nativeName:string)=>({id,name:id,nativeName,position:[x,0,1] as [number,number,number],rotation:[0,0,0] as [number,number,number],dimensions:[6,6,4] as [number,number,number],visible:true,locked:false});
+ return {...base,runtimeId:'haloCustomEdition',gameMode:'campaign',startingProfile:defaultNativePlayerProfile(),
+   placements:[terminal('deploy',0),terminal('activate',20)],
+   spawns:[{id:'safe',name:'Safe start',position:[0,0,0],facing:0,team:0,gameModes:[],visible:true,locked:false}],
+   logic:{schemaVersion:1,rules:[],triggers:[zone('hub',0,'extraction_return'),zone('field',20,'extraction_zone')],
+     devices:[{placementId:'deploy',nativeName:'extraction_deploy',powered:true,initialPosition:0},{placementId:'activate',nativeName:'extraction_activate',powered:true,initialPosition:0}]}};
+}
+it('requires every selectable Extraction start in the hub, including hidden and multiplayer-filtered starts',()=>{
+ const doc=extractionSource(),original=structuredClone(doc);
+ expect(extractionLayout(doc).issues).toEqual([]);
+ doc.spawns.push({...doc.spawns[0],id:'unsafe',name:'Field start',position:[20,0,0],visible:false,locked:true,team:1,gameModes:['slayer']});
+ const review=extractionLayout(doc);
+ expect(review.playerStarts).toEqual({total:2,safe:1});
+ expect(review.issues.filter(issue=>issue.objectId==='unsafe').map(issue=>issue.message)).toEqual([
+   'Player start Field start is outside the safe hub return volume.',
+   'Player start Field start is inside activation; move it into the safe hub outside activation.',
+ ]);
+ expect(doc.spawns[1].position).toEqual([20,0,0]); // Review must not silently move or discard authored data.
+ expect(doc.spawns[0]).toEqual(original.spawns[0]);
+ doc.spawns[1].position=[1,1,0];expect(extractionLayout(doc).issues).toEqual([]);
+});
+it('reports missing Extraction starts and does not call unknown hub bindings safe',()=>{
+ const doc=extractionSource();doc.spawns=[];
+ expect(extractionLayout(doc).issues.some(issue=>issue.message.includes('at least one player start'))).toBe(true);
+ doc.logic!.triggers=doc.logic!.triggers.filter(zone=>zone.nativeName!=='extraction_zone');
+ expect(extractionLayout(doc).playerStarts.safe).toBeNull();
 });
