@@ -337,7 +337,7 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
         }
     }
     for beat in &binding.missions {
-        if beat.trigger=="weaponOwned"{let path=beat.weapon_path.as_deref().unwrap_or("");if map.tags.iter().filter(|tag|tag.class=="weap"&&!tag.external&&tag.path.replace('\\',"/")==path).count()!=1{return invalid("Compiled mission technology weapon is missing, external or ambiguous");}}
+        if beat.trigger=="weaponOwned"{verify_mission_collection(beat,map)?;}
         if let Some(cue)=&beat.sound_cue {
             let found=map.tags.iter().filter(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==cue.sound_path).count();
             if found!=1{return invalid(format!("Compiled mission sound is missing or ambiguous: {}",cue.sound_path));}
@@ -352,6 +352,23 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
             return invalid("Compiled mission references a different HUD-message tag");
         }
         crate::firefight::verify_preserving_hud(&hud,&actual)?;
+    }
+    Ok(())
+}
+/// Verify the actual native scenario output, independently of authoring intent.
+/// A dependency alone is not a placed collectible, and any starting profile can
+/// make ownership true before the player reaches the authored technology.
+fn verify_mission_collection(beat:&MissionBeat,map:&crate::maps::MapInspection)->Result<()> {
+    let path=beat.weapon_path.as_deref().unwrap_or("");
+    let tags=map.tags.iter().filter(|tag|tag.class=="weap"&&!tag.external&&tag.path.replace('\\',"/")==path).collect::<Vec<_>>();
+    if tags.len()!=1{return invalid("Compiled mission technology weapon is missing, external or ambiguous");}
+    let id=tags[0].id;
+    if !map.objects.iter().any(|object|object.kind=="Weapon"&&object.tag_id==Some(id)&&object.position.iter().all(|v|v.is_finite())) {
+        return invalid("Compiled mission technology weapon has no readable native weapon placement; a tag dependency alone cannot supply collection");
+    }
+    let profiles=map.player_starting_profiles.as_ref().filter(|profiles|!profiles.is_empty()).ok_or_else(||crate::SparkError::Invalid("Compiled mission starting profiles are unavailable; technology ownership cannot be verified".into()))?;
+    if profiles.iter().any(|profile|profile.primary_weapon_tag_id==Some(id)||profile.secondary_weapon_tag_id==Some(id)) {
+        return invalid("Compiled mission technology is already granted by a native starting profile; select different technology or repair the loadout");
     }
     Ok(())
 }
@@ -658,6 +675,35 @@ mod tests {
         let mut active=project;active.quick_forge.as_mut().unwrap().campaign_encounters[0].start_active=true;assert!(check(&active).unwrap_err().to_string().contains("disable initial actor creation"));
     }
 
+    #[test]
+    fn mission_collection_checks_native_placement_and_every_starting_profile() {
+        // Synthetic native inspection regression, not compilation/game evidence.
+        let beat:MissionBeat=serde_json::from_value(serde_json::json!({"id":"technology","title":"Collect","objective":"Recover","trigger":"weaponOwned","weaponPath":"weapons/technology","encounterName":""})).unwrap();
+        let mut map:crate::maps::MapInspection=serde_json::from_value(serde_json::json!({
+            "header":{"version":609,"engine":"test","name":"collection","build":"test","scenarioType":0,"fileSize":0,"declaredSize":0,"tagOffset":0,"tagSize":0,"crc32":0,"flags":0,"demoLayout":false,"compressed":false,"extended":false,"legacyTagSizeRepair":false},
+            "sha256":"a".repeat(64),"tags":[{"id":42,"index":0,"class":"weap","path":"weapons/technology","dataOffset":2048,"external":false,"fields":[],"references":[]}],"objects":[],"mesh":crate::maps::MeshData::default(),"encounters":[],"scripts":[],"resources":[],"diagnostics":[],"scenarioPath":"levels/test"})).unwrap();
+        assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("placement"));
+        map.objects.push(serde_json::from_value(serde_json::json!({"id":"weapon-0","name":"Technology","kind":"Weapon","tagId":42,"position":[1,2,3],"rotation":[0,0,0],"scale":[1,1,1],"visible":true,"sourceOffset":2048,"rotationOffset":2060,"assetId":null})).unwrap());
+        assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("profiles are unavailable"));
+        let profile:crate::maps::PlayerStartingProfile=serde_json::from_value(serde_json::json!({"name":"insertion","health":1,"shields":1,"primaryWeaponTagId":7,"primaryLoaded":10,"primaryReserved":30,"secondaryWeaponTagId":null,"secondaryLoaded":0,"secondaryReserved":0,"fragmentationGrenades":0,"plasmaGrenades":0,"grenadeType2":0,"grenadeType3":0})).unwrap();
+        map.player_starting_profiles=Some(vec![profile.clone()]);verify_mission_collection(&beat,&map).unwrap();
+        let mut extra=profile;extra.name="alternate".into();extra.secondary_weapon_tag_id=Some(42);map.player_starting_profiles.as_mut().unwrap().push(extra);
+        assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("already granted"));
+        map.player_starting_profiles.as_mut().unwrap()[1].secondary_weapon_tag_id=None;
+        map.objects[0].tag_id=Some(7);assert!(verify_mission_collection(&beat,&map).is_err());map.objects[0].tag_id=Some(42);
+        map.objects[0].position[2]=f32::NAN;assert!(verify_mission_collection(&beat,&map).is_err());map.objects[0].position[2]=3.;
+        map.tags.push(map.tags[0].clone());assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("ambiguous"));
+    }
+    #[test]
+    #[ignore="Requires an explicitly selected owned native collection cache and weapon; read-only acceptance"]
+    fn installed_native_collection_readback_requires_placement_and_nonstarting_weapon() {
+        let path=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_MISSION_COLLECTION_CACHE").expect("Explicit owned native cache required"));
+        let weapon=std::env::var("SPARK_NATIVE_MISSION_COLLECTION_WEAPON").expect("Explicit placed nonstarting weapon required");
+        let before=crate::maps::hash_file(&path).unwrap();let map=crate::maps::inspect_map(&path,None).unwrap();
+        let beat:MissionBeat=serde_json::from_value(serde_json::json!({"id":"readback","title":"Readback","objective":"Read native collection data","trigger":"weaponOwned","weaponPath":weapon,"encounterName":""})).unwrap();
+        verify_mission_collection(&beat,&map).unwrap();assert_eq!(before,crate::maps::hash_file(&path).unwrap());
+        println!("Native collection placement/profile readback PASS; cacheSHA={before}; weapon={}; profiles={}; not complete mission or gameplay acceptance",beat.weapon_path.unwrap(),map.player_starting_profiles.unwrap().len());
+    }
     #[test]
     fn forerunner_mission_requires_real_technology_and_gated_safe_hub() {
         let mut project=crate::project::Project::new("Forerunner objectives");let mut document=studio();
