@@ -26,6 +26,9 @@ export default function CampaignEncounters({project,edit}:{
     if(values.length>16||values.reduce((sum,value)=>sum+(value.count??1),0)>128){
       setError('This native writer accepts up to 16 encounters and 128 starting locations in one reviewed source operation.');return;
     }
+    if(values.some(value=>value.difficulty&&[value.difficulty.normal,value.difficulty.insane].some(count=>!Number.isInteger(count)||count<0||count>(value.count??1)))){
+      setError('Keep native difficulty counts between 0 and the number of authored starting positions. Add starts first, or lower the overrides before removing starts.');return;
+    }
     edit({...project,quickForge:{...doc,campaignEncounters:values.length?values:undefined}},label);setError('');
   };
   const update=(patch:Partial<NativeEncounterAppend>)=>{
@@ -71,7 +74,7 @@ export default function CampaignEncounters({project,edit}:{
             update({actorPath:event.target.value});
           }}/></label>
         <div className="studio-fields">
-          <label>Actors<NumberField label="Campaign actor count" value={entry.count??1} min={1} max={32} step={1}
+          <label>Starting positions<NumberField label="Campaign starting position count" value={entry.count??1} min={Math.max(1,entry.difficulty?.normal??1,entry.difficulty?.insane??1)} max={32} step={1}
             onCommit={value=>update({count:Math.round(value)})}/></label>
           <label>Spacing<NumberField label="Campaign actor spacing" value={entry.spacing??.75} min={.25} max={16} step={.25}
             onCommit={value=>update({spacing:value})}/></label>
@@ -79,6 +82,20 @@ export default function CampaignEncounters({project,edit}:{
             label={'Campaign encounter '+axis} value={entry.position[index]} min={-2000} max={2000} step={.25}
             onCommit={value=>{const position=[...entry.position] as [number,number,number];position[index]=value;update({position});}}/></label>)}
         </div>
+        <details><summary>Difficulty population</summary>
+          <p className="studio-hint">The native normal/insane fields use all authored starts by default. Override them to keep fewer actors on a selected engine's difficulty settings. This does not change AI health, damage, behavior or player-count scaling.</p>
+          <label><input type="checkbox" checked={!!entry.difficulty} onChange={event=>update({
+            difficulty:event.target.checked?{normal:entry.count??1,insane:entry.count??1}:undefined
+          })}/>Use separate native difficulty counts</label>
+          {entry.difficulty&&<div className="studio-fields">
+            <label>Normal field<NumberField label="Campaign native normal population" value={entry.difficulty.normal} min={0} max={entry.count??1} step={1}
+              onCommit={value=>update({difficulty:{normal:Math.round(value),insane:entry.difficulty!.insane}})}/></label>
+            <label>Insane field<NumberField label="Campaign native insane population" value={entry.difficulty.insane} min={0} max={entry.count??1} step={1}
+              onCommit={value=>update({difficulty:{normal:entry.difficulty!.normal,insane:Math.round(value)}})}/></label>
+          </div>}
+          <p className="studio-hint">Authored starts: {entry.count??1} · native normal: {entry.difficulty?.normal??entry.count??1} · native insane: {entry.difficulty?.insane??entry.count??1}.
+            Add enough starts first. To remove starts, lower the overrides first. Save, Undo/Redo and source sharing include these values; native and gameplay validation remain required.</p>
+        </details>
         <label><input type="checkbox" checked={entry.startActive}
           onChange={event=>update({startActive:event.target.checked})}/>Create actors when the map starts</label>
         <p className="studio-hint">Leave initial creation off for mission-controlled encounters.

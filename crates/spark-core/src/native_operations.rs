@@ -10,7 +10,8 @@ use std::path::Path;
 pub enum Operation {
     Dependencies,
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
-        #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32 },
+        #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32,
+        #[serde(default,skip_serializing_if="Option::is_none")] difficulty:Option<EncounterDifficulty> },
     AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     EncounterSquadCounts { encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,#[serde(rename="normalCount")] normal_count:u16,#[serde(rename="insaneCount")] insane_count:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     EncounterSquadCountsBatch { edits:Vec<SquadCountEdit>,#[serde(rename="sourceSha256")] source_sha256:String },
@@ -29,21 +30,26 @@ impl SquadCountEdit {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EncounterDifficulty {pub normal:u16,pub insane:u16}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterGrid {pub total:u16,pub offset:u16}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterAppend {
     pub name:String,pub actor_path:String,pub position:[f32;3],pub start_active:bool,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub difficulty:Option<EncounterDifficulty>,
     #[serde(default="single_actor")] pub count:u16,
     #[serde(default="actor_spacing")] pub spacing:f32,
     #[serde(default,skip_serializing_if="Option::is_none")] pub grid:Option<EncounterGrid>,
 }
 impl EncounterAppend {
+    pub fn difficulty_counts(&self)->(u16,u16) {self.difficulty.as_ref().map(|value|(value.normal,value.insane)).unwrap_or((self.count,self.count))}
     pub fn positions(&self)->Result<Vec<[f32;3]>> {
         let(total,offset)=self.grid.as_ref().map(|grid|(usize::from(grid.total),usize::from(grid.offset))).unwrap_or((usize::from(self.count),0));
         Ok(crate::firefight::native_actor_start_grid(self.position,total,offset,usize::from(self.count),self.spacing)?.into_iter().map(|value|value.0).collect())
     }
-    pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing}}
+    pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing,difficulty:self.difficulty.clone()}}
 }
 fn single_actor()->u16{1}
 fn actor_spacing()->f32{0.75}
@@ -62,7 +68,7 @@ impl Operation {
     pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
     pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
         match self {
-            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,grid:None}]),
+            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None}]),
             Self::AppendEncounters{encounters,..}=>{
                 if encounters.is_empty()||encounters.len()>16{return invalid("Review 1–16 native encounter groups in one operation");}
                 Ok(encounters.clone())
@@ -97,18 +103,22 @@ impl Operation {
             return invalid("Native tag path is too long or begins with a command option");
         }
         match self {
-            Self::AppendEncounter {name,actor_path,position,count,spacing,..} => {
+            Self::AppendEncounter {name,actor_path,position,count,spacing,difficulty,..} => {
                 if class!="scnr" {return invalid("Append encounter requires a native scenario tag");}
                 if name.is_empty()||name.len()>31||!name.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_') {return invalid("Encounter name needs1–31ASCII letters, digits or underscores");}
                 safe_relative(actor_path)?;
                 if actor_path.is_empty()||actor_path.len()>240||actor_path.starts_with('-')||actor_path.ends_with(".actor_variant")||!actor_path.bytes().all(|c|c.is_ascii_alphanumeric()||b"_/\\ .-".contains(&c)) {return invalid("Choose a safe native actor-variant path without its extension");}
                 if *count==0||*count>32{return invalid("A native encounter squad supports 1–32 authored starting locations");}
+                if difficulty.as_ref().is_some_and(|value|value.normal>*count||value.insane>*count){
+                    return invalid("Author enough starting positions for both native difficulty counts; each supports 0–32 actors");
+                }
                 let _=crate::firefight::native_actor_start_grid(*position,*count as usize,0,*count as usize,*spacing)?;
             }
             Self::AppendEncounters{source_rules,..}=>{
                 if let Some(rules)=source_rules{crate::firefight::validate(rules)?;}
                 let entries=self.encounter_appends()?;let mut names=std::collections::BTreeSet::new();let mut total=0usize;
                 for entry in entries {
+                    if source_rules.is_some()&&entry.difficulty.is_some(){return invalid("Prepared Firefight groups require the exact controller population. Use Firefight wave rules rather than independent difficulty overrides");}
                     entry.operation().validate(class,tag)?;
                     let _=entry.positions()?;
                     if !names.insert(entry.name.to_ascii_lowercase()){return invalid("Each appended encounter needs a distinct native name");}
@@ -315,13 +325,14 @@ impl Operation {
         if !self.is_encounter_append(){return self.arguments(tags,class,tag);}
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
         for (entry,index,actor,add_palette) in encounter_append_layouts(before,self)? {
+        let (normal_count,insane_count)=entry.difficulty_counts();
         let EncounterAppend{name,actor_path,start_active,count,..}=&entry;
         let e=format!("encounters[{index}]");let squad=format!("{e}.squads[0]");
         let positions=entry.positions()?;
         if add_palette {args.extend(["-I".into(),"actor_palette".into(),"1".into(),"end".into(),"-S".into(),format!("actor_palette[{actor}].reference"),format!("{actor_path}.actor_variant")]);}
         args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),count.to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
-            (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),count.to_string()),(format!("{squad}.insane_diff_count"),count.to_string()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into())] {args.extend(["-S".into(),key,value]);}
+            (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),normal_count.to_string()),(format!("{squad}.insane_diff_count"),insane_count.to_string()),(format!("{squad}.initial_state"),"alert".into()),(format!("{squad}.return_state"),"alert".into())] {args.extend(["-S".into(),key,value]);}
         for(index,position)in positions.into_iter().enumerate() {
             let start=format!("{squad}.starting_locations[{index}]");let firing=format!("{e}.firing_positions[{index}]");let vector=position.map(|value|value.to_string()).join(",");
             for(key,value)in [(format!("{start}.position"),vector.clone()),(format!("{start}.facing"),"0".into()),(format!("{start}.flags.required"),"1".into()),(format!("{start}.sequence_id"),"-1".into()),(format!("{start}.actor_type"),"-1".into()),(format!("{start}.command_list"),"-1".into()),(format!("{start}.initial_state"),"alert".into()),(format!("{start}.return_state"),"alert".into()),(format!("{firing}.position"),vector),(format!("{firing}.group_index"),"a".into())] {args.extend(["-S".into(),key,value]);}
@@ -383,7 +394,7 @@ impl Operation {
     }
 }
 fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
-    let Operation::AppendEncounter{name,actor_path,position,start_active,count,spacing}=operation else{return invalid("Not an encounter append");};
+    let Operation::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=operation else{return invalid("Not an encounter append");};
     let (old_encounters,old_palette,actor)=encounter_append_layout(before,name,actor_path)?;
     let new_encounters=array_listing(after,"encounters")?;let new_palette=array_listing(after,"actor_palette")?;
     let added=usize::from(actor==old_palette.count);
@@ -396,7 +407,8 @@ fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Resul
         text.lines().enumerate().filter(|(index,_)|arrays.iter().all(|a|*index<a.start||*index>=a.end)).map(|(_,line)|line).collect::<Vec<_>>().join("\n")
     };
     if remaining(before,[&old_encounters,&old_palette])!=remaining(after,[&new_encounters,&new_palette]) {return invalid("Native encounter append changed other scenario fields; no revision was selected");}
-    Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")}])
+    let difficulty=difficulty.as_ref().map(|value|format!("; native normal={}, insane={}",value.normal,value.insane)).unwrap_or_default();
+    Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")+&difficulty}])
 }
 
 fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
@@ -418,7 +430,8 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
         for expected in ["squads[1] array".to_string(),format!("starting_locations[{}] array",entry.count),format!("firing_positions[{}] array",entry.count)] {
             if body.iter().filter(|line|line.split_whitespace().collect::<Vec<_>>().join(" ")==expected).count()!=1{return invalid("Native encounter group has unexpected squad/start/firing counts");}
         }
-        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)});
+        let difficulty=entry.difficulty.as_ref().map(|value|format!("; native normal={}, insane={}",value.normal,value.insane)).unwrap_or_default();
+        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty});
     }
     Ok(differences)
 }
@@ -461,7 +474,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
     for(w,wave)in config.waves.iter().enumerate(){for(g,group)in wave.groups.iter().enumerate(){
         let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||crate::SparkError::Invalid("Saved wave actor is missing".into()))?;
         let layout=crate::firefight::native_group_grid(config,w,g,&players)?;
-        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16})});
+        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16})});
     }}
     let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
     operation.validate("scnr","planned.scenario")?;
@@ -482,6 +495,8 @@ impl Operation {
     }
 }
 pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::MapInspection)->Result<()> {
+        entry.operation().validate("scnr",&format!("{}.scenario",map.scenario_path))?;
+        let (normal_count,insane_count)=entry.difficulty_counts();
         let EncounterAppend{name,actor_path,start_active,count,..}=entry;
         let found=map.encounters.iter().filter(|encounter|encounter.name==*name).collect::<Vec<_>>();
         if map.header.scenario_type!=0||found.len()!=1{return invalid("Compiled native encounter is missing, ambiguous or not singleplayer");}
@@ -491,7 +506,7 @@ pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::Ma
         let actors=map.tags.iter().filter(|tag|tag.class=="actv"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&path)&&!tag.external&&tag.data_offset.is_some()).collect::<Vec<_>>();
         if actors.len()!=1{return invalid("Compiled source actor is missing, ambiguous or has no embedded body");}
         let actor=Some(actors[0].id);let squad=&details.squads[0];
-        if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=*count as i16||squad.insane_count!=*count as i16||squad.initial_state!=2||squad.return_state!=2||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
+        if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=normal_count as i16||squad.insane_count!=insane_count as i16||squad.initial_state!=2||squad.return_state!=2||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
         let positions=entry.positions()?;
         let consume=|remaining:&mut Vec<[f32;3]>,position:[f32;3]|->Result<()> {
             let index=remaining.iter().position(|expected|expected.iter().zip(position).all(|(a,b)|(*a-b).abs()<=0.0001)).ok_or_else(||crate::SparkError::Invalid("Compiled native start/firing position differs from the accepted grid".into()))?;

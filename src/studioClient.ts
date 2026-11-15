@@ -109,7 +109,7 @@ export function studioDifferences(
   for (const name of new Set([...mineEncounters,...sharedEncounters].map(entry=>entry.name))) {
     const mine=mineEncounters.find(entry=>entry.name===name), theirs=sharedEncounters.find(entry=>entry.name===name);
     if (!mine || !theirs) rows.push({target:`campaignEncounters/${name}`,mine:mine?'Present':'Absent',shared:theirs?'Present':'Absent'});
-    else for (const field of Object.keys(mine) as (keyof typeof mine)[]) {
+    else for (const field of [...new Set([...Object.keys(mine),...Object.keys(theirs)])] as (keyof typeof mine)[]) {
       if (JSON.stringify(mine[field])!==JSON.stringify(theirs[field]))
         rows.push({target:`campaignEncounters/${name}/${field}`,mine:brief(mine[field]),shared:brief(theirs[field])});
       if (rows.length>=12) return rows;

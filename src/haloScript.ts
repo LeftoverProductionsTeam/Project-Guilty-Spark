@@ -486,6 +486,7 @@ export function exportPlannedFirefightRound(operation:Extract<NativeOperation,{k
   const config=operation.sourceRules;
   if(!config?.sourceSha256||!operation.encounters.length||operation.encounters.length>16)throw Error('Review a source-bound native group plan first.');
   const groups=config.waves.flatMap(wave=>wave.groups);
+  if(operation.encounters.some(entry=>entry.difficulty!=null))throw Error('Prepared Firefight groups keep their exact controller population; independent difficulty overrides belong to campaign encounter authoring.');
   if(groups.length!==operation.encounters.length||groups.some((group,index)=>group.count!==(operation.encounters[index].count??1)||operation.encounters[index].startActive||config.enemies.find(enemy=>enemy.id===group.enemyId)?.actorVariantPath.replaceAll('\\','/').toLowerCase()!==operation.encounters[index].actorPath.replaceAll('\\','/').toLowerCase()))throw Error('Planned native groups differ from their saved rule actors/counts/inactive state.');
   let index=0;
   const names=config.waves.map(wave=>wave.groups.map(()=>operation.encounters[index++].name));
