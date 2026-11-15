@@ -110,6 +110,22 @@ export async function prepareSoundImport(project: Project, item: ViewportAsset) 
   });
 }
 
+
+/** Same recursive import for campaign actors, including native Xbox cache
+ * sources. Format adaptation belongs to the selected native build, not the
+ * original or its immutable extracted closure. */
+export async function prepareCampaignActor(project:Project,source:OpenProject,tagId:number):Promise<NativeAssetImport> {
+ const doc=project.quickForge,inspection=source.inspection;
+ if(!doc||doc.native||doc.gameMode!=='campaign'||!['mccSteam','haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))
+  throw Error('Choose editable Campaign / scripted solo source before including an actor.');
+ if(!inspection||!source.project.source||inspection.sha256!==source.project.source.sha256)
+  throw Error('Reopen the exact source map before including its actor.');
+ const tag=inspection.tags.find(tag=>tag.id===tagId&&tag.class==='actv');
+ if(!tag)throw Error('Choose an actor variant from this preserved map.');
+ return prepareAssetImport(project,{key:'campaign:'+source.project.id+':'+tag.id,name:tag.path,path:tag.path,class:tag.class,
+  tagId:tag.id,sourceProjectId:source.project.id,sourceSha256:inspection.sha256,cacheVersion:inspection.header.version});
+}
+
 /** An async import belongs to one uninterrupted destination view. Leaving and
  * returning to the same map must not revive an earlier placement request. */
 export function useAssetImportGuard(projectId: string, active: boolean) {

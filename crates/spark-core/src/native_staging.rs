@@ -377,6 +377,80 @@ pub fn copy(
     Ok(hashes)
 }
 
+/// Convert real Xbox mode inputs only inside a disposable PC build. Immutable
+/// import receipts remain Xbox source; never rename a class header or alter it.
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct PcModelConversion {pub source:String,pub output:String,pub source_sha256:String,pub output_sha256:String,pub native_counts:[usize;4],pub geometry_sha256:String}
+pub fn pc_model_paths<'a>(files:impl IntoIterator<Item=&'a str>)->Result<Vec<(String,String)>> {
+    let files=files.into_iter().map(|file|file.replace('\\',"/")).collect::<BTreeSet<_>>();let mut plan=vec![];
+    for source in files.iter().filter(|file|file.ends_with(".model")) {
+        admitted_relative(source)?;
+        if !source.split('/').next().is_some_and(|prefix|prefix.starts_with("gs_assets_")&&prefix.len()==42) {
+            return invalid("PC model adaptation requires an exact managed native-import namespace");
+        }
+        let output=format!("{}.gbxmodel",source.strip_suffix(".model").unwrap());
+        if files.contains(&output){return invalid("Xbox import already contains a same-path PC model; review the source instead of overwriting it");}
+        plan.push((source.clone(),output));
+    }
+    if plan.len()>256{return invalid("Native model adaptation exceeds256models; split the source import");}
+    Ok(plan)
+}
+pub(crate) fn convert_imported_pc_models(tags:&Path,imports:&BTreeMap<String,String>,convert:&Path,refactor:&Path,reader:&Path,runner:&crate::build::Runner<'_>,workspace:&Path)->Result<Vec<PcModelConversion>> {
+    let plan=pc_model_paths(imports.keys().map(String::as_str))?;if plan.is_empty(){return Ok(vec![]);}
+    let canonical=fs::canonicalize(tags)?;let tags=canonical.as_path();
+    let original=crate::tool_transaction::inventory(tags)?;
+    let query=|relative:&str|->Result<[usize;4]>{
+        let text=runner.run(reader,&["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),"nodes".into(),"-C".into(),"regions".into(),"-C".into(),"geometries".into(),"-C".into(),"shaders".into(),relative.into()],workspace,"model-adaptation-readback",23)?;
+        let values=text.lines().map(str::trim).filter(|line|!line.is_empty()).map(|line|line.parse::<usize>().map_err(|_|SparkError::Invalid("Native model reader returned a non-count".into()))).collect::<Result<Vec<_>>>()?;
+        values.try_into().map_err(|_|SparkError::Invalid("Native model reader omitted a structural count".into()))
+    };
+    let geometry=|relative:&str|->Result<String>{
+        let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+        for field in ["nodes[*].name","nodes[*].parent_node_index","nodes[*].default_translation","nodes[*].default_rotation",
+            "regions[*].name","regions[*].permutations[*].name","regions[*].permutations[*].super_high","regions[*].permutations[*].high","regions[*].permutations[*].medium","regions[*].permutations[*].low","regions[*].permutations[*].super_low",
+            "regions[*].permutations[*].markers[*].name","regions[*].permutations[*].markers[*].node_index","regions[*].permutations[*].markers[*].translation","regions[*].permutations[*].markers[*].rotation",
+            "geometries[*].parts[*].shader_index","geometries[*].parts[*].uncompressed_vertices[*].position","geometries[*].parts[*].uncompressed_vertices[*].normal","geometries[*].parts[*].uncompressed_vertices[*].texture_coords",
+            "geometries[*].parts[*].triangles[*].vertex0_index","geometries[*].parts[*].triangles[*].vertex1_index","geometries[*].parts[*].triangles[*].vertex2_index","shaders[*].shader","shaders[*].permutation"] {
+            args.extend(["-G".into(),field.into()]);
+        }
+        args.push(relative.into());runner.run(reader,&args,workspace,"model-adaptation-readback",23)
+    };
+    let check=|relative:&str,class:&[u8;4]|->Result<()>{let file=tags.join(admitted_relative(relative)?);reject_links(&file)?;let mut header=[0u8;64];fs::File::open(file)?.read_exact(&mut header)?;
+        if &header[36..40]!=class||&header[60..64]!=b"blam"{return invalid("Native model conversion returned the wrong tag class/header");}Ok(())};
+    let mut result=vec![];
+    for(source,output) in &plan {
+        check(source,b"mode")?;let hash=maps::hash_file(&tags.join(admitted_relative(source)?))?;
+        if imports.get(source)!=Some(&hash){return invalid("Pinned Xbox model changed before native conversion");}
+        let destination=tags.join(admitted_relative(output)?);reject_links(&destination)?;if destination.try_exists()?{return invalid("Converted PC model already exists; no tag was overwritten");}
+        let counts=query(source)?;let source_geometry=geometry(source)?;
+        let log=runner.run(convert,&["-t".into(),tags.to_string_lossy().into_owned(),"-o".into(),tags.to_string_lossy().into_owned(),"-g".into(),"model".into(),"gbxmodel".into(),source.strip_suffix(".model").unwrap().into()],workspace,"xbox-model-to-pc",23)?;
+        if log.lines().any(|line|line.trim().to_ascii_lowercase().starts_with("error:")){return invalid("Native model converter reported an error");}
+        check(output,b"mod2")?;
+        if query(output)?!=counts{return invalid("Native model conversion changed nodes/regions/geometries/shaders counts");}
+        if geometry(output)?!=source_geometry{return invalid("Native model conversion changed node/marker/LOD/material/vertex/UV/triangle readback");}
+        let geometry_sha256=crate::hex_bytes(sha2::Sha256::digest(source_geometry.as_bytes()));
+        result.push(PcModelConversion{source:source.clone(),output:output.clone(),source_sha256:hash,output_sha256:maps::hash_file(&destination)?,native_counts:counts,geometry_sha256});
+    }
+    // Each bounded batch rewrites exact paths/classes with the native parser.
+    // No fuzzy source replacement and no edits to a base-kit tag are permitted.
+    for batch in plan.chunks(16) {
+        let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-M".into(),"no-move".into()];
+        for(source,output) in batch{args.extend(["-T".into(),source.clone(),output.clone()]);}
+        let log=runner.run(refactor,&args,workspace,"xbox-model-references",23)?;
+        if log.lines().any(|line|line.trim().to_ascii_lowercase().starts_with("error:")){return invalid("Native model reference repair reported an error");}
+    }
+    let after=crate::tool_transaction::inventory(tags)?;
+    for(path,hash) in &original {
+        let key=path.replace('\\',"/");
+        if after.get(path).is_none()||(!imports.contains_key(&key)&&after.get(path)!=Some(hash)){return invalid("Model adaptation changed or removed an unrelated staged tag");}
+    }
+    let added=after.keys().filter(|path|!original.contains_key(*path)).map(|path|path.replace('\\',"/")).collect::<BTreeSet<_>>();
+    if added!=plan.iter().map(|(_,output)|output.clone()).collect(){return invalid("Model adaptation created unexpected native files");}
+    for conversion in &result {if maps::hash_file(&tags.join(admitted_relative(&conversion.source)?))?!=conversion.source_sha256{return invalid("Original Xbox model changed during reference repair");}}
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561,4 +635,43 @@ mod tests {
         assert_eq!(fs::read(src.join("a.weapon")).unwrap(), b"needed");
         assert!(dependency_paths("../a.weapon", &src, "a.weapon").is_err());
     }
+    #[test]
+    fn pc_model_plans_preserve_namespaces_and_refuse_ambiguous_outputs() {
+        let prefix="gs_assets_12345678123442348234123456789012";
+        let source=format!("{prefix}/characters/marine/marine.model");let output=source.replace(".model",".gbxmodel");
+        assert_eq!(pc_model_paths([source.as_str()]).unwrap(),vec![(source.clone(),output.clone())]);
+        assert!(pc_model_paths([source.as_str(),output.as_str()]).is_err());
+        assert!(pc_model_paths(["characters/marine.model"]).is_err());
+        assert!(pc_model_paths(["gs_assets_12345678123442348234123456789012/../marine.model"]).is_err());
+        assert!(pc_model_paths(["globals/globals.globals"]).unwrap().is_empty());
+    }
+    #[test]
+    #[ignore="Requires explicit owner-installed Xbox map, Invader and owned output; not cache/gameplay acceptance"]
+    fn native_xbox_actor_to_pc_model_import() {
+        let map=std::path::PathBuf::from(std::env::var_os("SPARK_TEST_XBOX_MAP").expect("select owned Xbox source map"));
+        let tools_dir=std::path::PathBuf::from(std::env::var_os("SPARK_TEST_INVADER").expect("select installed Invader"));
+        let output=std::path::PathBuf::from(std::env::var_os("SPARK_GENERATED_ROOT").expect("run in existing owned development workspace"));
+        let tmp=tempfile::tempdir_in(&output).unwrap();let _library=crate::library::Library::open(tmp.path()).unwrap();let managed=tmp.path().join("managed");fs::create_dir(&managed).unwrap();
+        let before=maps::hash_file(&map).unwrap();let inspection=maps::inspect_map(&map,None).unwrap();assert_eq!(inspection.header.version,5);
+        let requested="characters/marine_armored/marine_armored assault rifle";
+        let actor=inspection.tags.iter().find(|tag|tag.class=="actv"&&tag.path.replace('\\',"/")==requested).expect("real Xbox Marine source");
+        let mut source=crate::project::Project::new("Owned Xbox actor source");source.source=Some(crate::project::Source{original_path:map.clone(),preserved_path:map.clone(),sha256:before.clone(),cache_version:5,engine:inspection.header.engine.clone(),scenario_path:inspection.scenario_path.clone(),archive:None,resource_directory:None,resource_sha256:BTreeMap::new(),audio_resources:None});
+        let tools=crate::build::Toolchain{invader_directory:Some(tools_dir.clone()),..Default::default()};let cancel=std::sync::Arc::new(AtomicBool::new(false));
+        let extract=crate::tag_exchange::extract_selected_tag(&source,&inspection,&tools,&managed,&uuid::Uuid::new_v4().to_string(),actor.id,cancel.clone(),|_|{}).unwrap();
+        let mut target=crate::project::Project::new("Campaign from Xbox tags");
+        let binding=crate::native_asset_imports::prepare(&target,&source,&inspection,&extract,&tools,&managed,&uuid::Uuid::new_v4().to_string(),actor.id,&cancel,|_|{}).unwrap();
+        let mut doc=crate::quickforge::create_arena("Xbox creator","smallIndoorArena").unwrap();doc.game_mode="campaign".into();
+        doc.campaign_encounters.push(serde_json::from_value(serde_json::json!({"name":"survivors","actorPath":binding.native_path,"position":[0,0,0],"startActive":false,"count":1,"spacing":1})).unwrap());target.quick_forge=Some(doc);target.native_asset_imports.push(binding.clone());
+        let imports=crate::native_asset_imports::source_hashes(&managed,&target).unwrap();assert_eq!(imports.len(),binding.file_count);assert!(imports.keys().any(|path|path.ends_with(".model")));
+        let stage=tmp.path().join("tags");fs::create_dir(&stage).unwrap();assert_eq!(crate::native_asset_imports::stage(&managed,&target,&stage).unwrap(),imports);
+        let event=|_|{};let runner=crate::build::Runner{id:"xbox-native-model-test",project:&target.id,cancel:&cancel,event:&event};
+        let binary=|name:&str|tools_dir.join(format!("{name}{}",if cfg!(windows){".exe"}else{""}));
+        let converted=convert_imported_pc_models(&stage,&imports,&binary("invader-convert"),&binary("invader-refactor"),&binary("invader-edit"),&runner,tmp.path()).unwrap();assert_eq!(converted.len(),4);
+        let log=runner.run(&binary("invader-dependency"),&["-t".into(),fs::canonicalize(&stage).unwrap().to_string_lossy().into_owned(),"-r".into(),format!("{}.actor_variant",binding.native_path)],tmp.path(),"asset-dependencies",90).unwrap();
+        assert!(!log.contains("[BROKEN]"));assert!(!log.lines().any(|line|line.trim().ends_with(".model")));assert!(log.contains(".gbxmodel"));
+        assert_eq!(crate::native_asset_imports::source_hashes(&managed,&target).unwrap(),imports);assert_eq!(maps::hash_file(&map).unwrap(),before);
+        let proof=serde_json::json!({"scope":"Real Xbox cache actor -> existing recursive/native import -> disposable PC model/reference adaptation, not cache/gameplay acceptance","sourceCacheVersion":5,"sourceSha256":before,"actorPath":requested,"importedFiles":binding.file_count,"convertedModels":converted,"originalMapAndImportsUnchanged":true,"cacheBuilt":false,"gameplayVerified":false});
+        fs::write(output.join("xbox-actor-proof.json"),serde_json::to_vec_pretty(&proof).unwrap()).unwrap();println!("{}",proof);
+    }
+
 }

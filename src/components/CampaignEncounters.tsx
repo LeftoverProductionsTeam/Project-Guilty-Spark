@@ -1,7 +1,10 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import AssetSourceBrowser from './AssetSourceBrowser';
+import {attachAssetImport,prepareCampaignActor} from '../nativeAssetImport';
+import {beginProjectMutation} from '../projectMutation';
 import { useMapState } from '../mapSession';
 import type { NativeEncounterAppend } from '../nativeOperations';
-import type { Project } from '../types';
+import type { OpenProject,Project } from '../types';
 import { Notice, NumberField } from './ui';
 
 const safeName = (name:string) => /^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(name);
@@ -18,6 +21,24 @@ export default function CampaignEncounters({project,edit}:{
   const [selected,setSelected]=useMapState<string>(project.id,'campaign-encounter','');
   const [name,setName]=useState('gs_patrol_1'),[actor,setActor]=useState(''),[error,setError]=useState('');
   const choices=useId();
+  const [actorSource,setActorSource]=useState<OpenProject|null>(null),[sourceTag,setSourceTag]=useState(''),[sourceQuery,setSourceQuery]=useState(''),[importing,setImporting]=useState(false);
+  const latest=useRef(project);latest.current=project;
+  const sourceRef=useRef(actorSource);sourceRef.current=actorSource;
+  const scope=useRef({id:project.id,active:true});
+  useEffect(()=>{const life={id:project.id,active:true};scope.current=life;setActorSource(null);setSourceTag('');setImporting(false);return()=>{life.active=false;};},[project.id]);
+  const candidates=(actorSource?.inspection?.tags??[]).filter(tag=>tag.class==='actv');
+  const matches=candidates.filter(tag=>tag.path.toLowerCase().includes(sourceQuery.toLowerCase()));
+  async function includeActor(){
+    if(importing||!actorSource||!sourceTag)return;
+    const input=latest.current,origin=actorSource,life=scope.current,release=beginProjectMutation(input.id);setImporting(true);setError('');
+    try{
+      const binding=await prepareCampaignActor(input,origin,Number(sourceTag)),current=latest.current;
+      if(!life.active||scope.current!==life||current.id!==input.id||current.quickForge!==input.quickForge||sourceRef.current!==origin)
+        throw Error('The campaign or actor source changed during inclusion. No old actor was applied; prepared tags remain available for retry.');
+      edit(attachAssetImport(current,binding),'Include campaign actor source');setActor(binding.nativePath);
+    }catch(problem){if(life.active&&scope.current===life)setError(String(problem));}
+    finally{release();if(life.active&&scope.current===life)setImporting(false);}
+  }
   const entry=entries.find(value=>value.name===selected)??entries[0];
   const actors=(project.nativeAssetImports??[]).filter(binding=>binding.tagClass==='actv').map(binding=>binding.nativePath);
   const total=entries.reduce((sum,value)=>sum+(value.count??1),0);
@@ -43,15 +64,32 @@ export default function CampaignEncounters({project,edit}:{
       <p className="studio-hint">Build &amp; playtest uses the existing native encounter writer.
         Choose a reviewed actor import below, or enter its exact editing-kit actor-variant path without an extension.
         These source groups do not enable a wave director or multiplayer replication.</p>
+      <details><summary>Include actors from a map · Xbox and other native sources</summary>
+        <AssetSourceBrowser actionLabel="Read campaign actor source" onLoaded={source=>{setActorSource(source);setSourceTag('');setSourceQuery('');}}/>
+        {actorSource&&<>
+          <p className="studio-hint">{actorSource.project.title} · cache {actorSource.inspection?.header.version??'unavailable'} · source {actorSource.inspection?.sha256.slice(0,12)}…</p>
+          <label>Find source actor<input type="search" aria-label="Find campaign source actor" value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)}/></label>
+          <label>Source actor<select aria-label="Campaign source actor" value={sourceTag} disabled={importing} onChange={event=>setSourceTag(event.target.value)}>
+            <option value="">Choose a native actor variant</option>
+            {sourceTag&&!matches.slice(0,100).some(tag=>String(tag.id)===sourceTag)&&candidates.filter(tag=>String(tag.id)===sourceTag).map(tag=><option key={tag.id} value={tag.id}>{tag.path}</option>)}
+            {matches.slice(0,100).map(tag=><option key={tag.id} value={tag.id}>{tag.path}</option>)}
+          </select></label>
+          <small>{matches.length} matches · showing up to100; search to narrow the source list.</small>
+          <button type="button" disabled={importing||!sourceTag} onClick={()=>void includeActor()}>{importing?'Including actor dependencies…':'Include actor for new encounter'}</button>
+        </>}
+        <p className="studio-hint">Reads your owned map and preserves its native actor, model, animation, sound and other dependencies in the existing managed import.
+          After inclusion, enter the encounter name and click Add encounter. Xbox model conversion, when required by a PC build, applies only to that build's disposable tags.
+          Missing dependencies or unsupported data block the native build; import is not gameplay acceptance.</p>
+      </details>
       <datalist id={choices}>{actors.map(path=><option key={path} value={path}/>)}</datalist>
       <div className="studio-fields">
         <label>New encounter name<input aria-label="New campaign encounter name" value={name} maxLength={31}
           onChange={event=>setName(event.target.value)}/></label>
-        <label>Actor variant tag<input aria-label="New campaign actor tag" value={actor} list={choices} maxLength={240}
+        <label>Actor variant tag<input aria-label="New campaign actor tag" value={actor} disabled={importing} list={choices} maxLength={240}
           onChange={event=>setActor(event.target.value)}/></label>
       </div>
       <button type="button" title="Choose a unique native name and a valid actor-variant tag path before adding an encounter."
-        disabled={!safeName(name)||!safeActor(actor)||entries.length>=16||total>=128||
+        disabled={importing||!safeName(name)||!safeActor(actor)||entries.length>=16||total>=128||
         entries.some(value=>value.name.toLowerCase()===name.toLowerCase())}
         onClick={()=>{
           const start=doc.spawns[0]?.position??[0,0,0];

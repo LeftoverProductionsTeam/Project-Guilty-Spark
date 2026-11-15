@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createEmitter, emptySoundScene } from './spatialAudio';
 import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound, prepareMissionSound } from './nativeSoundPlacement';
+import {prepareCampaignActor} from './nativeAssetImport';
 import { editRevisionKey, changedEditInputs } from './smartEdit';
 import { historyReducer, initialHistory } from './editor';
 import type { NativeAssetImport, Project } from './types';
@@ -187,4 +188,15 @@ it('includes mission radio through the same owned native closure and rejects sta
  await expect(prepareMissionSound(project,{...radio,customSound:{assetId:'wav',sha256:hash}})).rejects.toThrow(/compiled sound tag/);
  await expect(prepareMissionSound(project,emitter)).rejects.toThrow(/one-shot/);
  project.quickForge!.gameMode='slayer';await expect(prepareMissionSound(project,radio)).rejects.toThrow(/Campaign/);
+});
+
+
+it('includes a genuine Xbox-cache actor identity through the existing source importer',async()=>{
+ const {project}=fixture();project.quickForge!.gameMode='campaign';const original=JSON.stringify(project);
+ const source={project:{id:sourceId,source:{sha256:hash}},inspection:{sha256:hash,header:{version:5},tags:[{id:42,class:'actv',path:'characters/marine_armored/marine_armored assault rifle'}]}} as unknown as import('./types').OpenProject;
+ const actor={...binding,tagId:42,tagClass:'actv',tagPath:source.inspection!.tags[0].path,nativePath:'gs_assets_owned/characters/marine_armored/marine_armored assault rifle'};
+ api.call.mockResolvedValue(actor);expect(await prepareCampaignActor(project,source,42)).toEqual(actor);
+ expect(api.call).toHaveBeenLastCalledWith('prepare_native_asset_import',{projectId:project.id,sourceProjectId:sourceId,sourceSha256:hash,tagId:42,existing:null});
+ expect(JSON.stringify(project)).toBe(original);await expect(prepareCampaignActor(project,source,43)).rejects.toThrow(/actor variant/);
+ const stale=structuredClone(source);stale.inspection!.sha256='c'.repeat(64);await expect(prepareCampaignActor(project,stale,42)).rejects.toThrow(/exact source map/);
 });

@@ -170,12 +170,15 @@ pub(crate) fn find(
                 required.insert("invaderScript");
             }
             let mission_hud=crate::creative::native_mission_binding(project,document)?
-                .is_some_and(|binding|binding.missions.iter().any(|beat|beat.hud_objective==Some(true)));
+                .map(|binding|crate::creative::native_mission_hud(&binding)).transpose()?.flatten().is_some();
             if mission_hud || (document.game_mode!="campaign" && project.firefight.as_ref().is_some_and(|config|config.native_hud_messages==Some(true))){
                 required.insert("invaderString");
             }
             if document.runtime_id != crate::runtime::RuntimeId::MccSteam {
                 required.insert("invaderBuild");
+            }
+            if document.runtime_id!=crate::runtime::RuntimeId::MccSteam&&imported.keys().any(|path|path.ends_with(".model")) {
+                required.extend(["invaderConvert","invaderRefactor"]);
             }
             if receipt
                 .tool_identities
@@ -217,6 +220,8 @@ pub(crate) fn find(
                         "invaderScript" => "invader-script",
                         "invaderString" => "invader-string",
                         "invaderDependency" => "invader-dependency",
+                        "invaderConvert" => "invader-convert",
+                        "invaderRefactor" => "invader-refactor",
                         _ => return crate::invalid("Unknown cached native tool"),
                     };
                     tools.invader_directory.as_ref().map(|p| {

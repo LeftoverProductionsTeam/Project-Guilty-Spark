@@ -233,6 +233,7 @@ struct NativeBuildPeak {
     imported_tag_files: usize,
     imported_tag_bytes: u64,
     authored_source_bytes: u64,
+    derived_model_reserve_bytes: u64,
     compiler_output_bytes: u64,
     reserved_bytes: u64,
 }
@@ -248,7 +249,7 @@ fn native_build_peak(selected: &crate::native_staging::Inventory, imported: &cra
     let reserved_bytes = copies.checked_add(authored_source_bytes).and_then(|n| n.checked_add(compiler_output_bytes)).ok_or_else(overflow)?;
     Ok(NativeBuildPeak { selected_tag_files: selected.files.len(), selected_tag_bytes: selected.bytes,
         imported_tag_files: imported.files.len(), imported_tag_bytes: imported.bytes,
-        authored_source_bytes, compiler_output_bytes, reserved_bytes })
+        authored_source_bytes, derived_model_reserve_bytes:0, compiler_output_bytes, reserved_bytes })
 }
 
 fn admit_native_job(store: &crate::storage::Store, directory: &Path, source: Option<&Path>, estimate: u64) -> Result<crate::storage::Lease> {
@@ -397,7 +398,13 @@ pub fn run_prepared_job(
                     |requested|runner.run(&dependency_tool,&["-r".into(),"-t".into(),tags.to_string_lossy().into_owned(),requested.into()],tags,"dependencies",2))?
             };
             if maps::hash_file(&dependency_tool)?!=dependency_tool_sha256{return invalid("Native dependency tool changed while planning; no staging was allocated");}
-            let peak=native_build_peak(&selected,&imported,authored_source_reserve(project,&custom)?)?;
+            let mut peak=native_build_peak(&selected,&imported,authored_source_reserve(project,&custom)?)?;
+            if document.runtime_id!=RuntimeId::MccSteam {
+                crate::native_staging::pc_model_paths(imported.files.iter().map(|file|file.path.as_str()))?;
+                let models=imported.files.iter().filter(|file|file.path.ends_with(".model")).try_fold(0u64,|sum,file|sum.checked_add(file.bytes).ok_or_else(||SparkError::Invalid("Imported model reserve overflow".into())))?;
+                peak.derived_model_reserve_bytes=models.checked_mul(8).ok_or_else(||SparkError::Invalid("Imported model reserve overflow".into()))?;
+                peak.reserved_bytes=peak.reserved_bytes.checked_add(peak.derived_model_reserve_bytes).ok_or_else(||SparkError::Invalid("Imported model reserve overflow".into()))?;
+            }
             Some(NativeInputs{all,selected,imported,model_class_bindings,dependency_tool_sha256,peak})
         }else{None}
     }else{None};
@@ -475,12 +482,15 @@ pub fn run_prepared_job(
             }
             if !tags.join("globals/globals.globals").is_file(){receipt.blockers.push("The selected base tag tree has no globals/globals.globals".into());}
         }
+        let adapt_models=document.runtime_id!=RuntimeId::MccSteam&&imported.iter().any(|path|path.ends_with(".model"));
+        if adapt_models {for name in ["invader-convert","invader-refactor"]{if invader(tools,name).is_none(){receipt.blockers.push(format!("Xbox source models need {name} in the selected Invader folder for this PC build; no source was overwritten"));}}}
         if !receipt.blockers.is_empty(){receipt.status="blocked".into();return Ok(());}
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
         let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap()),("invaderDependency",invader(tools,"invader-dependency").unwrap())];
         if crate::native_logic::has_source(document){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
         if mission_hud.is_some()||native_round.as_ref().is_some_and(|plan|plan.hud_tag_path.is_some()){executables.push(("invaderString",invader(tools,"invader-string").unwrap()));}
         if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
+        if adapt_models {executables.extend([("invaderConvert",invader(tools,"invader-convert").unwrap()),("invaderRefactor",invader(tools,"invader-refactor").unwrap())]);}
         for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
         }
@@ -502,6 +512,11 @@ pub fn run_prepared_job(
         }
         project::atomic_write(&directory.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
         let import_hashes=crate::native_asset_imports::stage(import_root,project,&stage)?;
+        let converted_models=if adapt_models {
+            let result=crate::native_staging::convert_imported_pc_models(&stage,&import_hashes,&invader(tools,"invader-convert").unwrap(),&invader(tools,"invader-refactor").unwrap(),&invader(tools,"invader-edit").unwrap(),&runner,workspace)?;
+            project::atomic_write(&workspace.join("xbox-model-adaptation.json"),&serde_json::to_vec_pretty(&result)?,false)?;
+            emit("xbox-model-to-pc",format!("Adapted {} Xbox source models to native PC gbxmodel in this disposable build; original imports preserved. Source structure readback passed; rendering and game behavior require testing.",result.len()),24,"info");result
+        }else{vec![]};
         let mut combined_hashes=hashes.clone();combined_hashes.extend(import_hashes.clone());
         let source_names=all_inputs.files.iter().map(|f|&f.path).chain(combined_hashes.keys()).collect::<std::collections::BTreeSet<_>>();
         let material_blockers=audit_material_bindings(document,source_names.into_iter())?;
@@ -598,6 +613,14 @@ pub fn run_prepared_job(
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
+        let mut model_readback=vec![];
+        for model in &converted_models {
+            let path=model.output.strip_suffix(".gbxmodel").unwrap();
+            let found=inspected.tags.iter().filter(|tag|tag.path.replace('\\',"/").eq_ignore_ascii_case(path)).collect::<Vec<_>>();
+            if found.iter().any(|tag|tag.class=="mode")||found.iter().filter(|tag|tag.class=="mod2").count()>1{return invalid("Compiled PC cache retained an Xbox model class or ambiguous converted model");}
+            model_readback.push(serde_json::json!({"path":path,"referencedAsPcgBxModel":found.iter().any(|tag|tag.class=="mod2"),"scope":"Native class/path readback only; unused closure models may be omitted by the compiler"}));
+        }
+        if !converted_models.is_empty(){project::atomic_write(&workspace.join("xbox-model-readback.json"),&serde_json::to_vec_pretty(&model_readback)?,false)?;}
         crate::quickforge::verify_player_starts(document,&inspected.objects,&inspected.diagnostics)?;
         crate::quickforge::verify_starting_profile(document,&inspected)?;
         crate::quickforge::verify_campaign_encounters(document,&inspected)?;

@@ -51,7 +51,7 @@ export default function RuntimeLiveRebuild({project,onSave,runtimeId='chupathing
   }
   return <section className="runtime-rebuild-controls" aria-label={forerunner?'Forerunner solo playtest':'Chupathingy Live Rebuild'}>
     <strong>{forerunner?'Forerunner · staged solo playtest':'Chupathingy · Live Rebuild'}</strong>
-    <p className="subtle">{forerunner?'Uses the saved project’s validated CE solo build in disposable private folders. Select the staged map in the engine’s custom campaign chooser; temporary test profiles are removed on Stop. Automatic reload, game revision confirmation and combat acceptance are not available.':'Build saved changes, then restart the private playtest. The round resets; failed builds keep the running map.'}</p>
+    <p className="subtle">{forerunner?'Uses the saved project’s validated CE solo build in disposable private folders. Compatible Xbox-derived tags may supply its assets; the original Xbox cache is preserved and is not relabeled as CE. Select the staged map in the engine’s custom campaign chooser; temporary test profiles are removed on Stop. Automatic reload, game revision confirmation and combat acceptance are not available.':'Build saved changes, then restart the private playtest. The round resets; failed builds keep the running map.'}</p>
     {forerunner&&profileIssue&&<p role="status">{profileIssue}</p>}
     <div className="analysis-actions">
       <button disabled={!native||busy||running||!project||!onSave||(forerunner&&!profile)} onClick={()=>void perform('start')}><Play size={13}/>{forerunner?'Start staged solo test':'Start compiled playtest'}</button>

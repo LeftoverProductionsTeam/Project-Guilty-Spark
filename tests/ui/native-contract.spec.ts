@@ -4045,15 +4045,40 @@ test('Black Echo draft uses one project history action and selects its native ar
   p.quickForge={schemaVersion:1,name:'Synthetic campaign authoring',template:'customBlank',runtimeId:'mccSteam',gameMode:'campaign',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[],logic:{schemaVersion:1,triggers:[],devices:[],rules:[]}};
   p.studio={schemaVersion:1,missions:[],shots:[],playtests:[],server:{name:'Private source',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
   p.nativeAssetImports=[{id:'12345678-1234-4234-8234-123456789012',sourceProjectId:p.id,sourceSha256:'a'.repeat(64),tagId:42,tagClass:'snd!',tagPath:'sound/radio distress',nativePath:'gs_assets_12345678123442348234123456789012/sound/radio distress',receiptSha256:'b'.repeat(64),fileCount:1}];
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,source=w.__sparkMock.projects.b;
+  source.project.source={...source.project.source,sha256:'b'.repeat(64)};source.inspection.sha256='b'.repeat(64);source.inspection.header.version=5;
+  source.inspection.tags=[{id:77,class:'actv',path:'characters/marine_armored/marine_armored assault rifle',fields:[],references:[]}];
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='discover_asset_sources')return{maps:[{id:'xbox-actors',name:'Xbox a10',location:'Synthetic Xbox source',engine:'Xbox',cacheVersion:5,archive:false,bytes:100}],notices:[],elapsedMs:1};
+   if(command==='open_asset_source')return[structuredClone(source)];
+   if(command==='prepare_native_asset_import'&&args.tagId===77)return{id:'87654321-1234-4234-8234-123456789012',sourceProjectId:source.project.id,sourceSha256:'b'.repeat(64),tagId:77,tagClass:'actv',tagPath:source.inspection.tags[0].path,nativePath:'gs_assets_87654321123442348234123456789012/characters/marine_armored/marine_armored assault rifle',receiptSha256:'c'.repeat(64),fileCount:100};
+   return invoke(command,args);
+  };
  });
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  await chooseTool(page,'Creator Studio');const create=page.getByRole('button',{name:'Create Black Echo draft',exact:true,includeHidden:true});await revealPagedControl(create);await create.click();
  await expect(page.locator('.studio-record')).toHaveCount(7);
  const saved=()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project);
+
  await expect.poll(async()=>(await saved()).quickForge.logic.triggers.length).toBe(5);
  await page.keyboard.press('Control+z');await expect(page.locator('.studio-record')).toHaveCount(0);await expect.poll(async()=>(await saved()).quickForge.logic.triggers.length).toBe(0);
  await page.keyboard.press('Control+y');await expect(page.locator('.studio-record')).toHaveCount(7);await expect.poll(async()=>(await saved()).quickForge.logic.triggers.length).toBe(5);
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions.length)).toBe(7);
+ const ai=page.locator('details.studio-handoff').filter({has:page.locator('summary').filter({hasText:/^Campaign AI encounters/})});await ai.locator(':scope > summary').click();
+ const sources=ai.locator('details').filter({has:page.locator('summary').filter({hasText:/^Include actors from a map/})});await sources.locator(':scope > summary').click();
+ const browser=sources.locator('.asset-source-browser');await browser.locator('summary').click();await browser.getByRole('button',{name:'Rescan',exact:true}).click();
+ await browser.getByRole('combobox',{name:'Discovered asset source',exact:true}).selectOption('xbox-actors');await browser.getByRole('button',{name:'Read campaign actor source',exact:true}).click();
+ await sources.getByRole('combobox',{name:'Campaign source actor',exact:true}).selectOption('77');await sources.getByRole('button',{name:'Include actor for new encounter',exact:true}).click();
+ const actorPath='gs_assets_87654321123442348234123456789012/characters/marine_armored/marine_armored assault rifle';
+ await expect(ai.getByRole('combobox',{name:'New campaign actor tag',exact:true})).toHaveValue(actorPath);
+ await ai.getByRole('textbox',{name:'New campaign encounter name',exact:true}).fill('be_marines');await ai.getByRole('button',{name:'Add encounter',exact:true}).click();
+ await expect(ai.getByRole('combobox',{name:'Campaign encounter',exact:true})).toHaveValue('be_marines');
+ await page.keyboard.press('Control+z');await expect(ai.getByRole('combobox',{name:'Campaign encounter',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.nativeAssetImports?.length)).toBe(1);
+ await page.keyboard.press('Control+y');await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.campaignEncounters?.[0]?.actorPath)).toBe(actorPath);
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.nativeAssetImports?.length)).toBe(2);
+
  const record=page.locator('.studio-record').nth(4);await record.getByLabel('Optional condition 5',{exact:true}).fill('be_artifact');
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[4].conditionVolume)).toBe('be_artifact');
 
