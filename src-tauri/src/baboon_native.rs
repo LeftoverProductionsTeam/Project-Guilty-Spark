@@ -230,6 +230,24 @@ fn quickforge_compilation_baseline(
     let receipt_path = parent.join("quickforge-receipt.json");
     if !receipt_path.is_file() { return Ok(None); }
     let active: Option<ActiveSource> = lock(&state.library)?.setting(&source_key(&project.id)).map_err(error)?;
+    if let Some(managed)=native_source_revisions::selected(state,project,&build.id)? {
+        if fs::canonicalize(&managed).map_err(error)?!=source {
+            return Err("Only the selected managed native revision may reuse its compiled parent inventory".into());
+        }
+        core::reject_links(&receipt_path).map_err(error)?;
+        let receipt:core::forge_build::QuickForgeBuildReceipt=serde_json::from_slice(&bounded_read(&receipt_path,4*1024*1024)?).map_err(error)?;
+        let fingerprint=project.fingerprint().map_err(error)?;
+        if receipt.schema_version!=1||receipt.job_id!=build.id||receipt.project_id!=project.id||receipt.project_fingerprint!=fingerprint||receipt.status!="validated"||
+            receipt.build.as_ref().is_none_or(|record|record.id!=build.id||record.sha256!=build.sha256||record.project_fingerprint!=fingerprint||record.status!="validated") {
+            return Err("QuickForge parent receipt no longer proves the managed native revision's starting source".into());
+        }
+        let workspace=receipt.sources.ok_or("QuickForge parent source is unavailable")?.directory;
+        core::reject_links(&workspace).map_err(error)?;let workspace=fs::canonicalize(workspace).map_err(error)?;
+        if !workspace.starts_with(parent){return Err("QuickForge starting source escaped its validated job".into());}
+        let starting=workspace.join("tags");
+        let baseline=core::forge_build::verified_compiled_tags(parent,&starting).map_err(error)?;
+        return Ok(Some((baseline,starting)));
+    }
     let Some(active) = active else { return Ok(None); };
     let fingerprint = project.fingerprint().map_err(error)?;
     if active.project_id != project.id || active.parent_build_id != build.id || active.fingerprint != fingerprint {

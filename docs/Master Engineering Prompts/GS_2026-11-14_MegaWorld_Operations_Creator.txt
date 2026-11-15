@@ -1,0 +1,119 @@
+# GUILTY SPARK — COMPLETE MEGAWORLD OPERATIONS CREATOR
+
+**ALL THE TOOLS, AND THEN SOME.**
+
+Build a complete visual mission-authoring workflow for Halo-inspired cooperative and PvPvE Extraction. Preserve the entire existing roadmap.
+
+### Reuse existing implementations
+
+Extend Creator Studio, Mission Director, QuickForge, Logic / Events, native scenario editing, HaloScript export, Firefight/AI tools, Sound Mixer, asset library, viewport, Save, Undo/Redo and native compilation.
+
+Do not create a competing mission editor, script engine, asset system, or build pipeline.
+
+### Mission creation
+
+Creators must be able to design complete replayable operations inspired by the military missions in Halo's novels.
+
+Support reusable objective families:
+
+- Reconnaissance and intelligence gathering
+- Marine and civilian rescue, defense and escort
+- Covenant elimination, facility assault and base capture
+- Flood infestation discovery and containment
+- Forerunner artifact and technology recovery
+- Vehicle, supply and equipment salvage
+- Infiltration, sabotage and demolition
+- Communications restoration and defense
+- High-value-target elimination
+- Extraction, evacuation, failure and redeployment
+
+Build on the existing mission beats and visual Logic / Events system.
+
+Creators must be able to define objective dependencies, optional branches, alternate outcomes, failure conditions, rewards and mission escalation.
+
+An operation can change objectives as events unfold. No need to hardcode individual quests.
+
+### Complete visual authoring
+
+Enable creators to place, select, move and configure:
+
+- Spartan deployments and squad-specific insertion points
+- Pelican landing and extraction areas
+- Marine survivors, enemies, vehicles and equipment
+- AI squads, patrols, defenses, reinforcements and difficulty
+- Trigger volumes, terminals, switches and interactable objects
+- Salvage, collectible intelligence and recoverable equipment
+- Rescue routes, objectives and enemy-controlled locations
+- Medical and revive equipment locations
+- Extraction zones and multiplayer encounter areas
+
+Use actual viewport controls and existing native writers. Everything must support appropriate source review, Save, Undo/Redo, restart and native readback.
+
+### Voice, audio and presentation
+
+Expand the existing Sound Mixer and cinematic/mission tools to author:
+
+- UNSC radio transmissions
+- Marine distress calls and dialogue
+- ONI mission briefings
+- AI warnings, squad notifications and objective updates
+- Enemy transmissions and environmental sounds
+- Combat music transitions, alarms and extraction countdowns
+- Subtitles and synchronized dialogue/camera events
+
+Support creator-provided recordings and existing authorized Halo audio resources.
+
+Cues need editable triggers, playback scope, priority, timing, position, attenuation and preview.
+
+Do not duplicate the existing audio engine or bundle proprietary game assets.
+
+### Multiplayer operation authoring
+
+Creators configure:
+
+- Squads of up to six players
+- Separate missions and progress for different squads
+- Cooperative, PvE and PvPvE rules
+- Optional temporary alliances and rival squad encounters
+- Downed/revive rules and medical resources
+- Loot ownership, death drops and extraction rewards
+- Persistent weapon, armor and inventory progression
+- Regional spawning and quests across MegaWorld
+
+128 total players and 19 connected regions are eventual acceptance targets, not existing proven capabilities.
+
+### Spark–Forerunner boundary
+
+Reuse the existing Spark integration contract.
+
+Native Halo maps, tags, AI encounters, triggers, HUD messages, sounds and HaloScript remain native wherever compatible.
+
+For Forerunner-only features requiring independent squad state, define the smallest versioned supplemental mission data necessary. Do not add proprietary extensions to original Halo tags.
+
+Export must validate required assets, identifiers, references and native readback. Unsupported target runtimes must report limitations clearly.
+
+### First complete operation
+
+Build an original mission called **Operation Black Echo**:
+
+1. Deploy a squad into hostile territory.
+2. Locate and rescue stranded Marines.
+3. Investigate a Covenant facility.
+4. Recover classified technology.
+5. Encounter an optional Flood containment emergency.
+6. Defend an extraction point.
+7. Extract survivors and recovered equipment.
+
+Include creator-configurable enemy encounters, branching objectives, radio dialogue, sound effects, subtitles, HUD updates, rewards and replayability.
+
+### Acceptance
+
+Verify the complete creator workflow:
+
+Create → place assets and encounters → author quests/audio → Save → restart → reopen → native compile → independent readback → launch in Forerunner → observe mission execution → revise.
+
+Use proportionate focused tests throughout; keep full-scale gameplay acceptance as a separate milestone.
+
+Protect all original files and installations. Keep Forerunner read-only. Never push without approval.
+
+**Finish functional creator workflows, not isolated controls. Continue the remaining roadmap autonomously.**

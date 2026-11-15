@@ -29,7 +29,7 @@ fn output<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(S
         (String::from_utf8_lossy(&data).replace("\r\n", "\n"), cut)
     })
 }
-fn reader_root(tags: &Path, relative: &str) -> Reply<PathBuf> {
+pub(super) fn reader_root(tags: &Path, relative: &str) -> Reply<PathBuf> {
     core::safe_relative(relative).map_err(error)?;
     if relative.starts_with('-') {
         return Err("Native tag path cannot begin with a tool option".into());

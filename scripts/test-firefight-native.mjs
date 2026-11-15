@@ -20,7 +20,8 @@ await fs.mkdir(await assertQaOutputPath(output));
 const report={schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
 let browser,page,child,call;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
- await nativeStandaloneBaseline({context,archive,kit,invader,report:report.sourcePreparation,prepareOnly:true,
+ const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
+ await nativeStandaloneBaseline({context:{...context,directory:fixtureRoot},archive,kit,invader,report:report.sourcePreparation,prepareOnly:true,
   additionalRoots:['characters/grunt/grunt minor plasma pistol.actor_variant','ui/ui_tags_loaded_solo_scenario_type.tag_collection'],
   onPrepared:async ({root:sourceRoot,drive,run,tags})=>{
    const library=path.join(output,'library'),webview=path.join(output,'webview');
@@ -144,6 +145,59 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    await chooseTool(page,'Firefight rules');await page.keyboard.press('Control+z');await save(id);
    expect((await state(id)).project.firefight.title).toBe(p.firefight.title);
    await page.screenshot({path:path.join(output,'firefight-built.png')});
+   if(process.env.SPARK_FIREFIGHT_ENCOUNTER_REVIEW==='1'){
+    await page.evaluate(()=>{window.__sparkEncounterClicks=[];window.addEventListener('click',event=>{
+      const control=event.target instanceof Element?event.target.closest('button,summary,a'):null;
+      window.__sparkEncounterClicks.push({target:control?.getAttribute('aria-label')??control?.textContent?.trim().slice(0,100),
+        workspace:document.querySelector('[aria-label="Current workspace"]')?.textContent});
+      if(window.__sparkEncounterClicks.length>32)window.__sparkEncounterClicks.shift();
+    },true);});
+    // Exercise the existing native source UI on a real authored singleplayer
+    // parent. Only read state through IPC; preview/accept/restore/build are clicks.
+    await chooseTool(page,'Tag editor');
+    const panel=page.locator('.native-tag-operations');await panel.locator('> summary').click();
+    await expect(panel.locator('.native-encounter-authoring')).toBeVisible();
+    await panel.locator('.native-encounter-authoring > summary').click();
+    const context=()=>call('native_tag_context',{projectId:id});
+    const baseline=await context();expect(baseline.canAppendEncounter).toBe(true);
+    await panel.getByRole('textbox',{name:'Native encounter name',exact:true}).fill('gs_native_review');
+    await panel.getByRole('combobox',{name:'Native encounter actor',exact:true}).selectOption('characters/grunt/grunt minor plasma pistol');
+    await panel.getByRole('spinbutton',{name:'Native squad actor count',exact:true}).fill('2');
+    for(const [axis,value] of [['X','2'],['Y','-2'],['Z','0.1']])await panel.getByRole('spinbutton',{name:'Native actor '+axis,exact:true}).fill(value);
+    await panel.getByRole('button',{name:'Preview encounter append',exact:true}).click();
+    const accept=()=>panel.getByRole('button',{name:'Accept as new source revision',exact:true});
+    await expect(accept()).toBeEnabled();await accept().click();
+    await expect.poll(async()=>(await context()).scenarioStartSquads.some(row=>row.encounterName==='gs_native_review'),{timeout:180000,intervals:[1000,2000]}).toBe(true);
+    const appended=await context(),squad=appended.scenarioStartSquads.find(row=>row.encounterName==='gs_native_review');
+    expect(squad.starts).toHaveLength(2);
+    // Manually appended groups retain a source recipe. Direct start/count
+    // edits must remain blocked until that recipe can be reconciled; this is
+    // not an original-campaign coordinate-edit acceptance fixture.
+    await panel.locator('.native-ai-starts > summary').click();
+    await panel.getByRole('combobox',{name:'AI starting-position squad',exact:true}).selectOption(squad.encounter+':'+squad.squad);
+    await expect(panel.getByRole('spinbutton',{name:'AI start X',exact:true})).toBeDisabled();
+    await expect(panel.getByRole('button',{name:'Show handles in Level Editor',exact:true})).toBeDisabled();
+    await panel.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();
+    await expect.poll(async()=>(await context()).tagSha256,{timeout:180000,intervals:[1000,2000]}).toBe(baseline.tagSha256);
+    await expect(accept()).toBeEnabled();await accept().click();
+    await expect.poll(async()=>(await context()).tagSha256,{timeout:180000,intervals:[1000,2000]}).toBe(appended.tagSha256);
+    const selected=await context();await save(id);await close();await start();await chooseTool(page,'Map library');await open(title);
+    const restarted=await context();expect(restarted.tagSha256).toBe(selected.tagSha256);expect(restarted.scenarioStartSquads).toEqual(selected.scenarioStartSquads);
+    const previousBuilds=(await call('open_project',{id})).project.builds.map(build=>build.id);
+    await openStudioMenu(page);const activeRuntime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(activeRuntime);await activeRuntime.selectOption('mccSteam');await page.keyboard.press('Escape');
+    const dock=page.locator('.runtime-dock');await dock.getByRole('button',{name:'Runtime and tool details',exact:true}).click();
+    await page.getByRole('button',{name:'Build working tag edits',exact:true}).click();
+    let changed;await expect.poll(async()=>{changed=(await call('open_project',{id})).project.builds.find(build=>!previousBuilds.includes(build.id));if(changed?.status==='failed')throw Error('Encounter native build failed: '+JSON.stringify(changed));return changed?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');
+    const folder=path.join(output,'encounter-independent-readback');await fs.mkdir(folder);
+    await run(path.join(invader,'invader-extract.exe'),['-s',scenario+'.scenario','-t',folder,changed.output]);
+    const query=async key=>(await run(path.join(invader,'invader-edit.exe'),['-t',folder,'-G',key,scenario+'.scenario'])).stdout.trim();
+    const prefix='encounters['+squad.encounter+'].squads['+squad.squad+']';
+    expect(Number(await query(prefix+'.normal_diff_count'))).toBe(2);expect(Number(await query(prefix+'.insane_diff_count'))).toBe(2);
+    const compiledPosition=(await query(prefix+'.starting_locations[0].position')).split(',').map(Number);
+    selected.scenarioStartSquads.find(row=>row.encounterName==='gs_native_review').starts[0].position.forEach((value,index)=>expect(compiledPosition[index]).toBeCloseTo(value,5));
+    expect(await hash(map)).toBe(compiled.build.sha256); // previous-good cache remains untouched
+    report.nativeEncounterReview={scope:'manual encounter append, recovery, source persistence, native build and independent readback',realUi:true,sourceRestore:true,sourceRestart:true,recipeGuardPreserved:true,originalCoordinateWorkflow:'not exercised; manually appended recipes require reconciliation',sourceTagSha256:selected.tagSha256,cacheSha256:await hash(changed.output),compiledPosition,normalCount:2,insaneCount:2,gameplayVerified:false};
+   }
    if(process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'){
     await chooseTool(page,'Level editor');await openStudioMenu(page);
     const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('mccSteam');await page.keyboard.press('Escape');
@@ -172,6 +226,8 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    expect(report.errors).toEqual([]);await close();
    }catch(error){
     report.error=String(error);report.stack=error.stack;
+    report.nativeInputTrace=await page?.evaluate(()=>window.__sparkEncounterClicks??[]).catch(()=>[]);
+    report.nativePanelDiagnostic=await page?.locator('.native-tag-operations').innerText().then(text=>text.slice(-16384),()=>null);
     await page?.screenshot({path:path.join(output,'firefight-failure.png')}).catch(()=>{});
     throw error;
    }finally{

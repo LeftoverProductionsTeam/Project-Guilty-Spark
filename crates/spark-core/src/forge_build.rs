@@ -52,6 +52,11 @@ pub struct QuickForgeBuildReceipt {
 }
 /// Used only after the caller verifies the exact current native build and its
 /// owned source. Retain the dependency subset without prior generated geometry.
+/// Caller verifies exact validated build/project identity first. Reuse the
+/// existing compiled-source contract, never the edited tree or a new manifest.
+pub fn verified_compiled_tags(job:&Path,tags:&Path)->Result<BTreeMap<String,String>> {
+    crate::forge_reuse::compiled_inventory(job,tags)
+}
 pub fn collaboration_input_hashes(job: &Path, tags: &Path) -> Result<BTreeMap<String,String>> {
     crate::forge_reuse::admission_inputs(job, tags)
 }
