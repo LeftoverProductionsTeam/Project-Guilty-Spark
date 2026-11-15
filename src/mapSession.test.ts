@@ -180,3 +180,27 @@ test('global workspace scroll remains window-local across shared preference upda
  session.configureMapViewWindow('main');
  expect(session.readMapSession('global','scroll.settings',{})).toEqual({'surface.settings-interface':[399,0]});
 });
+
+
+test('native AI coordinate proposals stay window-local and never enter restart storage',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');
+ const draft={key:'source-point',values:['1','2','3'],active:true};
+ session.writeMapSession('a','world.ai-start',draft);session.writeMapSession('a','world.grid',true);
+ expect(session.readMapSession('a','world.ai-start',null)).toEqual(draft);
+ session.configureMapViewWindow('second');expect(session.readMapSession('a','world.ai-start',null)).toBeNull();
+ session.writeMapSession('a','world.ai-start',{...draft,key:'second'});
+ session.configureMapViewWindow('main');expect(session.readMapSession('a','world.ai-start',null)).toEqual(draft);
+ expect([...data.values()].every(text=>!text.includes('world.ai-start'))).toBe(true);
+ vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');
+ expect(restarted.readMapSession('a','world.ai-start',null)).toBeNull();
+ expect(restarted.readMapSession('a','world.grid',false)).toBe(true);
+});
+
+test('a quota failure retains ordinary settings without persisting a transient AI proposal',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');blocked=true;
+ session.writeMapSession('a','world.grid',true);session.writeMapSession('a','world.ai-start',{key:'pending'});
+ blocked=false;session.writeMapSession('a','world.snap',true);
+ expect(JSON.parse(data.get(prefix+'a')!)).not.toHaveProperty('world.ai-start');
+ expect(session.readMapSession('a','world.ai-start',null)).toEqual({key:'pending'});
+ expect(session.readMapSession('a','world.grid',false)).toBe(true);
+});

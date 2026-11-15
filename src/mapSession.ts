@@ -10,7 +10,7 @@ let viewWindow:string|null=null;
 /** Camera/selection/scroll are window-local. The last shared snapshot is still
  * written for an explicit handoff/new window, never used to reset a live peer. */
 export function configureMapViewWindow(label:string|null){viewWindow=label&&/^[\w-]{1,60}$/.test(label)?label:null;}
-const viewKey=(key:string)=>/^(hud:|bitmap\.hud\.|camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|bitmap\.(image|face)\.|tags\.(selection|focus|query|filter|classes|limit|contexts|context-selection|preview\.animation)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|smart-edit\.open$|build\.(inputsOpen|resourcesOpen|reportOpen|historyOpen)$|bsp\.(view\.|selection$|tool$|maximized$|edgeTarget$|edgePicks$)|creator-studio-pane$|scenario\.(query|selection)$)/.test(key);
+const viewKey=(key:string)=>/^(hud:|bitmap\.hud\.|camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|bitmap\.(image|face)\.|tags\.(selection|focus|query|filter|classes|limit|contexts|context-selection|preview\.animation)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start|ai-start)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|smart-edit\.open$|build\.(inputsOpen|resourcesOpen|reportOpen|historyOpen)$|bsp\.(view\.|selection$|tool$|maximized$|edgeTarget$|edgePicks$)|creator-studio-pane$|scenario\.(query|selection)$)/.test(key);
 // Browsing/category choices are independent UI state even without an active map.
 // Appearance, input preferences, shared source and collaboration stay shared.
 const windowUiKey=(key:string)=>/^(scroll\.|library\.|learning\.|community\.|interface\.section$|tools\.(advanced|dashboard|enginePackage|downloadOpen|connectRuntime)$|workspace\.layoutName$|hosting\.runtime$|director\.docked$)/.test(key);
@@ -120,13 +120,19 @@ export function useMapSessionValues(ids: readonly string[], key: string, fallbac
 export function writeMapSession<T>(id: string, key: string, value: T) {
   if (!id || id.length > 128 || !/^[\w.:-]{1,80}$/.test(key)) return;
   const local=scoped(id,key);
-  if(local!==id){writeRecord(id,key,value);writeRecord(local,key,value);return;}
+  if(local!==id){if(key!=='world.ai-start')writeRecord(id,key,value);writeRecord(local,key,value);return;}
   writeRecord(id,key,value);
 }
 function writeRecord<T>(id:string,key:string,value:T){
   // Another native WebView may have saved a different key since this cache loaded.
   const before=record(id);
   const old = merged(merged(before, stored(id) ?? {}), unpersisted.get(id) ?? {});
+  // Native coordinate handles are transient and window-owned; never restore an
+  // unreviewed source proposal after restart or hand it to another window.
+  if(key==='world.ai-start'){
+    unpersisted.set(id,{...unpersisted.get(id),[key]:value});publish(id,before,{...old,[key]:value});return;
+  }
+  const persistable={...old,[key]:value};delete persistable['world.ai-start'];
   let text: string;
   try {
     if (JSON.stringify(old[key]) === JSON.stringify(value)) {
@@ -135,7 +141,7 @@ function writeRecord<T>(id:string,key:string,value:T){
       publish(id,before,old);
       return;
     }
-    text = JSON.stringify({ ...old, [key]: value });
+    text = JSON.stringify(persistable);
     if (text.length > 262144) return;
   } catch {
     return;
@@ -143,8 +149,10 @@ function writeRecord<T>(id:string,key:string,value:T){
   const next={...old,[key]:value};
   try {
     localStorage.setItem(prefix + id, text);
-    rememberStored(id,text,{...next});
+    rememberStored(id,text,persistable);
+    const temporary=unpersisted.get(id);
     unpersisted.delete(id);
+    if(temporary&&Object.hasOwn(temporary,'world.ai-start'))unpersisted.set(id,{'world.ai-start':temporary['world.ai-start']});
   } catch {
     unpersisted.set(id, { ...unpersisted.get(id), [key]: value });
   }

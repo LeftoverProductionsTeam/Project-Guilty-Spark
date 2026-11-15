@@ -1,3 +1,6 @@
+import NativeAiStartOverlay from './NativeAiStartOverlay';
+import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
+import type {NativeAiStartView} from '../nativeAiStart';
 import NativeObjectShadows from './NativeObjectShadows';
 import GpuLightmapDraft,{GpuLightmapRenderer} from './GpuLightmapDraft';
 import {useAssemblyDonor} from '../useAssemblyDonor';
@@ -574,7 +577,8 @@ export default function World({
   };
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
-  const setSelected=(id:string|null)=>{setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
+  const [nativeAiStart,setNativeAiStart]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
+  const setSelected=(id:string|null)=>{if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
   const tagDocument=library?.documents.find(document=>document.id===tagSource);
   const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
   const librarySources = useAssetLibrarySources(library?.documents ?? []);
@@ -1211,17 +1215,17 @@ export default function World({
           if (!fly) setMode('scale');
           break;
         case 'f':
-          if (!fly) {setPlayerView(false);setFrame((f) => f + 1);}
+          if (!fly) {setPlayerView(false);if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else setFrame((f) => f + 1);}
           break;
         case 'escape':
-          setSelected(null);
+          setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSelected(null);
           setZoneSelection(null);
           break;
       }
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [activity.active,fly,project.id,chosen,catalog,assetBusy]);
+  }, [activity.active,fly,project.id,chosen,catalog,assetBusy,nativeAiStart]);
   return (
     <div
       className="world-layout"
@@ -1552,10 +1556,19 @@ export default function World({
                     onSceneDragEnd={onSceneDragEnd}
                   />
                 )}
+                {!cinematic&&!externalCameraAuthority&&<NativeAiStartOverlay project={project} enabled={!fly&&!cameraLocked&&!pickTarget} snap={snap}
+                  onSelectScene={()=>{setPlayerView(false);setSelected(null);setZoneSelection(null);}} onStart={onSceneDragStart} onEnd={onSceneDragEnd} notify={notify}/>}
                 {viewportChildren}
               </Canvas>}
             </Suspense>
           </ViewportBoundary>
+          {!cinematic&&nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
+            <strong>AI start draft · {nativeAiStart.encounterName} / {nativeAiStart.squadName} / {nativeAiStart.start}</strong>
+            <span>Unsaved coordinates · review in Native source controls</span>
+            <button disabled={fly||cameraLocked||externalCameraAuthority} title="Frame the coordinate proposal. Release fly navigation or camera ownership first."
+              onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>Frame AI start</button>
+            <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>
+          </div>}
           {!cinematic && chosen && (
             <div className="viewport-object-actions">
               <strong>{chosen.name}</strong>

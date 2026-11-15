@@ -61,7 +61,8 @@ export default function NativeTagOperations({
   const queuedActors=encounterQueue.reduce((sum,entry)=>sum+(entry.count??1),0);
   const validEncounterDraft=!!context?.canAppendEncounter&&context.actorVariants?.includes(actorPath)&&/^[A-Za-z0-9_]{1,31}$/.test(encounterName)&&Number.isInteger(Number(actorCount))&&Number(actorCount)>=1&&Number(actorCount)<=32&&actorSpacing.trim()!==''&&Number.isFinite(Number(actorSpacing))&&Number(actorSpacing)>=0.25&&Number(actorSpacing)<=16&&actorPosition.every(v=>v.trim()!==''&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=2048);
   const encounterDraft=():NativeEncounterAppend=>({name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive,count:Number(actorCount),spacing:Number(actorSpacing)});
-  const generation = useRef(0);
+  const generation = useRef(0),proposalGeneration=useRef(0);
+  function invalidateProposal(){proposalGeneration.current++;if(!accepted)setPreview(null);}
   const projectId = project.id;
   const ceSource=context?.sourceTarget==='gbx-custom'||project.buildTargets?.some(target=>target.id===project.activeBuildTarget&&['haloCustomEdition','chupathingyCe'].includes(target.runtimeId));
   const [nativeTag, setNativeTag] = useState<number | null>(null),
@@ -134,13 +135,14 @@ export default function NativeTagOperations({
   }
   function makePreview(operation: NativeOperation) {
     if (dirty) return;
+    const proposal=++proposalGeneration.current;
     void perform(async (current) => {
       const result = await call<NativePreview>('native_operation_preview', {
         projectId,
         tagId: selectedTagId,
         operation,
       });
-      if (current !== generation.current) return;
+      if (current !== generation.current||proposal!==proposalGeneration.current) return;
       setPreview(result);
       setAccepted(null);
     });
@@ -270,9 +272,9 @@ export default function NativeTagOperations({
                 <p className="subtle">Review below → Accept as new source revision → Build working tag edits (CE source uses Build CE working tag edits). Restore before-edit tag reverses this source revision. Draft count fields are not project edits or a running-game change.</p>
               </>}
             </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
-            {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={()=>{if(!accepted)setPreview(null);}}/>}
+            {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           </details>}
-          {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={()=>{if(!accepted)setPreview(null);}}/>}
+          {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {!!context.hudArrays?.length&&<details className="native-hud-structure">
             <summary>Duplicate native HUD element</summary>
             <p className="subtle">Append a copy of an existing element without moving original indices. Preview checks the copied fields and current dependencies. Accept the source revision, use Build working tag edits, then open the compiled HUD to edit its new layout. Your original tags stay unchanged.</p>

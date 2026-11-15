@@ -1,4 +1,7 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
+import {useMapState} from '../mapSession';
+import {NATIVE_AI_START_VIEW,nativeAiStartPosition,nativeAiStartMatches} from '../nativeAiStart';
+import type {NativeAiStartView} from '../nativeAiStart';
 import type {NativeOperation,NativeTagContext} from '../nativeOperations';
 import {Notice} from './ui';
 
@@ -6,20 +9,33 @@ import {Notice} from './ui';
 export default function NativeStartingPositions({context,busy,dirty,onPreview,onDraftChange}:{
   context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void;
 }) {
-  const [squadKey,setSquadKey]=useState(''),[startIndex,setStartIndex]=useState('0');
-  const [draft,setDraft]=useState<{key:string;values:[string,string,string]}|null>(null);
+  const [squadKey,setSquadKey]=useState(''),[startIndex,setStartIndex]=useState('');
+  const [draft,setDraft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
   const rows=context.scenarioStartSquads??[];
-  const squad=rows.find(row=>`${row.encounter}:${row.squad}`===squadKey)??rows.find(row=>row.starts?.length)??rows[0];
-  const point=squad?.starts?.find(point=>String(point.index)===startIndex)??squad?.starts?.[0];
+  const squad=rows.find(row=>`${row.encounter}:${row.squad}`===squadKey)??rows.find(row=>row.encounter===draft?.encounter&&row.squad===draft.squad)??rows.find(row=>row.starts?.length)??rows[0];
+  const point=squad?.starts?.find(point=>String(point.index)===startIndex)??squad?.starts?.find(point=>point.index===draft?.start)??squad?.starts?.[0];
   const key=JSON.stringify([context.projectId,context.buildId,context.tag,context.tagSha256,squad?.encounter,squad?.squad,point?.index]);
   const values=draft?.key===key?draft.values:point?.position.map(String) as [string,string,string]|undefined;
-  const position=values?.map(Number) as [number,number,number]|undefined;
-  const valid=!!values&&values.every(value=>value.trim()!==''&&Number.isFinite(Number(value))&&Math.abs(Number(value))<=1e6);
+  const position=nativeAiStartPosition(values);
+  const valid=!!position;
   const changed=!!point&&!!position&&valid&&point.position.some((value,index)=>
     Math.abs(value-position[index])>Math.max(1e-6,Math.abs(value)*2**-22));
   const protectedGroup=!!squad&&context.protectedSquadEncounters?.includes(squad.encounterName.replace(/[A-Z]/g,char=>char.toLowerCase()));
   const issue=context.startEditIssue??(protectedGroup?'This group has a preserved source recipe. Move its starts in its original authoring workflow; direct overrides require source reconciliation.':null);
   const disabled=busy||dirty||!!issue;
+  useEffect(()=>{
+    if(draft&&!nativeAiStartMatches(draft,context))setDraft(null);
+  },[context]);
+  useEffect(()=>{onDraftChange();},[draft?.key,JSON.stringify(draft?.values)]);
+  useEffect(()=>{
+    if(draft?.key===key&&nativeAiStartMatches(draft,context)&&draft.locked!==disabled)setDraft({...draft,locked:disabled});
+  },[disabled,key,draft]);
+  function coordinateDraft(next:[string,string,string],active=draft?.key===key&&draft.active,focus=draft?.key===key?draft.focus:0){
+    if(!squad||!point||!context.tagSha256)return;
+    setDraft({key,projectId:context.projectId,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,
+      encounter:squad.encounter,squad:squad.squad,start:point.index,encounterName:squad.encounterName,squadName:squad.name,
+      original:point.position,values:next,active,focus,locked:disabled});onDraftChange();
+  }
   function preview() {
     if(disabled||!changed||!squad||!point||!position||!context.tagSha256)return;
     onPreview({kind:'encounterStartPosition',encounter:squad.encounter,squad:squad.squad,start:point.index,
@@ -43,12 +59,14 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
         {(['X','Y','Z'] as const).map((axis,index)=><label key={axis}>Native {axis}<input type="number" step={0.25} min={-1e6} max={1e6}
           aria-label={'AI start '+axis} value={values[index]} disabled={disabled} onChange={event=>{
             const next=[...values] as [string,string,string];next[index]=event.target.value;
-            setDraft({key,values:next});onDraftChange();
+            coordinateDraft(next);
           }}/></label>)}
       </div>
+        <p className="subtle">Handles move this unsaved coordinate proposal only. Open Level Editor, then drag an axis; return here to review and accept. Handles are not an actor model, collision or reachability proof.</p>
         <p className="subtle">Current source: {point.position.join(' · ')}. Only this start's position will change.</p>
         {!valid&&<Notice tone="info">Enter three finite coordinates between −1,000,000 and1,000,000.</Notice>}
         <div className="button-row">
+          <button disabled={disabled||!valid||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>coordinateDraft(values,true,Date.now())}>Show handles in Level Editor</button>
           <button disabled={disabled||!changed||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={preview}>Preview AI starting position</button>
           <button disabled={busy||!draft||draft.key!==key} onClick={()=>{setDraft(null);onDraftChange();}}>Reset coordinate draft</button>
         </div>
