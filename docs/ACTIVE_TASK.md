@@ -3,8 +3,8 @@
 Task: Operation110 — native Extraction/campaign creator source; lighting/Linux/outbreak
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 184d5469aad87cb04a0b14c87ea9065972eeefbd base; current scoped repairs verified in native18083 and focused77190, awaiting local commit.
-Next action: Checkpoint the verified Xbox→CE builder/source-preservation/solo-start repairs locally, then resume original-campaign viewport→native source review/accept/rebuild/readback.18083 and77190 are terminal PASS, output deleted. Native CE candidate compiled/read back, but37 compiler warnings, current Windows UI/restart, Marine fidelity/AI, Forerunner/game acceptance and loose Xbox roots remain open. No game control, Forerunner access or push.
+Latest verified revision: 8f577e2b0b6ae2adb509ec50504ff05a3f9c9fca — Xbox actor→production CE solo compile/readback, preserving scenario parsing, required UI closure and solo starts; scoped source/tests/evidence committed locally.
+Next action: Extend the existing fresh native UI fixture for recovered compiled solo source: import a separately owned CE candidate, recover/admit its unchanged source, then exercise original-start handles→form→Preview/Accept→Restore/Save/restart→native rebuild/coordinate readback. Current fresh Firefight groups correctly remain protected by recipes; do not strip ownership to manufacture a pass. Old recovery harness needs a retired prior QA library, so do not revive that warehouse.8f577e2/native18083/focused77190 accepted only their recorded scope; no live run/game/Forerunner/push.
 
 ## Acceptance
 
