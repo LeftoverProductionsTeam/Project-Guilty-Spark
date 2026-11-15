@@ -17,6 +17,17 @@ const base: QuickForgeDocument = {
   objectives: [],
 };
 describe('shared conflict review', () => {
+  it('shows campaign difficulty fields added only by a peer and removed locally',()=>{
+    const mine=structuredClone(base),shared=structuredClone(base);
+    mine.gameMode=shared.gameMode='campaign';
+    mine.campaignEncounters=[{name:'patrol',actorPath:'characters/grunt',position:[0,0,0],startActive:false,count:4,spacing:.75}];
+    shared.campaignEncounters=structuredClone(mine.campaignEncounters);
+    shared.campaignEncounters[0].difficulty={normal:2,insane:4};
+    const forward=studioDifferences(mine,shared).find(row=>row.target==='campaignEncounters/patrol/difficulty');
+    expect(forward?.mine).toBe('(absent)');expect(forward?.shared).toContain('"normal":2');
+    const reverse=studioDifferences(shared,mine).find(row=>row.target==='campaignEncounters/patrol/difficulty');
+    expect(reverse?.shared).toBe('(absent)');
+  });
   it('explains semantic field and publication conflicts without dumping tag bytes',()=>{
     const mine=structuredClone(base),shared=structuredClone(base);
     mine.native={source:{inventorySha256:'a'.repeat(64),fieldTag:'weapons/pistol/pistol.weapon',fieldTagSha256:'b'.repeat(64),boundingRadius:.1,templateTag:'boulder.scenery',templateSha256:'c'.repeat(64),dependencies:{},previewSha256:'d'.repeat(64),previewTagId:1,previewTagPath:'boulder'},fields:[{id:'pistolBoundingRadius',boundingRadius:.3}],assets:[{id:'asset',name:'Rock',sha256:'c'.repeat(64),bytes:Array(632).fill(0)}]};

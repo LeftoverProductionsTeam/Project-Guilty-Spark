@@ -37,19 +37,16 @@ const uvVertex=[
   'out vec3 worldPoint; out vec3 worldNormal;',
   'void main(){ worldPoint=position; worldNormal=normal;',
   'gl_Position=vec4(lightmapUv*2.0-1.0,0.0,1.0); }',
-].join('
-');
+].join('\n');
 const shadowVertex=[
   'precision highp float; in vec3 position;',
   'uniform mat4 projectionMatrix; uniform mat4 modelViewMatrix;',
   'void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-].join('
-');
+].join('\n');
 const shadowFragment=[
   'precision highp float; out vec4 result;',
   'void main(){ result=vec4(gl_FragCoord.z,0.0,0.0,1.0); }',
-].join('
-');
+].join('\n');
 const lightFragment=[
   'precision highp float;',
   'in vec3 worldPoint; in vec3 worldNormal; out vec4 result;',
@@ -64,8 +61,7 @@ const lightFragment=[
   'vec2 uv=clamp(p.xy+vec2(float(x),float(y))*shadowTexel,vec2(0.0),vec2(1.0));',
   'visibility+=p.z<=texture(depthPage,uv).r+0.00001?1.0:0.0; }',
   'result=vec4(ambient+sunlight*max(dot(n,sunDirection),0.0)*(visibility/9.0),1.0); }',
-].join('
-');
+].join('\n');
 
 function cancelled(request:GpuLightmapRequest,renderer:THREE.WebGLRenderer) {
   request.signal.throwIfAborted();

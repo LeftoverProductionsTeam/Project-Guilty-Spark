@@ -640,7 +640,7 @@ pub fn scenario_hud_messages(path:&Path,inspection:&MapInspection)->Result<Optio
     let reference=scenario+0x594;
     let id=r.u32(reference+12)?;
     if id==u32::MAX {return Ok(None);}
-    if r.fourcc(reference)!="hmt " {return invalid("Scenario HUD dependency is not native hud_message_text");}
+    if r.fourcc(reference)?!="hmt " {return invalid("Scenario HUD dependency is not native hud_message_text");}
     let tags=inspection.tags.iter().filter(|tag|tag.id==id&&tag.class=="hmt ").collect::<Vec<_>>();
     if tags.len()!=1||tags[0].external {return invalid("Scenario HUD dependency is missing, ambiguous or external; resident readback is required");}
     let at=body(tags[0],128)?;
@@ -939,7 +939,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         let weapon=|at:usize| -> Result<Option<u32>> {
             let id=r.u32(at+12)?;
             if id==u32::MAX {return Ok(None);}
-            if r.fourcc(at)!="weap" || !tags.iter().any(|tag|tag.id==id&&tag.class=="weap") {
+            if r.fourcc(at)?!="weap" || !tags.iter().any(|tag|tag.id==id&&tag.class=="weap") {
                 return invalid("Player starting-profile weapon does not resolve to its native weapon tag");
             }
             Ok(Some(id))
@@ -962,7 +962,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         (0..count).map(|index| {
             let id=r.u32(at+index*16+12)?;
             if id==u32::MAX {return Ok(None);}
-            if r.fourcc(at+index*16)!="actv" || !tags.iter().any(|tag|tag.id==id&&tag.class=="actv") {return invalid(format!("Actor palette entry {index} does not resolve to an actor variant"));}
+            if r.fourcc(at+index*16)?!="actv" || !tags.iter().any(|tag|tag.id==id&&tag.class=="actv") {return invalid(format!("Actor palette entry {index} does not resolve to an actor variant"));}
             Ok(Some(id))
         }).collect()
     })();

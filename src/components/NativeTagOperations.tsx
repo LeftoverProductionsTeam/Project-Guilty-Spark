@@ -14,6 +14,7 @@ import { Notice, Pill } from './ui';
 import './nativeTools.css';
 import BaboonTools from './BaboonTools';
 import NativeSquadScaling from './NativeSquadScaling';
+import NativeStartingPositions from './NativeStartingPositions';
 
 /** Lazy, map-bound native operations. Reading a compiled tag does not grant
  * editing access to its native source; the desktop checks that separately. */
@@ -271,6 +272,7 @@ export default function NativeTagOperations({
             </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
             {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={()=>{if(!accepted)setPreview(null);}}/>}
           </details>}
+          {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={()=>{if(!accepted)setPreview(null);}}/>}
           {!!context.hudArrays?.length&&<details className="native-hud-structure">
             <summary>Duplicate native HUD element</summary>
             <p className="subtle">Append a copy of an existing element without moving original indices. Preview checks the copied fields and current dependencies. Accept the source revision, use Build working tag edits, then open the compiled HUD to edit its new layout. Your original tags stay unchanged.</p>

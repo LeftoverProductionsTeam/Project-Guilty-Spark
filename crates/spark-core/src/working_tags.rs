@@ -557,7 +557,7 @@ fn prepare(
     }
     if let Some(expected)=&input.expected_encounter {
         expected.validate("scnr",&format!("{scenario}.scenario"))?;
-        if !expected.is_encounter_append()&&!expected.is_squad_count_edit(){return invalid("Working-tag encounter expectation is not a reviewed native encounter edit");}
+        if !expected.is_encounter_append()&&!expected.is_scenario_ai_edit(){return invalid("Working-tag encounter expectation is not a reviewed native encounter edit");}
     }
     let scenario_file = checked_file(&tags.join(safe_relative(&format!("{scenario}.scenario"))?))?;
     let globals = checked_file(&tags.join("globals/globals.globals"))?;
@@ -637,7 +637,7 @@ fn prepare(
         snapshot.validate()?;
         // Parent expectations were verified above. Current source supersedes
         // only scalar count targets, never append/controller/actor safeguards.
-        encounter_expectations.retain(|expected|!expected.is_squad_count_edit());
+        encounter_expectations.retain(|expected|!expected.is_squad_count_edit()&&!(snapshot.include_starts&&expected.is_squad_start_edit()));
     }
     let scenario_squad_readback=input.scenario_squad_readback.clone().or(parent_squad_readback);
     if scenario_squad_readback.is_some(){
@@ -1055,6 +1055,13 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
 // definition is a source-review failure, never permission to drop an old check.
 fn retain_encounter_expectation(values:&mut Vec<crate::native_operations::Operation>,value:crate::native_operations::Operation)->Result<()> {
     value.validate("scnr","review.scenario")?;
+    if let crate::native_operations::Operation::EncounterStartPosition{encounter,squad,start,..}=&value{
+        if let Some(index)=values.iter().position(|old|matches!(old,crate::native_operations::Operation::EncounterStartPosition{encounter:e,squad:s,start:p,..} if e==encounter&&s==squad&&p==start)){
+            values[index]=value;return Ok(());
+        }
+        if values.len()>=32{return invalid("Native encounter expectation history exceeds32reviewed operations");}
+        values.push(value);return Ok(());
+    }
     if matches!(value,crate::native_operations::Operation::EncounterSquadCountsBatch{..}){
         if values.iter().any(|old|old==&value){return Ok(());}
         if values.len()>=32{return invalid("Native encounter expectation history exceeds32reviewed operations");}
@@ -1396,7 +1403,9 @@ fn run_with(
             let fields=invoke(&runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),native_scenario],&workspace,"squad-readback",49)?;
             recheck_tools(input,&prepared.tools)?;
             if fields.len()>1024*1024||maps::hash_file(&source)?!=source_sha256{return invalid("Staged native squad source changed or exceeded its review bound");}
-            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads:crate::native_operations::scenario_squad_choices(&fields)?};
+            let include_starts=prepared.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
+            let squads=if include_starts{crate::native_operations::scenario_squad_start_choices(&fields)?}else{crate::native_operations::scenario_squad_choices(&fields)?};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
@@ -1445,8 +1454,8 @@ fn run_with(
         if let Some(snapshot)=&receipt.scenario_squad_readback{
             snapshot.verify_map(&inspected)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
-                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,
-                "scope":"All reviewed current native squad indices, names and normal/insane count fields. This is not AI/gameplay acceptance."
+                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,
+                "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. This is not AI/gameplay acceptance."
             }))?,false)?;
         }
         if let Some(profile)=receipt.generated_firefight.as_ref().and_then(|generated|generated.player_profile.as_ref()){profile.verify_map(&inspected)?;}

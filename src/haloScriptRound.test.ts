@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachNativeFirefightRound, exportHaloCeFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
+import { attachNativeFirefightRound, exportHaloCeFirefightRound, exportPlannedFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
 import type { Project } from './types';
 import { defaultNativePlayerProfile, type FirefightConfig } from './firefight';
 export function nativeRoundFixture():FirefightConfig {
@@ -13,12 +13,19 @@ export function nativeRoundFixture():FirefightConfig {
       {id:'second',name:'Second wave',boss:false,scoreMultiplierMilli:2000,groups:[{enemyId:'elite',count:3}]}]};
 }
 describe('opt-in native Firefight round source',()=>{
+  it('refuses independent campaign population overrides on controller-owned wave plans',()=>{
+    const rules=nativeRoundFixture();rules.sourceSha256='a'.repeat(64);
+    const encounters=rules.waves.flatMap((wave,index)=>wave.groups.map(group=>({name:'wave_'+index,actorPath:'characters/elite/elite',
+      position:[0,0,0] as [number,number,number],startActive:false,count:group.count,spacing:.75})));
+    expect(()=>exportPlannedFirefightRound({kind:'appendEncounters',sourceRules:rules,
+      encounters:encounters.map((entry,index)=>index===0?{...entry,difficulty:{normal:1,insane:2}}:entry)},'manual')).toThrow(/independent difficulty/);
+  });
   it('owns exact encounters, waits for actual spawns and deaths, and provides bounded restart/score state',()=>{
     const out=exportHaloCeFirefightRound(nativeRoundFixture());
     expect(out.activation).toBe('(set gs_ff_start true)');
     expect(out.scenarioType).toBe('singleplayer');
     expect(out.content).toContain('(script continuous gs_firefight');
-    expect(out.content).toContain('(sleep_until (= (ai_living_count gs_w01_g01) 2) 1 150)');
+    expect(out.content).toContain('(sleep_until (or (= (ai_living_count gs_w01_g01) 2) (<= (unit_get_health gs_ff_player) 0)) 1 150)');
     expect(out.content).toContain('(set gs_ff_score (+ gs_ff_score 250))');
     expect(out.content).toContain('(set gs_ff_score (+ gs_ff_score 750))');
     expect(out.content).toContain('(ai_force_active gs_w01_g01 true)');
@@ -38,8 +45,13 @@ describe('opt-in native Firefight round source',()=>{
     const out=exportHaloCeFirefightRound(nativeRoundFixture());
     const source=out.content;
     expect(source).toContain('(global object_list gs_ff_units_w01_g01 (ai_actors gs_w01_g01))');
-    expect(source.indexOf('(set gs_ff_units_w01_g01 (ai_actors gs_w01_g01))',source.indexOf('(ai_place gs_w01_g01)')))
-      .toBeLessThan(source.indexOf('(sleep_until (= (ai_living_count gs_w01_g01) 2)'));
+    const wave=source.slice(source.indexOf('(script static void gs_wave_01'),source.indexOf('(script static void gs_wave_02'));
+    const placed=wave.indexOf('(ai_place gs_w01_g01)');
+    const captured=wave.indexOf('(set gs_ff_units_w01_g01 (ai_actors gs_w01_g01))');
+    const ready=wave.indexOf('(sleep_until (or (= (ai_living_count gs_w01_g01) 2) (<= (unit_get_health gs_ff_player) 0))');
+    const combat=wave.indexOf('(sleep_until (or (= (ai_living_count gs_w01_g01) 0)');
+    for(const index of [placed,captured,ready,combat])expect(index).toBeGreaterThanOrEqual(0);
+    expect(placed).toBeLessThan(captured);expect(captured).toBeLessThan(ready);expect(ready).toBeLessThan(combat);
     const cleanup=source.slice(source.indexOf('(script static void gs_ff_clean_w01_g01'),source.indexOf('(script static void gs_ff_clean_w02_g01'));
     expect(cleanup.indexOf('(list_get gs_ff_units_w01_g01 1)')).toBeLessThan(cleanup.indexOf('(list_get gs_ff_units_w01_g01 0)'));
     expect(cleanup).toContain('(ai_erase gs_w01_g01)');

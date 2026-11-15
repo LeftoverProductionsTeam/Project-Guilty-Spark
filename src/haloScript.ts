@@ -537,7 +537,7 @@ export function attachNativeFirefightRound(project: Project): Project {
     try { original = nativeRoundModule(JSON.parse(existing.content.slice(nativeRoundBinding.length,firstEnd))); }
     catch { throw Error('The existing round source has an invalid binding; preserve it in Logic / Events before replacing it.'); }
     if (existing.content !== original)
-      throw Error('The round source differs from the current generator; it may contain edits or use an older generator. Preserve or rename it in Logic / Events before regenerating.');
+      throw Error('The round source differs from the current generator; it may contain manual edits or use an older generator. Preserve or rename it in Logic / Events before regenerating.');
   }
   if (sources.some(source => source.filename.toLowerCase() === 'gs_firefight.hsc' && source !== existing))
     throw Error('Duplicate native round source; retain and reconcile each source in Logic / Events.');

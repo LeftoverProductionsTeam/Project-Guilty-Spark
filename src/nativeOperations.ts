@@ -1,9 +1,11 @@
 import type { FirefightConfig } from './firefight';
 export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number}}
 export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
+export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number]}[]|null}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
+  | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
@@ -17,7 +19,9 @@ export interface NativeTagContext {
   lensFlareScale: number | null;
   actorVariants?:string[];
   canAppendEncounter?:boolean;
-  scenarioSquads?:{encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number}[];
+  scenarioSquads?:NativeScenarioSquad[];
+  scenarioStartSquads?:NativeScenarioSquad[];
+  startEditIssue?:string|null;
   squadEditIssue?:string|null;
   protectedSquadEncounters?:string[];
   hudArrays?:{name:string;label:string;count:number|null;maximum:number;issue:string|null}[];

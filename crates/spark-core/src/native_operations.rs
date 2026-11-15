@@ -15,6 +15,8 @@ pub enum Operation {
     AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     EncounterSquadCounts { encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,#[serde(rename="normalCount")] normal_count:u16,#[serde(rename="insaneCount")] insane_count:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     EncounterSquadCountsBatch { edits:Vec<SquadCountEdit>,#[serde(rename="sourceSha256")] source_sha256:String },
+    EncounterStartPosition {encounter:u16,squad:u16,start:u16,#[serde(rename="encounterName")] encounter_name:String,
+        #[serde(rename="squadName")] squad_name:String,position:[f32;3],#[serde(rename="sourceSha256")] source_sha256:String},
     BoundingRadius { value: f64 },
     HudDuplicate { array:String,index:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     LensFlareScaleRepair,
@@ -54,6 +56,8 @@ impl EncounterAppend {
 fn single_actor()->u16{1}
 fn actor_spacing()->f32{0.75}
 impl Operation {
+    pub fn is_squad_start_edit(&self)->bool{matches!(self,Self::EncounterStartPosition{..})}
+    pub fn is_scenario_ai_edit(&self)->bool{self.is_squad_count_edit()||self.is_squad_start_edit()}
     pub fn is_squad_count_edit(&self)->bool {matches!(self,Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..})}
     pub fn squad_count_edits(&self)->Result<Vec<SquadCountEdit>> {
         match self {
@@ -79,20 +83,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -125,6 +129,14 @@ impl Operation {
                     total+=usize::from(entry.count);
                 }
                 if total>128{return invalid("One reviewed encounter group operation supports at most 128 starting locations");}
+            }
+            Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,source_sha256}=>{
+                if class!="scnr"||*encounter>=128||*squad>=4096||*start>=4096||
+                    [encounter_name,squad_name].iter().any(|name|name.len()>32||name.chars().any(char::is_control))||
+                    position.iter().any(|value|!value.is_finite()||value.abs()>1e6)||
+                    source_sha256.len()!=64||!source_sha256.bytes().all(|value|value.is_ascii_hexdigit()){
+                    return invalid("AI start editing needs exact scenario/source identities and finite supported coordinates");
+                }
             }
             Self::EncounterSquadCountsBatch{source_sha256,..}=>{
                 let mut seen=std::collections::BTreeSet::new();
@@ -172,7 +184,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("Squad editing requires the original native encounter inventory"),
+            Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -302,6 +314,14 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
+        if let Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,..}=self{
+            let (row,point)=selected_native_start(before,*encounter,*squad,*start)?;
+            if row.encounter_name!=*encounter_name||row.name!=*squad_name{return invalid("Native encounter/squad identity changed before start editing");}
+            if positions_close(point.position,*position){return invalid("The AI starting position already matches; no candidate was written");}
+            let value=position.map(|value|value.to_string()).join(",");
+            return Ok(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-S".into(),
+                format!("encounters[{encounter}].squads[{squad}].starting_locations[{start}].position"),value,tag.into()]);
+        }
         if self.is_squad_count_edit() {
             let rows=scenario_squad_choices(before)?;
             let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
@@ -341,6 +361,7 @@ impl Operation {
         args.push(tag.into());Ok(args)
     }
     pub fn actor_start_positions(&self)->Result<Option<Vec<[f32;3]>>> {
+        if let Self::EncounterStartPosition{position,..}=self{return Ok(Some(vec![*position]));}
         if !self.is_encounter_append(){return Ok(None);}
         let mut positions=vec![];
         for entry in self.encounter_appends()? {positions.extend(entry.positions()?);}
@@ -349,7 +370,7 @@ impl Operation {
     /// Keep reviewed command actions intact while respecting Windows argument
     /// length. All batches edit the same isolated candidate; acceptance is atomic.
     pub fn argument_batches(&self,args:Vec<String>,readback:bool)->Result<Vec<Vec<String>>> {
-        if !self.is_encounter_append()&&!self.is_squad_count_edit(){return Ok(vec![args]);}
+        if !self.is_encounter_append()&&!self.is_scenario_ai_edit(){return Ok(vec![args]);}
         if args.len()<3||args[0]!="-t"{return invalid("Malformed native argument envelope");}
         let cost=|value:&str|value.encode_utf16().count()+value.chars().filter(|c|*c=='\\'||*c=='"').count()+3;
         let end=args.len()-1;let tag=args[end].clone();let base=args[..2].to_vec();
@@ -371,7 +392,7 @@ impl Operation {
     }
     /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
-        if !self.is_encounter_append()&&!self.is_squad_count_edit() {return Ok(None);}
+        if !self.is_encounter_append()&&!self.is_scenario_ai_edit() {return Ok(None);}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut i=2;
         while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{args.extend(["-G".into(),written[i+1].clone()]);i+=3;},_=>return invalid("Unexpected native append recipe")}}
@@ -485,6 +506,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
 impl Operation {
     pub fn verify_compiled_encounter(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate("scnr",&format!("{}.scenario",map.scenario_path))?;
+        if let Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,..}=self{return verify_native_start(map,*encounter,*squad,*start,encounter_name,squad_name,*position);}
         if self.is_squad_count_edit(){
             for edit in self.squad_count_edits()?{verify_native_squad(map,edit.encounter,edit.squad,&edit.encounter_name,&edit.squad_name,edit.normal_count as i16,edit.insane_count as i16)?;}
             return Ok(());
@@ -555,6 +577,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
+    if operation.is_squad_start_edit(){return reviewed_start_position(before,after,operation);}
     if operation.is_squad_count_edit() {return reviewed_squad_counts(before,after,operation);}
     if matches!(operation,Operation::HudDuplicate{..}) {return reviewed_hud_duplicate(before,after,operation);}
     if matches!(operation,Operation::AppendEncounters{..}) {return reviewed_encounter_group_append(before,after,operation);}
@@ -673,17 +696,38 @@ fn array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>
 /// or authority to replay source edits.
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct ScenarioSquadReadback {pub source_sha256:String,pub squads:Vec<ScenarioSquadChoice>}
+pub struct ScenarioSquadReadback {
+    pub source_sha256:String,pub squads:Vec<ScenarioSquadChoice>,
+    #[serde(default,skip_serializing_if="squad_positions_disabled")] pub include_starts:bool,
+}
+fn squad_positions_disabled(value:&bool)->bool{!*value}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct ScenarioStartChoice {pub index:u16,pub position:[f32;3],#[serde(skip)] position_line:usize}
+fn positions_close(a:[f32;3],b:[f32;3])->bool {
+    a.iter().zip(b).all(|(a,b)|a.is_finite()&&b.is_finite()&&
+        (f64::from(*a)-f64::from(b)).abs()<=0.000001f64.max(f64::from(*a).abs()*f64::from(f32::EPSILON)*2.))
+}
 impl ScenarioSquadReadback {
     pub fn validate(&self)->Result<()> {
         if self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_hexdigit())||self.squads.len()>4096 {
             return invalid("Native squad readback needs an exact source SHA256 and bounded inventory");
         }
-        let mut seen=std::collections::BTreeSet::new();
+        let mut seen=std::collections::BTreeSet::new();let mut starts=0usize;
         for row in &self.squads {
             if row.encounter>=128||row.squad>=4096||!seen.insert((row.encounter,row.squad))||
                 [&row.encounter_name,&row.name].iter().any(|name|name.len()>32||name.chars().any(char::is_control)) {
                 return invalid("Native squad readback contains an invalid identity or duplicate index");
+            }
+            if self.include_starts!=row.starts.is_some(){return invalid("Native starting-position readback scope is inconsistent");}
+            if let Some(points)=&row.starts{
+                starts+=points.len();
+                if starts>4096{return invalid("Native starting-position review exceeds4096points");}
+                for (index,point) in points.iter().enumerate(){
+                    if usize::from(point.index)!=index||point.position.iter().any(|value|!value.is_finite()||value.abs()>1e6){
+                        return invalid("Native starting-position inventory is incomplete or outside supported coordinates");
+                    }
+                }
             }
         }
         Ok(())
@@ -693,7 +737,17 @@ impl ScenarioSquadReadback {
         let count=map.encounters.iter().try_fold(0usize,|count,encounter|encounter.details.as_ref().map(|details|count+details.squads.len())
             .ok_or_else(||crate::SparkError::Invalid("Compiled native encounter details are unavailable; squad parity is unproven".into())))?;
         if count!=self.squads.len(){return invalid("Compiled native squad inventory differs from the reviewed source");}
-        for row in &self.squads {verify_native_squad(map,row.encounter,row.squad,&row.encounter_name,&row.name,row.normal_count,row.insane_count)?;}
+        for row in &self.squads {
+            verify_native_squad(map,row.encounter,row.squad,&row.encounter_name,&row.name,row.normal_count,row.insane_count)?;
+            if let Some(starts)=&row.starts{
+                let native=map.encounters.get(usize::from(row.encounter)).and_then(|encounter|encounter.details.as_ref())
+                    .and_then(|details|details.squads.get(usize::from(row.squad))).ok_or_else(||crate::SparkError::Invalid("Compiled AI starting locations are unavailable".into()))?;
+                if native.starting_locations.len()!=starts.len(){return invalid("Compiled AI starting-location inventory differs from the source");}
+                for point in starts{
+                    if !positions_close(point.position,native.starting_locations[usize::from(point.index)].position){return invalid("Compiled AI starting position differs from the reviewed native source");}
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -711,6 +765,7 @@ fn verify_native_squad(map:&crate::maps::MapInspection,encounter:u16,squad:u16,e
 pub struct ScenarioSquadChoice {
     pub encounter:u16,pub squad:u16,pub encounter_name:String,pub name:String,
     pub normal_count:i16,pub insane_count:i16,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub starts:Option<Vec<ScenarioStartChoice>>,
     #[serde(skip)] normal_line:usize,
     #[serde(skip)] insane_line:usize,
 }
@@ -732,10 +787,22 @@ fn squad_count_field(fields:&str,name:&str)->Result<(i16,usize)> {
 }
 /// Current native-tool fields only. Array order, names, unknown values and
 /// structural/script references are preserved; this does not interpret tag bytes.
-pub fn scenario_squad_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {
+pub fn scenario_squad_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,false)}
+pub fn scenario_squad_start_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,true)}
+fn native_position(fields:&str)->Result<([f32;3],usize)> {
+    let values=fields.lines().enumerate().filter_map(|(index,line)|line.strip_prefix("position (").map(|tail|(index,tail))).collect::<Vec<_>>();
+    if values.len()!=1{return invalid("Native starting position is unavailable or ambiguous");}
+    let (index,tail)=values[0];
+    let value=tail.split_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native position field".into()))?.0;
+    let coordinates=value.split(',').map(|value|value.trim().parse::<f32>()).collect::<std::result::Result<Vec<_>,_>>()
+        .map_err(|_|crate::SparkError::Invalid("Native starting position is not a vector".into()))?;
+    if coordinates.len()!=3||coordinates.iter().any(|value|!value.is_finite()||value.abs()>1e6){return invalid("Native starting position exceeds its coordinate bounds");}
+    Ok(([coordinates[0],coordinates[1],coordinates[2]],index))
+}
+fn scenario_squad_inventory(fields:&str,include_starts:bool)->Result<Vec<ScenarioSquadChoice>> {
     let encounters=array_listing(fields,"encounters")?;
     if encounters.count>128{return invalid("Native encounter inventory exceeds128entries");}
-    let mut choices=vec![];let mut encounter_line=encounters.start+1;
+    let mut choices=vec![];let mut encounter_line=encounters.start+1;let mut total_starts=0usize;
     for (encounter,item) in array_items(&encounters,"encounters")?.iter().enumerate() {
         let root=direct_struct_fields(item)?;let encounter_name=native_name(&root)?;
         let squads=array_listing(&root,"squads")?;
@@ -745,13 +812,56 @@ pub fn scenario_squad_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {
             let root=direct_struct_fields(item)?;
             let (normal_count,normal)=squad_count_field(&root,"normal_diff_count")?;
             let (insane_count,insane)=squad_count_field(&root,"insane_diff_count")?;
-            choices.push(ScenarioSquadChoice{encounter:encounter as u16,squad:squad as u16,encounter_name:encounter_name.clone(),
+            let starts=if include_starts{
+                let locations=array_listing(&root,"starting_locations")?;
+                total_starts+=locations.count;if total_starts>4096{return invalid("Native starting-position review exceeds4096points");}
+                let mut start_line=squad_line+1+locations.start+1;let mut points=vec![];
+                for (index,item) in array_items(&locations,"starting_locations")?.iter().enumerate(){
+                    let (position,line)=native_position(&direct_struct_fields(item)?)?;
+                    points.push(ScenarioStartChoice{index:index as u16,position,position_line:start_line+1+line});
+                    start_line+=item.len();
+                }
+                Some(points)
+            }else{None};
+            choices.push(ScenarioSquadChoice{starts,encounter:encounter as u16,squad:squad as u16,encounter_name:encounter_name.clone(),
                 name:native_name(&root)?,normal_count,insane_count,normal_line:squad_line+1+normal,insane_line:squad_line+1+insane});
             squad_line+=item.len();
         }
         encounter_line+=item.len();
     }
     Ok(choices)
+}
+fn selected_native_start(fields:&str,encounter:u16,squad:u16,start:u16)->Result<(ScenarioSquadChoice,ScenarioStartChoice)> {
+    let row=scenario_squad_start_choices(fields)?.into_iter().find(|row|row.encounter==encounter&&row.squad==squad)
+        .ok_or_else(||crate::SparkError::Invalid("Native AI squad is unavailable".into()))?;
+    let point=row.starts.as_ref().and_then(|points|points.get(usize::from(start))).cloned()
+        .ok_or_else(||crate::SparkError::Invalid("Native AI starting location is unavailable".into()))?;
+    Ok((row,point))
+}
+fn verify_native_start(map:&crate::maps::MapInspection,encounter:u16,squad:u16,start:u16,encounter_name:&str,squad_name:&str,position:[f32;3])->Result<()>{
+    let region=map.encounters.get(usize::from(encounter)).ok_or_else(||crate::SparkError::Invalid("Compiled AI encounter is unavailable".into()))?;
+    let member=region.details.as_ref().and_then(|details|details.squads.get(usize::from(squad)))
+        .ok_or_else(||crate::SparkError::Invalid("Compiled AI squad is unavailable".into()))?;
+    let point=member.starting_locations.get(usize::from(start)).ok_or_else(||crate::SparkError::Invalid("Compiled AI starting location is unavailable".into()))?;
+    if region.name!=encounter_name||member.name!=squad_name||!positions_close(position,point.position){return invalid("Compiled AI starting position/identity differs from the reviewed edit");}
+    Ok(())
+}
+fn reviewed_start_position(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>>{
+    let Operation::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,..}=operation else{return invalid("Not a native AI start edit");};
+    let (old,original)=selected_native_start(before,*encounter,*squad,*start)?;
+    let (new,revised)=selected_native_start(after,*encounter,*squad,*start)?;
+    if old.encounter_name!=*encounter_name||new.encounter_name!=*encounter_name||old.name!=*squad_name||new.name!=*squad_name||
+        original.position_line!=revised.position_line||!positions_close(revised.position,*position){return invalid("Native AI starting position or structure differs from the reviewed edit");}
+    let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();
+    if a.len()!=b.len(){return invalid("AI start edit changed native field structure");}
+    let mut differences=vec![];
+    for(index,(old,new))in a.iter().zip(&b).enumerate(){
+        if old==new{continue;}
+        if index!=original.position_line{return invalid("AI start edit changed an unrelated native field");}
+        differences.push(FieldDifference{before:(*old).into(),after:(*new).into()});
+    }
+    if differences.len()!=1{return invalid("Native reader cannot certify exactly the selected AI starting position");}
+    Ok(differences)
 }
 fn reviewed_squad_counts(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
     let edits=operation.squad_count_edits()?;
@@ -898,6 +1008,64 @@ pub fn compare_hud_arrays(class:&str,source:&str,compiled:&str)->Result<Vec<HudA
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn ai_fields()->String {
+        "actor_palette[0] array\nencounters[1] array\n    encounters[0] struct\n        name (original) tagstring\n        squads[1] array\n            squads[0] struct\n                name (squad_a) tagstring\n                normal_diff_count (1) int16\n                insane_diff_count (1) int16\n                starting_locations[1] array\n                    starting_locations[0] struct\n                        position (1,2,3) point3d\n                        facing (90) angle\n                return_state (alert) enum\nscript_marker (preserve) tagstring\n".into()
+    }
+    fn start_edit()->Operation {
+        Operation::EncounterStartPosition{encounter:0,squad:0,start:0,encounter_name:"original".into(),squad_name:"squad_a".into(),
+            position:[4.0,5.0,6.0],source_sha256:"a".repeat(64)}
+    }
+    #[test]
+    fn ai_start_review_rejects_adjacent_fields_stale_identity_and_unavailable_coordinates(){
+        let before=ai_fields();let after=before.replace("position (1,2,3)","position (4,5,6)");
+        let operation=start_edit();let args=operation.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&before).unwrap();
+        assert!(args.iter().any(|arg|arg=="encounters[0].squads[0].starting_locations[0].position"));
+        assert_eq!(reviewed_difference(&before,&after,&operation).unwrap().len(),1);
+        assert!(reviewed_difference(&before,&after.replace("facing (90)","facing (91)"),&operation).is_err());
+        assert!(reviewed_difference(&before,&after.replace("name (squad_a)","name (other)"),&operation).is_err());
+        assert!(operation.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&before.replace("name (original)","name (other)")).is_err());
+        let unavailable=before.replace("position (1,2,3)","position (NaN,2,3)");
+        assert!(scenario_squad_choices(&unavailable).is_ok(),"count-only inspection must not require position telemetry");
+        assert!(scenario_squad_start_choices(&unavailable).is_err());
+    }
+    #[test]
+    fn campaign_difficulty_defaults_and_bounds_reach_existing_native_writer(){
+        let value=serde_json::json!({"kind":"appendEncounter","name":"gs_new","actorPath":"characters/grunt","position":[0,0,0],
+            "startActive":false,"count":4,"spacing":0.75});
+        let default:Operation=serde_json::from_value(value.clone()).unwrap();
+        assert!(serde_json::to_value(&default).unwrap().get("difficulty").is_none());
+        let mut modified=value;modified["difficulty"]=serde_json::json!({"normal":2,"insane":4});
+        let operation:Operation=serde_json::from_value(modified.clone()).unwrap();
+        let args=operation.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&ai_fields()).unwrap();
+        assert!(args.windows(3).any(|args|args==["-S","encounters[1].squads[0].normal_diff_count","2"]));
+        assert!(args.windows(3).any(|args|args==["-S","encounters[1].squads[0].insane_diff_count","4"]));
+        modified["difficulty"]["insane"]=serde_json::json!(5);
+        assert!(serde_json::from_value::<Operation>(modified).unwrap().validate("scnr","level.scenario").is_err());
+    }
+
+    #[test]
+    fn ai_coordinate_snapshot_rejects_wrong_compiled_values_missing_details_and_legacy_scope_changes(){
+        use crate::maps::*;
+        let squad=EncounterSquad{name:"squad_a".into(),actor_palette_index:-1,actor_variant_tag_id:None,normal_count:1,insane_count:1,
+            initial_state:2,return_state:2,starting_locations:vec![AiStartingLocation{position:[1.0,2.0,3.0],facing:0.0,flags:0,
+                initial_state:2,return_state:2,actor_palette_index:-1,actor_variant_tag_id:None,command_list:-1}]};
+        let mut map=MapInspection{player_starting_profiles:None,header:MapHeader{version:609,engine:"unit fixture".into(),name:"unit".into(),
+            build:String::new(),scenario_type:0,file_size:0,declared_size:0,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,
+            compressed:false,extended:false,legacy_tag_size_repair:false},tag_checksum:None,sha256:"b".repeat(64),tags:vec![],objects:vec![],decals:vec![],
+            mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![Encounter{name:"original".into(),squads:vec!["squad_a".into()],
+                team:0,details:Some(EncounterDetails{flags:0,manual_bsp_index:-1,squads:vec![squad],firing_positions:vec![]})}],
+            scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"level".into()};
+        let snapshot=ScenarioSquadReadback{source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&ai_fields()).unwrap(),include_starts:true};
+        snapshot.verify_map(&map).unwrap();
+        map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].position[0]=9.0;
+        assert!(snapshot.verify_map(&map).is_err());
+        let legacy=ScenarioSquadReadback{source_sha256:"a".repeat(64),squads:scenario_squad_choices(&ai_fields()).unwrap(),include_starts:false};
+        let encoded=serde_json::to_value(&legacy).unwrap();assert!(encoded.get("includeStarts").is_none());
+        serde_json::from_value::<ScenarioSquadReadback>(encoded).unwrap().verify_map(&map).unwrap();
+        map.encounters[0].details=None;
+        assert!(snapshot.verify_map(&map).is_err(),"missing data is unavailable, not zero");
+    }
+
     #[test]
     fn lens_repair_distinguishes_raw_radians_from_reader_degrees() {
         assert!(broken_lens_scale(20626.480625));
