@@ -97,7 +97,7 @@ export function mergeDependencyChoice(
       resourceDirectory: saved.source.resourceDirectory,
       resourceSha256: saved.source.resourceSha256,
     };
-  } else if (['h1a.choose', 'tags.choose', 'invader.choose'].includes(actionId)) {
+  } else if (['h1a.choose', 'tags.choose', 'h1a.sdk', 'invader.choose'].includes(actionId)) {
     if (
       current.activeBuildTarget !== before.activeBuildTarget ||
       saved.activeBuildTarget !== before.activeBuildTarget
@@ -123,7 +123,7 @@ export function mergeDependencyChoice(
       const fields =
         actionId === 'h1a.choose'
           ? (['hekDirectory', 'hekFlavor'] as const)
-          : actionId === 'tags.choose'
+          : actionId === 'tags.choose' || actionId === 'h1a.sdk'
             ? (['tagsDirectory'] as const)
             : (['invaderDirectory'] as const);
       if (fields.some((key) => latest[key] !== original[key]))

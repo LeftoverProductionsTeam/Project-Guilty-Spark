@@ -3,8 +3,8 @@
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
 Starting revision: 5d8afd4a31c21a1f2e64760db324db02306bb61a, canonical local master.
-Latest verified revision: 5d8afd4 + native route creation; manifests identify scope.
-Next action: bind native pilot/routes and landing/return volumes; supply matching CE tag inputs for full candidate. No push.
+Latest verified revision: da484143f782ad5647dfd8770d66efc125decf05 + scoped SDK setup; this commit’s manifests identify changes.
+Next action: compose native pilot/approach/landing/return and landed signals using the supplied SDK, compile/read back full CE609 Black Echo. Native desktop/game acceptance remains pending. No push.
 
 ## Acceptance
 
@@ -28,6 +28,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+16Nov SDK setup: owner supplied HCEEK/HCEEK.7z. Existing onboarding/dependency UI now chooses that archive separately, retains tool paths and uses guarded shared tag preparation; official install/guide and existing-tag alternatives remain. Frontend10/browser4/core sdk7+1skip/dependencies5(overlap1), TypeScript/Vite/Windows backend pass. Native dialogs/app restart/game remain unrun. QA11996/run-GUHvOl CLOSED1519710176logicalB; staged2630tags/147213411B and original SDK rehashed unchanged; output absent. Exact archive/manifest hashes and scope in RUNTIME_INTEGRATION_20261107. No SDK/archive/binary retained or Forerunner writes.
 
 P1 crew5d8afd4 integrated; stash1c2c73f recovery retained. Route creation now uses existing viewport/review/Restore/Save; frontend19/browser3/core2+2skip/native1/web pass. QA61530/run-gPlQeK CLOSED386760909logicalB; root absent. RUNTIME_INTEGRATION_20261107 has exact proof. Full CE cache/native Windows/flight/Black Echo and P0 acceptance OPEN.
 
@@ -111,7 +113,7 @@ Owner priorities/addenda remain active:
 
 QA9851/run-EBRqKl CLOSED; owned apps/tools exited;4337096416logicalB disposed, peak allocation4128882920B; final physical reclamation unavailable. No new screenshot/map/app/SDK/cache/archive retained. Earlier QA21477/QA6610/QA29134 closures remain in Git/RUNTIME_INTEGRATION_20261107.
 
-QA21402/run-9LXS9l CLOSED: owned apps/tools exited and output disposed4,488,883,429logicalB; final physical reclamation unavailable. Only the two small source-owned before/after PNGs remain. Final app351dd043 uses worker-thread Save/update, releases journal locks before UI events and reuses latestRefresh to bound native inspections. Browser3/3, frontend history10/10, Rust history11/11, TypeScript/Vite/Windows build pass. Native continued seven-stage HUD case:42rapid edits/Undo/Save/status5/2/2ms/151px panel/3normal closes/CE609 map057a9839/independent readback pass,0page errors. Initial two fresh Save timeouts remain documented; final fresh Save/restart passed, then source-panel auto-wait failed; explicit readiness/strict continued run passes. Do not relabel the failed earlier run or claim broad37944 closure. Existing RUNTIME_INTEGRATION_20261107 has exact app/map/scenario/HSC/HMT hashes and preserved before/after PNGs. One2355tag extraction, no SDK copy/game/Forerunner writes/push. Original inputs/475CSV/legacy checkpoint unchanged; patrol WIP integration is recorded in16Nov milestone. Full Operation110 remains incomplete.
+QA21402/run-9LXS9l CLOSED4488883429logicalB. Actual42edit/sevenHUD/Save/three normal restarts/CE609/readback evidence, initial failures, exact app/cache hashes and preservation remain in RUNTIME_INTEGRATION_20261107 (351dd043/057a9839). No broad37944 or game acceptance.
 
 Historical QA29199 disposal/original preservation evidence remains in Gitcfe6832:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no old jobs were revived.
 

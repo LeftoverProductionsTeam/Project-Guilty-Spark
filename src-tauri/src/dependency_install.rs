@@ -1,5 +1,5 @@
 //! On-demand dependency inspection and explicit reviewed install/page handoffs.
-//! Never downloads or executes an installer/Invader/SDK binary.
+//! No installer/game launch. Explicit SDK selection reuses the guarded local extractor.
 use super::*;
 use spark_core::dependencies as deps;
 use std::io::{Seek, SeekFrom};
@@ -811,21 +811,21 @@ pub(super) async fn choose_dependency_path(
     if action.kind != deps::DependencyActionKind::ChooseSetting {
         return Err("Open the model/animation workspace for this requirement".into());
     }
-    let key = action
+    let mut key = action
         .target
         .clone()
         .ok_or("Dependency picker has no fixed setting")?;
-    let chosen = rfd::AsyncFileDialog::new()
-        .set_title(&action.label)
-        .pick_folder()
-        .await;
-    let Some(chosen) = chosen else {
-        return Ok(DependencyChoiceResult {
-            bootstrap: None,
-            opened: None,
-        });
+    let folder=if key=="hekSdkArchive" {
+        if runtime_id!=runtime::RuntimeId::MccSteam{return Err("MCC SDK preparation needs the MCC source profile. CE uses its separately reviewed compatible tags".into());}
+        let selected=rfd::AsyncFileDialog::new().set_title(&action.label).add_filter("Halo SDK archive",&["7z"]).pick_file().await;
+        let Some(selected)=selected else{return Ok(DependencyChoiceResult{bootstrap:None,opened:None});};
+        core::connections::validate_sdk_archive(selected.path()).map_err(error)?;
+        let tags=super::prepare_mcc_conversion_tools(app.clone(),window.clone(),project_id.clone(),Some(selected.path().to_path_buf())).await?;
+        key="hekTagsDirectory".into();PathBuf::from(tags)
+    }else{
+        let selected=rfd::AsyncFileDialog::new().set_title(&action.label).pick_folder().await;
+        let Some(selected)=selected else{return Ok(DependencyChoiceResult{bootstrap:None,opened:None});};selected.path().to_path_buf()
     };
-    let folder = chosen.path().to_path_buf();
     core::reject_links(&folder).map_err(error)?;
     if !folder.is_dir() {
         return Err("Choose an existing installed/source folder".into());

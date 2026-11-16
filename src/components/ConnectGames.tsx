@@ -16,9 +16,11 @@ interface Kit {
     executed: boolean;
   }[];
   notes: string[];
+  sdkArchive?: { path: string | null; state: string; bytes: number } | null;
 }
 interface SetupReport {
   schemaVersion: number;
+  platform?: string;
   runtimes: RuntimeReport[];
   kits: Kit[];
   mccInstalled: boolean;
@@ -56,10 +58,19 @@ export default function ConnectGames({
   useEffect(() => {
     if (native) void refresh();
   }, []);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
   const previousSettings = useRef(data.settings);
   useEffect(() => {
     const previous = previousSettings.current;
-    setDraft(current => reconcileSettingsDraft(current, previous, data.settings));
+    setDraft((current) => reconcileSettingsDraft(current, previous, data.settings));
     previousSettings.current = data.settings;
   }, [data.settings]);
   useEffect(() => onDraftChange?.(draft), [draft]);
@@ -82,23 +93,55 @@ export default function ConnectGames({
       setBusy(false);
     }
   }
-  async function prepare() {
+  async function prepare(sdkArchive?: string) {
     setBusy(true);
     setError('');
-    setMessage('Preparing your installed MCC tags. This can take a few minutes.');
+    setMessage(
+      'Preparing a separate MCC tagset. This may require several GiB; storage is checked before extraction.',
+    );
     try {
       await onApply(draft);
-      const tags = await call<string>('prepare_mcc_conversion_tools', { projectId: null });
-      const next = { ...draft, hekFlavor: 'h1aEk' as const, hekTagsDirectory: tags };
+      const tags = await call<string>('prepare_mcc_conversion_tools', {
+        projectId: null,
+        ...(sdkArchive ? { sdkArchive } : {}),
+      });
+      if (!mounted.current) return;
+      const connected = await call<Bootstrap>('bootstrap');
+      if (!mounted.current) return;
+      const current = latestDraft.current;
+      if (
+        current.hekDirectory !== draft.hekDirectory ||
+        current.hekFlavor !== draft.hekFlavor ||
+        current.hekTagsDirectory !== draft.hekTagsDirectory
+      )
+        throw Error(
+          'Tool choices changed during preparation. Your newer choices are retained; review the prepared SDK in Settings.',
+        );
+      const next = {
+        ...current,
+        hekDirectory: connected.settings.hekDirectory,
+        hekFlavor: 'h1aEk' as const,
+        hekTagsDirectory: tags,
+      };
       await onApply(next);
       setDraft(next);
-      setMessage('MCC editing tools and tags are ready. Your choices are saved.');
+      setMessage(
+        'Prepared MCC tags are connected and saved. Build preflight still checks project dependencies.',
+      );
       await refresh();
     } catch (e) {
       setError(String(e));
       setMessage('');
     } finally {
       setBusy(false);
+    }
+  }
+  async function chooseSdk() {
+    try {
+      const selected = await call<string | null>('choose_setting_path', { key: 'hekSdkArchive' });
+      if (selected) await prepare(selected);
+    } catch (problem) {
+      setError(String(problem));
     }
   }
   const installed = report?.runtimes.filter((r) => r.installation) ?? [];
@@ -167,21 +210,24 @@ export default function ConnectGames({
                 ? 'Halo: CE Mod Tools - MCC was found. Select the detected kit below, then prepare or connect its editable tags.'
                 : `${report?.mccInstalled ? 'MCC is installed, but its map-building tools are a separate installation. ' : ''}Install the free Halo: CE Mod Tools - MCC package through Steam to edit and compile Halo 1 content.`}
           </p>
-          {wantsMcc && <><a
-            className="button"
-            href="https://store.steampowered.com/app/1532190/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open Steam listing
-          </a>
-          <p>
-            <small>
-              Steam Library → Tools → Halo: CE Mod Tools - MCC → Install. Follow the kit’s supplied tag
-              extraction instructions into a fresh working copy.
-            </small>
-          </p>
-          </>}
+          {wantsMcc && (
+            <>
+              <a
+                className="button"
+                href="https://store.steampowered.com/app/1532190/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Steam listing
+              </a>
+              <p>
+                <small>
+                  Steam Library → Tools → Halo: CE Mod Tools - MCC → Install. Follow the kit’s supplied tag
+                  extraction instructions into a fresh working copy.
+                </small>
+              </p>
+            </>
+          )}
           {wantsMcc && foundKit && (
             <button
               className="small-button"
@@ -257,7 +303,7 @@ export default function ConnectGames({
               legacy textures and MCC texture packs when needed. Self-contained maps load embedded textures.
             </small>
           </p>
-          {draft.hekFlavor === 'h1aEk' && (
+          {draft.hekFlavor === 'h1aEk' && report?.platform !== 'linux' && report?.platform !== 'macos' && (
             <>
               <button disabled={!native || busy || !draft.hekDirectory} onClick={() => void prepare()}>
                 Prepare MCC editable tags
@@ -270,6 +316,28 @@ export default function ConnectGames({
               </p>
             </>
           )}
+          <div className="button-row">
+            {wantsMcc && report?.platform !== 'linux' && report?.platform !== 'macos' && (
+              <button type="button" disabled={!native || busy} onClick={() => void chooseSdk()}>
+                Choose SDK archive &amp; prepare tags
+              </button>
+            )}
+            <a
+              href="https://learn.microsoft.com/en-us/halo-master-chief-collection/general/overview-tools"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Official tools &amp; SDK install guide
+            </a>
+          </div>
+          <p>
+            <small>
+              Already have source? Choose its editable tags folder above. Otherwise select the installed SDK
+              .7z file, including one outside the tool folder. Spark prepares a separate tagset and remembers
+              it; it does not move the archive or overwrite existing tags. The archive supplies MCC source; CE
+              still needs a separately reviewed compatible tagset.
+            </small>
+          </p>
           <button
             disabled={!native || busy || !draft.hekDirectory || !draft.hekFlavor}
             onClick={() => void connect()}
@@ -312,6 +380,13 @@ export default function ConnectGames({
           <summary>{kit.generation} · tools found and file checks</summary>
           <p className="path-text">{kit.root}</p>
           <p>{kit.editableTags}</p>
+          {kit.sdkArchive && (
+            <p>
+              <strong>SDK archive found</strong> · {kit.sdkArchive.state}
+              <br />
+              <small className="path-text">{kit.sdkArchive.path}</small>
+            </p>
+          )}
           <p>{kit.sourceData}</p>
           <ul>
             {kit.tools.map((t) => (

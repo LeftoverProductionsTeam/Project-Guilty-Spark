@@ -1393,6 +1393,12 @@ mod tests {
             "sourceSha256": maps::hash_file(&archive).unwrap(),
             "extractorSha256": maps::hash_file(&extractor).unwrap(),
         })).unwrap()).unwrap();
+        // Archive content identity authorizes reuse even outside the tool folder.
+        let selected=root.path().join("selected-sdk.7z");fs::copy(&archive,&selected).unwrap();
+        let id=uuid::Uuid::new_v4().to_string();let candidate=caches.join(&id);
+        assert_eq!(crate::conversion::prepare_sdk_tags_from_archive(&kit,&selected,&candidate,"fixture",&id,
+            |_|panic!("An identical selected SDK must not start extraction")).unwrap(),tags);
+        assert!(!candidate.exists());assert_eq!(fs::read(&selected).unwrap(),fs::read(&archive).unwrap());
         for _ in 0..3 {
             let id = uuid::Uuid::new_v4().to_string();
             let candidate = caches.join(&id);

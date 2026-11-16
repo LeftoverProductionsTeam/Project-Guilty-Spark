@@ -117,3 +117,20 @@ describe('dependency picker integration', () => {
     expect(dependencyContextMatches(report, 'mccSteam', { ...before, id: 'another' })).toBe(false);
   });
 });
+
+it('merges prepared SDK tags while preserving unrelated unsaved work and refusing later path changes', () => {
+  const before = project(),
+    current = structuredClone(before),
+    saved = structuredClone(before);
+  current.title = 'Unsaved mission';
+  current.buildTargets![0].name = 'Unsaved target';
+  saved.buildTargets![0].tagsDirectory = 'H:/managed-sdk/tags';
+  saved.title = 'Stale title';
+  const merged = mergeDependencyChoice(current, before, opened(saved), 'h1a.sdk');
+  expect(merged.project.title).toBe('Unsaved mission');
+  expect(merged.project.buildTargets![0].name).toBe('Unsaved target');
+  expect(merged.project.buildTargets![0].tagsDirectory).toBe('H:/managed-sdk/tags');
+  expect(merged.project.buildTargets![0].hekDirectory).toBe(before.buildTargets![0].hekDirectory);
+  current.buildTargets![0].tagsDirectory = 'H:/newer-user-choice';
+  expect(() => mergeDependencyChoice(current, before, opened(saved), 'h1a.sdk')).toThrow('retained');
+});

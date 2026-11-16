@@ -4718,3 +4718,73 @@ test('new native pilot routes author points through shared viewport review resto
  const preview=page.getByRole('region',{name:'Native edit preview',exact:true});await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.commandLists.length)).toBe(1);await preview.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.commandLists.length)).toBe(0);await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('a');
  await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'AI & scenario');const reopened=page.locator('.native-command-lists:visible');if(await reopened.getAttribute('open')===null)await reopened.locator(':scope > summary').click();await expect(reopened.getByRole('combobox',{name:'Native command source list',exact:true})).toContainText('pelican_approach');expect(errors).toEqual([]);
 });
+
+
+test('SDK setup selects an external archive, preserves tool choices and remembers prepared tags',async({page})=>{
+ await mockDesktop(page,null);await page.goto('/');
+ await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='choose_setting_path'&&args.key==='hekSdkArchive'){
+    w.__sparkMock.sdkPicked=true;return w.__sparkMock.sdkCancelled?null:'D:/Sources/HCEEK.7z';
+   }
+   if(command==='prepare_mcc_conversion_tools'){
+    w.__sparkMock.sdkRequest=structuredClone(args);
+    if(w.__sparkMock.sdkFailure)throw Error('SDK archive failed verification; previous tags retained');
+    const before=await original('bootstrap',{});
+    await original('save_settings',{settings:{...before.settings,hekDirectory:'D:/Tools/HCEEK',hekFlavor:'h1aEk',hekTagsDirectory:'C:/Managed/SDK/tags'}});
+    return 'C:/Managed/SDK/tags';
+   }
+   return original(command,args);
+  };
+ });
+ await chooseTool(page,'Start here');
+ await page.getByRole('group',{name:'Your Halo edition',exact:true}).getByRole('button',{name:/Halo CE in MCC/}).click();
+ await (await pagedControl(page,'button','Continue to tools')).click();
+ await (await pagedControl(page,'textbox','Setup Map Builder folder')).fill('D:/Tools/HCEEK');
+ await (await pagedControl(page,'combobox','Setup editing kit generation')).selectOption('h1aEk');
+ await (await pagedControl(page,'textbox','Setup Invader tools folder')).fill('D:/Tools/Invader');
+ await page.evaluate(()=>(window as any).__sparkMock.sdkCancelled=true);
+ await (await pagedControl(page,'button','Choose SDK archive & prepare tags')).click();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.sdkRequest??null)).toBeNull();
+ await page.evaluate(()=>{const m=(window as any).__sparkMock;m.sdkCancelled=false;m.sdkFailure=true;});
+ await (await pagedControl(page,'button','Choose SDK archive & prepare tags')).click();
+ await expect(page.getByRole('alert').filter({hasText:'SDK archive failed verification'})).toBeVisible();
+ await expect((await pagedControl(page,'textbox','Setup Editable Halo Tags folder'))).toHaveValue('');
+ await page.evaluate(()=>(window as any).__sparkMock.sdkFailure=false);
+ await (await pagedControl(page,'button','Choose SDK archive & prepare tags')).click();
+ await expect(page.getByRole('status').filter({hasText:'Prepared MCC tags are connected and saved'})).toBeVisible();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.sdkRequest)).toEqual({projectId:null,sdkArchive:'D:/Sources/HCEEK.7z'});
+ await expect((await pagedControl(page,'textbox','Setup Editable Halo Tags folder'))).toHaveValue('C:/Managed/SDK/tags');
+ await expect((await pagedControl(page,'textbox','Setup Invader tools folder'))).toHaveValue('D:/Tools/Invader');
+ await expect((await pagedControl(page,'textbox','Setup Map Builder folder'))).toHaveValue('D:/Tools/HCEEK');
+ const guide=page.getByRole('link',{name:'Official tools & SDK install guide',exact:true,includeHidden:true});
+ await expect(guide).toHaveAttribute('href','https://learn.microsoft.com/en-us/halo-master-chief-collection/general/overview-tools');
+ await page.reload();await chooseTool(page,'Start here');
+ await expect((await pagedControl(page,'textbox','Setup Editable Halo Tags folder'))).toHaveValue('C:/Managed/SDK/tags');
+ await expect((await pagedControl(page,'textbox','Setup Invader tools folder'))).toHaveValue('D:/Tools/Invader');
+});
+
+
+test('SDK dependency picker updates only the current map source profile and retains unsaved edits',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke,m=w.__sparkMock;
+  m.projects.a.project.buildTargets=[{id:'mcc-source',name:'Map source',runtimeId:'mccSteam',builder:'h1a-tool',hekDirectory:'D:/Kit',hekFlavor:'h1aEk',tagsDirectory:null,invaderDirectory:'D:/Invader',ceCompatibleTagset:false,openSauce:false}];
+  m.projects.a.project.activeBuildTarget='mcc-source';
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='dependency_report')return {schemaVersion:1,runtimeId:args.runtimeId,projectId:args.projectId,platform:'windows',diagnostics:[],items:[{id:'tags',label:'Matching editable tags',state:'setupRequired',detail:'Choose your installed SDK or matching editable tags.',actions:[{id:'h1a.sdk',kind:'chooseSetting',label:'Choose SDK archive & prepare MCC tags',target:'hekSdkArchive',requiresReview:false}]}]};
+   if(command==='choose_dependency_path'){
+    m.sdkDependency=structuredClone(args);const result=structuredClone(m.projects[args.projectId]);
+    result.project.buildTargets[0].tagsDirectory='C:/Managed/SDK/tags';return {bootstrap:null,opened:result};
+   }
+   return original(command,args);
+  };
+ });
+ await openFixture(page);
+ const field=page.getByLabel('Velocity',{exact:true});await field.fill('37');await field.press('Tab');
+ await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();
+ await page.getByRole('button',{name:'Choose SDK archive & prepare MCC tags',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'Your current scene, tag edits and map history were retained'})).toBeVisible();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.sdkDependency)).toMatchObject({projectId:'a',actionId:'h1a.sdk'});
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.buildTargets?.[0]?.tagsDirectory)).toBe('C:/Managed/SDK/tags');
+ await chooseTool(page,'Tag editor');await expect(page.getByLabel('Velocity',{exact:true})).toHaveValue('37');
+});

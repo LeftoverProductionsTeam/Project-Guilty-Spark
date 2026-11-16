@@ -1227,6 +1227,10 @@ async fn validate_setting_path(key:String,path:PathBuf)->Reply<String> {
 
 #[tauri::command]
 async fn choose_setting_path(key: String) -> Reply<Option<PathBuf>> {
+    if key=="hekSdkArchive" {
+        let chosen=rfd::AsyncFileDialog::new().set_title("Choose your installed Halo SDK archive").add_filter("Halo SDK archive",&["7z"]).pick_file().await;
+        return chosen.map(|file|{core::connections::validate_sdk_archive(file.path()).map_err(error)?;Ok(file.path().to_path_buf())}).transpose();
+    }
     if key == "nativeExecutable" {
         return Ok(rfd::AsyncFileDialog::new()
             .set_title("Choose a separately installed native Halo runtime executable")
@@ -1269,7 +1273,7 @@ async fn halo_setup_report(app:tauri::AppHandle)->Reply<serde_json::Value> {
         if let Some(root)=installation.editing_tools.as_ref().filter(|r|settings.hek_directory.as_ref()!=Some(*r)) {
             kits.push(core::connections::inspect_kit(root,"h1aEk (discovered; select to configure)",None).map_err(error)?);
         }
-        Ok(serde_json::json!({"schemaVersion":1,"runtimes":runtimes,"kits":kits,
+        Ok(serde_json::json!({"schemaVersion":1,"platform":std::env::consts::OS,"runtimes":runtimes,"kits":kits,
             "editingKitSteamAppId":"1532190","mccInstalled":installation.mcc_path.is_some(),
             "invaderConfigured":settings.invader_directory.is_some()}))
     }).await.map_err(error)?
@@ -1558,17 +1562,24 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn prepare_mcc_conversion_tools(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:Option<String>)->Reply<String>{
+pub(super) async fn prepare_mcc_conversion_tools(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:Option<String>,sdk_archive:Option<PathBuf>)->Reply<String>{
+    if !cfg!(windows){return Err("Installed MCC SDK preparation requires its Windows toolchain. Choose native editable tags or open the official setup guide on this platform".into());}
     let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();if let Some(project)=&project_id{check_document_owner(&state,project,&owner)?;}
-        let mut settings=lock(&state.settings)?.clone();
-        let kit=settings.hek_directory.clone().filter(|p|p.join("HCEEK.7z").is_file()).or(lock(&state.installation)?.editing_tools.clone()).ok_or("Install Halo: CE Mod Tools - MCC using Steam Library → Tools, then refresh discovery")?;
-        let existing=settings.hek_tags_directory.clone().filter(|p|settings.hek_flavor.as_deref()==Some("h1aEk")&&p.join("globals/globals.globals").is_file());
-        let tags=if let Some(tags)=existing{tags}else{let id=uuid::Uuid::new_v4().to_string();let project=project_id.as_deref().unwrap_or("setup");match core::conversion::prepare_sdk_tags(&kit,&state.root.join("sdk-cache").join(&id),project,&id,|e|event(&app,e)){
+        let settings=lock(&state.settings)?.clone();
+        if let Some(archive)=&sdk_archive{core::connections::validate_sdk_archive(archive).map_err(error)?;}
+        let kit=settings.hek_directory.clone().filter(|p|p.join("HCEEK.7z").is_file()||sdk_archive.is_some()&&settings.hek_flavor.as_deref()==Some("h1aEk")&&p.join("bin/x64/7zr.exe").is_file()).or_else(||sdk_archive.as_ref().and_then(|archive|archive.parent()).filter(|root|root.join("tool.exe").is_file()&&root.join("bin/x64/7zr.exe").is_file()).map(Path::to_path_buf)).or(lock(&state.installation)?.editing_tools.clone()).ok_or("Install Halo: CE Mod Tools - MCC using Steam Library → Tools, then refresh discovery")?;
+        let existing=settings.hek_tags_directory.clone().filter(|p|sdk_archive.is_none()&&settings.hek_flavor.as_deref()==Some("h1aEk")&&p.join("globals/globals.globals").is_file());
+        let tags=if let Some(tags)=existing{tags}else{let id=uuid::Uuid::new_v4().to_string();let project=project_id.as_deref().unwrap_or("setup");let archive=sdk_archive.clone().unwrap_or_else(||kit.join("HCEEK.7z"));match core::conversion::prepare_sdk_tags_from_archive(&kit,&archive,&state.root.join("sdk-cache").join(&id),project,&id,|e|event(&app,e)){
             Ok(tags)=>tags,Err(failure)=>{event(&app,JobEvent{job_id:id,project_id:project.into(),phase:"sdk-failed".into(),message:failure.to_string(),progress:100,severity:"error".into(),timestamp:chrono::Utc::now().to_rfc3339()});return Err(error(failure));}
         }};
-        settings.hek_directory=Some(kit);settings.hek_flavor=Some("h1aEk".into());settings.hek_tags_directory=Some(tags.clone());
-        configure(&app,&state,settings)?;Ok(tags.to_string_lossy().into_owned())
+        // Retain newer unrelated preferences after long-running preparation.
+        let mut current=lock(&state.settings)?.clone();
+        if current.hek_directory!=settings.hek_directory||current.hek_flavor!=settings.hek_flavor||current.hek_tags_directory!=settings.hek_tags_directory {
+            return Err("Editing tool choices changed during SDK preparation. Prepared tags were retained; review the new paths before connecting them".into());
+        }
+        current.hek_directory=Some(kit);current.hek_flavor=Some("h1aEk".into());current.hek_tags_directory=Some(tags.clone());
+        configure(&app,&state,current)?;Ok(tags.to_string_lossy().into_owned())
     }).await.map_err(error)?
 }
 fn event(app: &tauri::AppHandle, e: JobEvent) {

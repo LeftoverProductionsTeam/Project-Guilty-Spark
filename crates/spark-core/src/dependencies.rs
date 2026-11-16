@@ -146,6 +146,7 @@ pub fn action(id: &str) -> Option<DependencyAction> {
             Some(CLASSIC_RESOURCES_GUIDE),
             true,
         ),
+        "h1a.sdk" => (DependencyActionKind::ChooseSetting,"Choose SDK archive & prepare MCC tags",Some("hekSdkArchive"),false),
         "tags.choose" => (
             DependencyActionKind::ChooseSetting,
             "Choose editable Halo tags",
@@ -220,6 +221,7 @@ pub fn report(observation: &DependencyObservation) -> DependencyReport {
             &["steam.choose"],
         ));
         let mut kit_actions = vec!["h1a.choose", "h1a.guide"];
+        if observation.platform=="windows"{kit_actions.insert(1,"h1a.sdk");}
         if observation.platform == "windows"
             && observation.steam.state == DependencyState::Ready
             && observation.h1a.state == DependencyState::SetupRequired
@@ -250,7 +252,7 @@ pub fn report(observation: &DependencyObservation) -> DependencyReport {
             "tags",
             "Matching editable tags",
             &observation.editable_tags,
-            &["tags.choose", "tags.guide"],
+            if mcc&&observation.platform=="windows"{&["tags.choose","h1a.sdk","tags.guide"]}else{&["tags.choose","tags.guide"]},
         ));
         if observation.assets.state != DependencyState::NotApplicable {
             items.push(item(
@@ -342,11 +344,21 @@ mod tests {
         assert!(r.items.iter().any(|i| i.id == "communityContent"));
         let mut o = observed(RuntimeId::MccSteam);
         o.platform = "linux".into();
+        assert!(!report(&o).items.iter().flat_map(|i|&i.actions).any(|a|a.id=="h1a.sdk"));
         assert!(!report(&o)
             .items
             .iter()
             .flat_map(|i| &i.actions)
             .any(|a| a.kind == DependencyActionKind::InstallH1aViaSteam));
+    }
+    #[test]
+    fn sdk_selection_uses_fixed_local_picker_without_advertising_ce_compatibility() {
+        let sdk=action("h1a.sdk").unwrap();assert_eq!(sdk.kind,DependencyActionKind::ChooseSetting);
+        assert_eq!(sdk.target.as_deref(),Some("hekSdkArchive"));
+        assert!(report(&observed(RuntimeId::MccSteam)).items.iter().find(|i|i.id=="tags").unwrap().actions.iter().any(|a|a.id=="h1a.sdk"));
+        for runtime in [RuntimeId::HaloCustomEdition,RuntimeId::ChupathingyCe,RuntimeId::OpenCe] {
+            assert!(!report(&observed(runtime)).items.iter().flat_map(|i|&i.actions).any(|a|a.id=="h1a.sdk"));
+        }
     }
     #[test]
     fn unknown_actions_cannot_supply_urls_installers_or_command_lines() {

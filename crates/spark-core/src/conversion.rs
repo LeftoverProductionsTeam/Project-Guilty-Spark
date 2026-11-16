@@ -349,11 +349,22 @@ pub fn prepare_sdk_tags(
     job_id: &str,
     event: impl Fn(crate::build::JobEvent) + Send + Sync,
 ) -> Result<PathBuf> {
+    prepare_sdk_tags_from_archive(kit,&kit.join("HCEEK.7z"),cache,project_id,job_id,event)
+}
+
+pub fn prepare_sdk_tags_from_archive(
+    kit: &Path,
+    archive: &Path,
+    cache: &Path,
+    project_id: &str,
+    job_id: &str,
+    event: impl Fn(crate::build::JobEvent) + Send + Sync,
+) -> Result<PathBuf> {
     uuid::Uuid::parse_str(job_id)
         .map_err(|_| SparkError::Invalid("Invalid SDK preparation job".into()))?;
     crate::reject_links(kit)?;
     crate::reject_links(cache)?;
-    let archive = kit.join("HCEEK.7z");
+    let archive = archive.to_path_buf();
     let extractor = kit.join("bin/x64/7zr.exe");
     crate::reject_links(&archive)?;
     crate::reject_links(&extractor)?;
