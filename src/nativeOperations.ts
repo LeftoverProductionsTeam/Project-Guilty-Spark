@@ -9,7 +9,7 @@ export interface NativeFiringPoint {id:string;position:[number,number,number];gr
 export interface NativeCombatSource {points:NativeFiringPoint[];groups:Record<CampaignTacticalMode,string[]>}
 export interface NativeEncounterAppend {name:string;actorPath:string;position:[number,number,number];startActive:boolean;count?:number;spacing?:number;difficulty?:{normal:number;insane:number}|null;grid?:{total:number;offset:number};starts?:NativeEncounterStart[];patrol?:{points:NativePatrolPoint[]};combat?:NativeCombatSource;behavior?:{initialState:CampaignAiState;returnState:CampaignAiState}}
 export interface NativeSquadCountEdit {encounter:number;squad:number;encounterName:string;squadName:string;normalCount:number;insaneCount:number}
-export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number];facingRadians?:number|null}[]|null}
+export interface NativeScenarioSquad {encounter:number;squad:number;encounterName:string;name:string;normalCount:number;insaneCount:number;starts?:{index:number;position:[number,number,number];facingRadians?:number|null;commandList?:number|null}[]|null}
 export const nativeSourceAiStates=['none','sleeping','alert','moving_repeat_same_position','moving_loop','moving_loop_back_and_forth','moving_loop_randomly','moving_randomly','guarding','guarding_at_guard_position','searching','fleeing'] as const;
 export interface NativeSquadBehavior {initialState:string;returnState:string;starts:{index:number;initialState:string;returnState:string}[];patrolCount:number}
 export function nativeSourceStateReady(state:string,count:number){const index=nativeSourceAiStates.indexOf(state as typeof nativeSourceAiStates[number]);return index>=0&&count>=([4,5,6].includes(index)?2:[3,7].includes(index)?1:0);}
@@ -40,7 +40,7 @@ export interface NativeScenarioCombat {encounter:number;name:string;points:{inde
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
-  | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null}
+  | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null;commandList?:number|null}
   | {kind:'encounterSquadPatrol';encounter:number;squad:number;encounterName:string;squadName:string;route:NativeSourcePatrolRoute;sourceSha256:string}
   | {kind:'encounterSquadBehavior';encounter:number;squad:number;encounterName:string;squadName:string;behavior:NativeSquadBehavior;sourceSha256:string}
   | {kind:'encounterFiringPosition';encounter:number;point:number;encounterName:string;position:[number,number,number];group:string;sourceSha256:string}
@@ -60,6 +60,8 @@ export interface NativeTagContext {
   canAppendEncounter?:boolean;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
+  scenarioCommandLists?:{index:number;name:string;commands:number}[];
+  commandListIssue?:string|null;
   scenarioCombat?:NativeScenarioCombat[];
   combatEditIssue?:string|null;
   startEditIssue?:string|null;

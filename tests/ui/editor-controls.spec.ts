@@ -107,3 +107,13 @@ test('recovered patrol form preserves source rows, ordered edits and source-chan
  await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();await expect(preview).toBeDisabled();await expect(editor.getByRole('combobox',{name:'Native patrol point',exact:true})).toHaveValue('0');
  await page.getByRole('button',{name:'Toggle source protection',exact:true}).click();await expect(x).toBeDisabled();await expect(preview).toBeDisabled();
 });
+
+
+test('native starting command-list binding keeps the pose, source and other inspector drafts',async({page})=>{
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-ai-start&commands&facing');const first=page.getByTestId('ai-inspector-0');await first.locator('summary').click();
+ const binding=first.getByRole('combobox',{name:'AI start command list',exact:true});await expect(binding).toHaveValue('-1');await expect(binding.getByRole('option',{name:'1 · patrol · 3 commands',exact:true})).toHaveCount(1);
+ await binding.selectOption('1');await first.getByRole('button',{name:'Show handles in Level Editor',exact:true}).click();await expect(binding).toHaveValue('1');await first.getByRole('button',{name:'Preview AI start command binding',exact:true}).click();
+ const operation=JSON.parse((await page.getByTestId('ai-operation').textContent())!);expect(operation).toMatchObject({kind:'encounterStartPosition',encounter:0,squad:0,start:0,position:[1,2,3],commandList:1,facingRadians:Math.PI/2,sourceSha256:'a'.repeat(64)});
+ await page.getByRole('button',{name:'Finish preview',exact:true}).click();await first.getByRole('button',{name:'Reset coordinate draft',exact:true}).click();await expect(binding).toHaveValue('-1');
+ await binding.selectOption('0');await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(binding).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(binding).toHaveValue('0');
+});

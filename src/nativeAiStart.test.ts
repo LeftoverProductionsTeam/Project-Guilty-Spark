@@ -101,3 +101,13 @@ it('binds patrol viewport proposals to the complete original route and cancels s
  expect(nativeAiStartKey(source,0,0,0,'patrol')).not.toBe(nativeAiStartKey(source,0,0,0));
  expect(nativeAiStartKey(source,0,0,0,'patrol')).not.toBe(nativeAiStartKey(source,0,0,0,'firing'));
 });
+
+
+it('binds a command draft to the same original native start and cancels drags after binding changes',()=>{
+ const source=context();source.scenarioStartSquads![0].starts![0].commandList=-1;
+ const view={...draft(),originalCommandList:-1,commandList:1};expect(nativeAiStartMatches(view,source)).toBe(true);
+ expect(nativeAiStartDragValues(view,{...view,commandList:0},[7,8,9],true)).toBeNull();expect(nativeAiStartDragFacing(view,{...view,commandList:0},1,true)).toBeNull();
+ const changed=structuredClone(source);changed.scenarioStartSquads![0].starts![0].commandList=0;expect(nativeAiStartMatches(view,changed)).toBe(false);
+ delete changed.scenarioStartSquads![0].starts![0].commandList;expect(nativeAiStartMatches(view,changed)).toBe(false);
+ expect(nativeAiStartMatches(draft(),context())).toBe(true);
+});

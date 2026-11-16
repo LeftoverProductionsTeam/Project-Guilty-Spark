@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — recovered native patrol creator workflow; CE609 Black Echo / full roadmap retained
+Task: Operation110 — recovered AI command-list binding workflow; CE609 Black Echo / full roadmap retained
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: e3f0e2dbe757294286bb3ef92c3689c7b9ce91b4 parent; containing patrol commit verifies native source/viewport/Save/restart/CE build/readback. No gameplay acceptance.
-Next action: exercise the approved private Black Echo candidate in Forerunner when desktop control is available; verify actual objectives/HUD/AI route-following/settlement. Do not retry unchanged computer-control initialization failure. Otherwise advance independent campaign/creator requirements.37944 and full M1–M6 remain open.
+Latest verified revision: 680b0f6056385c0eb0e05b466476f40af4b85a53 parent; containing command-binding commit verifies native UI/Save/restart/CE build/readback. No gameplay acceptance.
+Next action: approved private Black Echo gameplay/HUD/objectives/settlement and real AI route/command execution when desktop control works; do not repeat unchanged initialization failure. Otherwise finish independent campaign cutscene/command-authoring/native creator gaps.37944/full M1–M6 remain open.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov patrol creator now passes actual Windows form/viewport drag/Review/Preview/Accept/Restore/Save/3normal restarts/recovered script Undo/Redo/CE609 build/Invader route readback;0page errors. Fixed Review squad focus, benign-refresh module cancellation and patrol snapshot admission panic. Frontend49/core15(including1installed Invader)/browser12unique/TypeScript/Vite/Windows build pass. App5c1e356b, receiptbc5596fa, map3cf9214b; full hashes/failures/capture in RUNTIME_INTEGRATION_20261107. No gameplay or37944 closure. Two-file patrol WIP is now integrated, not discarded. Previous compact151px/freeze182blocking-check repair remains accepted; all475IDs/originals/history protected. No push/publication.
+16Nov recovered AI command binding passes native form/Preview/Accept/Restore/Save/3normal restarts/recovered script Undo/Redo/CE609 compile/Invader index+name readback;0page errors. Frontend50/core16(including installed Invader)/browser6/TypeScript/Vite/Windows build pass. App7895741e, receipt27bf4f6a, map20335dc3; full evidence/failures in RUNTIME_INTEGRATION_20261107. Native65535sentinel handled; no guards weakened. Empty-list fixture proves references only, not AI execution. Patrol680b0f6 and compact151px/freeze repairs preserved. All475IDs/originals/history protected. No Forerunner/game/push/publication/37944closure.
 
 Reuse historical evidence; run proportionate focused checks under the updated policy:
 
@@ -105,7 +105,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA6610/run-eIdY0c CLOSED; all owned apps/tools exited;5235740324logicalB disposed, peak allocation5088738656B; final physical reclamation unavailable. One1591000B native PNG retained; no map/app/SDK/cache/archive. Prior QA29134 closure/evidence remains in Git/RUNTIME_INTEGRATION_20261107.
+QA21477/run-YMWJnt CLOSED; owned apps/tools exited;4327727961logicalB disposed, peak allocation4119519904B; final physical reclamation unavailable. No new screenshot/map/app/SDK/cache/archive retained. QA6610/QA29134 prior closures remain in Git/RUNTIME_INTEGRATION_20261107.
 
 QA21402/run-9LXS9l CLOSED: owned apps/tools exited and output disposed4,488,883,429logicalB; final physical reclamation unavailable. Only the two small source-owned before/after PNGs remain. Final app351dd043 uses worker-thread Save/update, releases journal locks before UI events and reuses latestRefresh to bound native inspections. Browser3/3, frontend history10/10, Rust history11/11, TypeScript/Vite/Windows build pass. Native continued seven-stage HUD case:42rapid edits/Undo/Save/status5/2/2ms/151px panel/3normal closes/CE609 map057a9839/independent readback pass,0page errors. Initial two fresh Save timeouts remain documented; final fresh Save/restart passed, then source-panel auto-wait failed; explicit readiness/strict continued run passes. Do not relabel the failed earlier run or claim broad37944 closure. Existing RUNTIME_INTEGRATION_20261107 has exact app/map/scenario/HSC/HMT hashes and preserved before/after PNGs. One2355tag extraction, no SDK copy/game/Forerunner writes/push. Original inputs/475CSV/legacy checkpoint unchanged; patrol WIP integration is recorded in16Nov milestone. Full Operation110 remains incomplete.
 
