@@ -1,3 +1,4 @@
+import NativeTransportAppend from './NativeTransportAppend';
 import NativeCommandLists from './NativeCommandLists';
 import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
 import type {NativeCommandDraft} from '../nativeOperations';
@@ -324,6 +325,7 @@ export default function NativeTagOperations({
             {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           </details>}
           {context.class==='vehi'&&<details className="native-vehicle-seats"><summary>Native vehicle seats</summary><p className="subtle">Read-only native seat labels, in source order. In Campaign source, Logic / Events → AI vehicle seating uses a case-sensitive part of a label. Each matching row is one seat; duplicate labels are separate seats. Build verifies capacity. Actual occupancy, AI driving and animations require gameplay testing.</p>{context.vehicleSeatIssue&&<Notice>{context.vehicleSeatIssue}</Notice>}{context.vehicleSeats&&<><ol>{context.vehicleSeats.map((label,index)=><li key={index}><code>{label||'(unnamed seat)'}</code></li>)}</ol>{!context.vehicleSeats.length&&<p>This vehicle has no native seats.</p>}</>}</details>}
+          {context.class==='scnr'&&<NativeTransportAppend context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='scnr'&&<NativeCommandLists context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeDevicePlacements context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeTriggerVolumes context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}

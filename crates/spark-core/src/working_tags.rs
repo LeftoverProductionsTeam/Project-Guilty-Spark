@@ -1444,7 +1444,8 @@ fn run_with(
             let volumes=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.volumes.is_some()){Some(crate::native_operations::scenario_volume_choices(&fields)?)}else{None};
             let devices=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.devices.is_some()){Some(crate::native_operations::scenario_device_choices(&fields)?)}else{None};
             let command_lists=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.command_lists.is_some()){Some(crate::native_operations::native_command_source(&fields)?.lists)}else{None};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
+            let transports=if let Some(selected)=prepared.scenario_squad_readback.as_ref().and_then(|s|s.transports.as_ref()) {Some(crate::native_operations::scenario_transport_snapshots(&fields,&selected.iter().map(|row|row.transport.name.clone()).collect::<Vec<_>>())?)}else{None};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }

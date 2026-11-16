@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 1f28be08775c4025861724426d439d4da10764e6, canonical local master.
-Latest verified revision: parent1f28be0 plus this CI/dependency setup checkpoint; staged source manifests identify the containing commit.
-Next action: finish retained recovered-aircraft append WIP using the installed Invader enum inventory, then compose the complete CE609 Black Echo dropship mission. Hosted CI awaits owner push; Save37944/native desktop/game acceptance open.
+Starting revision: fbcdc8dbe934278be2f0a97cef50f640ed7ea0f2, canonical local master.
+Latest verified revision: fbcdc8d plus this native aircraft append checkpoint; containing commit and staged manifests identify all verified source.
+Next action: compose the expanded Black Echo CE609 mission with actual pilots, routes and native controller via the existing editors; fix be_flood start[0-0] outside BSP0 and target bitmap/HUD warnings in owned candidate source. Native desktop/game/Save37944 gates remain open; no push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov CI/setup: three stale native_logic::verify_compiled calls now use their exact output map. Windows all-workspace/all-target locked compilation PASS; hosted/Linux not run (no push). Dependency core6/frontend8/browser4+tool3/TypeScript pass. Runtime setup now routes to the selected existing profile/download flow; source tags available without a map; tool/SDK links open externally. Exact results/failed fixture precursors in RUNTIME_INTEGRATION_20261107. Final master e210fbc9 copied exactly into existing Master Engineering Prompts. All475/M1–M6 remain active.
+16Nov CI/setup fbcdc8d: all3 stale native verifier calls repaired; Windows workspace/all-target check, dependency core6/frontend8/browser4+3/TypeScript pass. Runtime pickers/downloads, source tags before map creation and external tool/SDK links connected. Hosted/Linux run pending owner push. Final master e210fbc9 retained exactly. Evidence: RUNTIME_INTEGRATION_20261107.
 
 16Nov P0: frozen Save/native history ordering and paint-dependent keyboard Save/Undo repaired. Unit24/browser11/native storage13/TypeScript-Vite pass; exact causes/failures/hashes in RUNTIME_INTEGRATION_20261107. Actual Windows42-edit/full restart/37944 remain OPEN. QA47527/run-hJ8LWQ CLOSED500400313logicalB; root absent. Prior c9d1d11 command-route proof remains there; flight/mission acceptance open.
 
@@ -31,7 +31,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Retained uncommitted recovered-aircraft append: native_transport.rs, native_operations.rs, working_tags.rs, native_operations_native.rs, NativeTransportAppend.tsx, NativeTagOperations.tsx, nativeOperations.ts and its browser test. Core2/frontend/backend checks pass in scope; actual native readback still fails aircraft-type enum parsing. No playable aircraft mission accepted. QA55595/run-n392OX remains owned/active until scoped checks finish; do not delete active output.
+Recovered-aircraft append WIP is now source/native-readback accepted in scope: existing transaction/UI/receipt/staging preserves all original indices/AI/scripts and verifies new aircraft/signal markers plus AI starts after compilation. Existing native_children now parses the actual seven-choice aircraft enum; no fabricated type or seat. Preview/Accept/Restore browser1, core26+native_logic16, installed CE compile/readback3 and Windows backend all-target check pass. Exact source/output hashes, failed precursors and unresolved compiler warnings: RUNTIME_INTEGRATION_20261107. Native Windows Save/restart/flight/gameplay remain OPEN. QA55595/run-n392OX CLOSED;1635301751 logical bytes disposed, root absent; physical reclaimed bytes unavailable. No SDK tree copied, originals/Forerunner untouched.
 
 16Nov dropship: three native signals/craft and existing Runtime & Tools controller draft now connect actual seat/AI/route/pad source lists, repeatable grounded/boarding/settlement HSC, history/Save/review and pinned native build. Frontend51/core16/browser3distinct, native2+1/controller CE syntax, TypeScript/Vite/Windows check pass. Separate CE609 markers6/0groups pass; not full Black Echo/flight. Source requires preexisting aircraft; reviewed native structural append is next. QA25312/run-htH2Y3 CLOSED1487823130logicalB; root absent. Exact hashes, failures, current partial Spirit source and scope: RUNTIME_INTEGRATION_20261107. No Windows/game/Forerunner write/push.
 

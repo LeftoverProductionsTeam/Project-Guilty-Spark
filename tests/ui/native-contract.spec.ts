@@ -4812,6 +4812,31 @@ test('Forerunner dropship authoring retains draft history and enters the existin
  const request=await page.evaluate(()=>(window as any).__sparkMock.hudBuilds.at(-1));expect(request.expectedTagIdentity).toBe('e'.repeat(64));expect(request.compileScripts).toBe(true);expect(request.scriptAttachment.filename).toBe('gs_pelican_transport.hsc');expect(request.scriptAttachment.content).toContain('(script continuous forerunner_pelican_complete\n  (sleep -1)');
 });
 
+
+test('recovered aircraft append uses native Preview Accept Restore and retains explicit pose',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,m=w.__sparkMock;m.aircraftSha='a'.repeat(64);m.aircraftPreviews=[];m.projects.a.project.builds=[{id:'aircraft-source',timestamp:'',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'c'.repeat(64),message:'Synthetic owned source'}];
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'levels/test'}];
+   if(command==='native_tag_context')return{projectId:args.projectId,buildId:'aircraft-source',tag:'levels/test.scenario',class:'scnr',sourceTarget:'gbx-custom',tagsDirectory:'owned/tags',tagSha256:m.aircraftSha,canEdit:false,canRepair:false,history:[],boundingRadius:null,lensFlareScale:null,canAppendTransport:true,vehicleSources:['vehicles/pelican/pelican'],actorVariants:[]};
+   if(command==='native_operation_preview'){
+    if(args.operation.sourceSha256!==m.aircraftSha)throw Error('Source changed before preview');
+    m.aircraftPreviews.push(structuredClone(args.operation));return{id:'aircraft-preview',tag:'levels/test.scenario',toolId:'synthetic-source-writer',beforeSha256:m.aircraftSha,afterSha256:'b'.repeat(64),changedBytes:100,fieldChanges:[{before:'Original aircraft and signal arrays',after:'Append one aircraft plus three isolated signals'}],detail:'Synthetic native source contract only',currentState:'before'};
+   }
+   if(command==='native_operation_accept'){m.aircraftSha=(args.restore?'a':'b').repeat(64);return{operationId:args.operationId,revisionId:'aircraft-revision',tagsDirectory:'owned/tags',files:1,restored:args.restore,detail:'Synthetic native source selected; game untested'};}
+   return invoke(command,args);
+  };
+ });
+ await openFixture(page);await chooseTool(page,'AI & scenario');const native=page.locator('.scenario-page .native-tag-operations');const entry=native.locator(':scope > summary');await revealPagedControl(entry);if(await native.getAttribute('open')===null)await entry.click();
+ const form=native.locator('.native-transport-append');await revealPagedControl(form.locator('> summary'));await form.locator('> summary').click();const preview=form.getByRole('button',{name:'Preview native aircraft append',exact:true});await expect(preview).toBeDisabled();
+ await form.getByRole('combobox',{name:'Known native vehicle source',exact:true}).selectOption('vehicles/pelican/pelican');
+ for(const[name,value]of [['New aircraft X','49'],['New aircraft Y','-87.472'],['New aircraft Z','0.078429'],['New aircraft yaw','90']]){const control=form.getByRole('spinbutton',{name,exact:true});await revealPagedControl(control);await control.fill(value);}
+ await preview.click();await expect(native.getByRole('region',{name:'Native edit preview'})).toContainText('three isolated signals');
+ const request=await page.evaluate(()=>(window as any).__sparkMock.aircraftPreviews.at(-1));expect(request).toMatchObject({kind:'appendTransport',sourceSha256:'a'.repeat(64),transport:{name:'extraction_pelican',tagPath:'vehicles/pelican/pelican',position:[49,-87.472,0.078429]}});expect(request.transport.rotationRadians[0]).toBeCloseTo(Math.PI/2,8);
+ const accept=native.getByRole('button',{name:'Accept as new source revision',exact:true});await revealPagedControl(accept);await accept.click();const restore=native.getByRole('button',{name:'Restore before-edit tag',exact:true});await expect(restore).toBeEnabled();await restore.click();await expect(accept).toBeEnabled();await expect(form.getByRole('spinbutton',{name:'New aircraft yaw',exact:true})).toHaveValue('90');
+ await accept.click();await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'AI & scenario');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.aircraftSha)).toBe('b'.repeat(64));
+});
+
 // Dependency setup routing: synthetic desktop IPC, not installation/game acceptance.
 test('missing runtime setup reaches the selected existing profile and verified download controls',async({page})=>{
  await mockDesktop(page);await openFixture(page);
