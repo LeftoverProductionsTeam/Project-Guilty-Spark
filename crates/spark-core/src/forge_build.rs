@@ -543,6 +543,7 @@ pub fn run_prepared_job(
         if scenario_file.parent().is_some_and(|p|p.exists()){return invalid("Generated scenario namespace already exists in the supplied tags. Choose a unique project name; stale BSP/lightmap/item tags cannot be accepted as new output.");}
         custom.compile(workspace,&tool,&halo_tool_prefix(tools.hek_flavor.as_deref(),workspace,&stage)?,&invader(tools,"invader-edit").unwrap(),&runner)?;
         let mut reviewed_new_logic_names=false;
+        let mut reviewed_new_logic_groups=false;
         for (index,command) in sources.commands.iter().enumerate() {
             if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
             for expected in &command.expected_outputs {
@@ -577,6 +578,11 @@ pub fn run_prepared_job(
                 if let Some(lighting)=crate::native_lighting::request(project){let quality=lighting.lightmap_quality();if native_args.len()!=5||native_args[0]!="lightmaps"{return invalid("Unexpected native lightmap command");}native_args[3]=quality[0].into();native_args[4]=quality[1].into();}
             }
             args.extend(native_args);
+            if command.phase=="logic-groups"&&!reviewed_new_logic_groups {
+                let count=runner.run(&invader(tools,"invader-edit").unwrap(),&["-t".into(),stage.to_string_lossy().into_owned(),"-C".into(),"device_groups".into(),format!("{}.scenario",sources.scenario_path)],workspace,"logic-groups-review",45)?;
+                if count.trim()!="0"{return invalid("Transport signals require an empty new device-group table; existing groups and references are protected");}
+                reviewed_new_logic_groups=true;
+            }
             if command.phase=="logic-names"&&!reviewed_new_logic_names {
                 // Only a new Tool-generated scenario may receive this bounded
                 // Sapien-style name table. Never disable editing safeguards on
@@ -658,7 +664,7 @@ pub fn run_prepared_job(
         if let Some(markers)=crate::native_logic::verify_compiled(document,&inspected,&output)? {
             project::atomic_write(&workspace.join("native-logic-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
                 "schemaVersion":1,"cacheSha256":inspected.sha256,"markers":markers,
-                "scope":"Compiled marker names, device and vehicle bindings/poses and rotational volume geometry; not activation, collision or gameplay acceptance."
+                "scope":"Compiled marker names, device and vehicle bindings/poses, native transport group definitions and rotational volume geometry; not live readiness, activation, collision or gameplay acceptance."
             }))?,false)?;
             emit("verify",format!("Native marker readback passed: {} named objects and {} oriented volumes. Actual use, collision and gameplay still need a runtime test.",markers.names.len(),markers.volumes.len()),94,"info");
         }

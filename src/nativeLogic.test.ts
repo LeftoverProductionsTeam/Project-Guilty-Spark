@@ -2,6 +2,8 @@ import {defaultNativePlayerProfile} from './firefight';
 import { expect, it } from 'vitest';
 import {
   setNativeLogicName,
+  setNativeTransportSignals,
+  transportSignalNames,
   addLogicTrigger,
   addHandwrittenSource,
   centerDoorTrigger,
@@ -264,4 +266,22 @@ it('refuses ambiguous, locked, multiplayer and manually-owned transport bindings
  doc.gameMode='slayer';expect(()=>setNativeLogicName(doc,node,'ship')).toThrow(/solo/);doc.gameMode='campaign';
  doc.logic.manualSource='; original';expect(()=>setNativeLogicName(doc,node,'ship')).toThrow(/handwritten/);
  expect(doc.placements[0].nativeName).toBeUndefined();
+});
+
+
+it('authors dedicated transport groups through history, sharing and copying without claiming live readiness',()=>{
+ let doc=structuredClone(base);doc.gameMode='campaign';doc.placements=[{...doc.placements[0],id:'ship',name:'Aircraft',tagClass:'vehi',tagPath:'vehicles/pelican/pelican'}];
+ const selected=()=>forgeNodes(doc).find(n=>n.value.id==='ship')!;
+ expect(()=>setNativeTransportSignals(doc,selected(),true)).toThrow(/Bind one unique/);
+ doc=setNativeLogicName(doc,selected(),'extraction_pelican');const enabled=setNativeTransportSignals(doc,selected(),true);
+ expect(enabled.placements[0].transportSignals).toBe(true);expect(doc.placements[0].transportSignals).toBeUndefined();
+ expect(transportSignalNames(enabled.placements[0].nativeName!)).toEqual(['extraction_pelican_boarded','extraction_pelican_called']);
+ expect(()=>setNativeLogicName(enabled,forgeNodes(enabled).find(n=>n.value.id==='ship')!,'extraction_spirit')).toThrow(/Disable/);
+ expect(()=>setNativeLogicName(enabled,forgeNodes(enabled).find(n=>n.value.id==='ship')!,'')).toThrow(/Disable/);
+ let history=historyReducer(historyReducer(initialHistory,{type:'load',project:project(doc)}),{type:'edit',project:project(enabled),description:'Enable transport groups'});
+ history=historyReducer(history,{type:'undo'});expect(history.current?.quickForge?.placements[0].transportSignals).toBeUndefined();history=historyReducer(history,{type:'redo'});expect(history.current?.quickForge?.placements[0].transportSignals).toBe(true);
+ expect(mergeForge(doc,enabled,doc).placements[0].transportSignals).toBe(true);
+ const duplicate=duplicateForgeNodes(enabled,['ship']);expect(duplicate.document.placements[1].nativeName).toBeUndefined();expect(duplicate.document.placements[1].transportSignals).toBeUndefined();expect(duplicate.document.placements[0]).toEqual(enabled.placements[0]);
+ const disabled=setNativeTransportSignals(enabled,forgeNodes(enabled).find(n=>n.value.id==='ship')!,false);expect(disabled.placements[0].transportSignals).toBe(false);
+ expect(setNativeLogicName(disabled,forgeNodes(disabled).find(n=>n.value.id==='ship')!,'extraction_spirit').placements[0].nativeName).toBe('extraction_spirit');
 });

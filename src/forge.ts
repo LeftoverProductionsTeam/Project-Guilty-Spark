@@ -32,6 +32,8 @@ export interface ForgeMaterial {
 export interface ForgePlacement extends ForgeEntity {
   /** Standard solo-scenario vehicle name, separate from the display label. */
   nativeName?: string;
+  /** Compile dedicated zero-initialized boarding/recall groups for a named Forerunner craft. */
+  transportSignals?: boolean;
   publishedAssetId?: string;
   tagId: number | null;
   tagPath: string;
@@ -334,7 +336,7 @@ export function appendForgeNodes(doc:QuickForgeDocument,nodes:ForgeNode[],offset
     transformForgeNode(copy,copy.value.position,nodeRotation(copy),[1,1,1]);
     created.push(copy.value.id);
     if (copy.type === 'brush') result.geometry.push(copy.value);
-    else if (copy.type === 'placement') {delete copy.value.nativeName;result.placements.push(copy.value);}
+    else if (copy.type === 'placement') {delete copy.value.nativeName;delete copy.value.transportSignals;result.placements.push(copy.value);}
     else if (copy.type === 'spawn') result.spawns.push(copy.value);
     else if(copy.type==='objective') result.objectives.push(copy.value);
     else {delete copy.value.nativeName;result.logic??={schemaVersion:1,triggers:[],devices:[],rules:[]};result.logic.triggers.push(copy.value);}

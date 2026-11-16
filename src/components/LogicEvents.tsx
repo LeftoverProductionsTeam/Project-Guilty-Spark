@@ -9,6 +9,8 @@ import {
   isLogicTarget,
   logicDocument,
   setNativeLogicName,
+  setNativeTransportSignals,
+  transportSignalNames,
   extractionLayout,
   addExtractionZone,
 } from '../nativeLogic';
@@ -52,6 +54,7 @@ export default function LogicEvents({
   const extraction=useMemo(()=>extractionLayout(doc,{activationPowered:!missionGatedExtraction}),[doc,missionGatedExtraction]);
   const vehicleSelected=node?.type==='placement'&&node.value.tagClass==='vehi';
   const vehicleNamingUnavailable=vehicleSelected&&(!!doc.native||!['campaign','firefight','zombie'].includes(doc.gameMode));
+  const hasTransportSignals=vehicleSelected&&node.value.transportSignals===true;
   const controlSelected=node?.type==='placement'&&node.value.tagClass==='ctrl';
   const namingNeedsDoorBinding=node?.type==='placement'&&node.value.tagClass==='mach'&&
     !logic?.devices.some(d=>d.placementId===node.value.id);
@@ -84,6 +87,11 @@ export default function LogicEvents({
       if(next!==latestDocument.current)commit(next,'Set native scenario name');
       setError('');return true;
     } catch(error){setError(String(error));return false;}
+  };
+  const changeTransportSignals=(enabled:boolean)=>{
+    if(!node)return;
+    try{const next=setNativeTransportSignals(latestDocument.current,node,enabled);if(next!==latestDocument.current)commit(next,'Change native transport groups');setError('');}
+    catch(problem){setError(String(problem));}
   };
   const createExtractionZone=(role:'activation'|'return')=>{
     try {
@@ -128,7 +136,7 @@ export default function LogicEvents({
             Native scenario name
             <input key={node.value.id+':'+nativeBindingName} aria-label="Native scenario name"
               defaultValue={nativeBindingName} maxLength={31} placeholder={vehicleSelected?'Unnamed until assigned':'Automatic unique name'}
-              disabled={node.value.locked||namingNeedsDoorBinding||vehicleNamingUnavailable}
+              disabled={node.value.locked||namingNeedsDoorBinding||vehicleNamingUnavailable||hasTransportSignals}
               title={vehicleSelected?'Standard solo vehicle binding. Blank leaves this vehicle unnamed; display names and handwritten scripts remain separate.':namingNeedsDoorBinding?'Connect this door to a trigger below first; naming alone must not change automatic operation.':'Optional exact native script/engine binding. Display name and identity stay separate; blank restores the generated name.'}
               onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}
               onBlur={e=>{e.currentTarget.value=applyNativeBinding(e.currentTarget.value)?e.currentTarget.value.trim():nativeBindingName;}}/>
@@ -138,9 +146,17 @@ export default function LogicEvents({
           </label>}
           {vehicleSelected&&<>
             {vehicleNamingUnavailable?<p className="forge-hint">Vehicle script names require editable solo source. Use the matching native source editor for recovered maps; multiplayer collections do not expose these bindings.</p>:<div className="button-row" aria-label="Forerunner transport vehicle roles">
-              {['extraction_pelican','extraction_spirit'].map(name=><button key={name} disabled={node?.value.locked||nativeBindingName===name} onClick={()=>applyNativeBinding(name)}>{name==='extraction_pelican'?'Bind UNSC Pelican':'Bind Covenant Spirit'}</button>)}
+              {['extraction_pelican','extraction_spirit'].map(name=><button key={name} disabled={node?.value.locked||hasTransportSignals||nativeBindingName===name} title={hasTransportSignals?'Disable boarding & recall groups before changing the craft role.':undefined} onClick={()=>applyNativeBinding(name)}>{name==='extraction_pelican'?'Bind UNSC Pelican':'Bind Covenant Spirit'}</button>)}
             </div>}
-            {nativeBindingName&&<button disabled={node?.value.locked} onClick={()=>applyNativeBinding('')}>Clear native vehicle name</button>}
+            {nativeBindingName&&<button disabled={node?.value.locked||hasTransportSignals} title={hasTransportSignals?'Disable boarding & recall groups first; existing script references are not rewritten.':undefined} onClick={()=>applyNativeBinding('')}>Clear native vehicle name</button>}
+            <label className="checkbox-label"><input type="checkbox" checked={hasTransportSignals}
+              disabled={node?.value.locked||!hasTransportSignals&&(vehicleNamingUnavailable||!transportSignalNames(nativeBindingName).length)}
+              onChange={event=>changeTransportSignals(event.target.checked)}/>Create boarding &amp; recall groups</label>
+            <p className="forge-hint">Bind the matching craft first. Disable these generated groups before renaming it. Disabling removes their definitions from the next fresh build; review existing script references first. This edits native map definitions; Forerunner controls actual readiness and recall, with no inventory authority in Spark.</p>
+            {hasTransportSignals&&<details><summary>Native transport signal definitions</summary>
+              {transportSignalNames(nativeBindingName).map(name=><div key={name}><code>{name}</code> · initial value 0 · repeatable</div>)}
+              <p className="forge-hint">The compatible Forerunner host updates these dedicated groups. Native HaloScript can read them with device_group_get; never share them with device power or position. A legacy engine can retain the zero definitions without driving them. Actual boarding, recall and flight need game verification.</p>
+            </details>}
             <p className="forge-hint">A native vehicle name is not a flight controller. In Forerunner Extraction, declaring either transport requires physical boarding: provide the correct craft, usable seats, pilot, approach/landing/return scripts and crew callbacks. Spark does not grant loot, teleport passengers or verify flight here. Duplicate copies start unnamed.</p>
           </>}
           {(node?.type==='trigger'||controlSelected)&&<div className="button-row" aria-label="Forerunner native Extraction marker roles">

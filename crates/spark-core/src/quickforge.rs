@@ -214,6 +214,8 @@ pub struct ForgeMaterial {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForgePlacement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport_signals: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub published_asset_id: Option<String>,

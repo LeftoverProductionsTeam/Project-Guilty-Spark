@@ -117,6 +117,12 @@ pub fn native_name(prefix: &str, id: &str) -> String {
         &crate::studio_native::digest(id.as_bytes())[..12]
     )
 }
+/// Native group names from the existing Forerunner transport contract.
+pub fn transport_signal_groups(doc:&QuickForgeDocument)->Vec<String> {
+    doc.placements.iter().filter(|p|p.transport_signals==Some(true)).flat_map(|p|
+        p.native_name.as_deref().filter(|name|["extraction_pelican","extraction_spirit"].contains(name))
+         .map(|name|vec![format!("{name}_boarded"),format!("{name}_called")]).unwrap_or_default()).collect()
+}
 fn authored_name(value: &Option<String>) -> bool {
     value.as_ref().is_none_or(|name| {
         !name.is_empty() && name.len() <= 31 && !name.starts_with("gs_")
@@ -176,6 +182,10 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     let Some(logic)=effective.as_deref() else{return Ok(());};
     if doc.placements.iter().any(|p|p.native_name.is_some()&&(p.tag_class!="vehi"||doc.native.is_some()||crate::quickforge::native_scenario_type(doc)!=0||!authored_name(&p.native_name))) {
         return invalid("Native placement names require editable solo vehicle source and lowercase identifiers of 1–31 characters; gs_ is reserved");
+    }
+    if doc.placements.iter().any(|p|p.transport_signals==Some(true)&&(p.tag_class!="vehi"||doc.native.is_some()||crate::quickforge::native_scenario_type(doc)!=0||
+        !matches!(p.native_name.as_deref(),Some("extraction_pelican"|"extraction_spirit"))||logic.manual_source.is_some())) {
+        return invalid("Transport signals need a uniquely named Pelican or Spirit in generated editable solo source; handwritten modules are preserved");
     }
     if logic.devices.len()+doc.placements.iter().filter(|p|p.native_name.is_some()).count()>512 {
         return invalid("Native scenario object name limit512 reached; no bindings were dropped");
@@ -322,10 +332,10 @@ fn volume(logic: &Document, id: &str) -> String {
     format!("(volume_test_objects {name} (players))")
 }
 pub fn has_source(doc:&QuickForgeDocument)->bool {
-    doc.logic.is_some() || crate::quickforge::campaign_profile(doc).is_some() || doc.placements.iter().any(|p|p.native_name.is_some())
+    doc.logic.is_some() || crate::quickforge::campaign_profile(doc).is_some() || doc.placements.iter().any(|p|p.native_name.is_some()||p.transport_signals.is_some())
 }
 fn effective_logic(doc:&QuickForgeDocument)->Option<Cow<'_,Document>> {
-    doc.logic.as_ref().map(Cow::Borrowed).or_else(||(crate::quickforge::campaign_profile(doc).is_some()||doc.placements.iter().any(|p|p.native_name.is_some())).then(||Cow::Owned(Document {
+    doc.logic.as_ref().map(Cow::Borrowed).or_else(||(crate::quickforge::campaign_profile(doc).is_some()||doc.placements.iter().any(|p|p.native_name.is_some()||p.transport_signals.is_some())).then(||Cow::Owned(Document {
         schema_version:1,triggers:vec![],devices:vec![],rules:vec![],manual_source:None,handwritten_sources:vec![],
     })))
 }
@@ -454,6 +464,15 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
     validate(doc)?;
     let Some(logic)=effective_logic(doc) else{return Ok(());};
     if read.names.len()!=logic.devices.len()+doc.placements.iter().filter(|p|p.native_name.is_some()).count()||read.volumes.len()!=logic.triggers.len(){return invalid("Compiled Logic marker inventory differs from authored source");}
+    let groups=transport_signal_groups(doc);
+    if doc.placements.iter().any(|p|p.transport_signals.is_some()){
+        if read.groups.len()!=groups.len()||read.groups.iter().zip(&groups).any(|(actual,name)|actual.name!=*name||actual.initial_value!=0.||actual.flags!=0){
+            return invalid("Compiled native transport groups differ from their unique zero-initialized source definitions");
+        }
+        if !groups.is_empty()&&read.devices.iter().any(|device|device.power_group!=Some(-1)||device.position_group!=Some(-1)){
+            return invalid("Transport readiness/recall groups must not drive any device power or position");
+        }
+    }
     for (index,binding) in logic.devices.iter().enumerate(){
         let source=doc.placements.iter().find(|value|value.id==binding.placement_id).ok_or_else(||crate::SparkError::Invalid("Authored Logic device disappeared".into()))?;
         let array_index=doc.placements.iter().filter(|value|value.tag_class==source.tag_class).position(|value|value.id==source.id).unwrap();
@@ -542,6 +561,13 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         args,
         expected_outputs: vec![format!("tags/{}", tag.replace('\\', "/"))],
     };
+    for(index,name)in transport_signal_groups(doc).into_iter().enumerate(){
+        let mut args=vec!["-I".into(),"device_groups".into(),"1".into(),"end".into()];
+        set(&mut args,format!("device_groups[{index}].name"),name);
+        set(&mut args,format!("device_groups[{index}].initial_value"),"0");
+        set(&mut args,format!("device_groups[{index}].flags.can_change_only_once"),"0");
+        args.push(tag.clone());let mut group=command(args);group.phase="logic-groups".into();commands.push(group);
+    }
     for (i, device) in logic.devices.iter().enumerate() {
         let placement = doc.placements.iter().find(|p| p.id == device.placement_id).unwrap();
         let array = if placement.tag_class == "ctrl" { "controls" } else { "machines" };
@@ -935,7 +961,7 @@ pub fn verify_compiled(doc: &QuickForgeDocument, map: &crate::maps::MapInspectio
     let Some(source) = generate(doc)? else {
         return Ok(None);
     };
-    let read=if effective_logic(doc).is_some_and(|logic|!logic.devices.is_empty()||!logic.triggers.is_empty()||doc.placements.iter().any(|p|p.native_name.is_some())) {
+    let read=if effective_logic(doc).is_some_and(|logic|!logic.devices.is_empty()||!logic.triggers.is_empty()||doc.placements.iter().any(|p|p.native_name.is_some()||p.transport_signals.is_some())) {
         let read=crate::maps::scenario_logic_readback(output,map)?;
         verify_marker_readback(doc,&read)?;Some(read)
     }else{None};
