@@ -958,3 +958,29 @@ test('real QA child lifetime and observed exit are pinned in both owner receipts
   assert.equal(ended.processIdentities.writers.find(row=>row.pid===child.pid).exited,true);
  }finally{await stopQaProcess(child);await finish('passed');}
 }));
+
+
+test('a completed development namespace disappearing during recovery does not abort another run',async()=>{
+ const {root}=await readDevelopmentStorage();await fs.mkdir(root,{recursive:true});
+ const prior=await fs.mkdtemp(path.join(root,'run-')),parked=prior+'-owned-recovery-race';
+ const finish=await beginQaStorage(prior,{workflow:'source-development',appSha256:'a'.repeat(64),storageRoot:root,reservationBytes:8*1024**2});
+ await finish('passed');const receipt=path.join(prior,'storage-run.json'),read=fs.readFile;let retired=false,reads=0;
+ try{
+  fs.readFile=async(file,...args)=>{const value=await read(file,...args);if(!retired&&path.resolve(String(file))===receipt&&++reads===2){retired=true;assert.equal(path.dirname(parked),root);assert.equal(path.dirname(prior),root);await fs.rename(prior,parked);}return value;};
+  await withDevelopmentWorkspace('completed-recovery-race',async()=>{assert.ok(retired,'The old receipt was actually observed before retirement');},{reservationBytes:8*1024**2});
+  fs.readFile=read;await fs.rename(parked,prior);retired=false;
+  const before=await read(receipt),inspect=fs.lstat,missing=Object.assign(Error('Child inventory disappeared in an existing root'),{code:'ENOENT'});
+  try{
+   fs.lstat=async(file,...args)=>{if(path.resolve(String(file))===prior&&args[0]?.bigint)throw missing;return inspect(file,...args);};
+   await assert.rejects(withDevelopmentWorkspace('existing-root-still-protected',async()=>{throw Error('Must not admit after failed inventory');},{reservationBytes:8*1024**2}),error=>error===missing);
+   assert.ok((await inspect(prior)).isDirectory());assert.deepEqual(await read(receipt),before,'An existing completed receipt must remain unchanged');
+  }finally{fs.lstat=inspect;}
+
+ }finally{
+  fs.readFile=read;if(retired)await fs.rename(parked,prior);
+  // Only this test's completed namespace is restored, then retired normally by
+  // the existing nonce/hash/ownership protocol; no recursive test cleanup.
+  await withDevelopmentWorkspace('completed-recovery-race-cleanup',async()=>{},{reservationBytes:8*1024**2});
+ }
+ await assert.rejects(fs.stat(prior),{code:'ENOENT'});await assert.rejects(fs.stat(parked),{code:'ENOENT'});
+});

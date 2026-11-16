@@ -148,6 +148,25 @@ describe('Forerunner native transport source',()=>{
   expect(script.content).not.toMatch(/player_add_equipment|object_teleport|vehicle_unload|ai_place/);
   expect(script.dependencies).toContain('device_group:extraction_pelican_landed');
  });
+ it('authors empty return and real recall as separate phases without granting settlement',()=>{
+  for(const faction of ['unsc','covenant'] as const){
+   const role=faction==='unsc'?'pelican':'spirit',craft='extraction_'+role;
+   const source=exportHaloCeTransport({...options,faction,returnAfterInsertion:true});
+   expect(readNativeTransportSource(source.content).returnAfterInsertion).toBe(true);
+   const flight=source.content.slice(source.content.indexOf('(script continuous gs_'+role+'_trip'));
+   const commands=[...flight.matchAll(/\(ai_command_list pilot ([a-z_]+)\)/g)].map(row=>row[1]);
+   expect(commands).toEqual(['field_route','hub_route','field_route','hub_route']);
+   const firstReturn=flight.indexOf('(ai_command_list pilot hub_route)'),recall=flight.indexOf('(ai_command_list pilot field_route)',flight.indexOf('(ai_command_list pilot field_route)')+1),lastReturn=flight.lastIndexOf('(ai_command_list pilot hub_route)');
+   expect(flight.slice(0,firstReturn)).toContain('(= (list_count (vehicle_riders (unit '+craft+'))) 1)');
+   expect(flight.slice(firstReturn,recall)).toContain('(device_group_get '+craft+'_called)');
+   expect(flight.slice(firstReturn,recall)).not.toContain('(unit_set_enterable_by_player (unit '+craft+') true)');
+   expect(flight.slice(recall,lastReturn)).toContain('(device_group_get '+craft+'_boarded)');
+   expect(flight.slice(recall,lastReturn)).toContain('(set gs_'+role+'_settled false)');
+   expect(flight.slice(lastReturn)).toContain('gs_'+role+'_settled) 1)');
+   expect(source.content).not.toMatch(/vehicle_unload|object_teleport|player_add_equipment|ai_erase|object_destroy/);
+  }
+  expect(()=>exportHaloCeTransport({...options,returnAfterInsertion:'yes'} as any)).toThrow('whether');
+ });
  it('keeps factions distinct and rejects handwritten source regeneration and injected refs',()=>{
   const script=exportHaloCeTransport({...options,faction:'covenant',pilotSeat:'CD-driver',departureCue:'depart_cue',arrivalCue:'arrive_cue'});
   expect(script.content).toContain('forerunner_spirit_complete');expect(script.content).toContain('(depart_cue)');expect(script.content).toContain('(arrive_cue)');

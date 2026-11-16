@@ -1445,8 +1445,21 @@ export async function withDevelopmentWorkspace(
     const finalText=await fs.readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return null;throw error;});
     if(finalText===null)continue; // Its active owner may have completed normally.
     const final = JSON.parse(finalText);
-    if (final.workflow === 'source-development' && !final.active)
-      await removeDevelopmentReceipt(base, prior, final);
+    if (final.workflow === 'source-development' && !final.active) {
+      try { await removeDevelopmentReceipt(base, prior, final); }
+      catch (error) {
+        // A different owner can finish retiring this completed namespace after
+        // the final receipt read. Only absence of the entire old root is benign;
+        // a missing child/lease in an existing root still fails closed. This
+        // grants no deletion authority and never relaxes the sealed inventory.
+        if (error.code !== 'ENOENT') throw error;
+        const remains = await fs.lstat(prior).catch(probe => {
+          if (probe.code === 'ENOENT') return null;
+          throw probe;
+        });
+        if (remains) throw error;
+      }
+    }
   }
   const run = await fs.mkdtemp(path.join(base, 'run-'));
   let finish;

@@ -722,10 +722,13 @@ export interface NativeTransportOptions {
   faction:'unsc'|'covenant'; pilot:string; pilotSeat:string;
   outbound:string; inbound:string; hub:string; field:string;
   departureCue?:string; arrivalCue?:string;
+  /** Reuse the reviewed return/insertion routes for empty hub return and recall. */
+  returnAfterInsertion?:boolean;
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion'].includes(key)))throw Error('Invalid transport configuration.');
+  if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
   const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
   const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
@@ -764,9 +767,24 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '  (sleep_until '+pad(field)+' 1)',
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     enter(true),
+    ...(options.returnAfterInsertion?[
+      '  ; Empty return: every passenger disembarks normally before this flight.',
+      '  (sleep_until (and '+pad(field)+' (= (list_count (vehicle_riders (unit '+craft+'))) 1)) 1)',
+      enter(false),
+      ...(cues[0]?['  ('+cues[0]+')']:[]),
+      '  (ai_command_list '+pilot+' '+inbound+')',
+      '  (sleep_until '+pad(hub)+' 1)',
+      '  ; Keep the empty ship closed while the deployed field crew requests pickup.',
+      '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_called) 0.5) (= (list_count (vehicle_riders (unit '+craft+'))) 1)) 1)',
+      '  (ai_command_list '+pilot+' '+outbound+')',
+      '  (sleep_until '+pad(field)+' 1)',
+      ...(cues[1]?['  ('+cues[1]+')']:[]),
+      enter(true),
+    ]:[]),
     '  (sleep_until (and '+pad(field)+' (> (device_group_get '+craft+'_called) 0.5) (> (device_group_get '+craft+'_boarded) 0.5)) 1)',
     enter(false),
     ...(cues[0]?['  ('+cues[0]+')']:[]),
+    ...(options.returnAfterInsertion?['  (set '+stem+'_settled false)']:[]),
     '  (ai_command_list '+pilot+' '+inbound+')',
     '  (sleep_until '+pad(hub)+' 1)',
     ...(cues[1]?['  ('+cues[1]+')']:[]),

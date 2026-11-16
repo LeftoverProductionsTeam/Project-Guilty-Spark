@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: fbcdc8dbe934278be2f0a97cef50f640ed7ea0f2, canonical local master.
-Latest verified revision: fbcdc8d plus this native aircraft append checkpoint; containing commit and staged manifests identify all verified source.
-Next action: compose the expanded Black Echo CE609 mission with actual pilots, routes and native controller via the existing editors; fix be_flood start[0-0] outside BSP0 and target bitmap/HUD warnings in owned candidate source. Native desktop/game/Save37944 gates remain open; no push.
+Starting revision: 4f27ff2, canonical local master; exact containing revision is recorded by Git and staged source manifests.
+Latest verified revision: 4f27ff2 plus this recall-authoring/QA-race checkpoint; manifests identify the containing commit.
+Next action: complete Black Echo native aircraft/pilot/tag/route composition with Forerunner flight opt-in parameters and valid approaches; repair be_flood start[0-0]/target texture-HUD warnings in owned source. Native app/Save37944/gameplay and hosted CI remain open; no push.
 
 ## Acceptance
 
@@ -31,7 +31,11 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Recovered-aircraft append WIP is now source/native-readback accepted in scope: existing transaction/UI/receipt/staging preserves all original indices/AI/scripts and verifies new aircraft/signal markers plus AI starts after compilation. Existing native_children now parses the actual seven-choice aircraft enum; no fabricated type or seat. Preview/Accept/Restore browser1, core26+native_logic16, installed CE compile/readback3 and Windows backend all-target check pass. Exact source/output hashes, failed precursors and unresolved compiler warnings: RUNTIME_INTEGRATION_20261107. Native Windows Save/restart/flight/gameplay remain OPEN. QA55595/run-n392OX CLOSED;1635301751 logical bytes disposed, root absent; physical reclaimed bytes unavailable. No SDK tree copied, originals/Forerunner untouched.
+16Nov native recall option now connects insertion, real passenger disembarkation, empty return, host-derived field call, pickup and final settlement through the existing HSC/draft/history/review flow. Unit14/browser1/TypeScript-Vite and installed Pelican+Spirit parked/recall HSC compilation pass; no new map cache/game acceptance. Source/HSC hashes and exact How To are in RUNTIME_INTEGRATION_20261107.
+
+Observed parallel-QA ENOENT root-retirement race reproduced after the final receipt read and repaired. Only an already-absent completed root is tolerated; existing-root/missing-child, changed ownership, EIO and hashing still fail closed. Storage42/42 pass. All owned output auto-disposed; development runs/issues both empty. Protected475CSV/legacy checkpoint unchanged; no runtime/Forerunner/SDK writes or push.
+
+Native aircraft append4f27ff2 is source/CE609 compile/independent readback accepted in scope, with browser Preview/Accept/Restore. Exact original/output/source hashes and remaining out-of-BSP/bitmap/HUD warnings are in RUNTIME_INTEGRATION_20261107. Not native app/flight/gameplay acceptance. QA55595/run-n392OX closed and absent.
 
 16Nov dropship: three native signals/craft and existing Runtime & Tools controller draft now connect actual seat/AI/route/pad source lists, repeatable grounded/boarding/settlement HSC, history/Save/review and pinned native build. Frontend51/core16/browser3distinct, native2+1/controller CE syntax, TypeScript/Vite/Windows check pass. Separate CE609 markers6/0groups pass; not full Black Echo/flight. Source requires preexisting aircraft; reviewed native structural append is next. QA25312/run-htH2Y3 CLOSED1487823130logicalB; root absent. Exact hashes, failures, current partial Spirit source and scope: RUNTIME_INTEGRATION_20261107. No Windows/game/Forerunner write/push.
 
