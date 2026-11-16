@@ -6,7 +6,8 @@ use sha2::{Digest,Sha256};
 use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
-pub use transport::{TransportAppend,TransportSnapshot};
+pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning};
+pub fn native_vehicle_flight(fields:&str)->Result<VehicleFlightTuning>{transport::flight_source(fields)}
 pub fn scenario_transport_snapshots(fields:&str,names:&[String])->Result<Vec<TransportSnapshot>>{transport::snapshots(fields,names)}
 pub fn complete_transport_snapshots(fields:&str)->Result<Vec<TransportSnapshot>>{let values=scenario_transport_choices(fields)?;let names=values.vehicles.iter().filter(|vehicle|["boarded","called","landed"].iter().all(|suffix|values.groups.contains(&format!("{}_{suffix}",vehicle.name)))).map(|v|v.name.clone()).collect::<Vec<_>>();transport::snapshots(fields,&names)}
 pub fn validate_transport_vehicle_source(fields:&str)->Result<()> {transport::validate_vehicle_source(fields)}
@@ -23,11 +24,20 @@ pub fn native_vehicle_seats(fields:&str)->Result<Vec<String>> {
   if kind.trim()!="string"||label.len()>31||label.chars().any(char::is_control){return invalid("Native seat label has an unsupported shape");}labels.push(label.into());
  }Ok(labels)
 }
-
+/// Only real driver-flag seats may be offered to an authored AI pilot.
+/// Labels still come from the same bounded native inventory above.
+pub fn native_vehicle_pilot_seats(fields:&str)->Result<Vec<String>>{
+ let labels=native_vehicle_seats(fields)?;let table=array_listing(fields,"seats")?;let mut pilots=vec![];
+ for(label,row)in labels.iter().zip(array_items(&table,"seats")?){let root=direct_struct_fields(row)?;let flat=root.lines().map(str::trim).collect::<Vec<_>>().join("\n");let driver=number(&flat,"driver")?;
+  if driver!=0.&&driver!=1.{return invalid("Native driver seat flag is invalid");}
+  if driver==1.{if label.is_empty()||labels.iter().filter(|v|*v==label).count()!=1{return invalid("Native pilot seat label is empty or ambiguous");}pilots.push(label.clone());}
+ }Ok(pilots)
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Operation {
+    VehicleFlight {tuning:VehicleFlightTuning,#[serde(rename="sourceSha256")] source_sha256:String},
     AppendTransport {transport:TransportAppend,#[serde(rename="sourceSha256")] source_sha256:String},
     CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     Dependencies,
@@ -157,9 +167,10 @@ fn actor_spacing()->f32{0.75}
 impl Operation {
     /// One exhaustive source binding for preview, retained reviews and readback.
     pub fn expected_source_sha256(&self)->Option<&str>{match self{
-        Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
+        Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
         Self::Dependencies|Self::AppendEncounter{..}|Self::AppendEncounters{..}|Self::BoundingRadius{..}|Self::LensFlareScaleRepair=>None,
     }}
+    pub fn is_vehicle_flight(&self)->bool{matches!(self,Self::VehicleFlight{..})}
     pub fn is_transport_append(&self)->bool{matches!(self,Self::AppendTransport{..})}
     pub fn is_command_edit(&self)->bool{matches!(self,Self::CommandList{..})}
     pub fn is_device_edit(&self)->bool{matches!(self,Self::DevicePlacement{..})}
@@ -195,20 +206,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -219,6 +230,7 @@ impl Operation {
             return invalid("Native tag path is too long or begins with a command option");
         }
         match self {
+            Self::VehicleFlight{tuning,source_sha256}=>{if class!="vehi"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Vehicle flight editing needs an exact native vehicle source hash");}tuning.validate()?;}
             Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source and finite position/rotation");}}
@@ -311,7 +323,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::AppendTransport{..}|Self::CommandList{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
+            Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -447,6 +459,7 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
+        if let Self::VehicleFlight{tuning,..}=self{return transport::flight_arguments(tags,tag,before,tuning);}
         if let Self::AppendTransport{transport,..}=self{return transport::arguments(tags,tag,before,transport);}
         if let Self::CommandList{list,append,..}=self{return if *append{command_lists::append_arguments(tags,tag,before,list)}else{command_lists::arguments(tags,tag,before,list)};}
         if let Self::DevicePlacement{device,..}=self{
@@ -555,7 +568,7 @@ impl Operation {
     }
     /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
-        if !self.is_encounter_append()&&!self.is_scenario_ai_edit()&&!self.is_camera_edit()&&!self.is_trigger_edit()&&!self.is_device_edit()&&!self.is_command_edit() {return Ok(None);}
+        if !self.is_encounter_append()&&!self.is_scenario_ai_edit()&&!self.is_camera_edit()&&!self.is_trigger_edit()&&!self.is_device_edit()&&!self.is_command_edit()&&!self.is_vehicle_flight() {return Ok(None);}
         if let Self::EncounterSquadPatrol{encounter,squad,route,..}=self{self.arguments_with_fields(tags,class,tag,before)?;let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),format!("encounters[{encounter}].squads[{squad}].move_positions")];for(key,_)in patrol_scalar_fields(*encounter,*squad,route){args.extend(["-G".into(),key]);}args.push(tag.into());return Ok(Some(args));}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut i=2;
@@ -574,7 +587,7 @@ impl Operation {
             }else if key.ends_with(".orientation")||key.ends_with(".field_of_view")||key.ends_with(".rotation"){
                 let parse=|v:&str|v.split(',').map(|s|s.trim().parse::<f32>()).collect::<std::result::Result<Vec<_>,_>>();
                 match(parse(&value),parse(actual)){(Ok(a),Ok(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|facings_close(*a,b.to_radians())),_=>false}
-            }else if self.is_trigger_edit()||key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight")||self.is_command_edit()&&(key.ends_with(".parameter1")||key.ends_with(".parameter2")) {
+            }else if self.is_vehicle_flight()||self.is_trigger_edit()||key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight")||self.is_command_edit()&&(key.ends_with(".parameter1")||key.ends_with(".parameter2")) {
                 let parse=|s:&str|s.split(',').map(|v|v.trim().parse::<f64>().ok().filter(|v|v.is_finite())).collect::<Option<Vec<_>>>();
                 match(parse(&value),parse(actual)){(Some(a),Some(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|(a-b).abs()<=0.000001f64.max(a.abs()*f64::from(f32::EPSILON)*2.)),_=>false}
             }else if key.ends_with(".reference"){actual.replace('\\',"/").eq_ignore_ascii_case(&value.replace('\\',"/"))}
@@ -758,6 +771,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
+    if let Operation::VehicleFlight{tuning,..}=operation{return transport::reviewed_flight(before,after,tuning);}
     if let Operation::AppendTransport{transport,..}=operation{return transport::reviewed(before,after,transport);}
     if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}
     if let Operation::DevicePlacement{device,..}=operation{return reviewed_device(before,after,device);}
@@ -1862,7 +1876,11 @@ mod installed_device_inventory_test {
 
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct NativeTransportVehicle {pub name:String,pub tag_path:String,pub seats:Vec<String>}
+pub struct NativeTransportVehicle {
+ pub name:String,pub tag_path:String,pub seats:Vec<String>,pub pilot_seats:Vec<String>,
+ #[serde(skip_serializing_if="Option::is_none")] pub flight:Option<VehicleFlightTuning>,
+ #[serde(skip_serializing_if="Option::is_none")] pub flight_issue:Option<String>,
+}
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>}
@@ -1878,7 +1896,7 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
   if !["extraction_pelican","extraction_spirit"].contains(&name.as_str()){continue;}
   let index=native_index(&root,"type")?;let tag=usize::try_from(index).ok().and_then(|index|palette.get(index)).and_then(|path|path.strip_suffix(".vehicle")).ok_or_else(||crate::SparkError::Invalid("Transport vehicle palette reference is invalid".into()))?;
   safe_relative(&tag.replace('\\',"/"))?;if vehicles.iter().any(|v:&NativeTransportVehicle|v.name==*name){return invalid("Transport native vehicle name is ambiguous");}
-  vehicles.push(NativeTransportVehicle{name:name.clone(),tag_path:tag.replace('\\',"/"),seats:vec![]});
+  vehicles.push(NativeTransportVehicle{name:name.clone(),tag_path:tag.replace('\\',"/"),seats:vec![],pilot_seats:vec![],flight:None,flight_issue:None});
  }
  let table=array_listing(fields,"device_groups")?;if table.count>128{return invalid("Native device group budget exceeded");}
  let mut groups=vec![];let mut indices=std::collections::BTreeSet::new();

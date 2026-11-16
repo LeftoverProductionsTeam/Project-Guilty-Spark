@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 4f27ff2, canonical local master; exact containing revision is recorded by Git and staged source manifests.
-Latest verified revision: 4f27ff2 plus this recall-authoring/QA-race checkpoint; manifests identify the containing commit.
-Next action: complete Black Echo native aircraft/pilot/tag/route composition with Forerunner flight opt-in parameters and valid approaches; repair be_flood start[0-0]/target texture-HUD warnings in owned source. Native app/Save37944/gameplay and hosted CI remain open; no push.
+Starting revision: e2879a6081f9fa37fe29b7ce59d9e65a6497e7cc, canonical local master.
+Latest verified revision: parent e2879a6081f9fa37fe29b7ce59d9e65a6497e7cc plus scoped native-flight source identified by hashes in RUNTIME_INTEGRATION_20261107; local milestone commit follows this checkpoint.
+Next action: complete Black Echo native pilot/approach/landing/recall/departure and mission composition using existing editors/builders. Repair candidate out-of-BSP/bitmap/HUD diagnostics, independently compile/read back the full mission. Native Windows42-edit/Save37944 and approved Forerunner gameplay remain open while desktop control is unavailable; do not repeat unchanged initialization.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov flight (parent e2879a6): CE609 cache52f5fef0490a138f3461379fda71f64d5835054ff7474d517b7055c5a328db03 independently verifies tuned .5/5/2 and refuses mismatches for all3values; exact source/vehicle Restore passes. Real driver-seat choices and disabled/unread tuning refusal pass browser controls. Full mission/flight/native restart remain open; source hashes, warnings and detailed checks in RUNTIME_INTEGRATION_20261107.
 
 16Nov CI/setup fbcdc8d: all3 stale native verifier calls repaired; Windows workspace/all-target check, dependency core6/frontend8/browser4+3/TypeScript pass. Runtime pickers/downloads, source tags before map creation and external tool/SDK links connected. Hosted/Linux run pending owner push. Final master e210fbc9 retained exactly. Evidence: RUNTIME_INTEGRATION_20261107.
 
@@ -31,7 +33,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-16Nov native recall option now connects insertion, real passenger disembarkation, empty return, host-derived field call, pickup and final settlement through the existing HSC/draft/history/review flow. Unit14/browser1/TypeScript-Vite and installed Pelican+Spirit parked/recall HSC compilation pass; no new map cache/game acceptance. Source/HSC hashes and exact How To are in RUNTIME_INTEGRATION_20261107.
+Native flight workflow implemented and scoped checks PASS: real human-plane throttle/avoidance/pathfinding Preview/Accept/Restore; exact source/scenario binding pins; saved working revision; mandatory three-field compiled readback retained through script/HUD staging. Controller source reads actual tuning and driver flags, refuses unread/disabled/unsupported flight and passenger-seat pilots without discarding the draft. Core27+15, frontend21+4, browser2, TypeScript/Vite/Windows all-target check and installed CE609/readback1 pass; explicit opt-in skips5+1 are separate. No native app/restart/flight/gameplay acceptance. Exact precursor failures/output/source hashes in RUNTIME_INTEGRATION_20261107. No push.
 
 Observed parallel-QA ENOENT root-retirement race reproduced after the final receipt read and repaired. Only an already-absent completed root is tolerated; existing-root/missing-child, changed ownership, EIO and hashing still fail closed. Storage42/42 pass. All owned output auto-disposed; development runs/issues both empty. Protected475CSV/legacy checkpoint unchanged; no runtime/Forerunner/SDK writes or push.
 
@@ -121,6 +123,8 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
+QA51538/run-1p589v CLOSED;1398146244logicalB disposed automatically, root absent, development runs[]/issues[]. No active owned test/app/game, SDK/cache/archive retained, protected file writes or remote action. Physical reclaimed space unavailable.475CSV/legacy previous checkpoint hashes unchanged; do not create previous copies.
+
 QA9851/run-EBRqKl CLOSED; owned apps/tools exited;4337096416logicalB disposed, peak allocation4128882920B; final physical reclamation unavailable. No new screenshot/map/app/SDK/cache/archive retained. Earlier QA21477/QA6610/QA29134 closures remain in Git/RUNTIME_INTEGRATION_20261107.
 
 QA21402/run-9LXS9l CLOSED4488883429logicalB. Actual42edit/sevenHUD/Save/three normal restarts/CE609/readback evidence, initial failures, exact app/cache hashes and preservation remain in RUNTIME_INTEGRATION_20261107 (351dd043/057a9839). No broad37944 or game acceptance.
@@ -139,9 +143,9 @@ Earlier Forerunner review8d2cbb07, contract1ed7398d and disposed24,318,648B brow
 
 All newly owned operations terminal; no active test/app/game. Final root36441/run-aMCXpM exited0 and disposed3,615,422,165B (peak allocated3,421,368,016B). Initial failed root44809 disposed2,373,490,221B; Library root35481 disposed2,272,377,622B. Focused baseline run6826 disposed378,121,413B; earlier unit compiler run25659 disposed1,314,216,170B, wrong forge_reuse filter selected0 and is not a pass. Only small selected receipts/PNGs retained externally; no binary, map, SDK or archive exported. Original maps/SDK/runtimes/Forerunner/remotes untouched; no game/push/publication. Native followups/probes20439/93320/56728/74983/53123/29810/48805 are terminal; their failures/pass distinctions remain in UI_INTERACTION_AUDIT.md.
 
-Current native proof: H1A source manual encounter append, exact Restore/reaccept, Save/full restart, native working-tag compilation and independent readback PASS; cache6ec4eb73d2a926576526833bb02cac2d9f7fd36ae2973d13a569db020113f731, extracted scenario353aafafc680d4f1a273ff3c0be443464ee495ffe7628051357170867cc79c4a, app6139448d5dbd1788c62d6477e1e2ae2d59fc0b5bf7720851ba291aee41b181c1. The app tree includes unverified authored-viewport WIP, not a release. Source revision0454da3798d073143b2c7b54bb544bde24edfe70aa01f644a2690fd3c5bec3bf; before89937db04d1a8858df4a2c41de795ebc7921bf3fd74830bda3d8393d54eedf5e restored exactly. New starts[1.625,-2.375,.1]/[2.375,-2.375,.1], normal/insane2; original two encounters/cache preserved. Source Restore64,379ms for2398files. Exact evidence, controls and remaining intermittent native click navigation: E/resume-20261114/encounter-long-path-repair, UI_INTERACTION_AUDIT.md. Full optional automated UI run is RED; traced actual-control followup passes this scoped workflow. No original-coordinate/AI combat/multiplayer claim.
+Historical H1A append/restore/native UI restart/readback scope, hashes and initial failures remain in Gite2879a6:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. It does not close actual AI/game/peer or later Save37944 acceptance.
 
-Repairs: reuse native reader path canonicalization for writer; normalize inventory keys without changing tag receipts or one-file/hash safety; reuse existing validated forge_reuse compiled_tags contract for managed native baseline (parent tags/data/project rechecked, exact selected source ownership, changed corruption still blocks). Focused core1+6 pass; TypeScript/native build pass. Frontend runtime-preview/mapSession25 and native-start/mapSession17 suites pass (overlapping cases, not42unique). All475CSV SHAb82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 unchanged.
+Historical long-path, inventory-key and validated source-baseline repairs/protected hashes remain in Gite2879a6:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. No original data or historical evidence removed.
 
 Historical original-viewport WIP is completed by the scoped original AI position/facing milestone above. Authored campaign pose milestone extends the existing source/viewport; original recipe protections remain. Neither establishes gameplay acceptance.
 

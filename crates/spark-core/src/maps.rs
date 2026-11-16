@@ -1462,6 +1462,16 @@ fn read_fields(
             )?;
         }
     }
+    if matches!(version,5|6|7|13|609) && tag.class=="vehi" {
+        // Native Vehicle inherits Unit (0x2f0); these fields are in the common
+        // pinned HEK layout. Standard source fields, not runtime extensions.
+        space.pointer(space.address+(at-space.begin)as u32,0x3f0)?;
+        for(offset,key,label,max)in [(0x388,"vehicle-ai-avoidance","AI avoidance distance",1e6),
+            (0x38c,"vehicle-ai-pathfinding","AI pathfinding radius",1e6),
+            (0x3a4,"vehicle-ai-throttle","AI throttle maximum",1e6)]{
+            numeric(r,tag,at+offset,key,label,max,if offset==0x3a4{""}else{"world units"})?;
+        }
+    }
     if ["bipd", "vehi"].contains(&tag.class.as_str()) {
         space.pointer(space.address + (at - space.begin) as u32, 752)?;
         reference(r, tag, at + 588, "Spawned actor", None, ids)?;

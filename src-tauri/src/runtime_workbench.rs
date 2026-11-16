@@ -408,7 +408,12 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
             let trigger_volumes=core::native_operations::scenario_trigger_volume_names(&values).map_err(error)?;let scenario_type=source_scenario_type(&state,&project)?;
             if include_transport==Some(true){
                 let mut choices=core::native_operations::scenario_transport_choices(&values).map_err(error)?;
-                for vehicle in &mut choices.vehicles{let tag=format!("{}.vehicle",vehicle.tag_path);let listing=native_operations_native::fields(&state,&project,&context.tags,&tag)?;vehicle.seats=core::native_operations::native_vehicle_seats(&listing).map_err(error)?;}
+                for vehicle in &mut choices.vehicles{let tag=format!("{}.vehicle",vehicle.tag_path);let listing=native_operations_native::fields(&state,&project,&context.tags,&tag)?;vehicle.seats=core::native_operations::native_vehicle_seats(&listing).map_err(error)?;
+                    vehicle.pilot_seats=core::native_operations::native_vehicle_pilot_seats(&listing).map_err(error)?;
+                    match core::native_operations::native_vehicle_flight(&listing){
+                        Ok(flight)=>{vehicle.flight_issue=flight.validate().err().map(error);vehicle.flight=Some(flight);},
+                        Err(issue)=>vehicle.flight_issue=Some(error(issue)),
+                    }}
                 view.transport_review=Some(choices);
             }
             let latest=lock(&state.library)?.get(&project_id).map_err(error)?;if latest.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Saved authoring changed during camera review".into());}let current=source_context(&state,&latest)?;

@@ -14,9 +14,9 @@ impl TransportAppend {
 }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct TransportSnapshot {pub vehicle_index:u16,pub name_index:u16,pub groups:[u16;3],pub transport:TransportAppend}
+pub struct TransportSnapshot {#[serde(default,skip_serializing_if="Option::is_none")] pub flight:Option<VehicleFlightTuning>,pub vehicle_index:u16,pub name_index:u16,pub groups:[u16;3],pub transport:TransportAppend}
 impl TransportSnapshot {
- pub fn validate(&self)->Result<()>{self.transport.validate()?;if self.vehicle_index>=256||self.name_index>=512||self.groups.iter().any(|i|*i>=128)||self.groups.iter().collect::<std::collections::BTreeSet<_>>().len()!=3{return invalid("Invalid native transport readback indices");}Ok(())}
+ pub fn validate(&self)->Result<()>{self.transport.validate()?;if let Some(flight)=&self.flight{flight.validate()?;}if self.vehicle_index>=256||self.name_index>=512||self.groups.iter().any(|i|*i>=128)||self.groups.iter().collect::<std::collections::BTreeSet<_>>().len()!=3{return invalid("Invalid native transport readback indices");}Ok(())}
 }
 struct Layout {vehicle:usize,name:usize,palette:usize,new_palette:bool,group:usize}
 fn names(fields:&str,array:&str)->Result<Vec<String>>{let table=array_listing(fields,array)?;array_items(&table,array)?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect()}
@@ -69,12 +69,12 @@ pub fn snapshots(fields:&str,selected:&[String])->Result<Vec<TransportSnapshot>>
   if placed.len()!=1{return invalid("Transport name has missing/ambiguous vehicle reverse binding");}let(index,root)=&placed[0];let(position,_)=native_vector(root,"position")?;let(rotation,_)=native_vector(root,"rotation")?;
   let transport=TransportAppend{name:name.clone(),tag_path:found[0].tag_path.clone(),position,rotation_radians:rotation.map(f32::to_radians)};
   let mut binding=[0;3];for(i,name)in transport.group_names().iter().enumerate(){if !source.groups.contains(name){return invalid("Missing isolated zero-initialized transport signal");}binding[i]=groups.iter().position(|g|g==name).ok_or_else(||crate::SparkError::Invalid("Transport signal index is missing".into()))? as u16;}
-  let row=TransportSnapshot{vehicle_index:*index as u16,name_index:name_index as u16,groups:binding,transport};row.validate()?;result.push(row);
+  let row=TransportSnapshot{flight:None,vehicle_index:*index as u16,name_index:name_index as u16,groups:binding,transport};row.validate()?;result.push(row);
  }Ok(result)
 }
 pub fn verify_cache(expected:&[TransportSnapshot],path:&Path,map:&crate::maps::MapInspection)->Result<()>{
  let read=crate::maps::scenario_logic_readback(path,map)?;let mut signal_indices=std::collections::BTreeSet::new();
- for row in expected{row.validate()?;let value=&row.transport;let name=read.names.get(row.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled transport name is missing".into()))?;
+ for row in expected{row.validate()?;let value=&row.transport;if let Some(flight)=&row.flight{flight.verify_map(map,&value.tag_path)?;}let name=read.names.get(row.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled transport name is missing".into()))?;
   let vehicles=read.vehicles.iter().filter(|v|v.index==row.vehicle_index as usize).collect::<Vec<_>>();
   if name.name!=value.name||name.object_type!=1||name.object_index!=row.vehicle_index as i16||vehicles.len()!=1{return invalid("Compiled transport object/name/index binding differs");}let actual=vehicles[0];
   if actual.name_index!=row.name_index as i16||!actual.tag_path.replace('\\',"/").eq_ignore_ascii_case(&value.tag_path.replace('\\',"/"))||!positions_close(actual.position,value.position)||!actual.rotation_radians.iter().zip(value.rotation_radians).all(|(a,b)|facings_close(*a,b)){return invalid("Compiled transport tag/pose/reverse name differs");}
@@ -83,16 +83,30 @@ pub fn verify_cache(expected:&[TransportSnapshot],path:&Path,map:&crate::maps::M
  if read.devices.iter().any(|d|d.power_group.is_none_or(|i|signal_indices.contains(&i))||d.position_group.is_none_or(|i|signal_indices.contains(&i))){return invalid("Compiled transport signals are aliased by device power/position");}Ok(())
 }
 
-/// Aircraft identity and actual boarding capacity; never a fabricated vehicle.
-pub fn validate_vehicle_source(fields:&str)->Result<()>{
+
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct VehicleFlightTuning {pub throttle:f32,pub avoidance_distance:f32,pub pathfinding_radius:f32}
+impl VehicleFlightTuning {
+ pub fn validate(&self)->Result<()>{if !self.throttle.is_finite()||!(0.0..=1.0).contains(&self.throttle)||[self.avoidance_distance,self.pathfinding_radius].iter().any(|v|!v.is_finite()||!(0.0..=12.0).contains(v)){return invalid("Forerunner plane throttle must be0–1; avoidance and pathfinding radius0–12world units. Zero disables its native flight opt-in");}Ok(())}
+ fn values(&self)->[(&'static str,f32);3]{[("ai_throttle_maximum",self.throttle),("ai_avoidance_distance",self.avoidance_distance),("ai_pathfinding_radius",self.pathfinding_radius)]}
+ pub fn verify_map(&self,map:&crate::maps::MapInspection,tag_path:&str)->Result<()>{self.validate()?;let matches=map.tags.iter().filter(|t|t.class=="vehi"&&t.path.replace('\\',"/").eq_ignore_ascii_case(&tag_path.replace('\\',"/"))).collect::<Vec<_>>();if matches.len()!=1{return invalid("Compiled flight vehicle tag is missing or ambiguous");}for((_,expected),key)in self.values().into_iter().zip(["vehicle-ai-throttle","vehicle-ai-avoidance","vehicle-ai-pathfinding"]){let fields=matches[0].fields.iter().filter(|f|f.key==key).collect::<Vec<_>>();if fields.len()!=1||fields[0].value.as_f64().is_none_or(|v|!v.is_finite()||(v-f64::from(expected)).abs()>1e-6){return invalid("Compiled vehicle AI flight values differ from reviewed source");}}Ok(())}
+}
+pub fn flight_source(fields:&str)->Result<VehicleFlightTuning>{if vehicle_kind(fields)?!="human_plane"{return invalid("This Forerunner flight profile requires an actual native human-plane definition; other vehicle control is preserved");}Ok(VehicleFlightTuning{throttle:number(fields,"ai_throttle_maximum")? as f32,avoidance_distance:number(fields,"ai_avoidance_distance")? as f32,pathfinding_radius:number(fields,"ai_pathfinding_radius")? as f32})}
+pub fn flight_arguments(tags:&Path,tag:&str,before:&str,tuning:&VehicleFlightTuning)->Result<Vec<String>>{tuning.validate()?;if flight_source(before)?==*tuning{return invalid("Native flight settings already match; no source was serialized");}let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];for(key,value)in tuning.values(){args.extend(["-S".into(),key.into(),value.to_string()]);}args.push(tag.into());Ok(args)}
+pub fn reviewed_flight(before:&str,after:&str,tuning:&VehicleFlightTuning)->Result<Vec<FieldDifference>>{tuning.validate()?;flight_source(before)?;let actual=flight_source(after)?;for((_,a),(_,b))in tuning.values().into_iter().zip(actual.values()){if (a-b).abs()>1e-6{return invalid("Native flight field differs from request");}}let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();if a.len()!=b.len(){return invalid("Flight edit changed native source structure");}let mut changes=vec![];for(a,b)in a.into_iter().zip(b){if a!=b{if !tuning.values().iter().any(|(key,_)|a.starts_with(&format!("{key} ("))&&b.starts_with(&format!("{key} ("))){return invalid("Flight edit changed unrelated native source");}changes.push(FieldDifference{before:a.into(),after:b.into()});}}if changes.is_empty(){return invalid("No native flight fields changed");}Ok(changes)}
+fn vehicle_kind(fields:&str)->Result<&'static str>{
  let kinds=["human_tank","human_jeep","human_boat","human_plane","alien_scout","alien_fighter","turret"];
  let(_,children)=native_children(fields,"vehicle_type","enum",kinds.len())?;let mut selected=None;
  for((_,text),kind)in children.iter().zip(kinds){let tokens=text.split_whitespace().collect::<Vec<_>>();if tokens!=[kind,"enum","value"]&&tokens!=[kind,"(*)","enum","value"]{return invalid("Unknown native vehicle-type enum inventory");}if tokens.len()==4&&selected.replace(kind).is_some(){return invalid("Ambiguous selected native vehicle type");}}
- let kind=selected.ok_or_else(||crate::SparkError::Invalid("Native vehicle type is unavailable".into()))?;
+ selected.ok_or_else(||crate::SparkError::Invalid("Native vehicle type is unavailable".into()))
+}
+/// Aircraft identity and actual boarding capacity; never a fabricated vehicle.
+pub fn validate_vehicle_source(fields:&str)->Result<()>{
+ let kind=vehicle_kind(fields)?;
  if !["human_plane","alien_fighter"].contains(&kind){return invalid("Transport append requires an actual native aircraft; ordinary cars/turrets are not relabeled as dropships");}
- let labels=native_vehicle_seats(fields)?;let table=array_listing(fields,"seats")?;let mut drivers=0;
- for row in array_items(&table,"seats")?{let root=direct_struct_fields(row)?;let flat=root.lines().map(str::trim).collect::<Vec<_>>().join("\n");if number(&flat,"driver")?==1.{drivers+=1;}}
- if drivers!=1||labels.len()<2||labels.iter().any(|label|label.is_empty()){return invalid("Transport needs one real driver seat and at least one labeled passenger seat; repair or import the matching native vehicle source");}Ok(())
+ let labels=native_vehicle_seats(fields)?;let drivers=native_vehicle_pilot_seats(fields)?;
+ if drivers.len()!=1||labels.len()<2||labels.iter().any(|label|label.is_empty()){return invalid("Transport needs one real driver seat and at least one labeled passenger seat; repair or import the matching native vehicle source");}Ok(())
 }
 
 #[cfg(test)]
@@ -111,10 +125,24 @@ mod tests{
   assert!(arguments(Path::new("tags"),"level.scenario",&after,&value).is_err());
   let partial=before.replace("name (original_power)","name (extraction_pelican_landed)");assert!(arguments(Path::new("tags"),"level.scenario",&partial,&value).is_err());
  }
+ #[test]fn flight_fields_preserve_every_other_field_and_bound_native_values(){
+  let before="ai_throttle_maximum (0.65) float32\nai_avoidance_distance (4) float32\nai_pathfinding_radius (1.8) float32\nunrelated (retained) string\n";
+  let request=VehicleFlightTuning{throttle:0.5,avoidance_distance:5.,pathfinding_radius:2.};
+  let after=before.replace("(0.65)","(0.5)").replace("(4)","(5)").replace("(1.8)","(2)");
+  // Field preservation and native values are independent of kind/seat parsing.
+  let enum_fields="vehicle_type enum\n    human_tank enum value\n    human_jeep enum value\n    human_boat enum value\n    human_plane (*) enum value\n    alien_scout enum value\n    alien_fighter enum value\n    turret enum value\n";
+  let before=enum_fields.to_owned()+before;let after=enum_fields.to_owned()+&after;
+  assert_eq!(reviewed_flight(&before,&after,&request).unwrap().len(),3);
+  assert!(reviewed_flight(&before,&after.replace("retained","lost"),&request).is_err());
+  assert!(reviewed_flight(&before,&after.replace("(0.5)","(0.6)"),&request).is_err());
+  assert!(flight_arguments(Path::new("tags"),"ship.vehicle",&after,&request).is_err());
+  for bad in [VehicleFlightTuning{throttle:f32::NAN,..request.clone()},VehicleFlightTuning{throttle:1.1,..request.clone()},VehicleFlightTuning{avoidance_distance:12.1,..request.clone()},VehicleFlightTuning{pathfinding_radius:-1.,..request.clone()}]{assert!(bad.validate().is_err());}
+  let disabled=VehicleFlightTuning{throttle:0.,avoidance_distance:0.,pathfinding_radius:0.};disabled.validate().unwrap();
+ }
  #[test]fn transport_draft_and_aircraft_validation_refuse_invalid_inputs(){
   for value in [TransportAppend{name:"not_a_role".into(),..value()},TransportAppend{tag_path:"../original".into(),..value()},TransportAppend{position:[f32::NAN,0.,0.],..value()}]{assert!(value.validate().is_err());}
   let vehicle="vehicle_type enum\n ├──human_tank enum value\n ├──human_jeep enum value\n ├──human_boat enum value\n ├──human_plane (*) enum value\n ├──alien_scout enum value\n ├──alien_fighter enum value\n └──turret enum value\nseats[2] array\n    seats[0] struct\n        label (P-driver) string\n        flags bitmask\n            driver (1) bitfield\n    seats[1] struct\n        label (P-passenger) string\n        flags bitmask\n            driver (0) bitfield\n";
-  validate_vehicle_source(vehicle).unwrap();assert!(validate_vehicle_source(&vehicle.replace("human_plane (*)","human_plane").replace("human_jeep enum","human_jeep (*) enum")).is_err());assert!(validate_vehicle_source(&vehicle.replace("human_plane (*)","human_plane")).is_err());assert!(validate_vehicle_source(&vehicle.replace("alien_fighter enum","alien_fighter (*) enum")).is_err());assert!(validate_vehicle_source(&vehicle.replace("human_boat enum","unknown enum")).is_err());assert!(validate_vehicle_source(&vehicle.replace("driver (1)","driver (0)")).is_err());
+  validate_vehicle_source(vehicle).unwrap();assert_eq!(native_vehicle_pilot_seats(vehicle).unwrap(),vec!["P-driver"]);assert!(native_vehicle_pilot_seats(&vehicle.replace("P-passenger","P-driver")).is_err());assert!(native_vehicle_pilot_seats(&vehicle.replace("driver (0)","driver (2)")).is_err());assert!(validate_vehicle_source(&vehicle.replace("human_plane (*)","human_plane").replace("human_jeep enum","human_jeep (*) enum")).is_err());assert!(validate_vehicle_source(&vehicle.replace("human_plane (*)","human_plane")).is_err());assert!(validate_vehicle_source(&vehicle.replace("alien_fighter enum","alien_fighter (*) enum")).is_err());assert!(validate_vehicle_source(&vehicle.replace("human_boat enum","unknown enum")).is_err());assert!(validate_vehicle_source(&vehicle.replace("driver (1)","driver (0)")).is_err());
  }
 }
 
@@ -140,16 +168,29 @@ mod installed {
    let operation=Operation::AppendTransport{transport:value.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};let args=operation.arguments_with_fields(&tags,"scnr",tag,&previous).unwrap();run(&editor,args);let after=fields();reviewed_difference(&previous,&after,&operation).unwrap();selected.push(name.into());
    assert_eq!(original_scripts,scenario_script_names(&after).unwrap());assert_eq!(serde_json::to_value(&original_squads).unwrap(),serde_json::to_value(scenario_squad_start_choices(&after).unwrap()).unwrap());
   }
+  // Tune only an owned vehicle copy; do not serialize the shared original.
+  let vehicle_tag="forerunner/transport/pelican.vehicle";let original_vehicle=std::fs::read(shared.join(vehicle_tag)).unwrap();
+  let vehicle_file=tags.join(vehicle_tag);std::fs::create_dir_all(vehicle_file.parent().unwrap()).unwrap();std::fs::write(&vehicle_file,&original_vehicle).unwrap();
+  let before_flight=run(&editor,vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),vehicle_tag.into()]);
+  let flight=VehicleFlightTuning{throttle:0.5,avoidance_distance:5.,pathfinding_radius:2.};
+  let operation=Operation::VehicleFlight{tuning:flight.clone(),source_sha256:crate::maps::hash_file(&vehicle_file).unwrap()};
+  run(&editor,operation.arguments_with_fields(&tags,"vehi",vehicle_tag,&before_flight).unwrap());
+  let after_flight=run(&editor,vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),vehicle_tag.into()]);
+  reviewed_difference(&before_flight,&after_flight,&operation).unwrap();let scalar=run(&editor,operation.readback_arguments(&tags,"vehi",vehicle_tag,&before_flight).unwrap().unwrap());operation.verify_readback(&tags,"vehi",vehicle_tag,&before_flight,&scalar).unwrap();
+  let modified_vehicle_sha=crate::maps::hash_file(&vehicle_file).unwrap();let original_vehicle_sha=crate::maps::hash_file(&shared.join(vehicle_tag)).unwrap();
   let hashes=protected.iter().map(|p|crate::maps::hash_file(p).unwrap()).collect::<Vec<_>>();
-  let reviewed=fields();let snapshots=snapshots(&reviewed,&selected).unwrap();let source_sha=crate::maps::hash_file(&file).unwrap();
+  let reviewed=fields();let mut snapshots=snapshots(&reviewed,&selected).unwrap();snapshots[0].flight=Some(flight.clone());let source_sha=crate::maps::hash_file(&file).unwrap();
   run(&tools.join("invader-build.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-m".into(),output.to_string_lossy().into_owned(),"be_native".into()]);
   let cache=output.join("be_native.map");let map=crate::maps::inspect_map(&cache,None).unwrap();assert_eq!(map.header.version,609);assert_eq!(map.header.scenario_type,0);verify_cache(&snapshots,&cache,&map).unwrap();
   let snapshot=ScenarioSquadReadback{transports:Some(snapshots.clone()),command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:source_sha.clone(),squads:original_squads,include_starts:true,combat:vec![]};snapshot.verify_cache(&cache,&map).unwrap();
+  for field in 0..3{let mut wrong=flight.clone();match field{0=>wrong.throttle+=0.1,1=>wrong.avoidance_distance+=0.1,_=>wrong.pathfinding_radius+=0.1};assert!(wrong.verify_map(&map,"forerunner/transport/pelican").is_err());}
   for field in 0..4{let mut wrong=snapshots.clone();match field{0=>wrong[0].transport.position[0]+=1.,1=>wrong[0].transport.rotation_radians[0]+=0.5,2=>wrong[0].name_index+=1,_=>wrong[0].groups[0]+=1};assert!(verify_cache(&wrong,&cache,&map).is_err(),"Compiled aircraft readback accepted a wrong pose/name/group");}
 
   let names=map.scripts.iter().map(|s|s.name.clone()).collect::<Vec<_>>();assert_eq!(original_scripts,names);
   assert_eq!(hashes,protected.iter().map(|p|crate::maps::hash_file(p).unwrap()).collect::<Vec<_>>());assert_eq!(original_sha,crate::maps::hash_file(&input).unwrap());
+  std::fs::write(&vehicle_file,&original_vehicle).unwrap();assert_eq!(crate::maps::hash_file(&vehicle_file).unwrap(),crate::maps::hash_file(&shared.join(vehicle_tag)).unwrap());
   std::fs::write(&file,&original).unwrap();assert_eq!(original_sha,crate::maps::hash_file(&file).unwrap());
+  eprintln!("Native vehicle flight tag original/restored {original_vehicle_sha}; modified {modified_vehicle_sha}; all three compiled fields independently verified");
   eprintln!("Native append CE609 PASS: cache {}; revised scenario {source_sha}; original/restored {original_sha}; new transports {:?}; all original AI/scripts preserved; no flight/gameplay acceptance",map.sha256,snapshots);
  }
 }

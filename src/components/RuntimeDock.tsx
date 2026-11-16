@@ -199,10 +199,20 @@ export default function RuntimeDock({
   const currentCinematic=cinematicPlan?.key===scriptSourceKey&&cinematicPlan.tagIdentity===nativeCameras?.tagIdentity&&cinematicPlan.shotsKey===nativeCinematicTakeKey(project?.studio)&&cinematicPlan.name===cinematicName.trim()&&cinematicPlan.content===selectedScript?.content?cinematicPlan:null;
   const nativeCinematicDraft=selectedScript?.content.startsWith(nativeCinematicPrefix)??false;
   const nativeTransportDraft=selectedScript?.content.startsWith(nativeTransportPrefix)??false;
+  function transportFlightIssue(options:NativeTransportOptions){
+    const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
+    const vehicles=modules?.transportReview?.vehicles.filter(vehicle=>vehicle.name===name);
+    if(vehicles?.length!==1)return 'Read the actual named aircraft from native transport source.';
+    const {flight,flightIssue}=vehicles[0];
+    if(flightIssue)return flightIssue;
+    if(!flight)return 'Native human-plane flight settings have not been read.';
+    if([flight.throttle,flight.avoidanceDistance,flight.pathfindingRadius].some((value,index)=>!Number.isFinite(value)||value<=0||value>(index===0?1:12)))return 'Native plane AI flight is disabled or outside the supported range. Use positive throttle up to1 and both distances up to12.';
+    return null;
+  }
   function transportReferencesMatch(options:NativeTransportOptions){
     const refs=modules?.transportReview;if(!refs)return false;const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
     const vehicles=refs.vehicles.filter(v=>v.name===name);
-    return vehicles.length===1&&vehicles[0].seats.filter(seat=>seat===options.pilotSeat).length===1&&refs.pilots.filter(value=>value===options.pilot).length===1&&
+    return !transportFlightIssue(options)&&vehicles.length===1&&vehicles[0].pilotSeats?.filter(seat=>seat===options.pilotSeat).length===1&&refs.pilots.filter(value=>value===options.pilot).length===1&&
       [options.departureCue,options.arrivalCue].filter((cue):cue is string=>!!cue).every(cue=>nativeCameras?.scriptNames.filter(value=>value===cue).length===1)&&
       [options.outbound,options.inbound].every(route=>refs.routes.filter(value=>value===route).length===1)&&
       ['_boarded','_called','_landed'].every(suffix=>refs.groups.includes(name+suffix));
@@ -507,6 +517,7 @@ export default function RuntimeDock({
     try{
       if(source.target!=='gbx-custom'||review.scenarioType!==0)throw Error('Transport controllers need reviewed CE609 solo source for Forerunner. Other engines do not drive these signals.');
       const generated=exportHaloCeTransport(options);
+      const flightIssue=transportFlightIssue(options);if(flightIssue)throw Error(flightIssue+' Open AI & scenario → Invader · native checks & reviewed edits, select the matching native vehicle, then Native aircraft AI flight settings. Preview, Accept, Save/rebuild and read transport source again. No draft was replaced.');
       if(!transportReferencesMatch(options))throw Error('Choose the actual named aircraft, one unique native pilot seat, a single-pilot encounter/squad, two nonempty native routes and all three dedicated signals. Read native transport source after authoring them; no source was replaced.');
       for(const name of [options.hub,options.field])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Missing or ambiguous native pad volume '+name+'. Author it with the existing scenario area tools, Save/rebuild and read source again.');
       const previous=inventory.modules.find(module=>module.filename.toLowerCase()===generated.filename.toLowerCase());
@@ -957,14 +968,15 @@ export default function RuntimeDock({
                 <label>Aircraft faction<select aria-label="Transport faction" value={transport.faction} onChange={event=>setTransport({...transport,faction:event.target.value as NativeTransportOptions['faction']})}><option value="unsc">UNSC · Pelican</option><option value="covenant">Covenant · Spirit</option></select></label>
                 {([['pilot','Pilot encounter / squad'],['pilotSeat','Pilot native seat label'],['outbound','Insertion command list'],['inbound','Return command list'],['hub','Hub pad volume'],['field','Landing pad volume']] as const).map(([field,label])=>{
                   const refs=modules?.transportReview;
-                  const options=field==='pilot'?refs?.pilots:field==='pilotSeat'?refs?.vehicles.find(vehicle=>vehicle.name===(transport.faction==='unsc'?'extraction_pelican':'extraction_spirit'))?.seats:field==='hub'||field==='field'?nativeCameras.triggerVolumes:refs?.routes;
+                  const options=field==='pilot'?refs?.pilots:field==='pilotSeat'?refs?.vehicles.find(vehicle=>vehicle.name===(transport.faction==='unsc'?'extraction_pelican':'extraction_spirit'))?.pilotSeats:field==='hub'||field==='field'?nativeCameras.triggerVolumes:refs?.routes;
                   const values=[...new Set(options??[])];return <label key={field}>{label}<select aria-label={label} value={transport[field]} onChange={event=>setTransport({...transport,[field]:event.target.value})}><option value="">Choose an existing native reference</option>{transport[field]&&!values.includes(transport[field])&&<option value={transport[field]}>{transport[field]} · unavailable in current source</option>}{values.map(value=><option key={value} value={value}>{value}</option>)}</select></label>;
                 })}
                 <label><input type="checkbox" checked={transport.returnAfterInsertion??false} onChange={event=>setTransport({...transport,returnAfterInsertion:event.target.checked})}/>Return empty after insertion and recall for pickup</label>
                 <p className="subtle">After every passenger leaves at the landing zone, the aircraft follows Return to the hub and waits there closed. A real field recall sends it along Insertion again. Evacuation still requires actual boarding and the correct landing volume; gear settles only after the final return callback. Turn off to keep the aircraft at the landing zone. Reused routes must be safe in both phases; configure slower final approaches and real hull clearance.</p>
                 {([['departureCue','Departure camera/dialogue function'],['arrivalCue','Arrival camera/dialogue function']] as const).map(([field,label])=><label key={field}>{label}<input aria-label={label} maxLength={31} value={transport[field]??''} onChange={event=>setTransport({...transport,[field]:event.target.value})}/></label>)}
-                <details><summary>Available native transport references</summary><p>Pilots: {modules?.transportReview?.pilots.join(', ')||'No single-pilot group found'}</p><p>Routes: {modules?.transportReview?.routes.join(', ')||'No nonempty command list found'}</p>{modules?.transportReview?.vehicles.map(vehicle=><p key={vehicle.name}>{vehicle.name} · {vehicle.tagPath} · seats: {vehicle.seats.join(', ')}</p>)}<p>Dedicated groups: {modules?.transportReview?.groups.join(', ')||'None found'}</p></details>
-                <button type="button" onClick={()=>void prepareTransportSource()}>Prepare transport script draft</button>
+                <details><summary>Available native transport references</summary><p>Pilots: {modules?.transportReview?.pilots.join(', ')||'No single-pilot group found'}</p><p>Routes: {modules?.transportReview?.routes.join(', ')||'No nonempty command list found'}</p>{modules?.transportReview?.vehicles.map(vehicle=><p key={vehicle.name}>{vehicle.name} · {vehicle.tagPath} · seats: {vehicle.seats.join(', ')} · pilot: {vehicle.pilotSeats?.join(', ')||'No verified driver seat'} · {vehicle.flightIssue||(!vehicle.flight?'Flight settings unavailable':`AI throttle ${vehicle.flight.throttle}, avoidance ${vehicle.flight.avoidanceDistance}, radius ${vehicle.flight.pathfindingRadius}`)}</p>)}<p>Dedicated groups: {modules?.transportReview?.groups.join(', ')||'None found'}</p></details>
+                {transportFlightIssue(transport)&&<Notice>{transportFlightIssue(transport)} Open AI & scenario → Invader · native checks & reviewed edits, select the matching vehicle, then Native aircraft AI flight settings. Preview → Accept → Save/rebuild → read transport source again.</Notice>}
+                <button type="button" disabled={!!transportFlightIssue(transport)} onClick={()=>void prepareTransportSource()}>Prepare transport script draft</button>
               </fieldset>}
               <p className="subtle">Use CE609 solo source. Create pilot AI and real seats with the existing AI/tag tools; routes with Native source controls → Native command lists. Pad volumes must already exist. Read native transport source again after restarting or changing source; generated builds pin the current tag identity. Load transport configuration from draft restores its saved choices. Bind the matching craft and three dedicated boarding/recall/landing groups. The source waits for both real landing and its pad; it never treats hover or time as arrival. Optional camera/dialogue functions must already exist and end cinematics. Players disembark normally; returning craft stays closed until Forerunner wakes its crew-settlement callback. Native compilation checks references; pilot failure/recovery, clearances, repeat trips and multiplayer need actual game acceptance. Hand-edited modules are preserved and require Edit selected module.</p>
             </details>

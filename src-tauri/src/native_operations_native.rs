@@ -97,10 +97,10 @@ pub(super) fn hud_readback_targets(state:&AppState,project:&Project,build:&Build
 
 /// Existing receipts are evidence for readback/protection only. They never
 /// authorize replaying writes or launching a tool.
-fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord)->Reply<(bool,bool,Vec<recipes::Operation>,std::collections::BTreeSet<String>,bool,bool,bool,bool,bool)> {
-    let mut counts=false;let mut starts=false;let mut cameras=false;let mut volumes=false;let mut devices=false;let mut commands=false;let mut transports=false;let mut combat=vec![];let mut protected=std::collections::BTreeSet::new();
+fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord)->Reply<(bool,bool,Vec<recipes::Operation>,std::collections::BTreeSet<String>,bool,bool,bool,bool,bool,std::collections::BTreeSet<String>)> {
+    let mut flight_tags=std::collections::BTreeSet::new();let mut counts=false;let mut starts=false;let mut cameras=false;let mut volumes=false;let mut devices=false;let mut commands=false;let mut transports=false;let mut combat=vec![];let mut protected=std::collections::BTreeSet::new();
     let inspect_operation=|operation:&recipes::Operation,counts:&mut bool,starts:&mut bool,combat:&mut Vec<recipes::Operation>,protected:&mut std::collections::BTreeSet<String>,cameras:&mut bool,volumes:&mut bool,devices:&mut bool,commands:&mut bool,transports:&mut bool|->Reply<()>{
-        if operation.is_transport_append(){*counts=true;*starts=true;*transports=true;}
+        if operation.is_transport_append()||operation.is_vehicle_flight(){*counts=true;*starts=true;*transports=true;}
         if operation.is_command_edit(){*counts=true;*commands=true;}
         if operation.is_device_edit(){*counts=true;*devices=true;}
         if operation.is_trigger_edit(){*counts=true;*volumes=true;}
@@ -126,6 +126,7 @@ fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord
         let receipt:core::working_tags::WorkingTagsReceipt=serde_json::from_slice(&bounded_read(&parent,4*1024*1024)?).map_err(error)?;
         if receipt.schema_version!=1||receipt.job_id!=build.id||receipt.project_id!=project.id||receipt.status!="validated"||
             receipt.project_fingerprint!=build.project_fingerprint{return Err("Native encounter parent evidence changed; no squad edit was admitted".into());}
+        if let Some(rows)=receipt.scenario_squad_readback.as_ref().and_then(|s|s.transports.as_ref()){for row in rows.iter().filter(|row|row.flight.is_some()){flight_tags.insert(format!("{}.vehicle",row.transport.tag_path).replace('\\',"/").to_ascii_lowercase());}}
         let had_snapshot=receipt.scenario_squad_readback.is_some();
         let had_starts=receipt.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
         for operation in receipt.encounter_expectations.iter().chain(receipt.expected_encounter.iter()){inspect_operation(operation,&mut counts,&mut starts,&mut combat,&mut protected,&mut cameras,&mut volumes,&mut devices,&mut commands,&mut transports)?;}
@@ -141,13 +142,14 @@ fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord
         let receipt:Receipt=serde_json::from_slice(&bounded_read(&file,4*1024*1024)?).map_err(error)?;
         if receipt.schema_version!=1||receipt.id!=id||receipt.project_id!=project.id{return Err("Native encounter history identity changed; review its recovery evidence".into());}
         if receipt.parent_build_id!=build.id||receipt.fingerprint!=fingerprint{continue;}
+        if receipt.operation.is_vehicle_flight(){flight_tags.insert(receipt.tag.replace('\\',"/").to_ascii_lowercase());}
         receipt.operation.validate(&receipt.class,&receipt.tag).map_err(error)?;
         inspect_operation(&receipt.operation,&mut counts,&mut starts,&mut combat,&mut protected,&mut cameras,&mut volumes,&mut devices,&mut commands,&mut transports)?;
     }
-    Ok((counts,starts,combat,protected,cameras,volumes,devices,commands,transports))
+    Ok((counts,starts,combat,protected,cameras,volumes,devices,commands,transports,flight_tags))
 }
 pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path,force_cameras:bool)->Reply<Option<recipes::ScenarioSquadReadback>> {
-    let (required,include_starts,combat,_,include_cameras,include_volumes,include_devices,include_commands,include_transports)=encounter_review_metadata(state,project,build)?;
+    let (required,include_starts,combat,_,include_cameras,include_volumes,include_devices,include_commands,include_transports,flight_tags)=encounter_review_metadata(state,project,build)?;
     let include_cameras=include_cameras||force_cameras;
     if !required&&!include_cameras&&!include_volumes&&!include_devices&&!include_commands&&!include_transports{return Ok(None);}
     let tag=format!("{}.scenario",project.scenario_path().map_err(error)?);
@@ -161,7 +163,13 @@ pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&Bui
     let volumes=if include_volumes{Some(recipes::scenario_volume_choices(&listing).map_err(error)?)}else{None};
     let devices=if include_devices{Some(recipes::scenario_device_choices(&listing).map_err(error)?)}else{None};
     let command_lists=if include_commands{Some(recipes::native_command_source(&listing).map_err(error)?.lists)}else{None};
-    let transports=if include_transports{Some(recipes::complete_transport_snapshots(&listing).map_err(error)?)}else{None};
+    let transports=if include_transports{
+        let mut rows=recipes::complete_transport_snapshots(&listing).map_err(error)?;
+        let mut found=std::collections::BTreeSet::new();
+        for row in &mut rows {let tag=format!("{}.vehicle",row.transport.tag_path);let key=tag.replace('\\',"/").to_ascii_lowercase();if flight_tags.contains(&key){let listing=fields(state,project,tags,&tag)?;let tuning=recipes::native_vehicle_flight(&listing).map_err(error)?;tuning.validate().map_err(error)?;row.flight=Some(tuning);found.insert(key);}}
+        if found!=flight_tags{return Err("A reviewed flight vehicle no longer has its complete named source binding; rebuild was not started".into());}
+        Some(rows)
+    }else{None};
     let snapshot=recipes::ScenarioSquadReadback{transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
     snapshot.validate().map_err(error)?;
     Ok(Some(snapshot))
@@ -178,6 +186,8 @@ pub(super) struct Context {
     tags_directory: PathBuf,
     tag_sha256:String,
     bounding_radius: Option<f64>,
+    vehicle_flight:Option<recipes::VehicleFlightTuning>,
+    vehicle_flight_issue:Option<String>,
     lens_flare_scale: Option<f64>,
     actor_variants:Vec<String>,
     can_append_encounter:bool,
@@ -333,6 +343,17 @@ pub(super) fn executable(state: &AppState, project: &Project, id: &str) -> Reply
     }
     Ok(file)
 }
+/// Flight tuning stays bound to a real named CE solo transport and its existing
+/// source receipt. Arbitrary/unbound vehicle edits use their separate workflow.
+fn require_flight_transport(state:&AppState,source:&Source)->Reply<()> {
+    if source.class!="vehi"||source.build.target!="gbx-custom"||maps::inspect_header(source.build.output.as_ref().ok_or("Validated output is missing")?).map_err(error)?.scenario_type!=0{return Err("Flight tuning requires a named aircraft in reviewed CE609 solo working source".into());}
+    studio_native_source::require_unshared(state,&source.project.id)?;
+    let tag=format!("{}.scenario",source.project.scenario_path().map_err(error)?);
+    let native=fields(state,&source.project,&source.tags,&tag)?;
+    let rows=recipes::complete_transport_snapshots(&native).map_err(error)?;
+    if !rows.iter().any(|row|format!("{}.vehicle",row.transport.tag_path).replace('\\',"/").eq_ignore_ascii_case(&source.tag.replace('\\',"/"))){return Err("Bind this aircraft as a Pelican/Spirit with all three dedicated signals and build its source before tuning flight".into());}
+    Ok(())
+}
 pub(super) fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str) -> Reply<String> {
     let file = tags.join(core::safe_relative(tag).map_err(error)?);
     let before = maps::hash_file(&file).map_err(error)?;
@@ -450,6 +471,13 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         if maps::hash_file(&dependency).map_err(error)?!=identity{return Err("HUD dependency reader changed during review".into());}
         check_dependency_pins(&source.tags,&pins)?;return Ok(pins);
     }
+    if operation.is_vehicle_flight(){
+        let tag=format!("{}.scenario",source.project.scenario_path().map_err(error)?);
+        let file=source.tags.join(core::safe_relative(&tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
+        let before=maps::hash_file(&file).map_err(error)?;require_flight_transport(state,source)?;
+        if maps::hash_file(&file).map_err(error)?!=before{return Err("Native aircraft binding changed during flight review".into());}
+        return Ok(BTreeMap::from([(tag,before)]));
+    }
     if !operation.is_encounter_append()&&!operation.is_transport_append(){return Ok(BTreeMap::new());}
     let roots=if let recipes::Operation::AppendTransport{transport,..}=operation{
         if source.build.target!="gbx-custom"{return Err("Native transport append currently requires reviewed CE609 solo source".into());}
@@ -561,7 +589,7 @@ pub(super) async fn native_tag_context(
         }else{(vec![],None)};
         let protected_squad_encounters=if source.class=="scnr" {
             match encounter_review_metadata(&state,&source.project,&source.build){
-                Ok((_,_,_,names,_,_,_,_,_))=>names.into_iter().collect(),
+                Ok((_,_,_,names,_,_,_,_,_,_))=>names.into_iter().collect(),
                 Err(issue)=>{squad_edit_issue=Some(issue);vec![]}
             }
         }else{vec![]};
@@ -576,6 +604,7 @@ pub(super) async fn native_tag_context(
         let(scenario_command_lists,command_list_issue)=if source.class=="scnr"{match recipes::scenario_command_list_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_combat,mut combat_edit_issue)=if source.class=="scnr"{match recipes::scenario_combat_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(vehicle_seats,vehicle_seat_issue)=if source.class=="vehi"{match recipes::native_vehicle_seats(&values){Ok(rows)=>(Some(rows),None),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
+        let(vehicle_flight,vehicle_flight_issue)=if source.class=="vehi"{match require_flight_transport(&state,&source).and_then(|_|recipes::native_vehicle_flight(&values).map_err(error)){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(issue))}}else{(None,None)};
         let radius = recipes::number(&values, "bounding_radius").ok();
         let flare = recipes::number(&values, "rotation_function_scale").ok();
         let edit_issue = executable(&state, &source.project, "invaderNative").err();
@@ -625,6 +654,7 @@ pub(super) async fn native_tag_context(
             tag_sha256:hash,
             actor_variants,
             can_append_transport:can_append_encounter&&source.build.target=="gbx-custom",vehicle_sources,can_append_encounter,
+            vehicle_flight,vehicle_flight_issue,
             bounding_radius: radius,
             lens_flare_scale: flare,
             can_edit: radius.is_some() && edit_issue.is_none(),
@@ -686,7 +716,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
-    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if receipt.operation.is_transport_append(){"One named aircraft and three isolated zero-initialized signals are appended. Existing palette, placements, names, groups and script indices/bodies are retained. Dependencies are pinned. Accept selects separate source; Save/rebuild independently checks compiled vehicle pose/name/tag and signal indices/flags. Restore selects the exact original scenario. Pilot, routes, boarding, flight and settlement remain separate authoring/game gates."}else if receipt.operation.is_command_edit(){"Only the selected existing command actions, parameters, references, flags and point coordinates may differ. Names, command/point indices, AI bindings and unrelated source are preserved. Accept selects separate source; Save/rebuild verifies complete compiled command data. Native Restore is distinct from project Undo. AI execution/navigation requires gameplay testing."}else if receipt.operation.is_device_edit(){"Only this native device position/rotation may differ. Class, palette, name-table binding, flags, power/position groups and scripts remain unchanged. Accept selects separate source; Save/rebuild and independently inspect compiled placement. Native Restore is distinct from project Undo. Actual terminal use/doors/collision require gameplay acceptance."}else if receipt.operation.is_trigger_edit(){"Only this oriented trigger box geometry may differ. Names, indices and script references are preserved. Preview is temporary; Accept selects a separate source revision. Save/rebuild and inspect compiled bounds; Restore selects the original source. Trigger execution needs gameplay testing."}else if receipt.operation.is_camera_edit(){"Only this camera pose and lens may differ. Native point names, indices, scripts and other scenario fields stay unchanged. Accept selects a source revision; Save and rebuild to apply it. Restore selects the complete before-edit source. Editor preview is not native cinematic/gameplay acceptance."}else if receipt.operation.combat_target_key().is_some(){"Only the requested native AI source fields may differ: firing XYZ/group, squad tactical bits, reviewed squad/start behavior or patrol ordering/pose/weight/waits. Accept selects separate source; Restore selects the original before-edit source. Rebuild and independently inspect compiled positions/groups/patrols. Target compilers can expand search masks; source is never normalized automatically. Navigation, cover use and gameplay remain unverified."}else if receipt.operation.is_squad_start_edit(){"Only the selected AI starting position, requested facing and optional existing command-list binding may differ in exposed native fields. Command-list contents and all other starts stay unchanged. Accept selects separate source; rebuild and read back the compiled pose. Squad/start state fields, firing positions and navigation stay unchanged. Actual spawning, command execution, facing and reachability need gameplay validation."}else if receipt.operation.is_squad_count_edit(){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if receipt.operation.is_vehicle_flight(){"Only the requested native AI throttle, avoidance and pathfinding-radius fields may differ. The named aircraft and scenario binding remain pinned. Accept selects separate source; Save/rebuild checks all three compiled values. Native Restore is separate from project Undo. Actual pilot behavior, hull clearance, landing and flight require gameplay acceptance."}else if receipt.operation.is_transport_append(){"One named aircraft and three isolated zero-initialized signals are appended. Existing palette, placements, names, groups and script indices/bodies are retained. Dependencies are pinned. Accept selects separate source; Save/rebuild independently checks compiled vehicle pose/name/tag and signal indices/flags. Restore selects the exact original scenario. Pilot, routes, boarding, flight and settlement remain separate authoring/game gates."}else if receipt.operation.is_command_edit(){"Only the selected existing command actions, parameters, references, flags and point coordinates may differ. Names, command/point indices, AI bindings and unrelated source are preserved. Accept selects separate source; Save/rebuild verifies complete compiled command data. Native Restore is distinct from project Undo. AI execution/navigation requires gameplay testing."}else if receipt.operation.is_device_edit(){"Only this native device position/rotation may differ. Class, palette, name-table binding, flags, power/position groups and scripts remain unchanged. Accept selects separate source; Save/rebuild and independently inspect compiled placement. Native Restore is distinct from project Undo. Actual terminal use/doors/collision require gameplay acceptance."}else if receipt.operation.is_trigger_edit(){"Only this oriented trigger box geometry may differ. Names, indices and script references are preserved. Preview is temporary; Accept selects a separate source revision. Save/rebuild and inspect compiled bounds; Restore selects the original source. Trigger execution needs gameplay testing."}else if receipt.operation.is_camera_edit(){"Only this camera pose and lens may differ. Native point names, indices, scripts and other scenario fields stay unchanged. Accept selects a source revision; Save and rebuild to apply it. Restore selects the complete before-edit source. Editor preview is not native cinematic/gameplay acceptance."}else if receipt.operation.combat_target_key().is_some(){"Only the requested native AI source fields may differ: firing XYZ/group, squad tactical bits, reviewed squad/start behavior or patrol ordering/pose/weight/waits. Accept selects separate source; Restore selects the original before-edit source. Rebuild and independently inspect compiled positions/groups/patrols. Target compilers can expand search masks; source is never normalized automatically. Navigation, cover use and gameplay remain unverified."}else if receipt.operation.is_squad_start_edit(){"Only the selected AI starting position, requested facing and optional existing command-list binding may differ in exposed native fields. Command-list contents and all other starts stay unchanged. Accept selects separate source; rebuild and read back the compiled pose. Squad/start state fields, firing positions and navigation stay unchanged. Actual spawning, command execution, facing and reachability need gameplay validation."}else if receipt.operation.is_squad_count_edit(){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -702,13 +732,13 @@ pub(super) async fn native_operation_preview(
     if matches!(operation,recipes::Operation::Dependencies){return Err("Use the read-only dependency check for this operation".into());}
     let source=source(&state,&project_id,tag_id)?;if operation.is_transport_append()||operation.is_command_edit()||operation.is_device_edit()||operation.is_camera_edit()||operation.is_trigger_edit(){studio_native_source::require_unshared(&state,&source.project.id)?;}operation.validate(&source.class,&source.tag).map_err(error)?;
     if let recipes::Operation::CommandList{list,..}=&operation{
-        let(_,_,_,protected,_,_,_,_,_)=encounter_review_metadata(&state,&source.project,&source.build)?;
+        let(_,_,_,protected,_,_,_,_,_,_)=encounter_review_metadata(&state,&source.project,&source.build)?;
         let inventory=fields(&state,&source.project,&source.tags,&source.tag)?;
         let starts=recipes::scenario_squad_start_choices(&inventory).map_err(error)?;
         if starts.iter().any(|row|protected.contains(&row.encounter_name.to_ascii_lowercase())&&row.starts.iter().flatten().any(|point|point.command_list==Some(list.index as i16))){return Err("This native command list is used by a recipe-owned group. Edit it through that recipe's source workflow; no command revision was admitted".into());}
     }
     if operation.is_scenario_ai_edit(){
-        let (_,_,_,protected,_,_,_,_,_)=encounter_review_metadata(&state,&source.project,&source.build)?;
+        let (_,_,_,protected,_,_,_,_,_,_)=encounter_review_metadata(&state,&source.project,&source.build)?;
         let owned=if let Some(name)=operation.combat_encounter_name(){protected.contains(&name.to_ascii_lowercase())}
             else if let recipes::Operation::EncounterStartPosition{encounter_name,..}=&operation{protected.contains(&encounter_name.to_ascii_lowercase())}
             else{operation.squad_count_edits().map_err(error)?.iter().any(|edit|protected.contains(&edit.encounter_name.to_ascii_lowercase()))};

@@ -1444,7 +1444,7 @@ fn run_with(
             let volumes=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.volumes.is_some()){Some(crate::native_operations::scenario_volume_choices(&fields)?)}else{None};
             let devices=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.devices.is_some()){Some(crate::native_operations::scenario_device_choices(&fields)?)}else{None};
             let command_lists=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.command_lists.is_some()){Some(crate::native_operations::native_command_source(&fields)?.lists)}else{None};
-            let transports=if let Some(selected)=prepared.scenario_squad_readback.as_ref().and_then(|s|s.transports.as_ref()) {Some(crate::native_operations::scenario_transport_snapshots(&fields,&selected.iter().map(|row|row.transport.name.clone()).collect::<Vec<_>>())?)}else{None};
+            let transports=if let Some(selected)=prepared.scenario_squad_readback.as_ref().and_then(|s|s.transports.as_ref()) {Some({let mut rows=crate::native_operations::scenario_transport_snapshots(&fields,&selected.iter().map(|row|row.transport.name.clone()).collect::<Vec<_>>())?;for row in &mut rows{let before=selected.iter().find(|old|old.transport.name==row.transport.name&&old.transport.tag_path.replace('\\',"/").eq_ignore_ascii_case(&row.transport.tag_path.replace('\\',"/"))).ok_or_else(||SparkError::Invalid("Staged transport flight binding changed".into()))?;row.flight=before.flight.clone();}rows})}else{None};
             let snapshot=crate::native_operations::ScenarioSquadReadback{transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
