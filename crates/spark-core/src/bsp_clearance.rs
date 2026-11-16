@@ -139,6 +139,15 @@ impl Index {
         }
         best
     }
+    fn nearby_surface(&self,at:V,range:f64)->Option<f64>{
+        let mut ids=vec![];self.root.query([at[0]-1e-5,at[1]-1e-5,at[2]-range],[at[0]+1e-5,at[1]+1e-5,at[2]+range],&mut ids);
+        let mut best:Option<f64>=None;
+        for id in ids{let triangle=self.triangles[id];let(normal,square)=self.planes[id];if square<1e-20||normal[2].abs()<1e-12{continue;}
+            let z=triangle[0][2]-(normal[0]*(at[0]-triangle[0][0])+normal[1]*(at[1]-triangle[0][1]))/normal[2];
+            if !z.is_finite()||(z-at[2]).abs()>range{continue;}let point=[at[0],at[1],z];let delta=sub(closest(point,triangle),point);
+            if dot(delta,delta)<1e-10&&best.is_none_or(|old|(z-at[2]).abs()<(old-at[2]).abs()){best=Some(z);}
+        }best
+    }
     fn floor_diagnostic(&self,at:V)->String {
         let mut ids=vec![];self.root.query([at[0]-0.3,at[1]-0.3,at[2]-4.],[at[0]+0.3,at[1]+0.3,at[2]+4.],&mut ids);
         let mut near=ids.into_iter().map(|id|{let p=self.triangles[id];let d=sub(closest(at,p),at);(dot(d,d),id)}).collect::<Vec<_>>();
@@ -246,6 +255,9 @@ fn closest(p: V, t: Tri) -> V {
 pub(crate) struct RouteChecker { index: Index }
 impl RouteChecker {
     pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh)? }) }
+    /// Independent triangle projection for native ground-bound waypoint review.
+    /// The compiler remains authoritative for collision-surface/cluster binding.
+    pub(crate) fn native_surface_z(&self,point:[f32;3])->Option<f32>{self.index.nearby_surface(point.map(f64::from),0.5).map(|z|z as f32)}
     /// Static standing-capsule check, not a native movement/scenery test.
     pub(crate) fn verify_start(&self, position: V) -> Result<f64> {
         if position.iter().any(|v| !v.is_finite() || v.abs() > 4096.) {
@@ -425,6 +437,13 @@ mod tests {
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {
         assert!(verify_route(&corridor(2., 0.65), &plan()).is_err());
         assert!(verify_route(&corridor(0.30, 1.6), &plan()).is_err());
+    }
+    #[test]
+    fn native_surface_anchors_are_separate_from_standing_capsule_clearance(){
+        let mesh=corridor(2.,1.6);let checker=RouteChecker::new(&mesh).unwrap();
+        for z in [-0.25f32,0.,0.25,0.5]{assert_eq!(checker.native_surface_z([5.,0.,z]),Some(0.));}
+        assert_eq!(checker.native_surface_z([5.,0.,0.5001]),None);assert_eq!(checker.native_surface_z([11.,0.,0.]),None);
+        assert!(checker.verify_start([5.,0.,0.5]).is_err());
     }
     #[test]
     fn starting_capsules_require_close_floor_and_clear_body_not_just_a_valid_coordinate() {

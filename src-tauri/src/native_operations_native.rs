@@ -671,6 +671,24 @@ pub(super) async fn native_tag_context(
     .map_err(error)?
 }
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct CommandGeometryReview {build_id:String,tag_sha256:String,output_sha256:String,points:Vec<maps::BspPointLocation>}
+#[tauri::command]
+pub(super) async fn native_scenario_geometry(app:tauri::AppHandle,project_id:String,expected_build_id:String,expected_tag_sha256:String,points:Vec<[f32;3]>)->Reply<CommandGeometryReview>{
+ tauri::async_runtime::spawn_blocking(move||{
+  if points.is_empty()||points.len()>64||expected_tag_sha256.len()!=64||!expected_tag_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return Err("Invalid native source-point review".into());}
+  let state=app.state::<AppState>();let _guard=source_guard()?;require_idle(&state)?;let selected=source(&state,&project_id,None)?;
+  if selected.build.id!=expected_build_id{return Err("The native source build changed; refresh and review the current route".into());}
+  let file=selected.tags.join(core::safe_relative(&selected.tag).map_err(error)?);
+  if maps::hash_file(&file).map_err(error)?!=expected_tag_sha256{return Err("Native scenario changed after route selection; refresh source".into());}
+  let output=selected.build.output.as_ref().ok_or("Compiled BSP reference is unavailable")?;core::reject_links(output).map_err(error)?;
+  let map=maps::inspect_map(output,None).map_err(error)?;if selected.build.sha256.as_deref()!=Some(map.sha256.as_str()){return Err("Compiled BSP reference no longer matches its validated build".into());}
+  let result=maps::bsp_point_locations(output,&map,&points).map_err(error)?;
+  if maps::hash_file(&file).map_err(error)?!=expected_tag_sha256||lock(&state.library)?.get(&project_id).map_err(error)?.fingerprint().map_err(error)?!=selected.project.fingerprint().map_err(error)?{return Err("Native source changed during BSP review; no result was accepted".into());}
+  Ok(CommandGeometryReview{build_id:expected_build_id,tag_sha256:expected_tag_sha256,output_sha256:map.sha256,points:result})
+ }).await.map_err(error)?
+}
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct DependencyReport {
     tag: String,

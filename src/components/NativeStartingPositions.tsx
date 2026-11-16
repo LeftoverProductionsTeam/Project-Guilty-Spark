@@ -1,3 +1,4 @@
+import NativeBspPointCheck from './NativeBspPointCheck';
 import {useEffect,useRef,useState} from 'react';
 import {useMapState} from '../mapSession';
 import {NATIVE_AI_START_VIEW,nativeAiStartPosition,nativeAiStartMatches,nativeAiStartKey,nativeAiStartFacing,nativeAiFacingClose,nativeAiFacingDegrees} from '../nativeAiStart';
@@ -103,6 +104,7 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
           <button disabled={disabled||!changed||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={preview}>{firing?'Preview AI firing position':commandChanged?'Preview AI start command binding':facingChanged?(positionChanged?'Preview AI starting pose':'Preview AI facing'):'Preview AI starting position'}</button>
           <button disabled={busy||!draft||draft.key!==key} onClick={()=>{setDraft(null);onDraftChange();}}>{firing?'Reset firing draft':'Reset coordinate draft'}</button>
         </div>
+        <NativeBspPointCheck context={context} points={position?[position]:[]} disabled={busy||dirty||!valid} label={'Check '+label+' against compiled BSP'}/>
         <p className="subtle">Review below → Accept as new source revision → build working tag edits → inspect compiled coordinates and {firing?'group':'facing and command binding'}.  Restore before-edit tag selects the complete source from before that edit. Unaccepted drafts are temporary; no running game is changed here.</p>
       </>}
       {!squad.starts?.length&&!issue&&<p className="subtle">{firing?'This encounter has no firing positions. Adding native positions needs the encounter authoring workflow.':'This squad has no authored starting locations. Adding native locations needs the encounter authoring workflow.'}</p>}

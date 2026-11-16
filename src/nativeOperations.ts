@@ -218,3 +218,5 @@ export function customizeCampaignCombat(entry:NativeEncounterAppend):NativeComba
 
 /** Explicit source review for the pinned MCC compiler; never modifies input. */
 export function campaignMccSearchReview(combat:Pick<NativeCombatSource,'groups'>){const groups={...combat.groups,attackingSearch:[...new Set([...combat.groups.attackingSearch,...combat.groups.attacking])].sort(),defendingSearch:[...new Set([...combat.groups.defendingSearch,...combat.groups.attacking])].sort()};return {groups,changed:groups.attackingSearch.length!==combat.groups.attackingSearch.length||groups.defendingSearch.length!==combat.groups.defendingSearch.length};}
+
+export interface NativeCommandGeometryReview {buildId:string;tagSha256:string;outputSha256:string;points:{point:[number,number,number];bsps:number[];nearPartition:boolean;supports:{bsp:number;z:number}[]}[]}

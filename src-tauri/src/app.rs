@@ -3277,6 +3277,7 @@ pub fn run() {
             baboon_native::baboon_reconcile,
             baboon_native::baboon_restore_start,
             native_operations_native::native_tag_context,
+            native_operations_native::native_scenario_geometry,
             native_operations_native::native_tag_inventory,
             native_operations_native::native_dependency_check,
             native_operations_native::native_operation_preview,

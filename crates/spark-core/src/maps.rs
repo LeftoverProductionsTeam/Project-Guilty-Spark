@@ -1717,6 +1717,52 @@ fn source_active_surfaces(r:&Reader,space:&Space,root:usize,surfaces:usize)->Res
     while let Some(child)=references_to_walk.pop(){if child==u32::MAX{continue;}if child&0x80000000!=0{let index=(child&0x7fffffff) as usize;if index>=surfaces{return invalid("Source BSP2D surface index is invalid");}active[index]=true;}else{let index=child as usize;if index>=count2d{return invalid("Source BSP2D node index is invalid");}if nodes2d_seen[index]{continue;}nodes2d_seen[index]=true;references_to_walk.push(r.u32(nodes2d+index*20+12)?);references_to_walk.push(r.u32(nodes2d+index*20+16)?);}}
     Ok(active)
 }
+/// Membership in the compiled collision BSP; this is not aircraft clearance,
+/// ground contact, pathfinding or gameplay. Standard format: c20 sbsp BSP3D fields.
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct BspPointLocation {pub point:[f32;3],pub bsps:Vec<u16>,pub near_partition:bool,pub supports:Vec<BspPointSupport>}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct BspPointSupport {pub bsp:u16,pub z:f32}
+fn collision_leaf_at(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&mut usize)->Result<(bool,bool)>{
+ let(nodes,n)=space.block(r,root,12,262144)?;let(planes,pn)=space.block(r,root+12,16,262144)?;let(_,leaves)=space.block(r,root+24,8,262144)?;
+ if n==0||pn==0||leaves==0{return invalid("Compiled BSP has no usable partition tree");}
+ let mut child=0u32;let mut near=false;
+ for _ in 0..=n.min(4096){
+  if *budget==0{return invalid("Native BSP point review exceeds its traversal budget");}*budget-=1;
+  if child==u32::MAX{return Ok((false,near));}
+  if child&0x80000000!=0{if (child&0x7fffffff) as usize>=leaves{return invalid("Compiled BSP leaf index is invalid");}return Ok((true,near));}
+  let index=child as usize;if index>=n{return invalid("Compiled BSP node index is invalid");}let node=nodes+index*12;let plane=r.u32(node)? as usize;
+  if plane>=pn{return invalid("Compiled BSP partition plane index is invalid");}
+  let at=planes+plane*16;let normal=vec3(r,at)?;let distance=r.f32(at+12)?;
+  if normal.iter().any(|v|!v.is_finite())||!distance.is_finite()||normal.iter().map(|v|v*v).sum::<f32>()<1e-12{return invalid("Compiled BSP partition plane is nonfinite or degenerate");}
+  let side=normal[0]*point[0]+normal[1]*point[1]+normal[2]*point[2]-distance;
+  if !side.is_finite(){return invalid("Native BSP point plane test overflowed");}near|=side.abs()<=1e-5;
+  child=r.u32(node+if side>=0.{8}else{4})?;
+ }
+ invalid("Compiled BSP tree is cyclic or exceeds the supported traversal depth")
+}
+pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]])->Result<Vec<BspPointLocation>>{
+ if points.is_empty()||points.len()>1024||points.iter().flatten().any(|v|!v.is_finite()||v.abs()>1e6){return invalid("Review needs1–1024 finite native BSP points within supported bounds");}
+ let(header,bytes,hash)=read_cache_snapshot_shared(path)?;if hash!=inspection.sha256{return invalid("Compiled map changed after BSP inspection");}
+ let r=Reader(&bytes);let space=cache_tag_space(&r,&header)?;
+ let scenarios=inspection.tags.iter().filter(|tag|tag.class=="scnr"&&tag.path==inspection.scenario_path).collect::<Vec<_>>();
+ if scenarios.len()!=1{return invalid("Compiled scenario is missing or ambiguous");}let sc=scenarios[0].data_offset.ok_or_else(||SparkError::Invalid("Compiled scenario data is unavailable".into()))? as usize;
+ let(table,count)=space.block(&r,sc+0x5a4,32,16)?;if count==0{return invalid("Compiled scenario has no structure BSP");}
+ let mut rows=points.iter().map(|point|BspPointLocation{point:*point,bsps:vec![],near_partition:false,supports:vec![]}).collect::<Vec<_>>();let mut budget=1_000_000usize;
+ let(mesh,_)=collision_snapshot(&header,&bytes,inspection)?;
+ for index in 0..count{
+  let entry=table+index*32;let begin=r.u32(entry)? as usize;let size=r.u32(entry+4)? as usize;r.bytes(begin,size)?;
+  if size<24{return invalid("Compiled BSP region is too small");}let bsp_space=Space{begin,end:begin+size,address:r.u32(entry+8)?};let bsp=bsp_space.pointer(r.u32(begin)?,648)?;
+  let(blocks,n)=bsp_space.block(&r,bsp+0xb0,96,16)?;if n!=1{return invalid("Point membership requires one standard collision tree per native BSP");}
+  let part=mesh.parts.get(index).ok_or_else(||SparkError::Invalid("Compiled BSP collision part is unavailable".into()))?;
+  let selected=MeshData{positions:mesh.positions.clone(),indices:mesh.indices[part.index_start..part.index_start+part.index_count].to_vec(),..Default::default()};let checker=crate::bsp_clearance::RouteChecker::new(&selected)?;
+  for row in &mut rows{if let Some(z)=checker.native_surface_z(row.point){row.supports.push(BspPointSupport{bsp:index as u16,z});}}
+  for row in &mut rows{let(inside,near)=collision_leaf_at(&r,&bsp_space,blocks,row.point,&mut budget)?;if inside{row.bsps.push(index as u16);}row.near_partition|=near;}
+ }
+ Ok(rows)
+}
 pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
     let (header,bytes,hash)=read_cache_snapshot(path)?;
     if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}
@@ -2110,4 +2156,18 @@ mod shader_dependency_tests {
         install_ref(&mut bytes,512+0x6c,99,b"mtib");
         assert!(chicago_bitmap_references(&Reader(&bytes),&region,&mut shader_fixture("schi"),&ids,64).is_err());
     }
+}
+
+#[cfg(test)]
+mod bsp_point_tests {
+ use super::*;
+ fn tree()->Vec<u8>{let mut b=vec![0u8;256];for(at,n,p)in[(0,1u32,128u32),(12,1,144),(24,1,160)]{b[at..at+4].copy_from_slice(&n.to_le_bytes());b[at+4..at+8].copy_from_slice(&p.to_le_bytes());}b[132..136].copy_from_slice(&u32::MAX.to_le_bytes());b[136..140].copy_from_slice(&0x80000000u32.to_le_bytes());b[144..148].copy_from_slice(&1f32.to_le_bytes());b}
+ #[test]fn follows_native_front_back_and_leaf_flags_without_changing_bytes(){
+  let b=tree();let original=b.clone();let space=Space{begin:0,end:b.len(),address:0};let mut budget=64;
+  assert_eq!(collision_leaf_at(&Reader(&b),&space,0,[2.,0.,0.],&mut budget).unwrap(),(true,false));assert_eq!(collision_leaf_at(&Reader(&b),&space,0,[-2.,0.,0.],&mut budget).unwrap(),(false,false));assert_eq!(collision_leaf_at(&Reader(&b),&space,0,[0.,0.,0.],&mut budget).unwrap(),(true,true));assert_eq!(b,original);
+ }
+ #[test]fn malformed_partitions_and_cycles_cannot_claim_native_membership(){
+  for fault in 0..7{let mut b=tree();match fault{0=>b[128..132].copy_from_slice(&1u32.to_le_bytes()),1=>b[136..140].copy_from_slice(&0x80000001u32.to_le_bytes()),2=>b[136..140].copy_from_slice(&0u32.to_le_bytes()),3=>b[4..8].copy_from_slice(&4096u32.to_le_bytes()),4=>b[144..148].copy_from_slice(&f32::NAN.to_le_bytes()),5=>b[0..4].fill(0),_=>b[144..148].fill(0)}let space=Space{begin:0,end:b.len(),address:0};assert!(collision_leaf_at(&Reader(&b),&space,0,[2.,0.,0.],&mut 64).is_err(),"Fault{fault}");}
+  let b=tree();assert!(collision_leaf_at(&Reader(&b),&Space{begin:0,end:b.len(),address:0},0,[2.,0.,0.],&mut 0).is_err());
+ }
 }
