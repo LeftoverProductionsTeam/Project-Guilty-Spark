@@ -1,3 +1,4 @@
+import {PerspectiveCamera,Vector3} from 'three';
 import {workshopExample} from '../../src/bspWorkshop';
 import {defaultNativePlayerProfile} from '../../src/firefight';
 import {auditPagedSurface,samePagedLayout} from './helpers/compactSurfaces';
@@ -4569,4 +4570,71 @@ test('solo transport native names use actual asset instances, Save and Undo with
  await expect(logic).toContainText('requires physical boarding');await expect(logic).toContainText('not a flight controller');await expect(logic.getByRole('button',{name:'Enter → Open',exact:true})).toHaveCount(0);
  await page.getByRole('tab',{name:'Properties',exact:true}).click();await page.getByRole('tab',{name:'Logic',exact:true}).click();await expect(name).toHaveValue('extraction_spirit');
  await logic.getByRole('button',{name:'Clear native vehicle name',exact:true}).click();await expect(name).toHaveValue('');await page.keyboard.press('Control+z');await expect(name).toHaveValue('extraction_spirit');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.quickForge.placements[0].nativeName)).toBe('extraction_spirit');
+});
+
+
+async function mockNativeCommandRoutes(page:Page){
+ await mockDesktop(page);await page.evaluate(()=>{
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;
+  p.builds=[{id:'command-source',timestamp:'',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'c'.repeat(64),message:'Synthetic owned source'}];
+  const command={atom:'go_to',modifier:0,parameters:[0,0],point1:0,point2:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1};
+  w.__sparkMock.commandLists=[{index:0,name:'pilot_insert',flags:[false,false,false,false,false,false],bsp:-1,commands:[command],points:[[0,0,1],[4,0,2]]},{index:1,name:'pilot_return',flags:[false,false,false,false,false,false],bsp:-1,commands:[command],points:[[2,3,1],[4,5,3],[8,8,1]]}];
+  w.__sparkMock.commandOriginal=structuredClone(w.__sparkMock.commandLists);w.__sparkMock.commandSha='a'.repeat(64);w.__sparkMock.commandProtected=[];w.__sparkMock.commandPreviews=[];
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   const mock=w.__sparkMock;
+   if(command==='native_tag_inventory')return [{id:0,class:'scnr',path:'levels/test'}];
+   if(command==='native_tag_context')return {projectId:args.projectId,buildId:'command-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[],tagSha256:mock.commandSha,commandSource:{lists:structuredClone(mock.commandLists),atoms:['go_to','pause'],referenceCounts:[0,0,0,0,1]},protectedCommandLists:mock.commandProtected};
+   if(command==='native_operation_preview'){
+    if(args.operation.sourceSha256!==mock.commandSha)throw Error('Source changed');mock.commandPreviews.push(structuredClone(args.operation));
+    return {id:'command-preview',tag:'levels/test.scenario',toolId:'synthetic-source-writer',beforeSha256:mock.commandSha,afterSha256:'b'.repeat(64),changedBytes:4,fieldChanges:[{before:'point1 = 4,5,3',after:'reviewed coordinate proposal'}],detail:'Synthetic native review contract only',currentState:'before'};
+   }
+   if(command==='native_operation_accept'){
+    if(args.restore){mock.commandLists=structuredClone(mock.commandOriginal);mock.commandSha='a'.repeat(64);}
+    else{const operation=mock.commandPreviews.at(-1);mock.commandLists[operation.list.index]=structuredClone(operation.list);mock.commandSha='b'.repeat(64);}
+    return {operationId:args.operationId,revisionId:'reviewed-command-revision',tagsDirectory:'owned/tags',files:1,restored:args.restore,detail:'Synthetic accepted source revision'};
+   }
+   return invoke(command,args);
+  };
+ });
+ await openFixture(page);await chooseTool(page,'AI & scenario');
+ const native=page.locator('.native-tag-operations:visible');if(await native.getAttribute('open')===null)await native.locator(':scope > summary').click();
+ const form=page.locator('.native-command-lists:visible');await form.locator(':scope > summary').click();return form;
+}
+
+test('native command route points move visually and return to exact reviewed source and point',async({page},testInfo)=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));const form=await mockNativeCommandRoutes(page);
+ await form.getByRole('combobox',{name:'Native command source list',exact:true}).selectOption('1');await form.getByRole('combobox',{name:'Native command point',exact:true}).selectOption('1');
+ await form.getByRole('button',{name:'Show command route in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame command point',exact:true})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'Rotate (E)',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Scale (R)',exact:true})).toBeDisabled();
+ for(const size of [{width:800,height:600},{width:1280,height:720}]){await page.setViewportSize(size);const bar=page.locator('.viewport-object-actions:visible');expect(await bar.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);for(const button of await bar.getByRole('button').all())await expect(button).toBeVisible();await bar.getByRole('button',{name:'Frame command route',exact:true}).click();}
+ const canvas=page.locator('canvas[data-gs-gizmo]');await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(s=>s?JSON.parse(s).mode:null)).toBe('translate');
+ // Pick an actual unselected rendered waypoint, using existing read-only camera diagnostics.
+ const bounds=await canvas.boundingBox();expect(bounds).not.toBeNull();const pose=JSON.parse((await canvas.getAttribute('data-gs-camera'))!);
+ const camera=new PerspectiveCamera(55,bounds!.width/bounds!.height,.05,100000);camera.position.fromArray(pose.position);camera.quaternion.fromArray(pose.quaternion);camera.updateMatrixWorld(true);const marker=new Vector3(2,3,1).project(camera);
+ expect(Math.abs(marker.x)).toBeLessThan(1);expect(Math.abs(marker.y)).toBeLessThan(1);
+ const markerScreen={x:bounds!.x+(marker.x+1)*bounds!.width/2,y:bounds!.y+(1-marker.y)*bounds!.height/2};
+ console.log('Waypoint picking',JSON.stringify({bounds,pose,marker:marker.toArray(),markerScreen,target:await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.tagName,markerScreen)}));
+ await page.screenshot({path:testInfo.outputPath('command-route-before-pick.png')});await page.mouse.click(markerScreen.x,markerScreen.y);
+ await expect(page.locator('.viewport-object-actions:visible')).toContainText('Point 0');await page.getByRole('button',{name:'Review command source',exact:true}).click();await expect(form.getByRole('combobox',{name:'Native command point',exact:true})).toHaveValue('0');
+ await form.getByRole('combobox',{name:'Native command point',exact:true}).selectOption('1');await form.getByRole('button',{name:'Show command route in Level Editor',exact:true}).click();
+ const h=await canvas.evaluate(e=>{const r=e.getBoundingClientRect(),g=JSON.parse((e as HTMLElement).dataset.gsGizmo!);return{x:r.x+(g.handles.X[0]+1)*r.width/2,y:r.y+(1-g.handles.X[1])*r.height/2,dx:(g.handles.X[0]-g.origin[0])*r.width/2,dy:-(g.handles.X[1]-g.origin[1])*r.height/2};});const n=Math.hypot(h.dx,h.dy);expect(n).toBeGreaterThan(1);
+ await page.mouse.move(h.x,h.y);await page.mouse.down();await page.mouse.move(h.x+h.dx/n*40,h.y+h.dy/n*40,{steps:10});await page.mouse.up();
+ await page.getByRole('button',{name:'Lock command handles',exact:true}).click();await expect(page.getByRole('button',{name:'Unlock command handles',exact:true})).toBeVisible();await page.getByRole('button',{name:'Unlock command handles',exact:true}).click();
+ await page.getByRole('button',{name:'Review command source',exact:true}).click();
+ await expect(form.getByRole('combobox',{name:'Native command source list',exact:true})).toHaveValue('1');await expect(form.getByRole('combobox',{name:'Native command point',exact:true})).toHaveValue('1');
+ const x=form.getByRole('spinbutton',{name:'Command point X',exact:true});await expect(x).toBeFocused();expect(Number(await x.inputValue())).not.toBe(4);
+ await form.getByRole('button',{name:'Preview command list',exact:true}).click();const preview=page.getByRole('region',{name:'Native edit preview',exact:true});await expect(preview).toContainText('reviewed coordinate proposal');
+ const proposed=await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1).list);expect(proposed.index).toBe(1);expect(proposed.points[0]).toEqual([2,3,1]);expect(proposed.points[2]).toEqual([8,8,1]);expect(proposed.points[1][0]).not.toBe(4);expect(proposed.commands[0].point1).toBe(0);
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.commandSha)).toBe('b'.repeat(64));await expect(form.getByRole('combobox',{name:'Native command source list',exact:true})).toHaveValue('1');await expect(form.getByRole('combobox',{name:'Native command point',exact:true})).toHaveValue('1');
+ await expect(preview.getByRole('button',{name:'Restore before-edit tag',exact:true})).toBeEnabled();await preview.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.commandSha)).toBe('a'.repeat(64));
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.builds[0].id)).toBe('command-source');
+ await form.getByRole('combobox',{name:'Native command source list',exact:true}).selectOption('1');await form.getByRole('combobox',{name:'Native command point',exact:true}).selectOption('1');await expect(x).toHaveValue(String(proposed.points[1][0]));
+ expect(errors).toEqual([]);
+});
+
+test('native command routes refuse recipe ownership and hide handles after changed source',async({page})=>{
+ const form=await mockNativeCommandRoutes(page);await form.getByRole('combobox',{name:'Native command source list',exact:true}).selectOption('1');await form.getByRole('button',{name:'Show command route in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame command point',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Frame command point',exact:true})).toHaveCount(0);
+ await chooseTool(page,'AI & scenario');if(await form.getAttribute('open')===null)await form.locator(':scope > summary').click();await form.getByRole('button',{name:'Show command route in Level Editor',exact:true}).click();
+ await page.evaluate(()=>{(window as any).__sparkMock.commandSha='b'.repeat(64);window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}}));});await expect(page.getByRole('button',{name:'Frame command point',exact:true})).toHaveCount(0);
+ await page.evaluate(()=>(window as any).__sparkMock.commandProtected=[0,1]);await chooseTool(page,'Level editor');await chooseTool(page,'AI & scenario');const native=page.locator('.native-tag-operations:visible');if(await native.getAttribute('open')===null)await native.locator(':scope > summary').click();await native.getByRole('button',{name:'Refresh source',exact:true}).click();if(await form.getAttribute('open')===null)await form.locator(':scope > summary').click();await expect(form).toContainText('recipe-owned AI group');await expect(form.getByRole('button',{name:'Show command route in Level Editor',exact:true})).toBeDisabled();
 });

@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — compact mission controls; native freeze remains open
+Task: Operation110 — existing command-route viewport authoring/native proof
 Status: implementation incomplete
-Starting revision: bf9fb9a4488e3e6860ccfbfc124cfeb79913be68, canonical D:/Project Guilty Spark master.
-Latest verified revision: bf9fb9a base; focused source/UI checks pass; checkpoint commit in Git.
-Next action: native freeze reproduction when desktop prerequisite is restored; continue existing pilot/route authoring independently. No retry/bypass, Forerunner writes or push.
+Starting revision: c51309f99ad982da15bd6c2cb69af8c6e1049e05, canonical local master.
+Latest verified revision: c51309f base; current route source/browser/CE609 readback passes; checkpoint commit in Git.
+Next action: author native pilot/seat/approach/landing content in existing systems; resolve out-of-BSP routes before game acceptance. Desktop/37944 remain open; no bypass/push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current compact mission follow-up: Collapse all beats, responsive HUD fields, no repeated header, cached unchanged binding checks. Browser2/8sizes/128beats and frontend36/TypeScript/Vite pass; initial3incomplete-fixture failures fixed without production weakening. HUD162px at800/129px wider, overflow0. Two small browser captures in UI_INTERACTION_AUDIT. QAoutput disposed; no native freeze/37944 closure. Prior transport group proof remains in RUNTIME_INTEGRATION_20261107/Gitbf9fb9a.475IDs/fullGoal open.
+16Nov current command route: existing form→shared viewport→review/Restore/Save source wiring; frontend37/browser4/web/guard1/nativeCE4list readback pass. Fixed marker-bar obstruction and52px overflow. Native fixture21warnings (incl0BSP routes); not playable/flight acceptance. Hashes/failures/scope in RUNTIME_INTEGRATION_20261107. QA44344/run-dtMFHl CLOSED411106496logicalB; original hashes/475IDs preserved. Prior compactc51309f/37944/fullGoal remain recorded/open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 

@@ -1,6 +1,36 @@
 export interface NativeCommand {atom:string;modifier:number;parameters:[number,number];point1:number;point2:number;animation:number;script:number;recording:number;command:number;objectName:number}
 export interface NativeCommandList {index:number;name:string;flags:[boolean,boolean,boolean,boolean,boolean,boolean];bsp:number;commands:NativeCommand[];points:[number,number,number][]}
 export interface NativeCommandSource {lists:NativeCommandList[];atoms:string[];referenceCounts:[number,number,number,number,number]}
+
+/** Existing command-list proposal, shared with its form and window-local viewport.
+ * It is not a project object, pilot, accepted native edit or runtime route. */
+export const NATIVE_COMMAND_VIEW='world.command-list';
+export interface NativeCommandDraft {
+ key:string;projectId:string;buildId:string;tag:string;sourceSha256:string;
+ original:NativeCommandList;list:NativeCommandList;point:number;
+ active:boolean;focus:number;locked:boolean;reviewRequest?:number;frameRoute?:boolean;
+}
+export function nativeCommandKey(context:NativeTagContext,list:NativeCommandList):string {
+ return JSON.stringify([context.projectId,context.buildId,context.tag.replaceAll('\\','/'),context.tagSha256,list]);
+}
+export function nativeCommandMatches(draft:NativeCommandDraft,context:NativeTagContext):boolean {
+ const original=context.commandSource?.lists.find(row=>row.index===draft.original?.index);
+ return context.class==='scnr'&&!context.commandSourceIssue&&!!original&&
+  /^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&draft.projectId===context.projectId&&draft.buildId===context.buildId&&
+  draft.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&draft.sourceSha256===context.tagSha256&&
+  draft.key===nativeCommandKey(context,original)&&JSON.stringify(draft.original)===JSON.stringify(original)&&
+  draft.list.index===original.index&&draft.list.name===original.name&&draft.list.commands.length===original.commands.length&&
+  draft.list.points.length===original.points.length&&!context.protectedCommandLists?.includes(original.index);
+}
+export function nativeCommandPoint(draft:NativeCommandDraft|null):[number,number,number]|null {
+ const point=draft?.list.points[draft.point];return draft&&Number.isInteger(draft.point)&&draft.point>=0&&draft.point<64&&
+  Array.isArray(point)&&point.length===3&&point.every(v=>Number.isFinite(v)&&Math.abs(v)<=1e6)?point:null;
+}
+export function nativeCommandDrag(start:NativeCommandDraft|null,current:NativeCommandDraft|null,next:readonly number[]|undefined,enabled:boolean):NativeCommandDraft|null {
+ if(!enabled||!start?.active||!current?.active||start.locked||current.locked||
+  JSON.stringify(start)!==JSON.stringify(current)||!nativeCommandPoint(current)||!next||next.length!==3||next.some(v=>!Number.isFinite(v)||Math.abs(v)>1e6))return null;
+ return {...current,list:{...current.list,points:current.list.points.map((p,i)=>i===current.point?[next[0],next[1],next[2]]:p)}};
+}
 import type { FirefightConfig } from './firefight';
 export const campaignAiStates=['sleeping','alert','guarding','searching','fleeing','moving_repeat_same_position','moving_loop','moving_loop_back_and_forth','moving_loop_randomly','moving_randomly'] as const;
 export type CampaignAiState=typeof campaignAiStates[number];

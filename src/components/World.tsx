@@ -1,6 +1,7 @@
 import {NATIVE_DEVICE_VIEW,deviceMatches,deviceIdentity,deviceScope,deviceTransform,deviceSceneObject,deviceObjectId} from '../nativeDevicePlacement';
 import type {NativeDeviceView} from '../nativeDevicePlacement';
-import type {NativeTagContext} from '../nativeOperations';
+import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
+import type {NativeTagContext,NativeCommandDraft} from '../nativeOperations';
 import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
 import {NATIVE_VOLUME_VIEW} from '../nativeTriggerVolume';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
@@ -543,6 +544,7 @@ export default function World({
   onReviewCamera,
   onReviewTrigger,
   onReviewDevice,
+  onReviewCommand,
   onResourcesConnected,
   onBeforeResources,
   onBakeBuild,
@@ -569,6 +571,7 @@ export default function World({
   onReviewCamera?:()=>void;
   onReviewTrigger?:()=>void;
   onReviewDevice?:()=>void;
+  onReviewCommand?:()=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: (persist?:boolean) => Promise<void>;
   onBakeBuild?:()=>Promise<void>;
@@ -612,7 +615,8 @@ export default function World({
   const [nativeVolume,setNativeVolume]=useMapState<NativeVolumeView|null>(project.id,NATIVE_VOLUME_VIEW,()=>null);
   const [nativeCamera,setNativeCamera]=useMapState<NativeCameraView|null>(project.id,NATIVE_CAMERA_VIEW,()=>null);
   const [nativeAiStart,setNativeAiStart]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
-  const setSelected=(id:string|null)=>{if(id!==null&&nativeDevice?.active&&id!==deviceObjectId(nativeDevice.original))setNativeDevice({...nativeDevice,active:false});if(id)setNativeVolume(v=>v?.active?{...v,active:false}:v);if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
+  const [nativeCommand,setNativeCommand]=useMapState<NativeCommandDraft|null>(project.id,NATIVE_COMMAND_VIEW,()=>null);
+  const setSelected=(id:string|null)=>{if(id)setNativeCommand(v=>v?.active?{...v,active:false}:v);if(id!==null&&nativeDevice?.active&&id!==deviceObjectId(nativeDevice.original))setNativeDevice({...nativeDevice,active:false});if(id)setNativeVolume(v=>v?.active?{...v,active:false}:v);if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
   const tagDocument=library?.documents.find(document=>document.id===tagSource);
   const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
   const librarySources = useAssetLibrarySources(library?.documents ?? []);
@@ -678,6 +682,7 @@ export default function World({
   const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
   const ortho=!cinematic&&savedOrtho;
   function setMode(next:'translate'|'rotate'|'scale') {
+    if(!cinematic&&nativeCommand?.active&&next!=='translate'){notify('Native command route points support XYZ movement only. Review action parameters separately in Native source controls.');return;}
     if(!cinematic&&nativeDevice?.active&&next==='scale'){notify('Native device source supports position/rotation; scale and structural edits need their own source workflow.');return;}
     if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI points support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.');return;}
     setModeState(next);setNativeVolume(v=>v?.active&&v.mode!==next?{...v,mode:next}:v);
@@ -685,6 +690,7 @@ export default function World({
   }
   const [fly, setFly] = useMapState(project.id,'world.fly',false);
   useEffect(()=>{
+    if(nativeAiStart?.active)setNativeCommand(v=>v?.active?{...v,active:false}:v);
     if(nativeAiStart?.active)setNativeDevice(v=>v?.active?{...v,active:false}:v);
     // An explicit source-handle request owns navigation, not a cinematic
     // camera. Later user flight toggles remain independent of the proposal.
@@ -692,10 +698,11 @@ export default function World({
       setNativeVolume(null);setFly(false);setPlayerView(false);setMode(nativeAiStart.mode??'translate');
     }
   },[nativeAiStart?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
-  useEffect(()=>{if(nativeCamera?.active&&nativeCamera.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeVolume(null);setOrtho(false);setFly(true);setPlayerView(false);setNativeAiStart(v=>v?.active?{...v,active:false}:v);}},[nativeCamera?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
-  useEffect(()=>{if(nativeVolume?.active&&nativeVolume.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setFly(false);setPlayerView(false);setNativeAiStart(null);setNativeCamera(null);setMode(nativeVolume.mode??"translate");}},[nativeVolume?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
+  useEffect(()=>{if(nativeCamera?.active&&nativeCamera.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeCommand(v=>v?.active?{...v,active:false}:v);setNativeVolume(null);setOrtho(false);setFly(true);setPlayerView(false);setNativeAiStart(v=>v?.active?{...v,active:false}:v);}},[nativeCamera?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
+  useEffect(()=>{if(nativeVolume?.active&&nativeVolume.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeCommand(v=>v?.active?{...v,active:false}:v);setFly(false);setPlayerView(false);setNativeAiStart(null);setNativeCamera(null);setMode(nativeVolume.mode??"translate");}},[nativeVolume?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [frame, setFrame] = useState(0);
-  useEffect(()=>{if(nativeDeviceReady&&nativeDevice?.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeVolume(null);setNativeAiStart(null);setNativeCamera(null);setFly(false);setPlayerView(false);setLocalSelected(deviceObjectId(nativeDevice.original));setModeState('translate');setFrame(n=>n+1);}},[nativeDevice?.focus,nativeDeviceReady,project.id,cinematic,externalCameraAuthority,cameraLocked]);
+  useEffect(()=>{if(nativeDeviceReady&&nativeDevice?.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeCommand(v=>v?.active?{...v,active:false}:v);setNativeVolume(null);setNativeAiStart(null);setNativeCamera(null);setFly(false);setPlayerView(false);setLocalSelected(deviceObjectId(nativeDevice.original));setModeState('translate');setFrame(n=>n+1);}},[nativeDevice?.focus,nativeDeviceReady,project.id,cinematic,externalCameraAuthority,cameraLocked]);
+  useEffect(()=>{if(!nativeCommand?.active||!nativeCommand.focus||cinematic||externalCameraAuthority||cameraLocked)return;setNativeDevice(v=>v?.active?{...v,active:false}:v);setNativeAiStart(null);setNativeCamera(null);setNativeVolume(null);setFly(false);setPlayerView(false);setLocalSelected(null);setModeState('translate');},[nativeCommand?.focus,nativeCommand?.active,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
   const [startId,setStartId]=useMapState(project.id,'world.start','');
   const [bsp, setBsp] = useMapState(project.id,'world.bsp',0);
@@ -1268,9 +1275,10 @@ export default function World({
           if (!fly) setMode('scale');
           break;
         case 'f':
-          if (!fly) {setPlayerView(false);if(nativeVolume?.active)setNativeVolume({...nativeVolume,focus:Date.now()});else if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else setFrame((f) => f + 1);}
+          if (!fly) {setPlayerView(false);if(nativeVolume?.active)setNativeVolume({...nativeVolume,focus:Date.now()});else if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else if(nativeCommand?.active)setNativeCommand({...nativeCommand,focus:Date.now(),frameRoute:false});else setFrame((f) => f + 1);}
           break;
         case 'escape':
+          setNativeCommand(v=>v?.active?{...v,active:false}:v);
           setNativeDevice(v=>v?.active?{...v,active:false}:v);
             setNativeVolume(v=>v?.active?{...v,active:false}:v);
           setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSelected(null);
@@ -1280,7 +1288,7 @@ export default function World({
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [activity.active,fly,project.id,chosen,catalog,assetBusy,nativeAiStart,nativeVolume,nativeDevice]);
+  }, [activity.active,fly,project.id,chosen,catalog,assetBusy,nativeAiStart,nativeVolume,nativeDevice,nativeCommand]);
   return (
     <div
       className="world-layout"
@@ -1441,10 +1449,10 @@ export default function World({
             >
               <Move3D size={17} />
             </IconButton>
-            <IconButton label="Rotate (E)" active={mode === 'rotate'} disabled={!!nativeAiStart?.active&&!Number.isFinite(nativeAiStart.originalFacingRadians)} onClick={() => setMode('rotate')}>
+            <IconButton label="Rotate (E)" active={mode === 'rotate'} disabled={!cinematic&&!!nativeCommand?.active||!!nativeAiStart?.active&&!Number.isFinite(nativeAiStart.originalFacingRadians)} onClick={() => setMode('rotate')}>
               <Rotate3D size={17} />
             </IconButton>
-            <IconButton label="Scale (R)" active={mode === 'scale'} disabled={!!nativeAiStart?.active||!cinematic&&!!nativeDevice?.active} onClick={() => setMode('scale')}>
+            <IconButton label="Scale (R)" active={mode === 'scale'} disabled={!!nativeAiStart?.active||!cinematic&&(!!nativeDevice?.active||!!nativeCommand?.active)} onClick={() => setMode('scale')}>
               <Scaling size={17} />
             </IconButton>
           </div>
@@ -1614,7 +1622,7 @@ export default function World({
                   />
                 )}
                 {!cinematic&&!externalCameraAuthority&&<NativeTriggerVolumeOverlay project={project} mode={mode} enabled={activity.active&&!fly&&!cameraLocked&&!pickTarget} snap={snap} onSelectScene={()=>{setPlayerView(false);setSelected(null);setZoneSelection(null);}} onStart={onSceneDragStart} onEnd={onSceneDragEnd} notify={notify}/>}
-                {!cinematic&&!externalCameraAuthority&&<NativeAiStartOverlay project={project} mode={mode} enabled={!fly&&!cameraLocked&&!pickTarget} snap={snap}
+                {!cinematic&&!externalCameraAuthority&&<NativeAiStartOverlay project={project} command={nativeCommand} onCommandChange={setNativeCommand} mode={mode} enabled={activity.active&&!fly&&!cameraLocked&&!pickTarget} snap={snap}
                   onSelectScene={()=>{setPlayerView(false);setSelected(null);setZoneSelection(null);}} onStart={onSceneDragStart} onEnd={onSceneDragEnd} notify={notify}/>}
                 {viewportChildren}
               </Canvas>}
@@ -1623,6 +1631,7 @@ export default function World({
           {!cinematic&&nativeDevice?.active&&<div className="viewport-object-actions native-device-actions" role="status"><strong>Native device · {nativeDevice.original.name||nativeDevice.original.tagPath}</strong><span>Source model pose proposal · Move (W) / Rotate (E), then review</span>{chosen?.tagId!=null&&<button onClick={()=>openObjectTag(chosen.tagId!)}>Object tags</button>}<button onClick={()=>revealPanel('inspector')}>Transform</button><button disabled={!nativeDeviceReady||fly||cameraLocked||!!externalCameraAuthority} onClick={()=>{setPlayerView(false);setFrame(n=>n+1);}}>Frame native device</button>{onReviewDevice&&<button onClick={onReviewDevice}>Review device source</button>}<button onClick={()=>setNativeDevice({...nativeDevice,locked:!nativeDevice.locked})}>{nativeDevice.locked?'Unlock device handles':'Lock device handles'}</button><button onClick={()=>{setNativeDevice({...nativeDevice,active:false});setLocalSelected(null);}}>Hide device handles</button></div>}
           {!cinematic&&nativeVolume?.active&&<div className="viewport-object-actions" role="status"><strong>Trigger area · {nativeVolume.original.name}</strong><span>Source box proposal · Move (W), Rotate (E), Size (R); F frames</span><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeVolume({...nativeVolume,focus:Date.now()})}>Frame trigger area</button>{onReviewTrigger&&<button onClick={onReviewTrigger}>Review trigger source</button>}<button onClick={()=>setNativeVolume({...nativeVolume,locked:!nativeVolume.locked})}>{nativeVolume.locked?"Unlock trigger handles":"Lock trigger handles"}</button><button onClick={()=>setNativeVolume({...nativeVolume,active:false})}>Hide trigger handles</button></div>}
           {!cinematic&&nativeCamera?.active&&<div className="viewport-object-actions"><strong>Cutscene camera · {nativeCamera.original.name||nativeCamera.original.index}</strong><span>Editor preview · fly/orbit, then return and capture the viewport pose</span>{onReviewCamera&&<button onClick={onReviewCamera}>Review cutscene camera source</button>}<button onClick={()=>setNativeCamera({...nativeCamera,active:false})}>Leave camera preview</button></div>}
+          {!cinematic&&nativeCommand?.active&&<div className="viewport-object-actions native-command-actions" role="status"><strong>Command route · {nativeCommand.list.name||nativeCommand.list.index} / Point {nativeCommand.point}</strong><span>Unsaved source waypoint · Move (W), F frames; not a pilot flight simulation</span><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeCommand({...nativeCommand,focus:Date.now(),frameRoute:false})}>Frame command point</button><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeCommand({...nativeCommand,focus:Date.now(),frameRoute:true})}>Frame command route</button>{onReviewCommand&&<button onClick={onReviewCommand}>Review command source</button>}<button onClick={()=>setNativeCommand({...nativeCommand,locked:!nativeCommand.locked})}>{nativeCommand.locked?'Unlock command handles':'Lock command handles'}</button><button onClick={()=>setNativeCommand({...nativeCommand,active:false})}>Hide command handles</button></div>}
           {!cinematic&&nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
             <strong>{nativeAiStart.kind==='firing'?'AI firing draft':nativeAiStart.kind==='patrol'?'AI patrol draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
             <span>{nativeAiStart.kind==='firing'?'Unsaved XYZ/group proposal · Move (W), then review in Native source controls':'Unsaved pose · Move (W) / Rotate (E), then review in Native source controls'}</span>

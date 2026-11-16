@@ -8,7 +8,7 @@ Campaign authored AI starts now share viewport/form/history/locks/visibility, wi
 
 Campaign initial/return behavior now connects existing source controls/history/Save/peer conflicts/native writer and independent five-state tag readback. Focused tests pass; its native app/cache/game integration remains open. Existing pose proof is separate.
 
-Native authored campaign patrol now connects source/form/viewport/order/history/locks/clipboard, moving states, Save/restart, production compiled movement verification and independent MCC13 readback. Exact Windows proof/digests and limits: RUNTIME_INTEGRATION_20261107, Native campaign patrol authoring. Actual navigation/combat, original command-list editing and all broader475/M1–M6 gates remain open.
+Native authored campaign patrol now connects source/form/viewport/order/history/locks/clipboard, moving states, Save/restart, production compiled movement verification and independent MCC13 readback. Exact Windows proof/digests and limits: RUNTIME_INTEGRATION_20261107, Native campaign patrol authoring. Actual navigation/combat, command-list structural creation/game execution and all broader475/M1–M6 gates remain open.
 
 ## 14 November 2026 — Recovered Firefight source revision WIP
 
@@ -222,3 +222,5 @@ Owner addendum: full in-game HUD editor is required, not just Firefight text or 
 
 
 16Nov solo vehicle native bindings and transport signals: existing placement/history/SparkLink/Logic UI→standard names and optional boarded/called group definitions→native compiler→independent CE609 name/type/index/tag/pose/group readback passes in scope. Explicit disable produces0groups versus4enabled; aliases/nonzero/one-shot/stale groups refuse. Old source remains compatible; copies start unbound. Frontend36/browser2/core13/reader6, all-core-test compilation,2examples/web and native source/paired fresh-cache probes pass. Caches ef0f7335…enabled/30cc5b9c…disabled borrow a BSP and retain12legacy warnings per build; not new geometry, full Black Echo, native Windows restart, real flight/boarding/settlement, multiplayer or human acceptance. Source/475CSV and original inputs preserved. Exact scope/hashes/remaining pilot-flight-crew requirements are in existing runtime/audit/human records. Full M1–M6/Operation110 remain active.
+
+16Nov existing fixed-index command-route visual source editing: shared gizmo/form/native Preview/Accept/Restore/Save, source/window ownership and CE609 full4list independent readback pass in scope. See RUNTIME_INTEGRATION_20261107 and UI_INTERACTION_AUDIT for separate browser/native fixtures,21compiler warnings and exact bounds. Full Windows restart, pilot navigation/landing/flight/crew/settlement and broader command creation remain open;475IDs and M1–M6 unchanged.
