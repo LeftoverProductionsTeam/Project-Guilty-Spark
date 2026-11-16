@@ -241,7 +241,7 @@ pub struct CapabilityEvidence {
 #[cfg(test)] mod hosting_context_tests {
     use super::*;
     #[test]
-    fn forerunner_profiles_keep_exact_binary_and_dependency_architecture(){assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X86_SHA256),Some(0x014c));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(&"0".repeat(64)),None);assert_eq!(shared_content_interface(RuntimeId::OpenCe,FORERUNNER_WINDOWS_X64_SHA256),Some("forerunner"));assert_eq!(shared_content_interface(RuntimeId::ChupathingyCe,FORERUNNER_WINDOWS_X64_SHA256),None);}
+    fn forerunner_profiles_keep_exact_binary_and_dependency_architecture(){assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X86_SHA256),Some(0x014c));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(&"0".repeat(64)),None);assert_eq!(shared_content_interface(RuntimeId::OpenCe,FORERUNNER_WINDOWS_X64_SHA256),Some("forerunner"));assert_eq!(shared_content_interface(RuntimeId::ChupathingyCe,FORERUNNER_WINDOWS_X64_SHA256),None);}
     #[test] fn multiplayer_and_campaign_guides_use_their_actual_menu_context(){
         let multiplayer=hosting_plan_for(RuntimeId::MccSteam,HostingAction::HostPrivateOnline,Some(1));
         assert!(multiplayer.steps.iter().any(|step|step.contains("Custom Games")));
@@ -933,11 +933,13 @@ pub fn activate_registration(registrations: &mut Vec<RuntimeRegistration>, id: &
 pub const FORERUNNER_WINDOWS_X86_SHA256: &str =
     "fb8d204f21e57a4db6ed44f078338a02023c49a3998b6a437e1f4d1d8f8fa4b7";
 
-/// Owner-approved help/discovery,15Nov: build25767db9, Windows/x64,
+/// Owner-approved help/discovery,15Nov: buildf9b6d8dc, Windows/x64,
 /// contract1, runtime.discover only, network45/native44, CE609 solo startup.
 /// This admits the documented path interface, not game/mission acceptance.
-pub const FORERUNNER_WINDOWS_X64_SHA256:&str="9543508eced47d7237d69310915f4f78344b248b83686c7e2cafe82ba9e6b17b";
-pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_SHA256=>Some(0x8664),_=>None}}
+pub const FORERUNNER_WINDOWS_X64_SHA256:&str="ebe2064750c43173b3126c18b44e3215e833a3cc304b6259743a5ad5af09ef65";
+/// Previously reviewed build25767db9 remains usable as its own exact identity.
+pub const FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256:&str="9543508eced47d7237d69310915f4f78344b248b83686c7e2cafe82ba9e6b17b";
+pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_SHA256|FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256=>Some(0x8664),_=>None}}
 
 /// Reviewed path interfaces only. A declared version or a similarly named executable is insufficient.
 /// Local Faber234/Chupathingy identities are owner-installed, not publisher attestations.

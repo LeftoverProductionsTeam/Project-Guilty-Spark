@@ -318,6 +318,18 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
     let _=native_mission_hud(&binding)?;
     Ok(Some(binding))
 }
+/// A recovered native mission may lack Studio metadata. Admit the existing
+/// engine mode from its compiled callback/markers, never from a project label.
+pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<bool> {
+    let callbacks=map.scripts.iter().filter(|s|s.name=="forerunner_extraction_complete").collect::<Vec<_>>();
+    if callbacks.is_empty(){return Ok(false);}
+    if callbacks.len()!=1||callbacks[0].script_type!=1||map.header.version!=609||map.header.scenario_type!=0||map.header.extended {
+        return invalid("Forerunner settled Extraction requires one dormant callback in a standard native CE609 solo map");
+    }
+    let markers=crate::maps::scenario_logic_readback(cache,map)?;
+    crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
+    Ok(true)
+}
 /// Native ScriptType values follow the existing Invader scenario definition.
 /// Presence/type checks are independent readback, not gameplay acceptance.
 pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {

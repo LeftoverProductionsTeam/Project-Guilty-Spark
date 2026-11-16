@@ -111,9 +111,9 @@ fn registration(state: &AppState) -> Reply<runtime::RuntimeRegistration> {
     Ok(registration)
 }
 pub(crate) fn checked_build(state: &AppState, project: &Project, build_id: Option<&str>) -> Reply<BuildRecord> {
-    checked_build_for(state,project,build_id,1)
+    checked_build_for(state,project,build_id,1).map(|(build,_)|build)
 }
-fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>, scenario_type:u16) -> Reply<BuildRecord> {
+fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>, scenario_type:u16) -> Reply<(BuildRecord,bool)> {
     let build = if let Some(id) = build_id { verified_build(state, project, id)? } else { current_build(state, project)? };
     if build.target != "gbx-custom" { return Err(if scenario_type==0{"Build the saved project as standard Custom Edition solo content for Forerunner first"}else{"Build the saved project as standard Custom Edition content for Chupathingy first"}.into()); }
     let output = build.output.as_ref().ok_or("Validated native output is missing")?;
@@ -128,7 +128,8 @@ fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>
         return Err("This playtest needs a self-contained CE build. Rebuild with native embedded resources; no unrelated bitmap/sound bank is substituted".into());
     }
     if build.sha256.as_deref() != Some(inspection.sha256.as_str()) { return Err("Native output changed during inspection; the running game was left alone".into()); }
-    Ok(build)
+    let extraction=core::creative::compiled_extraction_mode(output,&inspection).map_err(error)?;
+    Ok((build,extraction))
 }
 fn copy_pin(source: &Path, target: &Path, expected: &str, total: &mut u64) -> Reply<()> {
     copy_pin_bounded(source,target,expected,total,COPY_LIMIT)
@@ -220,7 +221,8 @@ fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&S
     // HALO_START_MAP request is inherited or invented here.
     for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
     if stage.forerunner_extraction&&runtime::forerunner_windows_machine(&original.executable_sha256)!=Some(0x8664){return Err("This older Forerunner build is not reviewed for native Extraction settlement; select the current verified x64 profile".into());}
-    if stage.forerunner_extraction{command.env("HALO_EXTRACTION","true").env("HALO_NET_COOP_SCRIPT_ADAPTATIONS","false");}
+    command.env("HALO_EXTRACTION",if stage.forerunner_extraction{"true"}else{"false"});
+    if stage.forerunner_extraction{command.env("HALO_NET_COOP_SCRIPT_ADAPTATIONS","false");}
     if runtime::forerunner_windows_machine(&original.executable_sha256)==Some(0x014c){command.env("HALO_RENDERER","gl");}
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());Ok(command)
 }
@@ -397,14 +399,15 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let mission_extraction=project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled"));
         if mission_extraction&&runtime_id!=runtime::RuntimeId::OpenCe{return Err("This saved mission requires Forerunner native settled extraction; another engine cannot complete its objective".into());}
-        let build=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{checked_build(&state,&project,None)?};
+        let (build,compiled_extraction)=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{(checked_build(&state,&project,None)?,false)};
+        if mission_extraction&&!compiled_extraction{return Err("The saved mission requires native settled Extraction, but this compiled revision has no admitted callback and hub layout. Rebuild the reviewed mission first".into());}
         // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
         let mut workbench=lock(&state.runtime_workbench)?;
         if workbench.rebuilds.values().any(|s|s.view.lock().is_ok_and(|v|!matches!(v.phase.as_str(),"stopped"|"failed"))) { return Err("Stop the existing Live Rebuild playtest before starting another; other windows keep their own work".into()); }
         let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
-        let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=mission_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
+        let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
         match result {
             Ok(run)=>{let answer=lock(&session.view)?.clone();std::thread::spawn(move||{let result=drive(app,owner,reg,session.clone(),run);if let Ok(mut view)=session.view.lock(){view.process_id=None;view.game_build_id=None;view.game_sha256=None;view.pending_job_id=None;view.phase=if result.is_ok(){"stopped"}else{"failed"}.into();view.detail=result.err().unwrap_or_else(||"Private playtest stopped; generated runtime scratch disposed. Source and build history remain.".into());}});Ok(answer)}
             Err(problem)=>{let mut view=lock(&session.view)?;view.phase="failed".into();view.error=Some(problem.clone());Err(problem)}

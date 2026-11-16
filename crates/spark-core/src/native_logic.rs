@@ -434,6 +434,16 @@ fn vector(v: [f32; 3]) -> String {
 }
 /// Invader operates on stock native fields; the sidecar never becomes tag data.
 struct TriggerGeometry {forward:[f32;3],up:[f32;3],corner:[f32;3],dimensions:[f32;3]}
+impl TriggerGeometry {
+    fn contains(&self,point:[f32;3])->bool {
+        let dot=|a:[f32;3],b:[f32;3]|a.iter().zip(b).map(|(x,y)|x*y).sum::<f32>();
+        if point.iter().chain(self.forward.iter()).chain(self.up.iter()).chain(self.corner.iter()).chain(self.dimensions.iter()).any(|v|!v.is_finite())
+            ||self.dimensions.iter().any(|d|*d<=0.)||(dot(self.forward,self.forward)-1.).abs()>1e-4||(dot(self.up,self.up)-1.).abs()>1e-4||dot(self.forward,self.up).abs()>1e-4{return false;}
+        let [ux,uy,uz]=self.up;let [fx,fy,fz]=self.forward;let side=[uy*fz-uz*fy,uz*fx-ux*fz,ux*fy-uy*fx];
+        let delta=std::array::from_fn(|i|point[i]-self.corner[i]);
+        [self.forward,side,self.up].into_iter().zip(self.dimensions).all(|(axis,extent)|{let value=dot(delta,axis);value>=-1e-5&&value<=extent+1e-5})
+    }
+}
 fn trigger_geometry(trigger:&Trigger)->Result<TriggerGeometry>{
     if trigger.rotation[0].abs()>0.00001||trigger.rotation[1].abs()>0.00001 {
         return invalid("Native trigger volumes currently support yaw rotation; X/Y tilt is not implemented");
@@ -477,11 +487,7 @@ pub fn validate_extraction_layout(doc:&QuickForgeDocument,activation_powered:boo
     if logic.manual_source.is_some(){return invalid("Handwritten startup owns extraction power; reconcile it before preparing");}
     let zone=|name:&str|->Result<&Trigger>{let found=logic.triggers.iter().filter(|t|trigger_name(t)==name).collect::<Vec<_>>();if found.len()!=1{return invalid(format!("Extraction needs one named {name} volume"));}Ok(found[0])};
     let hub=zone("extraction_return")?;let field=zone("extraction_zone")?;
-    let inside=|point:[f32;3],volume:&Trigger| {
-        if point.iter().chain(volume.position.iter()).chain(volume.rotation.iter()).chain(volume.dimensions.iter()).any(|v|!v.is_finite())||volume.dimensions.iter().any(|v|*v<=0.)||volume.rotation[0].abs()>1e-5||volume.rotation[1].abs()>1e-5{return false;}
-        let x=point[0]-volume.position[0];let y=point[1]-volume.position[1];let(c,s)=(volume.rotation[2].cos(),volume.rotation[2].sin());
-        [x*c+y*s,-x*s+y*c,point[2]-volume.position[2]].iter().zip(volume.dimensions).all(|(v,d)|v.abs()<=d/2.+1e-5)
-    };
+    let inside=|point:[f32;3],volume:&Trigger|trigger_geometry(volume).is_ok_and(|geometry|geometry.contains(point));
     for(name,powered)in[("extraction_deploy",true),("extraction_activate",activation_powered)] {
         let rows=logic.devices.iter().filter(|d|d.native_name.as_deref()==Some(name)).collect::<Vec<_>>();if rows.len()!=1||rows[0].powered!=powered||!rows[0].initial_position.is_finite()||!(0. ..0.5).contains(&rows[0].initial_position){return invalid("Extraction native control power/position is incomplete");}
         let placements=doc.placements.iter().filter(|p|p.id==rows[0].placement_id&&p.tag_class=="ctrl").collect::<Vec<_>>();if placements.len()!=1{return invalid("Extraction needs one native control placement per binding");}let p=placements[0].position;
@@ -490,6 +496,30 @@ pub fn validate_extraction_layout(doc:&QuickForgeDocument,activation_powered:boo
     if doc.spawns.is_empty()||doc.spawns.iter().any(|spawn|!inside(spawn.position,hub)||inside(spawn.position,field)){return invalid("Every selectable native player start must be inside the safe hub and outside activation, including hidden or filtered starts");}
     Ok(())
 }
+/// Read-only compiled marker/start admission for the existing Forerunner mode.
+/// The engine still owns control-use behavior, collision, settlement and gameplay.
+pub fn validate_compiled_extraction_layout(map:&crate::maps::MapInspection,read:&crate::maps::ScenarioLogicReadback)->Result<()> {
+    if map.diagnostics.iter().any(|d|d.code=="PLAYER_SPAWNS_UNREADABLE"){return invalid("Compiled Extraction player starts are unreadable");}
+    let volume=|name:&str|->Result<TriggerGeometry>{
+        let rows=read.volumes.iter().filter(|v|v.name==name).collect::<Vec<_>>();
+        if rows.len()!=1||rows[0].kind!=1{return invalid(format!("Compiled Extraction needs one readable rotational {name} volume"));}
+        let g=rows[0].geometry.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled Extraction volume geometry is unavailable".into()))?;
+        Ok(TriggerGeometry{forward:g.forward,up:g.up,corner:g.corner,dimensions:g.dimensions})
+    };
+    let hub=volume("extraction_return")?;let field=volume("extraction_zone")?;
+    for name in ["extraction_deploy","extraction_activate"] {
+        let rows=read.names.iter().enumerate().filter(|(_,n)|n.name==name).collect::<Vec<_>>();
+        if rows.len()!=1||rows[0].1.object_type!=8||rows[0].1.object_index<0{return invalid(format!("Compiled Extraction control {name} is missing, ambiguous or has the wrong native type"));}
+        let (name_index,binding)=rows[0];let devices=read.devices.iter().filter(|d|d.class=="ctrl"&&d.index==binding.object_index as usize&&d.name_index==name_index as i16).collect::<Vec<_>>();
+        if devices.len()!=1{return invalid("Compiled Extraction control reverse binding is invalid");}
+        let point=devices[0].position;
+        if name=="extraction_deploy"&&(!hub.contains(point)||field.contains(point))||name=="extraction_activate"&&!field.contains(point){return invalid("Compiled Extraction controls are outside their hub/activation areas");}
+    }
+    let starts=map.objects.iter().filter(|o|o.kind=="Player spawn").collect::<Vec<_>>();
+    if starts.is_empty()||starts.iter().any(|s|!hub.contains(s.position)||field.contains(s.position)){return invalid("Every compiled player start must be inside the safe hub and outside activation");}
+    Ok(())
+}
+
 pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec<ForgeCommand>> {
     validate(doc)?;
     let Some(logic) = &doc.logic else {

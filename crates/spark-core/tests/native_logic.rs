@@ -314,3 +314,37 @@ fn compiled_extraction_markers_require_exact_names_devices_and_rotated_volumes()
     let mut missing=expected.clone();missing.volumes.clear();assert!(l::verify_marker_readback(&doc,&missing).is_err());
     let mut extra=expected.clone();extra.names.push(expected.names[0].clone());assert!(l::verify_marker_readback(&doc,&extra).is_err());
 }
+
+
+#[test]
+#[ignore="Requires an explicitly selected owned CE609 Extraction map; read-only"]
+fn installed_compiled_extraction_checks_all_hub_starts_and_native_bindings() {
+    use spark_core::{maps,creative};
+    let path=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_EXTRACTION_CACHE").expect("Explicit owned native cache required"));
+    let before=maps::hash_file(&path).unwrap();let map=maps::inspect_map(&path,None).unwrap();
+    assert!(creative::compiled_extraction_mode(&path,&map).unwrap());
+    let markers=maps::scenario_logic_readback(&path,&map).unwrap();
+    l::validate_compiled_extraction_layout(&map,&markers).unwrap();
+    for fault in 0..8 {
+        let mut wrong=markers.clone();
+        match fault {
+            0=>{wrong.volumes.retain(|v|v.name!="extraction_return");},
+            1=>{let row=wrong.volumes.iter().find(|v|v.name=="extraction_zone").unwrap().clone();wrong.volumes.push(row);},
+            2=>wrong.volumes.iter_mut().find(|v|v.name=="extraction_return").unwrap().kind=0,
+            3=>wrong.volumes.iter_mut().find(|v|v.name=="extraction_return").unwrap().geometry.as_mut().unwrap().forward=[0.;3],
+            4=>wrong.names.iter_mut().find(|n|n.name=="extraction_deploy").unwrap().object_type=7,
+            5=>wrong.names.iter_mut().find(|n|n.name=="extraction_activate").unwrap().object_index=-1,
+            6=>{let row=wrong.names.iter().find(|n|n.name=="extraction_deploy").unwrap().clone();wrong.names.push(row);},
+            _=>{for row in &mut wrong.devices {row.position=[f32::NAN,0.,0.];}},
+        }
+        assert!(l::validate_compiled_extraction_layout(&map,&wrong).is_err(),"native marker fault {fault}");
+    }
+    let mut wrong=map.clone();let spawn=wrong.objects.iter_mut().find(|o|o.kind=="Player spawn").expect("Native hub spawn");spawn.position=[f32::NAN,0.,0.];spawn.visible=false;
+    assert!(l::validate_compiled_extraction_layout(&wrong,&markers).is_err(),"hidden invalid starts cannot be filtered away");
+    let mut wrong=map.clone();let callback=wrong.scripts.iter_mut().find(|s|s.name=="forerunner_extraction_complete").unwrap();callback.script_type=0;
+    assert!(creative::compiled_extraction_mode(&path,&wrong).is_err());
+    let mut wrong=map.clone();wrong.scripts.retain(|s|s.name!="forerunner_extraction_complete");assert!(!creative::compiled_extraction_mode(&path,&wrong).unwrap());
+    let mut wrong=map.clone();wrong.header.version=13;assert!(creative::compiled_extraction_mode(&path,&wrong).is_err());
+    assert_eq!(before,maps::hash_file(&path).unwrap());
+    println!("Compiled Extraction callback/markers/all {} hub starts PASS; cacheSHA={before}; not gameplay or control-use acceptance",map.objects.iter().filter(|o|o.kind=="Player spawn").count());
+}
