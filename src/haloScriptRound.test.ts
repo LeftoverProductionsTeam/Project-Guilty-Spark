@@ -1,4 +1,4 @@
-import {exportHaloCeTransport,readNativeTransportSource,recoveredCampaignMission,readRecoveredMissionSource} from './haloScript';
+import {exportHaloCeTransport,readNativeTransportSource,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource} from './haloScript';
 import { describe, expect, it } from 'vitest';
 import {emptyCreatorStudio} from './creatorStudio';
 import { attachNativeFirefightRound, exportHaloCeFirefightRound, exportPlannedFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
@@ -179,10 +179,34 @@ describe('Forerunner native transport source',()=>{
 });
 
 describe('recovered campaign source preparation',()=>{
- it('has reversible source ownership and preserves bootstrap identity without requiring QuickForge initialization',()=>{
+ it('has reversible source ownership and preserves bootstrap identity without requiring QuickForge initialization',async()=>{
   const studio={...emptyCreatorStudio(),missions:[{id:'one',title:'Arrival',objective:'Reach the pad',trigger:'triggerVolume' as const,triggerRef:'pad',encounterName:''}]};
   const manual=recoveredCampaignMission(studio,'manual',false),startup=recoveredCampaignMission(studio,'startup',false);
-  expect(manual.content).not.toContain('gs_logic_ready');expect(startup.content).not.toContain('gs_logic_ready');expect(manual.content).toContain('(script startup gs_mission_bootstrap\n  (sleep -1)');expect(startup.content).toContain('(sleep_until (> (list_count (players)) 0) 1)\n  (wake gs_mission)');expect(readRecoveredMissionSource(startup.content).missions).toEqual(studio.missions);
-  expect(()=>readRecoveredMissionSource(startup.content+'; handwritten change\n')).toThrow(/edited/);expect(()=>readRecoveredMissionSource('(script startup old (sleep 1))')).toThrow(/unchanged/);
+  expect(manual.content).not.toContain('gs_logic_ready');expect(startup.content).not.toContain('gs_logic_ready');expect(manual.content).toContain('(script startup gs_mission_bootstrap\n  (sleep -1)');expect(startup.content).toContain('(sleep_until (> (list_count (players)) 0) 1)\n  (wake gs_mission)');expect((await readRecoveredMissionSource(startup.content)).missions).toEqual(studio.missions);
+  await expect(readRecoveredMissionSource(startup.content+'; handwritten change\n')).rejects.toThrow(/edited/);await expect(readRecoveredMissionSource('(script startup old (sleep 1))')).rejects.toThrow(/unchanged/);
+ });
+});
+
+
+describe('reviewed recovered mission module composition',()=>{
+ const original='; Creator-owned source license stays here.\r\n;* outer ;* (script startup fake (quit)) *; nested *;\r\n(global boolean old_done false)\r\n(script static void gs_complete_7 (set old_done true))\r\n(script dormant forerunner_extraction_complete (gs_complete_7))\r\n(script startup original_mission (print "(not a declaration); still a string") (ai_place guards))\r\n(script continuous unrelated (sleep 30))\r\n';
+ const composition={filename:'original.hsc',sourceSha256:'a'.repeat(64),retiredStartups:['original_mission'],replaceExtractionCallback:true};
+ const studio={...emptyCreatorStudio(),missions:[{id:'first',title:'Collect',objective:'Collect',trigger:'weaponOwned' as const,weaponPath:'technology/item',encounterName:''},{id:'last',title:'Return',objective:'Return',trigger:'forerunnerExtractionSettled' as const,triggerRef:'extraction_activate',encounterName:''}]};
+ const hash=async(text:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(n=>n.toString(16).padStart(2,'0')).join('');
+ it('preserves unrelated original forms/comments and replaces only explicitly reviewed controller bodies',async()=>{
+  const ownership={...composition,sourceSha256:await hash(original)},output=await composeRecoveredCampaignMission(studio,'startup',true,original,ownership),rows=haloSourceDeclarations(output.content);
+  expect(output.filename).toBe('original.hsc');expect(output.content).toContain('; Creator-owned source license stays here.\r\n');expect(output.content).toContain('(script continuous unrelated (sleep 30))\r\n');expect(output.content).toContain('(script static void gs_complete_7 (set old_done true))\r\n');expect(output.content).toContain('(global boolean old_done false)\r\n');
+  expect(output.content).toContain('(script startup original_mission\n  (sleep -1)\n)');expect(output.content).not.toContain('(ai_place guards)');expect(rows.filter(row=>row.name==='forerunner_extraction_complete')).toHaveLength(1);expect(rows.filter(row=>row.type==='startup').map(row=>row.name)).toEqual(['original_mission','gs_mission_bootstrap']);expect(rows.filter(row=>row.kind==='script').slice(0,4).map(row=>row.name)).toEqual(haloSourceDeclarations(original).filter(row=>row.kind==='script').map(row=>row.name));expect(rows.some(row=>row.name==='fake')).toBe(false);
+  expect((await readRecoveredMissionSource(output.content)).composition).toMatchObject(ownership);expect(original).toContain('(ai_place guards)');
+  const next=structuredClone(studio);next.missions[0].title='Updated';const revision=await composeRecoveredCampaignMission(next,'manual',true,output.content,{...composition,sourceSha256:await hash(output.content)});expect((await readRecoveredMissionSource(revision.content)).missions).toEqual(next.missions);expect(revision.content).toContain('(script continuous unrelated (sleep 30))');
+ });
+ it('refuses conflicting globals/functions, missing ownership and source ambiguity without producing a draft',async()=>{
+  for(const [text,options] of [[original,{...composition,replaceExtractionCallback:false}],[original,{...composition,retiredStartups:['missing']}],[original,{...composition,filename:'../old.hsc'}],[original,{...composition,sourceSha256:'bad'}],[original+'(global boolean gs_extraction_armed false)',composition],[original+'(script dormant gs_mission (sleep 1))',composition],[original.replace('dormant forerunner','startup forerunner'),composition],[original+original,composition]] as const)await expect(composeRecoveredCampaignMission(studio,'startup',true,text,{...options,retiredStartups:[...options.retiredStartups],sourceSha256:options.sourceSha256==='bad'?'bad':await hash(text)})).rejects.toThrow();
+  const output=await composeRecoveredCampaignMission(studio,'startup',true,original,{...composition,sourceSha256:await hash(original)});await expect(readRecoveredMissionSource(output.content+'; manual addition')).rejects.toThrow(/edited/);await expect(readRecoveredMissionSource(output.content.replace('(sleep -1)','(sleep 1)'))).rejects.toThrow(/edited|changed/);await expect(composeRecoveredCampaignMission(studio,'startup',true,output.content,{...composition,sourceSha256:await hash(output.content),retiredStartups:[]})).rejects.toThrow(/ownership/);
+  await expect(composeRecoveredCampaignMission(studio,'startup',true,original,composition)).rejects.toThrow(/SHA256/);
+ });
+ it('bounds lexical structure and ignores comment/string decoys when discovering declarations',()=>{
+  for(const text of ['(script startup broken (sleep 1)','(script startup broken "unterminated)',';* unclosed','outside (script dormant fine (sleep 1))','(script startup "quoted name" (sleep 1))','('.repeat(130)+')'.repeat(130),' '.repeat(256*1024+1)])expect(()=>haloSourceDeclarations(text)).toThrow();
+  const rows=haloSourceDeclarations(original);expect(rows.map(row=>row.name)).toEqual(['old_done','gs_complete_7','forerunner_extraction_complete','original_mission','unrelated']);for(const row of rows)expect(original.slice(row.start,row.end)).toMatch(/^\((?:script|global)/);
  });
 });

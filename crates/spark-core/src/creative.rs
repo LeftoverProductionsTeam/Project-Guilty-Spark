@@ -242,18 +242,30 @@ pub(crate) fn validate_working_mission(project:&crate::project::Project,binding:
 pub const RECOVERED_MISSION_PREFIX:&str="; Spark recovered campaign mission v1";
 /// Read the existing generated source's intent. The working-tag transaction pins
 /// the complete file bytes, preserves native inputs, and checks the compiled map.
-pub fn recovered_mission_binding(project:&crate::project::Project,source:&str)->Result<Option<NativeMissionBinding>> {
+pub fn recovered_mission_binding(project:&crate::project::Project,source:&str)->Result<Option<NativeMissionBinding>> {recovered_mission_binding_for_module(project,source,"gs_mission.hsc",None)}
+pub fn recovered_mission_binding_for_module(project:&crate::project::Project,source:&str,filename:&str,reviewed_source_sha256:Option<&str>)->Result<Option<NativeMissionBinding>> {
     let mut lines=source.splitn(3,'\n');
     if lines.next().unwrap_or("").trim_end_matches('\r')!=RECOVERED_MISSION_PREFIX{return Ok(None);}
     if source.len()>256*1024{return invalid("Recovered mission source exceeds256KiB");}
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
-    struct Configuration {activation:String,forerunner:bool,missions:Vec<MissionBeat>,shots:Vec<CameraShot>}
+    struct Configuration {activation:String,forerunner:bool,missions:Vec<MissionBeat>,shots:Vec<CameraShot>,#[serde(default)]composition:Option<Composition>}
+    #[derive(Deserialize)]
+    #[serde(rename_all="camelCase",deny_unknown_fields)]
+    struct Composition {filename:String,source_sha256:String,retained_sha256:String,retired_startups:Vec<String>,replace_extraction_callback:bool}
     let header=lines.next().unwrap_or("").trim_end_matches('\r').strip_prefix("; configuration: ")
         .ok_or_else(||crate::SparkError::Invalid("Recovered mission configuration is missing".into()))?;
     let config:Configuration=serde_json::from_str(header)?;
     let body=lines.next().filter(|body|!body.trim().is_empty()).ok_or_else(||crate::SparkError::Invalid("Recovered mission source body is missing".into()))?;
     if !["manual","startup"].contains(&config.activation.as_str()){return invalid("Unsupported recovered mission activation");}
+    if let Some(composition)=&config.composition {
+        let valid_module=composition.filename.strip_suffix(".hsc").is_some_and(|stem|!stem.is_empty()&&stem.len()<=31&&stem.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c))&&!stem.eq_ignore_ascii_case("global_scripts"));
+        let mut names=std::collections::BTreeSet::new();
+        if !valid_module||composition.filename!=filename||composition.source_sha256.len()!=64||!composition.source_sha256.bytes().all(|c|c.is_ascii_hexdigit())||composition.retired_startups.len()>16||composition.retired_startups.iter().any(|name|!script_ident(name)||!names.insert(name.to_ascii_lowercase()))||!body.contains("\n; Spark retained module body v1\n") {return invalid("Recovered mission composition no longer matches its reviewed module ownership");}
+        if reviewed_source_sha256.is_some_and(|expected|!composition.source_sha256.eq_ignore_ascii_case(expected)){return invalid("Composed mission original identity differs from the reviewed source revision");}
+        let retained=body.split_once("\n; Spark retained module body v1\n").unwrap().1.split_once("\n; Spark generated mission body v1\n").ok_or_else(||crate::SparkError::Invalid("Missing composed mission body boundary".into()))?.0;if crate::studio_native::digest(retained.as_bytes())!=composition.retained_sha256{return invalid("Retained native source differs from its reviewed composition checksum");}
+        if composition.replace_extraction_callback&&(!config.forerunner||!config.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled")){return invalid("Revised composition must retain its original Forerunner extraction callback");}
+    } else if !filename.eq_ignore_ascii_case("gs_mission.hsc") {return invalid("Recovered mission source was renamed without reviewed composition ownership");}
     let scenes=config.missions.iter().any(|beat|beat.cinematic_cue.is_some());
     let binding=NativeMissionBinding {schema_version:1,missions:config.missions,activation:config.activation,
         source_sha256:crate::studio_native::digest(body.as_bytes()),cinematic:if scenes{Some(config.shots.clone())}else{None},cinematic_intro:if scenes{Some(false)}else{None}};
@@ -374,7 +386,7 @@ pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInsp
 /// Presence/type checks are independent readback, not gameplay acceptance.
 pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {verify_native_mission_with_hud(binding,map,cache,None)}
 
-pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path,hud_path:Option<&str>)->Result<()> {
+pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path,retained_hud:Option<(&str,&[crate::maps::NativeHudMessage])>)->Result<()> {
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
     if binding.cinematic.is_some()&&binding.cinematic_intro!=Some(false){expected.push(("gs_cinematic".into(),3));}
@@ -414,14 +426,19 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
         }
     }
     if let Some(hud)=native_mission_hud(binding)? {
-        let expected=hud_path.map(str::to_owned).unwrap_or_else(||format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/")));
+        let expected=retained_hud.map(|(path,_)|path.to_owned()).unwrap_or_else(||format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/")));
         let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&expected)).collect::<Vec<_>>();
         if tags.len()!=1||tags[0].external||tags[0].data_offset.is_none(){return invalid("Compiled mission HUD dependency is missing, ambiguous or external");}
         let actual=crate::maps::scenario_hud_messages(cache,map)?.ok_or_else(||crate::SparkError::Invalid("Compiled mission has no scenario HUD-message reference".into()))?;
         if actual.tag_id!=tags[0].id||!actual.tag_path.replace('\\',"/").eq_ignore_ascii_case(&expected) {
             return invalid("Compiled mission references a different HUD-message tag");
         }
-        crate::firefight::verify_preserving_hud(&hud,&actual)?;
+        let mut complete=hud.clone();
+        if let Some((_,messages))=retained_hud {
+            for authored in &hud.messages {if messages.iter().filter(|message|message.name==authored.name).count()!=1||!messages.contains(authored){return invalid("Reviewed retained HUD no longer contains the current mission messages");}}
+            complete.messages=messages.to_vec();
+        }
+        crate::firefight::verify_preserving_hud(&complete,&actual)?;
     }
     Ok(())
 }
@@ -613,12 +630,22 @@ mod tests {
         let source=|doc:&CreatorStudio,activation:&str|format!("{RECOVERED_MISSION_PREFIX}\n; configuration: {}\n(script dormant gs_mission (sleep 1))\n",serde_json::json!({"activation":activation,"forerunner":true,"missions":doc.missions,"shots":doc.shots}));
         let text=source(&document,"manual");let binding=recovered_mission_binding(&project,&text).unwrap().unwrap();
         assert_eq!(binding.source_sha256,crate::studio_native::digest(b"(script dormant gs_mission (sleep 1))\n"));
+        assert!(recovered_mission_binding_for_module(&project,&text,"GS_MISSION.hsc",None).unwrap().is_some());
         assert!(recovered_mission_binding(&project,"(script dormant manual (sleep 1))").unwrap().is_none());
         assert!(recovered_mission_binding(&project,&source(&document,"unknown")).is_err());
         document.missions[0].title="Changed".into();assert!(recovered_mission_binding(&project,&source(&document,"manual")).unwrap_err().to_string().contains("Mission beats changed"));
         let root=tempfile::tempdir().unwrap();let map_path=root.path().join("synthetic.map");std::fs::write(&map_path,test_fixture::fixture(609)).unwrap();
         let map=crate::maps::inspect_map(&map_path,None).unwrap();
         assert!(verify_native_mission(&binding,&map,&map_path).is_err(),"A readable cache without the authored mission is never accepted");
+    }
+    #[test]
+    fn recovered_composition_pins_real_module_and_retains_forerunner_callback_ownership(){
+        let mut project=crate::project::Project::new("Composed recovered source");let mut doc=studio();doc.missions.push(serde_json::from_value(serde_json::json!({"id":"last","title":"Return","objective":"Settle","trigger":"forerunnerExtractionSettled","triggerRef":"extraction_activate","encounterName":""})).unwrap());project.studio=Some(doc.clone());
+        let mut config=serde_json::json!({"activation":"startup","forerunner":true,"missions":doc.missions,"shots":doc.shots,"composition":{"filename":"original.hsc","sourceSha256":"a".repeat(64),"retainedSha256":crate::studio_native::digest(b"(script startup old_start (sleep -1))\n"),"retiredStartups":["old_start"],"replaceExtractionCallback":true}});
+        let source=|value:&serde_json::Value|format!("{RECOVERED_MISSION_PREFIX}\n; configuration: {value}\n(script dormant gs_mission (sleep 1))\n; Spark retained module body v1\n(script startup old_start (sleep -1))\n\n; Spark generated mission body v1\n(script dormant generated (sleep 1))\n");
+        assert!(recovered_mission_binding_for_module(&project,&source(&config),"original.hsc",None).unwrap().is_some());assert!(recovered_mission_binding_for_module(&project,&source(&config),"original.hsc",Some(&"a".repeat(64))).unwrap().is_some());for wrong in ["".to_string(),"b".repeat(64)]{assert!(recovered_mission_binding_for_module(&project,&source(&config),"original.hsc",Some(&wrong)).is_err());}assert!(recovered_mission_binding(&project,&source(&config)).is_err());
+        for bad in ["../original.hsc","global_scripts.hsc","original.HSC",""]{config["composition"]["filename"]=bad.into();assert!(recovered_mission_binding_for_module(&project,&source(&config),bad,None).is_err());}
+        config["composition"]["filename"]="original.hsc".into();config["composition"]["retiredStartups"]=serde_json::json!(["old_start","OLD_START"]);assert!(recovered_mission_binding_for_module(&project,&source(&config),"original.hsc",None).is_err());config["composition"]["retiredStartups"]=serde_json::json!(["old_start"]);config["forerunner"]=false.into();assert!(recovered_mission_binding_for_module(&project,&source(&config),"original.hsc",None).is_err());
     }
     #[test]
     fn native_cinematic_trigger_roundtrips_without_changing_legacy_studio_defaults(){

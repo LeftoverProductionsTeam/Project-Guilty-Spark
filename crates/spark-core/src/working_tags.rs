@@ -846,6 +846,8 @@ fn compile_script_sources(
         }
         modules.push(name.to_owned());
     }
+    let mut ordered=original_modules.iter().filter(|name|name.as_str()!="global_scripts").filter(|name|modules.contains(name)).cloned().collect::<Vec<_>>();
+    for name in &modules{if !ordered.contains(name){ordered.push(name.clone());}}modules=ordered;
     let has_global=original_modules.iter().any(|name|name=="global_scripts");
     if has_global&&!sources.contains_key("global_scripts.hsc") {return invalid("Original global_scripts.hsc is missing; no script compilation was attempted");}
     for name in original_modules.iter().filter(|name|name.as_str()!="global_scripts") {
@@ -865,11 +867,9 @@ fn compile_script_sources(
     let final_globals=read_names("globals",512)?;
     let mut expected_modules=modules.clone();if has_global{expected_modules.push("global_scripts".into());}
     let mut final_modules=read_names("source_files",16)?;expected_modules.sort();final_modules.sort();
-    let retained=|before:&[String],after:&[String]| {
-        before.iter().all(|name|after.iter().filter(|other|*other==name).count()>=before.iter().filter(|other|*other==name).count())
-    };
+    let retained=|before:&[String],after:&[String]|after.starts_with(before);
     if expected_modules!=final_modules || !retained(&scripts,&final_scripts) || !retained(&globals,&final_globals) {
-        return invalid("Script compilation lost original native scripts/globals or changed the selected module inventory; no new cache was adopted");
+        return invalid("Script compilation lost original native scripts/globals, shifted their indices or changed the selected module inventory. Keep original declarations in order and append new ones, or use reviewed in-module composition; no new cache was adopted");
     }
     if script_hashes(Some(&workspace.join("data")),runner.cancel)?!=*sources {return invalid("Staged HaloScript sources changed during compilation");}
     Ok(expected_modules)
@@ -1358,11 +1358,12 @@ fn run_with(
                 if bytes.len()>8*1024*1024{return invalid("Controller source exceeded the existing script-file bound");}
                 let beginning=bytes.strip_prefix(&[0xef,0xbb,0xbf]).unwrap_or(&bytes);
                 if beginning.starts_with(crate::creative::RECOVERED_MISSION_PREFIX.as_bytes()) {
-                    if !relative[prefix.len()..].eq_ignore_ascii_case("gs_mission.hsc")||mission.is_some(){return invalid("Recovered mission module was renamed or duplicated; no compiler ran");}
+                    if mission.is_some(){return invalid("Recovered mission module was duplicated; no compiler ran");}
                     if input.scenario_type!=0{return invalid("Recovered mission source requires a native solo scenario");}
                     if crate::hex_bytes(Sha256::digest(&bytes))!=*hash{return invalid("Recovered mission source changed after staging");}
                     let source=std::str::from_utf8(beginning).map_err(|_|SparkError::Invalid("Recovered mission metadata needs valid UTF8 source".into()))?;
-                    mission=crate::creative::recovered_mission_binding(project,source)?;
+                    let reviewed_source=input.script_attachment.as_ref().filter(|attachment|attachment.filename==relative[prefix.len()..]).map(|attachment|attachment.replaces_sha256.as_deref().unwrap_or(""));
+                    mission=crate::creative::recovered_mission_binding_for_module(project,source,&relative[prefix.len()..],reviewed_source)?;
                 }
                 if !beginning.starts_with(b"; Spark source encounter bindings: "){continue;}
                 if crate::hex_bytes(Sha256::digest(&bytes))!=*hash{return invalid("Controller module changed after staging");}
@@ -1510,7 +1511,7 @@ fn run_with(
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
         if let Some(binding)=&receipt.mission_readback {
-            crate::creative::verify_native_mission_with_hud(binding,&inspected,&output,receipt.generated_mission_hud.as_ref().map(|hud|hud.tag_path.as_str()))?;
+            crate::creative::verify_native_mission_with_hud(binding,&inspected,&output,receipt.generated_mission_hud.as_ref().map(|hud|(hud.tag_path.as_str(),hud.messages.as_slice())))?;
             if binding.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled")&&!crate::creative::compiled_extraction_mode(&output,&inspected)? {return invalid("Compiled Forerunner Extraction callback is missing");}
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}

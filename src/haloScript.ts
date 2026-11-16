@@ -188,24 +188,89 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
 /** Recovered source uses the same mission exporter without QuickForge's
  * gs_logic_ready global. The existing reviewed-module transaction owns writes. */
 export const recoveredMissionPrefix='; Spark recovered campaign mission v1\n';
-export function recoveredCampaignMission(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean):ScriptExport {
+const retainedMissionMarker='\n; Spark retained module body v1\n';
+const generatedMissionMarker='\n; Spark generated mission body v1\n';
+function retainedMissionSource(content:string):string{const start=content.indexOf(retainedMissionMarker),end=content.indexOf(generatedMissionMarker,start+retainedMissionMarker.length);if(start<0||end<0||content.indexOf(retainedMissionMarker,start+1)>=0||content.indexOf(generatedMissionMarker,end+1)>=0)throw Error('Retained module source boundary is missing or ambiguous.');return content.slice(start+retainedMissionMarker.length,end);}
+export interface RecoveredMissionComposition {filename:string;sourceSha256:string;retainedSha256?:string;retiredStartups:string[];replaceExtractionCallback:boolean}
+export interface HaloSourceDeclaration {kind:'script'|'global';type:string;name:string;start:number;end:number;headerEnd:number}
+/** Bounded lossless source spans, not a replacement HaloScript compiler. */
+export function haloSourceDeclarations(source:string):HaloSourceDeclaration[]{
+ if(new TextEncoder().encode(source).length>256*1024)throw Error('Mission composition supports at most256KiB of original source. Use the manual source editor.');
+ const rows:HaloSourceDeclaration[]=[];let depth=0,start=0,at=0,header:{text:string;end:number;quoted?:boolean}[]=[];
+ while(at<source.length){
+  const c=source[at];if(/\s|\uFEFF/.test(c)){at++;continue;}
+  if(c===';'){
+   if(source[at+1]==='*'){let comments=1;at+=2;while(at<source.length&&comments){if(source.slice(at,at+2)===';*'){comments++;at+=2;}else if(source.slice(at,at+2)==='*;'){comments--;at+=2;}else at++;}if(comments)throw Error('Unclosed native source block comment.');}
+   else{while(at<source.length&&source[at]!=='\n')at++;}continue;
+  }
+  if(c==='('){if(!depth){start=at;header=[];}if(++depth>128)throw Error('Native source nesting exceeds the composition limit.');at++;continue;}
+  if(c===')'){
+   if(!depth)throw Error('Unbalanced native source parentheses.');at++;if(--depth)continue;
+   const kind=header[0]?.text,type=header[1]?.text,nameIndex=kind==='script'&&type==='static'?3:2,name=header[nameIndex];
+   if(!['script','global'].includes(kind)||!name||name.quoted||!ident.test(name.text)||!type||header.slice(0,nameIndex).some(t=>t.quoted))throw Error('Unsupported source declaration. Preserve it through the manual source editor.');
+   rows.push({kind:kind as 'script'|'global',type,name:name.text,start,end:at,headerEnd:name.end});if(rows.length>2048)throw Error('Native source declaration limit exceeded.');continue;
+  }
+  if(c==='"'){const begin=at++;let closed=false;while(at<source.length){if(source[at]==='\\'){at+=2;continue;}if(source[at++]==='"'){closed=true;break;}}if(!closed)throw Error('Unclosed native source string.');if(!depth)throw Error('Unexpected text outside native source declarations.');if(depth===1&&header.length<4)header.push({text:source.slice(begin,at),end:at,quoted:true});continue;}
+  const begin=at;while(at<source.length&&!/[\s();"\uFEFF]/.test(source[at]))at++;if(at===begin)throw Error('Unsupported native source text.');if(!depth)throw Error('Unexpected text outside native source declarations.');if(depth===1&&header.length<4)header.push({text:source.slice(begin,at),end:at});
+ }
+ if(depth)throw Error('Unbalanced native source parentheses.');return rows;
+}
+function validateMissionComposition(value:RecoveredMissionComposition,requireRetained=false){
+ if(!value||Object.keys(value).some(key=>!['filename','sourceSha256','retainedSha256','retiredStartups','replaceExtractionCallback'].includes(key))||!/^([A-Za-z0-9_-]{1,31})\.hsc$/.test(value.filename)||value.filename.toLowerCase()==='global_scripts.hsc'||!/^[a-f0-9]{64}$/i.test(value.sourceSha256)||!Array.isArray(value.retiredStartups)||value.retiredStartups.length>16||value.retiredStartups.some(name=>!ident.test(name))||new Set(value.retiredStartups.map(name=>name.toLowerCase())).size!==value.retiredStartups.length||typeof value.replaceExtractionCallback!=='boolean'||requireRetained&&!/^[a-f0-9]{64}$/i.test(value.retainedSha256??''))throw Error('Invalid reviewed mission source composition.');
+}
+function recoveredMissionDocument(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean,composition?:RecoveredMissionComposition,retained?:string):ScriptExport{
  if(!['manual','startup'].includes(activation)||typeof forerunner!=='boolean')throw Error('Choose manual or startup recovered mission activation.');
  const source=exportHaloCeMission(studio,{forerunner});
- const configuration={activation,forerunner,missions:studio.missions,shots:studio.shots};
  const bootstrap='\n(script startup gs_mission_bootstrap\n'+(activation==='startup'?'  (sleep_until (> (list_count (players)) 0) 1)\n  (wake gs_mission)':'  (sleep -1)')+'\n)\n';
+ const configuration={activation,forerunner,missions:studio.missions,shots:studio.shots,...(composition?{composition}:{})};
+ let body=source.content+bootstrap;
+ if(composition){
+  validateMissionComposition(composition,true);if(retained==null||retained.includes(retainedMissionMarker))throw Error('Missing or ambiguous retained native source.');
+  if(retained.includes(generatedMissionMarker))throw Error('Retained source contains a reserved mission boundary.');
+  const allGenerated=haloSourceDeclarations(body),callback=allGenerated.filter(row=>row.kind==='script'&&row.name==='forerunner_extraction_complete');
+  if(composition.replaceExtractionCallback){
+   const original=haloSourceDeclarations(retained).filter(row=>row.kind==='script'&&row.type==='dormant'&&row.name==='forerunner_extraction_complete');
+   if(callback.length!==1||original.length!==1||retained.slice(original[0].start,original[0].end)!==body.slice(callback[0].start,callback[0].end))throw Error('The revised mission must retain its reviewed extraction callback in its original declaration slot.');
+   body=body.slice(0,callback[0].start)+body.slice(callback[0].end);
+  }
+  const generated=haloSourceDeclarations(body),rows=haloSourceDeclarations(retained),key=(row:HaloSourceDeclaration)=>row.kind+':'+row.name.toLowerCase();
+  if(rows.some(row=>generated.some(other=>key(row)===key(other))))throw Error('A generated mission declaration still belongs to retained source. Reconcile it manually; no source was replaced.');
+  for(const name of composition.retiredStartups){const rowsNamed=rows.filter(row=>row.kind==='script'&&row.type==='startup'&&row.name===name);if(rowsNamed.length!==1||retained.slice(rowsNamed[0].headerEnd,rowsNamed[0].end)!=='\n  (sleep -1)\n)')throw Error('The reviewed retired startup changed. Preserve handwritten source through the manual editor.');}
+  body=retainedMissionMarker+retained+generatedMissionMarker+body;
+ }
  const header=JSON.stringify(configuration).replace(/[\u007f-\uffff]/g,character=>'\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'));
- const content=recoveredMissionPrefix+'; configuration: '+header+'\n'+source.content+bootstrap;
+ const content=recoveredMissionPrefix+'; configuration: '+header+'\n'+body;
  if(new TextEncoder().encode(content).length>256*1024)throw Error('Recovered mission source exceeds the256KiB native file budget; no source was replaced.');
- return {...source,content,activation:activation==='startup'?'Level startup':'(wake gs_mission)'};
+ return {...source,filename:composition?.filename??source.filename,content,activation:activation==='startup'?'Level startup':'(wake gs_mission)',warnings:[...source.warnings,...(composition?['Only the explicitly selected startup bodies and extraction callback were replaced. Every other original form and comment is retained. Review remaining startup/continuous scripts for competing gameplay ownership. Original source remains in the previous native build; existing license notices remain in the retained output.']:[])]};
 }
-export function readRecoveredMissionSource(content:string){
+export function recoveredCampaignMission(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean):ScriptExport{return recoveredMissionDocument(studio,activation,forerunner);}
+/** One reviewed module revision, using the same mission writer and native transaction. */
+export async function composeRecoveredCampaignMission(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean,original:string,composition:RecoveredMissionComposition):Promise<ScriptExport>{
+ validateMissionComposition(composition);if(await nativeMissionHash(original)!==composition.sourceSha256)throw Error('The original module differs from its reviewed SHA256. Read ownership again.');
+ if(original.startsWith(recoveredMissionPrefix)){
+  const prior=await readRecoveredMissionSource(original);if(!prior.composition||prior.composition.filename!==composition.filename||JSON.stringify(prior.composition.retiredStartups)!==JSON.stringify(composition.retiredStartups)||prior.composition.replaceExtractionCallback!==composition.replaceExtractionCallback)throw Error('Keep the existing composition ownership or reconcile it through the manual source editor.');
+  let retained=retainedMissionSource(original);
+  if(composition.replaceExtractionCallback){const current=haloSourceDeclarations(retained).find(row=>row.kind==='script'&&row.name==='forerunner_extraction_complete')!,nextSource=recoveredCampaignMission(studio,activation,forerunner).content,next=haloSourceDeclarations(nextSource).find(row=>row.kind==='script'&&row.name==='forerunner_extraction_complete');if(!next)throw Error('The revised mission no longer supplies the original extraction callback.');retained=retained.slice(0,current.start)+nextSource.slice(next.start,next.end)+retained.slice(current.end);}
+  return recoveredMissionDocument(studio,activation,forerunner,{...composition,retainedSha256:await nativeMissionHash(retained)},retained);
+ }
+ const generatedSource=recoveredCampaignMission(studio,activation,forerunner).content,rows=haloSourceDeclarations(original),generated=haloSourceDeclarations(generatedSource),edits:{start:number;end:number;content:string}[]=[];
+ const shared=rows.filter(row=>generated.some(other=>other.kind===row.kind&&other.name.toLowerCase()===row.name.toLowerCase()));
+ for(const row of shared){if(row.kind!=='script'||row.type!=='dormant'||row.name!=='forerunner_extraction_complete'||!composition.replaceExtractionCallback)throw Error('A generated declaration belongs to the original source: '+row.name+'. Reconcile through the manual source editor.');const replacement=generated.find(other=>other.kind==='script'&&other.name===row.name)!;edits.push({start:row.start,end:row.end,content:generatedSource.slice(replacement.start,replacement.end)});}
+ if(composition.replaceExtractionCallback&&shared.filter(row=>row.name==='forerunner_extraction_complete').length!==1)throw Error('Select exactly one existing dormant extraction callback for replacement.');
+ for(const name of composition.retiredStartups){const found=rows.filter(row=>row.kind==='script'&&row.type==='startup'&&row.name===name);if(found.length!==1)throw Error('Selected native startup is missing or ambiguous: '+name);const row=found[0];edits.push({start:row.headerEnd,end:row.end,content:'\n  (sleep -1)\n)'});}
+ let retained=original;for(const edit of edits.sort((a,b)=>b.start-a.start))retained=retained.slice(0,edit.start)+edit.content+retained.slice(edit.end);
+ return recoveredMissionDocument(studio,activation,forerunner,{...composition,retainedSha256:await nativeMissionHash(retained)},retained);
+}
+export async function readRecoveredMissionSource(content:string){
  if(!content.startsWith(recoveredMissionPrefix))throw Error('This is not an unchanged generated recovered mission. Use the explicit manual source editor.');
  const line=content.slice(recoveredMissionPrefix.length).split('\n',1)[0];if(!line.startsWith('; configuration: '))throw Error('Recovered mission configuration is missing.');
  const configuration=JSON.parse(line.slice('; configuration: '.length));
- if(!configuration||Object.keys(configuration).some(key=>!['activation','forerunner','missions','shots'].includes(key)))throw Error('Unknown recovered mission configuration.');
+ if(!configuration||Object.keys(configuration).some(key=>!['activation','forerunner','missions','shots','composition'].includes(key)))throw Error('Unknown recovered mission configuration.');
  const studio={...emptyCreatorStudio(),missions:configuration.missions,shots:configuration.shots};
- if(recoveredCampaignMission(studio,configuration.activation,configuration.forerunner).content!==content)throw Error('Recovered mission source was edited. Preserve it through the manual source workflow; regeneration refused.');
- return configuration as {activation:'manual'|'startup';forerunner:boolean;missions:CreatorStudioDocument['missions'];shots:CreatorStudioDocument['shots']};
+ const retained=configuration.composition?retainedMissionSource(content):undefined;
+ if(configuration.composition&&(!content.includes(retainedMissionMarker)||await nativeMissionHash(retained!)!==configuration.composition.retainedSha256))throw Error('Retained module source was edited or its checksum is missing. Preserve it through the manual source editor.');
+ if(recoveredMissionDocument(studio,configuration.activation,configuration.forerunner,configuration.composition,retained).content!==content)throw Error('Recovered mission source was edited. Preserve it through the manual source workflow; regeneration refused.');
+ return configuration as {activation:'manual'|'startup';forerunner:boolean;missions:CreatorStudioDocument['missions'];shots:CreatorStudioDocument['shots'];composition?:RecoveredMissionComposition};
 }
 
 export const nativeMissionBinding = '; Spark native mission configuration: ';

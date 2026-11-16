@@ -21,7 +21,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,recoveredCampaignMission,readRecoveredMissionSource,recoveredMissionPrefix } from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix } from '../haloScript';
 import type {NativeTransportOptions} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
 import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
@@ -198,6 +198,14 @@ export default function RuntimeDock({
   const latestTransport=useRef(transport);latestTransport.current=transport;
   const [recoveredMissionOpen,setRecoveredMissionOpen]=useState(false);
   const [recoveredActivation,setRecoveredActivation]=useMapState<'manual'|'startup'>(id,'sourceScripts.missionActivation','manual');
+  const [missionModule,setMissionModule]=useMapState<string>(id,'sourceScripts.missionModule','');
+  const pickedMissionModule=modules?.modules.find(module=>module.filename===missionModule);
+  const [missionOriginal,setMissionOriginal]=useState<{key:string;filename:string;sha256:string;content:string}|null>(null);
+  const [retiredStartups,setRetiredStartups]=useState<string[]>([]),[replaceMissionCallback,setReplaceMissionCallback]=useState(false),[missionOwnershipConfirmed,setMissionOwnershipConfirmed]=useState(false);
+  const reviewedMissionOriginal=missionOriginal?.key===scriptSourceKey&&missionOriginal.filename===missionModule&&pickedMissionModule?.sha256===missionOriginal.sha256&&!pickedMissionModule.unavailable?missionOriginal:null;
+
+  const missionCompositionLocked=reviewedMissionOriginal?.content.startsWith(recoveredMissionPrefix)??false;
+  const missionDeclarations=useMemo(()=>reviewedMissionOriginal?haloSourceDeclarations(reviewedMissionOriginal.content):[],[reviewedMissionOriginal]);
   const [recoveredMissionPlan,setRecoveredMissionPlan]=useState<{key:string;tagIdentity:string;content:string;studioKey:string;activation:'manual'|'startup'}|null>(null);
   const recoveredStudioKey=useMemo(()=>JSON.stringify({missions:project?.studio?.missions??[],shots:project?.studio?.shots??[]}),[project?.studio?.missions,project?.studio?.shots]);
   useEffect(()=>{
@@ -532,6 +540,20 @@ export default function RuntimeDock({
     }catch(problem){if(selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{release();if(request===moduleRequest.current)setModuleBusy(false);}
   }
+  async function readMissionComposition(){
+    const source=report?.workingSource,inventory=modules,previous=modules?.modules.find(row=>row.filename===missionModule),input=currentProject.current;
+    if(!input||!source||!inventory||!previous||previous.unavailable||dirty||busy||working||moduleBusy)return;
+    const request=++moduleRequest.current,key=scriptSourceKey;setModuleBusy(true);setError('');setMissionOriginal(null);setMissionOwnershipConfirmed(false);setRecoveredMissionPlan(null);
+    try{
+      const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:previous.filename,expectedSha256:previous.sha256});
+      if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Mission source changed during ownership review.');
+      haloSourceDeclarations(value.script.content);
+      const prior=value.script.content.startsWith(recoveredMissionPrefix)?await readRecoveredMissionSource(value.script.content):null;
+      if(prior&&!prior.composition)throw Error('This is the separate generated mission module. Keep the new-module workflow or reconcile through the manual editor.');
+      if(request!==moduleRequest.current||key!==currentScriptSourceKey.current)return;
+      setMissionOriginal({key,filename:previous.filename,sha256:previous.sha256,content:value.script.content});setRetiredStartups(prior?.composition?.retiredStartups??[]);setReplaceMissionCallback(prior?.composition?.replaceExtractionCallback??false);
+    }catch(problem){if(request===moduleRequest.current&&key===currentScriptSourceKey.current)setError(String(problem));}finally{if(request===moduleRequest.current)setModuleBusy(false);}
+  }
   async function prepareRecoveredMission(){
     const input=currentProject.current,source=report?.workingSource,inventory=modules,review=nativeCameras,refs=modules?.missionReview;
     if(!input||!source||!inventory||!review||!refs||dirty||busy||working||moduleBusy)return;
@@ -540,7 +562,9 @@ export default function RuntimeDock({
     setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
     try {
       if(!['gbx-custom','mcc-cea'].includes(source.target??'')||review.scenarioType!==0)throw Error('Recovered mission source requires reviewed CE609 or MCC solo source.');
-      const generated=recoveredCampaignMission(studio,activation,source.target==='gbx-custom');
+      const composition=missionModule?reviewedMissionOriginal:null;
+      if(missionModule&&(!composition||!missionOwnershipConfirmed))throw Error('Read and explicitly review the selected original module ownership before preparing a composed revision.');
+      const generated=composition?await composeRecoveredCampaignMission(studio,activation,source.target==='gbx-custom',composition.content,{filename:composition.filename,sourceSha256:composition.sha256,retiredStartups,replaceExtractionCallback:replaceMissionCallback}):recoveredCampaignMission(studio,activation,source.target==='gbx-custom');
       const bindings=inspectScenarioBindings([generated],null,null,[],review.triggerVolumes.map(name=>({name})),refs.devices,refs.squads);
       for(const row of bindings){
         if(['hud_message:','sound:','weapon:','forerunner_extraction:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
@@ -563,9 +587,9 @@ export default function RuntimeDock({
         if(previous.unavailable)throw Error(previous.unavailable);
         const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:previous.filename,expectedSha256:previous.sha256});
         if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Native mission source changed during mission preparation.');
-        readRecoveredMissionSource(value.script.content);original=value.script.content;
+        if(composition){if(value.script.content!==composition.content||value.script.sha256!==composition.sha256)throw Error('Reviewed original module changed. Read its ownership again.');}else await readRecoveredMissionSource(value.script.content);original=value.script.content;
       }
-      const names=(text:string)=>[...text.matchAll(/\(script (?:startup|continuous|dormant|static void|static boolean) ([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1]);
+      const names=(text:string)=>haloSourceDeclarations(text).filter(row=>row.kind==='script').map(row=>row.name);
       const previousNames=original?names(original):[];
       if(names(generated.content).some(name=>review.scriptNames.some(value=>value.toLowerCase()===name.toLowerCase())&&!previousNames.some(value=>value.toLowerCase()===name.toLowerCase())))throw Error('A mission function already belongs to another source module; original source was retained.');
       if(previousNames.some(name=>!names(generated.content).some(value=>value.toLowerCase()===name.toLowerCase())))throw Error('The revised mission would remove an existing native function. Preserve/reconcile it through the manual source editor.');
@@ -600,7 +624,7 @@ export default function RuntimeDock({
         if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Native transport module changed; read the current source again.');
         readNativeTransportSource(value.script.content);original=value.script.content;
       }
-      const names=(text:string)=>[...text.matchAll(/\(script (?:startup|continuous|dormant|static void|static boolean) ([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1]);
+      const names=(text:string)=>haloSourceDeclarations(text).filter(row=>row.kind==='script').map(row=>row.name);
       const previousNames=original?names(original):[];
       if(names(generated.content).some(name=>review.scriptNames.some(value=>value.toLowerCase()===name.toLowerCase())&&!previousNames.some(value=>value.toLowerCase()===name.toLowerCase())))throw Error('A transport function already belongs to another native module. Preserve that source and use Edit selected module; no replacement was made.');
       if(draft&&draft.content!==generated.content&&!window.confirm('Replace the current project script draft with the transport controller? Project Undo restores it; original native source remains in its previous build.'))return;
@@ -1057,8 +1081,21 @@ export default function RuntimeDock({
             {(!project.quickForge||project.quickForge.native)&&<details className="native-recovered-mission-source" open={recoveredMissionOpen} onToggle={event=>setRecoveredMissionOpen(event.currentTarget.open)}><summary>Recovered campaign mission source</summary>
               <p>Use saved Mission Director objectives with this native solo scenario. Read the current references, prepare, Save and review the draft, then Attach source &amp; compile. Native camera points own their poses; use the existing cinematic/source tools to edit them. Missing dependencies stop the build.</p>
               <button type="button" disabled={busy||working||dirty||moduleBusy} onClick={()=>void listScriptModules(true,false,true)}>Read native mission source</button>
-              <label>Recovered mission activation<select value={recoveredActivation} onChange={event=>setRecoveredActivation(event.target.value as 'manual'|'startup')}><option value="manual">Manual · wake gs_mission from another script</option><option value="startup">Startup · wait for players</option></select></label>
-              <button type="button" disabled={busy||working||dirty||moduleBusy||!modules?.missionReview||!nativeCameras} onClick={()=>void prepareRecoveredMission()}>Prepare recovered mission draft</button>
+              <label>Recovered mission activation<select value={recoveredActivation} disabled={busy||working||moduleBusy} onChange={event=>setRecoveredActivation(event.target.value as 'manual'|'startup')}><option value="manual">Manual · wake gs_mission from another script</option><option value="startup">Startup · wait for players</option></select></label>
+              <label>Mission source destination<select aria-label="Mission source destination" value={missionModule} disabled={busy||working||moduleBusy} onChange={event=>{setMissionModule(event.target.value);setMissionOriginal(null);setMissionOwnershipConfirmed(false);setRecoveredMissionPlan(null);}}><option value="">New gs_mission.hsc module</option>{missionModule&&(!pickedMissionModule||pickedMissionModule.unavailable)&&<option value={missionModule}>{pickedMissionModule?'Unavailable':'Missing'} selected module · {missionModule}</option>}{modules?.modules.filter(row=>!row.unavailable).map(row=><option key={row.filename} value={row.filename}>Reviewed revision · {row.filename}</option>)}</select></label>
+              {missionModule&&<details open><summary>Review original controller ownership</summary>
+                <button type="button" disabled={busy||working||dirty||moduleBusy||!pickedMissionModule||!!pickedMissionModule.unavailable} onClick={()=>void readMissionComposition()}>Read original mission module</button>
+                {(!pickedMissionModule||pickedMissionModule.unavailable)&&<p>{pickedMissionModule?.unavailable??'The selected module is unavailable in this source. Read native mission source, then choose an available module or the new-module workflow.'}</p>}
+                {reviewedMissionOriginal&&<>
+                  <p>Original {reviewedMissionOriginal.filename} · SHA256 {reviewedMissionOriginal.sha256.slice(0,12)}. Selected startup bodies will sleep permanently; every other original form and comment remains. Review the complete draft before compiling. The previous native build keeps the original file.</p>
+                  <details><summary>Inspect original module source</summary><textarea aria-label="Original mission module source" readOnly rows={6} value={reviewedMissionOriginal.content}/></details>
+                  {missionCompositionLocked&&<p>This module already has reviewed controller ownership. Objective edits remain subject to the native source checks; changing retired controllers or callback ownership requires the manual source editor or the previous native build.</p>}
+                  {missionDeclarations.filter(row=>row.kind==='script'&&row.type==='startup'&&row.name!=='gs_mission_bootstrap').map(row=><label key={row.name}><input type="checkbox" checked={retiredStartups.includes(row.name)} disabled={busy||working||moduleBusy||missionCompositionLocked} onChange={event=>{setRetiredStartups(names=>event.target.checked?[...names,row.name]:names.filter(name=>name!==row.name));setMissionOwnershipConfirmed(false);setRecoveredMissionPlan(null);}}/>Retire startup body · {row.name}</label>)}
+                  {missionDeclarations.some(row=>row.kind==='script'&&row.name==='forerunner_extraction_complete')&&<label><input type="checkbox" checked={replaceMissionCallback} disabled={busy||working||moduleBusy||missionCompositionLocked} onChange={event=>{setReplaceMissionCallback(event.target.checked);setMissionOwnershipConfirmed(false);setRecoveredMissionPlan(null);}}/>Replace the dormant extraction callback body with the new mission's settlement gate; original callback side effects are replaced.</label>}
+                  <label><input type="checkbox" aria-label="Confirm original mission ownership" checked={missionOwnershipConfirmed} disabled={busy||working||moduleBusy} onChange={event=>{setMissionOwnershipConfirmed(event.target.checked);setRecoveredMissionPlan(null);}}/>I reviewed the selected controller changes and remaining startup/continuous scripts for competing gameplay ownership.</label>
+                </>}
+              </details>}
+              <button type="button" disabled={busy||working||dirty||moduleBusy||!modules?.missionReview||!nativeCameras||!!missionModule&&(!reviewedMissionOriginal||!missionOwnershipConfirmed)} onClick={()=>void prepareRecoveredMission()}>Prepare recovered mission draft</button>
               {nativeRecoveredMissionDraft&&<button type="button" disabled={busy||working||moduleBusy} onClick={()=>{if(selectedScript){const end=selectedScript.content.indexOf('\n',recoveredMissionPrefix.length);keepScriptDraft({...selectedScript,content:selectedScript.content.slice(end+1),reviewed:false});setRecoveredMissionPlan(null);}}}>Use mission draft as manual HaloScript</button>}
               {nativeRecoveredMissionDraft&&!currentRecoveredMissionIdentity&&<small>Mission or source review is stale. Read source and prepare again before compiling.</small>}
             </details>}

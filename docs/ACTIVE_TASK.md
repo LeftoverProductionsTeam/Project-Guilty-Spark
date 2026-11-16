@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 74c16ac2a036e5475ed73ded4ce82c4916844215, canonical local master.
-Latest verified revision: this checkpoint commit (parent74c16ac2a036e5475ed73ded4ce82c4916844215); native point/surface review and owned coordinate repair pass focused checks, not full mission/flight.
-Next action: compose the complete7-beat native Black Echo candidate with reviewed original function ownership, HUD/audio/cameras/technology/pads and meaningful dropship insertion/landing/return routes. Use repaired native surface anchors; keep aircraft hull/grounding/pilot/boarding/flight and actual mission gameplay separate. Windows42-edit/Save37944/restart and engine acceptance remain open while desktop initialization is unavailable; no unchanged bypass retry.
+Starting revision: d5870e13dffc482acff973ea658ae92a8eaed794, canonical local master.
+Latest verified revision: this checkpoint commit (parent d5870e13dffc482acff973ea658ae92a8eaed794); reviewed mission composition, exact native indices/HUD and focused checks pass. Full mission/flight/gameplay remains incomplete.
+Next action: author explicit named native technology creation using existing Mission Director/source writer; weapons[0] be_technology is not placed automatically and the retired startup created it. Review deployment/insertion timing, then complete real pilot/crew, outbound/return/recall controllers, callback side effects and full Black Echo candidate. Keep native source indices, Undo/Save/readback guards. Windows42-edit/Save37944/restart, aircraft clearance/flight/boarding and mission gameplay remain OPEN; desktop initialization unavailable, no unchanged bypass retry.
 
 ## Acceptance
 
@@ -14,7 +14,9 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov BSP/native anchors (parent74c16ac): shared read-only Check compiled BSP in route/AI/firing source forms, current source/map identities and bounded node/triangle readers. Empty-space membership differs from native ±0.5surface proximity; stale/late/f32 replies handled, manual index never supplies missing binding. Native owned source repair moves only Flood Z1→0.078429 and uses a distinct authored approach; native compiler clears targeted Flood/route warnings with flags unchanged, independent coordinate/route/aircraft readback passes. Cache1a196afd0d645e4059bdbf205fc2a8d1ed652a526ce21efd26b95cc21083cae7; SCNR7677d9f315f83ffcd9214664254fd17a1e6984b767876309ad4efd05e4aadb82; original/restored1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207.2BSP+9clearance Rust, browser4, native1, guide20contexts, TypeScript/Vite/Windows all-target PASS. Original/script/native indices preserved. Legacy warnings, hull/flight/full mission/native desktop acceptance remain OPEN. Exact causes, hashes, intermediate failures and tests in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT/HUMAN_TEST_PLAN/RESEARCH.
+16Nov composed recovered source (parentd5870e1): existing mission writer + reviewed in-module revision; explicit startup retirement/callback replacement, read-only original inspection and missing-source guidance. Unrelated forms/comments and original4script/4global slots preserved; stale/edited source and shifted indices refuse. Native7-objective CE609/HUD9(original prefix1)/Extraction readback PASS; cache7dea5596e3ab9c7d6b349fc1ce0fc11c69ff316713f9e355cc3e6e8b2e9383f7, SCNR5fee4160eac531218d9805cf4695a387650fd8a4f5cf3ad721dba087e7fe8c96, HSC79684fbc097ffd19a4cb2d38a9d55a3b39ff554127edd02795b6f35a1375f1e7. Frontend39, core18+working_tags16 (2opt-in skips), separate native1, browser4distinct, TypeScript/Vite/Windows all-target and guide20contexts PASS. Final original-source inspection UI1PASS6.4s. No actual desktop/game/flight pass. Exact sources/hashes/failures and guard limits in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT/HUMAN_TEST_PLAN.
+
+d5870e1 BSP/native point surface repair retains its exact native/cache/source hashes and tests in RUNTIME_INTEGRATION_20261107 and Gitd5870e1. Targeted Flood/route warnings cleared; collision-space membership, surface association and actual clearance remain distinct. Native desktop/gameplay gates remain open.
 
 Prior recovered7-beat/native collection authoring (74c16ac) and mission source→CE609 readback (bb8e906) retain their exact scoped native/browser/history/Save evidence in RUNTIME_INTEGRATION_20261107 and Git. Source/path/recipe/handwritten ownership and all475IDs preserved. No complete Black Echo/flight/gameplay acceptance was inferred.
 
@@ -38,6 +40,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Current checkpoint: haloScript/RuntimeDock/native creative + working-tags source/fixture + existing regression files and guides. No duplicate writer, engine edit or new requirement tracker.
 
 Native flight tuning78c01b2 remains verified in scope. Current route workflow: existing command/volume readers check physical movement, final-stop/facing references and final craft-origin containment by readable selected pads; unread/unsupported/bad-pad programs refuse generated preparation, manual source remains available. Existing route editor exposes Stop/Keep moving while preserving unknown values; viewport/Preview/Accept/Restore/Save/reopen continue. Only two selected route reviews render. Core28/browser3distinct/guide4/TypeScript/Vite/Windows and installed CE609 route/volume/aircraft/tuning readback1 pass. Native Windows/full restart/flight/gameplay remain unrun. Exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No push.
 
@@ -129,7 +133,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA63438/run-eoMno0 CLOSED1398912317logicalB; root absent, development runs[]/issues[]. All tools/tests/log handles terminal, no retained SDK/map/test binary/archive, original/Forerunner write, game launch, push or publication. No physical-reclaimed claim.475CSV SHA b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643; legacy ACTIVE_TASK.previous SHA afc29077c1f71a4481044c220fa84136bae79604653c9e8a3d84b1e0c11c5607 unchanged. Both staged-source manifest aliases required; no source archive.
+QA22968/run-8RfKah CLOSED1399206950logicalB; allocated disposal unavailable, no physical-reclaimed claim. Root absent, Node owner exited, all children terminal. Final frontend39022/run-zaDrKR CLOSED28728134logicalB/28951144allocated-fileB; automatic disposal, no source archive. No retained map/binary/SDK/copy of Forerunner source, original/runtime write, game launch, push or publication. Prior QA63438/run-eoMno0 closed1398912317logicalB; exact evidence remains in Gitd5870e1.475CSV/legacy previous hashes unchanged; staged source manifests will be checked.
 
 Prior QA59805/run-n5CPtL closed1398599599logicalB; QA98579/run-yCym7t closed1399116590logicalB; earlier native UI/Save/restart/geometry/actor/source evidence, exact hashes and cleanup remain in existing RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git74c16ac/bb8e906/a2d0aa0/78c01b2/e2879a6/351dd043/057a9839/50f2f77. Git preserves checkpoint detail; never copy it into ACTIVE_TASK.previous. No old jobs revived. Save37944 and complete mission/flight/human/peer/platform acceptance stay OPEN.
 
