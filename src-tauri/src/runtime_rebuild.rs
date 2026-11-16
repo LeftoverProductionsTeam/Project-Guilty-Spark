@@ -27,6 +27,7 @@ pub(crate) struct View {
     id: String,
     runtime_id: runtime::RuntimeId,
     staged_map: String,
+    startup_map:Option<String>,
     engine_sha256: std::collections::BTreeMap<String,String>,
     project_id: String,
     phase: String,
@@ -206,6 +207,12 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
     for(name,sha)in &result.ce_resource_sha256{result.staged_sha256.insert(format!("data/maps_ce/{name}"),sha.clone());}
     result.budget.check().map_err(error)?;Ok(result)
 }
+fn apply_forerunner_startup(command:&mut Command,sha256:&str,map:&str)->Reply<Option<String>>{
+    let selector=runtime::forerunner_solo_startup_selector(sha256,map).map_err(error)?;
+    command.env_remove("HALO_START_MAP");
+    if let Some(selector)=&selector{command.env("HALO_START_MAP",selector);}
+    Ok(selector)
+}
 fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&Stage)->Reply<Command>{
     let original=runtime::prepare_launch(reg).map_err(error)?;
     if original.profile_interface.as_deref()!=Some("forerunner"){return Err("Forerunner identity changed; no playtest was started".into());}
@@ -217,10 +224,11 @@ fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&S
     let mut isolated=reg.clone();isolated.root=stage.root.join("engine");isolated.executable=isolated.root.join(&stage.executable_name);isolated.data_root=Some(stage.root.join("data"));
     let plan=runtime::prepare_launch(&isolated).map_err(error)?;
     let mut command=registered_runtime_command_at(state,&isolated,&plan,Some(&stage.root.join("profile")))?;
-    // Native HaloScript owns these waves. No debug/test startup or unbuilt
-    // HALO_START_MAP request is inherited or invented here.
+    // Native HaloScript owns these waves. A reviewed CE startup request uses
+    // only this staged cache; no debug/test startup is inherited.
     for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
     if stage.forerunner_extraction&&runtime::forerunner_windows_machine(&original.executable_sha256)!=Some(0x8664){return Err("This older Forerunner build is not reviewed for native Extraction settlement; select the current verified x64 profile".into());}
+    apply_forerunner_startup(&mut command,&original.executable_sha256,&stage.map)?;
     command.env("HALO_EXTRACTION",if stage.forerunner_extraction{"true"}else{"false"});
     if stage.forerunner_extraction{command.env("HALO_NET_COOP_SCRIPT_ADAPTATIONS","false");}
     if runtime::forerunner_windows_machine(&original.executable_sha256)==Some(0x014c){command.env("HALO_RENDERER","gl");}
@@ -324,12 +332,22 @@ fn owned_session(workbench: &WorkbenchState, owner: &str, id: &str) -> Reply<Arc
 fn owned(state: &AppState, owner: &str, id: &str) -> Reply<Arc<Session>> {
     owned_session(&*lock(&state.runtime_workbench)?,owner,id)
 }
+fn publish_forerunner(view:&mut View,sha:&str,map:&str)->Reply<()>{
+        view.game_build_id=None;view.game_sha256=None;
+        view.startup_map=runtime::forerunner_solo_startup_selector(sha,map).map_err(error)?;
+        if let Some(selector)=view.startup_map.clone(){view.phase="awaitingMapStartup".into();view.detail=format!("Forerunner was asked to start the staged CE solo map {selector} fresh. Create a temporary player profile in its native menus if prompted. This request does not confirm a loaded map, revision or gameplay. Stop disposes this owned profile and scratch.");}
+        else{view.phase="awaitingMapSelection".into();view.detail=format!("Forerunner opened with an isolated CE solo cache: {}. This reviewed build uses its native custom campaign chooser; create a temporary player profile if prompted. Spark cannot confirm the loaded map or restart it automatically. Stop disposes this owned profile and scratch.",map);}
+    Ok(())
+}
 fn publish(session: &Session, run: &Running) -> Reply<()> {
     let mut view=lock(&session.view)?;
     view.process_id=Some(run.process.child.id()); view.compiled_build_id=run.stage.build.id.clone(); view.compiled_sha256=run.stage.build.sha256.clone().ok_or("Missing map hash")?;
     view.ce_resource_sha256=run.stage.ce_resource_sha256.clone();
     view.staged_map=run.stage.map.clone();view.engine_sha256=run.stage.staged_sha256.iter().filter(|(name,_)|name.starts_with("engine/")).map(|(name,sha)|(name.clone(),sha.clone())).collect();
-    if view.runtime_id==runtime::RuntimeId::OpenCe{view.game_build_id=None;view.game_sha256=None;view.phase="awaitingMapSelection".into();view.detail=format!("Forerunner opened with an isolated CE solo cache: {}. Use its native custom campaign chooser and create a temporary player profile if prompted. Spark cannot confirm the loaded map or restart it automatically; no gameplay acceptance is inferred. Stop disposes this test profile and scratch.",run.stage.map);return Ok(());}
+    if view.runtime_id==runtime::RuntimeId::OpenCe{
+        let sha=run.stage.staged_sha256.get(&format!("engine/{}",run.stage.executable_name)).ok_or("Staged Forerunner identity missing")?;
+        return publish_forerunner(&mut view,sha,&run.stage.map);
+    }
     view.game_build_id=None; view.game_sha256=None; view.phase="loading".into();
     view.detail="Private native playtest started; waiting for an actual engine gameplay tick. Rebuild restarts this round and does not replace live geometry.".into();
     Ok(())
@@ -404,7 +422,7 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
         let mut workbench=lock(&state.runtime_workbench)?;
         if workbench.rebuilds.values().any(|s|s.view.lock().is_ok_and(|v|!matches!(v.phase.as_str(),"stopped"|"failed"))) { return Err("Stop the existing Live Rebuild playtest before starting another; other windows keep their own work".into()); }
-        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
+        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),startup_map:None,engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
         let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
@@ -434,7 +452,7 @@ pub(crate) async fn runtime_rebuild_begin(app: tauri::AppHandle, window: tauri::
     let owner=window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let session=owned(&state,&owner,&session_id)?;
-        if lock(&session.view)?.runtime_id!=runtime::RuntimeId::ChupathingyCe{return Err("Forerunner has no admitted Live Rebuild restart interface. Stop this owned test, rebuild saved source and start a fresh menu-selected test; game revision remains unconfirmed".into());}
+        if lock(&session.view)?.runtime_id!=runtime::RuntimeId::ChupathingyCe{return Err("Forerunner has no admitted Live Rebuild restart interface. Stop this owned test, rebuild saved source and start a fresh private test; game revision remains unconfirmed".into());}
         let project_id=lock(&session.view)?.project_id.clone();
         let mut pending=lock(&session.pending)?;
         if pending.is_some()||session.stopping.load(Ordering::Relaxed)||matches!(lock(&session.view)?.phase.as_str(),"failed"|"stopped") {
@@ -466,7 +484,18 @@ pub(crate) fn runtime_rebuild_stop(state: State<AppState>, window: tauri::Webvie
 mod tests {
     use super::*;
     fn session(id: &str, project: &str) -> Arc<Session> {
-        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
+        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),startup_map:None,engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
+    }
+    #[test]
+    fn forerunner_startup_is_pinned_scoped_and_not_a_game_acknowledgement(){
+        let mut command=Command::new("unused-no-process-created");command.env("HALO_START_MAP","inherited_unrelated@ce");
+        assert_eq!(apply_forerunner_startup(&mut command,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
+        let value=command.get_envs().find(|(key,_)|*key=="HALO_START_MAP").unwrap().1.unwrap();assert_eq!(value,"be_native@ce");assert_eq!(command.get_args().count(),0);
+        assert_eq!(apply_forerunner_startup(&mut command,runtime::FORERUNNER_WINDOWS_X64_SHA256,"be_native").unwrap(),None);assert!(command.get_envs().find(|(key,_)|*key=="HALO_START_MAP").unwrap().1.is_none());
+        assert!(apply_forerunner_startup(&mut command,&"0".repeat(64),"be_native").is_err());assert!(apply_forerunner_startup(&mut command,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"../other").is_err());
+        let session=session("owned","map");let mut view=lock(&session.view).unwrap();view.runtime_id=runtime::RuntimeId::OpenCe;
+        publish_forerunner(&mut view,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap();assert_eq!(view.startup_map.as_deref(),Some("be_native@ce"));assert_eq!(view.phase,"awaitingMapStartup");assert!(view.game_build_id.is_none()&&view.game_sha256.is_none());
+        publish_forerunner(&mut view,runtime::FORERUNNER_WINDOWS_X64_SHA256,"be_native").unwrap();assert_eq!(view.phase,"awaitingMapSelection");assert!(view.startup_map.is_none()&&view.game_build_id.is_none()&&view.game_sha256.is_none());
     }
     #[test]
     fn fresh_playtest_roots_exist_before_windows_process_path_validation() {

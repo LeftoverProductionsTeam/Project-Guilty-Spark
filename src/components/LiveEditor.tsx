@@ -84,7 +84,7 @@ interface Props {
   onOpenMap: () => Promise<void>;
   sourceControls?: React.ReactNode;
   onResourcesConnected?: (open: import('../types').OpenProject) => Promise<void>;
-  onBeforeResources?: () => Promise<void>;
+  onBeforeResources?: (persist?:boolean) => Promise<void>;
 }
 function LiveViewport({
   controls,
@@ -267,7 +267,7 @@ export default function LiveEditor(props: Props) {
   const [runtime]=useMapState<RuntimeId>(props.project?.id??'global','hosting.runtime',props.project?.quickForge?.runtimeId??props.defaultRuntime ?? PREFERRED_RUNTIME);
   return <LiveObjectInspector presentation={props.sourceViewport!==undefined?'drawer':'sidebar'} controlsOpen={props.mode==='live'}
     runtimeId={runtime}
-    rebuildControls={runtime==='chupathingyCe'||runtime==='openCe'?<RuntimeLiveRebuild runtimeId={runtime} project={props.project} onSave={props.onBeforeResources}/>:undefined}
+    rebuildControls={runtime==='chupathingyCe'||runtime==='openCe'?<RuntimeLiveRebuild runtimeId={runtime} project={props.project} onSave={props.onBeforeResources?()=>props.onBeforeResources!(true):undefined}/>:undefined}
     keyboardEnabled={status=>!!status&&(props.mode==='live'||(props.mode!=='source'&&matchesLiveMap(props.project,props.inspection,status)))}
     viewport={(controls) => <LiveViewport {...props} controls={controls} />} />;
 }

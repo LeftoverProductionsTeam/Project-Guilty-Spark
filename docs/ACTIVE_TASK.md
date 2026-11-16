@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — existing native AI command actions/waypoints creator workflow
+Task: Operation110 — compact mission freeze follow-up and reviewed Forerunner startup
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: parentabcd2e7aa12aed6f62a16bb7f36d19be3a443a64; current command source/UI/CE readback pass. Appa0c2e005d1cfcf52ce2eb08e5bd08aed02824c23d6c2e8f6668eac5f54e4b128; exact evidence in runtime record.
-Next action: verify updated Forerunner build identity/capabilities (16Nov06:06:37) under existing approval, then private Black Echo gameplay if desktop control works. QA70350 CLOSED,4015740905logicalB disposed; no push/Forerunner writes.
+Latest verified revision: 6c5e9dc46a9580dbf0bd16ff7d56bfdf8c7c91d6 base; current scoped source verified below and checkpointed in Git.
+Next action: native freeze/startup UI reproduction needs repaired computer-control prerequisite; do not repeat rejected initialization. Independent next creator gate: native Black Echo transport authoring. Forerunner read-only; no push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current checkpoint: command actions/flags/refs/points→review/Restore/Save/reopen→CE full readback passes;0page errors. Fixed runtime report ownership/module route; native continuation passes. Frontend33/core22+2skips/native2+cache1/browser1+5/Windows pass. Initial startup/module failures retained in runtime evidence. Originals/475IDs unchanged; structural commands/game/37944/fullGoal open.
+16Nov current checkpoint: compact128-beat keyboard/history/Save browser check passes; existing native36px rows/151px HUD preserved. Reviewed Forerunner66092de9 startup request stays unconfirmed; old pins retained. Explicit Save-before-test repaired. Core4/backend5/frontend42/browser4/TypeScript-Vite pass; exact hashes/failures in RUNTIME_INTEGRATION_20261107. QA3082/run-MsIoqf CLOSED,2035225903logicalB disposed; no physical-reclaimed claim. No new native app/game, original writes or push; fullGoal/37944 open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 

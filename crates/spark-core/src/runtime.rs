@@ -241,7 +241,21 @@ pub struct CapabilityEvidence {
 #[cfg(test)] mod hosting_context_tests {
     use super::*;
     #[test]
-    fn forerunner_profiles_keep_exact_binary_and_dependency_architecture(){assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X86_SHA256),Some(0x014c));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(&"0".repeat(64)),None);assert_eq!(shared_content_interface(RuntimeId::OpenCe,FORERUNNER_WINDOWS_X64_SHA256),Some("forerunner"));assert_eq!(shared_content_interface(RuntimeId::ChupathingyCe,FORERUNNER_WINDOWS_X64_SHA256),None);}
+    fn forerunner_profiles_keep_exact_binary_and_dependency_architecture(){assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_CURRENT_SHA256),Some(0x8664));assert_eq!(shared_content_interface(RuntimeId::OpenCe,FORERUNNER_WINDOWS_X64_CURRENT_SHA256),Some("forerunner"));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X86_SHA256),Some(0x014c));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256),Some(0x8664));assert_eq!(forerunner_windows_machine(&"0".repeat(64)),None);assert_eq!(shared_content_interface(RuntimeId::OpenCe,FORERUNNER_WINDOWS_X64_SHA256),Some("forerunner"));assert_eq!(shared_content_interface(RuntimeId::ChupathingyCe,FORERUNNER_WINDOWS_X64_SHA256),None);}
+    #[test]fn forerunner_startup_requests_are_exact_pinned_basenames_and_never_live_acknowledgements(){
+        assert_eq!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
+        for old in [FORERUNNER_WINDOWS_X86_SHA256,FORERUNNER_WINDOWS_X64_SHA256,FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256]{assert_eq!(forerunner_solo_startup_selector(old,"be_native").unwrap(),None);}
+        for bad in ["","../be_native","C:\\maps\\be_native","be_native@ce","be_native.map","map/name","with space"]{assert!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_CURRENT_SHA256,bad).is_err());}
+        assert!(forerunner_solo_startup_selector(&"0".repeat(64),"be_native").is_err());
+    }
+    #[test]#[ignore="Requires the explicitly reviewed installed Forerunner and original Xbox UI library; read-only plan only"]
+    fn installed_forerunner_profile_plan_preserves_originals(){
+        let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_EXE").expect("explicit engine"));let data=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_DATA").expect("explicit data"));
+        let original=maps::hash_file(&executable).unwrap();assert_eq!(original,FORERUNNER_WINDOWS_X64_CURRENT_SHA256);let ui=maps::hash_file(&data.join("maps/ui.map")).unwrap();
+        let registration=RuntimeRegistration{id:"native-read-only-forerunner".into(),runtime_id:RuntimeId::OpenCe,root:executable.parent().unwrap().into(),executable:executable.clone(),data_root:Some(data.clone()),version:None,network_version:None};
+        let plan=prepare_launch(&registration).unwrap();assert_eq!(plan.profile_interface.as_deref(),Some("forerunner"));assert!(!plan.direct_map_launch);assert!(plan.args.is_empty());assert_eq!(plan.environment.get("HALO_DATA_ROOT"),Some(&process_path(&data).unwrap()));assert!(!plan.environment.contains_key("HALO_START_MAP"));
+        assert_eq!(original,maps::hash_file(&executable).unwrap());assert_eq!(ui,maps::hash_file(&data.join("maps/ui.map")).unwrap());
+    }
     #[test] fn multiplayer_and_campaign_guides_use_their_actual_menu_context(){
         let multiplayer=hosting_plan_for(RuntimeId::MccSteam,HostingAction::HostPrivateOnline,Some(1));
         assert!(multiplayer.steps.iter().any(|step|step.contains("Custom Games")));
@@ -939,7 +953,20 @@ pub const FORERUNNER_WINDOWS_X86_SHA256: &str =
 pub const FORERUNNER_WINDOWS_X64_SHA256:&str="ebe2064750c43173b3126c18b44e3215e833a3cc304b6259743a5ad5af09ef65";
 /// Previously reviewed build25767db9 remains usable as its own exact identity.
 pub const FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256:&str="9543508eced47d7237d69310915f4f78344b248b83686c7e2cafe82ba9e6b17b";
-pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_SHA256|FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256=>Some(0x8664),_=>None}}
+/// Owner-approved help/discovery,16Nov: build66092de9, Windows/x64,
+/// contract1, runtime.discover only; native CE609 solo startup request declared.
+/// This is interface admission, not accepted loaded-map or gameplay behavior.
+pub const FORERUNNER_WINDOWS_X64_CURRENT_SHA256:&str="9954b4c0ca2fa657f2ba05a168fbf70ea4229388c14376e7e1018b8cce9994f0";
+pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_CURRENT_SHA256|FORERUNNER_WINDOWS_X64_SHA256|FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256=>Some(0x8664),_=>None}}
+
+/// Only this reviewed binary declares the CE startup interface being admitted.
+/// The caller must still validate/stage the exact native solo cache and resources.
+/// A requested selector is never a loaded-map acknowledgement or live RPC.
+pub fn forerunner_solo_startup_selector(sha256:&str,map:&str)->Result<Option<String>>{
+    if forerunner_windows_machine(sha256).is_none(){return invalid("Forerunner startup needs a reviewed executable identity");}
+    if !crate::ce_host::map_selector(map){return invalid("Forerunner startup needs a native map basename, not a path or family override");}
+    Ok((sha256==FORERUNNER_WINDOWS_X64_CURRENT_SHA256).then(||format!("{map}@ce")))
+}
 
 /// Reviewed path interfaces only. A declared version or a similarly named executable is insufficient.
 /// Local Faber234/Chupathingy identities are owner-installed, not publisher attestations.

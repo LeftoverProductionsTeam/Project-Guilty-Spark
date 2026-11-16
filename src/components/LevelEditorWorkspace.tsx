@@ -36,7 +36,7 @@ export default function LevelEditorWorkspace({
   intent: 'world' | 'quickforge' | 'live';
   notify: (message: string) => void;
   onOpenMap: () => Promise<void>;
-  onBeforeResources: () => Promise<void>;
+  onBeforeResources: (persist?:boolean) => Promise<void>;
   onResourcesConnected: (open: OpenProject) => Promise<void>;
   onSourceEdit: (project: Project, description: string) => void;
   entries:import('../types').LibraryEntry[];

@@ -1338,7 +1338,7 @@ export default function App() {
     return <RetainedLevelView key={id} id={id} active={active} graphicsResident={warm.has(id)} renderGraphics={!requestedPanel(location.search,workspace)}>
       <Suspense fallback={<div className="loading">Opening level editor…</div>}>
         <LevelEditorWorkspace defaultRuntime={data.settings.preferredHalo??undefined} entries={data.entries} onBuild={()=>setWorkspace('build')} project={project} inspection={map?.inspection??null} assetMeshes={map?.meshes??{}} intent={active?workspace as 'world'|'quickforge'|'live':'world'} onSourceEdit={edit} onImportMap={()=>void importFiles()} onContinue={id=>void openProject(id,'world')} onDirector={()=>void openRecordingDirector()}
-          source={sourceView(map)} newMap={forgeView(null)} notify={notice} onBeforeResources={()=>save(false,project?.id)} onResourcesConnected={applyResourceMetadata}
+          source={sourceView(map)} newMap={forgeView(null)} notify={notice} onBeforeResources={persist=>save(persist===true,project?.id)} onResourcesConnected={applyResourceMetadata}
           onOpenMap={async()=>{await save(false,project?.id);const opened=await call<OpenProject>('live_mcc_import_map');await load(opened);await refresh();}}/>
       </Suspense>
     </RetainedLevelView>;
