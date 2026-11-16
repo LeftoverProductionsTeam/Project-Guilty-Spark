@@ -125,6 +125,8 @@ export interface PlaytestRecord {
   manuallyReported: boolean;
 }
 export interface CreatorStudioDocument {
+  /** Recovered native cinematic activation; null keeps manual invocation. */
+  cinematicTriggerVolume?:string|null;
   engineMachinima?:{enabled:boolean;playback:'fixed'|'sequence';cameraId?:string|null;autoStart:boolean}|null;
   schemaVersion: 1;
   missions: MissionBeat[];
@@ -230,6 +232,7 @@ export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:s
 export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   if(doc.engineMachinima){const e=doc.engineMachinima;if(typeof e.enabled!=='boolean'||!['fixed','sequence'].includes(e.playback)||typeof e.autoStart!=='boolean'||(e.cameraId!=null&&!doc.shots?.some(s=>s.id===e.cameraId))||(e.enabled&&(!doc.shots?.length||doc.shots.length>64)))return ['Invalid game-native machinima take: choose 1–64 camera keys and an existing selected camera'];}
   const failures: string[] = [];
+  if(doc.cinematicTriggerVolume!=null&&(typeof doc.cinematicTriggerVolume!=='string'||! /^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(doc.cinematicTriggerVolume)))return ['Cinematic trigger area needs a native script identifier'];
   if (!doc || doc.schemaVersion !== 1) return ['Unsupported Creator Studio schema'];
   if (doc.machinima !== undefined && !validMachinimaSettings(doc.machinima)) return ['Invalid Machinima lens or playback settings'];
   if (!Array.isArray(doc.missions) || !Array.isArray(doc.shots) || !Array.isArray(doc.playtests) || !doc.server) return ['Missing Studio collection'];

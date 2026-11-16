@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — timed native cinematic source milestone; reviewed mission trigger next
+Task: Operation110 — native cinematic area milestone; existing trigger geometry workflow next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: d8136fabadb342725b652cb0e1dd387660a56549 parent plus this scoped source/manifest commit (git log -1 resolves its revision). Linked Windows/UI/native cinematic proof passes; no gameplay acceptance.
-Next action: connect the static cinematic through the existing recovered mission-module editor and verify its native trigger/readback. Game playback/input restoration still needs the authorized isolated runtime test when desktop control works. Exact90→120tick proof: RUNTIME_INTEGRATION_20261107. QA83720 CLOSED/disposed;37944/full M1–M6 remain open.
+Latest verified revision: 2b9eed208c910d52a10f4e335317d78a158ae84b parent plus this scoped source/manifest commit (git log -1 resolves it). Fresh Windows area activation/disable/CE readback passes; no gameplay acceptance.
+Next action: add existing native trigger-area geometry inspection/viewport editing through current native source and Level Editor systems. Preserve accepted cinematic exporter. Game activation/control restoration awaits authorized private testing when desktop control works;37944 and full M1–M6 remain open. QA68860 CLOSED/disposed.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov timed cinematic: saved native camera take/timing/history/Save/restart, guarded module attach/revision, CE60990→120tick compile/independent readback pass in linked Windows runs,0page errors. Frontend36/core17/browser6scoped/TypeScript/Vite/Windows compilation pass. Driver failures remain failed; hashes/bounds in RUNTIME_INTEGRATION_20261107. QA83720/run-H8MLKu CLOSED:4953928812 logicalB disposed; physical reclamation unavailable. No game/37944/full-suite claim. Source manifests/475CSV IDs/legacy checkpoint/originals unchanged.
+16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
 Reuse historical evidence; run proportionate focused checks under the updated policy:
 

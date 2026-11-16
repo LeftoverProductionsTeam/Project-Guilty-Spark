@@ -1159,6 +1159,9 @@ fn reviewed_combat(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDiffer
 pub fn camera_points_close(a:&crate::maps::NativeCameraPoint,b:&crate::maps::NativeCameraPoint)->bool{
     a.index==b.index&&a.name==b.name&&positions_close(a.position,b.position)&&a.orientation_radians.iter().zip(b.orientation_radians).all(|(a,b)|facings_close(*a,b))&&(a.fov_radians-b.fov_radians).abs()<=0.000002
 }
+pub fn scenario_trigger_volume_names(fields:&str)->Result<Vec<String>>{
+    let volumes=array_listing(fields,"trigger_volumes")?;if volumes.count>1024{return invalid("Native trigger inventory exceeds1024entries");}array_items(&volumes,"trigger_volumes")?.iter().map(|item|native_name(&direct_struct_fields(item)?)).collect()
+}
 pub fn scenario_script_names(fields:&str)->Result<Vec<String>>{
     let scripts=array_listing(fields,"scripts")?;if scripts.count>1024{return invalid("Native script inventory exceeds1024entries");}array_items(&scripts,"scripts")?.iter().map(|item|native_name(&direct_struct_fields(item)?)).collect()
 }
@@ -1468,6 +1471,19 @@ mod tests {
         for index in [-2,2,256]{if let Operation::EncounterStartPosition{command_list,..}=&mut op{*command_list=Some(index);}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",&before).is_err());}
         let missing=before.replace("                        command_list (65535) index\n","");if let Operation::EncounterStartPosition{command_list,..}=&mut op{*command_list=Some(-1);}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",&missing).is_err());assert!(scenario_command_list_choices(&before.replace("command_lists[2]","command_lists[257]")).is_err());
         let legacy:ScenarioStartChoice=serde_json::from_value(serde_json::json!({"index":0,"position":[1,2,3]})).unwrap();assert!(legacy.command_list.is_none());
+    }
+    #[test]
+    fn native_cinematic_area_inventory_preserves_names_and_refuses_malformed_fields(){
+        let fields="trigger_volumes[2] array
+    trigger_volumes[0] struct
+        name (intro_area) tagstring
+        position (1,2,3) point3d
+    trigger_volumes[1] struct
+        name (later_area) tagstring
+        position (4,5,6) point3d
+";
+        assert_eq!(scenario_trigger_volume_names(fields).unwrap(),vec!["intro_area","later_area"]);
+        assert!(scenario_trigger_volume_names(&fields.replace("name (intro_area)","missing (intro_area)")).is_err());assert!(scenario_trigger_volume_names(&fields.replace("trigger_volumes[2] array","trigger_volumes[1025] array")).is_err());
     }
     #[test]
     fn original_cutscene_camera_review_retains_indices_names_scripts_and_other_fields(){

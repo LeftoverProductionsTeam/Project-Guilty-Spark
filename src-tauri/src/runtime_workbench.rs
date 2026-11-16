@@ -358,7 +358,7 @@ pub(super) struct WorkingScriptSources {
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-pub(super) struct WorkingCameraReview {tag_identity:String,cameras:Vec<maps::NativeCameraPoint>,script_names:Vec<String>}
+pub(super) struct WorkingCameraReview {tag_identity:String,cameras:Vec<maps::NativeCameraPoint>,script_names:Vec<String>,trigger_volumes:Vec<String>,scenario_type:u16}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub(super) struct WorkingScriptSource {selection:WorkingScriptSources,script:core::working_tags::ScriptAttachment}
@@ -404,9 +404,10 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
             let identity=core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?;
             let values=native_operations_native::fields(&state,&project,&context.tags,&format!("{}.scenario",context.scenario_path))?;
             let cameras=core::native_operations::scenario_camera_choices(&values).map_err(error)?;let script_names=core::native_operations::scenario_script_names(&values).map_err(error)?;
+            let trigger_volumes=core::native_operations::scenario_trigger_volume_names(&values).map_err(error)?;let scenario_type=source_scenario_type(&state,&project)?;
             let latest=lock(&state.library)?.get(&project_id).map_err(error)?;if latest.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Saved authoring changed during camera review".into());}let current=source_context(&state,&latest)?;
             if current.build.id!=context.build.id||current.tags!=context.tags||core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?!=identity{return Err("Native camera/tag source changed during review; no source was prepared".into());}
-            view.camera_review=Some(WorkingCameraReview{tag_identity:identity,cameras,script_names});
+            view.camera_review=Some(WorkingCameraReview{tag_identity:identity,cameras,script_names,trigger_volumes,scenario_type});
         }
         Ok(view)
     }).await.map_err(error)?
@@ -1183,6 +1184,10 @@ pub(super) async fn build_working_tags(
                     // edits objectives while the background compiler is running.
                     let messages=|value:&Project|->Reply<serde_json::Value>{let messages=core::creative::mission_hud_messages(value.studio.as_ref().map_or(&[][..],|studio|studio.missions.as_slice())).map_err(error)?;serde_json::to_value(messages).map_err(error)};
                     if messages(&current)?!=messages(&project)?{return Err("Mission HUD text changed during compilation. The candidate was not adopted; previous-good source and builds remain intact. Save and prepare a new HUD review.".into());}
+                }
+                if input.script_attachment.as_ref().is_some_and(|script|script.content.starts_with("; Spark existing-camera cinematic\r\n")) {
+                    let take=|value:&Project|->Reply<serde_json::Value>{serde_json::to_value(value.studio.as_ref().map(|studio|(&studio.shots,&studio.cinematic_trigger_volume))).map_err(error)};
+                    if take(&current)?!=take(&project)?{return Err("Cinematic take or trigger changed during compilation. The candidate was not adopted; previous-good source and builds remain intact. Save and prepare a new review.".into());}
                 }
                 current.builds.push(record);current.modified_at=chrono::Utc::now().to_rfc3339();library.save(&current,None).map_err(error)
             });

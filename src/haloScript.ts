@@ -390,7 +390,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
 }
 
 /** Actual H1 camera_set/cinematic_start syntax. Raw exports require existing markers; native preparation writes their positions/FOV separately. */
-export function exportHaloCeCinematic(studio:CreatorStudioDocument,options:{prepared?:boolean;scriptName?:string}={}): ScriptExport {
+export function exportHaloCeCinematic(studio:CreatorStudioDocument,options:{prepared?:boolean;scriptName?:string;areaTrigger?:{volume:string|null}}={}): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.shots.length)throw new Error('Add at least one cinematic shot.');
   const deps:string[]=[],lines=heading('Cinematic Director');
@@ -409,6 +409,13 @@ export function exportHaloCeCinematic(studio:CreatorStudioDocument,options:{prep
   lines.push('  (cinematic_show_letterbox false)','  (camera_control false)','  (cinematic_stop)');
   if(options.prepared)lines.push('  (player_enable_input true)');
   lines.push(')','');
+  if(options.areaTrigger){
+    const controller=ensureName(scriptName+'_start','Cinematic trigger script name (use a function name of at most25characters)');
+    lines.push('; One area activation per map load; disabling preserves this native script identity.','(script startup '+controller);
+    if(options.areaTrigger.volume!=null){const volume=ensureName(options.areaTrigger.volume,'Cinematic trigger area');deps.push('trigger_volume:'+volume);lines.push('  (sleep_until (> (list_count (players)) 0) 1)','  (sleep_until (volume_test_objects '+volume+' (players)) 1)','  ('+scriptName+')');}
+    else lines.push('  (sleep_until false 15)');
+    lines.push(')','');
+  }
   return {filename:'gs_cinematic.hsc',content:lines.join('\r\n'),dependencies:deps,warnings:options.prepared?['Camera markers, position, orientation and FOV are prepared with the native mission. Subtitles remain rehearsal notes; native playback and camera restoration require game testing. Smooth uses the engine camera interpolation; cut snaps immediately.']:[
     'Place and orient the named cutscene camera points in the editable scenario using the shot metadata.',
     'Camera FOV, subtitle, animation, music and cinematic blending are not compiled by this exporter.',

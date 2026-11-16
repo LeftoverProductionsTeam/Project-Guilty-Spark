@@ -11,6 +11,8 @@ pub const STUDIO_SCHEMA_VERSION: u32 = 1;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreatorStudio {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub cinematic_trigger_volume:Option<String>,
     pub schema_version: u32,
     pub missions: Vec<MissionBeat>,
     pub shots: Vec<CameraShot>,
@@ -433,6 +435,7 @@ fn variant_token(s: &str) -> bool {
 
 impl CreatorStudio {
     pub fn validate(&self) -> Result<()> {
+        if self.cinematic_trigger_volume.as_ref().is_some_and(|name|!script_ident(name)){return invalid("Cinematic trigger area needs a native script identifier");}
         if let Some(engine)=&self.engine_machinima{
             if !["fixed","sequence"].contains(&engine.playback.as_str())||engine.camera_id.as_ref().is_some_and(|id|!valid_id(id)){return invalid("Invalid game-native machinima settings");}
             if engine.enabled&&(self.shots.is_empty()||self.shots.len()>64||engine.camera_id.as_ref().is_some_and(|id|!self.shots.iter().any(|s|&s.id==id))){return invalid("An engine take needs 1–64 camera keys and an existing selected camera");}
@@ -536,10 +539,14 @@ mod tests {
     use super::*;
     fn studio() -> CreatorStudio {
         CreatorStudio {
-            schema_version: 1, missions: vec![], shots: vec![], playtests: vec![], machinima: None,engine_machinima:None,
+            schema_version: 1, missions: vec![], shots: vec![], playtests: vec![], machinima: None,engine_machinima:None,cinematic_trigger_volume:None,
             server: ServerPlan { name: "LAN Test".into(), runtime: "haloCustomEdition".into(),
                 max_players: 8, public_listing: false, rotation: vec![], game_types: vec![] },
         }
+    }
+    #[test]
+    fn native_cinematic_trigger_roundtrips_without_changing_legacy_studio_defaults(){
+        let mut doc=studio();assert!(serde_json::to_value(&doc).unwrap().get("cinematicTriggerVolume").is_none());doc.cinematic_trigger_volume=Some("intro_area".into());doc.validate().unwrap();let saved=serde_json::to_string(&doc).unwrap();let reopened:CreatorStudio=serde_json::from_str(&saved).unwrap();assert_eq!(reopened.cinematic_trigger_volume,doc.cinematic_trigger_volume);doc.cinematic_trigger_volume=Some("bad) (quit".into());assert!(doc.validate().is_err());
     }
     #[test]
     fn never_accepts_server_command_injection() {

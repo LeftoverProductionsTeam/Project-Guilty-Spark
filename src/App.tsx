@@ -1891,7 +1891,7 @@ export default function App() {
             dirty={unsaved}
             working={busy || !!activeJob}
             epoch={epoch+(activeMap?.savedRevision??0)}
-            onSave={() => save()}
+            onSave={() => save(true)}
             onNavigate={(next) => (next === 'settings' ? openDependencySetup() : setWorkspace(next))}
             onOpenSourceProject={id=>openProject(id,'quickforge')}
             onOpenCompiled={(buildId) => {
