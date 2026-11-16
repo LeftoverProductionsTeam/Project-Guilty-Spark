@@ -1,7 +1,7 @@
 import {NATIVE_DEVICE_VIEW,deviceMatches,deviceDraft,deviceObjectId} from '../nativeDevicePlacement';
 import type {NativeDeviceView} from '../nativeDevicePlacement';
 import {useWorkspaceFileActions} from './WorkspacePanels';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { beginProjectMutation } from '../projectMutation';
 import {call,native} from '../api';
 import type {NativeTagContext} from '../nativeOperations';
@@ -92,8 +92,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [error, setError] = useState('');
   const [includingSound,setIncludingSound]=useState(false);
   const [cueSources,setCueSources]=useMapState<Record<string,string>>(project.id,'mission-cue-sources',{});
-  const studio = project.studio ?? emptyCreatorStudio();
-  const branchDecisions=(()=>{try{return [...missionBranchGroups(studio.missions)];}catch{return [];}})();
+  const studio = useMemo(()=>project.studio ?? emptyCreatorStudio(),[project.studio]);
+  const branchDecisions=useMemo(()=>{try{return [...missionBranchGroups(studio.missions)];}catch{return [];}},[studio.missions]);
   const earlierRescues=(index:number)=>studio.missions.slice(0,index).filter(beat=>beat.trigger==='escort'&&beat.escortFailure==='continue');
   function changeConditionVolume(beat:MissionBeat,volume:string){
     change({...studio,missions:studio.missions.map(row=>row.id===beat.id||beat.conditionGroup!=null&&row.conditionGroup===beat.conditionGroup?{...row,conditionVolume:volume}:row)},'Change mission branch volume');
@@ -106,13 +106,14 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     {id:'creator-evidence',label:'Export creator evidence…',run:()=>report()},
     {id:'native-source-tree',label:'Export HCEEK source tree…',run:()=>exportHceekTree()},
   ]);
-  const bindingChecks = (() => {
+  // Opening/collapsing controls must not regenerate every mission script and binding.
+  const bindingChecks = useMemo(() => {
     const scripts: ScriptExport[]=[];
     try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')})); } catch { /* incomplete authoring has no safe export yet */ }
     try { if(studio.shots.length) scripts.push(exportHaloCeCinematic(studio)); } catch { /* unresolved marker */ }
     try { if(project.firefight&&project.quickForge?.gameMode!=='campaign') scripts.push(exportHaloCeFirefight(project.firefight)); } catch { /* invalid/endless wave authoring */ }
     return inspectScenarioBindings(scripts,sourceInspection,project.quickForge,studio.missions.some(beat=>beat.cinematicCue!=null)?studio.shots.map(cinematicMarker):[],nativeAreas?.scenarioVolumes,nativeAreas?.scenarioDevices);
-  })();
+  },[studio,project.firefight,project.quickForge,sourceInspection,nativeAreas]);
   const change = (next: CreatorStudioDocument, label: string) => {
     const problems = validateCreatorStudio(next);
     if (problems.length) { setError(problems.join('; ')); return; }
@@ -384,17 +385,16 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       </details>
       <datalist id={volumeChoices}>{[...new Set([...(project.quickForge?.logic?.triggers??[]).flatMap(trigger=>trigger.nativeName?[trigger.nativeName]:[]),...(nativeAreas?.scenarioVolumes??[]).map(area=>area.name).filter(Boolean)])].map(name=><option key={name} value={name}/>)}</datalist>
       {studio.missions.length === 0 && <p className="studio-empty">No authored mission beats. Add an objective to start a custom campaign flow.</p>}
-      {studio.missions.length>0&&<p className="studio-hint">Expand a beat to edit it. Collapsing keeps its changes; Save stores the project. All beats remain in this list.</p>}
+      {studio.missions.length>0&&<div className="studio-beat-list-tools"><span className="studio-hint">Expand a beat to edit. Collapse keeps edits; Save stores the project.</span><button type="button" disabled={!studio.missions.some(beat=>openBeats[beat.id]===true)} onClick={()=>setOpenBeats({})}>Collapse all beats</button></div>}
       {studio.missions.map((beat, i) => <details className="studio-record studio-mission-record" key={beat.id} open={openBeats[beat.id]===true}
-        onToggle={event=>{const open=event.currentTarget.open;if(open!==(openBeats[beat.id]===true))setOpenBeats(previous=>previous[beat.id]===open?previous:{...previous,[beat.id]:open});}}>
+        onToggle={event=>{if(event.target!==event.currentTarget)return;const open=event.currentTarget.open;if(open!==(openBeats[beat.id]===true))setOpenBeats(previous=>previous[beat.id]===open?previous:{...previous,[beat.id]:open});}}>
         <summary className="studio-beat-summary"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><span>{({manual:'Manual',triggerVolume:'Area',weaponOwned:'Collection',forerunnerExtractionSettled:'Extraction',deviceActivated:'Terminal',encounterCleared:'Combat',escort:'Escort',timer:'Delay'} as const)[beat.trigger]}</span>{beat.hudObjective&&<small>HUD</small>}{beat.soundCue&&<small>Radio</small>}{beat.cinematicCue&&<small>Scene</small>}</summary>
         {openBeats[beat.id]===true&&<div className="studio-beat-body">
-        <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Remove dependent rescue-result conditions first.':undefined} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
-        <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
+        <div className="studio-fields studio-beat-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
         <label title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Later objectives use this rescue result. Remove those conditions before changing its trigger.':'Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.'}>Trigger<select value={beat.trigger} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'],...(e.target.value!=='escort'?{escortFailure:undefined}:{}),...(e.target.value==='forerunnerExtractionSettled'?{triggerRef:'extraction_activate'}:{}) })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
           <option value="weaponOwned">Native weapon collected (actual ownership)</option><option value="forerunnerExtractionSettled" disabled={!['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')}>Forerunner extraction settled (engine callback)</option><option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
-        <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
+        <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label><button className="studio-beat-remove" type="button" aria-label={`Remove beat ${i + 1}`} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Remove dependent rescue-result conditions first.':'Remove this mission beat'} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
         {(beat.trigger === 'triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':beat.trigger==='escort'?'Survivor destination volume':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
         {beat.trigger==='weaponOwned'&&<><label>Technology weapon tag<input aria-label={'Mission collection weapon '+(i+1)} list={'mission-weapon-tags-'+i} maxLength={240} spellCheck={false} value={beat.weaponPath??''} placeholder="Choose a placed, included native weapon" onChange={e=>updateBeat(beat.id,{weaponPath:e.target.value})}/><datalist id={'mission-weapon-tags-'+i}>{[...new Set((project.quickForge?.placements??[]).filter(p=>p.tagClass==='weap').map(p=>p.tagPath))].map(path=><option key={path} value={path}/>)}</datalist></label><p className="studio-hint">Checks one actual native player inventory per tick. Use a placed technology weapon absent from the starting loadout. An area or terminal activation does not satisfy collection. This is shared mission progress, not an independent squad inventory.</p></>}
@@ -519,11 +519,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
             Disable in-game recording first. Raw script exports still need the named native camera points.</p>
         </details>
         <details className="studio-native-objective"><summary>Native objective &amp; completion</summary>
-          <label className="checkbox-label"><input type="checkbox" checked={beat.hudObjective===true}
+          <div className="studio-native-hud-fields"><label className="checkbox-label"><input type="checkbox" checked={beat.hudObjective===true}
             onChange={event=>updateBeat(beat.id,{hudObjective:event.target.checked?true:undefined,
               ...(event.target.checked&&beat.hudText==null?{hudText:beat.title}:{})})}/>{project.quickForge&&!project.quickForge.native?'Show native HUD objective while this beat is active':'Author native HUD objective text for this beat'}</label>
           {beat.hudObjective&&<label>HUD objective text<input aria-label={'HUD objective '+(i+1)} maxLength={254}
-            value={beat.hudText??''} onChange={event=>updateBeat(beat.id,{hudText:event.target.value})}/></label>}
+            value={beat.hudText??''} onChange={event=>updateBeat(beat.id,{hudText:event.target.value})}/></label>}</div>
           <details className="studio-native-notes"><summary>HUD setup &amp; native limitations</summary><p className="studio-hint">HUD text is separate from direction notes: 1–254 UTF-16 characters, no percent signs or control characters.
             {project.quickForge&&!project.quickForge.native?'The prepared native build creates a standard message tag; a script-only export does not include that tag.':'For recovered source, Save and use Runtime & Tools → Details → Edit or attach scenario HaloScript → Campaign objective HUD messages. Review HaloScript calls to these message names separately.'}</p><p className="studio-hint">The engine can refuse unsafe checkpoints. Completion follows the selected campaign configuration. Prepare again after changes; HUD display, checkpoint restoration and level progression need game verification.</p></details>
           <div className="studio-native-completion"><label className="checkbox-label" title="The engine may refuse or time out a checkpoint when unsafe."><input type="checkbox" checked={beat.checkpoint===true}

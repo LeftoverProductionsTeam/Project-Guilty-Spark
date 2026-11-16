@@ -4439,7 +4439,8 @@ test('native cinematic area activation uses saved history and refuses a changed 
 });
 
 
-test('mission beats stay compact and lazy without losing keyboard edits, history or Save',async({page})=>{
+test('mission beats stay compact and lazy without losing keyboard edits, history or Save',async({page},testInfo)=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
  await mockDesktop(page);
  await page.evaluate(()=>{const p=(window as any).__sparkMock.projects.a.project;
   p.studio={schemaVersion:1,missions:Array.from({length:128},(_,i)=>({id:'compact-'+i,title:'Objective '+(i+1),objective:'Preserve mission '+i,trigger:'manual',encounterName:'',hudObjective:true,hudText:'Objective '+(i+1)})),shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
@@ -4464,6 +4465,34 @@ test('mission beats stay compact and lazy without losing keyboard edits, history
  const native=row.locator('.studio-native-objective');await native.locator(':scope > summary').click();const hud=row.getByRole('textbox',{name:'HUD objective 7',exact:true});await hud.fill('Equipment banked. Survivors extracted.');await hud.blur();await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[6].hudText)).toBe('Equipment banked. Survivors extracted.');
  await expect(page.getByRole('button',{name:'Add beat',exact:true})).toBeDisabled();await expect(rows).toHaveCount(128);
+ const collapse=page.getByRole('button',{name:'Collapse all beats',exact:true});
+ // A nested disclosure changes neither parent expansion nor mission/history.
+ const notes=native.locator('.studio-native-notes');await notes.locator(':scope > summary').click();await notes.locator(':scope > summary').click();
+ await expect(row).toHaveAttribute('open','');await expect(page.locator('.studio-beat-body')).toHaveCount(1);
+ await expect(row.locator('.studio-record-heading')).toHaveCount(0);
+ const measurements=[];
+ for(const size of [{width:800,height:600},{width:1280,height:720},{width:1366,height:768},{width:1500,height:950},{width:1920,height:1080},{width:2560,height:1080},{width:3440,height:1440},{width:5120,height:1440}]){
+  await page.setViewportSize(size);await revealPagedControl(native.locator(':scope > summary'));
+  const dimensions=await native.evaluate(node=>({height:node.getBoundingClientRect().height,overflow:node.scrollWidth-node.clientWidth}));
+  expect(dimensions.overflow).toBeLessThanOrEqual(1);expect(dimensions.height).toBeLessThanOrEqual(size.width<=900?240:180);
+  for(const control of await native.locator('input').all()){
+   const bounds=await control.evaluate(node=>{const rect=node.getBoundingClientRect(),parent=node.closest('.studio-native-objective')!.getBoundingClientRect();return {left:rect.left-parent.left,right:parent.right-rect.right,width:rect.width,height:rect.height};});
+   expect(bounds.left).toBeGreaterThanOrEqual(0);expect(bounds.right).toBeGreaterThanOrEqual(-1);expect(bounds.width).toBeGreaterThan(0);expect(bounds.height).toBeGreaterThan(0);
+  }
+  measurements.push({...size,...dimensions});
+  if(size.width===1500||size.width===800)await native.screenshot({path:testInfo.outputPath('compact-objective-'+size.width+'.png')});
+ }
+ console.log('Compact mission controls:',JSON.stringify(measurements));
+ await testInfo.attach('compact-objective-layouts',{body:JSON.stringify(measurements,null,2),contentType:'application/json'});
+ // Several expanded rows can be collapsed at once, without delayed native toggle events reopening them.
+ await revealPagedControl(rows.nth(5).locator(':scope > summary'));await rows.nth(5).locator(':scope > summary').click();
+ await expect(page.locator('.studio-beat-body')).toHaveCount(2);await revealPagedControl(collapse);await collapse.focus();await page.keyboard.press('Enter');
+ await expect(page.locator('.studio-beat-body')).toHaveCount(0);await expect(collapse).toBeDisabled();
+ for(let i=0;i<8;i++){await revealPagedControl(summary);await summary.focus();await page.keyboard.press('Enter');await expect(page.locator('.studio-beat-body')).toHaveCount(1);await page.keyboard.press('Space');await expect(page.locator('.studio-beat-body')).toHaveCount(0);}
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[6].hudText)).toBe('Equipment banked. Survivors extracted.');
+ await summary.focus();await page.keyboard.press('Control+z');await summary.press('Enter');await native.locator(':scope > summary').click();await expect(hud).toHaveValue('Objective 7');
+ await summary.focus();await page.keyboard.press('Control+y');await expect(hud).toHaveValue('Equipment banked. Survivors extracted.');
+ expect(errors).toEqual([]);
 });
 
 

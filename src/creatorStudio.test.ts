@@ -68,7 +68,7 @@ it('retains the Black Echo objective bindings through saved-data serialization w
 
 function campaignDraft():Project {
  return {id:'owned_campaign',title:'Owned campaign',studio:emptyCreatorStudio(),quickForge:{schemaVersion:1,gameMode:'campaign',runtimeId:'haloCustomEdition',native:null,
-   startingProfile:defaultNativePlayerProfile(),spawns:[{position:[2,3,.1]}],geometry:{preserve:'authored geometry'},campaignEncounters:[],
+   startingProfile:defaultNativePlayerProfile(),spawns:[{position:[2,3,.1]}],geometry:{preserve:'authored geometry'},placements:[],campaignEncounters:[],
    logic:{schemaVersion:1,triggers:[],devices:[],rules:[],handwrittenSources:[{filename:'owned.hsc',content:'; preserve authored radio source'}]}}} as unknown as Project;
 }
 it('creates one additive operation draft with real named areas, preserving existing source and area ownership',async()=>{

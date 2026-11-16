@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native transport groups verified in scope; pilot/flight authoring next
+Task: Operation110 — compact mission controls; native freeze remains open
 Status: implementation incomplete
-Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 2e003296a285538ce739eef43fcd4468281ad3f5 base; current native group source/output checks pass, checkpoint commit in Git.
-Next action: native pilot/route/flight/crew authoring through existing AI/command/cinematic systems. Desktop/game acceptance blocked; no retry/bypass. Forerunner read-only; no push.
+Starting revision: bf9fb9a4488e3e6860ccfbfc124cfeb79913be68, canonical D:/Project Guilty Spark master.
+Latest verified revision: bf9fb9a base; focused source/UI checks pass; checkpoint commit in Git.
+Next action: native freeze reproduction when desktop prerequisite is restored; continue existing pilot/route authoring independently. No retry/bypass, Forerunner writes or push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current checkpoint: per-craft native boarding/recall group UI→Save/history→CE609 compile/readback passes, enabled4/disabled0; no terminal group aliases. Frontend36/browser2/core13/reader6/web/all-core-test compilation/2examples/native probes pass. Cache ef0f7335…on/30cc5b9c…off borrows BSP,12warnings each; not flight/gameplay. QA14799/run-tKzg4J CLOSED1455639727logicalB; physical reclamation unavailable. Exact hashes/scope in RUNTIME_INTEGRATION_20261107.475IDs/37944/fullGoal open.
+16Nov current compact mission follow-up: Collapse all beats, responsive HUD fields, no repeated header, cached unchanged binding checks. Browser2/8sizes/128beats and frontend36/TypeScript/Vite pass; initial3incomplete-fixture failures fixed without production weakening. HUD162px at800/129px wider, overflow0. Two small browser captures in UI_INTERACTION_AUDIT. QAoutput disposed; no native freeze/37944 closure. Prior transport group proof remains in RUNTIME_INTEGRATION_20261107/Gitbf9fb9a.475IDs/fullGoal open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
