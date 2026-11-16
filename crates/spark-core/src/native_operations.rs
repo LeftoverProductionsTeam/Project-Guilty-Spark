@@ -1041,7 +1041,10 @@ pub fn native_mission_encounters(fields:&str)->Result<Vec<NativeMissionEncounter
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct NativeMissionWeapon {pub tag_path:String,pub placements:Vec<u16>,pub starting_equipment:bool}
+pub struct NativeMissionWeapon {pub tag_path:String,pub placements:Vec<u16>,pub starting_equipment:bool,pub objects:Vec<NativeMissionWeaponObject>}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeMissionWeaponObject {pub index:u16,pub name:Option<String>,pub not_placed_automatically:bool,pub create_issue:Option<String>}
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct NativeMissionSource {pub encounters:Vec<NativeMissionEncounter>,pub weapons:Vec<NativeMissionWeapon>}
@@ -1062,10 +1065,20 @@ pub fn native_mission_source(fields:&str)->Result<NativeMissionSource>{
  if palette.count>256||placed.count>4096||profiles.count>256{return invalid("Native mission weapon inventory exceeds its review bounds");}
  let refs=array_items(&palette,"weapon_palette")?.iter().map(|item|reference(&direct_struct_fields(item)?,"name")).collect::<Result<Vec<_>>>()?;
  let mut loadout=std::collections::BTreeSet::new();for item in array_items(&profiles,"player_starting_profile")?{let root=direct_struct_fields(item)?;for key in ["primary_weapon","secondary_weapon"]{if let Some(path)=reference(&root,key)?{loadout.insert(path.to_ascii_lowercase());}}}
+ let names=array_listing(fields,"object_names")?;if names.count>512{return invalid("Native object name table exceeds512entries");}
+ let names=array_items(&names,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
  let mut weapons:Vec<NativeMissionWeapon>=vec![];
  for(index,item)in array_items(&placed,"weapons")?.iter().enumerate(){let root=direct_struct_fields(item)?;let palette=native_index(&root,"type")?;let tag=usize::try_from(palette).ok().and_then(|n|refs.get(n)).and_then(|path|path.as_ref()).ok_or_else(||crate::SparkError::Invalid("Placed native weapon has an invalid or null palette reference".into()))?;
-  if let Some(row)=weapons.iter_mut().find(|row|row.tag_path.eq_ignore_ascii_case(tag)){row.placements.push(index as u16);}else{weapons.push(NativeMissionWeapon{tag_path:tag.clone(),placements:vec![index as u16],starting_equipment:loadout.contains(&tag.to_ascii_lowercase())});}
+  let name_index=native_index(&root,"name")?;let name=if name_index==-1{None}else{Some(names.get(usize::try_from(name_index).map_err(|_|crate::SparkError::Invalid("Invalid native weapon name index".into()))?).ok_or_else(||crate::SparkError::Invalid("Native weapon name index is outside its table".into()))?.clone())};
+  let(_,flags)=native_children(&root,"not_placed","bitmask",5)?;let mut automatic=None;
+  for(_,field)in flags{let(key,tail)=field.split_once(" (").ok_or_else(||crate::SparkError::Invalid("Invalid weapon placement flags".into()))?;let(value,kind)=tail.split_once(')').ok_or_else(||crate::SparkError::Invalid("Invalid weapon placement flag".into()))?;if kind.trim()!="bitfield"||!["0","1"].contains(&value){return invalid("Unsupported weapon placement flag value");}if key=="automatically"{if automatic.replace(value=="1").is_some(){return invalid("Ambiguous automatic weapon placement flag");}}}
+  let not_placed_automatically=automatic.ok_or_else(||crate::SparkError::Invalid("Missing automatic weapon placement flag".into()))?;
+  let create_issue=if let Some(name)=&name{if name.is_empty()||name.len()>31||!name.bytes().next().is_some_and(|v|v.is_ascii_alphabetic()||v==b'_')||!name.bytes().all(|v|v.is_ascii_alphanumeric()||v==b'_'){Some("This name needs manual source reconciliation before scripted creation".into())}else if names.iter().filter(|n|n.eq_ignore_ascii_case(name)).count()!=1{Some("This native object name is ambiguous".into())}else if !not_placed_automatically{Some("Automatic placement is enabled; use the existing placement or review its source flags".into())}else{None}}else{Some("This placement has no native script name".into())};
+  let object=NativeMissionWeaponObject{index:index as u16,name,not_placed_automatically,create_issue};
+  if let Some(row)=weapons.iter_mut().find(|row|row.tag_path.eq_ignore_ascii_case(tag)){row.placements.push(index as u16);row.objects.push(object);}else{weapons.push(NativeMissionWeapon{tag_path:tag.clone(),placements:vec![index as u16],starting_equipment:loadout.contains(&tag.to_ascii_lowercase()),objects:vec![object]});}
  }
+ let mut counts=std::collections::BTreeMap::new();for object in weapons.iter().flat_map(|w|&w.objects){if let Some(name)=&object.name{*counts.entry(name.to_ascii_lowercase()).or_insert(0usize)+=1;}}
+ for object in weapons.iter_mut().flat_map(|w|&mut w.objects){if object.name.as_ref().is_some_and(|name|counts[&name.to_ascii_lowercase()]!=1){object.create_issue=Some("Multiple weapon placements use this native name".into());}}
  Ok(NativeMissionSource{encounters,weapons})
 }
 pub fn scenario_squad_start_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,true)}
@@ -1958,8 +1971,11 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
 #[cfg(test)]mod mission_source_flags_tests {
  use super::*;
  #[test]fn mission_collection_choices_require_placed_native_weapons_and_check_every_loadout(){
-  let fields=concat!("encounters[0] array\nweapon_palette[1] array\n    weapon_palette[0] struct\n        name (weapons/plasma pistol/plasma pistol.weapon) dependency\nweapons[2] array\n    weapons[0] struct\n        type (0) index\n    weapons[1] struct\n        type (0) index\nplayer_starting_profile[2] array\n    player_starting_profile[0] struct\n        primary_weapon (weapons/assault rifle/assault rifle.weapon) dependency\n        secondary_weapon (null) dependency\n    player_starting_profile[1] struct\n        primary_weapon (weapons/pistol/pistol.weapon) dependency\n        secondary_weapon () dependency\n");
+  let fields=concat!("encounters[0] array\nobject_names[1] array\n    object_names[0] struct\n        name (technology) string\nweapon_palette[1] array\n    weapon_palette[0] struct\n        name (weapons/plasma pistol/plasma pistol.weapon) dependency\nweapons[2] array\n    weapons[0] struct\n        type (0) index\n        name (0) index\n        not_placed bitmask\n            automatically (1) bitfield\n            on_easy (0) bitfield\n            on_normal (0) bitfield\n            on_hard (0) bitfield\n            use_player_appearance (0) bitfield\n    weapons[1] struct\n        type (0) index\n        name (-1) index\n        not_placed bitmask\n            automatically (0) bitfield\n            on_easy (0) bitfield\n            on_normal (0) bitfield\n            on_hard (0) bitfield\n            use_player_appearance (0) bitfield\nplayer_starting_profile[2] array\n    player_starting_profile[0] struct\n        primary_weapon (weapons/assault rifle/assault rifle.weapon) dependency\n        secondary_weapon (null) dependency\n    player_starting_profile[1] struct\n        primary_weapon (weapons/pistol/pistol.weapon) dependency\n        secondary_weapon () dependency\n");
   let source=native_mission_source(fields).unwrap();assert!(source.encounters.is_empty());assert_eq!(source.weapons.len(),1);assert_eq!(source.weapons[0].placements,vec![0,1]);assert!(!source.weapons[0].starting_equipment);
+  assert_eq!(source.weapons[0].objects[0].name.as_deref(),Some("technology"));assert!(source.weapons[0].objects[0].not_placed_automatically);assert!(source.weapons[0].objects[0].create_issue.is_none());assert!(source.weapons[0].objects[1].create_issue.is_some());
+  assert!(native_mission_source(&fields.replace("name (0) index","name (999) index")).is_err());assert!(native_mission_source(&fields.replace("automatically (1)","automatically (2)")).is_err());assert!(native_mission_source(&fields.replace("automatically (1) bitfield","unknown_flag (1) bitfield")).is_err());
+  let duplicate=native_mission_source(&fields.replace("name (-1) index","name (0) index")).unwrap();assert!(duplicate.weapons[0].objects.iter().all(|object|object.create_issue.is_some()));
   let grant=fields.replace("primary_weapon (weapons/pistol/pistol.weapon)","primary_weapon (weapons/plasma pistol/plasma pistol.weapon)");assert!(native_mission_source(&grant).unwrap().weapons[0].starting_equipment);
   assert!(native_mission_source(&fields.replace("type (0)","type (1)")).is_err());
   assert!(native_mission_source(&fields.replace("weapons/plasma pistol/plasma pistol.weapon","../unsafe.weapon")).is_err());

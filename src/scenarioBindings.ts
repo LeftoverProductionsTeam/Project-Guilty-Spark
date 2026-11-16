@@ -7,9 +7,13 @@ import type { ScriptExport } from './haloScript';
 import type { QuickForgeDocument } from './forge';
 export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'presentInNativeSource'|'absentInNativeSource'|'notInspectable';
 export interface BindingResult { dependency: string; status: BindingStatus; detail: string }
-export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[],nativeDevices?:readonly {name:string;class:string}[],nativeSquads?:readonly {encounter:number;encounterName:string;name:string}[]): BindingResult[] {
+export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[],nativeDevices?:readonly {name:string;class:string}[],nativeSquads?:readonly {encounter:number;encounterName:string;name:string}[],nativeWeapons?:readonly import('./nativeOperations').NativeMissionWeapon[]): BindingResult[] {
   const dependencies=[...new Set(scripts.flatMap(s=>s.dependencies))];
   return dependencies.map(dependency=>{
+    if(dependency.startsWith('weapon_object:')){
+      const [,name,path]=dependency.split(':'),matches=(nativeWeapons??[]).filter(row=>row.tagPath===path&&!row.startingEquipment).flatMap(row=>(row.objects??[]).filter(object=>object.name===name&&object.notPlacedAutomatically&&!object.createIssue));
+      return {dependency,status:matches.length===1?'presentInNativeSource' as const:'absentInNativeSource' as const,detail:matches.length===1?'Unique named source weapon with automatic placement disabled. Native compilation/readback and actual creation/pickup remain separate checks.':'Read current recovered mission source and choose one unique named weapon with automatic placement disabled and no starting-profile grant. Blank-map source currently uses automatic weapon placement.'};
+    }
     if(nativeDevices&&dependency.startsWith('device_control:')&&!(source?.gameMode==='campaign'&&!source.native)){
       const name=dependency.slice('device_control:'.length),matches=nativeDevices.filter(row=>row.class==='ctrl'&&row.name===name).length;
       return {dependency,status:matches===1?'presentInNativeSource' as const:'absentInNativeSource' as const,detail:matches===1?'Unique control in the inspected native source. Pose editing preserves flags/groups/scripts; real activation and mission progress require native/game validation.':'Native control is missing or ambiguous; read source again or reconcile references in the matching native editor.'};

@@ -74,9 +74,23 @@ fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolum
     }
     Ok(volumes)
 }
+#[derive(Clone,Debug)]
+pub struct ScenarioLogicWeapon {pub index:usize,pub name_index:i16,pub tag_path:String,pub not_placed:u16}
+fn parse_names(r:&Reader,space:&Space,sc:usize)->Result<Vec<ScenarioLogicName>>{
+    let(at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
+    for index in 0..count{let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}Ok(names)
+}
+/// Named native weapons share the same bounded placement/name decoders.
+pub fn scenario_weapon_readback(path:&Path,map:&MapInspection)->Result<(Vec<ScenarioLogicName>,Vec<ScenarioLogicWeapon>)>{
+    with_scenario(path,map,|r,space,sc|{
+        let names=parse_names(r,space,sc)?;let mut diagnostics=vec![];let placed=placements(r,space,sc,(0x270,0x27c,92,"Weapon"),&map.tags,&mut diagnostics)?;
+        if !diagnostics.is_empty(){return invalid("Compiled mission weapon placement/palette is invalid");}
+        let(at,_)=space.block(r,sc+0x270,92,4096)?;let mut weapons=vec![];
+        for(index,object)in placed.iter().enumerate(){let targets=map.tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class=="weap").collect::<Vec<_>>();if targets.len()!=1||object.position.iter().any(|v|!v.is_finite()){return invalid("Compiled mission weapon identity or position is invalid");}let p=at+index*92;weapons.push(ScenarioLogicWeapon{index,name_index:r.u16(p+2)? as i16,tag_path:targets[0].path.clone(),not_placed:r.u16(p+4)?});}Ok((names,weapons))
+    })
+}
 fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadback>{
-    let (at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
-    for index in 0..count {let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}
+    let names=parse_names(r,space,sc)?;
     let volumes=parse_volumes(r,space,sc)?;
     let(at,count)=space.block(r,sc+0x288,52,128)?;let mut groups=vec![];
     for index in 0..count{let p=at+index*52;let initial_value=r.f32(p+32)?;

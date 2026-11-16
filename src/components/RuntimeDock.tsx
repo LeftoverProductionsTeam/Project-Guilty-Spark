@@ -565,7 +565,7 @@ export default function RuntimeDock({
       const composition=missionModule?reviewedMissionOriginal:null;
       if(missionModule&&(!composition||!missionOwnershipConfirmed))throw Error('Read and explicitly review the selected original module ownership before preparing a composed revision.');
       const generated=composition?await composeRecoveredCampaignMission(studio,activation,source.target==='gbx-custom',composition.content,{filename:composition.filename,sourceSha256:composition.sha256,retiredStartups,replaceExtractionCallback:replaceMissionCallback}):recoveredCampaignMission(studio,activation,source.target==='gbx-custom');
-      const bindings=inspectScenarioBindings([generated],null,null,[],review.triggerVolumes.map(name=>({name})),refs.devices,refs.squads);
+      const bindings=inspectScenarioBindings([generated],null,null,[],review.triggerVolumes.map(name=>({name})),refs.devices,refs.squads,refs.weapons);
       for(const row of bindings){
         if(['hud_message:','sound:','weapon:','forerunner_extraction:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
         if(row.dependency.startsWith('cutscene_camera_point:')){if(review.cameras.filter(camera=>camera.name===row.dependency.slice('cutscene_camera_point:'.length)).length!==1)throw Error('Native camera reference is missing or ambiguous: '+row.dependency);continue;}

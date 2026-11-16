@@ -13,6 +13,7 @@ function BeatView({side,beat,index}:{side:string;beat?:MissionBeat;index:number}
         {{id:'Identity',title:'Title',trigger:'Trigger',encounterName:'Encounter',triggerRef:'Volume',timerSeconds:'Delay (seconds)',hudObjective:'Native HUD objective',checkpoint:'Checkpoint request',completeMission:'Level completion request'}[field]}
         <input aria-label={side+' mission '+field} readOnly value={String(beat[field]??'')}/>
       </label>)}
+      {beat.createWeaponObject&&<label>Create native weapon<input aria-label={side+' mission create weapon'} readOnly value={beat.createWeaponObject}/></label>}
       {beat.cinematicCue&&<label>Camera scene<input aria-label={side+' mission camera scene'} readOnly value={beat.cinematicCue.phase+' · '+beat.cinematicCue.firstShotId+' → '+beat.cinematicCue.lastShotId}/></label>}
       <label>Objective / direction<textarea aria-label={side+' mission objective'} rows={3} readOnly value={beat.objective}/></label>
       <label>HUD objective text<textarea aria-label={side+' mission HUD text'} rows={2} readOnly value={beat.hudText??''}/></label>

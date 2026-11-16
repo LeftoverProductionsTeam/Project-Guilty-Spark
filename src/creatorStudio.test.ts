@@ -265,7 +265,7 @@ it('authors per-objective shot ranges without forcing an intro or bypassing cond
 it('connects Forerunner Black Echo to real ownership and settled-return source without replacing the blueprint or user modules',async()=>{
  const project=campaignDraft();project.history=[];project.quickForge!.runtimeId='haloCustomEdition';let id=0;const connected=connectBlackEchoObjectives(project,()=> 'native_echo_'+(++id));
  let history=historyReducer({...initialHistory,current:project},{type:'edit',project:connected,description:'Connect native Black Echo objectives'});history=historyReducer(history,{type:'undo'});expect(history.current?.studio!.missions).toHaveLength(0);history=historyReducer(history,{type:'redo'});expect(history.current?.studio!.missions).toEqual(connected.studio!.missions);
- expect(project.studio!.missions).toHaveLength(0);expect(connected.studio!.missions[3].trigger).toBe('weaponOwned');expect(connected.studio!.missions[6].trigger).toBe('forerunnerExtractionSettled');
+ expect(project.studio!.missions).toHaveLength(0);expect(connected.studio!.missions[0].trigger).toBe('deviceActivated');expect(connected.studio!.missions[0].triggerRef).toBe('extraction_deploy');expect(connected.studio!.missions[3].trigger).toBe('weaponOwned');expect(connected.studio!.missions[6].trigger).toBe('forerunnerExtractionSettled');
  expect(connected.quickForge!.logic!.handwrittenSources).toEqual(project.quickForge!.logic!.handwrittenSources);
  const beats=connected.studio!.missions;expect(()=>exportHaloCeMission(connected.studio!)).toThrow(/Forerunner/);
  beats[3].weaponPath='weapons/technology';const output=exportHaloCeMission(connected.studio!,{forerunner:true});

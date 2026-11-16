@@ -101,6 +101,7 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         break;
       case 'weaponOwned': {
         const path=beat.weaponPath??'';if(!validMissionWeaponPath(path))throw Error('Choose an included native technology weapon for objective '+(i+1)+'.');
+        if(beat.createWeaponObject!=null){const name=ensureName(beat.createWeaponObject,'Collection weapon object');deps.push('weapon_object:'+name+':'+path);scripted.push('  (object_create '+name+')');}
         deps.push('weapon:'+path);const cursor='gs_collector_'+(i+1),found='gs_collected_'+(i+1);
         globals.push('(global short '+cursor+' 0)','(global boolean '+found+' false)');
         scripted.push('  (sleep_until (begin',
@@ -305,11 +306,12 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','weaponPath','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
+  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','weaponPath','createWeaponObject','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||(beat.weaponPath!=null&&typeof beat.weaponPath!=='string')||
+    (beat.createWeaponObject!=null&&typeof beat.createWeaponObject!=='string')||
     (beat.conditionVolume!=null&&typeof beat.conditionVolume!=='string')||
     (beat.conditionGroup!=null&&typeof beat.conditionGroup!=='string')||
     (beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')||
@@ -336,7 +338,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
-    triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
+    triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
@@ -449,6 +451,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const sources=logic.handwrittenSources??[];
   if(sources.some(source=>source.filename.toLowerCase()==='gs_firefight.hsc'))
     throw Error('This campaign still has a survival controller. Review it in Logic / Events before explicitly removing it from this build.');
+  if(missions.some(beat=>beat.createWeaponObject!=null))throw Error('Scheduled named weapon creation currently requires recovered native scenario source. Editable blank-map weapons use automatic placement; no source was replaced.');
   const existing=sources.find(source=>source.filename.toLowerCase()==='gs_mission.hsc');
   let previousCinematic=false;
   if(sources.some(source=>source.content.startsWith(nativeMissionBinding)&&source!==existing))

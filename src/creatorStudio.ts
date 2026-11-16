@@ -58,6 +58,8 @@ export interface MissionBeat {
   encounterName: string;
   triggerRef?: string | null;
   weaponPath?: string | null;
+  /** Existing named scenario weapon, created once when this collection step starts. */
+  createWeaponObject?: string | null;
   timerSeconds?: number | null;
   minimumSurvivors?: number | null;
   escortFailure?: 'stop' | 'continue' | null;
@@ -169,7 +171,7 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
   for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
   for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
  }else if(base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
- return {...base,studio:{...studio,missions:beats.map((beat,index)=>index===3?{...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',objective:'Collect the selected native technology weapon. Actual player inventory ownership completes this objective; entering its area does not.'}:index===6?{...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'}:beat)}};
+ return {...base,studio:{...studio,missions:beats.map((beat,index)=>index===0&&beat.trigger==='triggerVolume'&&beat.triggerRef==='be_insert'?{...beat,trigger:'deviceActivated',triggerRef:'extraction_deploy',objective:'Activate the native deployment terminal to begin the operation. Runtime insertion and physical flight remain separate gameplay checks.'}:index===3?{...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',objective:'Collect the selected native technology weapon. Actual player inventory ownership completes this objective; entering its area does not.'}:index===6?{...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'}:beat)}};
 }
 /** Bind only an explicitly read existing native campaign. No native tag, marker,
  * original placement, recipe or script is changed by the metadata action. */
@@ -269,6 +271,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
       (m.weaponPath!=null&&m.weaponPath!==''&&(typeof m.weaponPath!=='string'||!validMissionWeaponPath(m.weaponPath))) ||
+      (m.createWeaponObject!=null&&(typeof m.createWeaponObject!=='string'||!scriptIdent.test(m.createWeaponObject)||m.trigger!=='weaponOwned')) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||

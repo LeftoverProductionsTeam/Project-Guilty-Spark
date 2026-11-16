@@ -1,4 +1,4 @@
-import {exportHaloCeTransport,readNativeTransportSource,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource} from './haloScript';
+import {exportHaloCeMission,exportHaloCeTransport,readNativeTransportSource,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource} from './haloScript';
 import { describe, expect, it } from 'vitest';
 import {emptyCreatorStudio} from './creatorStudio';
 import { attachNativeFirefightRound, exportHaloCeFirefightRound, exportPlannedFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
@@ -209,4 +209,12 @@ describe('reviewed recovered mission module composition',()=>{
   for(const text of ['(script startup broken (sleep 1)','(script startup broken "unterminated)',';* unclosed','outside (script dormant fine (sleep 1))','(script startup "quoted name" (sleep 1))','('.repeat(130)+')'.repeat(130),' '.repeat(256*1024+1)])expect(()=>haloSourceDeclarations(text)).toThrow();
   const rows=haloSourceDeclarations(original);expect(rows.map(row=>row.name)).toEqual(['old_done','gs_complete_7','forerunner_extraction_complete','original_mission','unrelated']);for(const row of rows)expect(original.slice(row.start,row.end)).toMatch(/^\((?:script|global)/);
  });
+});
+
+
+it('creates only the selected named collection weapon inside its eligible mission step without changing declaration slots',()=>{
+ const make=(create=false)=>({...emptyCreatorStudio(),missions:[{id:'collect',title:'Collect',objective:'Acquire',trigger:'weaponOwned' as const,weaponPath:'weapons/technology',encounterName:'',conditionVolume:'optional_route',...(create?{createWeaponObject:'be_technology'}:{})}]});
+ const before=exportHaloCeMission(make()),after=exportHaloCeMission(make(true));expect(before.content).not.toContain('(object_create ');expect(after.content).toContain('(object_create be_technology)');expect(after.dependencies).toContain('weapon_object:be_technology:weapons/technology');expect(after.content.indexOf('(object_create ')).toBeGreaterThan(after.content.indexOf('(if (volume_test_objects optional_route'));expect(after.content.indexOf('(object_create ')).toBeLessThan(after.content.indexOf('(unit_has_weapon '));expect(after.content).not.toMatch(/object_create_anew|object_destroy|player_add_equipment/);
+ expect(haloSourceDeclarations(after.content).map(row=>[row.kind,row.type,row.name])).toEqual(haloSourceDeclarations(before.content).map(row=>[row.kind,row.type,row.name]));
+ for(const value of ['', 'bad) (quit)', '../weapon', 'a'.repeat(32)])expect(()=>exportHaloCeMission({...make(),missions:[{...make().missions[0],createWeaponObject:value}]})).toThrow();expect(()=>exportHaloCeMission({...make(),missions:[{...make().missions[0],trigger:'manual',createWeaponObject:'be_technology'}]})).toThrow();
 });

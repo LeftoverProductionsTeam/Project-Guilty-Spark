@@ -62,6 +62,8 @@ pub struct MissionBeat {
     pub trigger_ref: Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub weapon_path:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub create_weapon_object:Option<String>,
     #[serde(default)]
     pub timer_seconds: Option<u32>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -309,6 +311,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
                 return invalid(format!("Mission '{}' references missing optional-condition volume '{}'",beat.title,name));
             }
         }
+        if beat.create_weapon_object.is_some(){return invalid("Scheduled named weapon creation requires recovered native source; blank-map weapons currently use automatic placement");}
         match beat.trigger.as_str() {
             "triggerVolume"=>{
                 let name=beat.trigger_ref.as_deref().unwrap_or("");
@@ -419,7 +422,7 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
                 if minimum==0||minimum>normal||minimum>insane||minimum>starts{return invalid("Survivor minimum exceeds compiled native starts or difficulty populations");}
             }
         }
-        if beat.trigger=="weaponOwned"{verify_mission_collection(beat,map)?;}
+        if beat.trigger=="weaponOwned"{verify_mission_collection(beat,map,cache)?;}
         if let Some(cue)=&beat.sound_cue {
             let found=map.tags.iter().filter(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==cue.sound_path).count();
             if found!=1{return invalid(format!("Compiled mission sound is missing or ambiguous: {}",cue.sound_path));}
@@ -445,7 +448,7 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
 /// Verify the actual native scenario output, independently of authoring intent.
 /// A dependency alone is not a placed collectible, and any starting profile can
 /// make ownership true before the player reaches the authored technology.
-fn verify_mission_collection(beat:&MissionBeat,map:&crate::maps::MapInspection)->Result<()> {
+fn verify_mission_collection(beat:&MissionBeat,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {
     let path=beat.weapon_path.as_deref().unwrap_or("");
     let tags=map.tags.iter().filter(|tag|tag.class=="weap"&&!tag.external&&tag.path.replace('\\',"/")==path).collect::<Vec<_>>();
     if tags.len()!=1{return invalid("Compiled mission technology weapon is missing, external or ambiguous");}
@@ -456,6 +459,13 @@ fn verify_mission_collection(beat:&MissionBeat,map:&crate::maps::MapInspection)-
     let profiles=map.player_starting_profiles.as_ref().filter(|profiles|!profiles.is_empty()).ok_or_else(||crate::SparkError::Invalid("Compiled mission starting profiles are unavailable; technology ownership cannot be verified".into()))?;
     if profiles.iter().any(|profile|profile.primary_weapon_tag_id==Some(id)||profile.secondary_weapon_tag_id==Some(id)) {
         return invalid("Compiled mission technology is already granted by a native starting profile; select different technology or repair the loadout");
+    }
+    if let Some(name)=&beat.create_weapon_object {
+        let (names,weapons)=crate::maps::scenario_weapon_readback(cache,map)?;
+        let selected=names.iter().enumerate().filter(|(_,row)|row.name==*name).collect::<Vec<_>>();
+        if selected.len()!=1||selected[0].1.object_type!=2||selected[0].1.object_index<0{return invalid("Compiled collection object is missing, ambiguous or not a native weapon");}
+        let (name_index,binding)=selected[0];let placed=weapons.iter().filter(|row|row.index==binding.object_index as usize&&row.name_index==name_index as i16).collect::<Vec<_>>();
+        if placed.len()!=1||placed[0].tag_path.replace('\\',"/")!=path||placed[0].not_placed&1==0{return invalid("Compiled collection object must uniquely reference the selected weapon with automatic placement disabled");}
     }
     Ok(())
 }
@@ -542,6 +552,7 @@ impl CreatorStudio {
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.sound_cue.as_ref().is_some_and(|cue|!cue.valid())
                 || beat.weapon_path.as_deref().is_some_and(|p|!p.is_empty()&&(p.len()>240||crate::safe_relative(p).is_err()||!p.bytes().all(|c|c.is_ascii_alphanumeric()||b"_ ./-".contains(&c))||p.ends_with(".weapon")))
+                || beat.create_weapon_object.as_deref().is_some_and(|name|beat.trigger!="weaponOwned"||!script_ident(name))
                 || beat.minimum_survivors.is_some_and(|n|n<1||n>32)
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
@@ -805,23 +816,28 @@ mod tests {
     }
 
     #[test]
+    fn named_collection_creation_is_optional_typed_intent_and_never_a_manual_stub(){
+        let mut doc=studio();let beat:MissionBeat=serde_json::from_value(serde_json::json!({"id":"technology","title":"Collect","objective":"Recover","trigger":"weaponOwned","weaponPath":"weapons/technology","createWeaponObject":"be_technology","encounterName":""})).unwrap();doc.missions.push(beat);doc.validate().unwrap();assert_eq!(serde_json::from_str::<CreatorStudio>(&serde_json::to_string(&doc).unwrap()).unwrap().missions,doc.missions);
+        for name in ["","bad) (quit)","../original"]{doc.missions[0].create_weapon_object=Some(name.into());assert!(doc.validate().is_err());}doc.missions[0].create_weapon_object=Some("be_technology".into());doc.missions[0].trigger="manual".into();assert!(doc.validate().is_err());doc.missions[0].create_weapon_object=None;doc.validate().unwrap();assert!(serde_json::to_value(&doc.missions[0]).unwrap().get("createWeaponObject").is_none());
+    }
+    #[test]
     fn mission_collection_checks_native_placement_and_every_starting_profile() {
         // Synthetic native inspection regression, not compilation/game evidence.
         let beat:MissionBeat=serde_json::from_value(serde_json::json!({"id":"technology","title":"Collect","objective":"Recover","trigger":"weaponOwned","weaponPath":"weapons/technology","encounterName":""})).unwrap();
         let mut map:crate::maps::MapInspection=serde_json::from_value(serde_json::json!({
             "header":{"version":609,"engine":"test","name":"collection","build":"test","scenarioType":0,"fileSize":0,"declaredSize":0,"tagOffset":0,"tagSize":0,"crc32":0,"flags":0,"demoLayout":false,"compressed":false,"extended":false,"legacyTagSizeRepair":false},
             "sha256":"a".repeat(64),"tags":[{"id":42,"index":0,"class":"weap","path":"weapons/technology","dataOffset":2048,"external":false,"fields":[],"references":[]}],"objects":[],"mesh":crate::maps::MeshData::default(),"encounters":[],"scripts":[],"resources":[],"diagnostics":[],"scenarioPath":"levels/test"})).unwrap();
-        assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("placement"));
+        assert!(verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).unwrap_err().to_string().contains("placement"));
         map.objects.push(serde_json::from_value(serde_json::json!({"id":"weapon-0","name":"Technology","kind":"Weapon","tagId":42,"position":[1,2,3],"rotation":[0,0,0],"scale":[1,1,1],"visible":true,"sourceOffset":2048,"rotationOffset":2060,"assetId":null})).unwrap());
-        assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("profiles are unavailable"));
+        assert!(verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).unwrap_err().to_string().contains("profiles are unavailable"));
         let profile:crate::maps::PlayerStartingProfile=serde_json::from_value(serde_json::json!({"name":"insertion","health":1,"shields":1,"primaryWeaponTagId":7,"primaryLoaded":10,"primaryReserved":30,"secondaryWeaponTagId":null,"secondaryLoaded":0,"secondaryReserved":0,"fragmentationGrenades":0,"plasmaGrenades":0,"grenadeType2":0,"grenadeType3":0})).unwrap();
-        map.player_starting_profiles=Some(vec![profile.clone()]);verify_mission_collection(&beat,&map).unwrap();
+        map.player_starting_profiles=Some(vec![profile.clone()]);verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).unwrap();
         let mut extra=profile;extra.name="alternate".into();extra.secondary_weapon_tag_id=Some(42);map.player_starting_profiles.as_mut().unwrap().push(extra);
-        assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("already granted"));
+        assert!(verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).unwrap_err().to_string().contains("already granted"));
         map.player_starting_profiles.as_mut().unwrap()[1].secondary_weapon_tag_id=None;
-        map.objects[0].tag_id=Some(7);assert!(verify_mission_collection(&beat,&map).is_err());map.objects[0].tag_id=Some(42);
-        map.objects[0].position[2]=f32::NAN;assert!(verify_mission_collection(&beat,&map).is_err());map.objects[0].position[2]=3.;
-        map.tags.push(map.tags[0].clone());assert!(verify_mission_collection(&beat,&map).unwrap_err().to_string().contains("ambiguous"));
+        map.objects[0].tag_id=Some(7);assert!(verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).is_err());map.objects[0].tag_id=Some(42);
+        map.objects[0].position[2]=f32::NAN;assert!(verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).is_err());map.objects[0].position[2]=3.;
+        map.tags.push(map.tags[0].clone());assert!(verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).unwrap_err().to_string().contains("ambiguous"));
     }
     #[test]
     #[ignore="Requires an explicitly selected owned native collection cache and weapon; read-only acceptance"]
@@ -830,7 +846,7 @@ mod tests {
         let weapon=std::env::var("SPARK_NATIVE_MISSION_COLLECTION_WEAPON").expect("Explicit placed nonstarting weapon required");
         let before=crate::maps::hash_file(&path).unwrap();let map=crate::maps::inspect_map(&path,None).unwrap();
         let beat:MissionBeat=serde_json::from_value(serde_json::json!({"id":"readback","title":"Readback","objective":"Read native collection data","trigger":"weaponOwned","weaponPath":weapon,"encounterName":""})).unwrap();
-        verify_mission_collection(&beat,&map).unwrap();assert_eq!(before,crate::maps::hash_file(&path).unwrap());
+        verify_mission_collection(&beat,&map,std::path::Path::new("not-read")).unwrap();assert_eq!(before,crate::maps::hash_file(&path).unwrap());
         println!("Native collection placement/profile readback PASS; cacheSHA={before}; weapon={}; profiles={}; not complete mission or gameplay acceptance",beat.weapon_path.unwrap(),map.player_starting_profiles.unwrap().len());
     }
     #[test]

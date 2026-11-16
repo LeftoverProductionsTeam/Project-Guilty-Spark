@@ -93,7 +93,7 @@ export type NativeOperation = {kind:'vehicleFlight';tuning:NativeVehicleFlight;s
   | {kind:'encounterSquadFiringGroups';encounter:number;squad:number;encounterName:string;squadName:string;groups:NativeCombatSource['groups'];sourceSha256:string}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'|'combat'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
-  missionSource?:{encounters:{name:string;initiallyCreated:boolean}[];weapons:{tagPath:string;placements:number[];startingEquipment:boolean}[]}|null;missionSourceIssue?:string|null;
+  missionSource?:{encounters:{name:string;initiallyCreated:boolean}[];weapons:NativeMissionWeapon[]}|null;missionSourceIssue?:string|null;
   vehicleFlight?:NativeVehicleFlight|null;vehicleFlightIssue?:string|null;
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;
@@ -220,3 +220,5 @@ export function customizeCampaignCombat(entry:NativeEncounterAppend):NativeComba
 export function campaignMccSearchReview(combat:Pick<NativeCombatSource,'groups'>){const groups={...combat.groups,attackingSearch:[...new Set([...combat.groups.attackingSearch,...combat.groups.attacking])].sort(),defendingSearch:[...new Set([...combat.groups.defendingSearch,...combat.groups.attacking])].sort()};return {groups,changed:groups.attackingSearch.length!==combat.groups.attackingSearch.length||groups.defendingSearch.length!==combat.groups.defendingSearch.length};}
 
 export interface NativeCommandGeometryReview {buildId:string;tagSha256:string;outputSha256:string;points:{point:[number,number,number];bsps:number[];nearPartition:boolean;supports:{bsp:number;z:number}[]}[]}
+
+export interface NativeMissionWeapon {tagPath:string;placements:number[];startingEquipment:boolean;objects?:{index:number;name:string|null;notPlacedAutomatically:boolean;createIssue:string|null}[]}
