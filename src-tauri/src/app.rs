@@ -1938,8 +1938,11 @@ struct Readiness {
     current_build_message: String,
 }
 #[tauri::command]
-fn launch_readiness(state: State<AppState>, id: String) -> Reply<Readiness> {
-    let p = lock(&state.library)?.get(&id).map_err(error)?;
+async fn launch_readiness(app:tauri::AppHandle,id:String)->Reply<Readiness> {
+    tauri::async_runtime::spawn_blocking(move||launch_readiness_state(&app.state::<AppState>(),&id)).await.map_err(error)?
+}
+fn launch_readiness_state(state:&AppState,id:&str)->Reply<Readiness> {
+    let p = lock(&state.library)?.get(id).map_err(error)?;
     let install = lock(&state.installation)?.clone();
     let root = lock(&state.managed)?.clone();
     let package_valid = root
@@ -1964,7 +1967,7 @@ fn launch_readiness(state: State<AppState>, id: String) -> Reply<Readiness> {
 }
 #[tauri::command]
 fn launch_mcc(state: State<AppState>, id: String) -> Reply<String> {
-    let ready = launch_readiness(state.clone(), id)?;
+    let ready = launch_readiness_state(&state, &id)?;
     if !ready.launch_ready {
         return Err(ready.message);
     }
@@ -2368,7 +2371,10 @@ fn runtime_reports(state: &AppState) -> Reply<Vec<runtime::RuntimeReport>> {
     let registrations: Vec<runtime::RuntimeRegistration> = lock(&state.library)?
         .setting("runtimeRegistrations")
         .map_err(error)?;
-    runtime::report(&*lock(&state.installation)?, &registrations).map_err(error)
+    // Runtime verification reads/hashes files. Keep discovery available to
+    // other UI requests while checking this consistent installation snapshot.
+    let installation=lock(&state.installation)?.clone();
+    runtime::report(&installation, &registrations).map_err(error)
 }
 #[tauri::command]
 async fn runtime_report(app: tauri::AppHandle) -> Reply<Vec<runtime::RuntimeReport>> {
@@ -3177,7 +3183,9 @@ pub fn run() {
             // dispatching to this event thread. Never wait for that lock here.
             tauri::async_runtime::spawn_blocking(move||{workspace_windows::release_window(&app,&label);if let Some(state)=app.try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=&label);}shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);ce_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);ce_setup::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);ce_source_recovery_native::release_window(&state,&label);}});
         }})
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler({
+            let timing=cfg!(debug_assertions)&&std::env::var_os("SPARK_DIAGNOSTICS_IPC_TIMING").is_some_and(|value|value=="1");
+            let handler:fn(tauri::ipc::Invoke<tauri::Wry>)->bool=tauri::generate_handler![
             home_voice_native::prepare_launch_voice,
             home_voice_native::play_launch_voice,
             home_voice_native::stop_launch_voice,
@@ -3506,7 +3514,18 @@ pub fn run() {
             export_peer_manifest,
             create_peer_manifest,
             reveal_folder
-        ])
+        ];
+            move |invoke:tauri::ipc::Invoke<tauri::Wry>| {
+                // Opt-in development diagnostics record command names only.
+                // Never print arguments, resource paths or authored content.
+                let command=if timing{Some(invoke.message.command().to_owned())}else{None};
+                let began=std::time::Instant::now();
+                if let Some(command)=&command{eprintln!("SPARK_IPC_START {command}");}
+                let handled=handler(invoke);
+                if let Some(command)=command{eprintln!("SPARK_IPC_RETURN {command} {}",began.elapsed().as_millis());}
+                handled
+            }
+        })
         .run(tauri::generate_context!())
         .expect("Guilty Spark could not start");
 }

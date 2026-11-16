@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { createLatestRefresh } from '../latestRefresh';
 import {
   ArrowRight,
   Check,
@@ -67,6 +68,17 @@ export default function Build({
     [historyOpen,setHistoryOpen]=useMapState(project.id,'build.historyOpen',false);
   const target=project.buildTargets?.find(t=>t.id===project.activeBuildTarget);
   const ceTarget=target?.builder==='invader-ce'&&['haloCustomEdition','chupathingyCe'].includes(target.runtimeId);
+  type Audit = [PromiseSettledResult<CompatibilityReport>,PromiseSettledResult<Readiness>,PromiseSettledResult<TemplateReport|null>];
+  const reportsRefresh=useRef<ReturnType<typeof createLatestRefresh<{id:string;ceTarget:boolean},Audit>>|null>(null);
+  useEffect(()=>{
+    const queue=createLatestRefresh(async({id,ceTarget}:{id:string;ceTarget:boolean}):Promise<Audit>=>Promise.allSettled([
+      call<CompatibilityReport>('compatibility',{id}),
+      call<Readiness>('launch_readiness',{id}),
+      ceTarget?Promise.resolve(null):call<TemplateReport>('inspect_template',{id}),
+    ]),()=>{});
+    reportsRefresh.current=queue;
+    return()=>{queue.dispose();if(reportsRefresh.current===queue)reportsRefresh.current=null;};
+  },[]);
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
@@ -74,11 +86,8 @@ export default function Build({
       // Keep the repair workflow mounted while saving and refreshing its audit.
       setChecking(true);
       setIssues([]);
-      const results = await Promise.allSettled([
-        call<CompatibilityReport>('compatibility', { id: project.id }),
-        call<Readiness>('launch_readiness', { id: project.id }),
-        ceTarget?Promise.resolve(null):call<TemplateReport>('inspect_template', { id: project.id }),
-      ]);
+      const queue=reportsRefresh.current;if(!queue)return;
+      const results = await queue.request({id:project.id,ceTarget:!!ceTarget});
       if (cancelled) return;
       setReport(results[0].status === 'fulfilled' ? results[0].value : null);
       setReadiness(results[1].status === 'fulfilled' ? results[1].value : null);
@@ -91,7 +100,11 @@ export default function Build({
         ),
       );
     }
-    void fetchReports();
+    void fetchReports().catch(error=>{
+      if(cancelled)return;
+      setReport(null);setReadiness(null);setTemplate(null);setChecking(false);
+      setIssues(['Build checks: '+String(error)]);
+    });
     return () => {
       cancelled = true;
     };

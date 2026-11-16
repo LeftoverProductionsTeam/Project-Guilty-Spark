@@ -4349,3 +4349,33 @@ test('runtime dock serializes a burst of native source refreshes',async({page})=
   expect(await page.evaluate(()=>(window as any).__dockBurst.peak)).toBe(1);
   await expect.poll(()=>page.evaluate(()=>(window as any).__dockBurst.active)).toBe(0);
 });
+
+
+test('build audits serialize rapid mission edits without discarding history',async({page})=>{
+  await mockCampaignHud(page);
+  await chooseTool(page,'Build & playtest');
+  await chooseTool(page,'Creator Studio');
+  await page.evaluate(()=>{
+    const internal=(window as any).__TAURI_INTERNALS__,invoke=internal.invoke.bind(internal);
+    const state=(window as any).__buildBurst={calls:0,active:0,peak:0,releases:[],restore:()=>{internal.invoke=invoke;}};
+    internal.invoke=(command:string,args:any)=>{
+      if(command!=='launch_readiness')return invoke(command,args);
+      state.calls++;state.active++;state.peak=Math.max(state.peak,state.active);
+      return new Promise((resolve,reject)=>state.releases.push(async()=>{try{resolve(await invoke(command,args));}catch(error){reject(error);}finally{state.active--;}}));
+    };
+  });
+  const title=page.locator('.studio-record').first().getByRole('textbox',{name:'Title',exact:true});
+  for(let i=0;i<20;i++)await title.fill('Mission edit '+i);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__buildBurst.calls)).toBe(1);
+  expect(await page.evaluate(()=>(window as any).__buildBurst.peak)).toBe(1);
+  await page.evaluate(()=>(window as any).__buildBurst.releases.shift()());
+  await expect.poll(()=>page.evaluate(()=>(window as any).__buildBurst.calls)).toBe(2);
+  await page.evaluate(()=>(window as any).__buildBurst.releases.shift()());
+  await expect.poll(()=>page.evaluate(()=>(window as any).__buildBurst.active)).toBe(0);
+  expect(await page.evaluate(()=>(window as any).__buildBurst.peak)).toBe(1);
+  await page.evaluate(()=>(window as any).__buildBurst.restore());
+  await title.blur();await page.keyboard.press('Control+z');await expect(title).toHaveValue('Mission edit 18');
+  await page.keyboard.press('Control+y');await expect(title).toHaveValue('Mission edit 19');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions[0].title)).toBe('Mission edit 19');
+});

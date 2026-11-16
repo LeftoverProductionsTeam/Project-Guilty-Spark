@@ -295,3 +295,30 @@ fn fuzzes_header_words_without_out_of_bounds() {
         let _ = parse_header(&b, b.len() as u64);
     }
 }
+
+#[test]
+#[ignore = "Read-only timing probe requires an explicitly selected file and independently verified SHA256"]
+fn installed_source_hash_readback_and_timing() {
+    let source = std::path::PathBuf::from(
+        std::env::var_os("SPARK_NATIVE_HASH_SOURCE").expect("Explicit source required"),
+    );
+    let expected = std::env::var("SPARK_NATIVE_HASH_SHA256")
+        .expect("Independent source hash required");
+    assert_eq!(expected.len(), 64);
+    assert!(expected.bytes().all(|c| c.is_ascii_hexdigit()));
+    spark_core::reject_links(&source).unwrap();
+    let bytes = std::fs::metadata(&source).unwrap().len();
+    assert!(bytes > 0 && bytes <= 2 * 1024 * 1024 * 1024);
+    let mut samples = Vec::new();
+    for _ in 0..3 {
+        let started = std::time::Instant::now();
+        assert_eq!(maps::hash_file(&source).unwrap(), expected);
+        samples.push(started.elapsed().as_secs_f64());
+    }
+    assert_eq!(std::fs::metadata(&source).unwrap().len(), bytes);
+    samples.sort_by(f64::total_cmp);
+    println!(
+        "Read-only SHA256: bytes={bytes}; samples_seconds={samples:?}; median_MiB_per_second={:.3}; expected={expected}; no native UI/gameplay acceptance",
+        bytes as f64 / (1024.0 * 1024.0) / samples[1],
+    );
+}

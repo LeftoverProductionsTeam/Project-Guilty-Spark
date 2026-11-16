@@ -3,8 +3,8 @@
 Task: Operation110 — CE609 Black Echo to Forerunner breakthrough; patrol WIP preserved
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 1c480f40392ba76740674ab74427532933e40aa6 campaign HUD source/native cache milestone; separate patrol WIP remains unchanged.
-Next action: Continue native source-readiness/loading responsiveness and broader Save37944 coverage; the compact HUD/queued inspections/continued42-edit native Save/restart/build/readback milestone is verified below. Private Forerunner gameplay remains authorized but unrun because Windows controls cannot initialize. Preserve full roadmap and separate patrol WIP.
+Latest verified revision: 42095f7cd02b06a947ddfae2e43a56ffbf909147 parent; this containing commit verifies the async Build-readiness/fresh native HUD milestone. Patrol WIP remains separate.
+Next action: Continue broader Save37944 and native Black Echo integration after the scoped freeze/compact gate below. Private Forerunner gameplay remains authorized but unrun because Windows controls cannot initialize; advance independent work safely. Preserve full roadmap and separate patrol WIP.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+15Nov freeze follow-up: actual native trace182 launch_readiness calls/60876ms window time exposed retained Build audit bursts. Existing queue now coalesces reports; readiness runs on workers; runtime discovery drops its lock before hashing. Dev SHA256 median2.4575562s→.0530798s for106461560B with identical digest. Focused Rust51/browser4/TypeScript/Vite/Windows build pass. Fresh42-edit/HUD/script Undo/Redo/Save/3normal restarts/CE609/independent scenario-HSC-HMT readback PASS; replies5/2/2ms, objective151px/no horizontal overflow. App34cb333e783c1c910a9994c3bee95c97a13f00624697349667d83e6900858058 includes unchanged patrol WIP. Map057a9839 matches prior native output;14warnings/game/peers/37944 remain open. Exact hashes, earlier failed runs, safety and source locations: RUNTIME_INTEGRATION_20261107 final section. No failed run reclassified, game/Forerunner write or push.
 
 Reuse historical evidence; run proportionate focused checks under the updated policy:
 
@@ -102,6 +104,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+QA29134/run-aHsnhS CLOSED; all owned apps/tools exited,5,461,853,359logicalB disposed; final physical reclamation unavailable (peak allocation5,278,712,672B). Only137606B PNG retained; no binary/map/SDK/cache/archive retained.
 
 QA21402/run-9LXS9l CLOSED: owned apps/tools exited and output disposed4,488,883,429logicalB; final physical reclamation unavailable. Only the two small source-owned before/after PNGs remain. Final app351dd043 uses worker-thread Save/update, releases journal locks before UI events and reuses latestRefresh to bound native inspections. Browser3/3, frontend history10/10, Rust history11/11, TypeScript/Vite/Windows build pass. Native continued seven-stage HUD case:42rapid edits/Undo/Save/status5/2/2ms/151px panel/3normal closes/CE609 map057a9839/independent readback pass,0page errors. Initial two fresh Save timeouts remain documented; final fresh Save/restart passed, then source-panel auto-wait failed; explicit readiness/strict continued run passes. Do not relabel the failed earlier run or claim broad37944 closure. Existing RUNTIME_INTEGRATION_20261107 has exact app/map/scenario/HSC/HMT hashes and preserved before/after PNGs. One2355tag extraction, no SDK copy/game/Forerunner writes/push. Original inputs/475CSV/legacy checkpoint and two patrol WIP files unchanged. Commit only scoped verified work; full Operation110 remains incomplete.
 

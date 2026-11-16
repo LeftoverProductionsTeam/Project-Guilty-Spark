@@ -14,3 +14,9 @@ sha2 = "0.11"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
+
+# Source Guardian verifies large native inputs even in development builds.
+# Optimize its checksum implementation without disabling checks or changing
+# the application's debug assertions. The test profile inherits this setting.
+[profile.dev.package."sha2:0.11.1"]
+opt-level = 3

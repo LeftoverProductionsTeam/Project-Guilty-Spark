@@ -101,7 +101,8 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const library=path.join(prior?path.dirname(resumeFile):output,'library'),webview=path.join(prior?path.dirname(resumeFile):output,'webview');
    async function start(){
     const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));
-    child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...context.env,GUILTY_SPARK_DATA_DIR:library,WEBVIEW2_USER_DATA_FOLDER:webview,WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port='+port}});
+    const log=await fs.open(path.join(output,'native-ipc-'+report.normalRestarts+'.log'),'wx');
+    try{child=spawn(app,[],{windowsHide:true,stdio:['ignore',log.fd,log.fd],env:{...context.env,SPARK_DIAGNOSTICS_IPC_TIMING:'1',GUILTY_SPARK_DATA_DIR:library,WEBVIEW2_USER_DATA_FOLDER:webview,WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port='+port}});}finally{await log.close();}
     await context.trackProcess(child);
     await expect.poll(()=>fetch('http://127.0.0.1:'+port+'/json/version').then(r=>r.ok,()=>false)).toBe(true);
     browser=await chromium.connectOverCDP('http://127.0.0.1:'+port);
@@ -205,6 +206,8 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     if(hudRecovery){
      expect(fork.studio.missions.map(beat=>beat.hudText)).toEqual(ceMissionHudSteps.map(step=>step.text));
      record.hud={messages:ceMissionHudSteps.map((step,i)=>({name:'gs_mission_obj_'+(i+1),text:step.text})),recoveredFromSaveTimeout:!!prior.saveFailure,continuedAfterSourcePanelTimeout:!prior.saveFailure};
+    }
+    if(ceMissionHudReview&&!compileResume){
      await chooseTool(page,'Creator Studio');
      // Reproduce the rapid multi-field load that exposed the original timeout,
      // retaining each authored Undo snapshot and restoring every saved value.
@@ -216,7 +219,14 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      record.hud.rapidFieldEdits=42;
      const row=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat 7',exact:true})});const completion=row.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);if(await row.locator('.studio-native-objective').getAttribute('open')===null)await completion.click();
      const text=row.getByRole('textbox',{name:'HUD objective 7',exact:true});await revealPagedControl(text);await text.fill(ceMissionHudSteps[6].text+' Ready.');await text.blur();await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);await page.keyboard.press('Control+y');await expect(text).toHaveValue(ceMissionHudSteps[6].text+' Ready.');await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);
-     const saving=save(fork.id),latency=[];for(let i=0;i<3;i++){const started=Date.now();await Promise.race([call('startup_status'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Windows command loop stopped responding during Save')),5000))]);latency.push(Date.now()-started);}await saving;
+     const saving=save(fork.id),latency=[];
+     const responsiveness=(async()=>{for(let i=0;i<3;i++){const started=Date.now();await Promise.race([call('startup_status'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Windows command loop stopped responding during Save')),5000))]);latency.push(Date.now()-started);}})();
+     // Preserve a failed responsiveness gate, but collect the actual Save result
+     // before closing its app. Do not abandon a pending Save on a timer rejection.
+     const settled=await Promise.allSettled([saving,responsiveness]);
+     record.hud.nativeCommandLatencyMs=latency;record.hud.saveSettled=settled[0].status;
+     report.saveIpcTraceFile='native-ipc-'+report.normalRestarts+'.log';
+     for(const result of settled)if(result.status==='rejected')throw result.reason;
      record.hud.objectiveUndoRedo=true;record.hud.recoverySave=true;record.hud.nativeCommandLatencyMs=latency;
      const panel=row.locator('.studio-native-objective');record.hud.compactPanel=await panel.evaluate(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,checkboxes:[...el.querySelectorAll('input[type=checkbox]')].length}));expect(record.hud.compactPanel.checkboxes).toBe(3);expect(record.hud.compactPanel.height).toBeLessThan(210);expect(record.hud.compactPanel.scrollWidth).toBeLessThanOrEqual(record.hud.compactPanel.clientWidth+1);await panel.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'campaign-hud-compact.png')});
     }
@@ -225,7 +235,12 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     await openStudioMenu(page);const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('chupathingyCe');await page.keyboard.press('Escape');
     await page.locator('.runtime-dock').getByRole('button',{name:'Runtime and tool details',exact:true}).click();const editor=page.locator('.native-script-attachment');await expect(editor).toBeVisible();await editor.locator('> summary').click();if(!prior||hudRecovery){await editor.getByRole('button',{name:'List recovered modules',exact:true}).click();await editor.getByRole('button',{name:'Edit selected module',exact:true}).click();}
     if(!compileResume){
-    const text=editor.getByRole('textbox',{name:'Edit source',exact:true});await expect(text).toBeVisible();const original=(await state(fork.id)).project.scenarioScriptDraft.content;expect(await text.inputValue()).toBe(original.replaceAll('\r\n','\n')); expect(original).toContain('(unit_has_weapon');expect(original).toContain('(script dormant forerunner_extraction_complete');
+    const text=editor.getByRole('textbox',{name:'Edit source',exact:true});await expect(text).toBeVisible();
+    // Optimistic UI may render before its serialized native history commit.
+    // Require the exact displayed source (textarea LF line endings) in the
+    // journal before reading it; the original native bytes stay untouched.
+    const displayed=await text.inputValue();await expect.poll(async()=>(await state(fork.id)).project?.scenarioScriptDraft?.content.replaceAll('\r\n','\n')).toBe(displayed);
+    const original=(await state(fork.id)).project.scenarioScriptDraft.content;expect(await text.inputValue()).toBe(original.replaceAll('\r\n','\n')); expect(original).toContain('(unit_has_weapon');expect(original).toContain('(script dormant forerunner_extraction_complete');
     const needle='    (ai_place be_defense)';expect(original.split(needle)).toHaveLength(2);let revised=original.replaceAll('\r\n','\n').replace(needle,'    ; Spark-authored three-second evacuation-defense preparation.\n    (sleep 90)\n'+needle);
     if(ceMissionHudReview){for(const [i,step]of ceMissionHudSteps.entries()){const marker='(print '+JSON.stringify('be stage: '+step.marker)+')';expect(revised.split(marker)).toHaveLength(2);revised=revised.replace(marker,marker+'\n  (hud_set_objective_text gs_mission_obj_'+(i+1)+')');}}
     record.stage='edit reviewed mission module';await text.fill(revised);await editor.locator('> summary').click();await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(fork.id)).project.scenarioScriptDraft?.content).toBe(original);await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(fork.id)).project.scenarioScriptDraft?.content).toBe(revised);await save(fork.id);
