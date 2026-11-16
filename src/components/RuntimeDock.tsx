@@ -1,3 +1,4 @@
+import {appendNativeCameraShot,nativeCinematicSource,nativeCinematicPrefix} from '../nativeCinematic';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {beginProjectMutation} from '../projectMutation';
 import {createLatestRefresh} from '../latestRefresh';
@@ -179,6 +180,13 @@ export default function RuntimeDock({
   const [moduleSearch,setModuleSearch]=useMapState<string>(id,'sourceScripts.search','');
   const modules=moduleInventory?.key===scriptSourceKey?moduleInventory.value:null;
   const pickedModule=modules?.modules.find(module=>module.filename===moduleName);
+  const [cinematicName,setCinematicName]=useMapState<string>(id,'director.nativeCinematicName','gs_cinematic');
+  const [cinematicCamera,setCinematicCamera]=useState('');
+  const [cinematicPlan,setCinematicPlan]=useState<{key:string;shotsKey:string;name:string;tagIdentity:string;content:string;original?:string}|null>(null);
+  const nativeCameras=modules?.cameraReview;
+  const takeCamera=nativeCameras?.cameras.find(p=>String(p.index)===cinematicCamera)??nativeCameras?.cameras[0];
+  const currentCinematic=cinematicPlan?.key===scriptSourceKey&&cinematicPlan.shotsKey===JSON.stringify(project?.studio?.shots??[])&&cinematicPlan.name===cinematicName.trim()&&cinematicPlan.content===selectedScript?.content?cinematicPlan:null;
+  const nativeCinematicDraft=selectedScript?.content.startsWith(nativeCinematicPrefix)??false;
   useEffect(()=>{
     moduleRequest.current++;setModuleBusy(false);
     return()=>{moduleRequest.current++;};
@@ -428,19 +436,41 @@ export default function RuntimeDock({
     return selection.projectId===project?.id&&selection.buildId===source.buildId&&selection.tagsDirectory===source.tagsDirectory
       &&selection.projectFingerprint===source.projectFingerprint;
   }
-  async function listScriptModules() {
+  async function listScriptModules(includeCameras=false) {
     const source=report?.workingSource;if(!native||!project||!source?.projectFingerprint||dirty||busy||working||moduleBusy)return;
     const request=++moduleRequest.current,key=scriptSourceKey;
     setModuleBusy(true);setError('');
     try {
       const value=await call<WorkingScriptSources>('working_script_sources',{projectId:project.id,expectedBuildId:source.buildId,
-        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint});
+        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,...(includeCameras?{includeCameras:true}:{})});
       if(request!==moduleRequest.current||key!==currentScriptSourceKey.current)return;
       if(!sourceSelectionMatches(value,source))throw Error('The recovered script listing belongs to a different source revision. Refresh its selection.');
       setModuleInventory({key,value});
       setModuleName(name=>value.modules.some(module=>module.filename===name)?name:value.modules.find(module=>!module.unavailable)?.filename??value.modules[0]?.filename??'');
     } catch(problem){if(request===moduleRequest.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{if(request===moduleRequest.current)setModuleBusy(false);}
+  }
+  function addCinematicCamera(){
+    const latest=currentProject.current;if(!latest||!takeCamera)return;
+    try{const studio=appendNativeCameraShot(latest.studio,takeCamera,crypto.randomUUID());onEdit({...latest,studio},'Add existing native camera to cinematic take');setCinematicPlan(null);setNotice('Camera added. Edit timing/order in Machinima; native camera geometry is unchanged.');}catch(problem){setError(String(problem));}
+  }
+  async function prepareCinematicSource(){
+    const input=currentProject.current,source=report?.workingSource,inventory=modules,review=nativeCameras;if(!input||!source||!inventory||!review||dirty||busy||working||moduleBusy)return;
+    const request=++moduleRequest.current,selection=++scriptSelection.current,key=scriptSourceKey,shotsKey=JSON.stringify(input.studio?.shots??[]),draft=input.scenarioScriptDraft;
+    setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
+    try{
+      if(!input.studio)throw Error('Add saved camera shots first.');const generated=nativeCinematicSource(input.studio,review.cameras,cinematicName);
+      const previous=inventory.modules.find(m=>m.filename.toLowerCase()===generated.filename.toLowerCase());if(previous?.unavailable)throw Error(previous.unavailable);
+      if(review.scriptNames.some(n=>n.toLowerCase()===cinematicName.trim().toLowerCase())&&!previous)throw Error('This function belongs to another native module. Choose an unused cinematic function/module name; original source was retained.');
+      if(draft&&draft.content!==generated.content&&!window.confirm('Replace the current project script draft with the timed cinematic? Project Undo restores it; original native source is retained.'))return;
+      let original:string|undefined;if(previous){const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:previous.filename,expectedSha256:previous.sha256});
+        if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Native source changed while reviewing the cinematic module.');original=value.script.content;}
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(generated.content)),sha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+      if(selection!==scriptSelection.current||key!==currentScriptSourceKey.current||currentProject.current?.id!==input.id||JSON.stringify(currentProject.current?.studio?.shots??[])!==shotsKey||currentProject.current?.scenarioScriptDraft!==draft)return;
+      keepScriptDraft({filename:generated.filename,content:generated.content,sha256,fileSha256:previous?.sha256??sha256,sourceKey:key,reviewed:false,...(previous?{replacesSha256:previous.sha256}:{})});setCinematicPlan({key,shotsKey,name:cinematicName.trim(),tagIdentity:review.tagIdentity,content:generated.content,original});
+      setNotice('Timed cinematic source prepared. Save and review before building. Call '+cinematicName.trim()+' from an appropriate campaign script; nothing autoplays.');
+    }catch(problem){if(selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    finally{release();if(request===moduleRequest.current)setModuleBusy(false);}
   }
   async function openScriptModule() {
     const source=report?.workingSource,inventory=modules,module=pickedModule,draft=currentProject.current?.scenarioScriptDraft;
@@ -555,6 +585,7 @@ export default function RuntimeDock({
     if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new or recorded generated groups and their controller, review Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
     if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||selectedScript.replacesSha256!==attachment.replacesSha256||!report?.workingSource))return;
+    if(attachment?.content.startsWith(nativeCinematicPrefix)&&!currentCinematic){setError('The take or source changed. Read native cameras and prepare its cinematic source again.');return;}
     if(mission&&(!selectedMissionHud?.reviewed||mission!==selectedMissionHud||firefight||!!attachment&&!compileScripts))return;
     const sourceKey = scriptSourceKey;
     setBusy(true);
@@ -563,7 +594,7 @@ export default function RuntimeDock({
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),...(mission?{missionHud:mission.plan.hud.review}:{}),
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
         ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256,...(attachment.replacesSha256?{replacesSha256:attachment.replacesSha256}:{})}}:{}),
-        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:{}) });
+        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:nativeCinematicDraft&&currentCinematic?{expectedTagIdentity:currentCinematic.tagIdentity}:{}) });
       if (sourceKey === currentScriptSourceKey.current) {
         setDetails(false);
         setNotice(
@@ -861,6 +892,18 @@ export default function RuntimeDock({
           {project&&report?.workingSource&&workingSourceAvailable&&<details ref={scriptEditor} open={scriptsOpen} onToggle={event=>setScriptsOpen(event.currentTarget.open)} className="native-script-attachment">
             <summary>Edit or attach scenario HaloScript</summary>
             <p className="subtle">Choose a recovered scenario module or new UTF8 .hsc file, up to 1 MiB. You can edit AI and cutscene script bodies here. Revising an existing module requires its exact original file and explicit revision selection; writes occur only in a separate build candidate. Original source must be fully recovered, and existing native script/global identities remain protected. This control retains original native script/global identities; global-source files and structural identity changes need further native editing support. Draft edits use project Undo/Redo and Save; reopening restores the draft, which must be reviewed again before compilation. Saving a draft does not change native source or the running game. Successful builds retain the revised module; Project Undo changes drafts, not compiled source revisions.</p>
+            <details className="native-cinematic-source"><summary>Timed cinematic · existing cameras</summary>
+              <p className="subtle">Use native camera names and poses with the saved Machinima timeline. Source review pins the complete tag library. This static function is not automatically played.</p>
+              <button disabled={!native||busy||working||moduleBusy||dirty} onClick={()=>void listScriptModules(true)}>Read native cameras &amp; modules</button>
+              {nativeCameras&&<><label>Existing native camera<select aria-label="Existing cinematic camera" value={takeCamera?.index??''} disabled={busy||working||moduleBusy} onChange={e=>setCinematicCamera(e.target.value)}>{nativeCameras.cameras.map(p=><option key={p.index} value={p.index}>{p.index} · {p.name||'Unnamed camera'}</option>)}</select></label>
+                <div className="button-row"><button disabled={!takeCamera||busy||working||moduleBusy} onClick={addCinematicCamera}>Add native camera to take</button><button onClick={()=>{setDetails(false);onNavigate('machinima');}}>Edit take timing in Machinima</button></div>
+                <label>Cinematic function / module<input aria-label="Cinematic function name" maxLength={31} value={cinematicName} disabled={busy||working||moduleBusy} onChange={e=>{setCinematicName(e.target.value);setCinematicPlan(null);}}/></label>
+                <button disabled={busy||working||moduleBusy||dirty||!project.studio?.shots.length} onClick={()=>void prepareCinematicSource()}>Prepare timed cinematic source</button></>}
+              {currentCinematic?.original&&<details><summary>Original module retained for review</summary><textarea aria-label="Original cinematic module" rows={8} readOnly value={currentCinematic.original}/></details>}
+              {nativeCinematicDraft&&!currentCinematic&&<Notice tone="info">The saved take or native source needs a fresh cinematic review before building. Read cameras and prepare again.</Notice>}
+              {nativeCinematicDraft&&<button disabled={busy||working} onClick={()=>{if(selectedScript){keepScriptDraft({...selectedScript,content:selectedScript.content.slice(nativeCinematicPrefix.length),reviewed:false});setCinematicPlan(null);}}}>Use draft as manual HaloScript</button>}
+              <p className="subtle">Change camera geometry in Tags → Existing cutscene cameras and accept it first. Timeline pose changes must match native source; they are never silently ignored. Review an existing module before replacement; the compiler refuses losing original scripts/globals. Reprepare after restart or source/take changes. In a recovered campaign module, call your cinematic function, then rebuild to connect its trigger. Playback and camera/input restoration require gameplay testing.</p>
+            </details>
             <div className="button-row">
               <button disabled={!native||busy||working||moduleBusy||dirty||!report.workingSource.projectFingerprint} onClick={()=>void listScriptModules()}>{moduleBusy?'Reading source…':modules?'Refresh recovered modules':'List recovered modules'}</button>
               {modules&&<label>Find module<input type="search" value={moduleSearch} onChange={event=>setModuleSearch(event.target.value)} placeholder="Script filename"/></label>}
@@ -897,7 +940,7 @@ export default function RuntimeDock({
               <p className="subtle">{dirty?'Save the project before reviewing or compiling this draft.':'Project draft saved. Review its source before compiling.'} Use project Undo/Redo to restore draft edits; compiled native revisions stay separate.</p>
               <label><input type="checkbox" checked={selectedScript.reviewed} disabled={busy||working||dirty} onChange={event=>{if(event.target.checked){void reviewScriptSource();}else{scriptSelection.current++;setScriptReview(null);}}}/>I reviewed this source and its native scenario references.</label>
               <div className="button-row">
-                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||nativeCinematicDraft&&!currentCinematic||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
                   onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>{selectedScript.replacesSha256?'Build reviewed script revision':'Attach source & compile'}</button>
                 <button disabled={busy||working} onClick={()=>keepScriptDraft(null)}>Remove project draft</button>
               </div>

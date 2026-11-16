@@ -1159,6 +1159,9 @@ fn reviewed_combat(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDiffer
 pub fn camera_points_close(a:&crate::maps::NativeCameraPoint,b:&crate::maps::NativeCameraPoint)->bool{
     a.index==b.index&&a.name==b.name&&positions_close(a.position,b.position)&&a.orientation_radians.iter().zip(b.orientation_radians).all(|(a,b)|facings_close(*a,b))&&(a.fov_radians-b.fov_radians).abs()<=0.000002
 }
+pub fn scenario_script_names(fields:&str)->Result<Vec<String>>{
+    let scripts=array_listing(fields,"scripts")?;if scripts.count>1024{return invalid("Native script inventory exceeds1024entries");}array_items(&scripts,"scripts")?.iter().map(|item|native_name(&direct_struct_fields(item)?)).collect()
+}
 pub fn scenario_camera_choices(fields:&str)->Result<Vec<crate::maps::NativeCameraPoint>>{Ok(native_camera_fields(fields)?.into_iter().map(|(point,_)|point).collect())}
 fn native_camera_fields(fields:&str)->Result<Vec<(crate::maps::NativeCameraPoint,[usize;3])>>{
     let array=array_listing(fields,"cutscene_camera_points")?;if array.count>512{return invalid("Native camera inventory exceeds512points");}let mut line=array.start+1;let mut points=vec![];

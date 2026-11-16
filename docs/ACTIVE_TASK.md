@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — recovered cutscene camera creator workflow; CE609 Black Echo / full roadmap retained
+Task: Operation110 — timed native cinematic source milestone; reviewed mission trigger next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: fceeb4cd0d1b608fa6e190dbfca9e493172b3dba parent; containing camera commit verifies native UI/viewport/Save/restart/CE build/cache readback. No gameplay acceptance.
-Next action: approved private Black Echo gameplay/HUD/objectives/settlement, actual AI and camera playback when desktop control works; do not repeat unchanged initialization failure. Otherwise advance campaign command/cutscene timing/native creator gaps.37944, other targets and full M1–M6 remain open.
+Latest verified revision: d8136fabadb342725b652cb0e1dd387660a56549 parent plus this scoped source/manifest commit (git log -1 resolves its revision). Linked Windows/UI/native cinematic proof passes; no gameplay acceptance.
+Next action: connect the static cinematic through the existing recovered mission-module editor and verify its native trigger/readback. Game playback/input restoration still needs the authorized isolated runtime test when desktop control works. Exact90→120tick proof: RUNTIME_INTEGRATION_20261107. QA83720 CLOSED/disposed;37944/full M1–M6 remain open.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov recovered camera loop passes actual Windows form/viewport RMB+W/capture/Review/Accept/Restore/Save/3normal restarts/CE609 compile/independent cache+Invader pose/lens readback;0page errors. Stale source refused. Frontend53/core17+camera12(2skips)/browser7/TypeScript/Vite/Windows build pass. App019bb690, receipt78728e77, mapb881d95e; full evidence/failures in RUNTIME_INTEGRATION_20261107. Native cinematic/gameplay/other targets/37944 remain open. Earlier command/patrol/compact/freeze work/all475IDs/originals/history preserved. No Forerunner write/game/push/publication.
+16Nov timed cinematic: saved native camera take/timing/history/Save/restart, guarded module attach/revision, CE60990→120tick compile/independent readback pass in linked Windows runs,0page errors. Frontend36/core17/browser6scoped/TypeScript/Vite/Windows compilation pass. Driver failures remain failed; hashes/bounds in RUNTIME_INTEGRATION_20261107. QA83720/run-H8MLKu CLOSED:4953928812 logicalB disposed; physical reclamation unavailable. No game/37944/full-suite claim. Source manifests/475CSV IDs/legacy checkpoint/originals unchanged.
 
 Reuse historical evidence; run proportionate focused checks under the updated policy:
 

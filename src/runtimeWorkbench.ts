@@ -112,6 +112,7 @@ export interface MissionHudSourcePlan {
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string;replacesSha256?:string|null }
 export interface WorkingScriptSources {
+  cameraReview?:{tagIdentity:string;cameras:import('./nativeOperations').NativeCameraPoint[];scriptNames:string[]};
   projectId:string;buildId:string;tagsDirectory:string;projectFingerprint:string;sourceSha256:string;
   modules:{filename:string;sha256:string;bytes:number;unavailable:string|null}[];
 }

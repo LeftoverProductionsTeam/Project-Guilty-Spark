@@ -354,7 +354,11 @@ pub(super) struct WorkingScriptModule {filename:String,sha256:String,bytes:u64,u
 pub(super) struct WorkingScriptSources {
     project_id:String,build_id:String,tags_directory:PathBuf,project_fingerprint:String,
     source_sha256:String,modules:Vec<WorkingScriptModule>,
+    #[serde(skip_serializing_if="Option::is_none")] camera_review:Option<WorkingCameraReview>,
 }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct WorkingCameraReview {tag_identity:String,cameras:Vec<maps::NativeCameraPoint>,script_names:Vec<String>}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub(super) struct WorkingScriptSource {selection:WorkingScriptSources,script:core::working_tags::ScriptAttachment}
@@ -386,14 +390,25 @@ fn working_script_inventory(state:&AppState,project_id:&str,build_id:&str,tags:&
         modules.push(WorkingScriptModule{filename:filename.into(),sha256,bytes,unavailable});
     }
     Ok((WorkingScriptSources{project_id:project.id,build_id:context.build.id,tags_directory:context.tags,
-        project_fingerprint:fingerprint.into(),source_sha256:identity,modules},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
+        project_fingerprint:fingerprint.into(),source_sha256:identity,modules,camera_review:None},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
 }
 #[tauri::command]
 pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:String,expected_build_id:String,
-    expected_source_directory:PathBuf,expected_project_fingerprint:String)->Reply<WorkingScriptSources> {
+    expected_source_directory:PathBuf,expected_project_fingerprint:String,include_cameras:Option<bool>)->Reply<WorkingScriptSources> {
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();
-        working_script_inventory(&state,&project_id,&expected_build_id,&expected_source_directory,&expected_project_fingerprint).map(|value|value.0)
+        let(mut view,_)=working_script_inventory(&state,&project_id,&expected_build_id,&expected_source_directory,&expected_project_fingerprint)?;
+        if include_cameras==Some(true){
+            let project=lock(&state.library)?.get(&project_id).map_err(error)?;let context=source_context(&state,&project)?;
+            if context.build.id!=expected_build_id||context.tags!=expected_source_directory||project.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Native camera source selection changed; read it again".into());}
+            let identity=core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?;
+            let values=native_operations_native::fields(&state,&project,&context.tags,&format!("{}.scenario",context.scenario_path))?;
+            let cameras=core::native_operations::scenario_camera_choices(&values).map_err(error)?;let script_names=core::native_operations::scenario_script_names(&values).map_err(error)?;
+            let latest=lock(&state.library)?.get(&project_id).map_err(error)?;if latest.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Saved authoring changed during camera review".into());}let current=source_context(&state,&latest)?;
+            if current.build.id!=context.build.id||current.tags!=context.tags||core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?!=identity{return Err("Native camera/tag source changed during review; no source was prepared".into());}
+            view.camera_review=Some(WorkingCameraReview{tag_identity:identity,cameras,script_names});
+        }
+        Ok(view)
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -1146,7 +1161,7 @@ pub(super) async fn build_working_tags(
         let scenario_type=source_scenario_type(&state,&project)?;
         let expected_encounter=native_operations_native::encounter_expectation(&state,&context.source_project,&context.build)?;
         let hud_readback_targets=native_operations_native::hud_readback_targets(&state,&context.source_project,&context.build)?;
-        let scenario_squad_readback=native_operations_native::squad_readback_targets(&state,&context.source_project,&context.build,&context.tags)?;
+        let scenario_squad_readback=native_operations_native::squad_readback_targets(&state,&context.source_project,&context.build,&context.tags,expected_tag_identity.is_some()&&compile_scripts.unwrap_or(false))?;
         let source_project=context.source_project;
         let mut input=core::working_tags::WorkingTagsInput{mission_hud,hud_readback_targets,scenario_squad_readback,encounter_append,script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;

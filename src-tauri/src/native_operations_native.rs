@@ -142,9 +142,10 @@ fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord
     }
     Ok((counts,starts,combat,protected,cameras))
 }
-pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path)->Reply<Option<recipes::ScenarioSquadReadback>> {
+pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path,force_cameras:bool)->Reply<Option<recipes::ScenarioSquadReadback>> {
     let (required,include_starts,combat,_,include_cameras)=encounter_review_metadata(state,project,build)?;
-    if !required{return Ok(None);}
+    let include_cameras=include_cameras||force_cameras;
+    if !required&&!include_cameras{return Ok(None);}
     let tag=format!("{}.scenario",project.scenario_path().map_err(error)?);
     let file=tags.join(core::safe_relative(&tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
     let source_sha256=maps::hash_file(&file).map_err(error)?;
