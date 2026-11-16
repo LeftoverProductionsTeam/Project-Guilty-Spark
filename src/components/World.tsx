@@ -1,3 +1,6 @@
+import {NATIVE_CAMERA_VIEW,cameraPoint,nativeCameraPose} from '../nativeCutsceneCamera';
+import type {NativeCameraView} from '../nativeCutsceneCamera';
+import {applyCameraPose} from './MachinimaRig';
 import NativeAiStartOverlay from './NativeAiStartOverlay';
 import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
@@ -205,6 +208,11 @@ function SceneObjectVisual({object,inspection,assetMeshes,ownedModels,spawnModel
   const tag=inspection?.tags.find(tag=>tag.id===object.tagId),matte=greenScreen&&!isChromaSubject(source?.tagClass??tag?.class,object.kind,tag?.references);
   if(source)return <ObjectVisual {...props} greenScreen={matte} object={object} asset={view?.mesh} shaderTextures={view?.shaderTextures} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>;
   return <ObjectVisual {...props} greenScreen={matte} object={object} asset={object.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,object.tagId,object.assetId,assetMeshes)}/>;
+}
+function SourceCutsceneView({view}:{view:NativeCameraView|null}){
+ const {camera,controls}=useThree();
+ useEffect(()=>{if(!view?.active||!view.focus||!(camera instanceof THREE.PerspectiveCamera))return;const point=cameraPoint(view);if(!point)return;const pose=nativeCameraPose(point);const orbit=controls as unknown as {target?:THREE.Vector3;update?:()=>void;enableDamping?:boolean};if(orbit){const damping=orbit.enableDamping;orbit.enableDamping=false;orbit.update?.();orbit.enableDamping=damping;orbit.target?.fromArray(pose.lookAt);}camera.zoom=1;applyCameraPose(camera,pose);},[view?.focus,camera,controls]);
+ return null;
 }
 function FrameCamera({
   mesh,
@@ -525,6 +533,7 @@ export default function World({
   onDetachTags,
   onSelectMap,
   onReviewAiStart,
+  onReviewCamera,
   onResourcesConnected,
   onBeforeResources,
   onBakeBuild,
@@ -548,6 +557,7 @@ export default function World({
   onDetachTags?: (sourceProjectId:string,tagId:number)=>Promise<boolean>;
   onSelectMap?: (id:string)=>void;
   onReviewAiStart?:()=>void;
+  onReviewCamera?:()=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: (persist?:boolean) => Promise<void>;
   onBakeBuild?:()=>Promise<void>;
@@ -579,6 +589,7 @@ export default function World({
   };
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
+  const [nativeCamera,setNativeCamera]=useMapState<NativeCameraView|null>(project.id,NATIVE_CAMERA_VIEW,()=>null);
   const [nativeAiStart,setNativeAiStart]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
   const setSelected=(id:string|null)=>{if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
   const tagDocument=library?.documents.find(document=>document.id===tagSource);
@@ -658,6 +669,7 @@ export default function World({
       setFly(false);setPlayerView(false);setMode(nativeAiStart.mode??'translate');
     }
   },[nativeAiStart?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
+  useEffect(()=>{if(nativeCamera?.active&&nativeCamera.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setOrtho(false);setFly(true);setPlayerView(false);setNativeAiStart(v=>v?.active?{...v,active:false}:v);}},[nativeCamera?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [frame, setFrame] = useState(0);
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
   const [startId,setStartId]=useMapState(project.id,'world.start','');
@@ -1542,6 +1554,7 @@ export default function World({
                   paused={cameraLocked || externalCameraAuthority}
                   requiresControls={!cinematic && !fly}
                 />
+                {!cinematic&&!cameraLocked&&!externalCameraAuthority&&<SourceCutsceneView view={nativeCamera}/>}
                 {library && <ViewportDropPoint point={dropPoint} onReady={setDropReady} />}
                 {!cinematic &&
                   project.audioPreview?.emitters
@@ -1576,6 +1589,7 @@ export default function World({
               </Canvas>}
             </Suspense>
           </ViewportBoundary>
+          {!cinematic&&nativeCamera?.active&&<div className="viewport-object-actions"><strong>Cutscene camera · {nativeCamera.original.name||nativeCamera.original.index}</strong><span>Editor preview · fly/orbit, then return and capture the viewport pose</span>{onReviewCamera&&<button onClick={onReviewCamera}>Review cutscene camera source</button>}<button onClick={()=>setNativeCamera({...nativeCamera,active:false})}>Leave camera preview</button></div>}
           {!cinematic&&nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
             <strong>{nativeAiStart.kind==='firing'?'AI firing draft':nativeAiStart.kind==='patrol'?'AI patrol draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
             <span>{nativeAiStart.kind==='firing'?'Unsaved XYZ/group proposal · Move (W), then review in Native source controls':'Unsaved pose · Move (W) / Rotate (E), then review in Native source controls'}</span>

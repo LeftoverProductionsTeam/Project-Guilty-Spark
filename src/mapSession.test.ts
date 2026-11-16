@@ -204,3 +204,13 @@ test('a quota failure retains ordinary settings without persisting a transient A
  expect(session.readMapSession('a','world.ai-start',null)).toEqual({key:'pending'});
  expect(session.readMapSession('a','world.grid',false)).toBe(true);
 });
+
+test('camera and AI source proposals survive ordinary writes together but never reach another window or restart',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');
+ session.writeMapSession('a','world.ai-start',{kind:'patrol',key:'native-ai'});session.writeMapSession('a','world.cutscene-camera',{sourceSha256:'a'.repeat(64),active:true});
+ blocked=true;session.writeMapSession('a','world.grid',true);blocked=false;session.writeMapSession('a','world.snap',true);
+ expect(session.readMapSession('a','world.ai-start',null)).toEqual({kind:'patrol',key:'native-ai'});expect(session.readMapSession('a','world.cutscene-camera',null)).toMatchObject({active:true});
+ expect([...data.values()].every(text=>!text.includes('world.ai-start')&&!text.includes('world.cutscene-camera'))).toBe(true);
+ session.configureMapViewWindow('second');expect(session.readMapSession('a','world.cutscene-camera',null)).toBeNull();
+ vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','world.cutscene-camera',null)).toBeNull();expect(restarted.readMapSession('a','world.ai-start',null)).toBeNull();expect(restarted.readMapSession('a','world.grid',false)).toBe(true);
+});

@@ -397,6 +397,11 @@ fn prepare_source(
 }
 /// One native camera-point writer for recording takes and reviewed campaign intros.
 /// Append only inside an owned build workspace; existing points/indices are retained.
+/// Shared native camera scalar encoding for authored and recovered source edits.
+pub(crate) fn camera_point_values(position:[f32;3],orientation:[f32;3],fov:f32)->[(&'static str,String);3]{
+    let vector=|v:[f32;3]|v.map(|n|format!("{n:.8}")).join(",");
+    [("position",vector(position)),("orientation",vector(orientation)),("field_of_view",format!("{fov:.8}"))]
+}
 pub(crate) fn append_camera_points(shots:&[CameraShot],names:&[String],scenario:&str,workspace:&Path,edit:&Path,runner:&Runner<'_>)->Result<()> {
     let tags=workspace.join("tags");let tag=format!("{scenario}.scenario");
     let count=runner.run(edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),"cutscene_camera_points".into(),tag.clone()],workspace,"engine-camera",47)?.trim().parse::<usize>().map_err(|_|SparkError::Invalid("Camera point count unavailable".into()))?;
@@ -411,7 +416,6 @@ pub(crate) fn append_camera_points(shots:&[CameraShot],names:&[String],scenario:
     for (i, shot) in shots.iter().enumerate() {
         let prefix = format!("cutscene_camera_points[{}]", count + i);
         let angles = camera_angles(shot)?;
-        let vector = |v: [f32; 3]| format!("{:.8},{:.8},{:.8}", v[0], v[1], v[2]);
         let mut args = vec![
             "-t".into(),
             tags.to_string_lossy().into_owned(),
@@ -420,12 +424,7 @@ pub(crate) fn append_camera_points(shots:&[CameraShot],names:&[String],scenario:
             "1".into(),
             "end".into(),
         ];
-        for (field, value) in [
-            ("name", names[i].clone()),
-            ("position", vector(shot.camera_position)),
-            ("orientation", vector(angles)),
-            ("field_of_view", format!("{:.8}", shot.fov.to_radians())),
-        ] {
+        for (field,value) in std::iter::once(("name",names[i].clone())).chain(camera_point_values(shot.camera_position,angles,shot.fov.to_radians())) {
             args.extend(["-S".into(), format!("{prefix}.{field}"), value]);
         }
         args.push(tag.clone());

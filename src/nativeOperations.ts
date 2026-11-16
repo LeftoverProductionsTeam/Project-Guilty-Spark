@@ -37,7 +37,8 @@ export function nativePatrolEqual(a:NativeSourcePatrolRoute,b:NativeSourcePatrol
  return a.points.length===b.points.length&&a.points.every((p,i)=>{const q=b.points[i];return p.sourceIndex===q.sourceIndex&&p.animation===q.animation&&p.sequenceId===q.sequenceId&&p.position.every((v,j)=>close(v,q.position[j]))&&close(p.weight,q.weight)&&p.waitSeconds.every((v,j)=>close(v,q.waitSeconds[j]))&&Number.isFinite(p.facingRadians)&&Number.isFinite(q.facingRadians)&&Math.abs(Math.atan2(Math.sin(p.facingRadians-q.facingRadians),Math.cos(p.facingRadians-q.facingRadians)))<=.000002;});
 }
 export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null;patrol?:NativeSourcePatrolRoute|null;patrolIssue?:string|null}[]}
-export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
+export interface NativeCameraPoint {index:number;name:string;position:[number,number,number];orientationRadians:[number,number,number];fovRadians:number}
+export type NativeOperation = {kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null;commandList?:number|null}
@@ -60,6 +61,8 @@ export interface NativeTagContext {
   canAppendEncounter?:boolean;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
+  scenarioCameras?:NativeCameraPoint[];
+  cameraEditIssue?:string|null;
   scenarioCommandLists?:{index:number;name:string;commands:number}[];
   commandListIssue?:string|null;
   scenarioCombat?:NativeScenarioCombat[];

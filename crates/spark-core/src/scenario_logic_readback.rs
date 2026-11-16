@@ -18,6 +18,23 @@ pub struct ScenarioLogicVolumeGeometry {pub forward:[f32;3],pub up:[f32;3],pub c
 pub struct ScenarioLogicReadback {pub names:Vec<ScenarioLogicName>,pub devices:Vec<ScenarioLogicDevice>,pub volumes:Vec<ScenarioLogicVolume>}
 /// Matches the exact previously inspected cache, never a source tag or sidecar.
 pub fn scenario_logic_readback(path:&Path,inspection:&MapInspection)->Result<ScenarioLogicReadback> {
+    with_scenario(path,inspection,|r,space,at|parse(r,space,at,&inspection.tags))
+}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NativeCameraPoint {pub index:u16,pub name:String,pub position:[f32;3],pub orientation_radians:[f32;3],pub fov_radians:f32}
+/// Cutscene camera points use the standard104-byte H1 scenario structure.
+/// Read only the requested block; unrelated device data is not camera evidence.
+pub fn scenario_camera_readback(path:&Path,inspection:&MapInspection)->Result<Vec<NativeCameraPoint>> {
+    with_scenario(path,inspection,parse_cameras)
+}
+fn parse_cameras(r:&Reader,space:&Space,at:usize)->Result<Vec<NativeCameraPoint>>{
+    let(start,count)=space.block(r,at+0x4f0,104,512)?;let mut points=vec![];
+    for index in 0..count {let p=start+index*104;let point=NativeCameraPoint{index:index as u16,name:r.string(p+4,32)?,position:vec3(r,p+40)?,orientation_radians:vec3(r,p+52)?,fov_radians:r.f32(p+64)?};
+        if point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.orientation_radians.iter().any(|v|!v.is_finite()||v.abs()>20000.)||!point.fov_radians.is_finite(){return invalid("Compiled cutscene camera contains invalid numeric values");}points.push(point);
+    }Ok(points)
+}
+fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Reader,&Space,usize)->Result<T>)->Result<T> {
     let (header,bytes,hash)=read_cache_snapshot_shared(path)?;
     if hash!=inspection.sha256{return invalid("Logic cache changed after map inspection");}
     let r=Reader(&bytes);let space=cache_tag_space(&r,&header)?;
@@ -26,7 +43,7 @@ pub fn scenario_logic_readback(path:&Path,inspection:&MapInspection)->Result<Sce
     if scenarios.len()!=1{return invalid("Compiled Logic scenario identity is missing or ambiguous");}
     let at=scenarios[0].data_offset.ok_or_else(||SparkError::Invalid("Compiled Logic scenario body is unavailable".into()))?;
     if at<space.begin||at.checked_add(0x5b0).is_none_or(|end|end>space.end){return invalid("Compiled Logic scenario body escapes its tag region");}
-    parse(&r,&space,at,&inspection.tags)
+    decode(&r,&space,at)
 }
 fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadback>{
     let (at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
@@ -59,6 +76,12 @@ fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadb
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_camera_cache_offsets_and_bounds_are_independent_of_devices(){
+        let mut bytes=vec![0u8;4096];bytes[0x4f0..0x4f4].copy_from_slice(&1u32.to_le_bytes());bytes[0x4f4..0x4f8].copy_from_slice(&0x800u32.to_le_bytes());bytes[0x804..0x809].copy_from_slice(b"intro");for(offset,value)in [(40,1f32),(44,2.),(48,3.),(52,0.5),(56,-0.2),(60,0.1),(64,1.2)]{bytes[0x800+offset..0x804+offset].copy_from_slice(&value.to_le_bytes());}
+        let space=Space{begin:0,end:bytes.len(),address:0};let points=parse_cameras(&Reader(&bytes),&space,0).unwrap();assert_eq!(points.len(),1);assert_eq!(points[0].name,"intro");assert_eq!(points[0].position,[1.,2.,3.]);assert_eq!(points[0].orientation_radians,[0.5,-0.2,0.1]);assert_eq!(points[0].fov_radians,1.2);
+        bytes[0x4f0..0x4f4].copy_from_slice(&513u32.to_le_bytes());assert!(parse_cameras(&Reader(&bytes),&space,0).is_err());bytes[0x4f0..0x4f4].copy_from_slice(&1u32.to_le_bytes());bytes[0x828..0x82c].copy_from_slice(&f32::NAN.to_le_bytes());assert!(parse_cameras(&Reader(&bytes),&space,0).is_err());
+    }
     fn fixture()->(Vec<u8>,Vec<Tag>){
         let mut bytes=vec![0u8;4096];
         let block=|bytes:&mut [u8],at:usize,count:u32,pointer:u32|{bytes[at..at+4].copy_from_slice(&count.to_le_bytes());bytes[at+4..at+8].copy_from_slice(&pointer.to_le_bytes());};

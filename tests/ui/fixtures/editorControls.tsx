@@ -1,3 +1,4 @@
+import NativeCutsceneCameras from '../../../src/components/NativeCutsceneCameras';
 import {useState} from 'react';
 import NativeSquadBehaviorEditor from '../../../src/components/NativeSquadBehavior';
 import NativeSquadPatrol from '../../../src/components/NativeSquadPatrol';
@@ -45,4 +46,8 @@ function NativePatrolFixture(){
  const [draft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
  return <><button onClick={()=>setDirty(!dirty)}>Toggle project dirty</button><button onClick={()=>{setRevision(revision+1);setOperation(null);}}>Refresh source revision</button><button onClick={()=>{setProtected(!protectedGroup);setOperation(null);}}>Toggle source protection</button><output data-testid="patrol-source">{JSON.stringify(source)}</output><output data-testid="patrol-operation">{JSON.stringify(operation)}</output><output data-testid="patrol-draft">{JSON.stringify(draft)}</output><NativeSquadPatrol context={context} squadChoice={{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1}} source={source} behavior={behavior} issue={protectedGroup?'Recipe-owned source retained':null} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)}/></>;
 }
-createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-patrol')?<NativePatrolFixture/>:location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);
+function NativeCameraFixture(){
+ const [revision,setRevision]=useState(0),[dirty,setDirty]=useState(false),[operation,setOperation]=useState<unknown>(null);const context={projectId:'camera-fixture',buildId:'build',tag:'level.scenario',class:'scnr',tagSha256:(revision?'b':'a').repeat(64),scenarioCameras:[{index:0,name:'intro',position:[1,2,3],orientationRadians:[0,0,0],fovRadians:Math.PI/3}]} as NativeTagContext;
+ return <><button onClick={()=>setRevision(v=>v+1)}>Refresh source revision</button><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><output data-testid="camera-operation">{JSON.stringify(operation)}</output><NativeCutsceneCameras context={context} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)} onLevelEditor={()=>{}}/></>;
+}
+createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-camera')?<NativeCameraFixture/>:location.search.startsWith('?native-patrol')?<NativePatrolFixture/>:location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);

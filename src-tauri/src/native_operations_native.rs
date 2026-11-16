@@ -97,9 +97,10 @@ pub(super) fn hud_readback_targets(state:&AppState,project:&Project,build:&Build
 
 /// Existing receipts are evidence for readback/protection only. They never
 /// authorize replaying writes or launching a tool.
-fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord)->Reply<(bool,bool,Vec<recipes::Operation>,std::collections::BTreeSet<String>)> {
-    let mut counts=false;let mut starts=false;let mut combat=vec![];let mut protected=std::collections::BTreeSet::new();
-    let inspect_operation=|operation:&recipes::Operation,counts:&mut bool,starts:&mut bool,combat:&mut Vec<recipes::Operation>,protected:&mut std::collections::BTreeSet<String>|->Reply<()>{
+fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord)->Reply<(bool,bool,Vec<recipes::Operation>,std::collections::BTreeSet<String>,bool)> {
+    let mut counts=false;let mut starts=false;let mut cameras=false;let mut combat=vec![];let mut protected=std::collections::BTreeSet::new();
+    let inspect_operation=|operation:&recipes::Operation,counts:&mut bool,starts:&mut bool,combat:&mut Vec<recipes::Operation>,protected:&mut std::collections::BTreeSet<String>,cameras:&mut bool|->Reply<()>{
+        if operation.is_camera_edit(){*counts=true;*cameras=true;}
         if operation.is_squad_count_edit(){*counts=true;}
         if let Some(key)=operation.combat_target_key(){*counts=true;if !combat.iter().any(|op|op.combat_target_key()==Some(key)){if combat.len()>=4096{return Err("Native combat readback exceeds4096targets".into());}combat.push(operation.clone());}}
         if operation.is_squad_start_edit(){*counts=true;*starts=true;}
@@ -123,10 +124,10 @@ fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord
             receipt.project_fingerprint!=build.project_fingerprint{return Err("Native encounter parent evidence changed; no squad edit was admitted".into());}
         let had_snapshot=receipt.scenario_squad_readback.is_some();
         let had_starts=receipt.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
-        for operation in receipt.encounter_expectations.iter().chain(receipt.expected_encounter.iter()){inspect_operation(operation,&mut counts,&mut starts,&mut combat,&mut protected)?;}
-        if let Some(generated)=&receipt.generated_firefight{inspect_operation(&generated.operation,&mut counts,&mut starts,&mut combat,&mut protected)?;}
-        if let Some(snapshot)=&receipt.scenario_squad_readback{snapshot.validate().map_err(error)?;for op in &snapshot.combat{inspect_operation(op,&mut counts,&mut starts,&mut combat,&mut protected)?;}}
-        counts|=had_snapshot;starts|=had_starts;
+        for operation in receipt.encounter_expectations.iter().chain(receipt.expected_encounter.iter()){inspect_operation(operation,&mut counts,&mut starts,&mut combat,&mut protected,&mut cameras)?;}
+        if let Some(generated)=&receipt.generated_firefight{inspect_operation(&generated.operation,&mut counts,&mut starts,&mut combat,&mut protected,&mut cameras)?;}
+        if let Some(snapshot)=&receipt.scenario_squad_readback{snapshot.validate().map_err(error)?;for op in &snapshot.combat{inspect_operation(op,&mut counts,&mut starts,&mut combat,&mut protected,&mut cameras)?;}}
+        counts|=had_snapshot;starts|=had_starts;cameras|=receipt.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.cameras.is_some());
     }
     let ids:Vec<String>=lock(&state.library)?.setting(&history_key(&project.id)).map_err(error)?;
     if ids.len()>32{return Err("Native encounter review history exceeds its existing bound".into());}
@@ -137,12 +138,12 @@ fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord
         if receipt.schema_version!=1||receipt.id!=id||receipt.project_id!=project.id{return Err("Native encounter history identity changed; review its recovery evidence".into());}
         if receipt.parent_build_id!=build.id||receipt.fingerprint!=fingerprint{continue;}
         receipt.operation.validate(&receipt.class,&receipt.tag).map_err(error)?;
-        inspect_operation(&receipt.operation,&mut counts,&mut starts,&mut combat,&mut protected)?;
+        inspect_operation(&receipt.operation,&mut counts,&mut starts,&mut combat,&mut protected,&mut cameras)?;
     }
-    Ok((counts,starts,combat,protected))
+    Ok((counts,starts,combat,protected,cameras))
 }
 pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path)->Reply<Option<recipes::ScenarioSquadReadback>> {
-    let (required,include_starts,combat,_)=encounter_review_metadata(state,project,build)?;
+    let (required,include_starts,combat,_,include_cameras)=encounter_review_metadata(state,project,build)?;
     if !required{return Ok(None);}
     let tag=format!("{}.scenario",project.scenario_path().map_err(error)?);
     let file=tags.join(core::safe_relative(&tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
@@ -151,7 +152,8 @@ pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&Bui
     if maps::hash_file(&file).map_err(error)?!=source_sha256{return Err("Native scenario changed during squad review; rebuild was not started".into());}
     let squads=if include_starts{recipes::scenario_squad_start_choices(&listing)}else{recipes::scenario_squad_choices(&listing)}.map_err(error)?;
     let combat=if combat.is_empty(){vec![]}else{recipes::current_combat_targets(&listing,&source_sha256,&combat).map_err(error)?};
-    let snapshot=recipes::ScenarioSquadReadback{source_sha256,squads,include_starts,combat};
+    let cameras=if include_cameras{Some(recipes::scenario_camera_choices(&listing).map_err(error)?)}else{None};
+    let snapshot=recipes::ScenarioSquadReadback{source_sha256,squads,include_starts,combat,cameras};
     snapshot.validate().map_err(error)?;
     Ok(Some(snapshot))
 }
@@ -172,6 +174,8 @@ pub(super) struct Context {
     can_append_encounter:bool,
     scenario_squads:Vec<recipes::ScenarioSquadChoice>,
     scenario_start_squads:Vec<recipes::ScenarioSquadChoice>,
+    scenario_cameras:Vec<maps::NativeCameraPoint>,
+    camera_edit_issue:Option<String>,
     scenario_command_lists:Vec<recipes::ScenarioCommandListChoice>,
     command_list_issue:Option<String>,
     start_edit_issue:Option<String>,
@@ -500,7 +504,7 @@ fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply
         .operation
         .validate(&receipt.class, &receipt.tag)
         .map_err(error)?;
-    if let recipes::Operation::HudDuplicate{source_sha256,..}|recipes::Operation::EncounterSquadCounts{source_sha256,..}|recipes::Operation::EncounterSquadCountsBatch{source_sha256,..}|recipes::Operation::EncounterStartPosition{source_sha256,..}|recipes::Operation::EncounterFiringPosition{source_sha256,..}|recipes::Operation::EncounterSquadPatrol{source_sha256,..}|recipes::Operation::EncounterSquadBehavior{source_sha256,..}|recipes::Operation::EncounterSquadFiringGroups{source_sha256,..}=&receipt.operation {if !source_sha256.eq_ignore_ascii_case(&receipt.before_sha256){return Err("Retained native operation source identity differs from its original revision".into());}}
+    if let Some(source_sha256)=receipt.operation.expected_source_sha256() {if !source_sha256.eq_ignore_ascii_case(&receipt.before_sha256){return Err("Retained native operation source identity differs from its original revision".into());}}
     if receipt.tool_id != receipt.operation.tool_id() {
         return Err("The native recipe identity changed".into());
     }
@@ -536,13 +540,14 @@ pub(super) async fn native_tag_context(
         }else{(vec![],None)};
         let protected_squad_encounters=if source.class=="scnr" {
             match encounter_review_metadata(&state,&source.project,&source.build){
-                Ok((_,_,_,names))=>names.into_iter().collect(),
+                Ok((_,_,_,names,_))=>names.into_iter().collect(),
                 Err(issue)=>{squad_edit_issue=Some(issue);vec![]}
             }
         }else{vec![]};
         let (scenario_start_squads,mut start_edit_issue)=if source.class=="scnr"{
             match recipes::scenario_squad_start_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}
         }else{(vec![],None)};
+        let(scenario_cameras,camera_edit_issue)=if source.class=="scnr"{match recipes::scenario_camera_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_command_lists,command_list_issue)=if source.class=="scnr"{match recipes::scenario_command_list_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_combat,mut combat_edit_issue)=if source.class=="scnr"{match recipes::scenario_combat_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let radius = recipes::number(&values, "bounding_radius").ok();
@@ -584,7 +589,7 @@ pub(super) async fn native_tag_context(
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
         Ok(Context {
-            firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
+            firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,
@@ -655,7 +660,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
-    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if receipt.operation.combat_target_key().is_some(){"Only the requested native AI source fields may differ: firing XYZ/group, squad tactical bits, reviewed squad/start behavior or patrol ordering/pose/weight/waits. Accept selects separate source; Restore selects the original before-edit source. Rebuild and independently inspect compiled positions/groups/patrols. Target compilers can expand search masks; source is never normalized automatically. Navigation, cover use and gameplay remain unverified."}else if receipt.operation.is_squad_start_edit(){"Only the selected AI starting position, requested facing and optional existing command-list binding may differ in exposed native fields. Command-list contents and all other starts stay unchanged. Accept selects separate source; rebuild and read back the compiled pose. Squad/start state fields, firing positions and navigation stay unchanged. Actual spawning, command execution, facing and reachability need gameplay validation."}else if receipt.operation.is_squad_count_edit(){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if receipt.operation.is_camera_edit(){"Only this camera pose and lens may differ. Native point names, indices, scripts and other scenario fields stay unchanged. Accept selects a source revision; Save and rebuild to apply it. Restore selects the complete before-edit source. Editor preview is not native cinematic/gameplay acceptance."}else if receipt.operation.combat_target_key().is_some(){"Only the requested native AI source fields may differ: firing XYZ/group, squad tactical bits, reviewed squad/start behavior or patrol ordering/pose/weight/waits. Accept selects separate source; Restore selects the original before-edit source. Rebuild and independently inspect compiled positions/groups/patrols. Target compilers can expand search masks; source is never normalized automatically. Navigation, cover use and gameplay remain unverified."}else if receipt.operation.is_squad_start_edit(){"Only the selected AI starting position, requested facing and optional existing command-list binding may differ in exposed native fields. Command-list contents and all other starts stay unchanged. Accept selects separate source; rebuild and read back the compiled pose. Squad/start state fields, firing positions and navigation stay unchanged. Actual spawning, command execution, facing and reachability need gameplay validation."}else if receipt.operation.is_squad_count_edit(){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -669,9 +674,9 @@ pub(super) async fn native_operation_preview(
     tauri::async_runtime::spawn_blocking(move||{
     let _gate=lock(gate())?;let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
     if matches!(operation,recipes::Operation::Dependencies){return Err("Use the read-only dependency check for this operation".into());}
-    let source=source(&state,&project_id,tag_id)?;operation.validate(&source.class,&source.tag).map_err(error)?;
+    let source=source(&state,&project_id,tag_id)?;if operation.is_camera_edit(){studio_native_source::require_unshared(&state,&source.project.id)?;}operation.validate(&source.class,&source.tag).map_err(error)?;
     if operation.is_scenario_ai_edit(){
-        let (_,_,_,protected)=encounter_review_metadata(&state,&source.project,&source.build)?;
+        let (_,_,_,protected,_)=encounter_review_metadata(&state,&source.project,&source.build)?;
         let owned=if let Some(name)=operation.combat_encounter_name(){protected.contains(&name.to_ascii_lowercase())}
             else if let recipes::Operation::EncounterStartPosition{encounter_name,..}=&operation{protected.contains(&encounter_name.to_ascii_lowercase())}
             else{operation.squad_count_edits().map_err(error)?.iter().any(|edit|protected.contains(&edit.encounter_name.to_ascii_lowercase()))};
@@ -689,7 +694,7 @@ pub(super) async fn native_operation_preview(
     if matches!(operation,recipes::Operation::LensFlareScaleRepair)&&!recipes::broken_lens_scale(recipes::number(&before_fields,"rotation_function_scale").map_err(error)?){return Err("This lens flare does not have the reviewed 360-to-zero repair precondition. No repair ran.".into());}
     let relative=core::safe_relative(&source.tag).map_err(error)?;let before=bounded_read(&source.tags.join(&relative),MAX_TAG)?;
     let before_sha256=hash_bytes(&before);
-    if let recipes::Operation::HudDuplicate{source_sha256,..}|recipes::Operation::EncounterSquadCounts{source_sha256,..}|recipes::Operation::EncounterSquadCountsBatch{source_sha256,..}|recipes::Operation::EncounterStartPosition{source_sha256,..}|recipes::Operation::EncounterFiringPosition{source_sha256,..}|recipes::Operation::EncounterSquadPatrol{source_sha256,..}|recipes::Operation::EncounterSquadBehavior{source_sha256,..}|recipes::Operation::EncounterSquadFiringGroups{source_sha256,..}=&operation {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native source changed after selection; refresh before editing. No writer ran.".into());}}
+    if let Some(source_sha256)=operation.expected_source_sha256() {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native source changed after selection; refresh before editing. No writer ran.".into());}}
     let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
     let candidate=directory.join("candidate/tags");fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;
@@ -761,7 +766,7 @@ pub(super) async fn native_operation_accept(
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
     let _gate=source_guard()?;let state=app.state::<AppState>();require_idle(&state)?;check_document_owner(&state,&project_id,&owner)?;let receipt=read_receipt(&state,&operation_id,&owner,&project_id)?;
-    let project=lock(&state.library)?.get(&project_id).map_err(error)?;let (build,current)=runtime_workbench::native_operation_source(&state,&project)?;
+    let project=lock(&state.library)?.get(&project_id).map_err(error)?;if receipt.operation.is_camera_edit(){studio_native_source::require_unshared(&state,&project.id)?;}let (build,current)=runtime_workbench::native_operation_source(&state,&project)?;
     if project.fingerprint().map_err(error)?!=receipt.fingerprint||(!restore&&build.id!=receipt.parent_build_id){return Err("The saved map/build changed after this preview. No source was selected; preview the current saved map again.".into());}
     if baboon_native::has_running(&project_id)?||runtime_workbench::has_running(&state,&project_id)?{return Err("Close this map's native editor/test process before selecting a new source revision".into());}
     let exe=executable(&state,&project,&receipt.tool_id)?;if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("The native writer changed after preview; review its identity again".into());}

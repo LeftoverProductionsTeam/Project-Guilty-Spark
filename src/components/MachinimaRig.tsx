@@ -21,7 +21,7 @@ export interface DirectorBridge {
   pose: CameraPose | null;
   canvas: HTMLCanvasElement | null;
 }
-function applyPose(camera: PerspectiveCamera, pose: CameraPose) {
+export function applyCameraPose(camera: PerspectiveCamera, pose: CameraPose) {
   camera.position.fromArray(pose.position);
   camera.up.set(0, 0, 1);
   const target = new Vector3(...pose.lookAt);
@@ -35,7 +35,7 @@ function applyPose(camera: PerspectiveCamera, pose: CameraPose) {
 function Frustum({ shot, aspect }: { shot: CameraShot; aspect: number }) {
   const helper = useMemo(() => {
     const camera = new PerspectiveCamera(shot.fov, aspect, 0.1, 1.4);
-    applyPose(camera, {
+    applyCameraPose(camera, {
       position: shot.cameraPosition,
       lookAt: shot.lookAt,
       fov: shot.fov,
@@ -99,7 +99,7 @@ export default function MachinimaRig({
     const time = settings.loopPlayback && duration > 0 ? elapsed % duration : Math.min(elapsed, duration),
       ended = transport.playing && !settings.loopPlayback && elapsed >= duration;
     const sampled = sampleCamera(shots, time);
-    if (transport.preview && sampled && camera instanceof PerspectiveCamera) applyPose(camera, sampled.pose);
+    if (transport.preview && sampled && camera instanceof PerspectiveCamera) applyCameraPose(camera, sampled.pose);
     const direction = new Vector3();
     camera.getWorldDirection(direction);
     bridge.current.pose = {

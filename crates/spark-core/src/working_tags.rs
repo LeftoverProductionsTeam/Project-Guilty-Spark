@@ -645,7 +645,7 @@ fn prepare(
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
     if let Some(hud)=&parent_generated_mission_hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}
     if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(profile)=&generated.player_profile{profile.verify_map(&parent_inspection)?;}if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
-    if let Some(snapshot)=&parent_squad_readback{snapshot.verify_map(&parent_inspection)?;}
+    if let Some(snapshot)=&parent_squad_readback{snapshot.verify_cache(&parent_output,&parent_inspection)?;}
     if let Some(snapshot)=&input.scenario_squad_readback{
         snapshot.validate()?;
         // Parent expectations were verified above. Current source supersedes
@@ -1440,7 +1440,8 @@ fn run_with(
             let include_starts=prepared.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
             let squads=if include_starts{crate::native_operations::scenario_squad_start_choices(&fields)?}else{crate::native_operations::scenario_squad_choices(&fields)?};
             let combat=crate::native_operations::current_combat_targets(&fields,&source_sha256,&prepared.scenario_squad_readback.as_ref().unwrap().combat)?;
-            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat};
+            let cameras=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cameras.is_some()){Some(crate::native_operations::scenario_camera_choices(&fields)?)}else{None};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat,cameras};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
@@ -1487,10 +1488,10 @@ fn run_with(
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
         if let Some(snapshot)=&receipt.scenario_squad_readback{
-            snapshot.verify_map(&inspected)?;
+            snapshot.verify_cache(&output,&inspected)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
-                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,
-                "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. This is not AI/gameplay acceptance."
+                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,
+                "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional camera inventory/pose/lens is read from the compiled cache. This is not AI/cinematic/gameplay acceptance."
             }))?,false)?;
         }
         if let Some(profile)=receipt.generated_firefight.as_ref().and_then(|generated|generated.player_profile.as_ref()){profile.verify_map(&inspected)?;}

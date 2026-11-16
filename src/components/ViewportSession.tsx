@@ -7,6 +7,7 @@ interface Pose {
   quaternion: number[];
   target?: number[];
   zoom: number;
+  fov?: number;
 }
 const finite = (a: unknown, n: number): a is number[] =>
   Array.isArray(a) &&
@@ -67,6 +68,7 @@ export default function ViewportSession({
       camera.position.fromArray(pose.position);
       camera.quaternion.fromArray(pose.quaternion).normalize();
       view.zoom = pose.zoom;
+      if('fov' in view&&typeof pose.fov==='number'&&pose.fov>=5&&pose.fov<=150)view.fov=pose.fov;
       camera.updateProjectionMatrix();
       const orbit = controlMatches
         ? (controls as unknown as { target?: import('three').Vector3; update?: () => void })
@@ -91,6 +93,7 @@ export default function ViewportSession({
       position: rounded(camera.position.toArray()),
       quaternion: rounded(camera.quaternion.toArray()),
       zoom: view.zoom,
+      ...('fov' in view?{fov:view.fov}:{}),
       target: orbit?.target ? rounded(orbit.target.toArray()) : undefined,
     };
     writeMapSession(id, key, pose);

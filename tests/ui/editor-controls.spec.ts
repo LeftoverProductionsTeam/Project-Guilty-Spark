@@ -117,3 +117,10 @@ test('native starting command-list binding keeps the pose, source and other insp
  await page.getByRole('button',{name:'Finish preview',exact:true}).click();await first.getByRole('button',{name:'Reset coordinate draft',exact:true}).click();await expect(binding).toHaveValue('-1');
  await binding.selectOption('0');await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(binding).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(binding).toHaveValue('0');
 });
+
+
+test('existing cutscene camera proposals preserve identity, validate lens and discard stale source',async({page})=>{
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-camera');const form=page.locator('.native-cutscene-cameras');await form.locator('> summary').click();const x=form.getByRole('spinbutton',{name:'Cutscene camera X',exact:true}),lens=form.getByRole('spinbutton',{name:'Cutscene camera FOV',exact:true}),preview=form.getByRole('button',{name:'Preview native camera edit',exact:true});await expect(preview).toBeDisabled();await x.fill('8.5');await lens.fill('180');await expect(preview).toBeDisabled();await lens.fill('80');await preview.click();const op=JSON.parse((await page.getByTestId('camera-operation').textContent())!);expect(op).toMatchObject({kind:'cutsceneCamera',sourceSha256:'a'.repeat(64),point:{index:0,name:'intro',position:[8.5,2,3]}});expect(op.point.fovRadians).toBeCloseTo(80*Math.PI/180,8);
+ await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(preview).toBeDisabled();await expect(x).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(x).toHaveValue('8.5');await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();await expect(x).toHaveValue('1');await expect(preview).toBeDisabled();
+ await form.getByRole('button',{name:'Use Level Editor camera',exact:true}).click();await expect(form).toContainText('A current pose and supported lens are required');
+});
