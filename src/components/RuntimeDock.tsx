@@ -1,5 +1,6 @@
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {beginProjectMutation} from '../projectMutation';
+import {createLatestRefresh} from '../latestRefresh';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Play,
@@ -237,16 +238,22 @@ export default function RuntimeDock({
     const frame=requestAnimationFrame(()=>scriptEditor.current?.querySelector<HTMLInputElement>('input[type="file"]')?.focus());
     return()=>cancelAnimationFrame(frame);
   },[details,scriptsOpen,report?.workingSource?.buildId]);
+  const reportRefresh=useRef<ReturnType<typeof createLatestRefresh<{runtimeId:RuntimeId;projectId:string|null},RuntimeWorkbenchReport>>|null>(null);
+  useEffect(()=>{
+    // Source admission hashes native inputs. Reuse the shared trailing-refresh
+    // queue so a burst of saved revisions cannot fan out identical native work.
+    const queue=createLatestRefresh<{runtimeId:RuntimeId;projectId:string|null},RuntimeWorkbenchReport>(input=>call('runtime_workbench_report',input),()=>{});
+    reportRefresh.current=queue;
+    return()=>{queue.dispose();if(reportRefresh.current===queue)reportRefresh.current=null;};
+  },[]);
   const refresh = useCallback(async () => {
     const request = ++generation.current;
     if (!native) return;
     setBusy(true);
     setError('');
     try {
-      const next = await call<RuntimeWorkbenchReport>('runtime_workbench_report', {
-        runtimeId: runtime,
-        projectId: project?.id ?? null,
-      });
+      const queue=reportRefresh.current;if(!queue)return;
+      const next=await queue.request({runtimeId:runtime,projectId:project?.id??null});
       if (request === generation.current) setReport(next);
     } catch (e) {
       if (request === generation.current) {

@@ -32,6 +32,9 @@ pub(super) async fn commit_workspace_history(app:tauri::AppHandle,window:tauri::
     // New documents need one explicit Save before automatic recovery has a
     // durable library entry through which it can be reopened after a crash.
     if library.is_saved(&project_id).map_err(error)?&&current.effective_automatic_backup_retention(lock(&state.settings)?.snapshot_retention).map_err(error)?>0{guard.checkpoint(&directory,&current).map_err(error)?;}
+    // The UI can request Save while this commit is completing. Release both
+    // state locks before dispatching an event back to that window.
+    drop(library);drop(guard);
     let _=window.app_handle().emit("spark:window-history",serde_json::json!({"projectId":project_id,"revision":revision,"owner":window.label()}));
     Ok(revision)}).await.map_err(error)?
 }

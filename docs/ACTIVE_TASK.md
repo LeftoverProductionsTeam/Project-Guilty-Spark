@@ -3,8 +3,8 @@
 Task: Operation110 — CE609 Black Echo to Forerunner breakthrough; patrol WIP preserved
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: ac3f1440fad9d7a854f1627202efeb481b2b996c parent; this checkpoint’s containing local commit records the verified campaign HUD milestone in RUNTIME_INTEGRATION_20261107.
-Next action: Exercise the new campaign HUD controls in actual Windows Spark, then reverify the current Forerunner binary and run the already-authorized isolated safe-start Black Echo native-menu/game workflow when Computer Use works. Native HMT/CE combined and text-only rebuild/readback, Save/reopen, source/browser/Windows checks pass; desktop HUD/game/37944 and full mission remain open.
+Latest verified revision: 1c480f40392ba76740674ab74427532933e40aa6 campaign HUD source/native cache milestone; separate patrol WIP remains unchanged.
+Next action: Continue native source-readiness/loading responsiveness and broader Save37944 coverage; the compact HUD/queued inspections/continued42-edit native Save/restart/build/readback milestone is verified below. Private Forerunner gameplay remains authorized but unrun because Windows controls cannot initialize. Preserve full roadmap and separate patrol WIP.
 
 ## Acceptance
 
@@ -103,7 +103,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA59558/run-rBwXga CLOSED: focused checks completed and owned output disposed2,984,157,168logicalB; final physical reclamation unavailable (allocated-disposal total null). No map, binary, SDK tree or archive retained. Campaign HUD core15/15+1opt-in skip; creative15/15+1skip; explicit canonical native HMT1/1 and CE combined/text-only chain1/1; browser2/2, TypeScript, Vite and Windows check pass. Exact map hashes22588d2f/5f13ac33 and test failures are in RUNTIME_INTEGRATION_20261107. All original map/scenario/CE/SDK hashes unchanged. No application/game launched or Forerunner modified. Owner approved isolated Black Echo game/menu test; Computer Use initialization still fails kernel-assets/path/os error3. Two original patrol WIP files remain separate with exact diffSHAe7b772d1; no push/publication or Operation110 completion. Source manifests will be refreshed from staged verified scope.
+QA21402/run-9LXS9l CLOSED: owned apps/tools exited and output disposed4,488,883,429logicalB; final physical reclamation unavailable. Only the two small source-owned before/after PNGs remain. Final app351dd043 uses worker-thread Save/update, releases journal locks before UI events and reuses latestRefresh to bound native inspections. Browser3/3, frontend history10/10, Rust history11/11, TypeScript/Vite/Windows build pass. Native continued seven-stage HUD case:42rapid edits/Undo/Save/status5/2/2ms/151px panel/3normal closes/CE609 map057a9839/independent readback pass,0page errors. Initial two fresh Save timeouts remain documented; final fresh Save/restart passed, then source-panel auto-wait failed; explicit readiness/strict continued run passes. Do not relabel the failed earlier run or claim broad37944 closure. Existing RUNTIME_INTEGRATION_20261107 has exact app/map/scenario/HSC/HMT hashes and preserved before/after PNGs. One2355tag extraction, no SDK copy/game/Forerunner writes/push. Original inputs/475CSV/legacy checkpoint and two patrol WIP files unchanged. Commit only scoped verified work; full Operation110 remains incomplete.
 
 Historical QA29199 disposal/original preservation evidence remains in Gitcfe6832:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no old jobs were revived.
 

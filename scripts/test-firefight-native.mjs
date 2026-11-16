@@ -17,6 +17,45 @@ const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
 const ceMissionReview=process.env.SPARK_NATIVE_CE_MISSION_REVIEW==='1';
+const ceMissionHudReview=process.env.SPARK_NATIVE_CE_MISSION_HUD_REVIEW==='1';
+if(ceMissionHudReview&&!ceMissionReview)throw Error('Campaign HUD native UI requires the CE mission review');
+const ceMissionHudSteps=[
+ {
+  "title": "Deployment",
+  "marker": "awaiting deployment terminal",
+  "text": "Use the deployment terminal to begin Operation Black Echo."
+ },
+ {
+  "title": "Marine rescue",
+  "marker": "native hostile encounter active",
+  "text": "Reach the Marines and eliminate the facility defenders."
+ },
+ {
+  "title": "Technology recovery",
+  "marker": "collect classified technology",
+  "text": "Recover the classified technology. Keep the Marines alive."
+ },
+ {
+  "title": "Flood outbreak",
+  "marker": "optional flood outbreak active",
+  "text": "Contain the Flood outbreak before evacuation."
+ },
+ {
+  "title": "Extraction defense",
+  "marker": "defend extraction",
+  "text": "Defend the extraction point."
+ },
+ {
+  "title": "Return to hub",
+  "marker": "activate extraction and return to hub",
+  "text": "Activate extraction and return all survivors to the hub."
+ },
+ {
+  "title": "Operation complete",
+  "marker": "equipment banked and survivors returned",
+  "text": "Equipment banked. Survivors extracted. Redeployment is available."
+ }
+];
 const blackEchoReview=process.env.SPARK_NATIVE_BLACK_ECHO_REVIEW==='1',marineTag='characters/marine_armored/marine_armored assault rifle',floodTag='characters/floodcombat_human/floodcombat_human assault rifle';
 const blackEchoCombatReview=process.env.SPARK_NATIVE_BLACK_ECHO_COMBAT_REVIEW==='1';
 if(ceMissionReview&&(blackEchoReview||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'||process.env.SPARK_NATIVE_AI_START_REVIEW==='1'))throw Error('CE source mission review is isolated and never launches a game');
@@ -56,7 +95,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     await assertQaOutputPath(resumeFile,{reservationBytes:0});const info=await fs.lstat(resumeFile);
     if(!info.isFile()||info.isSymbolicLink()||info.size>2*1024**2)throw Error('Invalid recovered-start continuation receipt');
     prior=JSON.parse(await fs.readFile(resumeFile,'utf8'));
-    if(ceMissionReview){const mission=prior.ceMission,compiledStage=mission?.stage==='compile reviewed mission and accepted AI';if(prior.complete||prior.errors?.length||(!compiledStage&&mission?.stage!=='edit reviewed mission module')||!mission?.acceptedSourceSha256||mission.parent?.status!=='validated'||prior.normalRestarts<1||(compiledStage&&(!mission.saveRestart||prior.normalRestarts<2||! /^[a-f0-9]{64}$/.test(mission.projectDraftSha256??''))))throw Error('CE continuation lacks its actual saved edit, successful restart and complete source build');}
+    if(ceMissionReview){const mission=prior.ceMission,compiledStage=mission?.stage==='compile reviewed mission and accepted AI',hudRecovery=ceMissionHudReview&&mission?.stage==='author campaign HUD through Creator Studio'&&(prior.saveFailure?.projectId===mission.projectId||!prior.saveFailure&&mission.hud?.messages?.length===7&&String(prior.error).includes('native-script-attachment'));if(prior.complete||prior.errors?.length||(!compiledStage&&!hudRecovery&&mission?.stage!=='edit reviewed mission module')||!mission?.acceptedSourceSha256||mission.parent?.status!=='validated'||prior.normalRestarts<1||(compiledStage&&(!mission.saveRestart||prior.normalRestarts<2||! /^[a-f0-9]{64}$/.test(mission.projectDraftSha256??''))))throw Error('CE continuation lacks its actual saved edit, successful restart and complete source build');}
     else if(prior.complete||prior.errors?.length||prior.originalAiStart?.stage!=='build accepted native starts'||!prior.sourcePreparation?.originalInputsUnchanged||prior.normalRestarts<2)throw Error('Continuation lacks the completed UI/source/restart gate');
    }
    const library=path.join(prior?path.dirname(resumeFile):output,'library'),webview=path.join(prior?path.dirname(resumeFile):output,'webview');
@@ -142,29 +181,76 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     await panel.getByRole('button',{name:'Preview AI starting position',exact:true}).click();const accept=panel.getByRole('button',{name:'Accept as new source revision',exact:true});await expect(accept).toBeEnabled();expect((await context()).tagSha256).toBe(before.tagSha256);await accept.click();
     let accepted;await expect.poll(async()=>{accepted=await context();return accepted.tagSha256;},{timeout:180000}).not.toBe(before.tagSha256);record.acceptedSourceSha256=accepted.tagSha256;
     expect(accepted.scenarioStartSquads.find(row=>row.encounter===flood.encounter&&row.squad===flood.squad).starts[0].position).toEqual(safe.position);await save(fork.id);
+    if(ceMissionHudReview){
+     record.stage='author campaign HUD through Creator Studio';await chooseTool(page,'Creator Studio');
+     for(const [i,step]of ceMissionHudSteps.entries()){
+      const add=page.getByRole('button',{name:'Add beat',exact:true});await revealPagedControl(add);await add.click();
+      const row=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat '+(i+1),exact:true})});
+      const title=row.getByRole('textbox',{name:'Title',exact:true});await revealPagedControl(title);await title.fill(step.title);
+      const direction=row.getByRole('textbox',{name:'Objective / direction',exact:true});await revealPagedControl(direction);await direction.fill(step.text);
+      const completion=row.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);await completion.click();
+      await row.getByRole('checkbox',{name:'Author native HUD objective text for this beat',exact:true}).check();
+      const text=row.getByRole('textbox',{name:'HUD objective '+(i+1),exact:true});await revealPagedControl(text);await text.fill(step.text);await text.blur();
+     }
+     const last=page.getByRole('textbox',{name:'HUD objective 7',exact:true});await page.keyboard.press('Control+z');await expect(last).not.toHaveValue(ceMissionHudSteps[6].text);await page.keyboard.press('Control+y');await expect(last).toHaveValue(ceMissionHudSteps[6].text);await save(fork.id);
+     record.hud={messages:ceMissionHudSteps.map((step,i)=>({name:'gs_mission_obj_'+(i+1),text:step.text})),objectiveUndoRedo:true};
+    }
     }else{
      record=report.ceMission={...prior.ceMission,resumedFrom:resumeFile};parent=record.parent;fork=(await call('open_project',{id:record.projectId})).project;
      expect(await hash(source)).toBe(record.originalSha);expect(await hash(parent.output)).toBe(parent.sha256);await chooseTool(page,'Map library');await open(fork.title);
      const current=await context();expect(current.tagSha256).toBe(record.acceptedSourceSha256);flood=current.scenarioStartSquads.find(row=>row.encounterName==='be_flood');safe={position:record.safeSourcePoint};expect(flood.starts[0].position).toEqual(safe.position);
     }
     const compileResume=!!prior&&prior.ceMission.stage==='compile reviewed mission and accepted AI';
+    const hudRecovery=!!prior&&ceMissionHudReview&&prior.ceMission.stage==='author campaign HUD through Creator Studio';
+    if(hudRecovery){
+     expect(fork.studio.missions.map(beat=>beat.hudText)).toEqual(ceMissionHudSteps.map(step=>step.text));
+     record.hud={messages:ceMissionHudSteps.map((step,i)=>({name:'gs_mission_obj_'+(i+1),text:step.text})),recoveredFromSaveTimeout:!!prior.saveFailure,continuedAfterSourcePanelTimeout:!prior.saveFailure};
+     await chooseTool(page,'Creator Studio');
+     // Reproduce the rapid multi-field load that exposed the original timeout,
+     // retaining each authored Undo snapshot and restoring every saved value.
+     for(const [i,step]of ceMissionHudSteps.entries()){
+      const item=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat '+(i+1),exact:true})});
+      for(const [name,value]of [['Title',step.title],['Objective / direction',step.text]]){const field=item.getByRole('textbox',{name,exact:true});await revealPagedControl(field);await field.fill(value+' review');await field.fill(value);}
+      const panel=item.locator('.studio-native-objective');if(await panel.getAttribute('open')===null){const summary=panel.locator('> summary');await revealPagedControl(summary);await summary.click();}const field=item.getByRole('textbox',{name:'HUD objective '+(i+1),exact:true});await revealPagedControl(field);await field.fill(step.text+' Review.');await field.fill(step.text);await field.blur();
+     }
+     record.hud.rapidFieldEdits=42;
+     const row=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat 7',exact:true})});const completion=row.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);if(await row.locator('.studio-native-objective').getAttribute('open')===null)await completion.click();
+     const text=row.getByRole('textbox',{name:'HUD objective 7',exact:true});await revealPagedControl(text);await text.fill(ceMissionHudSteps[6].text+' Ready.');await text.blur();await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);await page.keyboard.press('Control+y');await expect(text).toHaveValue(ceMissionHudSteps[6].text+' Ready.');await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);
+     const saving=save(fork.id),latency=[];for(let i=0;i<3;i++){const started=Date.now();await Promise.race([call('startup_status'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Windows command loop stopped responding during Save')),5000))]);latency.push(Date.now()-started);}await saving;
+     record.hud.objectiveUndoRedo=true;record.hud.recoverySave=true;record.hud.nativeCommandLatencyMs=latency;
+     const panel=row.locator('.studio-native-objective');record.hud.compactPanel=await panel.evaluate(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,checkboxes:[...el.querySelectorAll('input[type=checkbox]')].length}));expect(record.hud.compactPanel.checkboxes).toBe(3);expect(record.hud.compactPanel.height).toBeLessThan(210);expect(record.hud.compactPanel.scrollWidth).toBeLessThanOrEqual(record.hud.compactPanel.clientWidth+1);await panel.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'campaign-hud-compact.png')});
+    }
+
     if(compileResume){const draft=(await state(fork.id)).project.scenarioScriptDraft;expect(draft).toBeTruthy();expect(crypto.createHash('sha256').update(draft.content).digest('hex')).toBe(record.projectDraftSha256);}
     await openStudioMenu(page);const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('chupathingyCe');await page.keyboard.press('Escape');
-    await page.locator('.runtime-dock').getByRole('button',{name:'Runtime and tool details',exact:true}).click();const editor=page.locator('.native-script-attachment');await editor.locator('> summary').click();if(!prior){await editor.getByRole('button',{name:'List recovered modules',exact:true}).click();await editor.getByRole('button',{name:'Edit selected module',exact:true}).click();}
+    await page.locator('.runtime-dock').getByRole('button',{name:'Runtime and tool details',exact:true}).click();const editor=page.locator('.native-script-attachment');await expect(editor).toBeVisible();await editor.locator('> summary').click();if(!prior||hudRecovery){await editor.getByRole('button',{name:'List recovered modules',exact:true}).click();await editor.getByRole('button',{name:'Edit selected module',exact:true}).click();}
     if(!compileResume){
     const text=editor.getByRole('textbox',{name:'Edit source',exact:true});await expect(text).toBeVisible();const original=(await state(fork.id)).project.scenarioScriptDraft.content;expect(await text.inputValue()).toBe(original.replaceAll('\r\n','\n')); expect(original).toContain('(unit_has_weapon');expect(original).toContain('(script dormant forerunner_extraction_complete');
-    const needle='    (ai_place be_defense)';expect(original.split(needle)).toHaveLength(2);const revised=original.replaceAll('\r\n','\n').replace(needle,'    ; Spark-authored three-second evacuation-defense preparation.\n    (sleep 90)\n'+needle);
+    const needle='    (ai_place be_defense)';expect(original.split(needle)).toHaveLength(2);let revised=original.replaceAll('\r\n','\n').replace(needle,'    ; Spark-authored three-second evacuation-defense preparation.\n    (sleep 90)\n'+needle);
+    if(ceMissionHudReview){for(const [i,step]of ceMissionHudSteps.entries()){const marker='(print '+JSON.stringify('be stage: '+step.marker)+')';expect(revised.split(marker)).toHaveLength(2);revised=revised.replace(marker,marker+'\n  (hud_set_objective_text gs_mission_obj_'+(i+1)+')');}}
     record.stage='edit reviewed mission module';await text.fill(revised);await editor.locator('> summary').click();await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(fork.id)).project.scenarioScriptDraft?.content).toBe(original);await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(fork.id)).project.scenarioScriptDraft?.content).toBe(revised);await save(fork.id);
-    record.projectDraftSha256=crypto.createHash('sha256').update(revised).digest('hex');await close();await start();await chooseTool(page,'Map library');await open(fork.title);expect((await state(fork.id)).project.scenarioScriptDraft.content).toBe(revised);expect((await context()).tagSha256).toBe(record.acceptedSourceSha256);record.saveRestart=true;
+    record.projectDraftSha256=crypto.createHash('sha256').update(revised).digest('hex');await close();await start();await chooseTool(page,'Map library');await open(fork.title);expect((await state(fork.id)).project.scenarioScriptDraft.content).toBe(revised);expect((await context()).tagSha256).toBe(record.acceptedSourceSha256);record.saveRestart=true;if(ceMissionHudReview){expect((await state(fork.id)).project.studio.missions.map(beat=>beat.hudText)).toEqual(ceMissionHudSteps.map(step=>step.text));record.hud.objectiveSaveRestart=true;}
     }
     if(!compileResume){await page.locator('.runtime-dock').getByRole('button',{name:'Runtime and tool details',exact:true}).click();await page.locator('.native-script-attachment > summary').click();}
     await page.locator('.native-script-attachment').getByRole('checkbox',{name:'I reviewed this source and its native scenario references.',exact:true}).check();
-    const beforeBuilds=(await call('open_project',{id:fork.id})).project.builds.map(row=>row.id);record.stage='compile reviewed mission and accepted AI';await page.getByRole('button',{name:'Build reviewed script revision',exact:true}).click();const built=await waitBuild(beforeBuilds);record.build=built;
+    const beforeBuilds=(await call('open_project',{id:fork.id})).project.builds.map(row=>row.id);record.stage='compile reviewed mission and accepted AI';
+    if(ceMissionHudReview){
+     const hud=page.locator('.native-mission-hud');await revealPagedControl(hud.locator('> summary'));await hud.locator('> summary').click();await hud.getByRole('button',{name:'Prepare mission HUD messages',exact:true}).click();
+     const list=hud.getByRole('list',{name:'Campaign HUD message review',exact:true});await expect(list.getByRole('listitem')).toHaveCount(7);for(const step of ceMissionHudSteps)await expect(list).toContainText(step.text);
+     const build=hud.getByRole('button',{name:'Build script & mission HUD',exact:true});await expect(build).toBeDisabled();const review=hud.getByRole('checkbox',{name:'I reviewed the mission messages and their HaloScript references.',exact:true});await revealPagedControl(review);await review.check();await expect(build).toBeEnabled();await page.screenshot({path:path.join(output,'campaign-hud-native-review.png')});await build.click();record.hud.reviewedNativeUi=true;
+    }else await page.getByRole('button',{name:'Build reviewed script revision',exact:true}).click();
+    const built=await waitBuild(beforeBuilds);record.build=built;
     record.stage='save and reopen compiled source revision';await save(fork.id);await close();await start();await chooseTool(page,'Map library');await open(fork.title);
     const reopenedBuilds=(await call('project_build_history',{id:fork.id})).builds;expect(reopenedBuilds.find(row=>row.id===built.id)).toEqual(built);record.compiledBuildRestart=true;
     const readback=path.join(output,'ce-mission-readback');await fs.mkdir(readback);await run(path.join(invader,'invader-extract.exe'),['-t',readback,'-s',scenario+'.scenario',built.output]);
     const position=(await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-G','encounters['+flood.encounter+'].squads['+flood.squad+'].starting_locations[0].position',scenario+'.scenario'])).stdout.trim().split(',').map(Number);safe.position.forEach((v,i)=>expect(position[i]).toBeCloseTo(v,5));
     const recovered=path.join(readback,'data');await fs.mkdir(recovered);await run(path.join(invader,'invader-recover.exe'),['-t',readback,'-d',recovered,'-b',scenario+'.scenario']);const compiledSource=await fs.readFile(path.join(recovered,'levels/forerunner/be_native/scripts/extracted.hsc'),'utf8');expect(compiledSource).toMatch(/\(sleep 90\)\s*\(ai_place be_defense\)/);expect(compiledSource).toContain('(unit_has_weapon');expect(compiledSource).toContain('(script dormant forerunner_extraction_complete');
+    if(ceMissionHudReview){
+     const receipt=JSON.parse(await fs.readFile(path.join(library,'jobs',built.id,'working-tags-receipt.json'),'utf8')),hud=receipt.generatedMissionHud;expect(hud.messages).toHaveLength(7);expect(hud.ownedNames).toEqual(record.hud.messages.map(row=>row.name));
+     await run(path.join(invader,'invader-extract.exe'),['-t',readback,'-s','gs_hud*',built.output]);const nativeHud=path.join(readback,hud.tagPath+'.hud_message_text');expect(await hash(nativeHud)).toBe(hud.tagSha256);
+     for(const [i,step]of ceMissionHudSteps.entries()){expect(compiledSource).toContain('(hud_set_objective_text gs_mission_obj_'+(i+1)+')');expect(hud.messages[i]).toEqual({name:'gs_mission_obj_'+(i+1),panels:[{kind:'text',value:step.text}]});}
+     record.hud.nativeTagSha256=await hash(nativeHud);record.hud.compiledIndependentReadback=true;record.hud.compiledSaveRestart=true;
+    }
     expect(await hash(source)).toBe(originalSha);expect(await hash(parent.output)).toBe(parent.sha256);record.compiledFloodPosition=position;record.outputSha256=await hash(built.output);expect(record.outputSha256).toBe(built.sha256);record.independentScenarioSha256=await hash(path.join(readback,scenario+'.scenario'));record.independentSourceSha256=await hash(path.join(recovered,'levels/forerunner/be_native/scripts/extracted.hsc'));
     const nativeLog=await fs.readFile(path.join(library,'logs',built.id+'.jsonl'),'utf8');expect(Buffer.byteLength(nativeLog)).toBeLessThan(16*1024**2);const nativeEvents=nativeLog.trim().split(/\r?\n/).map(JSON.parse).filter(row=>row.jobId===built.id);expect(nativeEvents.some(row=>row.phase==='validated')).toBe(true);expect(nativeEvents.some(row=>row.severity==='tool')).toBe(true);record.nativeWarnings=nativeEvents.filter(row=>row.severity==='warning'||/^WARNING\b|Built successfully with .* warnings/.test(row.message)).map(row=>row.message);expect(nativeEvents.map(row=>row.message).join('\n')).not.toMatch(/be_flood.*outside|outside.*be_flood|starting location\[0-0\]/i);
     await chooseTool(page,'Build & playtest');const history=page.locator('.build-history');await revealPagedControl(history.locator('> summary'));if(await history.getAttribute('open')===null)await history.locator('> summary').click();const message=history.getByText(built.message,{exact:true});await expect(message).toBeVisible();await message.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'ce-mission-built.png')});Object.assign(record,{stage:'passed',complete:true,realUi:true,sourceUnchangedUntilAccept:true,scriptUndoRedo:true,originalAndPreviousGoodUnchanged:true});await close();return;

@@ -4327,3 +4327,25 @@ test('campaign HUD text builds without a script edit and rejects stale objective
   await hud.getByRole('button',{name:'Prepare mission HUD messages',exact:true}).click();await expect(review).not.toBeChecked();await review.check();const build=hud.getByRole('button',{name:'Build mission HUD text',exact:true});await revealPagedControl(build);await build.click();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.hudBuilds);expect(calls).toHaveLength(1);expect(calls[0].compileScripts).toBe(false);expect(calls[0].scriptAttachment).toBeUndefined();expect(calls[0].missionHud.outputTagPath).toBe('gs_hud/reviewed');
 });
+
+
+test('runtime dock serializes a burst of native source refreshes',async({page})=>{
+  await mockCampaignHud(page);
+  await page.evaluate(()=>{
+    const internal=(window as any).__TAURI_INTERNALS__,invoke=internal.invoke.bind(internal);
+    (window as any).__dockBurst={calls:0,active:0,peak:0,releases:[]};
+    internal.invoke=(command:string,args:any)=>{
+      if(command!=='runtime_workbench_report')return invoke(command,args);
+      const state=(window as any).__dockBurst;state.calls++;state.active++;state.peak=Math.max(state.peak,state.active);
+      return new Promise(resolve=>state.releases.push(async()=>{const report=await invoke(command,args);state.active--;resolve(report);}));
+    };
+    for(let i=0;i<20;i++)window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}}));
+  });
+  await expect.poll(()=>page.evaluate(()=>(window as any).__dockBurst.calls)).toBe(1);
+  expect(await page.evaluate(()=>(window as any).__dockBurst.peak)).toBe(1);
+  await page.evaluate(()=>(window as any).__dockBurst.releases.shift()());
+  await expect.poll(()=>page.evaluate(()=>(window as any).__dockBurst.calls)).toBe(2);
+  await page.evaluate(()=>(window as any).__dockBurst.releases.shift()());
+  expect(await page.evaluate(()=>(window as any).__dockBurst.peak)).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__dockBurst.active)).toBe(0);
+});

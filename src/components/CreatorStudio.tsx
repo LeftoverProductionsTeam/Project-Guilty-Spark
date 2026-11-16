@@ -367,7 +367,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
             Minimum must fit all authored native difficulty populations. Choose real Marine assets and playable AI navigation; pathfinding, co-op and gameplay remain separate tests.</p>
         </>}
         <label className="studio-wide">Objective / direction<textarea value={beat.objective} rows={2} maxLength={2048} onChange={e => updateBeat(beat.id, { objective: e.target.value })}/></label>
-        <label><input type="checkbox" checked={beat.conditionVolume!=null||beat.conditionResult!=null} disabled={beat.completeMission===true}
+        <label className="checkbox-label"><input type="checkbox" checked={beat.conditionVolume!=null||beat.conditionResult!=null} disabled={beat.completeMission===true}
           onChange={event=>updateBeat(beat.id,{conditionVolume:event.target.checked?'':undefined,conditionGroup:undefined,conditionOutside:undefined,conditionResult:undefined})}/>Optional step / branch · area or rescue result</label>
         {(beat.conditionVolume!=null||beat.conditionResult!=null)&&<label>Condition kind<select aria-label={'Mission condition source '+(i+1)} value={beat.conditionResult?(beat.conditionVolume!=null?'both':'result'):'area'}
           onChange={event=>{const mode=event.target.value;if(mode!=='area'){const source=earlierRescues(i).find(row=>row.id===beat.conditionResult?.beatId)??earlierRescues(i)[0];if(!source){setError('Configure an earlier survivor escort to continue on failure first.');return;}updateBeat(beat.id,{conditionResult:beat.conditionResult??{beatId:source.id,failed:false},conditionVolume:mode==='both'?(beat.conditionVolume??''):undefined,conditionGroup:mode==='both'?beat.conditionGroup:undefined,conditionOutside:mode==='both'?beat.conditionOutside:undefined});}
@@ -455,25 +455,22 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
           <p className="studio-hint">Prepare mission for native build snapshots these shots even with the separate mission intro off. Save and rebuild after changing a scene or shot.
             Disable in-game recording first. Raw script exports still need the named native camera points.</p>
         </details>
-        <details><summary>Native objective &amp; completion</summary>
-          <label><input type="checkbox" checked={beat.hudObjective===true}
+        <details className="studio-native-objective"><summary>Native objective &amp; completion</summary>
+          <label className="checkbox-label"><input type="checkbox" checked={beat.hudObjective===true}
             onChange={event=>updateBeat(beat.id,{hudObjective:event.target.checked?true:undefined,
               ...(event.target.checked&&beat.hudText==null?{hudText:beat.title}:{})})}/>{project.quickForge&&!project.quickForge.native?'Show native HUD objective while this beat is active':'Author native HUD objective text for this beat'}</label>
           {beat.hudObjective&&<label>HUD objective text<input aria-label={'HUD objective '+(i+1)} maxLength={254}
             value={beat.hudText??''} onChange={event=>updateBeat(beat.id,{hudText:event.target.value})}/></label>}
-          <p className="studio-hint">HUD text is separate from direction notes: 1–254 UTF-16 characters, no percent signs or control characters.
-            {project.quickForge&&!project.quickForge.native?'The prepared native build creates a standard message tag; a script-only export does not include that tag.':'For recovered source, Save and use Runtime & Tools → Details → Edit or attach scenario HaloScript → Campaign objective HUD messages. Review HaloScript calls to these message names separately.'}</p>
-          <label><input type="checkbox" checked={beat.checkpoint===true}
+          <details className="studio-native-notes"><summary>HUD setup &amp; native limitations</summary><p className="studio-hint">HUD text is separate from direction notes: 1–254 UTF-16 characters, no percent signs or control characters.
+            {project.quickForge&&!project.quickForge.native?'The prepared native build creates a standard message tag; a script-only export does not include that tag.':'For recovered source, Save and use Runtime & Tools → Details → Edit or attach scenario HaloScript → Campaign objective HUD messages. Review HaloScript calls to these message names separately.'}</p><p className="studio-hint">The engine can refuse unsafe checkpoints. Completion follows the selected campaign configuration. Prepare again after changes; HUD display, checkpoint restoration and level progression need game verification.</p></details>
+          <div className="studio-native-completion"><label className="checkbox-label" title="The engine may refuse or time out a checkpoint when unsafe."><input type="checkbox" checked={beat.checkpoint===true}
             disabled={beat.completeMission===true&&beat.checkpoint!==true}
             onChange={event=>updateBeat(beat.id,{checkpoint:event.target.checked?true:undefined})}/>Request a safe checkpoint after this beat</label>
-          <p className="studio-hint">The engine may refuse or time out a save when unsafe. This does not prove a saved checkpoint.</p>
-          <label title="Only the final unconditional beat can request completion; disable its checkpoint and optional condition first.">
+          <label className="checkbox-label" title="Only the final unconditional beat can request completion; disable its checkpoint and optional condition first.">
             <input type="checkbox" checked={beat.completeMission===true}
               disabled={beat.completeMission!==true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null)}
               onChange={event=>updateBeat(beat.id,{completeMission:event.target.checked?true:undefined})}/>Request native level completion after this beat
-          </label>
-          <p className="studio-hint">Completion can advance the campaign according to the selected engine's level configuration.
-            Prepare mission again after changes. HUD display, save restoration and level progression require native/game testing.</p>
+          </label></div>
         </details>
       </div>)}
     </section>}

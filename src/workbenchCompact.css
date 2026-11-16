@@ -59,6 +59,18 @@
 .application .creator-studio .studio-tabs {margin:9px 0;gap:4px;}
 .application .creator-studio .studio-heading {margin:4px 0 8px;gap:8px;align-items:center;}
 .application .creator-studio .studio-record {padding:10px;margin:8px 0;}
+.application .creator-studio .studio-record-heading {gap:8px;margin-bottom:6px;}
+.application .creator-studio .studio-record label {gap:4px;font-size:12px;}
+.application .creator-studio .studio-record :is(input:not([type=checkbox]),select,textarea) {padding:6px 8px;}
+.application .creator-studio .studio-record .checkbox-label {display:flex;flex-direction:row;align-items:center;gap:6px;margin:6px 0;font-size:12px;}
+.application .creator-studio .studio-record .checkbox-label input {flex:0 0 auto;}
+.application .creator-studio .studio-native-objective {display:grid;gap:5px;}
+.application .creator-studio .studio-native-objective:not([open]) {display:block;}
+.application .creator-studio .studio-native-completion {display:flex;flex-wrap:wrap;gap:4px 18px;}
+.application .creator-studio .studio-native-notes {font-size:11px;}
+.application .creator-studio .studio-native-notes .studio-hint {margin:5px 0;}
+.application .creator-studio .studio-wide {margin-bottom:7px;}
+
 .application .creator-studio .studio-fields {gap:7px;margin-bottom:8px;}
 .application .creator-studio .studio-empty {padding:14px 10px;}
 .application .library-hero {height:auto;min-height:150px;margin-bottom:12px;}

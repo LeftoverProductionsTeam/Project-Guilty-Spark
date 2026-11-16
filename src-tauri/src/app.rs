@@ -1125,12 +1125,12 @@ fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:
 }
 
 #[tauri::command]
-fn save_project(state: State<AppState>, window:tauri::WebviewWindow, project: Project) -> Reply<LibraryEntry> {
-    update_project_document(&state,&window,project,true)
+async fn save_project(app:tauri::AppHandle, window:tauri::WebviewWindow, project: Project) -> Reply<LibraryEntry> {
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();update_project_document(&state,&window,project,true)}).await.map_err(error)?
 }
 #[tauri::command]
-fn update_project(state: State<AppState>, window:tauri::WebviewWindow, project: Project) -> Reply<LibraryEntry> {
-    update_project_document(&state,&window,project,false)
+async fn update_project(app:tauri::AppHandle, window:tauri::WebviewWindow, project: Project) -> Reply<LibraryEntry> {
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();update_project_document(&state,&window,project,false)}).await.map_err(error)?
 }
 fn update_project_document(state:&AppState,window:&tauri::WebviewWindow,mut project:Project,persist:bool)->Reply<LibraryEntry>{
     let mut history_guard=lock(&state.window_history)?;
@@ -1149,6 +1149,9 @@ fn update_project_document(state:&AppState,window:&tauri::WebviewWindow,mut proj
         let library=lock(&state.library)?;
         library.save_with_history(&mut history_guard,&project).map_err(error)?
     }else{lock(&state.library)?.save(&project,None).map_err(error)?};
+    // Disk/history work must finish before dispatching back to a WebView.
+    // Never hold the journal lock across a UI-thread callback.
+    drop(history_guard);
     if persist{
         let _=window.app_handle().emit("spark:project-saved",&project.id);
         let _=window.app_handle().emit("spark:window-history",serde_json::json!({"projectId":project.id,"owner":window.label()}));
