@@ -74,6 +74,8 @@ pub fn extension(class:&str)->Result<&'static str>{
         "sgla"=>Ok("shader_transparent_glass"),"smet"=>Ok("shader_transparent_meter"),
         "fog "=>Ok("fog"),"ssce"=>Ok("sound_scenery"),"snde"=>Ok("sound_environment"),
         "ligh"=>Ok("light"),"lens"=>Ok("lens_flare"),"deca"=>Ok("decal"),
+        "mgs2"=>Ok("light_volume"),"colo"=>Ok("color_table"),
+        "devc"=>Ok("input_device_defaults"),"metr"=>Ok("meter"),
         "phys"=>Ok("physics"),"pphy"=>Ok("point_physics"),"part"=>Ok("particle"),
         "pctl"=>Ok("particle_system"),"rain"=>Ok("weather_particle_system"),
         "wind"=>Ok("wind"),"cont"=>Ok("contrail"),"flag"=>Ok("flag"),"elec"=>Ok("lightning"),

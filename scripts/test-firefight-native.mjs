@@ -6,7 +6,7 @@ import path from 'node:path';
 import net from 'node:net';
 import crypto from 'node:crypto';
 import {createReadStream} from 'node:fs';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
 import {chooseTool,openStudioMenu,openDrawer,revealPagedControl} from '../tests/ui/helpers/navigation.ts';
 import {assertQaOutputPath,withDevelopmentWorkspace,waitForQaExit,stopQaProcess} from './native-qa-storage.mjs';
@@ -16,8 +16,10 @@ import {sameCinematicData} from '../src/haloScript.ts';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
+const ceMissionReview=process.env.SPARK_NATIVE_CE_MISSION_REVIEW==='1';
 const blackEchoReview=process.env.SPARK_NATIVE_BLACK_ECHO_REVIEW==='1',marineTag='characters/marine_armored/marine_armored assault rifle',floodTag='characters/floodcombat_human/floodcombat_human assault rifle';
 const blackEchoCombatReview=process.env.SPARK_NATIVE_BLACK_ECHO_COMBAT_REVIEW==='1';
+if(ceMissionReview&&(blackEchoReview||process.env.SPARK_FIREFIGHT_GAME_REVIEW==='1'||process.env.SPARK_NATIVE_AI_START_REVIEW==='1'))throw Error('CE source mission review is isolated and never launches a game');
 if(blackEchoCombatReview&&!blackEchoReview)throw Error('Native combat authoring requires Black Echo workflow');
 const blackEchoPatrolReview=process.env.SPARK_NATIVE_BLACK_ECHO_PATROL_REVIEW==='1';
 if(blackEchoPatrolReview&&!blackEchoReview)throw Error('Native patrol authoring requires Black Echo workflow');
@@ -47,14 +49,15 @@ let browser,page,child,call;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
  const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
  const exercise=async ({root:sourceRoot,drive,run,tags})=>{
-   const resumeFile=process.env.SPARK_NATIVE_AI_START_RESUME;
+   const resumeFile=ceMissionReview?process.env.SPARK_NATIVE_CE_MISSION_RESUME:process.env.SPARK_NATIVE_AI_START_RESUME;
    let prior;
    if(resumeFile){
-    if(process.env.SPARK_NATIVE_AI_START_REVIEW!=='1'||saveOnly)throw Error('Recovered-start resume is a separate native rebuild continuation');
+    if((!ceMissionReview&&process.env.SPARK_NATIVE_AI_START_REVIEW!=='1')||saveOnly)throw Error('Resume requires its matching native source workflow');
     await assertQaOutputPath(resumeFile,{reservationBytes:0});const info=await fs.lstat(resumeFile);
     if(!info.isFile()||info.isSymbolicLink()||info.size>2*1024**2)throw Error('Invalid recovered-start continuation receipt');
     prior=JSON.parse(await fs.readFile(resumeFile,'utf8'));
-    if(prior.complete||prior.errors?.length||prior.originalAiStart?.stage!=='build accepted native starts'||!prior.sourcePreparation?.originalInputsUnchanged||prior.normalRestarts<2)throw Error('Continuation lacks the completed UI/source/restart gate');
+    if(ceMissionReview){const mission=prior.ceMission,compiledStage=mission?.stage==='compile reviewed mission and accepted AI';if(prior.complete||prior.errors?.length||(!compiledStage&&mission?.stage!=='edit reviewed mission module')||!mission?.acceptedSourceSha256||mission.parent?.status!=='validated'||prior.normalRestarts<1||(compiledStage&&(!mission.saveRestart||prior.normalRestarts<2||! /^[a-f0-9]{64}$/.test(mission.projectDraftSha256??''))))throw Error('CE continuation lacks its actual saved edit, successful restart and complete source build');}
+    else if(prior.complete||prior.errors?.length||prior.originalAiStart?.stage!=='build accepted native starts'||!prior.sourcePreparation?.originalInputsUnchanged||prior.normalRestarts<2)throw Error('Continuation lacks the completed UI/source/restart gate');
    }
    const library=path.join(prior?path.dirname(resumeFile):output,'library'),webview=path.join(prior?path.dirname(resumeFile):output,'webview');
    async function start(){
@@ -70,7 +73,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    }
    async function close(){
     await page.getByRole('button',{name:'Close window',exact:true}).click();
-    const saveChanges=page.getByRole('button',{name:'Save changes',exact:true});await expect.poll(async()=>child.exitCode!==null||child.signalCode!==null?'exited':await saveChanges.isVisible().catch(()=>false)?'save':'waiting').not.toBe('waiting');if(child.exitCode===null&&child.signalCode===null&&await saveChanges.isVisible())await saveChanges.click();
+    const saveChanges=page.getByRole('dialog',{name:'Save changes before closing?',exact:true}).getByRole('button',{name:'Save changes',exact:true});await expect.poll(async()=>child.exitCode!==null||child.signalCode!==null?'exited':await saveChanges.isVisible().catch(()=>false)?'save':'waiting').not.toBe('waiting');if(child.exitCode===null&&child.signalCode===null&&await saveChanges.isVisible())await saveChanges.click();
     await waitForQaExit(child);expect(child.exitCode).toBe(0);await browser.close();browser=null;child=null;report.normalRestarts++;
    }
    const state=async id=>{const status=await call('read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(snapshot=>snapshot.key===status.history.head.current)?.project};};
@@ -112,7 +115,58 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    }
    try{
    await start();
-   const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,walkthroughEnabled:false,autoBuild:false,hekDirectory:kit,hekTagsDirectory:tags,invaderDirectory:invader,hekFlavor:'h1aEk'}});
+   const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,walkthroughEnabled:false,autoBuild:false,hekDirectory:kit,hekTagsDirectory:tags,invaderDirectory:invader,hekFlavor:ceMissionReview?'legacyHek':'h1aEk',preferredHalo:ceMissionReview?'chupathingyCe':boot.settings.preferredHalo}});
+   if(ceMissionReview){
+    const source=path.resolve(process.env.SPARK_NATIVE_CE_MISSION_SOURCE??'');
+    if(!process.env.SPARK_NATIVE_CE_MISSION_SOURCE||!tags)throw Error('Select an owned CE mission source and prepared matching tags');
+    const originalSha=await hash(source),scenario='levels/forerunner/be_native/be_native';
+    let fork,record,parent,flood,safe;
+    const context=()=>call('native_tag_context',{projectId:fork.id});
+    const waitBuild=async(previous)=>{let build;await expect.poll(async()=>{build=(await call('project_build_history',{id:fork.id})).builds.find(row=>!previous.includes(row.id));if(build)report.failedNativeJobId=build.id;if(['failed','blocked','cancelled'].includes(build?.status))throw Error(build.message);const issue=(await page.locator('.toast.error,.toast.warning').allTextContents()).find(text=>/blocked compilation|Error:|refused|changed after/i.test(text));if(issue)throw Error(issue);return build?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');return build;};
+
+    if(!prior){
+    const [imported]=await call('import_paths',{paths:[source]});expect(imported.inspection.header.version).toBe(609);expect(imported.inspection.header.scenarioType).toBe(0);expect(imported.inspection.scenarioPath.replaceAll('\\','/')).toBe(scenario);
+    fork=imported.project;const target=crypto.randomUUID();fork.title='Black Echo CE mission source acceptance';fork.activeBuildTarget=null;
+    fork.buildTargets=[{id:target,name:'Reviewed Black Echo CE source',runtimeId:'chupathingyCe',builder:'invader-ce',hekDirectory:null,hekFlavor:null,tagsDirectory:tags,invaderDirectory:invader,ceCompatibleTagset:true,openSauce:false}];
+    await call('save_project',{project:fork});await page.reload();await chooseTool(page,'Map library');await open(fork.title);
+    record=report.ceMission={projectId:fork.id,originalSha,stage:'select CE source target',gameplayVerified:false};
+    await chooseTool(page,'Build & playtest');const targets=page.locator('.build-conversion .gs-build-targets');await targets.locator('> summary').click();await targets.getByRole('button',{name:'Use this target',exact:true}).click();await save(fork.id);
+    expect((await state(fork.id)).project.activeBuildTarget).toBe(target);
+    await page.getByRole('button',{name:'Build for Chupathingy',exact:true}).click();parent=await waitBuild([]);expect(parent.target).toBe('gbx-custom');record.parent=parent;
+    const before=await context();expect(before.startEditIssue).toBeNull();
+    flood=before.scenarioStartSquads.find(row=>row.encounterName==='be_flood');safe=before.scenarioStartSquads.find(row=>row.encounterName==='be_covenant')?.starts?.[0];expect(flood?.starts?.[0]).toBeTruthy();expect(safe).toBeTruthy();expect(safe.position).not.toEqual(flood.starts[0].position);
+    record.stage='edit native Flood start';record.beforeFlood=flood.starts[0].position;record.safeSourcePoint=safe.position;
+    await chooseTool(page,'Tag editor');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('scnr');await page.locator('.tag-row').click();await page.getByRole('tab',{name:'Native Output',exact:true}).click();
+    const panel=page.locator('.native-tag-operations');await panel.locator('> summary').click();await panel.locator('.native-ai-starts > summary').click();await panel.getByRole('combobox',{name:'AI starting-position squad',exact:true}).selectOption(flood.encounter+':'+flood.squad);
+    for(const [i,axis]of ['X','Y','Z'].entries())await panel.getByRole('spinbutton',{name:'AI start '+axis,exact:true}).fill(String(safe.position[i]));
+    await panel.getByRole('button',{name:'Preview AI starting position',exact:true}).click();const accept=panel.getByRole('button',{name:'Accept as new source revision',exact:true});await expect(accept).toBeEnabled();expect((await context()).tagSha256).toBe(before.tagSha256);await accept.click();
+    let accepted;await expect.poll(async()=>{accepted=await context();return accepted.tagSha256;},{timeout:180000}).not.toBe(before.tagSha256);record.acceptedSourceSha256=accepted.tagSha256;
+    expect(accepted.scenarioStartSquads.find(row=>row.encounter===flood.encounter&&row.squad===flood.squad).starts[0].position).toEqual(safe.position);await save(fork.id);
+    }else{
+     record=report.ceMission={...prior.ceMission,resumedFrom:resumeFile};parent=record.parent;fork=(await call('open_project',{id:record.projectId})).project;
+     expect(await hash(source)).toBe(record.originalSha);expect(await hash(parent.output)).toBe(parent.sha256);await chooseTool(page,'Map library');await open(fork.title);
+     const current=await context();expect(current.tagSha256).toBe(record.acceptedSourceSha256);flood=current.scenarioStartSquads.find(row=>row.encounterName==='be_flood');safe={position:record.safeSourcePoint};expect(flood.starts[0].position).toEqual(safe.position);
+    }
+    const compileResume=!!prior&&prior.ceMission.stage==='compile reviewed mission and accepted AI';
+    if(compileResume){const draft=(await state(fork.id)).project.scenarioScriptDraft;expect(draft).toBeTruthy();expect(crypto.createHash('sha256').update(draft.content).digest('hex')).toBe(record.projectDraftSha256);}
+    await openStudioMenu(page);const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('chupathingyCe');await page.keyboard.press('Escape');
+    await page.locator('.runtime-dock').getByRole('button',{name:'Runtime and tool details',exact:true}).click();const editor=page.locator('.native-script-attachment');await editor.locator('> summary').click();if(!prior){await editor.getByRole('button',{name:'List recovered modules',exact:true}).click();await editor.getByRole('button',{name:'Edit selected module',exact:true}).click();}
+    if(!compileResume){
+    const text=editor.getByRole('textbox',{name:'Edit source',exact:true});await expect(text).toBeVisible();const original=(await state(fork.id)).project.scenarioScriptDraft.content;expect(await text.inputValue()).toBe(original.replaceAll('\r\n','\n')); expect(original).toContain('(unit_has_weapon');expect(original).toContain('(script dormant forerunner_extraction_complete');
+    const needle='    (ai_place be_defense)';expect(original.split(needle)).toHaveLength(2);const revised=original.replaceAll('\r\n','\n').replace(needle,'    ; Spark-authored three-second evacuation-defense preparation.\n    (sleep 90)\n'+needle);
+    record.stage='edit reviewed mission module';await text.fill(revised);await editor.locator('> summary').click();await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(fork.id)).project.scenarioScriptDraft?.content).toBe(original);await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(fork.id)).project.scenarioScriptDraft?.content).toBe(revised);await save(fork.id);
+    record.projectDraftSha256=crypto.createHash('sha256').update(revised).digest('hex');await close();await start();await chooseTool(page,'Map library');await open(fork.title);expect((await state(fork.id)).project.scenarioScriptDraft.content).toBe(revised);expect((await context()).tagSha256).toBe(record.acceptedSourceSha256);record.saveRestart=true;
+    }
+    if(!compileResume){await page.locator('.runtime-dock').getByRole('button',{name:'Runtime and tool details',exact:true}).click();await page.locator('.native-script-attachment > summary').click();}
+    await page.locator('.native-script-attachment').getByRole('checkbox',{name:'I reviewed this source and its native scenario references.',exact:true}).check();
+    const beforeBuilds=(await call('open_project',{id:fork.id})).project.builds.map(row=>row.id);record.stage='compile reviewed mission and accepted AI';await page.getByRole('button',{name:'Build reviewed script revision',exact:true}).click();const built=await waitBuild(beforeBuilds);record.build=built;
+    const readback=path.join(output,'ce-mission-readback');await fs.mkdir(readback);await run(path.join(invader,'invader-extract.exe'),['-t',readback,'-s',scenario+'.scenario',built.output]);
+    const position=(await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-G','encounters['+flood.encounter+'].squads['+flood.squad+'].starting_locations[0].position',scenario+'.scenario'])).stdout.trim().split(',').map(Number);safe.position.forEach((v,i)=>expect(position[i]).toBeCloseTo(v,5));
+    const recovered=path.join(readback,'data');await fs.mkdir(recovered);await run(path.join(invader,'invader-recover.exe'),['-t',readback,'-d',recovered,'-b',scenario+'.scenario']);const compiledSource=await fs.readFile(path.join(recovered,'levels/forerunner/be_native/scripts/extracted.hsc'),'utf8');expect(compiledSource).toMatch(/\(sleep 90\)\s*\(ai_place be_defense\)/);expect(compiledSource).toContain('(unit_has_weapon');expect(compiledSource).toContain('(script dormant forerunner_extraction_complete');
+    expect(await hash(source)).toBe(originalSha);expect(await hash(parent.output)).toBe(parent.sha256);record.compiledFloodPosition=position;record.outputSha256=await hash(built.output);expect(record.outputSha256).toBe(built.sha256);record.independentScenarioSha256=await hash(path.join(readback,scenario+'.scenario'));record.independentSourceSha256=await hash(path.join(recovered,'levels/forerunner/be_native/scripts/extracted.hsc'));
+    const boot=await call('bootstrap');record.nativeWarnings=boot.logs.filter(row=>row.jobId===built.id&&(row.severity==='warning'||/^WARNING\b|Built successfully with .* warnings/.test(row.message))).map(row=>row.message);expect(record.nativeWarnings.join('\n')).not.toMatch(/be_flood.*outside|outside.*be_flood|starting location\[0-0\]/i);
+    await page.screenshot({path:path.join(output,'ce-mission-built.png')});Object.assign(record,{stage:'passed',complete:true,realUi:true,sourceUnchangedUntilAccept:true,scriptUndoRedo:true,originalAndPreviousGoodUnchanged:true});await close();return;
+   }
    if(prior){
     const original=prior.originalAiStart;await chooseTool(page,'Map library');await open('Recovered native AI start acceptance');
     const fork=(await call('open_project',{id:original.sourceProjectId})).project;
@@ -569,7 +623,13 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     await browser?.close().catch(()=>{});browser=null;
    }
   };
- if(saveOnly)await exercise({root:fixtureRoot,tags:null});
+ if(ceMissionReview){
+  const tags=path.resolve(process.env.SPARK_NATIVE_CE_MISSION_TAGS??'');if(!process.env.SPARK_NATIVE_CE_MISSION_TAGS)throw Error('Prepared CE tags required');await assertQaOutputPath(tags,{reservationBytes:0});
+  report.sourcePreparation={scope:'Reuse prepared matching CE tags; no SDK copy/extraction, no game launch'};
+  const run=async(binary,args)=>{const result=await new Promise((resolve,reject)=>{const process=execFile(binary,args,{windowsHide:true,maxBuffer:4*1024**2,timeout:120000},(error,stdout,stderr)=>error?reject(Object.assign(error,{stdout,stderr})):resolve({stdout,stderr}));context.trackProcess(process).catch(reject);});return result;};
+  await exercise({root:fixtureRoot,tags,run});
+ }
+ else if(saveOnly)await exercise({root:fixtureRoot,tags:null});
  else await nativeStandaloneBaseline({context:{...context,directory:fixtureRoot},archive,kit,invader,report:report.sourcePreparation,prepareOnly:true,
   additionalRoots:['characters/grunt/grunt minor plasma pistol.actor_variant','ui/ui_tags_loaded_solo_scenario_type.tag_collection',...(terminalReview?[controlTag+'.device_control']:[]),...(blackEchoReview?[marineTag+'.actor_variant',floodTag+'.actor_variant']:[])],onPrepared:exercise});
  report.complete=true;

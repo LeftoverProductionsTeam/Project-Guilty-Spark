@@ -1128,12 +1128,26 @@ pub(super) async fn build_working_tags(
         let jobs_root=state.root.join("jobs");let returned=job_id.clone();let worker_app=app.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let state=worker_app.state::<AppState>();
+            let cancelled=cancel.clone();
             let result=baboon_native::compilation_source(&state,&source_project,&input.parent_build,&input.tags_directory,cancel.clone()).and_then(|tags|{
                 input.tags_directory=tags;
                 core::working_tags::run_build_from_tags(&project,&input,&jobs_root,&job_id,cancel,|e|event(&worker_app,e)).map_err(error)
             });
             let result=result.and_then(|record|{let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;current.builds.push(record);current.modified_at=chrono::Utc::now().to_rfc3339();library.save(&current,None).map_err(error)});
-            if let Err(message)=result{event(&worker_app,JobEvent{job_id:job_id.clone(),project_id,phase:"failed".into(),severity:"error".into(),message,progress:100,timestamp:chrono::Utc::now().to_rfc3339()});}
+            if let Err(mut message)=result{
+                // Source/integrity admission may fail before core creates a job
+                // receipt. Keep that real outcome in the existing build history;
+                // no failed candidate gains an output, hash or launch authority.
+                let status=if cancelled.load(std::sync::atomic::Ordering::Relaxed){"cancelled"}else{"failed"};
+                let saved=(||->Reply<()>{
+                    let record=BuildRecord{id:job_id.clone(),timestamp:chrono::Utc::now().to_rfc3339(),status:status.into(),target:input.parent_build.target.clone(),output:None,sha256:None,message:message.clone(),project_fingerprint:project.fingerprint().map_err(error)?};
+                    let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;
+                    if !current.builds.iter().any(|record|record.id==job_id){current.builds.push(record);library.save(&current,None).map_err(error)?;}
+                    Ok(())
+                })();
+                if let Err(issue)=saved{message.push_str(&format!(" Failed to record this outcome in build history: {issue}"));}
+                event(&worker_app,JobEvent{job_id:job_id.clone(),project_id,phase:status.into(),severity:if status=="cancelled"{"warning"}else{"error"}.into(),message,progress:100,timestamp:chrono::Utc::now().to_rfc3339()});
+            }
             if let Ok(mut jobs)=state.jobs.lock(){jobs.remove(&job_id);}
             let _=worker_app.emit("spark:library-changed",());
         });

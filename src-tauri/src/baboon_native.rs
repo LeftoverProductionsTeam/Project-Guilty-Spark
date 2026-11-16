@@ -319,7 +319,7 @@ pub(super) fn compilation_source(
         usize::MAX,
     )?;
     if health.blocked() {
-        return Err(format!("Native tag integrity check blocked compilation: {}. The last compiled map is preserved.",health.findings.iter().take(4).map(|f|format!("{}: {}",f.path,f.detail)).collect::<Vec<_>>().join("; ")));
+        return Err(format!("Native tag integrity check blocked compilation: {}. The last compiled map is preserved.",health.findings.iter().filter(|f|matches!(f.state.as_str(),"invalid"|"unverified"|"pending")).take(4).map(|f|format!("{}: {}",f.path,f.detail)).collect::<Vec<_>>().join("; ")));
     }
     if source.starts_with(&parent) {
         return Ok(source);

@@ -26,6 +26,15 @@ pub struct Report {
     pub list_truncated: bool,
 }
 impl Report {
+    /// Keep actionable failures visible when successful parser findings fill
+    /// the bounded report. This changes diagnostics, never admission counts.
+    pub fn push_finding(&mut self, finding: Finding) {
+        if self.findings.len()<128 { self.findings.push(finding); return; }
+        self.list_truncated=true;
+        if matches!(finding.state.as_str(),"invalid"|"unverified"|"pending") {
+            if let Some(index)=self.findings.iter().rposition(|f|!matches!(f.state.as_str(),"invalid"|"unverified"|"pending")) { self.findings[index]=finding; }
+        }
+    }
     pub fn blocked(&self) -> bool {
         self.invalid_files > 0
             || self.pending_files > 0
@@ -229,6 +238,30 @@ mod tests {
         bytes[40..44].copy_from_slice(&(!crc.sum()).to_be_bytes());
         bytes.extend_from_slice(payload);
         bytes
+    }
+    #[test]
+    fn bounded_parser_report_keeps_rejections_after_successful_findings() {
+        let mut report=Report::default();
+        for _ in 0..128 { report.push_finding(finding("ok.weapon","parsed","native parser passed")); }
+        report.push_finding(finding("broken.weapon","invalid","native parser rejected structure"));
+        assert_eq!(report.findings.len(),128);assert!(report.list_truncated);
+        assert!(report.findings.iter().any(|f|f.path=="broken.weapon"&&f.state=="invalid"));
+        report.push_finding(finding("more.weapon","parsed","passed"));
+        assert!(report.findings.iter().any(|f|f.path=="broken.weapon"));
+    }
+    #[test]
+    fn known_auxiliary_classes_still_require_matching_headers_crc_and_native_parse() {
+        let root=tempfile::tempdir().unwrap();
+        for(class,extension)in[("mgs2","light_volume"),("colo","color_table"),("devc","input_device_defaults"),("metr","meter")] {
+            let mut bytes=tag(b"synthetic format guard only, not a native semantic fixture");bytes[36..40].copy_from_slice(class.as_bytes());
+            let relative=format!("known.{extension}");let file=root.path().join(&relative);fs::write(&file,&bytes).unwrap();
+            let result=inspect(root.path(),&relative,&maps::hash_file(&file).unwrap()).unwrap();assert_eq!(result.state,"checked");
+            let report=Cache::default().scan(root.path(),&Hashes::new(),&Hashes::from([(relative.clone(),maps::hash_file(&file).unwrap())]),u64::MAX).unwrap();
+            assert_eq!(report.checked_files,1);assert!(report.blocked(),"Known class and CRC never replace required native semantic parsing");
+            let wrong="wrong.weapon";fs::write(root.path().join(wrong),&bytes).unwrap();assert_eq!(inspect(root.path(),wrong,&maps::hash_file(&root.path().join(wrong)).unwrap()).unwrap().state,"invalid");
+            bytes[65]^=1;fs::write(&file,&bytes).unwrap();assert_eq!(inspect(root.path(),&relative,&maps::hash_file(&file).unwrap()).unwrap().state,"invalid");
+        }
+        let mut unknown=tag(b"unknown class stays unverified");unknown[36..40].copy_from_slice(b"zzzz");let file=root.path().join("unknown.color_table");fs::write(&file,unknown).unwrap();assert_eq!(inspect(root.path(),"unknown.color_table",&maps::hash_file(&file).unwrap()).unwrap().state,"unverified");
     }
     #[test]
     fn detects_corruption_and_recovers_without_repairing_bytes() {

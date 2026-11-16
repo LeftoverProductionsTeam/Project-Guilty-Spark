@@ -247,11 +247,7 @@ impl Cache {
                     report.native_parser_checked_files += 1;
                 }
             }
-            if report.findings.len() < 128 {
-                report.findings.push(finding.clone());
-            } else {
-                report.list_truncated = true;
-            }
+            report.push_finding(finding.clone());
         }
         Ok(())
     }
