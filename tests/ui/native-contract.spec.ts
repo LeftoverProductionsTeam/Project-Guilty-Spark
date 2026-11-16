@@ -4465,3 +4465,42 @@ test('mission beats stay compact and lazy without losing keyboard edits, history
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[6].hudText)).toBe('Equipment banked. Survivors extracted.');
  await expect(page.getByRole('button',{name:'Add beat',exact:true})).toBeDisabled();await expect(rows).toHaveCount(128);
 });
+
+
+async function mockRecoveredMissionAreas(page:Page){
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;
+  p.builds=[{id:'native-area-source',timestamp:'',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'c'.repeat(64),message:'Synthetic owned source'}];
+  p.studio={schemaVersion:1,missions:[{id:'area-objective',title:'Containment',objective:'Reach containment',trigger:'triggerVolume',triggerRef:'entrance',encounterName:''}],shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
+  w.__sparkMock.nativeAreaSha='a'.repeat(64);w.__sparkMock.areaReads=0;
+  w.__sparkMock.nativeAreas=[{name:'entrance',kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,6,8]}}];
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'levels/test'}];
+   if(command==='native_tag_context'){w.__sparkMock.areaReads++;return {projectId:args.projectId,buildId:'native-area-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[],tagSha256:w.__sparkMock.nativeAreaSha,boundingRadius:null,lensFlareScale:null,scenarioVolumes:structuredClone(w.__sparkMock.nativeAreas),triggerEditIssue:null};}
+   return invoke(command,args);
+  };
+ });
+ await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
+ const source=page.locator('.studio-native-areas');await source.locator(':scope > summary').click();return source;
+}
+
+test('recovered campaign objectives select real native areas and review the same geometry without changing source',async({page})=>{
+ const source=await mockRecoveredMissionAreas(page),row=page.locator('.studio-mission-record').first(),select=row.getByRole('button',{name:'Select objective area in Level Editor',exact:true});
+ await expect(select).toBeDisabled();await source.getByRole('button',{name:'Read native scenario areas',exact:true}).click();await expect(source).toContainText('1 native areas');await expect(select).toBeEnabled();
+ const area=row.getByLabel('Scenario trigger-volume identifier',{exact:true});await area.fill('missing');await area.blur();await expect(select).toBeDisabled();await row.locator(':scope > summary').focus();await page.keyboard.press('Control+z');await expect(area).toHaveValue('entrance');await page.keyboard.press('Control+y');await expect(area).toHaveValue('missing');await area.fill('entrance');await area.blur();await page.keyboard.press('Control+s');
+ const references=page.locator('.studio-bindings');await references.locator(':scope > summary').click();await expect(references).toContainText('In native source');await expect(references).toContainText('Name found uniquely');
+ await select.click();await expect(page.getByRole('button',{name:'Frame trigger area',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Review trigger source',exact:true}).click();
+ const form=page.locator('.native-trigger-volumes:visible');await expect(form.getByRole('combobox',{name:'Native trigger area',exact:true})).toHaveValue('0');await expect(form.getByRole('spinbutton',{name:'Trigger center X',exact:true})).toBeFocused();await expect(form.getByRole('spinbutton',{name:'Trigger center X',exact:true})).toHaveValue('2');await expect(form.getByRole('spinbutton',{name:'Trigger size Y',exact:true})).toHaveValue('6');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.areaReads)).toBeGreaterThanOrEqual(3);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.nativeAreaSha)).toBe('a'.repeat(64));await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[0].triggerRef)).toBe('entrance');
+ await chooseTool(page,'Creator Studio');await openMissionBeats(page);await expect(area).toHaveValue('entrance');
+});
+
+test('recovered objective areas refuse stale source, duplicate names and unsupported native geometry',async({page})=>{
+ const source=await mockRecoveredMissionAreas(page),row=page.locator('.studio-mission-record').first(),select=row.getByRole('button',{name:'Select objective area in Level Editor',exact:true}),read=source.getByRole('button',{name:'Read native scenario areas',exact:true});
+ await read.click();await expect(select).toBeEnabled();await page.evaluate(()=>(window as any).__sparkMock.nativeAreaSha='b'.repeat(64));await select.click();await expect(page.locator('.creator-studio .notice')).toContainText('Native source changed');await expect(select).toBeDisabled();await expect(page.getByRole('button',{name:'Frame trigger area',exact:true})).toHaveCount(0);
+ await page.evaluate(()=>{const mock=(window as any).__sparkMock;mock.nativeAreas.push(structuredClone(mock.nativeAreas[0]));});await read.click();await expect(source).toContainText('2 native areas');await expect(select).toBeDisabled();
+ const references=page.locator('.studio-bindings');await references.locator(':scope > summary').click();await expect(references).toContainText('ambiguous in native source');
+ await page.evaluate(()=>(window as any).__sparkMock.nativeAreas=[{name:'entrance',kind:0,geometry:null}]);await read.click();await expect(source).toContainText('require the matching native editor');await expect(select).toBeDisabled();
+ await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}})));await expect(source).not.toContainText('1 native areas');
+});

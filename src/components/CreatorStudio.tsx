@@ -1,6 +1,10 @@
 import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useId, useRef, useState } from 'react';
 import { beginProjectMutation } from '../projectMutation';
+import {call,native} from '../api';
+import type {NativeTagContext} from '../nativeOperations';
+import {NATIVE_VOLUME_VIEW,nativeVolumeMatches,volumeDraft} from '../nativeTriggerVolume';
+import type {NativeVolumeView} from '../nativeTriggerVolume';
 import CampaignEncounters from './CampaignEncounters';
 import MissionSourceReview from './MissionSourceReview';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
@@ -32,6 +36,7 @@ import ExternalBrowserLink from './ExternalBrowserLink';
 const bindingLabels = {
   presentInImportedCache:'In source map', absentInImportedCache:'Not in source map',
   presentInAuthoringSource:'Authored', absentInAuthoringSource:'Missing in source',
+  presentInNativeSource:'In native source', absentInNativeSource:'Missing / ambiguous native area',
   notInspectable:'Review required',
 };
 type Pane = 'mission' | 'cinematic' | 'powerups' | 'server' | 'playtest';
@@ -76,6 +81,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const attachedCinematic=project.quickForge?.logic?.handwrittenSources?.some(source=>source.content.startsWith(nativeMissionBinding)&&source.content.split('\n',1)[0].includes('"cinematic":[')&&!source.content.split('\n',1)[0].includes('"cinematicIntro":false'))??false;
   const missionCinematic=nextCinematic==='source'?attachedCinematic:nextCinematic==='enabled';
   const [preparingMission,setPreparingMission]=useState(false);
+  const [nativeAreas,setNativeAreas]=useState<NativeTagContext|null>(null),[readingNativeAreas,setReadingNativeAreas]=useState(false);
+  const nativeAreaGeneration=useRef(0),nativeBuildsKey=project.builds.map(build=>build.id+':'+build.status).join('|');
+  useEffect(()=>{nativeAreaGeneration.current++;setNativeAreas(null);setReadingNativeAreas(false);const changed=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id){nativeAreaGeneration.current++;setNativeAreas(null);setReadingNativeAreas(false);}};window.addEventListener('guilty-spark-native-source-changed',changed);return()=>{nativeAreaGeneration.current++;window.removeEventListener('guilty-spark-native-source-changed',changed);};},[project.id,nativeBuildsKey]);
   const latestProject=useRef(project);latestProject.current=project;
   const activeProject=useRef<string|null>(project.id);
   useEffect(()=>{activeProject.current=project.id;return()=>{activeProject.current=null;};},[project.id]);
@@ -101,7 +109,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')})); } catch { /* incomplete authoring has no safe export yet */ }
     try { if(studio.shots.length) scripts.push(exportHaloCeCinematic(studio)); } catch { /* unresolved marker */ }
     try { if(project.firefight&&project.quickForge?.gameMode!=='campaign') scripts.push(exportHaloCeFirefight(project.firefight)); } catch { /* invalid/endless wave authoring */ }
-    return inspectScenarioBindings(scripts,sourceInspection,project.quickForge,studio.missions.some(beat=>beat.cinematicCue!=null)?studio.shots.map(cinematicMarker):[]);
+    return inspectScenarioBindings(scripts,sourceInspection,project.quickForge,studio.missions.some(beat=>beat.cinematicCue!=null)?studio.shots.map(cinematicMarker):[],nativeAreas?.scenarioVolumes);
   })();
   const change = (next: CreatorStudioDocument, label: string) => {
     const problems = validateCreatorStudio(next);
@@ -172,18 +180,46 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     } catch(problem) {if(activeProject.current===input.id)setError(String(problem));}
     finally {release();setPreparingMission(false);}
   }
-  function selectMissionArea(name:string,device=false){
+  function sourceAreas(name:string){return project.quickForge?.native?[]:project.quickForge?.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];}
+  function nativeArea(name:string){const rows=nativeAreas?.scenarioVolumes?.map((original,index)=>({original,index})).filter(row=>row.original.name===name)??[];return rows.length===1?rows[0]:null;}
+  function canSelectMissionArea(name:string){const authored=sourceAreas(name);if(authored.length)return authored.length===1;const area=nativeArea(name);return !readingNativeAreas&&!nativeAreas?.triggerEditIssue&&!!area?.original.geometry&&area.original.kind===1;}
+  async function readNativeAreas(){
+    if(readingNativeAreas)return;
+    const input=latestProject.current,generation=++nativeAreaGeneration.current;setReadingNativeAreas(true);setError('');
+    try{const context=await call<NativeTagContext>('native_tag_context',{projectId:input.id});
+      if(generation!==nativeAreaGeneration.current||activeProject.current!==input.id)return;
+      if(context.projectId!==input.id||context.class!=='scnr'||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')||!latestProject.current.builds.some(build=>build.id===context.buildId&&build.status==='validated'))throw Error('A current verified native scenario source is required. Build or connect its matching source first.');
+      setNativeAreas(context);
+    }catch(problem){if(generation===nativeAreaGeneration.current){setNativeAreas(null);setError(String(problem));}}
+    finally{if(generation===nativeAreaGeneration.current)setReadingNativeAreas(false);}
+  }
+  async function selectMissionArea(name:string,device=false){
     const doc=project.quickForge;
     const area=device?(doc?.logic?.devices??[]).filter(binding=>binding.nativeName===name)
-      .flatMap(binding=>doc!.placements.filter(placement=>placement.id===binding.placementId&&placement.tagClass==='ctrl')):
-      doc?.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
-    if(!onLevelEditor||area.length!==1){setError('Select one existing named source area or native control before opening the Level Editor.');return;}
-    selectSourceObject(area[0].id);
+      .flatMap(binding=>doc!.placements.filter(placement=>placement.id===binding.placementId&&placement.tagClass==='ctrl')):sourceAreas(name);
+    if(!onLevelEditor){setError('The Level Editor is unavailable in this window.');return;}
+    if(area.length===1){selectSourceObject(area[0].id);return;}
+    const selected=!device&&area.length===0?nativeArea(name):null,context=nativeAreas;
+    if(!selected?.original.geometry||!context?.tagSha256||!canSelectMissionArea(name)){setError('Read native scenario areas, then choose one uniquely named editable area; native controls use their own source workflow.');return;}
+    const generation=++nativeAreaGeneration.current,input=latestProject.current;setReadingNativeAreas(true);setError('');
+    try{
+      const current=await call<NativeTagContext>('native_tag_context',{projectId:input.id});
+      if(generation!==nativeAreaGeneration.current||activeProject.current!==input.id)return;
+      const old=readMapSession<NativeVolumeView|null>(input.id,NATIVE_VOLUME_VIEW,null);
+      const proposed:NativeVolumeView={projectId:input.id,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,index:selected.index,original:selected.original,...volumeDraft(selected.original.geometry),active:true,focus:Date.now(),mode:'translate'};
+      if(!nativeVolumeMatches(proposed,current)||!latestProject.current.builds.some(build=>build.id===current.buildId&&build.status==='validated')){setNativeAreas(null);throw Error('Native source changed. Read native scenario areas again; no older area was shown or applied.');}
+      writeMapSession(input.id,NATIVE_AI_START_VIEW,null);writeMapSession(input.id,'world.cutscene-camera',null);
+      writeMapSession(input.id,NATIVE_VOLUME_VIEW,old&&old.index===selected.index&&nativeVolumeMatches(old,current)?{...old,active:true,focus:Date.now()}:proposed);
+      writeMapSession(input.id,'forge.cameraMode','orbit');writeMapSession(input.id,'forge.bspWorkshop',false);onLevelEditor();
+    }catch(problem){if(generation===nativeAreaGeneration.current)setError(String(problem));}
+    finally{if(generation===nativeAreaGeneration.current)setReadingNativeAreas(false);}
   }
   function selectSourceObject(id:string){
     if(!onLevelEditor)return;
     const actor=readMapSession<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,null);
     if(actor?.active)writeMapSession(project.id,NATIVE_AI_START_VIEW,{...actor,active:false});
+    const volume=readMapSession<NativeVolumeView|null>(project.id,NATIVE_VOLUME_VIEW,null);if(volume?.active)writeMapSession(project.id,NATIVE_VOLUME_VIEW,{...volume,active:false});
+    const camera=readMapSession<{active:boolean}|null>(project.id,'world.cutscene-camera',null);if(camera?.active)writeMapSession(project.id,'world.cutscene-camera',{...camera,active:false});
     writeMapSession(project.id,'forge.selection',[id]);writeMapSession(project.id,'forge.zone',null);
     writeMapSession(project.id,'forge.sourceSurface',null);writeMapSession(project.id,'forge.workshopSelection',null);
     writeMapSession(project.id,'forge.mode','translate');writeMapSession(project.id,'forge.frame',readMapSession<number>(project.id,'forge.frame',0)+1);
@@ -267,7 +303,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       <p>Authored source names and imported cache names are separate evidence. Native compilation and gameplay are still required.</p>
       {bindingChecks.map(check => <div className="squad-row" key={check.dependency}>
         <span><code>{check.dependency}</code> — {check.detail}</span>
-        <Pill tone={check.status==='presentInImportedCache'||check.status==='presentInAuthoringSource'?'green':'muted'}>{bindingLabels[check.status]}</Pill>
+        <Pill tone={check.status==='presentInImportedCache'||check.status==='presentInAuthoringSource'||check.status==='presentInNativeSource'?'green':'muted'}>{bindingLabels[check.status]}</Pill>
       </div>)}
     </details>}
     <p className="studio-hint">Exports are Halo CE .hsc source. Matching scenario assets, native compilation and an in-game test are required.</p>
@@ -323,8 +359,15 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         ...(project.quickForge?.gameMode==='campaign'?project.quickForge.campaignEncounters??[]:[]).map(entry=>entry.name),
         ...(sourceInspection?.encounters??[]).map(entry=>entry.name),
       ])].map(name=><option key={name} value={name}/>)}</datalist>
-      <datalist id={volumeChoices}>{(project.quickForge?.logic?.triggers??[]).filter(trigger=>trigger.nativeName)
-        .map(trigger=><option key={trigger.id} value={trigger.nativeName}>{trigger.name}</option>)}</datalist>
+      <details className="studio-handoff studio-native-areas"><summary>Recovered scenario areas</summary>
+        <button type="button" disabled={!native||readingNativeAreas||!project.builds.some(build=>build.status==='validated')} onClick={()=>void readNativeAreas()}>{readingNativeAreas?'Reading native areas…':'Read native scenario areas'}</button>
+        <p className="studio-hint">Read the latest verified native scenario, then use its names in area objectives and optional conditions. Select objective area in Level Editor opens the real native box. Review trigger source returns to its existing Preview/Accept/Restore workflow; Save and rebuild after accepting. Script-only mission exports do not change native scripts automatically.</p>
+        {!project.builds.some(build=>build.status==='validated')&&<p className="studio-hint">Connect matching native source and complete its validated build first. The original map stays unchanged.</p>}
+        {nativeAreas&&<p className="studio-hint">{nativeAreas.scenarioVolumes?.length??0} native areas · source {nativeAreas.tagSha256?.slice(0,12)}. Native compilation and gameplay remain separate checks.</p>}
+        {nativeAreas?.triggerEditIssue&&<Notice tone="info">{nativeAreas.triggerEditIssue}</Notice>}
+        {nativeAreas?.scenarioVolumes?.some(area=>!area.geometry||area.kind!==1)&&<p className="studio-hint">Fixed or unsupported native boxes retain their names but require the matching native editor for geometry.</p>}
+      </details>
+      <datalist id={volumeChoices}>{[...new Set([...(project.quickForge?.logic?.triggers??[]).flatMap(trigger=>trigger.nativeName?[trigger.nativeName]:[]),...(nativeAreas?.scenarioVolumes??[]).map(area=>area.name).filter(Boolean)])].map(name=><option key={name} value={name}/>)}</datalist>
       {studio.missions.length === 0 && <p className="studio-empty">No authored mission beats. Add an objective to start a custom campaign flow.</p>}
       {studio.missions.length>0&&<p className="studio-hint">Expand a beat to edit it. Collapsing keeps its changes; Save stores the project. All beats remain in this list.</p>}
       {studio.missions.map((beat, i) => <details className="studio-record studio-mission-record" key={beat.id} open={openBeats[beat.id]===true}
@@ -356,8 +399,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         </>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}
         {onLevelEditor&&(beat.trigger==='triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null)&&<button type="button"
-          disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.triggerRef)}
-          title="Select the existing native area in the Level Editor. Use its move/scale handles; then return to Mission director."
+          disabled={!canSelectMissionArea(beat.triggerRef??'')}
+          title="Select an authored area, or read Recovered scenario areas above to select its real native box. Use its handles; review native source before accepting changes."
           onClick={()=>selectMissionArea(beat.triggerRef??'')}>Select objective area in Level Editor</button>}
         {beat.trigger==='escort'&&<>
           <NumberField label={'Minimum survivors '+(i+1)} min={1} max={32} step={1} value={beat.minimumSurvivors??1}
@@ -392,7 +435,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         </div>}
         {beat.conditionVolume!=null&&<div><label>Optional step condition volume<input list={volumeChoices} maxLength={31} spellCheck={false}
           aria-label={'Optional condition '+(i+1)} value={beat.conditionVolume} onChange={event=>changeConditionVolume(beat,event.target.value)}/></label>
-          {onLevelEditor&&<button type="button" disabled={!project.quickForge?.logic?.triggers.some(trigger=>trigger.nativeName===beat.conditionVolume)}
+          {onLevelEditor&&<button type="button" disabled={!canSelectMissionArea(beat.conditionVolume??'')}
             onClick={()=>selectMissionArea(beat.conditionVolume??'')}>Select optional area in Level Editor</button>}
           <label>Decision<select aria-label={'Mission branch decision '+(i+1)} value={beat.conditionGroup==null?'independent':'group:'+beat.conditionGroup}
             onChange={event=>{const value=event.target.value,group=value==='new'?freshId():value.startsWith('group:')?value.slice(6):undefined;

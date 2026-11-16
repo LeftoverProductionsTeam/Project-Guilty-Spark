@@ -1,15 +1,20 @@
 /** Cross-check HaloScript references against authored campaign intent or the
  * read-only imported cache. Neither proves native compilation or gameplay.
- * Native camera/trigger indexes are not decoded; explicit authoring names are separate.
+ * Imported camera/trigger indexes are separate from an explicitly read native-source inventory.
  */
 import type { MapInspection } from './types';
 import type { ScriptExport } from './haloScript';
 import type { QuickForgeDocument } from './forge';
-export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'notInspectable';
+export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'presentInNativeSource'|'absentInNativeSource'|'notInspectable';
 export interface BindingResult { dependency: string; status: BindingStatus; detail: string }
-export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[]): BindingResult[] {
+export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[]): BindingResult[] {
   const dependencies=[...new Set(scripts.flatMap(s=>s.dependencies))];
   return dependencies.map(dependency=>{
+    if(nativeVolumes&&dependency.startsWith('trigger_volume:')&&!(source?.gameMode==='campaign'&&!source.native)){
+      const name=dependency.slice('trigger_volume:'.length),matches=nativeVolumes.filter(area=>area.name===name).length;
+      return {dependency,status:matches===1?'presentInNativeSource' as const:'absentInNativeSource' as const,
+        detail:matches===1?'Name found uniquely in the inspected native scenario source. Source review, compilation/readback and gameplay remain separate checks.':matches===0?'Name is missing from the inspected native source. Read native areas again after changing the source.':'This name is ambiguous in native source. Reconcile the original references in the matching native editor; Spark does not choose an arbitrary index.'};
+    }
     if(source?.gameMode==='campaign'&&!source.native&&dependency.startsWith('cutscene_camera_point:')) {
       const name=dependency.slice('cutscene_camera_point:'.length),present=plannedCameras.filter(camera=>camera===name).length===1;
       return {dependency,status:present?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,
@@ -24,7 +29,7 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
           'Name matches campaign encounter source. Native actor dependencies, compilation and gameplay remain separate checks.'):
           'No matching campaign source encounter/squad. Add or select a group below; the native source writer uses source_squad.'};
     }
-    if(source?.gameMode==='campaign'&&dependency.startsWith('trigger_volume:')) {
+    if(source?.gameMode==='campaign'&&!source.native&&dependency.startsWith('trigger_volume:')) {
       const name=dependency.slice('trigger_volume:'.length);
       const found=source.logic?.triggers.filter(trigger=>trigger.nativeName===name)??[];
       return {dependency,status:found.length===1?'presentInAuthoringSource' as const:'notInspectable' as const,
@@ -65,6 +70,6 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
           'Name not found in imported cache. Create/rename encounter and squad in your editable scenario before compilation.'};
     }
     return {dependency,status:'notInspectable' as const,
-      detail:'Trigger volume/camera-point indexes are not currently decoded; verify by opening the editable scenario in Sapien.'};
+      detail:'No native-source inventory is loaded for this reference. Read Recovered scenario areas in Mission director, or use the matching native camera/source editor.'};
   });
 }

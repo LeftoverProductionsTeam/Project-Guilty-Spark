@@ -17,3 +17,13 @@ assert.deepEqual(results.map(row=>row.status),['presentInAuthoringSource','absen
 assert.equal(inspectScenarioBindings(cameras,null,{gameMode:'campaign',native:null},['gs_cs_001','gs_cs_001'])[0].status,'absentInAuthoringSource');
 assert.equal(inspectScenarioBindings(cameras,null,{gameMode:'campaign',native:{source:{}}},['gs_cs_001'])[0].status,'notInspectable');
 console.log('PASS: exact planned camera identities; missing, ambiguous and imported source never gain native admission');
+
+const nativeVolumes=[{name:'entrance'},{name:'ambiguous'},{name:'ambiguous'}];
+const volumeScripts=[{dependencies:['trigger_volume:entrance','trigger_volume:missing','trigger_volume:ambiguous']}];
+results=inspectScenarioBindings(volumeScripts,inspected,undefined,[],nativeVolumes);
+assert.deepEqual(results.map(row=>row.status),['presentInNativeSource','absentInNativeSource','absentInNativeSource']);assert.match(results[0].detail,/compilation.*separate/);assert.match(results[2].detail,/ambiguous/);
+assert.equal(inspectScenarioBindings(volumeScripts,null,undefined,[],nativeVolumes)[0].status,'presentInNativeSource');
+assert.equal(inspectScenarioBindings(volumeScripts,inspected)[0].status,'notInspectable');
+assert.equal(inspectScenarioBindings(volumeScripts,null,{gameMode:'campaign',native:{source:{}}},[],nativeVolumes)[0].status,'presentInNativeSource');
+assert.equal(inspectScenarioBindings(volumeScripts,null,{gameMode:'campaign',logic:{triggers:[{nativeName:'entrance'}]}},[],[])[0].status,'presentInAuthoringSource');
+console.log('PASS: native source areas remain distinct from imported cache and authored volume evidence; missing/ambiguous names refused');

@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — compact responsive mission editing; native trigger geometry accepted in scope
+Task: Operation110 — recovered mission objective areas → native viewport/source/build
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: e22676d3bdfc15f827c316e0eacc3af40b2c9e99 plus this verified source/manifest checkpoint (resolve git log -1). Native app62dbbda8; exact hashes/evidence in RUNTIME_INTEGRATION_20261107.
-Next action: resume Black Echo/campaign native creator and37944 investigation; preserve accepted trigger/compact-UI scopes. Native game acceptance awaits available desktop control; no repeated unchanged retry. Full M1–M6/475IDs remain open.
+Latest verified revision: fb7590dcd4eb15b3f98cbcf199ce18c8cb676bad. Current mission-area bridge is uncommitted; TypeScript/Vite/Windows compile pass, native UI/build pending.
+Next action: run mission→native area→viewport/source review→Save/restart/CE readback in QA73504/run-3KBsDw LIVE/disposable. Source changes preserve current native writer/history and475IDs; no game/Forerunner write/push.
 
 ## Acceptance
 
