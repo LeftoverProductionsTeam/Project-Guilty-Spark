@@ -64,3 +64,14 @@ export async function revealPagedControl(target:Locator){
  }
  throw Error('Control remained hidden after actual page navigation: '+JSON.stringify({surface:await surface.getAttribute('data-surface'),pages,page:await surface.getAttribute('data-page')}));
 }
+
+/** Existing full mission workflows explicitly expand the rows they are about to edit. */
+export async function openMissionBeats(page:Page){
+ await page.locator('.creator-studio').waitFor({state:'visible'});
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ const rows=page.locator('.studio-mission-record');
+ for(let i=0;i<await rows.count();i++){
+  const row=rows.nth(i);
+  if(await row.getAttribute('open')===null){const summary=row.locator(':scope > summary');await revealPagedControl(summary);await summary.click();}
+ }
+}

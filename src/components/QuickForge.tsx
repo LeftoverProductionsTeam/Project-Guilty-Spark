@@ -1,3 +1,6 @@
+import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
+import {NATIVE_VOLUME_VIEW} from '../nativeTriggerVolume';
+import type {NativeVolumeView} from '../nativeTriggerVolume';
 import NativeAiStartOverlay from './NativeAiStartOverlay';
 import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
@@ -193,6 +196,7 @@ interface Props {
   onSettings: () => void;
   onLive?: () => void;
   onReviewAiStart?:()=>void;
+  onReviewTrigger?:()=>void;
   notify: (message: string, tone?: string) => void;
   logs: JobEvent[];
   activeJob: string | null;
@@ -339,6 +343,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
   const [surfaceSelection, setSurfaceSelection] = useMapState<{brushId:string;faceId?:string}|null>(project.id, 'forge.sourceSurface', () => null);
   const [bspBusy, setBspBusy] = useState(false);
+  const [nativeVolume,setNativeVolume]=useMapState<NativeVolumeView|null>(project.id,NATIVE_VOLUME_VIEW,()=>null);
   const [nativeAiStart,setNativeAiStart]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
   const nativeAiSelectionGuard=useRef(0);
   const [selected, setSelected] = useMapState<string[]>(project.id, 'forge.selection', []),
@@ -365,18 +370,19 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     'palette',
   );
   const [actorId, setActorId] = useState('');
+  useEffect(()=>{if(activity.active&&nativeVolume?.active&&nativeVolume.focus){setBspMode(false);setCameraMode("orbit");setMode(nativeVolume.mode??"translate");setSelected([]);setSelectedZone(null);setWorkshopSelected(null);setNativeAiStart(null);}},[activity.active,nativeVolume?.focus]);
   useEffect(()=>{
     nativeAiSelectionGuard.current=0;
     if(!activity.active||!nativeAiStart?.active)return;
     // Source proposals use the shared world-coordinate viewport, including
     // maps whose geometry was authored in the four-view BSP Workshop.
-    setBspMode(false);setCameraMode('orbit');setMode(nativeAiStart.mode??'translate');setSelected([]);setSelectedZone(null);setWorkshopSelected(null);
+    setNativeVolume(null);setBspMode(false);setCameraMode('orbit');setMode(nativeAiStart.mode??'translate');setSelected([]);setSelectedZone(null);setWorkshopSelected(null);
   },[activity.active,nativeAiStart?.key,nativeAiStart?.active,nativeAiStart?.focus]);
   function setMode(next:'translate'|'rotate'|'scale') {
     if(next==='rotate'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&node.type==='campaignFiring')){notify('Native firing positions support XYZ movement only.','info');return;}
     if(next==='scale'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring'))){notify('Native AI points cannot be scaled. Starts and patrol points support Move and Z facing; firing positions support XYZ only.','info');return;}
     if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI points support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.','info');return;}
-    setModeState(next);
+    setModeState(next);setNativeVolume(v=>v?.active&&v.mode!==next?{...v,mode:next}:v);
     if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
   }
   const [query, setQuery] = useMapState(project.id, 'forge.query', ''),
@@ -887,7 +893,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }
   function select(id: string | null, additive: boolean) {
     if(performance.now()<nativeAiSelectionGuard.current)return;
-    if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);
+    if(id)setNativeVolume(v=>v?.active?{...v,active:false}:v);if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);
     setSurfaceSelection(null);
     setWorkshopSelected(null);
     setSelectedZone(null);
@@ -983,6 +989,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         remove();
       }
       if (event.key === 'Escape') {
+        setNativeVolume(v=>v?.active?{...v,active:false}:v);
         setNativeAiStart(value=>value?.active?{...value,active:false}:value);
         setSelected([]);
         setSelectedZone(null);
@@ -992,19 +999,19 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       if (event.key.toLowerCase() === 'e') setMode('rotate');
       if (
         event.key.toLowerCase() === 'r' &&
-        (workshop || (mutableNodes.length === 1 && mutableNodes[0].type === 'brush'))
+        (nativeVolume?.active || workshop || (mutableNodes.length === 1 && mutableNodes[0].type === 'brush'))
       )
         setMode('scale');
       if (event.key.toLowerCase() === 'f') {
         setWrlFocus(false);
-        if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else setFrame((value) => value + 1);
+        if(nativeVolume?.active)setNativeVolume({...nativeVolume,focus:Date.now()});else if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else setFrame((value) => value + 1);
       }
       if (event.key.toLowerCase() === 'g') setGridSnap((value) => !value);
       if (event.key.toLowerCase() === 'm') setMeshSnap((value) => !value);
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop,assetBusy,studioRole,nativeAiStart]);
+  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop,assetBusy,studioRole,nativeAiStart,nativeVolume]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
     const usageId = nextFreeUsageId(doc, 'hill');
     if (usageId === null || doc.objectives.length + 4 > 200) {
@@ -1592,9 +1599,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   <Rotate3D size={17} />
                 </IconButton>
                 <IconButton
-                  label="Resize brush (R)"
+                  label={nativeVolume?.active?"Resize trigger area (R)":"Resize brush (R)"}
                   active={mode === 'scale'}
-                  disabled={!!nativeAiStart?.active||mutableNodes.length !== 1 || mutableNodes[0]?.type !== 'brush'}
+                  disabled={!!nativeAiStart?.active||!nativeVolume?.active&&(mutableNodes.length !== 1 || mutableNodes[0]?.type !== 'brush')}
                   onClick={() => setMode('scale')}
                 >
                   <Scaling size={17} />
@@ -1783,6 +1790,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   document={doc}
                   viewportChildren={(textures) => (
                     <>
+                      <NativeTriggerVolumeOverlay project={project} mode={mode} enabled={activity.active&&cameraMode==='orbit'&&!assetBusy&&studioRole==null} snap={gridSnap?snap:0} onSelectScene={()=>{setSelected([]);setSelectedZone(null);setWorkshopSelected(null);}} onStart={()=>{nativeAiSelectionGuard.current=Infinity;}} onEnd={()=>{nativeAiSelectionGuard.current=performance.now()+250;}} notify={message=>notify(message,'info')}/>
                       <NativeAiStartOverlay project={project} mode={mode} enabled={cameraMode==='orbit'&&!assetBusy&&studioRole==null} snap={gridSnap?snap:0}
                         onSelectScene={()=>{setSelected([]);setSelectedZone(null);setWorkshopSelected(null);}}
                         onStart={()=>{nativeAiSelectionGuard.current=Infinity;}} onEnd={()=>{nativeAiSelectionGuard.current=performance.now()+250;}}
@@ -1907,6 +1915,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   }}
                   onError={(message) => notify(message, 'error')}
                 />
+                {nativeVolume?.active&&<div className="viewport-object-actions" role="status"><strong>Trigger area · {nativeVolume.original.name}</strong><span>Source geometry proposal · Move/Rotate/Size, then review</span><button disabled={cameraMode!=="orbit"||assetBusy} onClick={()=>setNativeVolume({...nativeVolume,focus:Date.now()})}>Frame trigger area</button>{props.onReviewTrigger&&<button onClick={props.onReviewTrigger}>Review trigger source</button>}<button onClick={()=>setNativeVolume({...nativeVolume,locked:!nativeVolume.locked})}>{nativeVolume.locked?"Unlock trigger handles":"Lock trigger handles"}</button><button onClick={()=>setNativeVolume({...nativeVolume,active:false})}>Hide trigger handles</button></div>}
                 {nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
                   <strong>{nativeAiStart.kind==='firing'?'AI firing draft':nativeAiStart.kind==='patrol'?'AI patrol draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
                   <span>{nativeAiStart.kind==='firing'?'Unsaved XYZ/group proposal · Move (W), then review in Native source controls':'Unsaved pose · Move (W) / Rotate (E), then review in Native source controls'}</span>

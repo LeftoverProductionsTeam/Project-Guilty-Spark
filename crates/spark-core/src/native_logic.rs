@@ -433,17 +433,7 @@ fn vector(v: [f32; 3]) -> String {
     v.map(real).join(",")
 }
 /// Invader operates on stock native fields; the sidecar never becomes tag data.
-struct TriggerGeometry {forward:[f32;3],up:[f32;3],corner:[f32;3],dimensions:[f32;3]}
-impl TriggerGeometry {
-    fn contains(&self,point:[f32;3])->bool {
-        let dot=|a:[f32;3],b:[f32;3]|a.iter().zip(b).map(|(x,y)|x*y).sum::<f32>();
-        if point.iter().chain(self.forward.iter()).chain(self.up.iter()).chain(self.corner.iter()).chain(self.dimensions.iter()).any(|v|!v.is_finite())
-            ||self.dimensions.iter().any(|d|*d<=0.)||(dot(self.forward,self.forward)-1.).abs()>1e-4||(dot(self.up,self.up)-1.).abs()>1e-4||dot(self.forward,self.up).abs()>1e-4{return false;}
-        let [ux,uy,uz]=self.up;let [fx,fy,fz]=self.forward;let side=[uy*fz-uz*fy,uz*fx-ux*fz,ux*fy-uy*fx];
-        let delta=std::array::from_fn(|i|point[i]-self.corner[i]);
-        [self.forward,side,self.up].into_iter().zip(self.dimensions).all(|(axis,extent)|{let value=dot(delta,axis);value>=-1e-5&&value<=extent+1e-5})
-    }
-}
+use crate::maps::ScenarioLogicVolumeGeometry as TriggerGeometry;
 fn trigger_geometry(trigger:&Trigger)->Result<TriggerGeometry>{
     if trigger.rotation[0].abs()>0.00001||trigger.rotation[1].abs()>0.00001 {
         return invalid("Native trigger volumes currently support yaw rotation; X/Y tilt is not implemented");

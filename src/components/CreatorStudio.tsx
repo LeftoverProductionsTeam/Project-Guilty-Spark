@@ -69,6 +69,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   onMachinima?:()=>void;
 }) {
   const [pane, setPane] = useMapState<Pane>(project.id,'creator-studio-pane','mission');
+  const [openBeats,setOpenBeats]=useMapState<Record<string,boolean>>(project.id,'creator-mission-expanded',{});
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
   const [missionActivation,setMissionActivation]=useMapState<'manual'|'startup'>(project.id,'native-mission-startup','manual');
   const [nextCinematic,setNextCinematic]=useMapState<'source'|'enabled'|'disabled'>(project.id,'native-mission-intro','source');
@@ -284,8 +285,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     {pane==='powerups'&&<PowerupStudio project={project} inspection={inspection} edit={edit} onBuild={onBuild}/>}
     {pane === 'mission' && <section className="analysis-card">
       <div className="studio-heading"><div><h2><Flag size={18}/> Mission director</h2><p>Ordered objectives and scenario triggers with a Halo CE .hsc source generator. Every trigger must exist in your editable scenario.</p></div>
-        <button className="primary" type="button" disabled={studio.missions.length >= 128} onClick={() => change({ ...studio,
-          missions: [...studio.missions, { id: freshId(), title: `Beat ${studio.missions.length + 1}`, objective: '', trigger: 'manual', encounterName: '' }] }, 'Add mission beat')}><Plus size={15}/> Add beat</button></div>
+        <button className="primary" type="button" disabled={studio.missions.length >= 128} onClick={() => {const id=freshId();change({ ...studio,
+          missions: [...studio.missions, { id, title: `Beat ${studio.missions.length + 1}`, objective: '', trigger: 'manual', encounterName: '' }] }, 'Add mission beat');setOpenBeats(previous=>({...previous,[id]:true}));}}><Plus size={15}/> Add beat</button></div>
       <div className="analysis-actions"><button type="button" disabled={studio.missions.length>0||project.quickForge?.gameMode!=='campaign'||!!project.quickForge?.native}
         title={studio.missions.length?'Use an empty mission in a separate project to preserve this operation.':'Use editable Campaign / scripted solo source. Adds objectives and selectable areas; does not deploy gameplay.'}
         onClick={()=>{try{edit(addBlackEchoDraft(project,freshId),'Create Operation Black Echo blueprint');setError('');notify('Black Echo objectives and five areas added. Move markers onto playable terrain and bind be_marines, enemies and your audio. Native rescue needs gameplay testing; collection, inventory settlement and squad behavior need actual runtime logic.','info');}catch(error){setError(String(error));}}}>Create Black Echo draft</button>
@@ -325,7 +326,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       <datalist id={volumeChoices}>{(project.quickForge?.logic?.triggers??[]).filter(trigger=>trigger.nativeName)
         .map(trigger=><option key={trigger.id} value={trigger.nativeName}>{trigger.name}</option>)}</datalist>
       {studio.missions.length === 0 && <p className="studio-empty">No authored mission beats. Add an objective to start a custom campaign flow.</p>}
-      {studio.missions.map((beat, i) => <div className="studio-record" key={beat.id}>
+      {studio.missions.length>0&&<p className="studio-hint">Expand a beat to edit it. Collapsing keeps its changes; Save stores the project. All beats remain in this list.</p>}
+      {studio.missions.map((beat, i) => <details className="studio-record studio-mission-record" key={beat.id} open={openBeats[beat.id]===true}
+        onToggle={event=>{const open=event.currentTarget.open;if(open!==(openBeats[beat.id]===true))setOpenBeats(previous=>previous[beat.id]===open?previous:{...previous,[beat.id]:open});}}>
+        <summary className="studio-beat-summary"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><span>{({manual:'Manual',triggerVolume:'Area',weaponOwned:'Collection',forerunnerExtractionSettled:'Extraction',deviceActivated:'Terminal',encounterCleared:'Combat',escort:'Escort',timer:'Delay'} as const)[beat.trigger]}</span>{beat.hudObjective&&<small>HUD</small>}{beat.soundCue&&<small>Radio</small>}{beat.cinematicCue&&<small>Scene</small>}</summary>
+        {openBeats[beat.id]===true&&<div className="studio-beat-body">
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Remove dependent rescue-result conditions first.':undefined} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
         <label title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Later objectives use this rescue result. Remove those conditions before changing its trigger.':'Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.'}>Trigger<select value={beat.trigger} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'],...(e.target.value!=='escort'?{escortFailure:undefined}:{}),...(e.target.value==='forerunnerExtractionSettled'?{triggerRef:'extraction_activate'}:{}) })}>
@@ -472,7 +477,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
               onChange={event=>updateBeat(beat.id,{completeMission:event.target.checked?true:undefined})}/>Request native level completion after this beat
           </label></div>
         </details>
-      </div>)}
+      </div>}
+      </details>)}
     </section>}
     {pane === 'cinematic' && <section className="analysis-card">
       <div className="studio-heading"><div><h2><Camera size={18}/> Cinematic director</h2><p>Edit saved shots here or in Machinima. For an editable campaign, select a shot range in an objective’s Camera scene or enable the mission intro, then Prepare mission for native build to include native camera position, orientation and FOV. The separate raw export still requires existing scenario markers; subtitles remain rehearsal notes.</p></div>

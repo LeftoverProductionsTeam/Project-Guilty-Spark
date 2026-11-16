@@ -1,3 +1,4 @@
+import NativeTriggerVolumes from '../../../src/components/NativeTriggerVolumes';
 import NativeCutsceneCameras from '../../../src/components/NativeCutsceneCameras';
 import {useState} from 'react';
 import NativeSquadBehaviorEditor from '../../../src/components/NativeSquadBehavior';
@@ -50,4 +51,8 @@ function NativeCameraFixture(){
  const [revision,setRevision]=useState(0),[dirty,setDirty]=useState(false),[operation,setOperation]=useState<unknown>(null);const context={projectId:'camera-fixture',buildId:'build',tag:'level.scenario',class:'scnr',tagSha256:(revision?'b':'a').repeat(64),scenarioCameras:[{index:0,name:'intro',position:[1,2,3],orientationRadians:[0,0,0],fovRadians:Math.PI/3}]} as NativeTagContext;
  return <><button onClick={()=>setRevision(v=>v+1)}>Refresh source revision</button><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><output data-testid="camera-operation">{JSON.stringify(operation)}</output><NativeCutsceneCameras context={context} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)} onLevelEditor={()=>{}}/></>;
 }
-createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-camera')?<NativeCameraFixture/>:location.search.startsWith('?native-patrol')?<NativePatrolFixture/>:location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);
+function NativeVolumeFixture(){
+ const [revision,setRevision]=useState(0),[dirty,setDirty]=useState(false),[operation,setOperation]=useState<unknown>(null);const context={projectId:'volume-fixture',buildId:'build',tag:'level.scenario',class:'scnr',tagSha256:(revision?'b':'a').repeat(64),scenarioVolumes:[{name:'intro_area',kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,6,8]}}]} as NativeTagContext;
+ return <><button onClick={()=>setRevision(v=>v+1)}>Refresh source revision</button><button onClick={()=>setDirty(v=>!v)}>Toggle project dirty</button><output data-testid="volume-operation">{JSON.stringify(operation)}</output><NativeTriggerVolumes context={context} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)} onLevelEditor={()=>{}}/></>;
+}
+createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-volume')?<NativeVolumeFixture/>:location.search.startsWith('?native-camera')?<NativeCameraFixture/>:location.search.startsWith('?native-patrol')?<NativePatrolFixture/>:location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);

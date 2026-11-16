@@ -9,6 +9,7 @@ use std::path::Path;
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Operation {
     Dependencies,
+    TriggerVolume {index:u16,name:String,geometry:crate::maps::ScenarioLogicVolumeGeometry,#[serde(rename="sourceSha256")] source_sha256:String},
     CutsceneCamera {point:crate::maps::NativeCameraPoint,#[serde(rename="sourceSha256")] source_sha256:String},
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32,
@@ -133,9 +134,10 @@ fn actor_spacing()->f32{0.75}
 impl Operation {
     /// One exhaustive source binding for preview, retained reviews and readback.
     pub fn expected_source_sha256(&self)->Option<&str>{match self{
-        Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
+        Self::TriggerVolume{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
         Self::Dependencies|Self::AppendEncounter{..}|Self::AppendEncounters{..}|Self::BoundingRadius{..}|Self::LensFlareScaleRepair=>None,
     }}
+    pub fn is_trigger_edit(&self)->bool{matches!(self,Self::TriggerVolume{..})}
     pub fn is_camera_edit(&self)->bool{matches!(self,Self::CutsceneCamera{..})}
 
     pub fn is_squad_start_edit(&self)->bool{matches!(self,Self::EncounterStartPosition{..})}
@@ -167,20 +169,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -191,6 +193,7 @@ impl Operation {
             return invalid("Native tag path is too long or begins with a command option");
         }
         match self {
+            Self::TriggerVolume{index,name,geometry,source_sha256}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
             Self::CutsceneCamera{point,source_sha256}=>{
                 if class!="scnr"||point.index>=512||point.name.len()>32||point.name.chars().any(char::is_control)||point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.orientation_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU+1e-6)||!point.fov_radians.is_finite()||!(5f32.to_radians()..=150f32.to_radians()).contains(&point.fov_radians)||source_sha256.len()!=64||!source_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return invalid("Native camera editing needs exact source/index/name, finite pose and5–150degree FOV");}
             }
@@ -279,7 +282,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
+            Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -415,6 +418,11 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
+        if let Self::TriggerVolume{index,name,geometry,..}=self{
+            let row=native_volume_fields(before)?.into_iter().nth(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Native trigger index changed".into()))?.0;
+            if row.name!=*name||row.kind!=1||row.geometry.as_ref().is_none_or(|g|volume_geometry_close(g,geometry)){return invalid("Trigger source changed, is unsupported or already matches");}
+            let prefix=format!("trigger_volumes[{index}]");let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];for(field,value)in volume_values(geometry){args.extend(["-S".into(),format!("{prefix}.{field}"),value.map(|v|v.to_string()).join(",")]);}args.push(tag.into());return Ok(args);
+        }
         if let Self::CutsceneCamera{point,..}=self{
             let original=native_camera_fields(before)?.into_iter().find(|(p,_)|p.index==point.index&&p.name==point.name).ok_or_else(||crate::SparkError::Invalid("Selected native camera index/name changed".into()))?.0;
             if camera_points_close(&original,point){return invalid("Native camera already matches; no candidate was written");}
@@ -511,7 +519,7 @@ impl Operation {
     }
     /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
-        if !self.is_encounter_append()&&!self.is_scenario_ai_edit()&&!self.is_camera_edit() {return Ok(None);}
+        if !self.is_encounter_append()&&!self.is_scenario_ai_edit()&&!self.is_camera_edit()&&!self.is_trigger_edit() {return Ok(None);}
         if let Self::EncounterSquadPatrol{encounter,squad,route,..}=self{self.arguments_with_fields(tags,class,tag,before)?;let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),format!("encounters[{encounter}].squads[{squad}].move_positions")];for(key,_)in patrol_scalar_fields(*encounter,*squad,route){args.extend(["-G".into(),key]);}args.push(tag.into());return Ok(Some(args));}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut i=2;
@@ -530,7 +538,7 @@ impl Operation {
             }else if key.ends_with(".orientation")||key.ends_with(".field_of_view"){
                 let parse=|v:&str|v.split(',').map(|s|s.trim().parse::<f32>()).collect::<std::result::Result<Vec<_>,_>>();
                 match(parse(&value),parse(actual)){(Ok(a),Ok(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|facings_close(*a,b.to_radians())),_=>false}
-            }else if key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight") {
+            }else if self.is_trigger_edit()||key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight") {
                 let parse=|s:&str|s.split(',').map(|v|v.trim().parse::<f64>().ok().filter(|v|v.is_finite())).collect::<Option<Vec<_>>>();
                 match(parse(&value),parse(actual)){(Some(a),Some(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|(a-b).abs()<=0.000001f64.max(a.abs()*f64::from(f32::EPSILON)*2.)),_=>false}
             }else if key.ends_with(".reference"){actual.replace('\\',"/").eq_ignore_ascii_case(&value.replace('\\',"/"))}
@@ -714,6 +722,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
+    if let Operation::TriggerVolume{index,name,geometry,..}=operation{return reviewed_volume(before,after,*index,name,geometry);}
     if let Operation::CutsceneCamera{point,..}=operation{return reviewed_camera(before,after,point);}
 
     if operation.combat_target_key().is_some(){return reviewed_combat(before,after,operation);}
@@ -838,6 +847,7 @@ fn array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioSquadReadback {
     pub source_sha256:String,pub squads:Vec<ScenarioSquadChoice>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub volumes:Option<Vec<crate::maps::ScenarioLogicVolume>>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub cameras:Option<Vec<crate::maps::NativeCameraPoint>>,
     #[serde(default,skip_serializing_if="Vec::is_empty")] pub combat:Vec<Operation>,
     #[serde(default,skip_serializing_if="squad_positions_disabled")] pub include_starts:bool,
@@ -865,6 +875,7 @@ impl ScenarioSquadReadback {
         }
         if self.combat.len()>4096{return invalid("Native combat readback exceeds4096selected targets");}let mut targets=std::collections::BTreeSet::new();for op in &self.combat{let key=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unsupported combat readback operation".into()))?;if !targets.insert(key){return invalid("Duplicate native combat readback target");}op.validate("scnr","readback.scenario")?;let source=op.expected_source_sha256().ok_or_else(||crate::SparkError::Invalid("Unsupported native combat readback source binding".into()))?;if !source.eq_ignore_ascii_case(&self.source_sha256){return invalid("Combat readback source identity differs from its snapshot");}}
         if let Some(points)=&self.cameras{if points.len()>512||points.iter().enumerate().any(|(i,p)|usize::from(p.index)!=i||p.name.len()>32||p.name.chars().any(char::is_control)||p.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||p.orientation_radians.iter().any(|v|!v.is_finite()||v.abs()>20000.)||!p.fov_radians.is_finite()){return invalid("Invalid native camera snapshot inventory");}}
+        if let Some(volumes)=&self.volumes{if volumes.len()>1024||volumes.iter().any(|v|v.name.len()>32||v.name.chars().any(char::is_control)||v.kind>1||(v.kind==1)!=v.geometry.is_some()||v.geometry.as_ref().is_some_and(|g|!g.valid())){return invalid("Invalid trigger snapshot inventory");}}
         let mut seen=std::collections::BTreeSet::new();let mut starts=0usize;
         for row in &self.squads {
             if row.encounter>=128||row.squad>=4096||!seen.insert((row.encounter,row.squad))||
@@ -885,7 +896,7 @@ impl ScenarioSquadReadback {
         Ok(())
     }
     pub fn verify_cache(&self,path:&Path,map:&crate::maps::MapInspection)->Result<()> {
-        self.verify_map(map)?;if let Some(expected)=&self.cameras{let actual=crate::maps::scenario_camera_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(&actual).any(|(a,b)|!camera_points_close(a,b)){return invalid("Compiled native camera inventory/name/pose/lens differs from reviewed source");}}Ok(())
+        self.verify_map(map)?;if let Some(expected)=&self.volumes{let actual=crate::maps::scenario_volume_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(actual).any(|(a,b)|a.name!=b.name||a.kind!=b.kind||match(&a.geometry,&b.geometry){(Some(a),Some(b))=>!volume_geometry_close(a,b),(None,None)=>false,_=>true}){return invalid("Compiled trigger inventory, identity or geometry differs from reviewed source");}}if let Some(expected)=&self.cameras{let actual=crate::maps::scenario_camera_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(&actual).any(|(a,b)|!camera_points_close(a,b)){return invalid("Compiled native camera inventory/name/pose/lens differs from reviewed source");}}Ok(())
     }
     pub fn verify_map(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate()?;
@@ -958,8 +969,9 @@ fn squad_count_field(fields:&str,name:&str)->Result<(i16,usize)> {
 /// structural/script references are preserved; this does not interpret tag bytes.
 pub fn scenario_squad_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,false)}
 pub fn scenario_squad_start_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,true)}
-fn native_position(fields:&str)->Result<([f32;3],usize)> {
-    let values=fields.lines().enumerate().filter_map(|(index,line)|line.strip_prefix("position (").map(|tail|(index,tail))).collect::<Vec<_>>();
+fn native_position(fields:&str)->Result<([f32;3],usize)> {native_vector(fields,"position")}
+fn native_vector(fields:&str,key:&str)->Result<([f32;3],usize)> {
+    let values=fields.lines().enumerate().filter_map(|(index,line)|line.strip_prefix(&format!("{key} (")).map(|tail|(index,tail))).collect::<Vec<_>>();
     if values.len()!=1{return invalid("Native starting position is unavailable or ambiguous");}
     let (index,tail)=values[0];
     let value=tail.split_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native position field".into()))?.0;
@@ -1158,6 +1170,17 @@ fn reviewed_combat(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDiffer
 }
 pub fn camera_points_close(a:&crate::maps::NativeCameraPoint,b:&crate::maps::NativeCameraPoint)->bool{
     a.index==b.index&&a.name==b.name&&positions_close(a.position,b.position)&&a.orientation_radians.iter().zip(b.orientation_radians).all(|(a,b)|facings_close(*a,b))&&(a.fov_radians-b.fov_radians).abs()<=0.000002
+}
+pub fn volume_geometry_close(a:&crate::maps::ScenarioLogicVolumeGeometry,b:&crate::maps::ScenarioLogicVolumeGeometry)->bool{[(a.forward,b.forward),(a.up,b.up),(a.corner,b.corner),(a.dimensions,b.dimensions)].into_iter().all(|(a,b)|positions_close(a,b))}
+fn volume_values(g:&crate::maps::ScenarioLogicVolumeGeometry)->[(&'static str,[f32;3]);4]{[("rotation_vector_forward",g.forward),("rotation_vector_up",g.up),("starting_corner",g.corner),("ending_corner_offset",g.dimensions)]}
+pub fn scenario_volume_choices(fields:&str)->Result<Vec<crate::maps::ScenarioLogicVolume>>{Ok(native_volume_fields(fields)?.into_iter().map(|r|r.0).collect())}
+fn native_volume_fields(fields:&str)->Result<Vec<(crate::maps::ScenarioLogicVolume,[usize;4])>>{
+    let array=array_listing(fields,"trigger_volumes")?;if array.count>1024{return invalid("Native trigger inventory exceeds1024entries");}let mut line=array.start+1;let mut rows=vec![];
+    for item in array_items(&array,"trigger_volumes")?{let root=direct_struct_fields(&item)?;let(_,types)=native_children(&root,"type","enum",2)?;let mut chosen=None;for(i,(_,text))in types.iter().enumerate(){let label=["fixed","rotational"][i];let parts=text.split_whitespace().collect::<Vec<_>>();if parts!=[label,"enum","value"]&&parts!=[label,"(*)","enum","value"]{return invalid("Unsupported native volume enum choices");}if parts.len()==4&&chosen.replace(i as u16).is_some(){return invalid("Ambiguous native volume type");}}let kind=chosen.ok_or_else(||crate::SparkError::Invalid("Native volume type unavailable".into()))?;let mut lines=[usize::MAX;4];let geometry=if kind==1{let mut values=vec![];for(i,key)in ["rotation_vector_forward","rotation_vector_up","starting_corner","ending_corner_offset"].into_iter().enumerate(){let(v,offset)=native_vector(&root,key)?;values.push(v);lines[i]=line+1+offset;}let g=crate::maps::ScenarioLogicVolumeGeometry{forward:values[0],up:values[1],corner:values[2],dimensions:values[3]};if !g.valid(){return invalid("Native trigger box has invalid basis, coordinates or dimensions");}Some(g)}else{None};rows.push((crate::maps::ScenarioLogicVolume{name:native_name(&root)?,kind,geometry},lines));line+=item.len();}Ok(rows)
+}
+fn reviewed_volume(before:&str,after:&str,index:u16,name:&str,geometry:&crate::maps::ScenarioLogicVolumeGeometry)->Result<Vec<FieldDifference>>{
+    let old=native_volume_fields(before)?;let new=native_volume_fields(after)?;if old.len()!=new.len(){return invalid("Trigger edit changed inventory");}let(a,lines)=old.get(usize::from(index)).ok_or_else(||crate::SparkError::Invalid("Trigger index missing".into()))?;let(b,new_lines)=&new[usize::from(index)];if a.name!=name||b.name!=name||a.kind!=1||b.kind!=1||lines!=new_lines||b.geometry.as_ref().is_none_or(|g|!volume_geometry_close(g,geometry)){return invalid("Trigger edit changed identity or differs from proposed geometry");}
+    let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();if a.len()!=b.len(){return invalid("Trigger edit changed native field structure");}let mut differences=vec![];for(i,(a,b))in a.iter().zip(&b).enumerate(){if a!=b{if !lines.contains(&i){return invalid("Trigger edit changed unrelated fields or script references");}differences.push(FieldDifference{before:(*a).into(),after:(*b).into()});}}if differences.is_empty(){return invalid("Trigger edit changed no fields");}Ok(differences)
 }
 pub fn scenario_trigger_volume_names(fields:&str)->Result<Vec<String>>{
     let volumes=array_listing(fields,"trigger_volumes")?;if volumes.count>1024{return invalid("Native trigger inventory exceeds1024entries");}array_items(&volumes,"trigger_volumes")?.iter().map(|item|native_name(&direct_struct_fields(item)?)).collect()
@@ -1404,7 +1427,7 @@ mod tests {
         let readback=run(operation.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());
         assert_eq!(readback.trim().split(',').map(|value|value.trim().parse::<f32>().unwrap()).collect::<Vec<_>>(),[20.25,-8.5,4.125]);
         let after_sha=crate::maps::hash_file(&file).unwrap();assert_ne!(before_sha,after_sha);
-        ScenarioSquadReadback{cameras:None,combat:vec![],source_sha256:after_sha.clone(),squads:scenario_squad_start_choices(&after).unwrap(),include_starts:true}.validate().unwrap();
+        ScenarioSquadReadback{volumes:None,cameras:None,combat:vec![],source_sha256:after_sha.clone(),squads:scenario_squad_start_choices(&after).unwrap(),include_starts:true}.validate().unwrap();
         let restore=Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),
             position:[1.,1.,1.],source_sha256:after_sha.clone(),facing_radians:None,command_list:None};
         run(restore.arguments_with_fields(&tags,"scnr",tag,&after).unwrap());assert_eq!(before,fields());
@@ -1415,6 +1438,8 @@ mod tests {
         let original=pose([1.,1.,1.],std::f32::consts::FRAC_PI_4);run(original.arguments_with_fields(&tags,"scnr",tag,&after_pose).unwrap());assert_eq!(before,fields());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let original_bytes=fs::read(&file).unwrap();
         run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"cutscene_camera_points".into(),"2".into(),"end".into(),"-S".into(),"cutscene_camera_points[1].name".into(),"native_camera".into(),"-S".into(),"cutscene_camera_points[1].field_of_view".into(),70f32.to_radians().to_string(),tag.into()]);let camera_before=fields();let mut point=scenario_camera_choices(&camera_before).unwrap()[1].clone();point.position=[4.25,-5.5,6.75];point.orientation_radians=[1.25,-0.2,0.4];point.fov_radians=80f32.to_radians();let edit=Operation::CutsceneCamera{point:point.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};run(edit.arguments_with_fields(&tags,"scnr",tag,&camera_before).unwrap());let camera_after=fields();assert_eq!(reviewed_difference(&camera_before,&camera_after,&edit).unwrap().len(),3);let result=run(edit.readback_arguments(&tags,"scnr",tag,&camera_before).unwrap().unwrap());edit.verify_readback(&tags,"scnr",tag,&camera_before,&result).unwrap();assert!(camera_points_close(&point,&scenario_camera_choices(&camera_after).unwrap()[1]));println!("Native cutscene camera:index/name preserved; pose/lens roundtrip; sourceSHA={}",crate::maps::hash_file(&file).unwrap());fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"trigger_volumes".into(),"1".into(),"end".into(),"-S".into(),"trigger_volumes[0].type".into(),"rotational".into(),"-S".into(),"trigger_volumes[0].name".into(),"native_volume".into(),"-S".into(),"trigger_volumes[0].rotation_vector_forward".into(),"1,0,0".into(),"-S".into(),"trigger_volumes[0].rotation_vector_up".into(),"0,0,1".into(),"-S".into(),"trigger_volumes[0].starting_corner".into(),"0,0,0".into(),"-S".into(),"trigger_volumes[0].ending_corner_offset".into(),"4,4,4".into(),tag.into()]);let volume_before=fields();let volume=Operation::TriggerVolume{index:0,name:"native_volume".into(),geometry:crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.25,-2.5,3.75],dimensions:[6.,7.,8.]},source_sha256:crate::maps::hash_file(&file).unwrap()};run(volume.arguments_with_fields(&tags,"scnr",tag,&volume_before).unwrap());let volume_after=fields();assert_eq!(reviewed_difference(&volume_before,&volume_after,&volume).unwrap().len(),3);let read=run(volume.readback_arguments(&tags,"scnr",tag,&volume_before).unwrap().unwrap());volume.verify_readback(&tags,"scnr",tag,&volume_before,&read).unwrap();fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+
         run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"command_lists".into(),"2".into(),"end".into(),"-S".into(),"command_lists[0].name".into(),"guard".into(),"-S".into(),"command_lists[1].name".into(),"patrol".into(),tag.into()]);
         let commands=fields();let lists=scenario_command_list_choices(&commands).unwrap();assert_eq!(lists.len(),2);assert_eq!(lists[1].name,"patrol");
         let point=scenario_squad_start_choices(&commands).unwrap()[3].starts.as_ref().unwrap()[1].clone();assert_eq!(point.command_list,Some(-1));
@@ -1428,7 +1453,7 @@ mod tests {
         let mut moving=all.clone();if let Operation::EncounterSquadBehavior{behavior,..}=&mut moving{behavior.initial_state="moving_loop".into();}assert!(moving.arguments_with_fields(&tags,"scnr",tag,&before).is_err());let mut renumbered=all.clone();if let Operation::EncounterSquadBehavior{behavior,..}=&mut renumbered{behavior.starts[0].index=1;}assert!(renumbered.arguments_with_fields(&tags,"scnr",tag,&before).is_err());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let combat_inventory=scenario_combat_choices(&before).unwrap();assert_eq!(combat_inventory[1].points.len(),2);assert_eq!(combat_inventory[1].points[1].group,"z");
         let firing=Operation::EncounterFiringPosition{encounter:1,point:0,encounter_name:"original_1".into(),position:[7.,8.,9.],group:"b".into(),source_sha256:before_sha.clone()};run(firing.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let revised=fields();assert_eq!(reviewed_difference(&before,&revised,&firing).unwrap().len(),3);assert!(reviewed_difference(&before,&revised.replace("name (original_0)","name (changed)"),&firing).is_err());let read=run(firing.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());firing.verify_readback(&tags,"scnr",tag,&before,&read).unwrap();let firing_sha=crate::maps::hash_file(&file).unwrap();
-        let groups=FiringGroups{attacking:vec!["a".into(),"z".into()],attacking_search:vec!["b".into()],attacking_guard:vec!["z".into()],defending:vec!["a".into()],defending_search:vec![],defending_guard:vec!["b".into(),"z".into()]};let tactical=Operation::EncounterSquadFiringGroups{encounter:1,squad:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),groups,source_sha256:firing_sha.clone()};for batch in tactical.argument_batches(tactical.arguments_with_fields(&tags,"scnr",tag,&revised).unwrap(),false).unwrap(){run(batch);}let final_fields=fields();assert_eq!(reviewed_difference(&revised,&final_fields,&tactical).unwrap().len(),7);let read=run(tactical.readback_arguments(&tags,"scnr",tag,&revised).unwrap().unwrap());tactical.verify_readback(&tags,"scnr",tag,&revised,&read).unwrap();let hash=crate::maps::hash_file(&file).unwrap();let targets=current_combat_targets(&final_fields,&hash,&[firing.clone(),tactical.clone()]).unwrap();let snapshot=ScenarioSquadReadback{cameras:None,source_sha256:hash.clone(),squads:scenario_squad_start_choices(&final_fields).unwrap(),include_starts:true,combat:targets};snapshot.validate().unwrap();let restored_targets=current_combat_targets(&before,&before_sha,&snapshot.combat).unwrap();assert!(matches!(&restored_targets[0],Operation::EncounterFiringPosition{position,group,..}if *position==[0.,0.,0.]&&group=="a"));assert!(matches!(&restored_targets[1],Operation::EncounterSquadFiringGroups{groups,..}if groups.masks().unwrap()==[0;6]));println!("Original native firing/tactics:pointSHA={firing_sha}; groupsSHA={hash}; scalarSHA={}; exact fields/restore scope verified",crate::hex_bytes(Sha256::digest(read.as_bytes())));fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        let groups=FiringGroups{attacking:vec!["a".into(),"z".into()],attacking_search:vec!["b".into()],attacking_guard:vec!["z".into()],defending:vec!["a".into()],defending_search:vec![],defending_guard:vec!["b".into(),"z".into()]};let tactical=Operation::EncounterSquadFiringGroups{encounter:1,squad:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),groups,source_sha256:firing_sha.clone()};for batch in tactical.argument_batches(tactical.arguments_with_fields(&tags,"scnr",tag,&revised).unwrap(),false).unwrap(){run(batch);}let final_fields=fields();assert_eq!(reviewed_difference(&revised,&final_fields,&tactical).unwrap().len(),7);let read=run(tactical.readback_arguments(&tags,"scnr",tag,&revised).unwrap().unwrap());tactical.verify_readback(&tags,"scnr",tag,&revised,&read).unwrap();let hash=crate::maps::hash_file(&file).unwrap();let targets=current_combat_targets(&final_fields,&hash,&[firing.clone(),tactical.clone()]).unwrap();let snapshot=ScenarioSquadReadback{volumes:None,cameras:None,source_sha256:hash.clone(),squads:scenario_squad_start_choices(&final_fields).unwrap(),include_starts:true,combat:targets};snapshot.validate().unwrap();let restored_targets=current_combat_targets(&before,&before_sha,&snapshot.combat).unwrap();assert!(matches!(&restored_targets[0],Operation::EncounterFiringPosition{position,group,..}if *position==[0.,0.,0.]&&group=="a"));assert!(matches!(&restored_targets[1],Operation::EncounterSquadFiringGroups{groups,..}if groups.masks().unwrap()==[0;6]));println!("Original native firing/tactics:pointSHA={firing_sha}; groupsSHA={hash}; scalarSHA={}; exact fields/restore scope verified",crate::hex_bytes(Sha256::digest(read.as_bytes())));fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         fs::create_dir_all(tags.join("actors")).unwrap();run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),"actors/behavior.actor_variant".into()]);
         let states=[CampaignAiState::Sleeping,CampaignAiState::Alert,CampaignAiState::Guarding,CampaignAiState::Searching,CampaignAiState::Fleeing];
         let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]}),patrol:None,combat:None}).collect();
@@ -1446,7 +1471,7 @@ mod tests {
         for batch in patrol_edit.argument_batches(patrol_edit.arguments_with_fields(&tags,"scnr",tag,&after).unwrap(),false).unwrap(){run(batch);}let route_after=fields();reviewed_difference(&after,&route_after,&patrol_edit).unwrap();assert!(reviewed_difference(&after,&route_after.replace("name (original_0)","name (bad)"),&patrol_edit).is_err());
         let mut scalar=vec![];for batch in patrol_edit.argument_batches(patrol_edit.readback_arguments(&tags,"scnr",tag,&after).unwrap().unwrap(),true).unwrap(){scalar.extend(run(batch).lines().map(str::to_owned));}let scalar=scalar.join("\n");patrol_edit.verify_readback(&tags,"scnr",tag,&after,&scalar).unwrap();
         let refreshed=current_combat_targets(&route_after,&crate::maps::hash_file(&file).unwrap(),std::slice::from_ref(&patrol_edit)).unwrap();if let Operation::EncounterSquadPatrol{route,..}=&refreshed[0]{assert_eq!(route.points.len(),4);assert!(route.points.iter().enumerate().all(|(i,p)|p.source_index==Some(i as u16)));}else{panic!("Wrong patrol readback scope");}
-        let binding=ScenarioSquadReadback{cameras:None,source_sha256:crate::maps::hash_file(&file).unwrap(),squads:scenario_squad_start_choices(&route_after).unwrap(),include_starts:true,combat:refreshed};binding.validate().unwrap();let mut stale=binding.clone();stale.source_sha256="f".repeat(64);assert!(stale.validate().is_err());
+        let binding=ScenarioSquadReadback{volumes:None,cameras:None,source_sha256:crate::maps::hash_file(&file).unwrap(),squads:scenario_squad_start_choices(&route_after).unwrap(),include_starts:true,combat:refreshed};binding.validate().unwrap();let mut stale=binding.clone();stale.source_sha256="f".repeat(64);assert!(stale.validate().is_err());
         println!("Original patrol source: insert/copy/move/erase/pose/weight/waits; tagSHA={}; scalarSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(scalar.as_bytes())));
         let mut invalid=patrol_edit.clone();if let Operation::EncounterSquadPatrol{route,..}=&mut invalid{route.points[0].animation=7;}assert!(invalid.arguments_with_fields(&tags,"scnr",tag,&after).is_err());
         if let Operation::EncounterSquadPatrol{route,..}=&mut invalid{*route=revised_route.clone();route.points.truncate(1);}assert!(invalid.arguments_with_fields(&tags,"scnr",tag,&after).is_err());
@@ -1471,6 +1496,15 @@ mod tests {
         for index in [-2,2,256]{if let Operation::EncounterStartPosition{command_list,..}=&mut op{*command_list=Some(index);}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",&before).is_err());}
         let missing=before.replace("                        command_list (65535) index\n","");if let Operation::EncounterStartPosition{command_list,..}=&mut op{*command_list=Some(-1);}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",&missing).is_err());assert!(scenario_command_list_choices(&before.replace("command_lists[2]","command_lists[257]")).is_err());
         let legacy:ScenarioStartChoice=serde_json::from_value(serde_json::json!({"index":0,"position":[1,2,3]})).unwrap();assert!(legacy.command_list.is_none());
+    }
+    #[test]
+    fn native_trigger_geometry_edit_preserves_identity_and_refuses_unrelated_changes(){
+        let before="trigger_volumes[1] array\n    trigger_volumes[0] struct\n        type enum
+            fixed enum value
+            rotational (*) enum value\n        name (intro_area) tagstring\n        rotation_vector_forward (1,0,0) vector3d\n        rotation_vector_up (0,0,1) vector3d\n        starting_corner (0,0,0) point3d\n        ending_corner_offset (4,4,4) vector3d\nscript_marker (preserve) tagstring\n";
+        let geometry=crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.,2.,3.],dimensions:[6.,7.,8.]};let op=Operation::TriggerVolume{index:0,name:"intro_area".into(),geometry:geometry.clone(),source_sha256:"a".repeat(64)};op.validate("scnr","owned.scenario").unwrap();let args=op.arguments_with_fields(Path::new("tags"),"scnr","owned.scenario",before).unwrap();assert!(args.iter().any(|s|s=="trigger_volumes[0].starting_corner"));assert!(!args.iter().any(|s|s.ends_with(".name")||s.ends_with(".type")));op.verify_readback(Path::new("tags"),"scnr","owned.scenario",before,"0,1,0\n0,0,1\n1,2,3\n6,7,8").unwrap();
+        let after=before.replace("(1,0,0)","(0,1,0)").replace("(0,0,0)","(1,2,3)").replace("(4,4,4)","(6,7,8)");assert_eq!(reviewed_difference(before,&after,&op).unwrap().len(),3);for changed in [after.replace("name (intro_area)","name (other)"),after.replace("script_marker (preserve)","script_marker (lost)"),after.replace("rotational (*)","fixed (*)")]{assert!(reviewed_difference(before,&changed,&op).is_err());}
+        let mut bad=geometry;bad.dimensions[0]=0.;assert!(Operation::TriggerVolume{index:0,name:"intro_area".into(),geometry:bad,source_sha256:"a".repeat(64)}.validate("scnr","owned.scenario").is_err());assert!(op.arguments_with_fields(Path::new("tags"),"scnr","owned.scenario",&before.replace("rotational (*)","rotational").replace("fixed enum","fixed (*) enum")).is_err());
     }
     #[test]
     fn native_cinematic_area_inventory_preserves_names_and_refuses_malformed_fields(){
@@ -1513,7 +1547,7 @@ mod tests {
     #[test]
     fn original_patrol_snapshot_validates_its_source_binding_without_panicking(){
         let operation:Operation=serde_json::from_value(serde_json::json!({"kind":"encounterSquadPatrol","encounter":0,"squad":0,"encounterName":"original_0","squadName":"squad_0","route":{"points":[]},"sourceSha256":"a".repeat(64)})).unwrap();
-        let mut snapshot=ScenarioSquadReadback{cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![operation.clone()]};snapshot.validate().unwrap();
+        let mut snapshot=ScenarioSquadReadback{volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![operation.clone()]};snapshot.validate().unwrap();
         snapshot.source_sha256="b".repeat(64);assert!(snapshot.validate().is_err());snapshot.source_sha256="a".repeat(64);snapshot.combat.push(operation);assert!(snapshot.validate().is_err());
     }
     #[test]
@@ -1543,15 +1577,15 @@ mod tests {
             mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![Encounter{name:"original".into(),squads:vec!["squad_a".into()],
                 team:0,details:Some(EncounterDetails{flags:0,manual_bsp_index:-1,squads:vec![squad],firing_positions:vec![]})}],
             scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"level".into()};
-        let snapshot=ScenarioSquadReadback{cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&ai_fields()).unwrap(),include_starts:true};
+        let snapshot=ScenarioSquadReadback{volumes:None,cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&ai_fields()).unwrap(),include_starts:true};
         snapshot.verify_map(&map).unwrap();
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].facing=0.;assert!(snapshot.verify_map(&map).is_err());
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].facing=std::f32::consts::FRAC_PI_2;
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].position[0]=9.0;
         assert!(snapshot.verify_map(&map).is_err());
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].position=[1.,2.,3.];
-        let fields=ai_fields().replace("facing (90) angle","facing (90) angle\n                        command_list (1) index");let bound=ScenarioSquadReadback{cameras:None,source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&fields).unwrap(),include_starts:true,combat:vec![]};assert!(bound.verify_map(&map).is_err());map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=1;bound.verify_map(&map).unwrap();let mut binding=start_edit();if let Operation::EncounterStartPosition{position,facing_radians,command_list,..}=&mut binding{*position=[1.,2.,3.];*facing_radians=Some(std::f32::consts::FRAC_PI_2);*command_list=Some(1);}binding.verify_compiled_encounter(&map).unwrap();map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=-1;assert!(binding.verify_compiled_encounter(&map).is_err());
-        let legacy=ScenarioSquadReadback{cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_choices(&ai_fields()).unwrap(),include_starts:false};
+        let fields=ai_fields().replace("facing (90) angle","facing (90) angle\n                        command_list (1) index");let bound=ScenarioSquadReadback{volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&fields).unwrap(),include_starts:true,combat:vec![]};assert!(bound.verify_map(&map).is_err());map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=1;bound.verify_map(&map).unwrap();let mut binding=start_edit();if let Operation::EncounterStartPosition{position,facing_radians,command_list,..}=&mut binding{*position=[1.,2.,3.];*facing_radians=Some(std::f32::consts::FRAC_PI_2);*command_list=Some(1);}binding.verify_compiled_encounter(&map).unwrap();map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=-1;assert!(binding.verify_compiled_encounter(&map).is_err());
+        let legacy=ScenarioSquadReadback{volumes:None,cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_choices(&ai_fields()).unwrap(),include_starts:false};
         let encoded=serde_json::to_value(&legacy).unwrap();assert!(encoded.get("includeStarts").is_none());
         serde_json::from_value::<ScenarioSquadReadback>(encoded.clone()).unwrap().verify_map(&map).unwrap();
         assert!(encoded.get("combat").is_none());let firing=Operation::EncounterFiringPosition{encounter:0,point:0,encounter_name:"original".into(),position:[4.,5.,6.],group:"z".into(),source_sha256:"a".repeat(64)};map.encounters[0].details.as_mut().unwrap().firing_positions.push(AiFiringPosition{position:[4.,5.,6.],group_index:25,cluster_index:-1,surface_index:0});firing.verify_compiled_encounter(&map).unwrap();map.encounters[0].details.as_mut().unwrap().firing_positions[0].group_index=0;assert!(firing.verify_compiled_encounter(&map).is_err());map.encounters[0].details.as_mut().unwrap().firing_positions[0].group_index=25;

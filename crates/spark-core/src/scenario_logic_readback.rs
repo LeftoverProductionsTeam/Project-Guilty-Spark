@@ -7,12 +7,23 @@ pub struct ScenarioLogicName {pub name:String,pub object_type:i16,pub object_ind
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct ScenarioLogicDevice {pub class:String,pub index:usize,pub name_index:i16,pub tag_path:String,pub position:[f32;3]}
-#[derive(Clone,Debug,Serialize)]
-#[serde(rename_all="camelCase")]
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioLogicVolume {pub name:String,pub kind:u16,pub geometry:Option<ScenarioLogicVolumeGeometry>}
-#[derive(Clone,Debug,Serialize)]
-#[serde(rename_all="camelCase")]
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioLogicVolumeGeometry {pub forward:[f32;3],pub up:[f32;3],pub corner:[f32;3],pub dimensions:[f32;3]}
+impl ScenarioLogicVolumeGeometry {
+    pub(crate) fn valid(&self)->bool{self.contains(self.corner)&&self.corner.iter().chain(self.dimensions.iter()).all(|v|v.abs()<=1e6)}
+    pub(crate) fn contains(&self,point:[f32;3])->bool {
+        let dot=|a:[f32;3],b:[f32;3]|a.iter().zip(b).map(|(x,y)|x*y).sum::<f32>();
+        if point.iter().chain(self.forward.iter()).chain(self.up.iter()).chain(self.corner.iter()).chain(self.dimensions.iter()).any(|v|!v.is_finite())
+            ||self.dimensions.iter().any(|d|*d<=0.)||(dot(self.forward,self.forward)-1.).abs()>1e-4||(dot(self.up,self.up)-1.).abs()>1e-4||dot(self.forward,self.up).abs()>1e-4{return false;}
+        let [ux,uy,uz]=self.up;let [fx,fy,fz]=self.forward;let side=[uy*fz-uz*fy,uz*fx-ux*fz,ux*fy-uy*fx];
+        let delta=std::array::from_fn(|i|point[i]-self.corner[i]);
+        [self.forward,side,self.up].into_iter().zip(self.dimensions).all(|(axis,extent)|{let value=dot(delta,axis);value>=-1e-5&&value<=extent+1e-5})
+    }
+}
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct ScenarioLogicReadback {pub names:Vec<ScenarioLogicName>,pub devices:Vec<ScenarioLogicDevice>,pub volumes:Vec<ScenarioLogicVolume>}
@@ -45,10 +56,9 @@ fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Rea
     if at<space.begin||at.checked_add(0x5b0).is_none_or(|end|end>space.end){return invalid("Compiled Logic scenario body escapes its tag region");}
     decode(&r,&space,at)
 }
-fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadback>{
-    let (at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
-    for index in 0..count {let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}
-    let (at,count)=space.block(r,sc+0x360,96,4096)?;let mut volumes=vec![];
+pub fn scenario_volume_readback(path:&Path,inspection:&MapInspection)->Result<Vec<ScenarioLogicVolume>> {with_scenario(path,inspection,parse_volumes)}
+fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolume>> {
+    let (at,count)=space.block(r,at+0x360,96,4096)?;let mut volumes=vec![];
     for index in 0..count {let p=at+index*96;let kind=r.u16(p)?;
         if kind>1{return invalid("Compiled native trigger volume has an unsupported representation");}
         // Axis-aligned volumes use another union member. Never interpret their
@@ -56,6 +66,12 @@ fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadb
         let geometry=if kind==1{Some(ScenarioLogicVolumeGeometry{forward:vec3(r,p+48)?,up:vec3(r,p+60)?,corner:vec3(r,p+72)?,dimensions:vec3(r,p+84)?})}else{None};
         volumes.push(ScenarioLogicVolume{name:r.string(p+4,32)?,kind,geometry});
     }
+    Ok(volumes)
+}
+fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadback>{
+    let (at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
+    for index in 0..count {let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}
+    let volumes=parse_volumes(r,space,sc)?;
     let mut devices=vec![];
     for (offset,palette,class,kind) in [(0x294,0x2a0,"mach","Machine"),(0x2ac,0x2b8,"ctrl","Control")] {
         // Reuse the editor's native placement decoder; only the reverse name

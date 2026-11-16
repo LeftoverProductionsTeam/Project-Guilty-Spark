@@ -1,3 +1,6 @@
+import NativeTriggerVolumes from './NativeTriggerVolumes';
+import {NATIVE_VOLUME_VIEW} from '../nativeTriggerVolume';
+import type {NativeVolumeView} from '../nativeTriggerVolume';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { Project } from '../types';
@@ -87,9 +90,10 @@ export default function NativeTagOperations({
   const [nativeTag, setNativeTag] = useState<number | null>(null),
     [choices, setChoices] = useState<{ id: number; class: string; path: string }[]>([]);
   const selectedTagId = tagId ?? nativeTag;
+  const [volumeView]=useMapState<NativeVolumeView|null>(project.id,NATIVE_VOLUME_VIEW,()=>null);
   const [cameraView]=useMapState<NativeCameraView|null>(project.id,NATIVE_CAMERA_VIEW,()=>null);
   const [aiDraft]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
-  useEffect(()=>{if(tagId===undefined&&(aiDraft?.reviewRequest||cameraView?.reviewRequest)){setNativeTag(null);setExpanded(true);}},[project.id,tagId,aiDraft?.reviewRequest,cameraView?.reviewRequest]);
+  useEffect(()=>{if(tagId===undefined&&(aiDraft?.reviewRequest||cameraView?.reviewRequest||volumeView?.reviewRequest)){setNativeTag(null);setExpanded(true);}},[project.id,tagId,aiDraft?.reviewRequest,cameraView?.reviewRequest,volumeView?.reviewRequest]);
   useEffect(()=>{if(context&&aiDraft?.kind==='patrol'&&aiDraft.reviewRequest&&nativeAiStartMatches(aiDraft,context))setSquadKey(`${aiDraft.encounter}:${aiDraft.squad}`);},[context,aiDraft?.reviewRequest]);
   useEffect(() => {
     setNativeTag(null);
@@ -311,6 +315,7 @@ export default function NativeTagOperations({
             </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
             {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           </details>}
+          {context.class==='scnr'&&<NativeTriggerVolumes context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeCutsceneCameras context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeStartingPositions kind="firing" context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}

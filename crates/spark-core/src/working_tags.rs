@@ -1441,7 +1441,8 @@ fn run_with(
             let squads=if include_starts{crate::native_operations::scenario_squad_start_choices(&fields)?}else{crate::native_operations::scenario_squad_choices(&fields)?};
             let combat=crate::native_operations::current_combat_targets(&fields,&source_sha256,&prepared.scenario_squad_readback.as_ref().unwrap().combat)?;
             let cameras=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cameras.is_some()){Some(crate::native_operations::scenario_camera_choices(&fields)?)}else{None};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat,cameras};
+            let volumes=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.volumes.is_some()){Some(crate::native_operations::scenario_volume_choices(&fields)?)}else{None};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat,cameras,volumes};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
@@ -1490,7 +1491,7 @@ fn run_with(
         if let Some(snapshot)=&receipt.scenario_squad_readback{
             snapshot.verify_cache(&output,&inspected)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
-                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,
+                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,"volumes":snapshot.volumes,
                 "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional camera inventory/pose/lens is read from the compiled cache. This is not AI/cinematic/gameplay acceptance."
             }))?,false)?;
         }

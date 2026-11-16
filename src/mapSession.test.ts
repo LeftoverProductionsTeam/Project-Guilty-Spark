@@ -187,7 +187,7 @@ test('native AI coordinate proposals stay window-local and never enter restart s
  const draft={key:'source-point',values:['1','2','3'],active:true,reviewRequest:42};
  session.writeMapSession('a','world.ai-start',draft);session.writeMapSession('a','world.grid',true);
  expect(session.readMapSession('a','world.ai-start',null)).toEqual(draft);
- session.configureMapViewWindow('second');expect(session.readMapSession('a','world.ai-start',null)).toBeNull();
+ session.configureMapViewWindow('second');expect(session.readMapSession('a','world.trigger-volume',null)).toBeNull();expect(session.readMapSession('a','world.ai-start',null)).toBeNull();
  session.writeMapSession('a','world.ai-start',{...draft,key:'second'});
  session.configureMapViewWindow('main');expect(session.readMapSession('a','world.ai-start',null)).toEqual(draft);
  expect([...data.values()].every(text=>!text.includes('world.ai-start'))).toBe(true);
@@ -207,10 +207,17 @@ test('a quota failure retains ordinary settings without persisting a transient A
 
 test('camera and AI source proposals survive ordinary writes together but never reach another window or restart',async()=>{
  const session=await import('./mapSession');session.configureMapViewWindow('main');
- session.writeMapSession('a','world.ai-start',{kind:'patrol',key:'native-ai'});session.writeMapSession('a','world.cutscene-camera',{sourceSha256:'a'.repeat(64),active:true});
+ session.writeMapSession('a','world.trigger-volume',{active:true});session.writeMapSession('a','world.ai-start',{kind:'patrol',key:'native-ai'});session.writeMapSession('a','world.cutscene-camera',{sourceSha256:'a'.repeat(64),active:true});
  blocked=true;session.writeMapSession('a','world.grid',true);blocked=false;session.writeMapSession('a','world.snap',true);
  expect(session.readMapSession('a','world.ai-start',null)).toEqual({kind:'patrol',key:'native-ai'});expect(session.readMapSession('a','world.cutscene-camera',null)).toMatchObject({active:true});
- expect([...data.values()].every(text=>!text.includes('world.ai-start')&&!text.includes('world.cutscene-camera'))).toBe(true);
+ expect([...data.values()].every(text=>!text.includes('world.ai-start')&&!text.includes('world.cutscene-camera')&&!text.includes('world.trigger-volume'))).toBe(true);
  session.configureMapViewWindow('second');expect(session.readMapSession('a','world.cutscene-camera',null)).toBeNull();
- vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','world.cutscene-camera',null)).toBeNull();expect(restarted.readMapSession('a','world.ai-start',null)).toBeNull();expect(restarted.readMapSession('a','world.grid',false)).toBe(true);
+ vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','world.trigger-volume',null)).toBeNull();expect(restarted.readMapSession('a','world.cutscene-camera',null)).toBeNull();expect(restarted.readMapSession('a','world.ai-start',null)).toBeNull();expect(restarted.readMapSession('a','world.grid',false)).toBe(true);
+});
+
+test('mission expansion stays window-local and restores without touching authored content',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('a','creator-mission-expanded',{first:true});
+ session.configureMapViewWindow('other');session.writeMapSession('a','creator-mission-expanded',{second:true});
+ session.configureMapViewWindow('main');expect(session.readMapSession('a','creator-mission-expanded',{})).toEqual({first:true});
+ vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','creator-mission-expanded',{})).toEqual({first:true});
 });

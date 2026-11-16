@@ -38,7 +38,9 @@ export function nativePatrolEqual(a:NativeSourcePatrolRoute,b:NativeSourcePatrol
 }
 export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null;patrol?:NativeSourcePatrolRoute|null;patrolIssue?:string|null}[]}
 export interface NativeCameraPoint {index:number;name:string;position:[number,number,number];orientationRadians:[number,number,number];fovRadians:number}
-export type NativeOperation = {kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
+export interface NativeVolumeGeometry {forward:[number,number,number];up:[number,number,number];corner:[number,number,number];dimensions:[number,number,number]}
+export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVolumeGeometry|null}
+export type NativeOperation = {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null;commandList?:number|null}
@@ -61,6 +63,8 @@ export interface NativeTagContext {
   canAppendEncounter?:boolean;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
+  scenarioVolumes?:NativeTriggerVolume[];
+  triggerEditIssue?:string|null;
   scenarioCameras?:NativeCameraPoint[];
   cameraEditIssue?:string|null;
   scenarioCommandLists?:{index:number;name:string;commands:number}[];

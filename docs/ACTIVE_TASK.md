@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native cinematic area milestone; existing trigger geometry workflow next
+Task: Operation110 — compact responsive mission editing; native trigger geometry accepted in scope
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 2b9eed208c910d52a10f4e335317d78a158ae84b parent plus this scoped source/manifest commit (git log -1 resolves it). Fresh Windows area activation/disable/CE readback passes; no gameplay acceptance.
-Next action: add existing native trigger-area geometry inspection/viewport editing through current native source and Level Editor systems. Preserve accepted cinematic exporter. Game activation/control restoration awaits authorized private testing when desktop control works;37944 and full M1–M6 remain open. QA68860 CLOSED/disposed.
+Latest verified revision: e22676d3bdfc15f827c316e0eacc3af40b2c9e99 plus this verified source/manifest checkpoint (resolve git log -1). Native app62dbbda8; exact hashes/evidence in RUNTIME_INTEGRATION_20261107.
+Next action: resume Black Echo/campaign native creator and37944 investigation; preserve accepted trigger/compact-UI scopes. Native game acceptance awaits available desktop control; no repeated unchanged retry. Full M1–M6/475IDs remain open.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov current checkpoint: native trigger Move-Rotate-Scale/review/Restore/Save/3restarts/CE geometry readback passes. Compact36px mission rows,42rapid edits/Undo/Save/status10-2-2ms/3restarts/HUD readback pass;0page errors.128beat/browser8journeys pass. Exact hashes/captures/failures in runtime evidence. QA42550/run-KrC4rf CLOSED:4562026213logicalB disposed, peak allocated4361025184B; physical reclaimed unavailable. Originals/475IDs unchanged; no game/37944/full-suite acceptance.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
