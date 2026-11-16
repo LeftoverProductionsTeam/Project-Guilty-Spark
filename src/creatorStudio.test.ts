@@ -1,3 +1,4 @@
+import type {NativeTagContext} from './nativeOperations';
 import {inspectScenarioBindings} from './scenarioBindings';
 import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
@@ -295,4 +296,17 @@ it('recovered mission encounters use actual native source instead of stale impor
  const squads=[{encounter:0,encounterName:'guards',name:'patrol'}];expect(inspectScenarioBindings([script],null,null,[],[],[],squads).find(row=>row.dependency.startsWith('ai_encounter:'))?.status).toBe('presentInNativeSource');
  expect(inspectScenarioBindings([script],null,null,[],[],[],[]).find(row=>row.dependency.startsWith('ai_encounter:'))?.status).toBe('absentInNativeSource');
  expect(inspectScenarioBindings([script],null,null,[],[],[],[...squads,{...squads[0],encounter:1}]).find(row=>row.dependency.startsWith('ai_encounter:'))?.status).toBe('absentInNativeSource');
+});
+
+it('authors and connects the complete recovered Black Echo blueprint without replacing native content',()=>{
+ const project=campaignDraft();project.history=[];project.quickForge=null;project.source={sha256:'c'.repeat(64)} as Project['source'];project.builds=[{id:'source',status:'validated',target:'gbx-custom'}] as Project['builds'];
+ const box={forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,4,4]};
+ const names=['be_marines','be_covenant','be_flood','be_defense'];
+ const source={projectId:project.id,buildId:'source',class:'scnr',sourceTarget:'gbx-custom',canAppendEncounter:true,tagSha256:'a'.repeat(64),protectedSquadEncounters:[],scenarioVolumes:['be_insert','be_survivors','be_artifact','be_containment','be_extract','extraction_return','extraction_zone'].map(name=>({name,kind:1,geometry:box})),scenarioDevices:['extraction_deploy','extraction_activate'].map(name=>({name,class:'ctrl'})),scenarioSquads:names.map((encounterName,encounter)=>({encounter,encounterName,name:'squad'})),missionSource:{encounters:names.map(name=>({name,initiallyCreated:false})),weapons:[]}} as unknown as NativeTagContext;
+ const before=JSON.stringify(project),native=JSON.stringify(source);let id=0;const draft=addBlackEchoDraft(project,()=>`recovered_${++id}`,source);expect(draft.studio!.missions).toHaveLength(7);expect(draft.quickForge).toBeNull();expect(JSON.stringify(project)).toBe(before);expect(JSON.stringify(source)).toBe(native);
+ const connected=connectBlackEchoObjectives(draft,()=>`unused_${++id}`,source);expect(connected.studio!.missions.map(beat=>beat.id)).toEqual(draft.studio!.missions.map(beat=>beat.id));expect(connected.studio!.missions[3].trigger).toBe('weaponOwned');expect(connected.studio!.missions[6].trigger).toBe('forerunnerExtractionSettled');expect(connected.source).toBe(project.source);expect(connected.builds).toBe(project.builds);
+ const broken=structuredClone(source);broken.scenarioVolumes!.pop();expect(()=>connectBlackEchoObjectives(draft,()=>'',broken)).toThrow(/extraction pad/);
+ for(const kind of ['active','recipe','missing','stale','malformed'] as const){const bad=structuredClone(source);if(kind==='active')bad.missionSource!.encounters[0].initiallyCreated=true;if(kind==='recipe')bad.protectedSquadEncounters=['be_marines'];if(kind==='missing')bad.scenarioVolumes!.shift();if(kind==='stale')bad.buildId='other';if(kind==='malformed')bad.missionSourceIssue='Unreadable profile';expect(()=>addBlackEchoDraft(project,()=>'',bad)).toThrow();}
+ expect(()=>connectBlackEchoObjectives(draft,()=>'',{...source,sourceTarget:'mcc-cea'})).toThrow(/CE609/);
+ let history=historyReducer({...initialHistory,current:project},{type:'edit',project:connected,description:'Author recovered Black Echo'});history=historyReducer(history,{type:'undo'});expect(history.current).toEqual(project);history=historyReducer(history,{type:'redo'});expect(JSON.parse(JSON.stringify(history.current)).studio.missions).toEqual(connected.studio!.missions);
 });

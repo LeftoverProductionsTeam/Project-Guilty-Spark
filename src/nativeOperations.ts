@@ -93,6 +93,7 @@ export type NativeOperation = {kind:'vehicleFlight';tuning:NativeVehicleFlight;s
   | {kind:'encounterSquadFiringGroups';encounter:number;squad:number;encounterName:string;squadName:string;groups:NativeCombatSource['groups'];sourceSha256:string}
   | ({kind:'appendEncounter'}&Omit<NativeEncounterAppend,'grid'|'starts'|'behavior'|'patrol'|'combat'>) | {kind:'appendEncounters';encounters:NativeEncounterAppend[];sourceRules?:FirefightConfig};
 export interface NativeTagContext {
+  missionSource?:{encounters:{name:string;initiallyCreated:boolean}[];weapons:{tagPath:string;placements:number[];startingEquipment:boolean}[]}|null;missionSourceIssue?:string|null;
   vehicleFlight?:NativeVehicleFlight|null;vehicleFlightIssue?:string|null;
   sourceTarget?: 'mcc-cea' | 'gbx-custom';
   projectId: string;

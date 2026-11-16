@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: a2d0aa074e7ecdadeee9cc723bfdba3d0d85b7d0, canonical local master.
-Latest verified revision: this checkpoint commit (parent a2d0aa074e7ecdadeee9cc723bfdba3d0d85b7d0); recovered campaign source integration has focused browser/core/native readback evidence, not full mission acceptance.
-Next action: compose the full reviewed Black Echo mission using repaired recovered Mission Director source, existing campaign HUD/audio/technology/AI/pad/dropship tools; fix real out-of-BSP route points and Flood start without relaxing checks, compile/read back. Native Windows42-edit/Save37944/full restart and approved Forerunner mission/gameplay remain open while desktop initialization is unavailable. Continue independent authoring; no unchanged desktop bypass retry.
+Starting revision: bb8e90654c0a4dc900859bc035ad9d79a1727ffd, canonical local master.
+Latest verified revision: this checkpoint commit (parent bb8e90654c0a4dc900859bc035ad9d79a1727ffd); recovered Black Echo blueprint/native-item source workflow passes focused checks, not complete mission/gameplay.
+Next action: author/fix the expanded Black Echo native geometry, out-of-BSP AI starts and physically valid dropship routes using existing BSP/AI/command source tools; then compose all7 objectives/HUD/audio/technology/pads and native compile/readback. Native Windows42-edit/Save37944/restart and approved Forerunner flight/mission acceptance remain open; no unchanged blocked desktop retry.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov native Black Echo source (parent bb8e906): direct native read → create7 beats using existing areas/encounters → native collection/settlement binding → placed technology selection → history/Save/reopen → reviewed source draft. Native indices/tags/scripts stay unchanged. Every starting profile is checked; granted items disabled and skipped by keyboard. Missing/active/recipe-owned/stale source refuses. Frontend36/core28(+5opt-in skips)/browser5/guide20contexts/TypeScript/Vite/Windows all-target PASS; native fixture1PASS reads actual technology placement0 and absence from loadouts, preserves original hashes. Fixture cachee5711810... is separate from a full7-beat Black Echo compile/playtest. Exact source/test hashes and initial fixes in RUNTIME_INTEGRATION_20261107. Full mission/geometry/flight/native UI gates remain OPEN.
 
 16Nov recovered mission (parent a2d0aa0): Creator Studio → current-window RuntimeDock native reference review → generated saved draft/history/reopen → pinned working-tag compilation/readback. Original source/recipe ownership, stale metadata and handwritten/function conflicts refuse replacement; recovered camera poses remain source-owned. Existing native mission/HUD/Extraction validators now retained in working-tag receipt. Final7browser/35frontend/60Rust(+7opt-in skips)/guide20contexts/TypeScript/Vite/Windows all-target checks PASS. Installed native1PASS: generated startup two-objective CE609 cache7cbf2941ef5e99ed4affc051e0245694dd314797a96207b0bf7e54a25961ce04, original/restored SCNR1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207. Native HSC manual/startup syntax separately passes. be_flood start and2/3flight points outsideBSP0 plus legacy asset warnings remain; NOT full Black Echo/flight/gameplay/native desktop acceptance. Exact source/test hashes, failures/repair and How To in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT/HUMAN_TEST_PLAN.
 
@@ -126,6 +128,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+QA59805/run-n5CPtL CLOSED;1398599599logicalB disposed, root absent, development runs[]/issues[]. All owned tools/tests/logs terminal. No physical-reclamation claim, SDK/map/app/archive retained, Forerunner/original writes, runtime/game launch, push or publication.475CSV/legacy hashes and Git/stashes preserved. Both source manifests required; regenerate from staged source without archive.
 
 QA98579/run-yCym7t CLOSED; all owned tools/tests terminal and log handles closed.1399116590logicalB disposed, root absent, development runs[]/issues[]. No physical-reclaimed claim. No retained map/test executable/SDK/archive, game/Forerunner/original/remote writes or app/release build.475CSV SHA b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 and ACTIVE_TASK.previous SHA afc29077c1f71a4481044c220fa84136bae79604653c9e8a3d84b1e0c11c5607 unchanged. Both manifest aliases remain required and must be regenerated from staged source; no source archive.
 

@@ -1039,6 +1039,35 @@ pub fn native_mission_encounters(fields:&str)->Result<Vec<NativeMissionEncounter
   let(value,kind)=flags[0].split_once(')').ok_or_else(||crate::SparkError::Invalid("Native encounter initial-creation flag is malformed".into()))?;if kind.trim()!="bitfield"{return invalid("Native encounter initial-creation flag has an unsupported type");}let initially_created=match value.trim(){"0"=>true,"1"=>false,_=>return invalid("Native encounter initial-creation flag has an unsupported value")};Ok(NativeMissionEncounter{name,initially_created})
  }).collect()
 }
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeMissionWeapon {pub tag_path:String,pub placements:Vec<u16>,pub starting_equipment:bool}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeMissionSource {pub encounters:Vec<NativeMissionEncounter>,pub weapons:Vec<NativeMissionWeapon>}
+/// Current native placements and every starting profile, never a stale cache's
+/// palette alone. This is source selection, not a claim that an item spawns.
+pub fn native_mission_source(fields:&str)->Result<NativeMissionSource>{
+ let encounters=native_mission_encounters(fields)?;
+ let reference=|root:&str,key:&str|->Result<Option<String>>{
+  let prefix=format!("{key} (");let rows=root.lines().filter_map(|line|line.strip_prefix(&prefix)).collect::<Vec<_>>();
+  if rows.len()!=1{return invalid("Native mission weapon reference is missing or ambiguous");}
+  let(value,kind)=rows[0].rsplit_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native weapon reference".into()))?;
+  if kind.trim()!="dependency"{return invalid("Unsupported native weapon reference type");}
+  if value.is_empty()||value=="null"{return Ok(None);}
+  let value=value.replace('\\',"/");let path=value.strip_suffix(".weapon").ok_or_else(||crate::SparkError::Invalid("Native weapon reference has another tag class".into()))?;
+  crate::safe_relative(path)?;if path.len()>240{return invalid("Native mission weapon path exceeds240bytes");}Ok(Some(path.into()))
+ };
+ let palette=array_listing(fields,"weapon_palette")?;let placed=array_listing(fields,"weapons")?;let profiles=array_listing(fields,"player_starting_profile")?;
+ if palette.count>256||placed.count>4096||profiles.count>256{return invalid("Native mission weapon inventory exceeds its review bounds");}
+ let refs=array_items(&palette,"weapon_palette")?.iter().map(|item|reference(&direct_struct_fields(item)?,"name")).collect::<Result<Vec<_>>>()?;
+ let mut loadout=std::collections::BTreeSet::new();for item in array_items(&profiles,"player_starting_profile")?{let root=direct_struct_fields(item)?;for key in ["primary_weapon","secondary_weapon"]{if let Some(path)=reference(&root,key)?{loadout.insert(path.to_ascii_lowercase());}}}
+ let mut weapons:Vec<NativeMissionWeapon>=vec![];
+ for(index,item)in array_items(&placed,"weapons")?.iter().enumerate(){let root=direct_struct_fields(item)?;let palette=native_index(&root,"type")?;let tag=usize::try_from(palette).ok().and_then(|n|refs.get(n)).and_then(|path|path.as_ref()).ok_or_else(||crate::SparkError::Invalid("Placed native weapon has an invalid or null palette reference".into()))?;
+  if let Some(row)=weapons.iter_mut().find(|row|row.tag_path.eq_ignore_ascii_case(tag)){row.placements.push(index as u16);}else{weapons.push(NativeMissionWeapon{tag_path:tag.clone(),placements:vec![index as u16],starting_equipment:loadout.contains(&tag.to_ascii_lowercase())});}
+ }
+ Ok(NativeMissionSource{encounters,weapons})
+}
 pub fn scenario_squad_start_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,true)}
 fn native_position(fields:&str)->Result<([f32;3],usize)> {native_vector(fields,"position")}
 fn native_vector(fields:&str,key:&str)->Result<([f32;3],usize)> {
@@ -1928,6 +1957,15 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
 
 #[cfg(test)]mod mission_source_flags_tests {
  use super::*;
+ #[test]fn mission_collection_choices_require_placed_native_weapons_and_check_every_loadout(){
+  let fields=concat!("encounters[0] array\nweapon_palette[1] array\n    weapon_palette[0] struct\n        name (weapons/plasma pistol/plasma pistol.weapon) dependency\nweapons[2] array\n    weapons[0] struct\n        type (0) index\n    weapons[1] struct\n        type (0) index\nplayer_starting_profile[2] array\n    player_starting_profile[0] struct\n        primary_weapon (weapons/assault rifle/assault rifle.weapon) dependency\n        secondary_weapon (null) dependency\n    player_starting_profile[1] struct\n        primary_weapon (weapons/pistol/pistol.weapon) dependency\n        secondary_weapon () dependency\n");
+  let source=native_mission_source(fields).unwrap();assert!(source.encounters.is_empty());assert_eq!(source.weapons.len(),1);assert_eq!(source.weapons[0].placements,vec![0,1]);assert!(!source.weapons[0].starting_equipment);
+  let grant=fields.replace("primary_weapon (weapons/pistol/pistol.weapon)","primary_weapon (weapons/plasma pistol/plasma pistol.weapon)");assert!(native_mission_source(&grant).unwrap().weapons[0].starting_equipment);
+  assert!(native_mission_source(&fields.replace("type (0)","type (1)")).is_err());
+  assert!(native_mission_source(&fields.replace("weapons/plasma pistol/plasma pistol.weapon","../unsafe.weapon")).is_err());
+  assert!(native_mission_source(&fields.replace(".weapon)",".sound)")).is_err());
+  assert!(native_mission_source(&fields.replace("secondary_weapon () dependency","")).is_err());
+ }
  #[test]fn mission_activation_comes_from_the_actual_encounter_flag(){
   let fields="encounters[1] array\n    encounters[0] struct\n        name (be_marines) string\n        flags bitmask\n            not_initially_created (1) bitfield\n";
   let rows=native_mission_encounters(fields).unwrap();assert_eq!(rows[0].name,"be_marines");assert!(!rows[0].initially_created);assert!(!native_mission_encounters(&fields.replace("(1) bitfield","(1)     bitfield")).unwrap()[0].initially_created);assert!(native_mission_encounters(&fields.replace("(1) bitfield","(0) bitfield")).unwrap()[0].initially_created);

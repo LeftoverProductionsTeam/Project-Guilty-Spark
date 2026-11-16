@@ -195,6 +195,7 @@ pub(super) struct Context {
     can_append_transport:bool,vehicle_sources:Vec<String>,
     scenario_squads:Vec<recipes::ScenarioSquadChoice>,
     scenario_start_squads:Vec<recipes::ScenarioSquadChoice>,
+    mission_source:Option<recipes::NativeMissionSource>,mission_source_issue:Option<String>,
     scenario_devices:Vec<recipes::NativeDevicePlacement>,
     device_edit_issue:Option<String>,
     scenario_volumes:Vec<maps::ScenarioLogicVolume>,
@@ -597,6 +598,7 @@ pub(super) async fn native_tag_context(
         let (scenario_start_squads,mut start_edit_issue)=if source.class=="scnr"{
             match recipes::scenario_squad_start_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}
         }else{(vec![],None)};
+        let(mission_source,mission_source_issue)=if source.class=="scnr"{match recipes::native_mission_source(&values){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
         let(scenario_devices,device_edit_issue)=if source.class=="scnr"{match recipes::scenario_device_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_volumes,trigger_edit_issue)=if source.class=="scnr"{match recipes::scenario_volume_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_cameras,camera_edit_issue)=if source.class=="scnr"{match recipes::scenario_camera_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
@@ -645,7 +647,7 @@ pub(super) async fn native_tag_context(
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
         Ok(Context {
-            vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,command_source,command_source_issue,protected_command_lists,scenario_devices,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
+            mission_source,mission_source_issue,vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,command_source,command_source_issue,protected_command_lists,scenario_devices,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,

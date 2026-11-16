@@ -1,3 +1,4 @@
+import type {NativeTagContext} from './nativeOperations';
 /** Authoring-only mission, cinematic, dedicated server and QA project data.
  *
  * No workflow in this module edits installed Halo files or starts a process.
@@ -160,21 +161,39 @@ export function blackEchoMission(nextId:()=>string):MissionBeat[] {
 }
 /** Explicitly bind this known blueprint to Forerunner's existing native contract.
  * Existing objective IDs, authored text, source modules and other beats survive. */
-export function connectBlackEchoObjectives(project:Project,nextId:()=>string):Project {
- const base=project.studio?.missions.length?project:addBlackEchoDraft(project,nextId),studio=base.studio!,beats=studio.missions;
+export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null):Project {
+ const base=project.studio?.missions.length?project:addBlackEchoDraft(project,nextId,nativeSource),studio=base.studio!,beats=studio.missions;
  if(beats.length!==7||beats[1].trigger!=='escort'||beats[1].encounterName!=='be_marines'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
- if(!base.quickForge||base.quickForge.native||base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
+ if(!base.quickForge||base.quickForge.native){
+  requireNativeBlackEcho(base,nativeSource);if(nativeSource!.sourceTarget!=='gbx-custom')throw Error('Forerunner settlement requires reviewed standard CE609 solo source; other engines do not provide its callback.');
+  for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
+  for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
+ }else if(base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
  return {...base,studio:{...studio,missions:beats.map((beat,index)=>index===3?{...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',objective:'Collect the selected native technology weapon. Actual player inventory ownership completes this objective; entering its area does not.'}:index===6?{...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'}:beat)}};
+}
+/** Bind only an explicitly read existing native campaign. No native tag, marker,
+ * original placement, recipe or script is changed by the metadata action. */
+function requireNativeBlackEcho(project:Project,source?:NativeTagContext|null):asserts source is NativeTagContext {
+ if(!source||source.projectId!==project.id||source.class!=='scnr'||!['gbx-custom','mcc-cea'].includes(source.sourceTarget??'')||!source.canAppendEncounter||!/^[a-f0-9]{64}$/i.test(source.tagSha256??'')||!project.builds.some(build=>build.id===source.buildId&&build.status==='validated'))throw Error('Read the current editable native solo scenario areas before creating Black Echo.');
+ if(source.missionSourceIssue||!source.missionSource)throw Error(source.missionSourceIssue??'Native mission references are unavailable; read source again.');
+ for(const name of ['be_insert','be_survivors','be_artifact','be_containment','be_extract'])if(source.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Black Echo needs a unique readable native area '+name+'. Author or name it with the existing scenario tools, then read source again.');
+ for(const name of ['be_marines','be_covenant','be_flood','be_defense']){
+  const encounters=source.missionSource.encounters.filter(row=>row.name===name),squads=source.scenarioSquads?.filter(row=>row.encounterName===name)??[];
+  if(encounters.length!==1||!squads.length||new Set(squads.map(row=>row.encounter)).size!==1)throw Error('Black Echo native encounter is missing or ambiguous: '+name);
+  if(encounters[0].initiallyCreated)throw Error('Black Echo encounter must be script-created: '+name);
+  if(source.protectedSquadEncounters?.some(row=>row.toLowerCase()===name))throw Error('Black Echo encounter is recipe-owned: '+name+'. Keep its existing controller.');
+ }
 }
 export function validMissionWeaponPath(value:string):boolean {
  return value.length>0&&value.length<=240&&/^[A-Za-z0-9_][A-Za-z0-9_ ./-]*$/.test(value)&&value.split('/').every(part=>part!==''&&part!=='.'&&part!=='..')&&!value.endsWith('.weapon');
 }
 /** One project history action; original geometry, bindings and source modules
  * stay intact. Areas are editable source markers, not valid terrain/navigation. */
-export function addBlackEchoDraft(project:Project,nextId:()=>string):Project {
+export function addBlackEchoDraft(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null):Project {
   if(project.studio?.missions.length)throw Error('Preserve the current operation; use a campaign project with no mission beats.');
   let document=project.quickForge;
-  if(!document||document.native||document.gameMode!=='campaign')throw Error('Open editable Campaign / scripted solo source before creating Black Echo.');
+  if(!document||document.native){requireNativeBlackEcho(project,nativeSource);return {...project,studio:{...(project.studio??emptyCreatorStudio()),missions:blackEchoMission(nextId)}};}
+  if(document.gameMode!=='campaign')throw Error('Open editable Campaign / scripted solo source before creating Black Echo.');
   if(document.logic?.manualSource!=null||document.logic?.handwrittenSources?.some(source=>source.filename.toLowerCase()==='gs_mission.hsc'))
     throw Error('Preserve and reconcile the existing mission or handwritten logic before adding a generated operation.');
   const areas:[string,string,number,number,number][]=[
