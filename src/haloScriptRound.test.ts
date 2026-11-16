@@ -1,3 +1,4 @@
+import {exportHaloCeTransport,readNativeTransportSource} from './haloScript';
 import { describe, expect, it } from 'vitest';
 import { attachNativeFirefightRound, exportHaloCeFirefightRound, exportPlannedFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
 import type { Project } from './types';
@@ -129,4 +130,30 @@ it('retains old generated source for comparison but requires an explicit loadout
  expect(()=>attachNativeFirefightRound(p)).toThrow(/Player loadout/);
  const fixed=nativeSoloFirefightRules(config);expect(fixed.nativePlayerProfile).toEqual(defaultNativePlayerProfile());
  expect(config.nativePlayerProfile).toBeUndefined();
+});
+
+
+describe('Forerunner native transport source',()=>{
+ const options={faction:'unsc' as const,pilot:'pilot',pilotSeat:'P-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:'extraction_zone'};
+ it('uses actual landing and native boarding/settlement without inventing banking or boarding players',()=>{
+  const script=exportHaloCeTransport(options);expect(readNativeTransportSource(script.content)).toEqual(options);
+  expect(script.filename).toBe('gs_pelican_transport.hsc');
+  expect(script.content).toContain('(volume_test_object extraction_zone extraction_pelican) (> (device_group_get extraction_pelican_landed) 0.5)');
+  expect(script.content).toContain('(device_group_get extraction_pelican_called)');
+  expect(script.content).toContain('(ai_command_list pilot field_route)');expect(script.content).toContain('(ai_command_list pilot hub_route)');
+  expect(script.content).toContain('(script continuous forerunner_pelican_complete\n  (sleep -1)');
+  expect(script.content.indexOf('(set gs_pelican_settled false)')).toBeLessThan(script.content.indexOf('(ai_command_list pilot field_route)'));
+  const wait=script.content.indexOf(' gs_pelican_settled) 1)');expect(wait).toBeGreaterThan(script.content.indexOf('(ai_command_list pilot hub_route)'));
+  expect(script.content.slice(wait)).toContain('(unit_set_enterable_by_player (unit extraction_pelican) true)');
+  expect(script.content).not.toMatch(/player_add_equipment|object_teleport|vehicle_unload|ai_place/);
+  expect(script.dependencies).toContain('device_group:extraction_pelican_landed');
+ });
+ it('keeps factions distinct and rejects handwritten source regeneration and injected refs',()=>{
+  const script=exportHaloCeTransport({...options,faction:'covenant',pilotSeat:'CD-driver',departureCue:'depart_cue',arrivalCue:'arrive_cue'});
+  expect(script.content).toContain('forerunner_spirit_complete');expect(script.content).toContain('(depart_cue)');expect(script.content).toContain('(arrive_cue)');
+  expect(script.content).not.toContain('extraction_pelican');
+  expect(()=>readNativeTransportSource(script.content+'; Handwritten change\n')).toThrow('edited');
+  expect(()=>readNativeTransportSource('(script startup old (sleep 1))')).toThrow('handwritten');
+  for(const change of [{pilot:'pilot) (object_destroy all)'},{pilotSeat:'P-driver"'},{pilotSeat:'P-driver\\bad'},{outbound:options.inbound},{hub:options.field},{arrivalCue:'bad function'}])expect(()=>exportHaloCeTransport({...options,...change})).toThrow();
+ });
 });

@@ -1846,3 +1846,40 @@ mod installed_device_inventory_test {
   let edit=std::env::var_os("SPARK_NATIVE_INVADER_EDIT").expect("Installed native tool required");let root=std::env::var_os("SPARK_NATIVE_DEVICE_SOURCE_ROOT").expect("Explicit source root required");let tag=std::env::var("SPARK_NATIVE_DEVICE_SOURCE_TAG").expect("Explicit scenario required");let file=Path::new(&root).join(&tag);let before=crate::maps::hash_file(&file).unwrap();let result=std::process::Command::new(edit).args(["-t",Path::new(&root).to_str().unwrap(),"-L",&tag]).output().unwrap();assert!(result.status.success());let fields=String::from_utf8(result.stdout).unwrap();let rows=scenario_device_choices(&fields).unwrap();assert!(rows.iter().any(|row|row.class=="ctrl"&&row.name=="extraction_loadout"));assert!(rows.iter().all(NativeDevicePlacement::valid));assert_eq!(crate::maps::hash_file(&file).unwrap(),before);println!("Actual native device rows={}, sourceSHA={before}, no writes",rows.len());
  }
 }
+
+
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeTransportVehicle {pub name:String,pub tag_path:String,pub seats:Vec<String>}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>}
+/// Reuse the existing bounded Invader field inventory, never a second tag reader.
+pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
+ let table=array_listing(fields,"object_names")?;if table.count>512{return invalid("Transport names exceed512entries");}
+ let names=array_items(&table,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
+ let table=array_listing(fields,"vehicle_palette")?;if table.count>512{return invalid("Vehicle palette exceeds512entries");}
+ let palette=array_items(&table,"vehicle_palette")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
+ let table=array_listing(fields,"vehicles")?;if table.count>4096{return invalid("Vehicle source exceeds4096entries");}let mut vehicles=vec![];
+ for row in array_items(&table,"vehicles")?{let root=direct_struct_fields(row)?;let index=native_index(&root,"name")?;
+  let name=if index<0{continue}else{names.get(index as usize).ok_or_else(||crate::SparkError::Invalid("Vehicle name index is invalid".into()))?};
+  if !["extraction_pelican","extraction_spirit"].contains(&name.as_str()){continue;}
+  let index=native_index(&root,"type")?;let tag=usize::try_from(index).ok().and_then(|index|palette.get(index)).and_then(|path|path.strip_suffix(".vehicle")).ok_or_else(||crate::SparkError::Invalid("Transport vehicle palette reference is invalid".into()))?;
+  safe_relative(&tag.replace('\\',"/"))?;if vehicles.iter().any(|v:&NativeTransportVehicle|v.name==*name){return invalid("Transport native vehicle name is ambiguous");}
+  vehicles.push(NativeTransportVehicle{name:name.clone(),tag_path:tag.replace('\\',"/"),seats:vec![]});
+ }
+ let table=array_listing(fields,"device_groups")?;if table.count>128{return invalid("Native device group budget exceeded");}
+ let mut groups=vec![];let mut indices=std::collections::BTreeSet::new();
+ for(index,row)in array_items(&table,"device_groups")?.iter().enumerate(){let root=direct_struct_fields(row)?;let name=native_name(&root)?;
+  if !["extraction_pelican","extraction_spirit"].iter().any(|craft|["_boarded","_called","_landed"].iter().any(|suffix|name==format!("{craft}{suffix}"))){continue;}
+  let trimmed=root.lines().map(str::trim).collect::<Vec<_>>().join("\n");
+  if groups.contains(&name)||number(&root,"initial_value")?!=0.||number(&trimmed,"can_change_only_once")?!=0.{return invalid("Transport groups must be unique, initially zero and repeatable");}
+  groups.push(name);indices.insert(index as i16);
+ }
+ for array in ["machines","controls"]{let table=array_listing(fields,array)?;for row in array_items(&table,array)?{let root=direct_struct_fields(row)?;for key in ["power_group","position_group"]{if indices.contains(&native_index(&root,key)?){return invalid("Transport groups must not drive device power or position");}}}}
+ let routes=scenario_command_list_choices(fields)?.into_iter().filter(|route|route.commands>0).map(|route|route.name).collect();
+ let squads=scenario_squad_choices(fields)?;let mut pilots=vec![];
+ for squad in &squads{if squad.normal_count==1&&squad.insane_count==1{pilots.push(format!("{}/{}",squad.encounter_name,squad.name));}}
+ for name in squads.iter().map(|s|&s.encounter_name).collect::<std::collections::BTreeSet<_>>(){let rows=squads.iter().filter(|s|&s.encounter_name==name).collect::<Vec<_>>();if rows.iter().all(|s|s.normal_count>=0&&s.insane_count>=0)&&rows.iter().map(|s|i32::from(s.normal_count)).sum::<i32>()==1&&rows.iter().map(|s|i32::from(s.insane_count)).sum::<i32>()==1{pilots.push(name.clone());}}
+ Ok(NativeTransportChoices{vehicles,groups,routes,pilots})
+}

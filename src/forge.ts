@@ -32,7 +32,7 @@ export interface ForgeMaterial {
 export interface ForgePlacement extends ForgeEntity {
   /** Standard solo-scenario vehicle name, separate from the display label. */
   nativeName?: string;
-  /** Compile dedicated zero-initialized boarding/recall groups for a named Forerunner craft. */
+  /** Compile dedicated zero-initialized boarding/recall/landing groups for a named Forerunner craft. */
   transportSignals?: boolean;
   publishedAssetId?: string;
   tagId: number | null;

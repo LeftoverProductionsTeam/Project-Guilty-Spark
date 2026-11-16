@@ -3,8 +3,8 @@
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
 Starting revision: 5d8afd4a31c21a1f2e64760db324db02306bb61a, canonical local master.
-Latest verified revision: da484143f782ad5647dfd8770d66efc125decf05 + scoped SDK setup; this commit’s manifests identify changes.
-Next action: compose native pilot/approach/landing/return and landed signals using the supplied SDK, compile/read back full CE609 Black Echo. Native desktop/game acceptance remains pending. No push.
+Latest verified revision: 95c449692da92c58bd8bdfdd41f86dbc11772508 + native dropship source slice; manifests identify this commit’s scope.
+Next action: extend existing reviewed native writer to append aircraft + isolated signals to recovered Black Echo, then compose/compile/read back its full CE609 mission. Windows/game/37944 open. No push.
 
 ## Acceptance
 
@@ -29,7 +29,9 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-16Nov SDK setup: owner supplied HCEEK/HCEEK.7z. Existing onboarding/dependency UI now chooses that archive separately, retains tool paths and uses guarded shared tag preparation; official install/guide and existing-tag alternatives remain. Frontend10/browser4/core sdk7+1skip/dependencies5(overlap1), TypeScript/Vite/Windows backend pass. Native dialogs/app restart/game remain unrun. QA11996/run-GUHvOl CLOSED1519710176logicalB; staged2630tags/147213411B and original SDK rehashed unchanged; output absent. Exact archive/manifest hashes and scope in RUNTIME_INTEGRATION_20261107. No SDK/archive/binary retained or Forerunner writes.
+16Nov dropship: three native signals/craft and existing Runtime & Tools controller draft now connect actual seat/AI/route/pad source lists, repeatable grounded/boarding/settlement HSC, history/Save/review and pinned native build. Frontend51/core16/browser3distinct, native2+1/controller CE syntax, TypeScript/Vite/Windows check pass. Separate CE609 markers6/0groups pass; not full Black Echo/flight. Source requires preexisting aircraft; reviewed native structural append is next. QA25312/run-htH2Y3 CLOSED1487823130logicalB; root absent. Exact hashes, failures, current partial Spirit source and scope: RUNTIME_INTEGRATION_20261107. No Windows/game/Forerunner write/push.
+
+SDK setup95c4496: local archive picker, guarded shared preparation/official guidance and source-preserving paths pass focused checks. Exact2630input/archive hashes, tests/limits and QA11996disposal are in RUNTIME_INTEGRATION_20261107. No full mission/game acceptance.
 
 P1 crew5d8afd4 integrated; stash1c2c73f recovery retained. Route creation now uses existing viewport/review/Restore/Save; frontend19/browser3/core2+2skip/native1/web pass. QA61530/run-gPlQeK CLOSED386760909logicalB; root absent. RUNTIME_INTEGRATION_20261107 has exact proof. Full CE cache/native Windows/flight/Black Echo and P0 acceptance OPEN.
 
@@ -44,7 +46,7 @@ Camera548b1c8/fb9eadc native recording/intro,8size and stale actor Clear proof i
 
 Recovered AI40f84ef XYZ milestone is extended here to exposed native facing. Tags→actual X drag→E/Z mouse rotation→review heading→Accept→Restore/reapply→Save/full reopen→MCC13 build/independent pose readback passes. Before[4,3,.1]/0rad; compiled[4.427971,3,.1]/75.775293°. TypeScript/frontend20/browser2/Rust native10/frozen Windows build pass. Unknown heading unavailable; recipes preserved. Exact hashes/initial corrected fixture failures/scopes in RUNTIME_INTEGRATION_20261107. Project history is distinct from native Restore/reapply. Stock campaign/CE/game/peers and37944 remain open.
 
-Efficiency: reused2676-file/146023117B SDK and accepted UI project; no new archive/SDK warehouse. Both239483B checksum aliases are required by release/archive consumers and share one Git blob. Active-task helper preserves existing legacy recovery and skips unchanged writes; no automatic previous copy. Initial37944 Save failure remains unresolved; later Save-only/native creator passes do not establish its cause.
+Historical SDK reuse/manifest-consumer audit evidence remains in RUNTIME_INTEGRATION_20261107 and Git95c4496:docs/ACTIVE_TASK.md. Both checksum aliases remain required; no previous-checkpoint copies.37944 remains open.
 
 Terminal objective native creator milestone00a32a7/184d546: source/history/Save/HSC/backend plus Windows native UI/restart/MCC cache/readback pass in37189. Powered inactive unique ctrl binding required; no terminal reset, loot or squad authority. First37643 close prompt was not reproduced and is not a claimed production repair. Exact hashes, seeded-placement limit and three native script targets remain in UI_INTERACTION_AUDIT/RUNTIME_INTEGRATION_20261107. No control-use/game/Forerunner acceptance.
 

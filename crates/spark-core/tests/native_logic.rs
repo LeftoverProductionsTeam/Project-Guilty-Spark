@@ -368,7 +368,10 @@ fn solo_vehicle_names_share_native_names_and_keep_exact_pose_and_reverse_links()
     for fault in 0..7{let mut wrong=read.clone();match fault{0=>wrong.names[1].name="other".into(),1=>wrong.names[1].object_type=0,2=>wrong.names[1].object_index=0,3=>wrong.vehicles[0].name_index=0,4=>wrong.vehicles[0].tag_path="vehicles/warthog/warthog".into(),5=>wrong.vehicles[0].position[0]+=1.,_=>wrong.vehicles[0].rotation_radians[0]=0.};assert!(l::verify_marker_readback(&doc,&wrong).is_err(),"fault {fault}");}
     let unflagged=doc.clone();doc.placements[2].transport_signals=Some(true);
     let mut signalled=read.clone();signalled.groups=l::transport_signal_groups(&doc).into_iter().map(|name|spark_core::maps::ScenarioLogicGroup{name,initial_value:0.,flags:0}).collect();
-    l::verify_marker_readback(&doc,&signalled).unwrap();assert_eq!(l::scenario_commands(&doc,"levels/test/test").unwrap().iter().filter(|c|c.phase=="logic-groups").count(),2);
+    l::verify_marker_readback(&doc,&signalled).unwrap();
+    let mut legacy=signalled.clone();legacy.groups.retain(|group|!group.name.ends_with("_landed"));
+    assert!(l::verify_marker_readback(&doc,&legacy).is_err(),"Previous two-group builds must not pass current landing-source readback");
+    assert_eq!(l::scenario_commands(&doc,"levels/test/test").unwrap().iter().filter(|c|c.phase=="logic-groups").count(),3);
     for fault in 0..7{let mut wrong=signalled.clone();match fault{0=>{wrong.groups.pop();},1=>wrong.groups[0].name="other".into(),2=>wrong.groups[0].initial_value=1.,3=>wrong.groups[0].flags=1,4=>wrong.devices[0].power_group=Some(0),5=>wrong.devices[0].position_group=Some(1),_=>wrong.devices[0].power_group=None};assert!(l::verify_marker_readback(&doc,&wrong).is_err(),"group fault {fault}");}
     doc.placements[2].transport_signals=Some(false);assert!(l::verify_marker_readback(&doc,&signalled).is_err());l::verify_marker_readback(&doc,&read).unwrap();
     doc.placements[2].transport_signals=Some(true);doc.placements[2].native_name=Some("ordinary_ship".into());assert!(l::validate(&doc).is_err());doc=unflagged;
@@ -386,6 +389,14 @@ fn installed_transport_cache_has_real_vehicle_reverse_names_and_unchanged_bytes(
     use spark_core::maps;
     let path=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_TRANSPORT_CACHE").expect("Explicit native cache required"));
     let before=maps::hash_file(&path).unwrap();let map=maps::inspect_map(&path,None).unwrap();let read=maps::scenario_logic_readback(&path,&map).unwrap();
+    if let (Some(tags),Some(editor))=(std::env::var_os("SPARK_NATIVE_TRANSPORT_TAGS"),std::env::var_os("SPARK_NATIVE_INVADER_EDIT")){
+        let tag=format!("{}.scenario",map.scenario_path);let source=std::path::Path::new(&tags).join(&tag);let source_sha=maps::hash_file(&source).unwrap();
+        let fields=std::process::Command::new(editor).arg("-t").arg(&tags).arg("-L").arg(&tag).output().unwrap();assert!(fields.status.success());
+        let fields=String::from_utf8(fields.stdout).unwrap();let inventory=spark_core::native_operations::scenario_transport_choices(&fields).unwrap();
+        assert_eq!(inventory.vehicles.len(),2);assert_eq!(inventory.groups,vec!["extraction_pelican_boarded","extraction_spirit_boarded","extraction_pelican_called","extraction_pelican_landed"]);assert!(inventory.routes.contains(&"tf_field".to_owned()));assert!(inventory.routes.contains(&"tf_home".to_owned()));
+        assert!(spark_core::native_operations::scenario_transport_choices(&fields.replace("can_change_only_once (0)","can_change_only_once (1)")).is_err());
+        assert_eq!(source_sha,maps::hash_file(&source).unwrap());eprintln!("Native transport source inventory: routes={}, pilots={:?}, groups={:?}, unchanged scenario SHA256 {source_sha}",inventory.routes.len(),inventory.pilots,inventory.groups);
+    }
     for name in ["extraction_pelican","extraction_spirit"]{
         let names=read.names.iter().enumerate().filter(|(_,row)|row.name==name).collect::<Vec<_>>();assert_eq!(names.len(),1);let(index,row)=names[0];assert_eq!(row.object_type,1);assert!(row.object_index>=0);
         let vehicles=read.vehicles.iter().filter(|vehicle|vehicle.index==row.object_index as usize&&vehicle.name_index==index as i16).collect::<Vec<_>>();assert_eq!(vehicles.len(),1);assert!(!vehicles[0].tag_path.is_empty());assert!(vehicles[0].position.iter().chain(vehicles[0].rotation_radians.iter()).all(|v|v.is_finite()));
@@ -415,7 +426,7 @@ fn installed_invader_writes_transport_names_to_fresh_native_source(){
         for command in l::scenario_commands(&doc,scenario).unwrap(){invoke(&command.args);}
         let name=invoke(&["-G".into(),format!("object_names[{}].name",usize::from(pair)),tag.clone()]);assert_eq!(name.trim(),"extraction_pelican");
         let reverse=invoke(&["-G".into(),"vehicles[1].name".into(),tag.clone()]);assert_eq!(reverse.trim(),if pair{"1"}else{"0"});
-        let groups=invoke(&["-C".into(),"device_groups".into(),tag]);assert_eq!(groups.trim(),if pair{"4"}else{"0"});
+        let groups=invoke(&["-C".into(),"device_groups".into(),tag]);assert_eq!(groups.trim(),if pair{"6"}else{"0"});
     }
     let vehicle="vehicles/crew_probe.vehicle".to_owned();std::fs::create_dir_all(tags.join("vehicles")).unwrap();
     invoke(&["-N".into(),vehicle.clone()]);invoke(&["-I".into(),"seats".into(),"3".into(),"end".into(),"-S".into(),"seats[0].label".into(),"P-driver".into(),"-S".into(),"seats[1].label".into(),"P-passenger".into(),"-S".into(),"seats[2].label".into(),"P-passenger".into(),vehicle.clone()]);
@@ -461,9 +472,9 @@ fn installed_transport_scenario_writer_compiles_and_reads_back_native_vehicle_na
     let mut protected=vec![fixture.join(spark_core::safe_relative(&original_tag).unwrap()),fixture.join(spark_core::safe_relative(bsp).unwrap()),fixture.join("globals/globals.globals")];
     let mut base=level();base.game_mode="campaign".into();base.runtime_id=RuntimeId::ChupathingyCe;base.placements.clear();base.objectives.clear();base.campaign_encounters.clear();base.starting_profile=None;
     for name in ["extraction_pelican","extraction_spirit"]{
-        let row=markers.names.iter().enumerate().find(|(_,row)|row.name==name).unwrap();let vehicle=markers.vehicles.iter().find(|v|v.name_index==row.0 as i16).unwrap();assert_eq!(vehicle.rotation_radians,[0.;3]);
+        let row=markers.names.iter().enumerate().find(|(_,row)|row.name==name).unwrap();let vehicle=markers.vehicles.iter().find(|v|v.name_index==row.0 as i16).unwrap();assert!(vehicle.rotation_radians.iter().all(|v|v.is_finite()));
         protected.push(fixture.join(spark_core::safe_relative(&format!("{}.vehicle",vehicle.tag_path.replace('\\',"/"))).unwrap()));
-        base.placements.push(q::ForgePlacement{transport_signals:None,native_name:Some(name.into()),id:name.into(),name:name.into(),tag_path:vehicle.tag_path.clone(),tag_class:"vehi".into(),position:vehicle.position,rotation:[0.;3],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
+        base.placements.push(q::ForgePlacement{transport_signals:None,native_name:Some(name.into()),id:name.into(),name:name.into(),tag_path:vehicle.tag_path.clone(),tag_class:"vehi".into(),position:vehicle.position,rotation:[0.,0.,0.25],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
     }
     let control=markers.devices.iter().find(|device|device.class=="ctrl").expect("Real source control");protected.push(fixture.join(spark_core::safe_relative(&format!("{}.device_control",control.tag_path.replace('\\',"/"))).unwrap()));
     base.placements.push(q::ForgePlacement{transport_signals:None,native_name:None,id:"probe-control".into(),name:"Source control".into(),tag_path:control.tag_path.clone(),tag_class:"ctrl".into(),position:control.position,rotation:[0.;3],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
@@ -472,7 +483,7 @@ fn installed_transport_scenario_writer_compiles_and_reads_back_native_vehicle_na
     let mut hashes=vec![];
     for enabled in [true,false]{
         let mut doc=base.clone();doc.name=if enabled{"Transport signals on"}else{"Transport signals off"}.into();for vehicle in doc.placements.iter_mut().filter(|p|p.tag_class=="vehi"){vehicle.transport_signals=Some(enabled);}
-        if enabled{doc.logic.as_mut().unwrap().handwritten_sources.push(l::HandwrittenSource{filename:"transport_probe.hsc".into(),content:"(script static boolean gs_transport_probe (and (= (device_group_get extraction_pelican_boarded) 0) (= (device_group_get extraction_pelican_called) 0) (= (device_group_get extraction_spirit_boarded) 0) (= (device_group_get extraction_spirit_called) 0)))\n".into()});}
+        if enabled{doc.logic.as_mut().unwrap().handwritten_sources.push(l::HandwrittenSource{filename:"transport_probe.hsc".into(),content:"(script static boolean gs_transport_probe (and (= (device_group_get extraction_pelican_boarded) 0) (= (device_group_get extraction_pelican_called) 0) (= (device_group_get extraction_spirit_boarded) 0) (= (device_group_get extraction_spirit_called) 0) (= (device_group_get extraction_pelican_landed) 0) (= (device_group_get extraction_spirit_landed) 0)))\n".into()});}
         let scenario=q::scenario_path(&doc).unwrap();let tag=format!("{scenario}.scenario");std::fs::create_dir_all(tags.join(spark_core::safe_relative(&tag).unwrap()).parent().unwrap()).unwrap();
         invoke(&editor,&["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),tag.clone()]);
         invoke(&editor,&["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"structure_bsps".into(),"1".into(),"end".into(),"-S".into(),"structure_bsps[0].structure_bsp".into(),bsp.into(),tag.clone()]);
@@ -485,7 +496,7 @@ fn installed_transport_scenario_writer_compiles_and_reads_back_native_vehicle_na
         invoke(&tools.join("invader-script.exe"),&["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),fixture.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-E".into(),scenario.clone()]);
         invoke(&tools.join("invader-build.exe"),&["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),fixture.to_string_lossy().into_owned(),"-m".into(),output.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),scenario.clone()]);
         let built=output.join(format!("{}.map",scenario.rsplit('\\').next().unwrap().rsplit('/').next().unwrap()));let map=maps::inspect_map(&built,None).unwrap();assert_eq!(map.header.version,609);assert_eq!(map.header.scenario_type,0);
-        let read=l::verify_compiled(&doc,&map,&built).unwrap().expect("Named source requires marker readback");assert_eq!(read.names.len(),3);assert_eq!(read.vehicles.len(),2);assert_eq!(read.devices.len(),1);assert_eq!(read.groups.len(),if enabled{4}else{0});
+        let read=l::verify_compiled(&doc,&map,&built).unwrap().expect("Named source requires marker readback");assert_eq!(read.names.len(),3);assert_eq!(read.vehicles.len(),2);assert_eq!(read.devices.len(),1);assert_eq!(read.groups.len(),if enabled{6}else{0});
         assert_eq!(map.scripts.iter().any(|s|s.name=="gs_transport_probe"),enabled);
         eprintln!("Fresh CE609 transport signals {enabled}: cache SHA256 {}; names {}, vehicles {}, devices {}, groups {}; borrowed BSP/original inputs unchanged",map.sha256,read.names.len(),read.vehicles.len(),read.devices.len(),read.groups.len());hashes.push(map.sha256);
     }

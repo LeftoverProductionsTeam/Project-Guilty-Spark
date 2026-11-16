@@ -19,7 +19,8 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound } from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix } from '../haloScript';
+import type {NativeTransportOptions} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
 import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
@@ -191,10 +192,25 @@ export default function RuntimeDock({
   const [cinematicName,setCinematicName]=useMapState<string>(id,'director.nativeCinematicName','gs_cinematic');
   const [cinematicCamera,setCinematicCamera]=useState('');
   const [cinematicPlan,setCinematicPlan]=useState<{key:string;shotsKey:string;name:string;tagIdentity:string;content:string;original?:string}|null>(null);
+  const [transport,setTransport]=useMapState<NativeTransportOptions>(id,'sourceScripts.transport',{faction:'unsc',pilot:'',pilotSeat:'',outbound:'',inbound:'',hub:'extraction_return',field:'extraction_zone'});
+  const latestTransport=useRef(transport);latestTransport.current=transport;
   const nativeCameras=modules?.cameraReview;
   const takeCamera=nativeCameras?.cameras.find(p=>String(p.index)===cinematicCamera)??nativeCameras?.cameras[0];
   const currentCinematic=cinematicPlan?.key===scriptSourceKey&&cinematicPlan.tagIdentity===nativeCameras?.tagIdentity&&cinematicPlan.shotsKey===nativeCinematicTakeKey(project?.studio)&&cinematicPlan.name===cinematicName.trim()&&cinematicPlan.content===selectedScript?.content?cinematicPlan:null;
   const nativeCinematicDraft=selectedScript?.content.startsWith(nativeCinematicPrefix)??false;
+  const nativeTransportDraft=selectedScript?.content.startsWith(nativeTransportPrefix)??false;
+  function transportReferencesMatch(options:NativeTransportOptions){
+    const refs=modules?.transportReview;if(!refs)return false;const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
+    const vehicles=refs.vehicles.filter(v=>v.name===name);
+    return vehicles.length===1&&vehicles[0].seats.filter(seat=>seat===options.pilotSeat).length===1&&refs.pilots.filter(value=>value===options.pilot).length===1&&
+      [options.departureCue,options.arrivalCue].filter((cue):cue is string=>!!cue).every(cue=>nativeCameras?.scriptNames.filter(value=>value===cue).length===1)&&
+      [options.outbound,options.inbound].every(route=>refs.routes.filter(value=>value===route).length===1)&&
+      ['_boarded','_called','_landed'].every(suffix=>refs.groups.includes(name+suffix));
+  }
+  let currentTransportIdentity:string|null=null;
+  if(nativeTransportDraft&&nativeCameras&&report?.workingSource?.target==='gbx-custom'&&nativeCameras.scenarioType===0){
+    try{const options=readNativeTransportSource(selectedScript!.content);if(transportReferencesMatch(options)&&[options.hub,options.field].every(name=>nativeCameras.triggerVolumes.filter(v=>v===name).length===1))currentTransportIdentity=nativeCameras.tagIdentity;}catch{/* Edited source needs the explicit manual-source route. */}
+  }
   useEffect(()=>{
     moduleRequest.current++;setModuleBusy(false);
     return()=>{moduleRequest.current++;};
@@ -444,13 +460,13 @@ export default function RuntimeDock({
     return selection.projectId===project?.id&&selection.buildId===source.buildId&&selection.tagsDirectory===source.tagsDirectory
       &&selection.projectFingerprint===source.projectFingerprint;
   }
-  async function listScriptModules(includeCameras=false) {
+  async function listScriptModules(includeCameras=false,includeTransport=false) {
     const source=report?.workingSource;if(!native||!project||!source?.projectFingerprint||dirty||busy||working||moduleBusy)return;
     const request=++moduleRequest.current,key=scriptSourceKey;
-    setModuleBusy(true);setError('');
+    setModuleBusy(true);setError('');if(includeTransport)setModuleInventory(null);
     try {
       const value=await call<WorkingScriptSources>('working_script_sources',{projectId:project.id,expectedBuildId:source.buildId,
-        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,...(includeCameras?{includeCameras:true}:{})});
+        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,...(includeCameras?{includeCameras:true}:{}),...(includeTransport?{includeTransport:true}:{})});
       if(request!==moduleRequest.current||key!==currentScriptSourceKey.current){if(currentProject.current?.id===project.id)setNotice('The runtime or editable source changed while reading modules. Use List recovered modules for the current source.');return;}
       if(!sourceSelectionMatches(value,source))throw Error('The recovered script listing belongs to a different source revision. Refresh its selection.');
       setModuleInventory({key,value});
@@ -480,6 +496,35 @@ export default function RuntimeDock({
       if(selection!==scriptSelection.current||key!==currentScriptSourceKey.current||currentProject.current?.id!==input.id||nativeCinematicTakeKey(currentProject.current?.studio)!==shotsKey||currentProject.current?.scenarioScriptDraft!==draft)return;
       keepScriptDraft({filename:generated.filename,content:generated.content,sha256,fileSha256:previous?.sha256??sha256,sourceKey:key,reviewed:false,...(previous?{replacesSha256:previous.sha256}:{})});setCinematicPlan({key,shotsKey,name:cinematicName.trim(),tagIdentity:review.tagIdentity,content:generated.content,original});
       setNotice('Timed cinematic source prepared. Save and review before building. '+generated.warnings.join(' '));
+    }catch(problem){if(selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    finally{release();if(request===moduleRequest.current)setModuleBusy(false);}
+  }
+  async function prepareTransportSource(){
+    const input=currentProject.current,source=report?.workingSource,inventory=modules,review=nativeCameras;
+    if(!input||!source||!inventory||!review||dirty||busy||working||moduleBusy)return;
+    const request=++moduleRequest.current,selection=++scriptSelection.current,key=scriptSourceKey,options=transport,draft=input.scenarioScriptDraft;
+    setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
+    try{
+      if(source.target!=='gbx-custom'||review.scenarioType!==0)throw Error('Transport controllers need reviewed CE609 solo source for Forerunner. Other engines do not drive these signals.');
+      const generated=exportHaloCeTransport(options);
+      if(!transportReferencesMatch(options))throw Error('Choose the actual named aircraft, one unique native pilot seat, a single-pilot encounter/squad, two nonempty native routes and all three dedicated signals. Read native transport source after authoring them; no source was replaced.');
+      for(const name of [options.hub,options.field])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Missing or ambiguous native pad volume '+name+'. Author it with the existing scenario area tools, Save/rebuild and read source again.');
+      const previous=inventory.modules.find(module=>module.filename.toLowerCase()===generated.filename.toLowerCase());
+      let original:string|undefined;
+      if(previous){
+        if(previous.unavailable)throw Error(previous.unavailable);
+        const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:previous.filename,expectedSha256:previous.sha256});
+        if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Native transport module changed; read the current source again.');
+        readNativeTransportSource(value.script.content);original=value.script.content;
+      }
+      const names=(text:string)=>[...text.matchAll(/\(script (?:startup|continuous|static void|static boolean) ([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1]);
+      const previousNames=original?names(original):[];
+      if(names(generated.content).some(name=>review.scriptNames.includes(name)&&!previousNames.includes(name)))throw Error('A transport function already belongs to another native module. Preserve that source and use Edit selected module; no replacement was made.');
+      if(draft&&draft.content!==generated.content&&!window.confirm('Replace the current project script draft with the transport controller? Project Undo restores it; original native source remains in its previous build.'))return;
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(generated.content)),sha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+      if(selection!==scriptSelection.current||key!==currentScriptSourceKey.current||currentProject.current?.id!==input.id||latestTransport.current!==options||currentProject.current.scenarioScriptDraft!==draft)return;
+      keepScriptDraft({filename:generated.filename,content:generated.content,sha256,fileSha256:previous?.sha256??sha256,sourceKey:key,reviewed:false,...(previous?{replacesSha256:previous.sha256}:{})});
+      setNotice('Transport source prepared. Save, review the native references, then attach and compile. This does not verify landing, flight or banking.');
     }catch(problem){if(selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{release();if(request===moduleRequest.current)setModuleBusy(false);}
   }
@@ -597,6 +642,7 @@ export default function RuntimeDock({
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
     if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||selectedScript.replacesSha256!==attachment.replacesSha256||!report?.workingSource))return;
     if(attachment?.content.startsWith(nativeCinematicPrefix)&&!currentCinematic){setError('The take or source changed. Read native cameras and prepare its cinematic source again.');return;}
+    if(nativeTransportDraft&&!currentTransportIdentity){setError('Read native transport source again and check both pad volumes before compiling generated transport source. Preserve handwritten changes through the manual source route.');return;}
     if(mission&&(!selectedMissionHud?.reviewed||mission!==selectedMissionHud||firefight||!!attachment&&!compileScripts))return;
     const sourceKey = scriptSourceKey;
     setBusy(true);
@@ -605,7 +651,7 @@ export default function RuntimeDock({
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),...(mission?{missionHud:mission.plan.hud.review}:{}),
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
         ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256,...(attachment.replacesSha256?{replacesSha256:attachment.replacesSha256}:{})}}:{}),
-        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:nativeCinematicDraft&&currentCinematic?{expectedTagIdentity:currentCinematic.tagIdentity}:{}) });
+        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:nativeCinematicDraft&&currentCinematic?{expectedTagIdentity:currentCinematic.tagIdentity}:nativeTransportDraft&&currentTransportIdentity?{expectedTagIdentity:currentTransportIdentity}:{}) });
       if (sourceKey === currentScriptSourceKey.current) {
         setDetails(false);
         setNotice(
@@ -903,6 +949,23 @@ export default function RuntimeDock({
           {project&&report?.workingSource&&workingSourceAvailable&&<details ref={scriptEditor} open={scriptsOpen} onToggle={event=>setScriptsOpen(event.currentTarget.open)} className="native-script-attachment">
             <summary>Edit or attach scenario HaloScript</summary>
             <p className="subtle">Choose a recovered scenario module or new UTF8 .hsc file, up to 1 MiB. You can edit AI and cutscene script bodies here. Revising an existing module requires its exact original file and explicit revision selection; writes occur only in a separate build candidate. Original source must be fully recovered, and existing native script/global identities remain protected. This control retains original native script/global identities; global-source files and structural identity changes need further native editing support. Draft edits use project Undo/Redo and Save; reopening restores the draft, which must be reviewed again before compilation. Saving a draft does not change native source or the running game. Successful builds retain the revised module; Project Undo changes drafts, not compiled source revisions.</p>
+            <details className="native-transport-source"><summary>Forerunner dropship controller</summary>
+              <p className="subtle">Author native insertion and evacuation using existing named aircraft, pilot AI, command lists and pad volumes. Spark prepares an ordinary .hsc module in the same project draft; Forerunner owns deployment, physical boarding and durable banking. No mandatory raid timer.</p>
+              <button disabled={!native||busy||working||moduleBusy||dirty} onClick={()=>void listScriptModules(true,true)}>Read native transport source</button>
+              {nativeTransportDraft&&<div className="button-row"><button type="button" disabled={busy||working||moduleBusy} onClick={()=>{try{setTransport(readNativeTransportSource(selectedScript!.content));}catch(problem){setError(String(problem));}}}>Load transport configuration from draft</button><button type="button" disabled={busy||working||moduleBusy} onClick={()=>{if(selectedScript)keepScriptDraft({...selectedScript,content:selectedScript.content.slice(nativeTransportPrefix.length),reviewed:false});}}>Use transport draft as manual HaloScript</button></div>}
+              {nativeCameras&&<fieldset disabled={busy||working||moduleBusy||dirty||report.workingSource?.target!=='gbx-custom'||nativeCameras.scenarioType!==0}>
+                <label>Aircraft faction<select aria-label="Transport faction" value={transport.faction} onChange={event=>setTransport({...transport,faction:event.target.value as NativeTransportOptions['faction']})}><option value="unsc">UNSC · Pelican</option><option value="covenant">Covenant · Spirit</option></select></label>
+                {([['pilot','Pilot encounter / squad'],['pilotSeat','Pilot native seat label'],['outbound','Insertion command list'],['inbound','Return command list'],['hub','Hub pad volume'],['field','Landing pad volume']] as const).map(([field,label])=>{
+                  const refs=modules?.transportReview;
+                  const options=field==='pilot'?refs?.pilots:field==='pilotSeat'?refs?.vehicles.find(vehicle=>vehicle.name===(transport.faction==='unsc'?'extraction_pelican':'extraction_spirit'))?.seats:field==='hub'||field==='field'?nativeCameras.triggerVolumes:refs?.routes;
+                  const values=[...new Set(options??[])];return <label key={field}>{label}<select aria-label={label} value={transport[field]} onChange={event=>setTransport({...transport,[field]:event.target.value})}><option value="">Choose an existing native reference</option>{transport[field]&&!values.includes(transport[field])&&<option value={transport[field]}>{transport[field]} · unavailable in current source</option>}{values.map(value=><option key={value} value={value}>{value}</option>)}</select></label>;
+                })}
+                {([['departureCue','Departure camera/dialogue function'],['arrivalCue','Arrival camera/dialogue function']] as const).map(([field,label])=><label key={field}>{label}<input aria-label={label} maxLength={31} value={transport[field]??''} onChange={event=>setTransport({...transport,[field]:event.target.value})}/></label>)}
+                <details><summary>Available native transport references</summary><p>Pilots: {modules?.transportReview?.pilots.join(', ')||'No single-pilot group found'}</p><p>Routes: {modules?.transportReview?.routes.join(', ')||'No nonempty command list found'}</p>{modules?.transportReview?.vehicles.map(vehicle=><p key={vehicle.name}>{vehicle.name} · {vehicle.tagPath} · seats: {vehicle.seats.join(', ')}</p>)}<p>Dedicated groups: {modules?.transportReview?.groups.join(', ')||'None found'}</p></details>
+                <button type="button" onClick={()=>void prepareTransportSource()}>Prepare transport script draft</button>
+              </fieldset>}
+              <p className="subtle">Use CE609 solo source. Create pilot AI and real seats with the existing AI/tag tools; routes with Native source controls → Native command lists. Pad volumes must already exist. Read native transport source again after restarting or changing source; generated builds pin the current tag identity. Load transport configuration from draft restores its saved choices. Bind the matching craft and three dedicated boarding/recall/landing groups. The source waits for both real landing and its pad; it never treats hover or time as arrival. Optional camera/dialogue functions must already exist and end cinematics. Players disembark normally; returning craft stays closed until Forerunner wakes its crew-settlement callback. Native compilation checks references; pilot failure/recovery, clearances, repeat trips and multiplayer need actual game acceptance. Hand-edited modules are preserved and require Edit selected module.</p>
+            </details>
             <details className="native-cinematic-source"><summary>Timed cinematic · existing cameras</summary>
               <p className="subtle">Use native camera names and poses with the saved Machinima timeline. Source review pins the complete tag library. Choose manual invocation or a native trigger area below.</p>
               <button disabled={!native||busy||working||moduleBusy||dirty} onClick={()=>void listScriptModules(true)}>Read native cameras &amp; modules</button>
@@ -956,7 +1019,7 @@ export default function RuntimeDock({
               <p className="subtle">{dirty?'Save the project before reviewing or compiling this draft.':'Project draft saved. Review its source before compiling.'} Use project Undo/Redo to restore draft edits; compiled native revisions stay separate.</p>
               <label><input type="checkbox" checked={selectedScript.reviewed} disabled={busy||working||dirty} onChange={event=>{if(event.target.checked){void reviewScriptSource();}else{scriptSelection.current++;setScriptReview(null);}}}/>I reviewed this source and its native scenario references.</label>
               <div className="button-row">
-                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||nativeCinematicDraft&&!currentCinematic||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||nativeCinematicDraft&&!currentCinematic||nativeTransportDraft&&!currentTransportIdentity||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
                   onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>{selectedScript.replacesSha256?'Build reviewed script revision':'Attach source & compile'}</button>
                 <button disabled={busy||working} onClick={()=>keepScriptDraft(null)}>Remove project draft</button>
               </div>

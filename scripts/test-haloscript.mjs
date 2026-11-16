@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { blackEchoMission, emptyCreatorStudio } from '../src/creatorStudio.ts';
-import { attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
+import { exportHaloCeTransport, attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
 const studio=emptyCreatorStudio();
 studio.missions=[
   {id:'one',title:'First Contact',objective:'Move to the bridge',trigger:'triggerVolume',triggerRef:'gs_bridge',encounterName:''},
@@ -177,5 +177,41 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   const failure=await run('invader-edit',['-G','messages[1].name','levels/radio_messages.hud_message_text'],true);assert.equal(failure,'gs_mission_fail_2');
   assert.equal(crypto.createHash('sha256').update(await fs.readFile(template)).digest('hex'),templateHash);
   console.log(JSON.stringify({templateHash,nativeMissionAudioSyntax:'pass',nativeEscortSyntax:'pass',nativeTerminalSyntax:'pass',nativeSharedBranchSyntax:'pass',nativeRescueOutcomeSyntax:'pass',controlName,failure,sourceSha256:crypto.createHash('sha256').update(source).digest('hex'),soundSha256:await hash(path.join(tags,'sound/radio.sound')),hudSha256:await hash(path.join(tags,'levels/radio_messages.hud_message_text')),caption,results,cacheBuilt:false,gameplayVerified:false}));
+ },{reservationBytes:32*1024*1024});
+}
+
+
+if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
+ const fs=await import('node:fs/promises'),path=await import('node:path'),crypto=await import('node:crypto');
+ const {promisify}=await import('node:util'),{execFile}=await import('node:child_process'),exec=promisify(execFile);
+ const {withDevelopmentWorkspace}=await import('./native-qa-storage.mjs');
+ await withDevelopmentWorkspace('native-transport-source',async context=>{
+  const root=await fs.mkdtemp(path.join(context.directory,'transport-syntax-'));
+  const tags=path.join(root,'tags'),data=path.join(root,'data');await fs.mkdir(tags);await fs.mkdir(path.join(data,'scripts'),{recursive:true});
+  const invader=path.resolve(process.env.SPARK_QA_INVADER??'tools/invader');
+  const run=async(tool,args)=>{const value=await exec(path.join(invader,tool+'.exe'),['-t',tags,...args],{cwd:root,windowsHide:true,maxBuffer:1024*1024});assert.ok(!/ERROR:|Failed to/i.test(value.stdout+'\n'+value.stderr),value.stderr);return value.stdout.trim();};
+  const scenario='transport.scenario';await run('invader-edit',['-N',scenario]);
+  await run('invader-edit',['-n','-I','vehicles','2','end','-I','object_names','2','end','-I','encounters','2','end','-I','command_lists','2','end','-I','trigger_volumes','2','end','-I','device_groups','6','end',scenario]);
+  const args=[];
+  for(const [i,role]of ['pelican','spirit'].entries()){
+   args.push('-S','object_names['+i+'].name','extraction_'+role,'-S','vehicles['+i+'].name',String(i),'-S','encounters['+i+'].name','pilot_'+role);
+   for(const [j,suffix]of ['boarded','called','landed'].entries())args.push('-S','device_groups['+(i*3+j)+'].name','extraction_'+role+'_'+suffix,'-S','device_groups['+(i*3+j)+'].initial_value','0');
+  }
+  for(const[i,name]of ['field_route','hub_route'].entries())args.push('-S','command_lists['+i+'].name',name);
+  for(const[i,name]of ['extraction_return','extraction_zone'].entries())args.push('-S','trigger_volumes['+i+'].name',name);
+  await run('invader-edit',['-n',...args,scenario]);
+  await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');
+  const sources=[];
+  for(const faction of ['unsc','covenant']){
+   const role=faction==='unsc'?'pelican':'spirit';const source=exportHaloCeTransport({faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue'});
+   await fs.writeFile(path.join(data,'scripts',source.filename),source.content);sources.push({filename:source.filename,sha256:crypto.createHash('sha256').update(source.content).digest('hex')});
+  }
+  await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  const names=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/),types=(await run('invader-edit',['-G','scripts[*].script_type',scenario])).split(/\r?\n/);
+  for(const role of ['pelican','spirit']){
+   for(const name of ['gs_'+role+'_pilot','gs_'+role+'_trip','forerunner_'+role+'_complete'])assert.ok(names.includes(name),name);
+   assert.equal(types[names.indexOf('forerunner_'+role+'_complete')],'continuous');
+  }
+  console.log(JSON.stringify({nativeTransportSyntax:'pass',scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex'),cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }

@@ -60,7 +60,7 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
   if((trigger??device??vehicle)!.locked)throw Error('Unlock this object before changing its native name.');
   const existing=vehicle?.nativeName??trigger?.nativeName??logic.devices.find(d=>d.placementId===device?.id)?.nativeName;
   if(value===(existing??''))return doc;
-  if(vehicle?.transportSignals)throw Error('Disable boarding & recall groups before changing this vehicle name; handwritten references are never rewritten.');
+  if(vehicle?.transportSignals)throw Error('Disable transport groups before changing this vehicle name; handwritten references are never rewritten.');
   if(vehicle&&!value&&logic.rules.some(rule=>rule.actions.some(a=>a.kind==='aiVehicleLoad'&&a.targetId===vehicle.id)))throw Error('Remove the vehicle’s AI seating connections before clearing its native name.');
   if(value&&[...logic.triggers.filter(t=>t.id!==trigger?.id).map(t=>t.nativeName),
       ...logic.devices.filter(d=>d.placementId!==device?.id).map(d=>d.nativeName),
@@ -87,7 +87,7 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
 
 /** Standard device groups, not a new runtime state or inventory format. */
 export function transportSignalNames(name:string):string[] {
-  return ['extraction_pelican','extraction_spirit'].includes(name)?[name+'_boarded',name+'_called']:[];
+  return ['extraction_pelican','extraction_spirit'].includes(name)?[name+'_boarded',name+'_called',name+'_landed']:[];
 }
 export function setNativeTransportSignals(doc:QuickForgeDocument,node:ForgeNode,enabled:boolean):QuickForgeDocument {
   const vehicle=node.type==='placement'?doc.placements.find(p=>p.id===node.value.id&&p.tagClass==='vehi'):undefined;

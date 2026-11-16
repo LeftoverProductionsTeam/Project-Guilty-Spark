@@ -714,3 +714,80 @@ export function nativeSoloFirefightRules(config: FirefightConfig): FirefightConf
     maxSpawnAttempts:1,maxAlive:32,maxTotalPerWave:32,difficultyStepPercent:0,extraPlayerCountPercent:0,
     startingEquipment:[],replenishAmmoEachWave:false,supplyDropTags:[],nativePlayerProfile:config.nativePlayerProfile??defaultNativePlayerProfile()};
 }
+
+
+/** Original Spark source generator using the documented native Forerunner
+ * contract. Native tags/AI/paths remain owned by the existing scenario editors. */
+export interface NativeTransportOptions {
+  faction:'unsc'|'covenant'; pilot:string; pilotSeat:string;
+  outbound:string; inbound:string; hub:string; field:string;
+  departureCue?:string; arrivalCue?:string;
+}
+export const nativeTransportPrefix='; Spark native transport controller v1\n';
+export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
+  const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
+  const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
+  const hub=ensureName(options.hub,'Hub volume'),field=ensureName(options.field,'Landing volume');
+  if(hub===field||outbound===inbound)throw Error('Use distinct hub/landing volumes and insertion/return command lists.');
+  if(!options.pilotSeat||options.pilotSeat.length>31||!/^[\x20-\x21\x23-\x5b\x5d-\x7e]+$/.test(options.pilotSeat)||!options.pilotSeat.trim())
+    throw Error('Copy a real native pilot seat label (1–31 printable characters, without quotes or backslashes).');
+  const cues=[options.departureCue,options.arrivalCue].map((cue,index)=>cue?ensureName(cue,index?'Arrival camera/dialogue function':'Departure camera/dialogue function'):null);
+  const role=options.faction==='unsc'?'pelican':'spirit',craft='extraction_'+role,stem='gs_'+role;
+  const health='(> (unit_get_health (unit '+craft+')) 0)';
+  const crew='(vehicle_test_seat_list (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
+  const landed='(> (device_group_get '+craft+'_landed) 0.5)';
+  const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+crew+' (volume_test_object '+name+' '+craft+') '+landed+')';
+  const enter=(enabled:boolean)=>'  (unit_set_enterable_by_player (unit '+craft+') '+enabled+')';
+  const lines=[nativeTransportPrefix.trimEnd(),'; configuration: '+JSON.stringify(options),...heading('Native '+role+' insertion and evacuation'),
+    '; Forerunner only: requires actual native ground contact and durable crew callback.',
+    '; No player force-boarding, loot grant, banking, teleport or raid timer.',
+    '(global boolean '+stem+'_ready false)',
+    '(global boolean '+stem+'_settled false)',
+    '(script startup '+stem+'_pilot',
+    '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
+    '  (vehicle_load_magic (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))',
+    '  (sleep_until '+crew+' 1)',
+    '  (set '+stem+'_ready true)',')','',
+    '(script continuous forerunner_'+role+'_complete',
+    '  (sleep -1)',
+    '  (set '+stem+'_settled true)',')','',
+    '(script continuous '+stem+'_trip',
+    '  (sleep_until (and '+stem+'_ready '+pad(hub)+') 1)',
+    enter(true),
+    '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_boarded) 0.5)) 1)',
+    enter(false),
+    '  (set '+stem+'_settled false)',
+    ...(cues[0]?['  ('+cues[0]+')']:[]),
+    '  (ai_command_list '+pilot+' '+outbound+')',
+    '  (sleep_until '+pad(field)+' 1)',
+    ...(cues[1]?['  ('+cues[1]+')']:[]),
+    enter(true),
+    '  (sleep_until (and '+pad(field)+' (> (device_group_get '+craft+'_called) 0.5) (> (device_group_get '+craft+'_boarded) 0.5)) 1)',
+    enter(false),
+    ...(cues[0]?['  ('+cues[0]+')']:[]),
+    '  (ai_command_list '+pilot+' '+inbound+')',
+    '  (sleep_until '+pad(hub)+' 1)',
+    ...(cues[1]?['  ('+cues[1]+')']:[]),
+    '  (sleep_until (and '+pad(hub)+' '+stem+'_settled) 1)',
+    enter(true),
+    '  (sleep_until (and '+pad(hub)+' (= (list_count (vehicle_riders (unit '+craft+'))) 1)) 1)',
+    ')',''];
+  return {filename:stem+'_transport.hsc',content:lines.join('\n'),generatedOnly:true,scenarioType:'singleplayer',
+    dependencies:['native_vehicle:'+craft,'ai_encounter:'+pilot,'command_list:'+outbound,'command_list:'+inbound,
+      'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
+      ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue)],
+    warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
+      'The scenario must create exactly one living pilot in the selected encounter/squad, provide its exact seat label and author reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
+      'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
+      'Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};
+}
+
+export function readNativeTransportSource(content:string):NativeTransportOptions {
+  if(!content.startsWith(nativeTransportPrefix))throw Error('Existing module is not generated transport source; use Edit selected module to retain its handwritten logic.');
+  const row=content.split('\n')[1];if(!row?.startsWith('; configuration: '))throw Error('Transport configuration is missing; use the existing module editor.');
+  const options=JSON.parse(row.slice('; configuration: '.length)) as NativeTransportOptions;
+  if(exportHaloCeTransport(options).content!==content)throw Error('Existing transport source was edited. Use Edit selected module; automatic regeneration would discard those edits.');
+  return options;
+}

@@ -122,7 +122,7 @@ pub fn native_name(prefix: &str, id: &str) -> String {
 pub fn transport_signal_groups(doc:&QuickForgeDocument)->Vec<String> {
     doc.placements.iter().filter(|p|p.transport_signals==Some(true)).flat_map(|p|
         p.native_name.as_deref().filter(|name|["extraction_pelican","extraction_spirit"].contains(name))
-         .map(|name|vec![format!("{name}_boarded"),format!("{name}_called")]).unwrap_or_default()).collect()
+         .map(|name|vec![format!("{name}_boarded"),format!("{name}_called"),format!("{name}_landed")]).unwrap_or_default()).collect()
 }
 fn authored_name(value: &Option<String>) -> bool {
     value.as_ref().is_none_or(|name| {
@@ -504,7 +504,7 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
             return invalid("Compiled native transport groups differ from their unique zero-initialized source definitions");
         }
         if !groups.is_empty()&&read.devices.iter().any(|device|device.power_group!=Some(-1)||device.position_group!=Some(-1)){
-            return invalid("Transport readiness/recall groups must not drive any device power or position");
+            return invalid("Transport boarding/recall/landing groups must not drive any device power or position");
         }
     }
     for (index,binding) in logic.devices.iter().enumerate(){

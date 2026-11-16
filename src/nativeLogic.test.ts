@@ -276,7 +276,7 @@ it('authors dedicated transport groups through history, sharing and copying with
  expect(()=>setNativeTransportSignals(doc,selected(),true)).toThrow(/Bind one unique/);
  doc=setNativeLogicName(doc,selected(),'extraction_pelican');const enabled=setNativeTransportSignals(doc,selected(),true);
  expect(enabled.placements[0].transportSignals).toBe(true);expect(doc.placements[0].transportSignals).toBeUndefined();
- expect(transportSignalNames(enabled.placements[0].nativeName!)).toEqual(['extraction_pelican_boarded','extraction_pelican_called']);
+ expect(transportSignalNames(enabled.placements[0].nativeName!)).toEqual(['extraction_pelican_boarded','extraction_pelican_called','extraction_pelican_landed']);
  expect(()=>setNativeLogicName(enabled,forgeNodes(enabled).find(n=>n.value.id==='ship')!,'extraction_spirit')).toThrow(/Disable/);
  expect(()=>setNativeLogicName(enabled,forgeNodes(enabled).find(n=>n.value.id==='ship')!,'')).toThrow(/Disable/);
  let history=historyReducer(historyReducer(initialHistory,{type:'load',project:project(doc)}),{type:'edit',project:project(enabled),description:'Enable transport groups'});
