@@ -173,6 +173,7 @@ struct WorkingSource { target:String, build_id:String, tags_directory:PathBuf, a
 struct SourceContext {
     source_project: Project,
     generated_firefight:Option<core::working_tags::GeneratedFirefightSource>,
+    generated_mission_hud:Option<core::working_tags::GeneratedHudSource>,
     authoring_pending: bool,
     build: BuildRecord,
     workspace: PathBuf,
@@ -451,7 +452,7 @@ pub(super) fn collaboration_tags(state: &AppState, project: &Project, build: &Bu
 }
 fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord) -> Reply<SourceContext> {
     let job = state.root.join("jobs").join(&build.id);
-    let mut generated_firefight=None;
+    let mut generated_firefight=None;let mut generated_mission_hud=None;
     let workspace = if job.join("working-tags-receipt.json").is_file() {
         let receipt: core::working_tags::WorkingTagsReceipt = serde_json::from_slice(
             &bounded_read(&job.join("working-tags-receipt.json"), 4 * 1024 * 1024)?,
@@ -479,7 +480,7 @@ fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord)
         {
             return Err("Working-tag source folder changed".into());
         }
-        generated_firefight=receipt.generated_firefight;
+        generated_firefight=receipt.generated_firefight;generated_mission_hud=receipt.generated_mission_hud;
         workspace
     } else if project.quick_forge.is_some() {
         let receipt: forge_build::QuickForgeBuildReceipt = serde_json::from_slice(&bounded_read(
@@ -529,6 +530,7 @@ fn owned_source_context(state: &AppState, project: &Project, build: BuildRecord)
     Ok(SourceContext {
         source_project: project.clone(),
         generated_firefight,
+        generated_mission_hud,
         authoring_pending: false,
         build,
         workspace,
@@ -1011,6 +1013,30 @@ pub(super) async fn inspect_bsp_audio_workspace(app:tauri::AppHandle,project_id:
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
+pub(super) struct MissionHudSourcePlan {
+    project_id:String,build_id:String,tags_directory:PathBuf,project_fingerprint:String,
+    hud:core::working_tags::HudAppendPlan,
+}
+#[tauri::command]
+pub(super) async fn prepare_mission_hud(app:tauri::AppHandle,project_id:String)->Reply<MissionHudSourcePlan> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let context=source_context(&state,&project)?;
+        if source_scenario_type(&state,&project)?!=0||context.authoring_pending{return Err("Campaign HUD requires current solo source; finish any pending Firefight controller first".into());}
+        let identity=core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?;
+        let fields=native_operations_native::fields(&state,&project,&context.tags,&format!("{}.scenario",context.scenario_path))?;
+        if fields.len()>1024*1024{return Err("Native HUD scenario listing exceeds1MiB".into());}
+        let writer=native_operations_native::executable(&state,&project,"invaderNative")?;
+        let string=writer.with_file_name(if cfg!(windows){"invader-string.exe"}else{"invader-string"});core::reject_links(&string).map_err(error)?;
+        if fs::metadata(&string).map_err(error)?.len()>256*1024*1024{return Err("Native HUD string tool exceeds its identity limit".into());}
+        let hud=core::working_tags::prepare_mission_hud_append(&project,&context.tags,&fields,context.generated_mission_hud.as_ref(),&maps::hash_file(&string).map_err(error)?).map_err(error)?.ok_or("Enable objective HUD text in Creator Studio first")?;
+        if core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?!=identity{return Err("Native source changed during HUD review; prepare again".into());}
+        Ok(MissionHudSourcePlan{project_id,build_id:context.build.id,tags_directory:context.tags,project_fingerprint:project.fingerprint().map_err(error)?,hud})
+    }).await.map_err(error)?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub(super) struct FirefightSourcePlan {
     project_id:String,build_id:String,tags_directory:PathBuf,tag_identity:String,
     request:core::working_tags::EncounterAppendRequest,
@@ -1084,6 +1110,7 @@ pub(super) async fn build_working_tags(
     window: tauri::WebviewWindow,
     project_id: String,
     bsp_audio: Option<core::bsp_audio::Request>,
+    mission_hud:Option<core::working_tags::HudAppendReview>,
     expected_tag_identity:Option<String>,
     compile_scripts:Option<bool>,
     script_attachment:Option<core::working_tags::ScriptAttachment>,
@@ -1103,8 +1130,8 @@ pub(super) async fn build_working_tags(
         if context.authoring_pending&&(!compile_scripts.unwrap_or(false)||expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
             return Err("Changed Firefight rules require an explicit script build against the reviewed retained source. Refresh/review its source and controller; no build was started.".into());
         }
-        if script_attachment.is_some()&&(expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
-            return Err("The native build/source selection changed after script review. Select and review the module again; no build was started.".into());
+        if (script_attachment.is_some()||mission_hud.is_some())&&(expected_build_id.as_deref()!=Some(context.build.id.as_str())||expected_source_directory.as_ref()!=Some(&context.tags)) {
+            return Err("The native build/source selection changed after script or HUD review. Prepare and review against the current source; no build was started.".into());
         }
         if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}
         if let Some(append)=&encounter_append {
@@ -1121,7 +1148,7 @@ pub(super) async fn build_working_tags(
         let hud_readback_targets=native_operations_native::hud_readback_targets(&state,&context.source_project,&context.build)?;
         let scenario_squad_readback=native_operations_native::squad_readback_targets(&state,&context.source_project,&context.build,&context.tags)?;
         let source_project=context.source_project;
-        let mut input=core::working_tags::WorkingTagsInput{hud_readback_targets,scenario_squad_readback,encounter_append,script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
+        let mut input=core::working_tags::WorkingTagsInput{mission_hud,hud_readback_targets,scenario_squad_readback,encounter_append,script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
         let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is running; wait for completion or cancel it first".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);
@@ -1133,7 +1160,17 @@ pub(super) async fn build_working_tags(
                 input.tags_directory=tags;
                 core::working_tags::run_build_from_tags(&project,&input,&jobs_root,&job_id,cancel,|e|event(&worker_app,e)).map_err(error)
             });
-            let result=result.and_then(|record|{let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;current.builds.push(record);current.modified_at=chrono::Utc::now().to_rfc3339();library.save(&current,None).map_err(error)});
+            let result=result.and_then(|record|{
+                let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;
+                if input.mission_hud.is_some() {
+                    // Studio intent is not normally a native fingerprint input.
+                    // A HUD transaction must not adopt older text after a user
+                    // edits objectives while the background compiler is running.
+                    let messages=|value:&Project|->Reply<serde_json::Value>{let messages=core::creative::mission_hud_messages(value.studio.as_ref().map_or(&[][..],|studio|studio.missions.as_slice())).map_err(error)?;serde_json::to_value(messages).map_err(error)};
+                    if messages(&current)?!=messages(&project)?{return Err("Mission HUD text changed during compilation. The candidate was not adopted; previous-good source and builds remain intact. Save and prepare a new HUD review.".into());}
+                }
+                current.builds.push(record);current.modified_at=chrono::Utc::now().to_rfc3339();library.save(&current,None).map_err(error)
+            });
             if let Err(mut message)=result{
                 // Source/integrity admission may fail before core creates a job
                 // receipt. Keep that real outcome in the existing build history;

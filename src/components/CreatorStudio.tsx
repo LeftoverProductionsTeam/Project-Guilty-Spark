@@ -458,11 +458,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <details><summary>Native objective &amp; completion</summary>
           <label><input type="checkbox" checked={beat.hudObjective===true}
             onChange={event=>updateBeat(beat.id,{hudObjective:event.target.checked?true:undefined,
-              ...(event.target.checked&&beat.hudText==null?{hudText:beat.title}:{})})}/>Show native HUD objective while this beat is active</label>
+              ...(event.target.checked&&beat.hudText==null?{hudText:beat.title}:{})})}/>{project.quickForge&&!project.quickForge.native?'Show native HUD objective while this beat is active':'Author native HUD objective text for this beat'}</label>
           {beat.hudObjective&&<label>HUD objective text<input aria-label={'HUD objective '+(i+1)} maxLength={254}
             value={beat.hudText??''} onChange={event=>updateBeat(beat.id,{hudText:event.target.value})}/></label>}
           <p className="studio-hint">HUD text is separate from direction notes: 1–254 UTF-16 characters, no percent signs or control characters.
-            The prepared native build creates a standard message tag; a script-only export does not include that tag.</p>
+            {project.quickForge&&!project.quickForge.native?'The prepared native build creates a standard message tag; a script-only export does not include that tag.':'For recovered source, Save and use Runtime & Tools → Details → Edit or attach scenario HaloScript → Campaign objective HUD messages. Review HaloScript calls to these message names separately.'}</p>
           <label><input type="checkbox" checked={beat.checkpoint===true}
             disabled={beat.completeMission===true&&beat.checkpoint!==true}
             onChange={event=>updateBeat(beat.id,{checkpoint:event.target.checked?true:undefined})}/>Request a safe checkpoint after this beat</label>

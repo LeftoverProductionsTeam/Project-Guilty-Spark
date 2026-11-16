@@ -1,4 +1,5 @@
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
+import {beginProjectMutation} from '../projectMutation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Play,
@@ -27,6 +28,7 @@ import type {
   WorkingScriptSources,
   WorkingScriptSource,
   FirefightSourcePlan,
+  MissionHudSourcePlan,
   RuntimeDockAction,
   ToolLaunchPlan,
   ToolProcessView,
@@ -182,6 +184,9 @@ export default function RuntimeDock({
   const [firefightActivation,setFirefightActivation]=useState<'manual'|'startup'>('manual');
   const [firefightSource,setFirefightSource]=useState<{sourceKey:string;plan:FirefightSourcePlan;script:NativeScriptAttachment;reviewed:boolean}|null>(null);
   const selectedFirefightSource=firefightSource?.sourceKey===scriptSourceKey?firefightSource:null;
+  const [missionHud,setMissionHud]=useState<{sourceKey:string;missionsKey:string;plan:MissionHudSourcePlan;reviewed:boolean}|null>(null);
+  const missionsKey=JSON.stringify(project?.studio?.missions??[]);
+  const selectedMissionHud=missionHud?.sourceKey===scriptSourceKey&&missionHud.missionsKey===missionsKey?missionHud:null;
   const currentReport = useRef(report);
   currentReport.current = report;
   const detailsDialog = useRef<HTMLElement | null>(null);
@@ -462,10 +467,11 @@ export default function RuntimeDock({
     onEdit({...latest,scenarioScriptDraft:draft},draft?'Edit scenario script draft':'Remove scenario script draft');
   }
   async function selectScript(file:File|undefined) {
-    const selection=++scriptSelection.current,request=generation.current,key=scriptSourceKey;
+    const selection=++scriptSelection.current,key=scriptSourceKey;
     setError('');
     if(!file)return;
     if(scriptAttachment&&scriptAttachment.sha256!==scriptAttachment.fileSha256&&!window.confirm('Replace the edited script draft? Export it first if you want to retain a separate copy.'))return;
+    const input=currentProject.current;if(!input)return;const release=beginProjectMutation(input.id);
     try {
       if(!/^[A-Za-z0-9_-]{1,31}\.hsc$/.test(file.name)||file.name.toLowerCase()==='global_scripts.hsc')throw Error('Choose a scenario .hsc module with a safe name of 1–31characters. Existing global source is preserved separately.');
       if(!file.size||file.size>1048576)throw Error('HaloScript source must be nonempty and at most 1 MiB.');
@@ -474,9 +480,13 @@ export default function RuntimeDock({
       if(!content.trim()||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(content))throw Error('Choose valid UTF8 HaloScript text without binary control characters.');
       const digest=await crypto.subtle.digest('SHA-256',bytes);
       const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
-      if(request!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
+      // A status refresh may temporarily remove the report while this local
+      // file is decoding. Retain its original source key as an unreviewed draft;
+      // changed native source stays stale and cannot gain build authority.
+      if(selection!==scriptSelection.current||currentProject.current?.id!==input.id)return;
       keepScriptDraft({filename:file.name,content,sha256,fileSha256:sha256,sourceKey:key,reviewed:false});
-    }catch(problem){if(request===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    }catch(problem){if(selection===scriptSelection.current&&currentProject.current?.id===input.id)setError(String(problem));}
+    finally{release();}
   }
   async function reviewScriptSource() {
     const input=selectedScript,draft=project?.scenarioScriptDraft;if(!input||!draft)return;
@@ -508,7 +518,18 @@ export default function RuntimeDock({
     }catch(problem){if(request===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{if(request===generation.current)setBusy(false);}
   }
-  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false, attachment?:NativeScriptAttachment, firefight?:NonNullable<typeof firefightSource>) {
+  async function prepareMissionHud(){
+    if(!native||!project||dirty||working||busy||!workingSourceAvailable||!report?.workingSource)return;
+    const request=generation.current,key=scriptSourceKey;setBusy(true);setError('');
+    try {
+      const plan=await call<MissionHudSourcePlan>('prepare_mission_hud',{projectId:project.id});
+      if(request!==generation.current||key!==currentScriptSourceKey.current||JSON.stringify(currentProject.current?.studio?.missions??[])!==missionsKey)return;
+      if(plan.projectId!==project.id||plan.buildId!==report.workingSource.buildId||plan.tagsDirectory!==report.workingSource.tagsDirectory||plan.projectFingerprint!==report.workingSource.projectFingerprint)throw Error('Native source selection changed; prepare mission messages again.');
+      setMissionHud({sourceKey:key,missionsKey,plan,reviewed:false});
+    }catch(problem){if(request===generation.current){setMissionHud(null);setError(String(problem));}}
+    finally{if(request===generation.current)setBusy(false);}
+  }
+  async function buildWorkingTags(bspAudio?: BspAudioRequest, compileScripts=false, attachment?:NativeScriptAttachment, firefight?:NonNullable<typeof firefightSource>,mission?:NonNullable<typeof missionHud>) {
     if (
       !project ||
       dirty ||
@@ -522,11 +543,12 @@ export default function RuntimeDock({
     if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new or recorded generated groups and their controller, review Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
     if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||selectedScript.replacesSha256!==attachment.replacesSha256||!report?.workingSource))return;
+    if(mission&&(!selectedMissionHud?.reviewed||mission!==selectedMissionHud||firefight||!!attachment&&!compileScripts))return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
-      await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),
+      await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),...(mission?{missionHud:mission.plan.hud.review}:{}),
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
         ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256,...(attachment.replacesSha256?{replacesSha256:attachment.replacesSha256}:{})}}:{}),
         ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:{}) });
@@ -867,8 +889,24 @@ export default function RuntimeDock({
                   onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>{selectedScript.replacesSha256?'Build reviewed script revision':'Attach source & compile'}</button>
                 <button disabled={busy||working} onClick={()=>keepScriptDraft(null)}>Remove project draft</button>
               </div>
+
               <p className="subtle">Compilation checks references and preserves other modules and original native script identities. It does not prove actor spawning, gameplay, wave rules or Forerunner compatibility. Missing encounters, loadout profiles or navigation must be authored separately.</p>
             </>}
+              <details className="native-mission-hud">
+                <summary>Campaign objective HUD messages</summary>
+                <p className="subtle">Edit objective text in Creator Studio, then Save and prepare its native message review here. Use the listed message names in your HaloScript. Build text alone to retain existing compiled scripts, or review an edited module to build both. Runtime display and objective progression need game checks.</p>
+                <button disabled={!native||busy||working||dirty||!project.studio?.missions.length} onClick={()=>void prepareMissionHud()}>Prepare mission HUD messages</button>
+                {selectedMissionHud&&<>
+                  <p>{selectedMissionHud.plan.hud.originalCount} original messages preserved; {selectedMissionHud.plan.hud.messages.length} messages in the proposed native HUD. Existing indices and button symbols are retained.</p>
+                  <ul aria-label="Campaign HUD message review">{selectedMissionHud.plan.hud.messages.filter(message=>/^gs_mission_(obj|cue|fail)_\d+$/.test(message.name)).map(message=><li key={message.name}><code>{message.name}</code> — {message.panels.map(panel=>panel.kind==='text'?panel.value:`[button ${panel.value}]`).join('')}</li>)}</ul>
+                  <button onClick={()=>downloadLocalText('mission-hud-review.json',JSON.stringify(selectedMissionHud.plan.hud.messages,null,2),'application/json')}>Export message review</button>
+                  <label><input type="checkbox" checked={selectedMissionHud.reviewed} disabled={busy||working||dirty} onChange={event=>setMissionHud({...selectedMissionHud,reviewed:event.target.checked})}/>I reviewed the mission messages and their HaloScript references.</label>
+                  <button disabled={!native||busy||working||dirty||!selectedMissionHud.reviewed||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                    onClick={()=>void buildWorkingTags(undefined,false,undefined,undefined,selectedMissionHud)}>Build mission HUD text</button>
+                  {selectedScript&&<button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!selectedMissionHud.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                    onClick={()=>void buildWorkingTags(undefined,true,selectedScript,undefined,selectedMissionHud)}>Build script &amp; mission HUD</button>}
+                </>}
+              </details>
           </details>}
           {report && (
             <>

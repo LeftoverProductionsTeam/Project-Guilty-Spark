@@ -1236,10 +1236,43 @@ mod tests {
         assert_eq!(modules.len() as u64,receipt["recoveredScriptModules"].as_u64().unwrap());
         assert_eq!(before,maps::hash_file(&source).unwrap());project.builds.push(build.clone());project::save_project(&jobs.join("ce-handoff.gsproject"),&project).unwrap();
         let reopened=project::load_project(&jobs.join("ce-handoff.gsproject")).unwrap();assert_eq!(reopened.fingerprint().unwrap(),project.fingerprint().unwrap());
-        let input=crate::working_tags::WorkingTagsInput{hud_readback_targets:vec![],scenario_squad_readback:None,encounter_append:None,script_attachment:None,expected_encounter:None,compile_scripts:true,expected_tag_identity:Some(crate::working_tags::source_identity(&jobs.join(&id).join("tags"),&AtomicBool::new(false)).unwrap()),bsp_audio:None,parent_build:build.clone(),tags_directory:jobs.join(&id).join("tags"),scenario_path:inspection.scenario_path.clone(),scenario_type:inspection.header.scenario_type,tool:tool_path(&tools,"invader-build").unwrap(),invader_info:tool_path(&tools,"invader-info").unwrap()};
+        let input=crate::working_tags::WorkingTagsInput{mission_hud:None,hud_readback_targets:vec![],scenario_squad_readback:None,encounter_append:None,script_attachment:None,expected_encounter:None,compile_scripts:true,expected_tag_identity:Some(crate::working_tags::source_identity(&jobs.join(&id).join("tags"),&AtomicBool::new(false)).unwrap()),bsp_audio:None,parent_build:build.clone(),tags_directory:jobs.join(&id).join("tags"),scenario_path:inspection.scenario_path.clone(),scenario_type:inspection.header.scenario_type,tool:tool_path(&tools,"invader-build").unwrap(),invader_info:tool_path(&tools,"invader-info").unwrap()};
+        let hud_review=std::env::var("SPARK_NATIVE_CE_MISSION_HUD_REVIEW").as_deref()==Ok("1");
+        let mut reopened=reopened;let mut input=input;
+        let read_fields=|tags:&Path|{
+            let result=std::process::Command::new(invader.join("invader-edit.exe")).args(["-t",tags.to_str().unwrap(),"-L",&format!("{}.scenario",inspection.scenario_path)]).output().unwrap();
+            assert!(result.status.success(),"{}",String::from_utf8_lossy(&result.stderr));String::from_utf8(result.stdout).unwrap()
+        };
+        if hud_review {
+            assert_eq!(inspection.header.scenario_type,0,"Mission HUD requires actual solo source");
+            reopened.studio=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"missions":[{"id":"technology","title":"Technology","objective":"Recover the technology","trigger":"manual","encounterName":"","hudObjective":true,"hudText":"Recover the technology and return to extraction."}],"shots":[],"playtests":[],"server":{"name":"Private","runtime":"haloCustomEdition","maxPlayers":1,"publicListing":false,"rotation":[],"gameTypes":[]}})).unwrap());
+            let string_sha=maps::hash_file(&invader.join("invader-string.exe")).unwrap();
+            input.mission_hud=Some(crate::working_tags::prepare_mission_hud_append(&reopened,&input.tags_directory,&read_fields(&input.tags_directory),None,&string_sha).unwrap().unwrap().review);
+            // A reviewed native module exercises the name without replacing the recovered mission.
+            let content="(script dormant gs_hud_review\n  (hud_set_objective_text gs_mission_obj_1)\n)\n".to_string();
+            input.script_attachment=Some(crate::working_tags::ScriptAttachment{filename:"spark_hud_review.hsc".into(),sha256:crate::hex_bytes(Sha256::digest(content.as_bytes())),content,replaces_sha256:None});
+        }
         let second=uuid::Uuid::new_v4().to_string();let rebuilt=crate::working_tags::run_build_from_tags(&reopened,&input,&jobs,&second,Arc::new(AtomicBool::new(false)),|e|println!("working {}: {}",e.phase,e.message)).unwrap();
         assert_eq!(rebuilt.status,"validated","{}",rebuilt.message);assert_eq!(maps::hash_file(&source).unwrap(),before);
-        println!("CE source/Save/reopen/native working-script rebuild PASS: first={}; second={}; originalSHA={before}; modules={}; no app/game acceptance",readback.sha256,rebuilt.sha256.unwrap(),modules.len());
+        println!("CE source/Save/reopen/native working-script rebuild PASS: first={}; second={}; originalSHA={before}; modules={}; no app/game acceptance",readback.sha256,rebuilt.sha256.as_ref().unwrap(),modules.len());
+        if hud_review {
+            let output=rebuilt.output.as_ref().unwrap();let compiled=maps::inspect_map(output,None).unwrap();
+            let receipt:crate::working_tags::WorkingTagsReceipt=serde_json::from_slice(&fs::read(jobs.join(&second).join("working-tags-receipt.json")).unwrap()).unwrap();
+            let owner=receipt.generated_mission_hud.as_ref().unwrap();let hud=maps::scenario_hud_messages(output,&compiled).unwrap().unwrap();assert_eq!(hud.messages,owner.messages);assert!(compiled.scripts.iter().any(|script|script.name=="gs_hud_review"));
+            let parent_tags_identity=crate::working_tags::source_identity(&receipt.tags_directory,&AtomicBool::new(false)).unwrap();
+            let old_index=hud.messages.iter().position(|message|message.name=="gs_mission_obj_1").unwrap();
+            reopened.builds.push(rebuilt.clone());reopened.studio.as_mut().unwrap().missions[0].hud_text=Some("Bring the technology back to the extraction terminal.".into());
+            project::save_project(&jobs.join("ce-handoff.gsproject"),&reopened).unwrap();let revised=project::load_project(&jobs.join("ce-handoff.gsproject")).unwrap();
+            let mut text_only=input.clone();text_only.parent_build=rebuilt.clone();text_only.tags_directory=receipt.tags_directory.clone();text_only.expected_tag_identity=Some(parent_tags_identity.clone());text_only.compile_scripts=false;text_only.script_attachment=None;
+            text_only.mission_hud=Some(crate::working_tags::prepare_mission_hud_append(&revised,&text_only.tags_directory,&read_fields(&text_only.tags_directory),Some(owner),&maps::hash_file(&invader.join("invader-string.exe")).unwrap()).unwrap().unwrap().review);
+            let third=uuid::Uuid::new_v4().to_string();let final_build=crate::working_tags::run_build_from_tags(&revised,&text_only,&jobs,&third,Arc::new(AtomicBool::new(false)),|e|println!("HUD text {}: {}",e.phase,e.message)).unwrap();assert_eq!(final_build.status,"validated","{}",final_build.message);
+            let final_map=maps::inspect_map(final_build.output.as_ref().unwrap(),None).unwrap();let final_hud=maps::scenario_hud_messages(final_build.output.as_ref().unwrap(),&final_map).unwrap().unwrap();
+            assert_eq!(final_hud.messages.len(),hud.messages.len());assert_eq!(final_hud.messages[old_index].name,"gs_mission_obj_1");assert_ne!(final_hud.messages[old_index],hud.messages[old_index]);
+            for (index,message) in hud.messages.iter().enumerate(){if index!=old_index{assert_eq!(&final_hud.messages[index],message);}}
+            assert_eq!(serde_json::to_value(&final_map.scripts).unwrap(),serde_json::to_value(&compiled.scripts).unwrap(),"Text-only revision preserves all compiled script signatures");
+            assert_eq!(crate::working_tags::source_identity(&text_only.tags_directory,&AtomicBool::new(false)).unwrap(),parent_tags_identity);assert_eq!(maps::hash_file(&source).unwrap(),before);
+            println!("Campaign HUD combined script/cache + text-only Save/reopen/native readback PASS: combined={}; text-only={}; HUD index={old_index}; messages={}; no native UI/game acceptance",rebuilt.sha256.unwrap(),final_build.sha256.unwrap(),final_hud.messages.len());
+        }
     }
     fn lifecycle_record(output: &Path) -> BuildRecord {
         let inspection = maps::inspect_map(output, None).unwrap();

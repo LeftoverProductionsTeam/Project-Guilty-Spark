@@ -4282,3 +4282,48 @@ test('campaign firing source separates tactical groups and placement with histor
  await combat.getByRole('button',{name:'Duplicate firing position',exact:true}).click();await expect.poll(async()=>(await group()).combat?.points.length).toBe(3);await combat.getByRole('button',{name:'Remove firing position',exact:true}).click();await expect.poll(async()=>(await group()).combat?.points.length).toBe(2);await combat.getByRole('combobox',{name:'Campaign firing position',exact:true}).selectOption('grid-0');await combat.getByRole('checkbox',{name:'Lock firing position editing',exact:true}).check();await expect(x).toBeDisabled();await expect(combat.getByRole('button',{name:'Reset firing source to native defaults',exact:true})).toBeDisabled();await combat.getByRole('checkbox',{name:'Lock firing position editing',exact:true}).uncheck();
  await combat.getByRole('button',{name:'Select firing position in Level Editor',exact:true}).click();await openDrawer(page,'Inspector');const properties=page.getByRole('region',{name:'Inspector panel',exact:true}).getByRole('button',{name:'Properties',exact:true});await revealPagedControl(properties);await properties.click();await expect(page.getByRole('textbox',{name:'Selected object name',exact:true})).toHaveValue('guards / Firing 0');await expect(page.getByRole('spinbutton',{name:'Rotation Z',exact:true})).toBeDisabled();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.campaignEncounters[0].combat.points[0].position[0])).toBe(4);await chooseTool(page,'Map library');await card().click();await chooseTool(page,'Creator Studio');if(!await combat.isVisible())await ai.locator(':scope > summary').click();if(!await x.isVisible())await combat.locator(':scope > summary').click();await expect(x).toHaveValue('4');expect((await group()).combat.groups.attackingSearch).toEqual(['a','z']);expect((await group()).combat.groups.defendingSearch).toEqual(['a','z']);expect((await group()).starts).toBeUndefined();await combat.getByRole('button',{name:'Reset firing source to native defaults',exact:true}).click();await expect(combat.getByRole('button',{name:'Customize firing source',exact:true})).toBeVisible();await page.keyboard.press('Control+z');await expect(x).toHaveValue('4');
 });
+
+
+async function mockCampaignHud(page:Page){
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,project=w.__sparkMock.projects.a.project;
+    project.studio={schemaVersion:1,missions:[{id:'tech',title:'Technology',objective:'Recover technology',trigger:'manual',encounterName:'',hudObjective:true,hudText:'Recover technology.'}],shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[],gameTypes:[]}};
+    w.__sparkMock.hudBuilds=[];
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='runtime_workbench_report'){const value=await invoke(command,args);value.sourceIssue=null;value.toolsIssue=null;value.workingSource={target:'gbx-custom',buildId:'owned-ce-source',tagsDirectory:'owned/tags',projectFingerprint:'c'.repeat(64)};return value;}
+      if(command==='prepare_mission_hud')return{projectId:'a',buildId:'owned-ce-source',tagsDirectory:'owned/tags',projectFingerprint:'c'.repeat(64),hud:{originalCount:1,inputMessages:[{name:'original',panels:[{kind:'text',value:'Original'}]}],messages:[{name:'original',panels:[{kind:'text',value:'Original'}]},{name:'gs_mission_obj_1',panels:[{kind:'text',value:w.__sparkMock.projects.a.project.studio.missions[0].hudText}]}],review:{inputReference:'original.hud_message_text',inputTagSha256:'d'.repeat(64),sourceSha256:'e'.repeat(64),messagesSha256:'f'.repeat(64),outputTagPath:'gs_hud/reviewed',stringToolSha256:'b'.repeat(64)}}};
+      if(command==='build_working_tags'){w.__sparkMock.hudBuilds.push(structuredClone(args));return 'synthetic-hud-job';}
+      return invoke(command,args);
+    };
+  });
+  await openFixture(page);
+}
+
+test('campaign HUD review builds the saved script and preserves draft history',async({page})=>{
+  await mockCampaignHud(page);
+  await chooseTool(page,'Creator Studio');const completion=page.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);await completion.click();
+  const objective=page.getByRole('textbox',{name:'HUD objective 1',exact:true});await revealPagedControl(objective);await objective.fill('Return with the technology.');await objective.blur();
+  await page.keyboard.press('Control+z');await expect(objective).toHaveValue('Recover technology.');await page.keyboard.press('Control+y');await expect(objective).toHaveValue('Return with the technology.');await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions[0].hudText)).toBe('Return with the technology.');
+  await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();const editor=page.locator('.native-script-attachment');await revealPagedControl(editor.locator('> summary'));await editor.locator('> summary').click();
+  await page.evaluate(()=>{const read=File.prototype.arrayBuffer;File.prototype.arrayBuffer=function(){const file=this;return file.name==='mission.hsc'?new Promise<ArrayBuffer>((resolve,reject)=>setTimeout(()=>void read.call(file).then(resolve,reject),150)):read.call(file);};});
+  await editor.locator('input[type=file]').setInputFiles({name:'mission.hsc',mimeType:'text/plain',buffer:Buffer.from('(script dormant mission (sleep 1))')});await page.keyboard.press('Control+s');
+  const sourceReview=editor.getByRole('checkbox',{name:'I reviewed this source and its native scenario references.',exact:true});await revealPagedControl(sourceReview);await sourceReview.check();
+  const hud=editor.locator('.native-mission-hud');await revealPagedControl(hud.locator('> summary'));await hud.locator('> summary').click();await hud.getByRole('button',{name:'Prepare mission HUD messages',exact:true}).click();
+  const build=hud.getByRole('button',{name:'Build script & mission HUD',exact:true});await expect(build).toBeDisabled();await expect(hud).toContainText('1 original messages preserved; 2 messages');await expect(hud.getByRole('list',{name:'Campaign HUD message review'})).toContainText('gs_mission_obj_1');
+  const review=hud.getByRole('checkbox',{name:'I reviewed the mission messages and their HaloScript references.',exact:true});await revealPagedControl(review);await review.check();await expect(build).toBeEnabled();await build.click();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.hudBuilds);expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({projectId:'a',compileScripts:true,expectedBuildId:'owned-ce-source',expectedSourceDirectory:'owned/tags',scriptAttachment:{filename:'mission.hsc',content:'(script dormant mission (sleep 1))'},missionHud:{outputTagPath:'gs_hud/reviewed',messagesSha256:'f'.repeat(64)}});
+});
+
+
+test('campaign HUD text builds without a script edit and rejects stale objective reviews',async({page})=>{
+  await mockCampaignHud(page);await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();
+  const editor=page.locator('.native-script-attachment');await revealPagedControl(editor.locator('> summary'));await editor.locator('> summary').click();
+  const hud=editor.locator('.native-mission-hud');await revealPagedControl(hud.locator('> summary'));await hud.locator('> summary').click();await hud.getByRole('button',{name:'Prepare mission HUD messages',exact:true}).click();
+  const review=hud.getByRole('checkbox',{name:'I reviewed the mission messages and their HaloScript references.',exact:true});await revealPagedControl(review);await review.check();
+  await page.keyboard.press('Escape');await chooseTool(page,'Creator Studio');const completion=page.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);await completion.click();const text=page.getByRole('textbox',{name:'HUD objective 1',exact:true});await revealPagedControl(text);await text.fill('Return safely.');await text.blur();await page.keyboard.press('Control+s');
+  await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();await revealPagedControl(hud.locator('> summary'));if(await hud.getAttribute('open')===null)await hud.locator('> summary').click();await expect(hud.getByRole('button',{name:'Build mission HUD text',exact:true})).toHaveCount(0);
+  await hud.getByRole('button',{name:'Prepare mission HUD messages',exact:true}).click();await expect(review).not.toBeChecked();await review.check();const build=hud.getByRole('button',{name:'Build mission HUD text',exact:true});await revealPagedControl(build);await build.click();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.hudBuilds);expect(calls).toHaveLength(1);expect(calls[0].compileScripts).toBe(false);expect(calls[0].scriptAttachment).toBeUndefined();expect(calls[0].missionHud.outputTagPath).toBe('gs_hud/reviewed');
+});

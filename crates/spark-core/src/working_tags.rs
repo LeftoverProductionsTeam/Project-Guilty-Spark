@@ -97,6 +97,15 @@ fn same_hud_path(a:&str,b:&str)->bool {a.replace('\\',"/").eq_ignore_ascii_case(
 /// native inventory and displays this plan before any writer is allowed.
 pub fn prepare_hud_append(config:&crate::firefight::FirefightConfig,tags:&Path,fields:&str,previous:Option<&GeneratedHudSource>,string_tool_sha256:&str)->Result<Option<HudAppendPlan>> {
     if config.native_hud_messages!=Some(true){return Ok(None);}
+    prepare_native_hud_append(crate::firefight::native_hud_messages(config)?,tags,fields,previous,string_tool_sha256)
+}
+pub fn prepare_mission_hud_append(project:&Project,tags:&Path,fields:&str,previous:Option<&GeneratedHudSource>,string_tool_sha256:&str)->Result<Option<HudAppendPlan>> {
+    let messages=crate::creative::mission_hud_messages(project.studio.as_ref().map_or(&[][..],|studio|studio.missions.as_slice()))?;
+    if messages.is_empty(){return Ok(None);}
+    prepare_native_hud_append(messages,tags,fields,previous,string_tool_sha256)
+}
+fn prepare_native_hud_append(messages:Vec<crate::firefight::NativeRoundHudMessage>,tags:&Path,fields:&str,previous:Option<&GeneratedHudSource>,string_tool_sha256:&str)->Result<Option<HudAppendPlan>> {
+    if messages.is_empty(){return Ok(None);}
     if !valid_hash(string_tool_sha256){return invalid("HUD string tool identity is missing");}
     let root=checked_directory(tags)?;let input_reference=scenario_hud_reference(fields)?;
     let original=input_reference.as_ref().map(|relative|->Result<maps::HudSourceTag>{
@@ -105,12 +114,15 @@ pub fn prepare_hud_append(config:&crate::firefight::FirefightConfig,tags:&Path,f
     let planned=if let Some(previous)=previous {
         let original=original.as_ref().ok_or_else(||SparkError::Invalid("Recorded generated HUD reference was removed".into()))?;
         if !input_reference.as_deref().is_some_and(|path|same_hud_path(path,&format!("{}.hud_message_text",previous.tag_path)))||original.sha256!=previous.tag_sha256||original.messages!=previous.messages{return invalid("Recorded generated HUD changed; preserve/reconcile handwritten edits before revision");}
-        crate::firefight::revise_preserving_native_hud_source(config,original,&previous.owned_names)?
-    }else{crate::firefight::preserving_native_hud_source(config,original.as_ref())?}.ok_or_else(||SparkError::Invalid("Native HUD plan is empty".into()))?;
+        crate::firefight::format_native_hud_append(messages,Some(original),&previous.owned_names)?
+    }else{crate::firefight::format_native_hud_append(messages,original.as_ref(),&[])?}.ok_or_else(||SparkError::Invalid("Native HUD plan is empty".into()))?;
     let output_tag_path=format!("gs_hud/{}",planned.source_sha256);
     let output=root.join(format!("{output_tag_path}.hud_message_text"));crate::reject_links(&output)?;
     if output.try_exists()?&&!previous.is_some_and(|previous|same_hud_path(&previous.tag_path,&output_tag_path)&&original.as_ref().is_some_and(|tag|tag.sha256==previous.tag_sha256)&&planned.messages==previous.messages){return invalid("Derived HUD tag path is already occupied; no tag will be replaced");}
     Ok(Some(HudAppendPlan{review:HudAppendReview{input_reference,input_tag_sha256:planned.original_tag_sha256,source_sha256:planned.source_sha256,messages_sha256:crate::hex_bytes(Sha256::digest(serde_json::to_vec(&planned.messages)?)),output_tag_path,string_tool_sha256:string_tool_sha256.into()},original_count:planned.original_count,input_messages:original.map_or_else(Vec::new,|tag|tag.messages),messages:planned.messages,source:planned.source}))
+}
+fn sync_hud_reference(owner:&mut GeneratedHudSource,current:&GeneratedHudSource) {
+    owner.tag_path=current.tag_path.clone();owner.tag_sha256=current.tag_sha256.clone();owner.messages=current.messages.clone();
 }
 fn verify_generated_hud(expected:&GeneratedHudSource,cache:&Path,map:&maps::MapInspection)->Result<()> {
     let actual=maps::scenario_hud_messages(cache,map)?.ok_or_else(||SparkError::Invalid("Compiled generated HUD scenario reference is missing".into()))?;
@@ -140,6 +152,8 @@ impl ScriptAttachment {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub mission_hud:Option<HudAppendReview>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -170,6 +184,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub generated_mission_hud:Option<GeneratedHudSource>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -266,6 +282,7 @@ struct Prepared {
     source_data: Option<PathBuf>,
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
     parent_generated_firefight:Option<GeneratedFirefightSource>,
+    parent_generated_mission_hud:Option<GeneratedHudSource>,
     hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     scenario_squad_readback:Option<crate::native_operations::ScenarioSquadReadback>,
     encounter_expectations:Vec<crate::native_operations::Operation>,
@@ -409,9 +426,9 @@ fn parent_native_identity(
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>,Option<crate::native_operations::ScenarioSquadReadback>)> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>,Option<crate::native_operations::ScenarioSquadReadback>,Option<GeneratedHudSource>)> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
-    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut hud_readback_targets=vec![];let mut scenario_squad_readback=None;
+    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut generated_mission_hud=None;let mut hud_readback_targets=vec![];let mut scenario_squad_readback=None;
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -438,7 +455,7 @@ fn parent_native_identity(
         retain_hud_targets(&mut hud_readback_targets,receipt.hud_readback_targets)?;
         scenario_squad_readback=receipt.scenario_squad_readback;
         controller_binding=receipt.controller_binding;
-        generated_firefight=receipt.generated_firefight;
+        generated_firefight=receipt.generated_firefight;generated_mission_hud=receipt.generated_mission_hud;
         for expectation in receipt.encounter_expectations.into_iter().chain(receipt.expected_encounter){retain_encounter_expectation(&mut encounter_expectations,expectation)?;}
         receipt.workspace
     } else if forge_receipt.exists() {
@@ -481,9 +498,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback))
+        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback,generated_mission_hud))
     } else {
-        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback))
+        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback,generated_mission_hud))
     }
 }
 
@@ -612,7 +629,10 @@ fn prepare(
         let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
         tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
     }
-    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets,parent_squad_readback) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    if input.mission_hud.is_some()&&(input.scenario_type!=0||input.encounter_append.is_some()) {
+        return invalid("Campaign HUD requires a solo target; prepare Firefight messages in a separate revision");
+    }
+    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets,parent_squad_readback,parent_generated_mission_hud) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
     retain_hud_targets(&mut hud_readback_targets,input.hud_readback_targets.clone())?;
     if !hud_readback_targets.is_empty(){
         for (key,name) in [("invaderEdit","invader-edit"),("invaderExtract","invader-extract")] {
@@ -623,6 +643,7 @@ fn prepare(
     }
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
+    if let Some(hud)=&parent_generated_mission_hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}
     if let Some(generated)=&parent_generated_firefight{generated.operation.verify_compiled_encounter(&parent_inspection)?;if let Some(profile)=&generated.player_profile{profile.verify_map(&parent_inspection)?;}if let Some(hud)=&generated.hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}}
     if let Some(snapshot)=&parent_squad_readback{snapshot.verify_map(&parent_inspection)?;}
     if let Some(snapshot)=&input.scenario_squad_readback{
@@ -673,7 +694,10 @@ fn prepare(
             tools.insert(key.into(),maps::hash_file(&path)?);
         }
     }
-    if let Some(review)=input.encounter_append.as_ref().and_then(|request|request.hud.as_ref()) {
+    if let Some(review)=input.mission_hud.as_ref().or_else(||input.encounter_append.as_ref().and_then(|request|request.hud.as_ref())) {
+        let edit=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"}))?;
+        if fs::metadata(&edit)?.len()>256*1024*1024{return invalid("Native HUD reference writer exceeds its identity limit");}
+        tools.insert("invaderEdit".into(),maps::hash_file(&edit)?);
         let string=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-string.exe"}else{"invader-string"}))?;
         if fs::metadata(&string)?.len()>256*1024*1024{return invalid("Native HUD string tool exceeds its identity limit");}
         let sha=maps::hash_file(&string)?;if sha!=review.string_tool_sha256{return invalid("Native HUD string tool changed after review");}tools.insert("invaderString".into(),sha);
@@ -685,6 +709,7 @@ fn prepare(
         source_data,
         parent_controller_binding,
         parent_generated_firefight,
+        parent_generated_mission_hud,
         hud_readback_targets,
         scenario_squad_readback,
         encounter_expectations,
@@ -891,15 +916,20 @@ pub(crate) fn tree_hashes(root: &Path, cancel: &AtomicBool) -> Result<BTreeMap<S
     Ok(hashes)
 }
 
-fn apply_hud_append(project:&Project,input:&WorkingTagsInput,prepared:&Prepared,review:&HudAppendReview,tags:&Path,workspace:&Path,runner:&Runner<'_>,invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)->Result<GeneratedHudSource> {
+fn apply_hud_append(project:&Project,input:&WorkingTagsInput,prepared:&Prepared,review:&HudAppendReview,mission:bool,tags:&Path,workspace:&Path,runner:&Runner<'_>,invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)->Result<GeneratedHudSource> {
     let scenario=normalize_scenario(&input.scenario_path)?;let native_scenario=format!("{scenario}.scenario");
     let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});
     recheck_tools(input,&prepared.tools)?;
     let fields=invoke(runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),native_scenario.clone()],workspace,"hud-review",44)?;
     if fields.len()>1024*1024{return invalid("Native HUD scenario review exceeds1MiB");}
-    let rules=project.firefight.as_ref().ok_or_else(||SparkError::Invalid("Reviewed HUD rules disappeared".into()))?;
-    let previous=prepared.parent_generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref());
-    let plan=prepare_hud_append(rules,tags,&fields,previous,&review.string_tool_sha256)?.ok_or_else(||SparkError::Invalid("Reviewed native HUD is no longer enabled".into()))?;
+    let previous=if mission{prepared.parent_generated_mission_hud.as_ref()}else{prepared.parent_generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref())};
+    let (plan,messages)=if mission {
+        (prepare_mission_hud_append(project,tags,&fields,previous,&review.string_tool_sha256)?,crate::creative::mission_hud_messages(project.studio.as_ref().map_or(&[][..],|studio|studio.missions.as_slice()))?)
+    } else {
+        let rules=project.firefight.as_ref().ok_or_else(||SparkError::Invalid("Reviewed HUD rules disappeared".into()))?;
+        (prepare_hud_append(rules,tags,&fields,previous,&review.string_tool_sha256)?,crate::firefight::native_hud_messages(rules)?)
+    };
+    let plan=plan.ok_or_else(||SparkError::Invalid("Reviewed native HUD is no longer enabled".into()))?;
     if &plan.review!=review{return invalid("Native HUD source/rules/tool changed after review; no HUD writer ran");}
     let target=tags.join(format!("{}.hud_message_text",review.output_tag_path));crate::reject_links(&target)?;
     if !target.try_exists()? {
@@ -908,7 +938,7 @@ fn apply_hud_append(project:&Project,input:&WorkingTagsInput,prepared:&Prepared,
         project::atomic_write(&source,&plan.source,false)?;
         if maps::hash_file(&source)?!=review.source_sha256{return invalid("Derived HUD authoring source changed before native generation");}
         let string=input.invader_info.with_file_name(if cfg!(windows){"invader-string.exe"}else{"invader-string"});recheck_tools(input,&prepared.tools)?;
-        invoke(runner,&string,&["-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),"-T".into(),"hud_message_text".into(),review.output_tag_path.clone()],workspace,"hud-generate",45)?;
+        invoke(runner,&string,&["-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),"-T".into(),"hud_message_text".into(),review.output_tag_path.replace('/',std::path::MAIN_SEPARATOR_STR)],workspace,"hud-generate",45)?;
         if maps::hash_file(&source)?!=review.source_sha256{return invalid("Derived HUD authoring source changed during native generation");}
     }
     let generated=maps::read_hud_source_tag(&target)?;
@@ -928,7 +958,7 @@ fn apply_hud_append(project:&Project,input:&WorkingTagsInput,prepared:&Prepared,
     }
     recheck_tools(input,&prepared.tools)?;
     let mut owned_names=previous.map_or_else(Vec::new,|previous|previous.owned_names.clone());
-    for message in crate::firefight::native_hud_messages(rules)?{if !owned_names.contains(&message.name){owned_names.push(message.name);}}
+    for message in messages{if !owned_names.contains(&message.name){owned_names.push(message.name);}}
     Ok(GeneratedHudSource{tag_path:review.output_tag_path.clone(),tag_sha256:generated.sha256,messages:generated.messages,owned_names})
 }
 
@@ -1196,6 +1226,7 @@ fn run_with(
     };
     let mut receipt = WorkingTagsReceipt {
         generated_firefight:prepared.parent_generated_firefight.clone(),
+        generated_mission_hud:prepared.parent_generated_mission_hud.clone(),
         hud_readback_targets:prepared.hud_readback_targets.clone(),
         scenario_squad_readback:prepared.scenario_squad_readback.clone(),
         encounter_expectations:prepared.encounter_expectations.clone(),
@@ -1370,8 +1401,15 @@ fn run_with(
             receipt.generated_firefight=Some(GeneratedFirefightSource{player_profile,hud:prepared.parent_generated_firefight.as_ref().and_then(|previous|previous.hud.clone()),operation:append.operation.clone(),controller:receipt.attached_script.clone().ok_or_else(||SparkError::Invalid("Generated controller source identity disappeared".into()))?,encounter_fields_sha256});
         }
         if let Some(review)=input.encounter_append.as_ref().and_then(|request|request.hud.as_ref()) {
-            let hud=apply_hud_append(project,input,&prepared,review,&tags,&workspace,&runner,&invoke)?;
+            let hud=apply_hud_append(project,input,&prepared,review,false,&tags,&workspace,&runner,&invoke)?;
             receipt.generated_firefight.as_mut().ok_or_else(||SparkError::Invalid("HUD append requires generated controller ownership".into()))?.hud=Some(hud);
+        }
+        if let Some(review)=&input.mission_hud {
+            let hud=apply_hud_append(project,input,&prepared,review,true,&tags,&workspace,&runner,&invoke)?;
+            if let Some(other)=receipt.generated_firefight.as_mut().and_then(|generated|generated.hud.as_mut()){sync_hud_reference(other,&hud);}
+            receipt.generated_mission_hud=Some(hud);
+        } else if let (Some(mission),Some(hud))=(receipt.generated_mission_hud.as_mut(),receipt.generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref())) {
+            sync_hud_reference(mission,hud);
         }
         if input.compile_scripts {
             receipt.compiled_script_modules=compile_script_sources(input,&prepared,&tags,&workspace,&staged_scripts,&runner,&invoke)?;
@@ -1461,6 +1499,10 @@ fn run_with(
             project::atomic_write(&directory.join("native-hud-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({"sourceParentSha256":receipt.parent_output_sha256,"outputSha256":inspected.sha256,"tags":hud_readback,"scope":"Current staged HUD root reflexive inventories and exposed descendants, independently recovered from compiled output. Root scalars, opaque cells and gameplay are not certified."}))?,false)?;
         }
         if let Some(binding)=&receipt.controller_binding{binding.verify_map(&inspected)?;}
+        if let Some(hud)=&receipt.generated_mission_hud {
+            verify_generated_hud(hud,&output,&inspected)?;
+            if maps::read_hud_source_tag(&tags.join(safe_relative(&format!("{}.hud_message_text",hud.tag_path))?))?.sha256!=hud.tag_sha256{return invalid("Generated campaign HUD source changed during native compilation");}
+        }
         if let Some(hud)=receipt.generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref()){
             verify_generated_hud(hud,&output,&inspected)?;
             if maps::read_hud_source_tag(&tags.join(safe_relative(&format!("{}.hud_message_text",hud.tag_path))?))?.sha256!=hud.tag_sha256{return invalid("Generated HUD source changed during native compilation");}
@@ -1629,6 +1671,44 @@ mod tests {
     }
 
     use super::*;
+    fn mission_project(text:&str)->Project {
+        let mut project=Project::new("Campaign HUD fixture");
+        project.studio=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"missions":[{"id":"tech","title":"Technology","objective":"Recover technology","trigger":"manual","encounterName":"","hudObjective":true,"hudText":text}],"shots":[],"playtests":[],"server":{"name":"Private","runtime":"haloCustomEdition","maxPlayers":1,"publicListing":false,"rotation":[],"gameTypes":[]}})).unwrap());project
+    }
+    #[test]
+    fn mission_message_review_refuses_unpreservable_text_and_pins_current_intent() {
+        let root=tempfile::tempdir().unwrap();let fields="hud_messages dependency";let tool="a".repeat(64);
+        let project=mission_project("Recover the technology.");let plan=prepare_mission_hud_append(&project,root.path(),fields,None,&tool).unwrap().unwrap();
+        assert_eq!(plan.original_count,0);assert_eq!(plan.messages[0].name,"gs_mission_obj_1");assert!(root.path().read_dir().unwrap().next().is_none(),"Preparation never writes native source");
+        let revised=prepare_mission_hud_append(&mission_project("Return to the hub."),root.path(),fields,None,&tool).unwrap().unwrap();assert_ne!(plan.review.messages_sha256,revised.review.messages_sha256);assert_ne!(plan.review.source_sha256,revised.review.source_sha256);
+        for text in ["".to_string(),"100% complete".into(),"bad\nline".into(),"x".repeat(255)]{assert!(prepare_mission_hud_append(&mission_project(&text),root.path(),fields,None,&tool).is_err());}
+        assert!(prepare_mission_hud_append(&project,root.path(),fields,None,"bad tool identity").is_err());
+        assert!(prepare_mission_hud_append(&project,root.path(),"hud_messages (../outside.hud_message_text) dependency",None,&tool).is_err());
+    }
+    #[test]
+    #[ignore="Requires explicitly configured installed Invader string tool; owned native HMT output only"]
+    fn installed_campaign_hud_preserves_original_indices_icons_and_both_message_owners() {
+        let tool=PathBuf::from(std::env::var_os("SPARK_NATIVE_INVADER_STRING").expect("Explicit installed string tool"));
+        let tool_sha=std::env::var("SPARK_NATIVE_INVADER_STRING_SHA256").expect("Reviewed string-tool identity");assert_eq!(maps::hash_file(&tool).unwrap(),tool_sha);
+        let root=tempfile::tempdir().unwrap();let canonical=fs::canonicalize(root.path()).unwrap();let tags=canonical.join("tags");let data=canonical.join("data");fs::create_dir(&tags).unwrap();fs::create_dir(&data).unwrap();
+        let write=|name:&str,source:&[u8]|{
+            let input=data.join(format!("{name}.hmt"));fs::create_dir_all(input.parent().unwrap()).unwrap();fs::write(&input,source).unwrap();
+            let result=std::process::Command::new(&tool).args(["-t",tags.to_str().unwrap(),"-d",data.to_str().unwrap(),"-T","hud_message_text",&name.replace('/',std::path::MAIN_SEPARATOR_STR)]).output().unwrap();assert!(result.status.success(),"{}",String::from_utf8_lossy(&result.stderr));maps::read_hud_source_tag(&tags.join(format!("{name}.hud_message_text"))).unwrap()
+        };
+        let original=maps::HudSourceTag{sha256:"a".repeat(64),messages:vec![maps::NativeHudMessage{name:"original_prompt".into(),panels:vec![maps::NativeHudPanel::Text("Use ".into()),maps::NativeHudPanel::Button(9),maps::NativeHudPanel::Text(" to deploy.".into())]}]};
+        let original_plan=crate::firefight::format_native_hud_append(vec![],Some(&original),&[]).unwrap().unwrap();let original=write("original",&original_plan.source);
+        let fields="hud_messages (original.hud_message_text) dependency";let mut project=mission_project("Recover the technology.");let plan=prepare_mission_hud_append(&project,&tags,fields,None,&tool_sha).unwrap().unwrap();let mission=write(&plan.review.output_tag_path,&plan.source);assert_eq!(mission.messages,plan.messages);assert_eq!(mission.messages[0],original.messages[0]);
+        let mut owner=GeneratedHudSource{tag_path:plan.review.output_tag_path.clone(),tag_sha256:mission.sha256,messages:mission.messages,owned_names:vec!["gs_mission_obj_1".into()]};
+        let fields=format!("hud_messages ({}.hud_message_text) dependency",owner.tag_path);project.studio.as_mut().unwrap().missions[0].hud_text=Some("Return with the technology.".into());
+        let revision=prepare_mission_hud_append(&project,&tags,&fields,Some(&owner),&tool_sha).unwrap().unwrap();assert_eq!(revision.messages.len(),2);let revised=write(&revision.review.output_tag_path,&revision.source);assert_eq!(revised.messages[0],original.messages[0]);
+        owner=GeneratedHudSource{tag_path:revision.review.output_tag_path,tag_sha256:revised.sha256,messages:revised.messages,owned_names:owner.owned_names};
+        let ff_message=crate::firefight::NativeRoundHudMessage{name:"gs_ff_ready".into(),text:"Defend the generator.".into()};let fields=format!("hud_messages ({}.hud_message_text) dependency",owner.tag_path);let ff=prepare_native_hud_append(vec![ff_message],&tags,&fields,None,&tool_sha).unwrap().unwrap();let ff_tag=write(&ff.review.output_tag_path,&ff.source);
+        let ff_owner=GeneratedHudSource{tag_path:ff.review.output_tag_path,tag_sha256:ff_tag.sha256,messages:ff_tag.messages,owned_names:vec!["gs_ff_ready".into()]};sync_hud_reference(&mut owner,&ff_owner);assert_eq!(owner.owned_names,vec!["gs_mission_obj_1"]);
+        let fields=format!("hud_messages ({}.hud_message_text) dependency",owner.tag_path);project.studio.as_mut().unwrap().missions[0].hud_text=Some("Extract safely.".into());let mixed=prepare_mission_hud_append(&project,&tags,&fields,Some(&owner),&tool_sha).unwrap().unwrap();let final_tag=write(&mixed.review.output_tag_path,&mixed.source);
+        assert_eq!(final_tag.messages[0],original.messages[0]);assert_eq!(final_tag.messages[1].name,"gs_mission_obj_1");assert_eq!(final_tag.messages[2],ff_owner.messages[2]);
+        assert_eq!(maps::read_hud_source_tag(&tags.join("original.hud_message_text")).unwrap().sha256,original.sha256);assert_eq!(maps::hash_file(&tool).unwrap(),tool_sha);
+        println!("Native HMT creation/campaign revision/mixed-owner preservation PASS; {} messages. No cache compile or game display acceptance",final_tag.messages.len());
+    }
     struct Case {
         _root: tempfile::TempDir,
         jobs: PathBuf,
@@ -1699,6 +1779,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            mission_hud:None,
             hud_readback_targets:vec![],
             scenario_squad_readback:None,
             encounter_append:None,

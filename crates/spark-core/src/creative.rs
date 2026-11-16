@@ -386,8 +386,16 @@ fn verify_mission_collection(beat:&MissionBeat,map:&crate::maps::MapInspection)-
 }
 /// Share the standard HMT source writer; never invent an engine HUD payload.
 pub fn native_mission_hud(binding:&NativeMissionBinding)->Result<Option<crate::firefight::NativeHudAppendPlan>> {
+    let messages=mission_hud_messages(&binding.missions)?;
+    if messages.is_empty(){return Ok(None);}
+    crate::firefight::format_native_hud_append(messages,None,&[])
+}
+/// Shared messages for generated missions and reviewed recovered-map source.
+/// Formatting a HUD never asserts that a handwritten script displays it.
+pub fn mission_hud_messages(missions:&[MissionBeat])->Result<Vec<crate::firefight::NativeRoundHudMessage>> {
+    if missions.len()>128{return invalid("Mission HUD supports at most128objectives");}
     let mut messages=vec![];
-    for (index,beat) in binding.missions.iter().enumerate() {
+    for (index,beat) in missions.iter().enumerate() {
         if beat.trigger=="escort" {
             messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_fail_{}",index+1),text:if beat.escort_failure.as_deref()==Some("continue"){"Rescue failed: not enough survivors. Continuing the operation.".into()}else{"Rescue failed: not enough survivors. Restart or revise the operation.".into()}});
         }
@@ -402,8 +410,7 @@ pub fn native_mission_hud(binding:&NativeMissionBinding)->Result<Option<crate::f
         }
         messages.push(crate::firefight::NativeRoundHudMessage{name:format!("gs_mission_obj_{}",index+1),text});
     }
-    if messages.is_empty(){return Ok(None);}
-    crate::firefight::format_native_hud_append(messages,None,&[])
+    Ok(messages)
 }
 
 fn bounded(s: &str, max: usize) -> bool {
