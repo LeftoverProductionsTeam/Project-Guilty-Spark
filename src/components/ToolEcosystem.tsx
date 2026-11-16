@@ -1,3 +1,4 @@
+import ExternalBrowserLink from './ExternalBrowserLink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Box, FileCode2, Hammer, Layers3, Tags, Wrench } from 'lucide-react';
@@ -230,7 +231,7 @@ export default function ToolEcosystem({
           )}
         {compact&&desktop&&!installed&&tool.integration!=='externalCompanion'&&<button disabled={busy} onClick={()=>locate(tool)}>Locate {tool.label}</button>}
         {compact&&tool.integration==='externalCompanion'&&<button disabled={busy} onClick={()=>void companion(installed?'launch':'select')}>{installed?'Launch Mantle':'Select installed application'}</button>}
-        {compact&&<a className="small-button gs-tool-get" href={tool.releaseUrl??tool.sourceUrl} target="_blank" rel="noreferrer" title={`Official download or installation instructions for ${tool.label}`}>Get {tool.label}</a>}
+        {compact&&<ExternalBrowserLink className="small-button gs-tool-get" href={tool.releaseUrl??tool.sourceUrl} target="_blank" rel="noreferrer" title={`Official download or installation instructions for ${tool.label}`}>Get {tool.label}</ExternalBrowserLink>}
         <ToolOptions compact={compact}>
         {desktop && (!compact||installed) && tool.integration !== 'externalCompanion' && (
           <button
@@ -249,9 +250,9 @@ export default function ToolEcosystem({
             . Map handoff support is checked separately.
           </p>
         )}
-        {!compact&&<a className="small-button" href={tool.releaseUrl ?? tool.sourceUrl} target="_blank" rel="noreferrer">
+        {!compact&&<ExternalBrowserLink className="small-button" href={tool.releaseUrl ?? tool.sourceUrl} target="_blank" rel="noreferrer">
           Get {tool.label}
-        </a>}
+        </ExternalBrowserLink>}
         {(!compact || !assessment.canUseWorkflow) && <p className="subtle">{assessment.detail}</p>}
         {tool.integration === 'externalCompanion' && (
           <>
@@ -295,7 +296,7 @@ export default function ToolEcosystem({
             <dt>Manual steps</dt><dd>{tool.workflow.manualOperations.join(' · ')}</dd>
             <dt>Limits</dt><dd>{tool.workflow.limitations.join(' · ')}</dd>
             <dt>Integration evidence</dt><dd>{tool.workflow.integrationTests.join(' · ')}</dd>
-            <dt>Reference</dt><dd><a href={tool.workflow.documentation} target="_blank" rel="noreferrer">Reviewed documentation</a></dd>
+            <dt>Reference</dt><dd><ExternalBrowserLink href={tool.workflow.documentation} target="_blank" rel="noreferrer">Reviewed documentation</ExternalBrowserLink></dd>
           </dl>}
           {row.externalCompanion && (
             <p className="subtle">
@@ -304,16 +305,16 @@ export default function ToolEcosystem({
               Registered SHA-256: <code>{row.externalCompanion.registration.executableSha256}</code>
             </p>
           )}
-          <a href={tool.sourceUrl} target="_blank" rel="noreferrer">
+          <ExternalBrowserLink href={tool.sourceUrl} target="_blank" rel="noreferrer">
             {tool.maintainer} · official source &amp; setup
-          </a>
+          </ExternalBrowserLink>
           {tool.releaseUrl && (
             <>
               {' '}
               ·{' '}
-              <a href={tool.releaseUrl} target="_blank" rel="noreferrer">
+              <ExternalBrowserLink href={tool.releaseUrl} target="_blank" rel="noreferrer">
                 Official releases
-              </a>
+              </ExternalBrowserLink>
             </>
           )}
         </details>

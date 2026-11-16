@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 5d8afd4a31c21a1f2e64760db324db02306bb61a, canonical local master.
-Latest verified revision: 95c449692da92c58bd8bdfdd41f86dbc11772508 + native dropship source slice; manifests identify this commit’s scope.
-Next action: extend existing reviewed native writer to append aircraft + isolated signals to recovered Black Echo, then compose/compile/read back its full CE609 mission. Windows/game/37944 open. No push.
+Starting revision: 1f28be08775c4025861724426d439d4da10764e6, canonical local master.
+Latest verified revision: parent1f28be0 plus this CI/dependency setup checkpoint; staged source manifests identify the containing commit.
+Next action: finish retained recovered-aircraft append WIP using the installed Invader enum inventory, then compose the complete CE609 Black Echo dropship mission. Hosted CI awaits owner push; Save37944/native desktop/game acceptance open.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov CI/setup: three stale native_logic::verify_compiled calls now use their exact output map. Windows all-workspace/all-target locked compilation PASS; hosted/Linux not run (no push). Dependency core6/frontend8/browser4+tool3/TypeScript pass. Runtime setup now routes to the selected existing profile/download flow; source tags available without a map; tool/SDK links open externally. Exact results/failed fixture precursors in RUNTIME_INTEGRATION_20261107. Final master e210fbc9 copied exactly into existing Master Engineering Prompts. All475/M1–M6 remain active.
 
 16Nov P0: frozen Save/native history ordering and paint-dependent keyboard Save/Undo repaired. Unit24/browser11/native storage13/TypeScript-Vite pass; exact causes/failures/hashes in RUNTIME_INTEGRATION_20261107. Actual Windows42-edit/full restart/37944 remain OPEN. QA47527/run-hJ8LWQ CLOSED500400313logicalB; root absent. Prior c9d1d11 command-route proof remains there; flight/mission acceptance open.
 
@@ -28,6 +30,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Retained uncommitted recovered-aircraft append: native_transport.rs, native_operations.rs, working_tags.rs, native_operations_native.rs, NativeTransportAppend.tsx, NativeTagOperations.tsx, nativeOperations.ts and its browser test. Core2/frontend/backend checks pass in scope; actual native readback still fails aircraft-type enum parsing. No playable aircraft mission accepted. QA55595/run-n392OX remains owned/active until scoped checks finish; do not delete active output.
 
 16Nov dropship: three native signals/craft and existing Runtime & Tools controller draft now connect actual seat/AI/route/pad source lists, repeatable grounded/boarding/settlement HSC, history/Save/review and pinned native build. Frontend51/core16/browser3distinct, native2+1/controller CE syntax, TypeScript/Vite/Windows check pass. Separate CE609 markers6/0groups pass; not full Black Echo/flight. Source requires preexisting aircraft; reviewed native structural append is next. QA25312/run-htH2Y3 CLOSED1487823130logicalB; root absent. Exact hashes, failures, current partial Spirit source and scope: RUNTIME_INTEGRATION_20261107. No Windows/game/Forerunner write/push.
 
@@ -70,11 +74,11 @@ Native/source7d271c2: Installed Invader native fixture4squads/8starts: one selec
 
 Historical239373f/f5082e09 original AI proposal/source-control details remain in Git4414650:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; accepted native pose milestones supersede their earlier unrun status without closing gameplay or original structural editing.
 
-Source472b10b: Forerunner Extraction layout now checks every authored player start, including hidden/locked/different-team/game-mode rows, and reports each unsafe source ID with the existing Select repair action. Missing starts and unavailable zone bindings are distinct; review never moves/deletes data. Native authored loop emits every spawn, and Forerunner players.c::find_best_starting_location_index can fall back across starts in solo. Focused nativeLogic/forgeSession22/22, nativeLogic/featureWorkflow13/13 and TypeScript pass. This closes the prior any-one-safe authoring defect, not compiled/native collision or death recovery acceptance. Forerunner only read: observed HEAD87521711b467ae314303aa876145b36da8766865; working contract SHA c5142b92d7b4f9872c3d542fae8d2e7efe2bdc5801c9fc2e00f41f2519a6be0c, players.c SHA e4cb6728cd4b3b20eb59aab3d29a908c7859a65aabb9753429f83ee10dff76e5; no implementation copied/API invented.
+Historical Source472b10b: evidence remains in Git1f28be0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no prior native/game/peer acceptance is upgraded.
 
-Current source f5082e09befeffce0452de65cec3676f77fb34bb: Native source controls → AI starting positions selects current loose-source encounter/squad/start, edits XYZ and reuses Preview/Accept/Restore plus exact source SHA/native indices. A bounded position inventory and one-field-only review protect facing/state/other tags. Immutable recipe groups refuse overrides before writes. Accepted revisions retain full coordinate scope through staging/receipts and compare every expected compiled point; old count-only receipts retain legacy scope. Count scaling/difficulty work2fa0409/ba4f5dd/3547a77 remains; exact earlier source notes in Gitd5e867c and RUNTIME_INTEGRATION_20261107.md. Viewport/native follow-up is recorded below; actual game acceptance remains open.
+Historical Current source f5082e09 evidence remains in Git1f28be0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no prior native/game/peer acceptance is upgraded.
 
-Focused validation: frontend Vite build/typecheck PASS; Windows backend cargo check PASS; core native_operations7passed/0failed/508filtered; affected haloScriptRound/studioClient/forgeSession30passed/0failed. Initial checks exposed four malformed GPU shader join literals and three missing fallible fourcc reads, now repaired. Three outdated Firefight assertions were corrected to verify death-interruptible waits and strict capture-before-combat ordering; manual-edit refusal message clarified without removing preservation checks. No native Halo compiler, application or game was launched. Unit map fixtures are not compiled map readback.
+Historical Focused validation: frontend Vite evidence remains in Git1f28be0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no prior native/game/peer acceptance is upgraded.
 
 Earlier source details are preserved in Gitfec34a0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107.md, not removed from history: mission HUD/checkpoint/endingb0b5336, mission reconciliationd6f7ce7, native mission attachment e2c3ff0, original script drafts129ecbe/module selection5a06bf0, independent campaign/loadout, native ctrl marker workflows9f99f29 and GPU direct-light draft63f1fed. They remain implementation/partial automation, not native/UI/gameplay acceptance. Full visual HUD/arrays, original Zombie recovery/controller/source-preservation, Forerunner staging, source recipe history and their exact earlier hashes remain in those existing records. No old code, requirement or unique evidence was discarded by this bounded checkpoint compaction.
 

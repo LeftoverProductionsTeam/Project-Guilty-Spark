@@ -9,6 +9,7 @@ pub const H1A_GUIDE: &str =
 pub const INVADER_RELEASES: &str = "https://github.com/SnowyMouse/invader/releases";
 pub const WEBVIEW2_GUIDE: &str = "https://developer.microsoft.com/en-us/microsoft-edge/webview2/";
 pub const CLASSIC_RESOURCES_GUIDE: &str = "https://c20.reclaimers.net/h1/maps/";
+pub const CLASSIC_TAGS_GUIDE: &str = "https://c20.reclaimers.net/h1/h1-ek/";
 pub const ANIMATION_GUIDE: &str = "https://c20.reclaimers.net/h1/tags/model_animations/";
 pub const COMMUNITY_CONTENT_GUIDE:&str="https://github.com/ChupathingyCE/chupathingyce/blob/c5a07c69589ab8d40180fc99eac993bc06b06ebb/README.md";
 
@@ -39,6 +40,7 @@ pub enum DependencyActionKind {
     ChooseSetting,
     ChooseResources,
     ChooseAssets,
+    ChooseRuntime,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -110,6 +112,12 @@ pub fn action(id: &str) -> Option<DependencyAction> {
             Some("hekDirectory"),
             false,
         ),
+        "runtime.setup" => (
+            DependencyActionKind::ChooseRuntime,
+            "Locate or get this runtime",
+            None,
+            false,
+        ),
         "halo.choose" => (
             DependencyActionKind::ChooseSetting,
             "Choose installed Halo folder",
@@ -157,6 +165,12 @@ pub fn action(id: &str) -> Option<DependencyAction> {
             DependencyActionKind::OpenOfficialPage,
             "Official source/tag setup",
             Some(H1A_GUIDE),
+            true,
+        ),
+        "tags.classicGuide" => (
+            DependencyActionKind::OpenOfficialPage,
+            "Classic source/tag setup",
+            Some(CLASSIC_TAGS_GUIDE),
             true,
         ),
         "assets.choose" => (
@@ -211,7 +225,7 @@ pub fn report(observation: &DependencyObservation) -> DependencyReport {
         "game",
         "Selected Halo installation",
         &observation.game,
-        if mcc { &["halo.choose"][..] } else { &[][..] },
+        if mcc { &["halo.choose"][..] } else { &["runtime.setup"][..] },
     )];
     if mcc {
         items.push(item(
@@ -248,12 +262,20 @@ pub fn report(observation: &DependencyObservation) -> DependencyReport {
             &observation.resources,
             &["resources.choose", "resources.guide"],
         ));
-        items.push(item(
+    }
+    items.push(item(
             "tags",
             "Matching editable tags",
             &observation.editable_tags,
-            if mcc&&observation.platform=="windows"{&["tags.choose","h1a.sdk","tags.guide"]}else{&["tags.choose","tags.guide"]},
+            if mcc && observation.platform == "windows" {
+                &["tags.choose", "h1a.sdk", "tags.guide"]
+            } else if mcc {
+                &["tags.choose", "tags.guide"]
+            } else {
+                &["tags.choose", "tags.classicGuide"]
+            },
         ));
+    if observation.project_id.is_some() {
         if observation.assets.state != DependencyState::NotApplicable {
             items.push(item(
                 "assets",
@@ -271,7 +293,7 @@ pub fn report(observation: &DependencyObservation) -> DependencyReport {
             "communityContent",
             "Community runtime base data",
             &observation.community_content,
-            &["community.guide"],
+            &["runtime.setup", "community.guide"],
         ));
     }
     if observation.platform == "windows" {
@@ -359,6 +381,29 @@ mod tests {
         for runtime in [RuntimeId::HaloCustomEdition,RuntimeId::ChupathingyCe,RuntimeId::OpenCe] {
             assert!(!report(&observed(runtime)).items.iter().flat_map(|i|&i.actions).any(|a|a.id=="h1a.sdk"));
         }
+    }
+
+    #[test]
+    fn missing_runtime_and_tags_have_actions_before_a_project_is_opened() {
+        for runtime in [RuntimeId::OpenCe, RuntimeId::ChupathingyCe, RuntimeId::HaloCustomEdition,
+            RuntimeId::HaloPc, RuntimeId::MacRetail, RuntimeId::HaloXbox] {
+            let mut observation = observed(runtime);
+            observation.project_id = None;
+            let result = report(&observation);
+            let game = result.items.iter().find(|item| item.id == "game").unwrap();
+            assert!(game.actions.iter().any(|a| a.id == "runtime.setup" &&
+                a.kind == DependencyActionKind::ChooseRuntime && !a.requires_review && a.target.is_none()));
+            let tags = result.items.iter().find(|item| item.id == "tags").unwrap();
+            assert!(tags.actions.iter().any(|a| a.id == "tags.choose"));
+            assert!(tags.actions.iter().any(|a| a.id == "tags.classicGuide" && a.target.as_deref() == Some(CLASSIC_TAGS_GUIDE)));
+            assert!(!result.items.iter().flat_map(|item| &item.actions).any(|a| a.id == "h1a.sdk" || a.id == "h1a.install"));
+            assert!(!result.items.iter().any(|item| item.id == "resources" || item.id == "assets"));
+        }
+        let mut observation = observed(RuntimeId::MccSteam);
+        observation.project_id = None;
+        let result = report(&observation);
+        assert!(result.items.iter().find(|item| item.id == "tags").unwrap().actions.iter().any(|a| a.id == "h1a.sdk"));
+        assert!(result.items.iter().find(|item| item.id == "game").unwrap().actions.iter().any(|a| a.id == "halo.choose"));
     }
     #[test]
     fn unknown_actions_cannot_supply_urls_installers_or_command_lines() {

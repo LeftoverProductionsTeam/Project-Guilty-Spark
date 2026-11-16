@@ -3,7 +3,7 @@ import type { Bootstrap, OpenProject, Project, RuntimeId } from './types';
 export type DependencyState = 'ready' | 'setupRequired' | 'unverified' | 'notApplicable' | 'blocked';
 export interface DependencyAction {
   id: string;
-  kind: 'installH1aViaSteam' | 'openOfficialPage' | 'chooseSetting' | 'chooseResources' | 'chooseAssets';
+  kind: 'installH1aViaSteam' | 'openOfficialPage' | 'chooseSetting' | 'chooseResources' | 'chooseAssets' | 'chooseRuntime';
   label: string;
   target: string | null;
   requiresReview: boolean;

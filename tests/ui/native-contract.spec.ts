@@ -4811,3 +4811,21 @@ test('Forerunner dropship authoring retains draft history and enters the existin
  await page.evaluate(()=>(window as any).__missingTransportSeat=false);await revealPagedControl(read);await read.click();await revealPagedControl(build);await expect(build).toBeEnabled();await build.click();
  const request=await page.evaluate(()=>(window as any).__sparkMock.hudBuilds.at(-1));expect(request.expectedTagIdentity).toBe('e'.repeat(64));expect(request.compileScripts).toBe(true);expect(request.scriptAttachment.filename).toBe('gs_pelican_transport.hsc');expect(request.scriptAttachment.content).toContain('(script continuous forerunner_pelican_complete\n  (sleep -1)');
 });
+
+// Dependency setup routing: synthetic desktop IPC, not installation/game acceptance.
+test('missing runtime setup reaches the selected existing profile and verified download controls',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(async()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,[base]=await invoke('runtime_report');w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+  if(command==='runtime_report')return [base,{...base,id:'chupathingyCe',name:'ChupathingyCE',installation:null}];
+  if(command==='managed_runtime_packages')return [{id:'chupathingy',name:'Chupathingy',version:'synthetic',runtimeId:'chupathingyCe',releasePage:'https://github.com/ChupathingyCE/chupathingyce/releases',bytes:1024}];
+  if(command==='dependency_report')return {schemaVersion:1,runtimeId:args.runtimeId,projectId:args.projectId,platform:'windows',diagnostics:[],items:[{id:'game',label:'Selected Halo installation',state:'setupRequired',detail:'Connect an installed engine or review a supported download.',actions:[{id:'runtime.setup',kind:'chooseRuntime',label:'Locate or get this runtime',target:null,requiresReview:false}]}]};
+  return invoke(command,args);
+ };});
+ await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();
+ await page.getByRole('combobox',{name:'Dependency target runtime',exact:true}).selectOption('chupathingyCe');
+ await page.getByRole('button',{name:'Locate or get this runtime',exact:true}).click();
+ await expect(page.getByRole('tab',{name:'Runtime setup',exact:true})).toHaveAttribute('aria-selected','true');
+ const install=page.getByRole('textbox',{name:'Installation directory',exact:true,includeHidden:true});await revealPagedControl(install);await expect(install).toBeVisible();
+ const engine=page.getByRole('combobox',{name:'Engine to download',exact:true,includeHidden:true});await revealPagedControl(engine);await expect(engine).toHaveValue('chupathingy');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>['prepare_runtime_engine_download','fetch_runtime_engine_download','install_runtime_engine_download','register_runtime','save_project'].includes(c.command)))).toBe(false);
+});

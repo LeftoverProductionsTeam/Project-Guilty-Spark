@@ -116,3 +116,9 @@ test('selection never launches and cancelling confirmation sends no launch IPC',
   await page.getByRole('button', { name: 'Forget selection', exact: true }).click();
   await expect(launch).toBeDisabled();
 });
+
+test('Get tool opens its catalog source in the system browser without installing or launching it',async({page})=>{
+ const get=page.getByRole('link',{name:/^Get OpenCE Mantle/});await expect(get).toBeVisible();const url=await get.getAttribute('href');await get.click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).companionCalls.filter((c:any)=>c.command==='open_external_url'))).toEqual([{command:'open_external_url',args:{url}}]);
+ expect(await page.evaluate(()=>(window as any).companionCalls.some((c:any)=>c.command.includes('download')||c.command.includes('launch')))).toBe(false);
+});

@@ -173,7 +173,7 @@ fn run() -> Result<()> {
         .clone();
     let compiled = maps::inspect_map(build.output.as_ref().unwrap(), None)?;
     native_asset_imports::verify_compiled(&target, &compiled)?;
-    spark_core::native_logic::verify_compiled(target.quick_forge.as_ref().unwrap(), &compiled)?;
+    spark_core::native_logic::verify_compiled(target.quick_forge.as_ref().unwrap(), &compiled, build.output.as_ref().unwrap())?;
     let machine = compiled
         .tags
         .iter()

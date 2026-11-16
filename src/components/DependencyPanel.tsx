@@ -21,12 +21,14 @@ export default function DependencyPanel({
   onSetupChanged,
   onProjectUpdated,
   onChooseAssets,
+  onChooseRuntime,
 }: {
   project: Project | null;
   runtime: RuntimeId;
   onSetupChanged?: (bootstrap: Bootstrap) => void;
   onProjectUpdated?: (opened: OpenProject) => void;
   onChooseAssets?: () => void;
+  onChooseRuntime?: () => void;
 }) {
   const [report, setReport] = useState<DependencyReport | null>(null);
   const [plan, setPlan] = useState<DependencyActionPlan | null>(null);
@@ -76,6 +78,13 @@ export default function DependencyPanel({
   }, [refresh, discard]);
 
   async function act(action: DependencyAction) {
+    if (action.kind === 'chooseRuntime') {
+      discard(plan);
+      setPlan(null);
+      setReviewed(false);
+      onChooseRuntime?.();
+      return;
+    }
     if (action.kind === 'chooseAssets') {
       onChooseAssets?.();
       return;
@@ -161,7 +170,8 @@ export default function DependencyPanel({
       <p>
         Check the tools, source data and model / animation files needed by{' '}
         {project?.title ?? 'your selected Halo'}. Choices are remembered; this guide does not restart
-        onboarding.
+        onboarding. Missing files can be located here; runtime setup offers verified engine downloads or
+        installation guidance. Original game data must come from your own installation.
       </p>
       {!native && (
         <p className="dependency-notice">
@@ -251,7 +261,7 @@ export default function DependencyPanel({
               <button
                 key={action.id}
                 type="button"
-                disabled={busy || (action.kind === 'chooseAssets' && !onChooseAssets)}
+                disabled={!native || busy || (action.kind === 'chooseAssets' && !onChooseAssets) || (action.kind === 'chooseRuntime' && !onChooseRuntime)}
                 onClick={() => void act(action)}
               >
                 {action.label}

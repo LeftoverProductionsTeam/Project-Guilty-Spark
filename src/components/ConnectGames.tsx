@@ -1,3 +1,4 @@
+import ExternalBrowserLink from './ExternalBrowserLink';
 import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { Bootstrap, RuntimeReport, Settings, Workspace } from '../types';
@@ -212,14 +213,14 @@ export default function ConnectGames({
           </p>
           {wantsMcc && (
             <>
-              <a
+              <ExternalBrowserLink
                 className="button"
                 href="https://store.steampowered.com/app/1532190/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Open Steam listing
-              </a>
+              </ExternalBrowserLink>
               <p>
                 <small>
                   Steam Library → Tools → Halo: CE Mod Tools - MCC → Install. Follow the kit’s supplied tag
@@ -322,13 +323,13 @@ export default function ConnectGames({
                 Choose SDK archive &amp; prepare tags
               </button>
             )}
-            <a
+            <ExternalBrowserLink
               href="https://learn.microsoft.com/en-us/halo-master-chief-collection/general/overview-tools"
               target="_blank"
               rel="noopener noreferrer"
             >
               Official tools &amp; SDK install guide
-            </a>
+            </ExternalBrowserLink>
           </div>
           <p>
             <small>
@@ -365,9 +366,9 @@ export default function ConnectGames({
           >
             Browse Invader tools
           </button>
-          <a href="https://github.com/SnowyMouse/invader/releases" target="_blank" rel="noopener noreferrer">
+          <ExternalBrowserLink href="https://github.com/SnowyMouse/invader/releases" target="_blank" rel="noopener noreferrer">
             Official Invader releases
-          </a>
+          </ExternalBrowserLink>
         </article>
       </div>
       {report?.kits.length === 0 && (
@@ -406,13 +407,13 @@ export default function ConnectGames({
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
       <p>
-        <a href="https://c20.reclaimers.net/h1/h1-ek/" target="_blank" rel="noopener noreferrer">
+        <ExternalBrowserLink href="https://c20.reclaimers.net/h1/h1-ek/" target="_blank" rel="noopener noreferrer">
           Community editing-kit guide
-        </a>{' '}
+        </ExternalBrowserLink>{' '}
         ·{' '}
-        <a href="https://c20.reclaimers.net/general/mod-tools/" target="_blank" rel="noopener noreferrer">
+        <ExternalBrowserLink href="https://c20.reclaimers.net/general/mod-tools/" target="_blank" rel="noopener noreferrer">
           Steam installation steps
-        </a>
+        </ExternalBrowserLink>
       </p>
     </section>
   );

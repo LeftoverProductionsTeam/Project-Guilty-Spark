@@ -164,7 +164,7 @@ fn run() -> Result<()> {
     let after = storage::measure(&args[4])?;
     let output = build.output.as_ref().unwrap();
     let inspection = maps::inspect_map(output, None)?;
-    spark_core::native_logic::verify_compiled(p.quick_forge.as_ref().unwrap(), &inspection)?;
+    spark_core::native_logic::verify_compiled(p.quick_forge.as_ref().unwrap(), &inspection, output)?;
     let staged = sources.directory.join("tags");
     let input_hashes: std::collections::BTreeMap<String, String> =
         serde_json::from_slice(&fs::read(jobs.join(&id).join("input-tags.json"))?)?;
@@ -317,6 +317,7 @@ fn run() -> Result<()> {
     spark_core::native_logic::verify_compiled(
         changed.quick_forge.as_ref().unwrap(),
         &changed_inspection,
+        changed_build.output.as_ref().unwrap(),
     )?;
     let machine = changed_inspection
         .tags
