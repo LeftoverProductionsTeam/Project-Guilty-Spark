@@ -3,8 +3,8 @@
 Task: Operation110 — recovered mission objective areas → native viewport/source/build
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: fb7590dcd4eb15b3f98cbcf199ce18c8cb676bad. Current mission-area bridge is uncommitted; TypeScript/Vite/Windows compile pass, native UI/build pending.
-Next action: run mission→native area→viewport/source review→Save/restart/CE readback in QA73504/run-3KBsDw LIVE/disposable. Source changes preserve current native writer/history and475IDs; no game/Forerunner write/push.
+Latest verified revision: 2067a80fff63dec3674adc57a49f40409c151caa. Native appcaa875d4; exact hashes/results in RUNTIME_INTEGRATION_20261107.
+Next action: finish recovered native control/terminal placement workflow. Game/37944/M1–M6 remain open. QA73504 CLOSED; no Forerunner writes/push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current checkpoint: native trigger Move-Rotate-Scale/review/Restore/Save/3restarts/CE geometry readback passes. Compact36px mission rows,42rapid edits/Undo/Save/status10-2-2ms/3restarts/HUD readback pass;0page errors.128beat/browser8journeys pass. Exact hashes/captures/failures in runtime evidence. QA42550/run-KrC4rf CLOSED:4562026213logicalB disposed, peak allocated4361025184B; physical reclaimed unavailable. Originals/475IDs unchanged; no game/37944/full-suite acceptance.
+16Nov current checkpoint: mission→native area→viewport/review/Restore/Save/3restarts/CE bounds readback passes;0page errors. Reference history/2browser/6frontend/bindings/Windows checks pass. QA73504/run-3KBsDw CLOSED:3153610941logicalB disposed; physical reclamation unavailable. Originals/475IDs unchanged. Exact hashes/failures in runtime evidence. No game/37944/full-suite acceptance.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
