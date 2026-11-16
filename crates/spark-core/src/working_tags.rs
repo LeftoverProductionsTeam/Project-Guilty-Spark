@@ -1442,7 +1442,8 @@ fn run_with(
             let combat=crate::native_operations::current_combat_targets(&fields,&source_sha256,&prepared.scenario_squad_readback.as_ref().unwrap().combat)?;
             let cameras=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cameras.is_some()){Some(crate::native_operations::scenario_camera_choices(&fields)?)}else{None};
             let volumes=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.volumes.is_some()){Some(crate::native_operations::scenario_volume_choices(&fields)?)}else{None};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat,cameras,volumes};
+            let devices=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.devices.is_some()){Some(crate::native_operations::scenario_device_choices(&fields)?)}else{None};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{source_sha256,squads,include_starts,combat,cameras,volumes,devices};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
@@ -1491,8 +1492,8 @@ fn run_with(
         if let Some(snapshot)=&receipt.scenario_squad_readback{
             snapshot.verify_cache(&output,&inspected)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
-                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,"volumes":snapshot.volumes,
-                "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional camera inventory/pose/lens is read from the compiled cache. This is not AI/cinematic/gameplay acceptance."
+                "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,"volumes":snapshot.volumes,"devices":snapshot.devices,
+                "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional native device identity/pose, trigger bounds and camera inventory/pose/lens are read from the compiled cache. This is not AI/cinematic/gameplay acceptance."
             }))?,false)?;
         }
         if let Some(profile)=receipt.generated_firefight.as_ref().and_then(|generated|generated.player_profile.as_ref()){profile.verify_map(&inspected)?;}

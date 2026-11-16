@@ -27,3 +27,8 @@ assert.equal(inspectScenarioBindings(volumeScripts,inspected)[0].status,'notInsp
 assert.equal(inspectScenarioBindings(volumeScripts,null,{gameMode:'campaign',native:{source:{}}},[],nativeVolumes)[0].status,'presentInNativeSource');
 assert.equal(inspectScenarioBindings(volumeScripts,null,{gameMode:'campaign',logic:{triggers:[{nativeName:'entrance'}]}},[],[])[0].status,'presentInAuthoringSource');
 console.log('PASS: native source areas remain distinct from imported cache and authored volume evidence; missing/ambiguous names refused');
+
+const controlScripts=[{dependencies:['device_control:terminal','device_control:missing']}];
+assert.deepEqual(inspectScenarioBindings(controlScripts,null,undefined,[],undefined,[{class:'ctrl',name:'terminal'}]).map(row=>row.status),['presentInNativeSource','absentInNativeSource']);
+assert.equal(inspectScenarioBindings(controlScripts,null,undefined,[],undefined,[{class:'mach',name:'terminal'}])[0].status,'absentInNativeSource');
+assert.equal(inspectScenarioBindings(controlScripts,null,undefined,[],undefined,[{class:'ctrl',name:'terminal'},{class:'ctrl',name:'terminal'}])[0].status,'absentInNativeSource');

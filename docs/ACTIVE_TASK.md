@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — recovered mission objective areas → native viewport/source/build
+Task: Operation110 — compact mission UI and recovered native device source checkpoint
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 2067a80fff63dec3674adc57a49f40409c151caa. Native appcaa875d4; exact hashes/results in RUNTIME_INTEGRATION_20261107.
-Next action: finish recovered native control/terminal placement workflow. Game/37944/M1–M6 remain open. QA73504 CLOSED; no Forerunner writes/push.
+Latest verified revision: parent11f58497d7d2a48113101099cbbc540fae4828cb; current scoped source/native checks pass. App6c88b0c4fcce985216eec8e5561a08a319061b72fa18399e6d89be5a927cf2af; exact output hashes in runtime evidence.
+Next action: approved private Black Echo gameplay when desktop control works; otherwise continue existing campaign command-list authoring. Native Restore != project Undo. QA98092 CLOSED; no game/push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current checkpoint: mission→native area→viewport/review/Restore/Save/3restarts/CE bounds readback passes;0page errors. Reference history/2browser/6frontend/bindings/Windows checks pass. QA73504/run-3KBsDw CLOSED:3153610941logicalB disposed; physical reclamation unavailable. Originals/475IDs unchanged. Exact hashes/failures in runtime evidence. No game/37944/full-suite acceptance.
+16Nov current checkpoint: terminal reference→actual model Move/Rotate→review/Restore/Save/3restarts→CE complete-device readback passes;0page errors. Frontend22/core22+2skips/browser4+toolbar/Windows checks pass. One wrapping bar fixes native overlap. QA98092/run-uKcX8S CLOSED:4718760219logicalB disposed, physical unavailable. Compact36px/HUD151px/42rapid-edit proof retained;37944/game/fullGoal open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
@@ -98,7 +98,7 @@ Owner priorities/addenda remain active:
 
 - Campaign/loadout WIP: typecheck, compilation, UI Save/Undo/Redo/restart, profile semantics, dependency staging/readback, SparkLink peers and engine application are unrun. No playable Extraction, inventory persistence or new runtime capability was established. Existing native controller and source preservation guards are retained.
 
-- Native controls/marker WIP: native compile/readback/gameplay/Undo/Save/restart, control tag compatibility, old saved-project reconciliation for newly decoded controls and target-specific render/count changes await authorized execution. Naming and source checks are not a playable Extraction or persistence result.
+- Native control pose/UI/Restore/Save/3restarts/CE device/name/palette readback passes; real machine/door/collision/gameplay, native Undo and other targets remain open. Not playable Extraction/persistence acceptance.
 
 - Current source: frontend/backend compilation checks pass. Full UI/discovery/profile persistence/window isolation and native source-preservation workflows still await stabilization. No new packaged executable represents it.
 - Historical R692 creation failure is repaired and scoped Windows create/Save/restart/textures passes. Earlier create-OjDwa6 Interface Studio navigation anomaly was not reproduced by later instrumented runs; not claimed repaired. Native newly authored cache compilation/AI/gameplay and complete UI/history/companion acceptance remain open.

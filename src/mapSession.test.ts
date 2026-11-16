@@ -221,3 +221,5 @@ test('mission expansion stays window-local and restores without touching authore
  session.configureMapViewWindow('main');expect(session.readMapSession('a','creator-mission-expanded',{})).toEqual({first:true});
  vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','creator-mission-expanded',{})).toEqual({first:true});
 });
+
+test('native device model proposals are window-local and never restart as accepted edits',async()=>{const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('a','world.device-placement',{active:true});expect(session.readMapSession('a','world.device-placement',null)).toEqual({active:true});session.configureMapViewWindow('second');expect(session.readMapSession('a','world.device-placement',null)).toBeNull();expect([...data.values()].every(text=>!text.includes('world.device-placement'))).toBe(true);vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','world.device-placement',null)).toBeNull();});

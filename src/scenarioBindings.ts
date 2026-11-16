@@ -7,9 +7,13 @@ import type { ScriptExport } from './haloScript';
 import type { QuickForgeDocument } from './forge';
 export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'presentInNativeSource'|'absentInNativeSource'|'notInspectable';
 export interface BindingResult { dependency: string; status: BindingStatus; detail: string }
-export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[]): BindingResult[] {
+export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[],nativeDevices?:readonly {name:string;class:string}[]): BindingResult[] {
   const dependencies=[...new Set(scripts.flatMap(s=>s.dependencies))];
   return dependencies.map(dependency=>{
+    if(nativeDevices&&dependency.startsWith('device_control:')&&!(source?.gameMode==='campaign'&&!source.native)){
+      const name=dependency.slice('device_control:'.length),matches=nativeDevices.filter(row=>row.class==='ctrl'&&row.name===name).length;
+      return {dependency,status:matches===1?'presentInNativeSource' as const:'absentInNativeSource' as const,detail:matches===1?'Unique control in the inspected native source. Pose editing preserves flags/groups/scripts; real activation and mission progress require native/game validation.':'Native control is missing or ambiguous; read source again or reconcile references in the matching native editor.'};
+    }
     if(nativeVolumes&&dependency.startsWith('trigger_volume:')&&!(source?.gameMode==='campaign'&&!source.native)){
       const name=dependency.slice('trigger_volume:'.length),matches=nativeVolumes.filter(area=>area.name===name).length;
       return {dependency,status:matches===1?'presentInNativeSource' as const:'absentInNativeSource' as const,

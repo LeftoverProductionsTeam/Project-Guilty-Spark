@@ -218,3 +218,7 @@
 .asset-preview-drag{cursor:grab;user-select:none;touch-action:none;}
 .asset-preview-drag :is(canvas,img){-webkit-user-drag:none;}
 .asset-preview-drag:active{cursor:grabbing;}
+
+/* A selected native source model owns one toolbar, with wrapping at narrow sizes. */
+.native-device-actions {flex-wrap:wrap;row-gap:4px;}
+.native-device-actions>span {flex:1 1 230px;min-width:0;}

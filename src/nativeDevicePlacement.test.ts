@@ -1,0 +1,13 @@
+import {it,expect} from 'vitest';
+import {deviceDraft,devicePose,deviceScope,deviceMatches,deviceTransform,deviceSceneObject} from './nativeDevicePlacement';
+import type {NativeDeviceView} from './nativeDevicePlacement';
+import type {NativeDevicePlacement,NativeTagContext} from './nativeOperations';
+import type {Project,MapInspection,SceneObject} from './types';
+const original:NativeDevicePlacement={class:'ctrl',index:0,nameIndex:1,name:'terminal',tagPath:'devices/terminal',position:[1,2,3],rotationRadians:[Math.PI/2,0,0]};
+const view=():NativeDeviceView=>({projectId:'p',buildId:'b',tag:'level.scenario',sourceSha256:'a'.repeat(64),original,active:true,focus:1,...deviceDraft(original)});
+it('retains native radians and maps the actual model pose without editing the saved scene',()=>{const v=view();expect(devicePose(v)).toEqual(original);v.position[0]='4';expect(devicePose(v)?.rotationRadians).toEqual(original.rotationRadians);v.angles[0]='-90';expect(devicePose(v)?.rotationRadians[0]).toBeCloseTo(-Math.PI/2);
+ const object={id:'Control-0',tagId:42,kind:'Control',position:[1,2,3],rotation:[0,0,0],scale:[1,1,1]} as SceneObject,p={scene:[object]} as Project,inspection={tags:[{id:42,class:'ctrl',path:'devices\\terminal'}]} as MapInspection;expect(deviceSceneObject(v,p,inspection)?.position).toEqual([4,2,3]);expect(object.position).toEqual([1,2,3]);expect(deviceSceneObject({...v,original:{...original,tagPath:'devices/other'}},p,inspection)).toBeNull();
+});
+it('rejects hidden locked scaled invalid or stale native drags without falling back to a cache edit',()=>{const v=view(),object={id:'Control-0',position:[4,5,6],rotation:[0,0,1],scale:[1,1,1]} as SceneObject;expect(deviceTransform(v,deviceScope(v),object)?.position).toEqual(['4','5','6']);for(const changed of [{...v,sourceSha256:'b'.repeat(64)},{...v,active:false},{...v,locked:true},{...v,position:['9','2','3'] as [string,string,string]}])expect(deviceTransform(changed,deviceScope(v),object)).toBeNull();expect(deviceTransform(null,deviceScope(v),object)).toBeNull();expect(deviceTransform(v,deviceScope(v),{...object,scale:[2,1,1]})).toBeNull();expect(devicePose({...v,angles:['','0','0']})).toBeNull();expect(devicePose({...v,position:['NaN','0','0']})).toBeNull();
+ const context={projectId:'p',buildId:'b',tag:'level.scenario',class:'scnr',tagSha256:v.sourceSha256,scenarioDevices:[original]} as NativeTagContext;expect(deviceMatches(v,context)).toBe(true);expect(deviceMatches(v,{...context,deviceEditIssue:'shared source'})).toBe(false);expect(deviceMatches(v,{...context,tagSha256:'b'.repeat(64)})).toBe(false);
+});

@@ -4467,19 +4467,20 @@ test('mission beats stay compact and lazy without losing keyboard edits, history
 });
 
 
-async function mockRecoveredMissionAreas(page:Page){
+async function mockRecoveredMissionAreas(page:Page,withDevice=false){
  await mockDesktop(page);
- await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;
+ await page.evaluate(withDevice=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;
   p.builds=[{id:'native-area-source',timestamp:'',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'c'.repeat(64),message:'Synthetic owned source'}];
   p.studio={schemaVersion:1,missions:[{id:'area-objective',title:'Containment',objective:'Reach containment',trigger:'triggerVolume',triggerRef:'entrance',encounterName:''}],shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
   w.__sparkMock.nativeAreaSha='a'.repeat(64);w.__sparkMock.areaReads=0;
   w.__sparkMock.nativeAreas=[{name:'entrance',kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,6,8]}}];
+  if(withDevice){const open=w.__sparkMock.projects.a;p.scene=[{id:'Control-0',name:'Terminal',kind:'Control',tagId:42,position:[1,2,3],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:8,rotationOffset:20,assetId:null,sourceModel:null}];open.inspection.objects=structuredClone(p.scene);open.inspection.tags.push({id:42,class:'ctrl',path:'devices/terminal',fields:[],references:[]});open.inspection.modelMeshes={42:{label:'Synthetic native device model',source:'synthetic',positions:[0,0,0,1,0,0,0,0,1],indices:[0,1,2],materialRanges:[]}};w.__sparkMock.nativeDevices=[{class:'ctrl',index:0,nameIndex:0,name:'terminal',tagPath:'devices/terminal',position:[1,2,3],rotationRadians:[0,0,0]}];}
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
    if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'levels/test'}];
-   if(command==='native_tag_context'){w.__sparkMock.areaReads++;return {projectId:args.projectId,buildId:'native-area-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[],tagSha256:w.__sparkMock.nativeAreaSha,boundingRadius:null,lensFlareScale:null,scenarioVolumes:structuredClone(w.__sparkMock.nativeAreas),triggerEditIssue:null};}
+   if(command==='native_tag_context'){w.__sparkMock.areaReads++;return {projectId:args.projectId,buildId:'native-area-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[],tagSha256:w.__sparkMock.nativeAreaSha,boundingRadius:null,lensFlareScale:null,scenarioVolumes:structuredClone(w.__sparkMock.nativeAreas),triggerEditIssue:null,scenarioDevices:w.__sparkMock.nativeDevices??[],deviceEditIssue:null};}
    return invoke(command,args);
   };
- });
+ },withDevice);
  await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
  const source=page.locator('.studio-native-areas');await source.locator(':scope > summary').click();return source;
 }
@@ -4503,4 +4504,10 @@ test('recovered objective areas refuse stale source, duplicate names and unsuppo
  const references=page.locator('.studio-bindings');await references.locator(':scope > summary').click();await expect(references).toContainText('ambiguous in native source');
  await page.evaluate(()=>(window as any).__sparkMock.nativeAreas=[{name:'entrance',kind:0,geometry:null}]);await read.click();await expect(source).toContainText('require the matching native editor');await expect(select).toBeDisabled();
  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}})));await expect(source).not.toContainText('1 native areas');
+});
+
+test('recovered mission terminals move the actual model through native source review without modifying the cache scene',async({page})=>{
+ await mockRecoveredMissionAreas(page,true);const row=page.locator('.studio-mission-record').first();await row.getByRole('combobox',{name:'Trigger',exact:true}).selectOption('deviceActivated');const controls=page.locator('.studio-native-areas');if(await controls.getAttribute('open')===null)await controls.locator(':scope > summary').click();await controls.getByRole('button',{name:'Read native controls',exact:true}).click();await row.getByRole('combobox',{name:'Mission terminal 1',exact:true}).selectOption('terminal');await page.keyboard.press('Control+s');await row.getByRole('button',{name:'Select objective terminal in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame native device',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'Scale (R)',exact:true})).toBeDisabled();await expect(page.locator('.viewport-object-actions:visible')).toHaveCount(1);for(const width of [800,1280]){await page.setViewportSize({width,height:800});const bar=page.locator('.native-device-actions');expect(await bar.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);await expect(bar.getByRole('button',{name:'Object tags',exact:true})).toBeVisible();await expect(bar.getByRole('button',{name:'Transform',exact:true})).toBeVisible();}
+ const canvas=page.locator('canvas[data-gs-gizmo]');await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(s=>s?JSON.parse(s).mode:null)).toBe('translate');const h=await canvas.evaluate(e=>{const r=e.getBoundingClientRect(),g=JSON.parse((e as HTMLElement).dataset.gsGizmo!);return{x:r.x+(g.handles.X[0]+1)*r.width/2,y:r.y+(1-g.handles.X[1])*r.height/2,dx:(g.handles.X[0]-g.origin[0])*r.width/2,dy:-(g.handles.X[1]-g.origin[1])*r.height/2};});const n=Math.hypot(h.dx,h.dy);expect(n).toBeGreaterThan(1);await page.mouse.move(h.x,h.y);await page.mouse.down();await page.mouse.move(h.x+h.dx/n*40,h.y+h.dy/n*40,{steps:10});await page.mouse.up();
+ await page.getByRole('button',{name:'Review device source',exact:true}).click();const form=page.locator('.native-device-placements:visible');await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toBeFocused();await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).not.toHaveValue('1');expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.project.scene[0].position)).toEqual([1,2,3]);
 });

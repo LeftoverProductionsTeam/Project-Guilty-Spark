@@ -6,7 +6,7 @@ use super::*;
 pub struct ScenarioLogicName {pub name:String,pub object_type:i16,pub object_index:i16}
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct ScenarioLogicDevice {pub class:String,pub index:usize,pub name_index:i16,pub tag_path:String,pub position:[f32;3]}
+pub struct ScenarioLogicDevice {pub class:String,pub index:usize,pub name_index:i16,pub tag_path:String,pub position:[f32;3],pub rotation_radians:[f32;3]}
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioLogicVolume {pub name:String,pub kind:u16,pub geometry:Option<ScenarioLogicVolumeGeometry>}
@@ -84,7 +84,7 @@ fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadb
             let targets=tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class==class).collect::<Vec<_>>();
             if targets.len()!=1{return invalid("Compiled Logic device tag identity/class is missing or ambiguous");}
             devices.push(ScenarioLogicDevice{class:class.into(),index,name_index:r.u16(at+index*64+2)? as i16,
-                tag_path:targets[0].path.clone(),position:object.position});
+                tag_path:targets[0].path.clone(),position:object.position,rotation_radians:object.rotation});
         }
     }
     Ok(ScenarioLogicReadback{names,devices,volumes})

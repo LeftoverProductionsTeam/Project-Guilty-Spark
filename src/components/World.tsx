@@ -1,3 +1,6 @@
+import {NATIVE_DEVICE_VIEW,deviceMatches,deviceIdentity,deviceScope,deviceTransform,deviceSceneObject,deviceObjectId} from '../nativeDevicePlacement';
+import type {NativeDeviceView} from '../nativeDevicePlacement';
+import type {NativeTagContext} from '../nativeOperations';
 import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
 import {NATIVE_VOLUME_VIEW} from '../nativeTriggerVolume';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
@@ -313,14 +316,14 @@ function Scene({
   onSceneDragStart,onSceneDragEnd,
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
-  ownedModels,assembly,joinedPreview,additionalBounds,pickTarget,surfacePick,
+  ownedModels,assembly,joinedPreview,additionalBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
   assetMeshes: Record<string, MeshData>;
   selected: string | null;
   setSelected: (s: string | null) => void;
-  onTransform: (o: SceneObject,duplicate?:boolean) => void;
+  onTransform: (o: SceneObject,duplicate?:boolean,sourceScope?:string) => void;
   onOpenTag?: (tagId: number) => void;
   onPickSurface?: (pick:NativeSurfacePick)=>void;
   shaderTextures: Record<number, THREE.Texture>;
@@ -343,9 +346,10 @@ function Scene({
   assembly:AssemblyViewportSource|null;
   joinedPreview?:import('../bspAssembly').AssemblyReport['viewport'];
   additionalBounds:{min:Vec3;max:Vec3}|null;
-  pickTarget?:'base'|'donor'|null;surfacePick?:NativeSurfacePick|null;
+  pickTarget?:'base'|'donor'|null;surfacePick?:NativeSurfacePick|null;sourceScope?:string;transformLocked?:boolean;
 }) {
   const group = useRef<THREE.Group>(null);
+  const sourceDragScope=useRef<string|undefined>(undefined);
   const altDrag=useRef(false),{gl}=useThree();
   useEffect(()=>{const begin=(event:PointerEvent)=>{altDrag.current=event.altKey;};gl.domElement.addEventListener('pointerdown',begin,true);return()=>gl.domElement.removeEventListener('pointerdown',begin,true);},[gl]);
   const chosen = project.scene.find((o) => o.id === selected);
@@ -382,7 +386,7 @@ function Scene({
     const source=object.sourceModel?{projectId:object.sourceModel.projectId,sourceSha256:object.sourceModel.sourceSha256,tagId:object.sourceModel.tagId}:project.source&&object.tagId!==null?{projectId:project.id,sourceSha256:project.source.sha256,tagId:object.tagId}:undefined;
     return {id:object.id,name:object.name,preview,source,collision:object.assetId?preview:undefined,matrix:new THREE.Matrix4().compose(new THREE.Vector3(...object.position),new THREE.Quaternion().setFromEuler(new THREE.Euler(object.rotation[2],object.rotation[1],object.rotation[0],'ZYX')),new THREE.Vector3(...object.scale))};
   };
-  useEndToFloor({enabled:!fly&&!cinematic&&!cameraLocked,revision:JSON.stringify(project.scene),selected:chosen?[dropBody(chosen)]:[],others:all.filter(o=>o.id!==selected&&o.kind!=='Player spawn').map(dropBody),terrain:inspection?.mesh,onDrop:delta=>{if(chosen)onTransform({...chosen,position:[chosen.position[0],chosen.position[1],chosen.position[2]+delta]});},onError:onSnapError});
+  useEndToFloor({enabled:!fly&&!cinematic&&!cameraLocked&&!transformLocked,revision:JSON.stringify(project.scene),selected:chosen?[dropBody(chosen)]:[],others:all.filter(o=>o.id!==selected&&o.kind!=='Player spawn').map(dropBody),terrain:inspection?.mesh,onDrop:delta=>{if(chosen)onTransform({...chosen,position:[chosen.position[0],chosen.position[1],chosen.position[2]+delta]},false,sourceScope);},onError:onSnapError});
   const cameraStartId=startId||project.scene.find(o=>o.kind==='Player spawn')?.id;
   return (
     <>
@@ -484,13 +488,13 @@ function Scene({
         <TransformControls
           object={group as MutableRefObject<THREE.Group>}
           mode={mode}
-          enabled={!fly}
+          enabled={!fly&&!transformLocked}
           showX={mode!=='rotate'||!['Player spawn','Netgame item'].includes(chosen.kind)} showY={mode!=='rotate'||!['Player spawn','Netgame item'].includes(chosen.kind)} showZ
           space={mode === 'translate' ? 'world' : 'local'}
           translationSnap={snap ? 0.5 : null}
           rotationSnap={snap ? Math.PI / 12 : null}
           scaleSnap={snap ? 0.1 : null}
-          onMouseDown={()=>onSceneDragStart?.()}
+          onMouseDown={()=>{sourceDragScope.current=sourceScope;onSceneDragStart?.();}}
           onMouseUp={() => {
             if (group.current) {
               const g = group.current;
@@ -503,7 +507,7 @@ function Scene({
                 position: g.position.toArray() as Vec3,
                 rotation: [g.rotation.z, g.rotation.y, g.rotation.x],
                 scale: g.scale.toArray() as Vec3,
-              },altDrag.current);
+              },altDrag.current,sourceDragScope.current);
             }
             onSceneDragEnd?.();
           }}
@@ -538,6 +542,7 @@ export default function World({
   onReviewAiStart,
   onReviewCamera,
   onReviewTrigger,
+  onReviewDevice,
   onResourcesConnected,
   onBeforeResources,
   onBakeBuild,
@@ -563,6 +568,7 @@ export default function World({
   onReviewAiStart?:()=>void;
   onReviewCamera?:()=>void;
   onReviewTrigger?:()=>void;
+  onReviewDevice?:()=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: (persist?:boolean) => Promise<void>;
   onBakeBuild?:()=>Promise<void>;
@@ -594,10 +600,19 @@ export default function World({
   };
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
+  const [nativeDevice,setNativeDevice]=useMapState<NativeDeviceView|null>(project.id,NATIVE_DEVICE_VIEW,()=>null);
+  const [verifiedDevice,setVerifiedDevice]=useState('');const nativeDeviceLatest=useRef(nativeDevice);nativeDeviceLatest.current=nativeDevice;
+  const nativeDeviceIdentity=!cinematic&&nativeDevice?.active?deviceIdentity(nativeDevice):'';
+  const nativeDeviceReady=!!nativeDeviceIdentity&&nativeDeviceIdentity===verifiedDevice&&project.builds.some(build=>build.id===nativeDevice?.buildId&&build.status==='validated');
+  const sourceDevice=nativeDeviceReady&&nativeDevice?deviceSceneObject(nativeDevice,project,inspection):null;
+  const renderProject=sourceDevice?{...project,scene:project.scene.map(object=>object.id===sourceDevice.id?sourceDevice:object)}:project;
+  const nativeSourceScope=!cinematic&&nativeDevice?.active?deviceScope(nativeDevice):undefined;
+  useEffect(()=>{let live=true;setVerifiedDevice('');if(!nativeDeviceIdentity||!nativeDevice||!native)return;const requested=nativeDevice;void call<NativeTagContext>('native_tag_context',{projectId:project.id}).then(context=>{if(!live)return;if(deviceMatches(requested,context)&&deviceSceneObject(requested,project,inspection))setVerifiedDevice(nativeDeviceIdentity);else{setNativeDevice(null);setLocalSelected(null);notify('Native device source/instance changed. Refresh source controls or rebuild/reopen its compiled map.');}}).catch(error=>{if(live){setNativeDevice(null);setLocalSelected(null);notify('Native device could not verify its source: '+String(error));}});return()=>{live=false;};},[nativeDeviceIdentity,project.id]);
+  useEffect(()=>{const changed=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id){if(nativeDeviceLatest.current?.active)setLocalSelected(null);setNativeDevice(null);}};window.addEventListener('guilty-spark-native-source-changed',changed);return()=>window.removeEventListener('guilty-spark-native-source-changed',changed);},[project.id]);
   const [nativeVolume,setNativeVolume]=useMapState<NativeVolumeView|null>(project.id,NATIVE_VOLUME_VIEW,()=>null);
   const [nativeCamera,setNativeCamera]=useMapState<NativeCameraView|null>(project.id,NATIVE_CAMERA_VIEW,()=>null);
   const [nativeAiStart,setNativeAiStart]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
-  const setSelected=(id:string|null)=>{if(id)setNativeVolume(v=>v?.active?{...v,active:false}:v);if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
+  const setSelected=(id:string|null)=>{if(id!==null&&nativeDevice?.active&&id!==deviceObjectId(nativeDevice.original))setNativeDevice({...nativeDevice,active:false});if(id)setNativeVolume(v=>v?.active?{...v,active:false}:v);if(id)setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
   const tagDocument=library?.documents.find(document=>document.id===tagSource);
   const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
   const librarySources = useAssetLibrarySources(library?.documents ?? []);
@@ -663,12 +678,14 @@ export default function World({
   const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
   const ortho=!cinematic&&savedOrtho;
   function setMode(next:'translate'|'rotate'|'scale') {
+    if(!cinematic&&nativeDevice?.active&&next==='scale'){notify('Native device source supports position/rotation; scale and structural edits need their own source workflow.');return;}
     if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI points support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.');return;}
     setModeState(next);setNativeVolume(v=>v?.active&&v.mode!==next?{...v,mode:next}:v);
     if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
   }
   const [fly, setFly] = useMapState(project.id,'world.fly',false);
   useEffect(()=>{
+    if(nativeAiStart?.active)setNativeDevice(v=>v?.active?{...v,active:false}:v);
     // An explicit source-handle request owns navigation, not a cinematic
     // camera. Later user flight toggles remain independent of the proposal.
     if(nativeAiStart?.active&&nativeAiStart.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){
@@ -678,6 +695,7 @@ export default function World({
   useEffect(()=>{if(nativeCamera?.active&&nativeCamera.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeVolume(null);setOrtho(false);setFly(true);setPlayerView(false);setNativeAiStart(v=>v?.active?{...v,active:false}:v);}},[nativeCamera?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   useEffect(()=>{if(nativeVolume?.active&&nativeVolume.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setFly(false);setPlayerView(false);setNativeAiStart(null);setNativeCamera(null);setMode(nativeVolume.mode??"translate");}},[nativeVolume?.focus,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [frame, setFrame] = useState(0);
+  useEffect(()=>{if(nativeDeviceReady&&nativeDevice?.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeVolume(null);setNativeAiStart(null);setNativeCamera(null);setFly(false);setPlayerView(false);setLocalSelected(deviceObjectId(nativeDevice.original));setModeState('translate');setFrame(n=>n+1);}},[nativeDevice?.focus,nativeDeviceReady,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
   const [startId,setStartId]=useMapState(project.id,'world.start','');
   const [bsp, setBsp] = useMapState(project.id,'world.bsp',0);
@@ -1116,7 +1134,7 @@ export default function World({
   const textureScope=textureResourceScope(project.source);
   const currentTextureScopeRef=useRef(textureScope);
   currentTextureScopeRef.current=textureScope;
-  const chosen = project.scene.find((o) => o.id === selected);
+  const chosen = renderProject.scene.find((o) => o.id === selected);
   const renderAvailable = hasRenderGeometry(inspection);
   useEffect(()=>{
     setViewMode(renderAvailable ? 'render' : 'smooth');
@@ -1190,7 +1208,8 @@ export default function World({
       notify(`Exported ${exported.triangles} real source triangles as OBJ (read-only). Material IDs are diagnostic; compiled BSP/collision and game textures are not included.`);
     } catch (error) { notify(`OBJ export rejected: ${String(error)}`); }
   }
-  function update(o: SceneObject,asCopy=false) {
+  function update(o: SceneObject,asCopy=false,sourceScope?:string) {
+    if(sourceScope||(!cinematic&&nativeDeviceLatest.current?.active&&o.id===deviceObjectId(nativeDeviceLatest.current.original))){const current=nativeDeviceLatest.current,proof=sourceScope??nativeSourceScope;const next=!asCopy&&proof&&nativeDeviceReady&&!fly&&!cameraLocked&&!externalCameraAuthority?deviceTransform(current,proof,o):null;if(next)setNativeDevice(next);else notify('Native device proposal retained: source/selection changed, handles are locked, or scale/duplicate is unsupported.');return;}
     try {
       validateSceneTransform(o);
       if(asCopy){const duplicate=cloneSceneObject(o);edit({...project,scene:[...project.scene,duplicate]},`Duplicate and move ${o.name}`);setSelected(duplicate.id);return;}
@@ -1198,6 +1217,7 @@ export default function World({
     } catch (error) { notify(`Scene transform was not saved: ${String(error)}`); }
   }
   function duplicate() {
+    if(!cinematic&&nativeDevice?.active){notify('Native placement proposals do not duplicate source rows. Hide source handles before ordinary asset authoring.');return;}
     if (!chosen) return;
     const o = {
       ...structuredClone(chosen),
@@ -1251,6 +1271,7 @@ export default function World({
           if (!fly) {setPlayerView(false);if(nativeVolume?.active)setNativeVolume({...nativeVolume,focus:Date.now()});else if(nativeAiStart?.active)setNativeAiStart({...nativeAiStart,focus:Date.now()});else setFrame((f) => f + 1);}
           break;
         case 'escape':
+          setNativeDevice(v=>v?.active?{...v,active:false}:v);
             setNativeVolume(v=>v?.active?{...v,active:false}:v);
           setNativeAiStart(value=>value?.active?{...value,active:false}:value);setSelected(null);
           setZoneSelection(null);
@@ -1259,7 +1280,7 @@ export default function World({
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [activity.active,fly,project.id,chosen,catalog,assetBusy,nativeAiStart,nativeVolume]);
+  }, [activity.active,fly,project.id,chosen,catalog,assetBusy,nativeAiStart,nativeVolume,nativeDevice]);
   return (
     <div
       className="world-layout"
@@ -1423,7 +1444,7 @@ export default function World({
             <IconButton label="Rotate (E)" active={mode === 'rotate'} disabled={!!nativeAiStart?.active&&!Number.isFinite(nativeAiStart.originalFacingRadians)} onClick={() => setMode('rotate')}>
               <Rotate3D size={17} />
             </IconButton>
-            <IconButton label="Scale (R)" active={mode === 'scale'} disabled={!!nativeAiStart?.active} onClick={() => setMode('scale')}>
+            <IconButton label="Scale (R)" active={mode === 'scale'} disabled={!!nativeAiStart?.active||!cinematic&&!!nativeDevice?.active} onClick={() => setMode('scale')}>
               <Scaling size={17} />
             </IconButton>
           </div>
@@ -1524,7 +1545,8 @@ export default function World({
                 <GpuLightmapRenderer onRenderer={setGpuDraftRenderer}/>
                 <Scene
                   {...{
-                    project,
+                    project:renderProject,
+                    sourceScope:nativeSourceScope,transformLocked:!!nativeSourceScope&&(!nativeDeviceReady||nativeDevice?.locked||mode==='scale'),
                     assetMeshes,
                     selected,
                     setSelected,
@@ -1598,6 +1620,7 @@ export default function World({
               </Canvas>}
             </Suspense>
           </ViewportBoundary>
+          {!cinematic&&nativeDevice?.active&&<div className="viewport-object-actions native-device-actions" role="status"><strong>Native device · {nativeDevice.original.name||nativeDevice.original.tagPath}</strong><span>Source model pose proposal · Move (W) / Rotate (E), then review</span>{chosen?.tagId!=null&&<button onClick={()=>openObjectTag(chosen.tagId!)}>Object tags</button>}<button onClick={()=>revealPanel('inspector')}>Transform</button><button disabled={!nativeDeviceReady||fly||cameraLocked||!!externalCameraAuthority} onClick={()=>{setPlayerView(false);setFrame(n=>n+1);}}>Frame native device</button>{onReviewDevice&&<button onClick={onReviewDevice}>Review device source</button>}<button onClick={()=>setNativeDevice({...nativeDevice,locked:!nativeDevice.locked})}>{nativeDevice.locked?'Unlock device handles':'Lock device handles'}</button><button onClick={()=>{setNativeDevice({...nativeDevice,active:false});setLocalSelected(null);}}>Hide device handles</button></div>}
           {!cinematic&&nativeVolume?.active&&<div className="viewport-object-actions" role="status"><strong>Trigger area · {nativeVolume.original.name}</strong><span>Source box proposal · Move (W), Rotate (E), Size (R); F frames</span><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeVolume({...nativeVolume,focus:Date.now()})}>Frame trigger area</button>{onReviewTrigger&&<button onClick={onReviewTrigger}>Review trigger source</button>}<button onClick={()=>setNativeVolume({...nativeVolume,locked:!nativeVolume.locked})}>{nativeVolume.locked?"Unlock trigger handles":"Lock trigger handles"}</button><button onClick={()=>setNativeVolume({...nativeVolume,active:false})}>Hide trigger handles</button></div>}
           {!cinematic&&nativeCamera?.active&&<div className="viewport-object-actions"><strong>Cutscene camera · {nativeCamera.original.name||nativeCamera.original.index}</strong><span>Editor preview · fly/orbit, then return and capture the viewport pose</span>{onReviewCamera&&<button onClick={onReviewCamera}>Review cutscene camera source</button>}<button onClick={()=>setNativeCamera({...nativeCamera,active:false})}>Leave camera preview</button></div>}
           {!cinematic&&nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
@@ -1608,7 +1631,7 @@ export default function World({
             {onReviewAiStart&&<button onClick={onReviewAiStart}>{nativeAiStart.kind==='firing'?'Review AI firing source':nativeAiStart.kind==='patrol'?'Review AI patrol source':'Review AI start source'}</button>}
             <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>
           </div>}
-          {!cinematic && chosen && (
+          {!cinematic && chosen && !nativeSourceScope && (
             <div className="viewport-object-actions">
               <strong>{chosen.name}</strong>
               {(chosen.tagId !== null || chosen.sourceModel) && (
@@ -1829,7 +1852,7 @@ export default function World({
                 )}
               <label className="field-label">
                 Object name
-                <input value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
+                <input disabled={!!nativeSourceScope} value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
               </label>
               <div className="inspector-section">
                 <div className="section-label">Transform</div>
@@ -1853,7 +1876,7 @@ export default function World({
                             }
                             label={property === 'rotation' ? `Rotation ${['Yaw', 'Pitch', 'Roll'][i]}` : `${property === 'position' ? 'Position' : 'Scale'} ${['X', 'Y', 'Z'][i]}`}
                             disabled={
-                              property === 'rotation' &&
+                              !!nativeSourceScope&&(property==='scale'||!!nativeDevice?.locked||!nativeDeviceReady) || property === 'rotation' &&
                               i > 0 &&
                               ['Player spawn', 'Netgame item'].includes(chosen.kind)
                             }
@@ -1868,7 +1891,7 @@ export default function World({
                                     i,
                                     property === 'rotation' ? (v * Math.PI) / 180 : v,
                                   ),
-                                });
+                                },false,nativeSourceScope);
                               } catch (e) {
                                 notify(String(e));
                               }
@@ -1886,12 +1909,13 @@ export default function World({
                 </Notice>
               )}
               <div className="inspector-actions">
-                <button onClick={duplicate}>
+                <button disabled={!!nativeSourceScope} onClick={duplicate}>
                   <Copy size={14} />
                   Duplicate
                 </button>
                 <button
                   onClick={() => {
+                    if(nativeSourceScope){notify('Native source row deletion is unavailable in pose preview.');return;}
                     edit(
                       { ...project, scene: project.scene.filter((o) => o.id !== chosen.id) },
                       `Remove ${chosen.name} from editor`,
