@@ -172,9 +172,14 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
             return invalid("Campaign starting loadout needs generated startup logic. Preserve handwritten HaloScript separately and explicitly return to generated logic before enabling the loadout");
         }
     }
-    let Some(logic) = &doc.logic else {
-        return Ok(());
-    };
+    let effective=effective_logic(doc);
+    let Some(logic)=effective.as_deref() else{return Ok(());};
+    if doc.placements.iter().any(|p|p.native_name.is_some()&&(p.tag_class!="vehi"||doc.native.is_some()||crate::quickforge::native_scenario_type(doc)!=0||!authored_name(&p.native_name))) {
+        return invalid("Native placement names require editable solo vehicle source and lowercase identifiers of 1–31 characters; gs_ is reserved");
+    }
+    if logic.devices.len()+doc.placements.iter().filter(|p|p.native_name.is_some()).count()>512 {
+        return invalid("Native scenario object name limit512 reached; no bindings were dropped");
+    }
     if logic.schema_version != 1
         || logic.triggers.len() > 64
         || logic.devices.len() > 64
@@ -197,6 +202,9 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     }
     let mut names: BTreeSet<String> = ["gs_logic_ready".to_owned(), "gs_logic_init".to_owned()]
         .into_iter().chain(logic.rules.iter().map(|r| native_name("evt", &r.id))).collect();
+    for placement in doc.placements.iter().filter(|p|p.native_name.is_some()) {
+        if !names.insert(placement.native_name.clone().unwrap()){return invalid("Native vehicle, device and trigger names must be unique");}
+    }
     for trigger in &logic.triggers {
         if !authored_name(&trigger.native_name) || !names.insert(trigger_name(trigger)) {
             return invalid("Native trigger names must be unique ASCII identifiers of 1–31 lowercase characters; gs_ is reserved");
@@ -314,10 +322,10 @@ fn volume(logic: &Document, id: &str) -> String {
     format!("(volume_test_objects {name} (players))")
 }
 pub fn has_source(doc:&QuickForgeDocument)->bool {
-    doc.logic.is_some() || crate::quickforge::campaign_profile(doc).is_some()
+    doc.logic.is_some() || crate::quickforge::campaign_profile(doc).is_some() || doc.placements.iter().any(|p|p.native_name.is_some())
 }
 fn effective_logic(doc:&QuickForgeDocument)->Option<Cow<'_,Document>> {
-    doc.logic.as_ref().map(Cow::Borrowed).or_else(||crate::quickforge::campaign_profile(doc).map(|_|Cow::Owned(Document {
+    doc.logic.as_ref().map(Cow::Borrowed).or_else(||(crate::quickforge::campaign_profile(doc).is_some()||doc.placements.iter().any(|p|p.native_name.is_some())).then(||Cow::Owned(Document {
         schema_version:1,triggers:vec![],devices:vec![],rules:vec![],manual_source:None,handwritten_sources:vec![],
     })))
 }
@@ -445,7 +453,7 @@ fn trigger_geometry(trigger:&Trigger)->Result<TriggerGeometry>{
 pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::ScenarioLogicReadback)->Result<()> {
     validate(doc)?;
     let Some(logic)=effective_logic(doc) else{return Ok(());};
-    if read.names.len()!=logic.devices.len()||read.volumes.len()!=logic.triggers.len(){return invalid("Compiled Logic marker inventory differs from authored source");}
+    if read.names.len()!=logic.devices.len()+doc.placements.iter().filter(|p|p.native_name.is_some()).count()||read.volumes.len()!=logic.triggers.len(){return invalid("Compiled Logic marker inventory differs from authored source");}
     for (index,binding) in logic.devices.iter().enumerate(){
         let source=doc.placements.iter().find(|value|value.id==binding.placement_id).ok_or_else(||crate::SparkError::Invalid("Authored Logic device disappeared".into()))?;
         let array_index=doc.placements.iter().filter(|value|value.tag_class==source.tag_class).position(|value|value.id==source.id).unwrap();
@@ -456,6 +464,18 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
             compiled.name_index<0||compiled.name_index as usize!=index||!compiled.tag_path.replace('\\',"/").eq_ignore_ascii_case(&source.tag_path.replace('\\',"/"))||
             !crate::native_operations::positions_close(source.position,compiled.position) {
             return invalid(format!("Compiled Logic device {} name/index/tag/position differs from source",source.name));
+        }
+    }
+    for (offset,source) in doc.placements.iter().filter(|p|p.native_name.is_some()).enumerate(){
+        let index=logic.devices.len()+offset;
+        let vehicle_index=doc.placements.iter().filter(|p|p.tag_class=="vehi").position(|p|p.id==source.id).unwrap();
+        let name=&read.names[index];let compiled=read.vehicles.iter().find(|p|p.index==vehicle_index)
+            .ok_or_else(||crate::SparkError::Invalid("Compiled named vehicle is unavailable".into()))?;
+        let rotation=crate::quickforge::scenario_rotation(source.rotation);
+        if name.name!=source.native_name.as_deref().unwrap()||name.object_type!=1||name.object_index<0||name.object_index as usize!=vehicle_index||
+            compiled.name_index<0||compiled.name_index as usize!=index||!compiled.tag_path.replace('\\',"/").eq_ignore_ascii_case(&source.tag_path.replace('\\',"/"))||
+            !crate::native_operations::positions_close(source.position,compiled.position)||!crate::native_operations::positions_close(rotation,compiled.rotation_radians){
+            return invalid(format!("Compiled vehicle {} name/index/tag/pose differs from source",source.name));
         }
     }
     for (source,compiled) in logic.triggers.iter().zip(&read.volumes){
@@ -512,9 +532,8 @@ pub fn validate_compiled_extraction_layout(map:&crate::maps::MapInspection,read:
 
 pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec<ForgeCommand>> {
     validate(doc)?;
-    let Some(logic) = &doc.logic else {
-        return Ok(vec![]);
-    };
+    let effective=effective_logic(doc);
+    let Some(logic)=effective.as_deref() else{return Ok(vec![]);};
     let tag = format!("{scenario}.scenario");
     let mut commands = vec![];
     let command = |args| ForgeCommand {
@@ -566,6 +585,14 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         let mut names = command(args);
         names.phase = "logic-names".into();
         commands.push(names);
+    }
+    for (offset,placement) in doc.placements.iter().filter(|p|p.native_name.is_some()).enumerate(){
+        let index=logic.devices.len()+offset;
+        let vehicle_index=doc.placements.iter().filter(|p|p.tag_class=="vehi").position(|p|p.id==placement.id).unwrap();
+        let mut args=vec!["-n".into(),"-I".into(),"object_names".into(),"1".into(),"end".into()];
+        set(&mut args,format!("object_names[{index}].name"),placement.native_name.clone().unwrap());
+        set(&mut args,format!("vehicles[{vehicle_index}].name"),index.to_string());args.push(tag.clone());
+        let mut names=command(args);names.phase="logic-names".into();commands.push(names);
     }
     for (i, trigger) in logic.triggers.iter().enumerate() {
         let mut args = vec![
@@ -908,7 +935,7 @@ pub fn verify_compiled(doc: &QuickForgeDocument, map: &crate::maps::MapInspectio
     let Some(source) = generate(doc)? else {
         return Ok(None);
     };
-    let read=if effective_logic(doc).is_some_and(|logic|!logic.devices.is_empty()||!logic.triggers.is_empty()) {
+    let read=if effective_logic(doc).is_some_and(|logic|!logic.devices.is_empty()||!logic.triggers.is_empty()||doc.placements.iter().any(|p|p.native_name.is_some())) {
         let read=crate::maps::scenario_logic_readback(output,map)?;
         verify_marker_readback(doc,&read)?;Some(read)
     }else{None};

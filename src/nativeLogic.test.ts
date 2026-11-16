@@ -1,6 +1,7 @@
 import {defaultNativePlayerProfile} from './firefight';
 import { expect, it } from 'vitest';
 import {
+  setNativeLogicName,
   addLogicTrigger,
   addHandwrittenSource,
   centerDoorTrigger,
@@ -9,6 +10,7 @@ import {
   extractionLayout,
 } from './nativeLogic';
 import {
+  duplicateForgeNodes,
   appendForgeNodes,
   forgeGeometryKey,
   forgeNodes,
@@ -236,3 +238,30 @@ it('reports missing Extraction starts and does not call unknown hub bindings saf
 });
 
 it('retains the same safe-hub checks while mission objectives gate activation power',()=>{const doc=extractionSource();doc.logic!.devices[1].powered=false;expect(extractionLayout(doc,{activationPowered:false}).issues).toEqual([]);expect(extractionLayout(doc).issues.some(i=>i.message.includes('power'))).toBe(true);doc.spawns[0].position=[20,0,0];expect(extractionLayout(doc,{activationPowered:false}).issues.some(i=>i.objectId==='safe')).toBe(true);});
+
+
+it('names a solo transport through native placement source, history and collaboration without changing display identity',()=>{
+ const doc=structuredClone(base);doc.gameMode='campaign';doc.placements=[{...doc.placements[0],id:'ship',name:'My aircraft',tagClass:'vehi',tagPath:'vehicles/pelican/pelican'}];
+ const node=forgeNodes(doc).find(n=>n.value.id==='ship')!;
+ const named=setNativeLogicName(doc,node,'extraction_pelican');
+ expect(named.placements[0]).toEqual({...doc.placements[0],nativeName:'extraction_pelican'});
+ expect(doc.placements[0].nativeName).toBeUndefined();
+ const initial=project(doc);
+ let history=historyReducer(historyReducer(initialHistory,{type:'load',project:initial}),{type:'edit',project:{...initial,quickForge:named},description:'Bind transport'});
+ history=historyReducer(history,{type:'undo'});expect(history.current?.quickForge?.placements[0].nativeName).toBeUndefined();
+ history=historyReducer(history,{type:'redo'});expect(history.current?.quickForge?.placements[0].nativeName).toBe('extraction_pelican');
+ expect(mergeForge(doc,named,doc).placements[0].nativeName).toBe('extraction_pelican');
+ const copy=duplicateForgeNodes(named,['ship']);expect(copy.document.placements[0].nativeName).toBe('extraction_pelican');expect(copy.document.placements[1].nativeName).toBeUndefined();
+ expect(setNativeLogicName(named,forgeNodes(named).find(n=>n.value.id==='ship')!,'').placements[0].nativeName).toBeUndefined();
+});
+it('refuses ambiguous, locked, multiplayer and manually-owned transport bindings without replacing source',()=>{
+ const doc=structuredClone(base);doc.gameMode='campaign';doc.placements=[{...doc.placements[0],id:'ship',tagClass:'vehi',tagPath:'vehicles/pelican/pelican'}];
+ const node=forgeNodes(doc).find(n=>n.value.id==='ship')!;
+ for(const name of ['gs_reserved','../map','with space','UPPER'])expect(()=>setNativeLogicName(doc,node,name)).toThrow();
+ doc.logic={schemaVersion:1,triggers:[],devices:[],rules:[]};doc.logic.triggers.push({id:'zone',name:'Existing zone',nativeName:'extraction_pelican',position:[0,0,0],rotation:[0,0,0],dimensions:[2,2,2],visible:true,locked:false});
+ expect(()=>setNativeLogicName(doc,node,'extraction_pelican')).toThrow(/unique/);
+ doc.logic.triggers=[];doc.placements[0].locked=true;expect(()=>setNativeLogicName(doc,node,'ship')).toThrow(/Unlock/);doc.placements[0].locked=false;
+ doc.gameMode='slayer';expect(()=>setNativeLogicName(doc,node,'ship')).toThrow(/solo/);doc.gameMode='campaign';
+ doc.logic.manualSource='; original';expect(()=>setNativeLogicName(doc,node,'ship')).toThrow(/handwritten/);
+ expect(doc.placements[0].nativeName).toBeUndefined();
+});

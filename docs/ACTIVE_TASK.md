@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — compact mission freeze follow-up and reviewed Forerunner startup
+Task: Operation110 — native solo transport bindings; flight authoring next
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 6c5e9dc46a9580dbf0bd16ff7d56bfdf8c7c91d6 base; current scoped source verified below and checkpointed in Git.
-Next action: native freeze/startup UI reproduction needs repaired computer-control prerequisite; do not repeat rejected initialization. Independent next creator gate: native Black Echo transport authoring. Forerunner read-only; no push.
+Latest verified revision: c01a4a591776c9f50a97c553ec27897f11d303a4 base; current transport source/native checks pass, checkpoint commit in Git.
+Next action: native transport readiness/call groups and pilot/flight/crew authoring. Windows controls remain blocked; no retry/bypass. Forerunner read-only; no push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current checkpoint: compact128-beat keyboard/history/Save browser check passes; existing native36px rows/151px HUD preserved. Reviewed Forerunner66092de9 startup request stays unconfirmed; old pins retained. Explicit Save-before-test repaired. Core4/backend5/frontend42/browser4/TypeScript-Vite pass; exact hashes/failures in RUNTIME_INTEGRATION_20261107. QA3082/run-MsIoqf CLOSED,2035225903logicalB disposed; no physical-reclaimed claim. No new native app/game, original writes or push; fullGoal/37944 open.
+16Nov current checkpoint: solo vehicle names→UI/Save/history/SparkLink→native source→CE609 independent name/type/index/tag/pose readback passes. Copied vehicles unnamed; vehicle-only builds require readback. Frontend35/browser2/core13/reader5/all-core-test compilation/2examples/web/3native probes pass;12compiler warnings. Cachebf02878800f3143e52be53c4ae1c75bc98a4485962467f95f82709ce97845977 borrows a BSP, not new geometry/gameplay. QA81672/run-NWhxzY CLOSED1455389113logicalB; physical reclamation unavailable. Exact failures/scope/hashes in RUNTIME_INTEGRATION_20261107.475IDs/37944/fullGoal open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 

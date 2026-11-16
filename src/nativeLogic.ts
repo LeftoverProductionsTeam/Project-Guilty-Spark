@@ -52,14 +52,21 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
   if(value&&(!/^[a-z][a-z0-9_]{0,30}$/.test(value)||value.startsWith('gs_')))
     throw Error('Use 1–31 lowercase letters, digits or underscores, starting with a letter. gs_ is reserved for generated names.');
   const trigger=node.type==='trigger'?logic.triggers.find(t=>t.id===node.value.id):undefined;
+  const vehicle=node.type==='placement'?doc.placements.find(p=>p.id===node.value.id&&p.tagClass==='vehi'):undefined;
+  if(vehicle&&value&&(doc.native||!['campaign','firefight','zombie'].includes(doc.gameMode)))throw Error('Vehicle script names require editable solo source. Multiplayer collections and recovered BSP recipes keep their own native source workflow.');
   const device=node.type==='placement'?doc.placements.find(p=>p.id===node.value.id&&['mach','ctrl'].includes(p.tagClass)):undefined;
-  if(!trigger&&!device)throw Error('Select an existing native trigger, door or control terminal.');
-  if((trigger??device)!.locked)throw Error('Unlock this object before changing its native name.');
-  const existing=trigger?.nativeName??logic.devices.find(d=>d.placementId===device?.id)?.nativeName;
+  if(!trigger&&!device&&!vehicle)throw Error('Select an existing native trigger, door, control terminal or solo vehicle.');
+  if((trigger??device??vehicle)!.locked)throw Error('Unlock this object before changing its native name.');
+  const existing=vehicle?.nativeName??trigger?.nativeName??logic.devices.find(d=>d.placementId===device?.id)?.nativeName;
   if(value===(existing??''))return doc;
   if(value&&[...logic.triggers.filter(t=>t.id!==trigger?.id).map(t=>t.nativeName),
-      ...logic.devices.filter(d=>d.placementId!==device?.id).map(d=>d.nativeName)].includes(value))
+      ...logic.devices.filter(d=>d.placementId!==device?.id).map(d=>d.nativeName),
+      ...doc.placements.filter(p=>p.id!==vehicle?.id).map(p=>p.nativeName)].includes(value))
     throw Error('Another object already uses this native name. Choose a unique binding.');
+  if(vehicle){
+    if(value&&!existing&&logic.devices.length+doc.placements.filter(p=>p.nativeName).length>=512)throw Error('Native scenario object name limit512 reached.');
+    return {...doc,logic,placements:doc.placements.map(p=>{if(p.id!==vehicle.id)return p;const copy={...p};if(value)copy.nativeName=value;else delete copy.nativeName;return copy;})};
+  }
   if(trigger) {
     if(value)trigger.nativeName=value;else delete trigger.nativeName;
   } else {
@@ -369,5 +376,5 @@ export function removeLogicReferences(
   };
 }
 export function isLogicTarget(node: ForgeNode | null): boolean {
-  return node?.type === 'trigger' || (node?.type === 'placement' && ['mach','ctrl'].includes(node.value.tagClass));
+  return node?.type === 'trigger' || (node?.type === 'placement' && ['mach','ctrl','vehi'].includes(node.value.tagClass));
 }

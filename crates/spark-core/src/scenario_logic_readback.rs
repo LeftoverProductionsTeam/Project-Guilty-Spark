@@ -26,7 +26,7 @@ impl ScenarioLogicVolumeGeometry {
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct ScenarioLogicReadback {pub names:Vec<ScenarioLogicName>,pub devices:Vec<ScenarioLogicDevice>,pub volumes:Vec<ScenarioLogicVolume>}
+pub struct ScenarioLogicReadback {pub names:Vec<ScenarioLogicName>,pub devices:Vec<ScenarioLogicDevice>,pub vehicles:Vec<ScenarioLogicDevice>,pub volumes:Vec<ScenarioLogicVolume>}
 /// Matches the exact previously inspected cache, never a source tag or sidecar.
 pub fn scenario_logic_readback(path:&Path,inspection:&MapInspection)->Result<ScenarioLogicReadback> {
     with_scenario(path,inspection,|r,space,at|parse(r,space,at,&inspection.tags))
@@ -72,22 +72,27 @@ fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadb
     let (at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
     for index in 0..count {let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}
     let volumes=parse_volumes(r,space,sc)?;
-    let mut devices=vec![];
-    for (offset,palette,class,kind) in [(0x294,0x2a0,"mach","Machine"),(0x2ac,0x2b8,"ctrl","Control")] {
+    let mut devices=vec![];let mut vehicles=vec![];
+    let mut blocks=vec![(0x294,0x2a0,64,"mach","Machine"),(0x2ac,0x2b8,64,"ctrl","Control")];
+    // Vehicle1 is a standard native object type. Keep unrelated unnamed vehicle
+    // inventories outside this optional marker readback; reuse the same decoder.
+    if names.iter().any(|name|name.object_type==1){blocks.push((0x240,0x24c,120,"vehi","Vehicle"));}
+    for (offset,palette,stride,class,kind) in blocks {
         // Reuse the editor's native placement decoder; only the reverse name
         // binding is additional metadata absent from SceneObject.
         let mut diagnostics=vec![];
-        let placed=placements(r,space,sc,(offset,palette,64,kind),tags,&mut diagnostics)?;
+        let placed=placements(r,space,sc,(offset,palette,stride,kind),tags,&mut diagnostics)?;
         if !diagnostics.is_empty(){return invalid("Compiled Logic device placement/palette is invalid; review native diagnostics");}
-        let (at,_)=space.block(r,sc+offset,64,4096)?;
+        let (at,_)=space.block(r,sc+offset,stride,4096)?;
         for (index,object) in placed.into_iter().enumerate(){
             let targets=tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class==class).collect::<Vec<_>>();
             if targets.len()!=1{return invalid("Compiled Logic device tag identity/class is missing or ambiguous");}
-            devices.push(ScenarioLogicDevice{class:class.into(),index,name_index:r.u16(at+index*64+2)? as i16,
-                tag_path:targets[0].path.clone(),position:object.position,rotation_radians:object.rotation});
+            let placement=ScenarioLogicDevice{class:class.into(),index,name_index:r.u16(at+index*stride+2)? as i16,
+                tag_path:targets[0].path.clone(),position:object.position,rotation_radians:object.rotation};
+            if class=="vehi"{vehicles.push(placement);}else{devices.push(placement);}
         }
     }
-    Ok(ScenarioLogicReadback{names,devices,volumes})
+    Ok(ScenarioLogicReadback{names,devices,vehicles,volumes})
 }
 #[cfg(test)]
 mod tests {
@@ -124,6 +129,16 @@ mod tests {
         let (bytes,tags)=fixture();let space=Space{begin:0,end:bytes.len(),address:0};let read=parse(&Reader(&bytes),&space,0,&tags).unwrap();
         assert_eq!(read.names[0].name,"deploy");assert_eq!(read.names[0].object_type,8);assert_eq!(read.devices[0].tag_path,"devices/terminal");
         assert_eq!(read.volumes[0].name,"hub");assert_eq!(read.volumes[0].geometry.as_ref().unwrap().forward,[1.,0.,0.]);assert_eq!(read.volumes[0].geometry.as_ref().unwrap().up,[0.,0.,1.]);assert_eq!(read.volumes[0].geometry.as_ref().unwrap().dimensions,[4.;3]);
+    }
+    #[test]
+    fn vehicle_name_reverse_binding_uses_native_vehicle_stride_and_palette(){
+        let(mut bytes,mut tags)=fixture();
+        bytes[0x204..0x208].copy_from_slice(&2u32.to_le_bytes());bytes[0x724..0x736].copy_from_slice(b"extraction_pelican");bytes[0x744..0x746].copy_from_slice(&1u16.to_le_bytes());
+        for(at,pointer)in[(0x240,0xc00u32),(0x24c,0xd00u32)]{bytes[at..at+4].copy_from_slice(&1u32.to_le_bytes());bytes[at+4..at+8].copy_from_slice(&pointer.to_le_bytes());}
+        bytes[0xc02..0xc04].copy_from_slice(&1u16.to_le_bytes());bytes[0xc08..0xc0c].copy_from_slice(&4f32.to_le_bytes());bytes[0xd00..0xd04].copy_from_slice(b"ihev");bytes[0xd0c..0xd10].copy_from_slice(&13u32.to_le_bytes());
+        let mut tag=tags[0].clone();tag.id=13;tag.class="vehi".into();tag.path="vehicles/pelican/pelican".into();tags.push(tag);
+        let space=Space{begin:0,end:bytes.len(),address:0};let read=parse(&Reader(&bytes),&space,0,&tags).unwrap();assert_eq!(read.devices.len(),1);assert_eq!(read.vehicles.len(),1);assert_eq!(read.vehicles[0].name_index,1);assert_eq!(read.vehicles[0].tag_path,"vehicles/pelican/pelican");assert_eq!(read.vehicles[0].position,[4.,0.,0.]);assert_eq!(read.names[1].object_type,1);
+        bytes[0xc00..0xc02].copy_from_slice(&1u16.to_le_bytes());assert!(parse(&Reader(&bytes),&space,0,&tags).is_err());
     }
     #[test]
     fn axis_aligned_union_does_not_expose_unused_oriented_basis(){

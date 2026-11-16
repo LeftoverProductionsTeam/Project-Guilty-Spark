@@ -50,11 +50,13 @@ export default function LogicEvents({
   const selectedModule = handwritten.find((m) => m.filename === moduleName) ?? handwritten[0];
   const overridden = logic?.manualSource != null;
   const extraction=useMemo(()=>extractionLayout(doc,{activationPowered:!missionGatedExtraction}),[doc,missionGatedExtraction]);
+  const vehicleSelected=node?.type==='placement'&&node.value.tagClass==='vehi';
+  const vehicleNamingUnavailable=vehicleSelected&&(!!doc.native||!['campaign','firefight','zombie'].includes(doc.gameMode));
   const controlSelected=node?.type==='placement'&&node.value.tagClass==='ctrl';
   const namingNeedsDoorBinding=node?.type==='placement'&&node.value.tagClass==='mach'&&
     !logic?.devices.some(d=>d.placementId===node.value.id);
   const nativeBindingName=node?.type==='trigger'?node.value.nativeName??'':
-    node?.type==='placement'?logic?.devices.find(d=>d.placementId===node.value.id)?.nativeName??'':'';
+    node?.type==='placement'?(vehicleSelected?node.value.nativeName??'':logic?.devices.find(d=>d.placementId===node.value.id)?.nativeName??''):'';
   const trigger =
     node?.type === 'trigger'
       ? node.value.id
@@ -125,15 +127,22 @@ export default function LogicEvents({
           {isLogicTarget(node)&&node&&<label>
             Native scenario name
             <input key={node.value.id+':'+nativeBindingName} aria-label="Native scenario name"
-              defaultValue={nativeBindingName} maxLength={31} placeholder="Automatic unique name"
-              disabled={node.value.locked||namingNeedsDoorBinding}
-              title={namingNeedsDoorBinding?'Connect this door to a trigger below first; naming alone must not change automatic operation.':'Optional exact native script/engine binding. Display name and identity stay separate; blank restores the generated name.'}
+              defaultValue={nativeBindingName} maxLength={31} placeholder={vehicleSelected?'Unnamed until assigned':'Automatic unique name'}
+              disabled={node.value.locked||namingNeedsDoorBinding||vehicleNamingUnavailable}
+              title={vehicleSelected?'Standard solo vehicle binding. Blank leaves this vehicle unnamed; display names and handwritten scripts remain separate.':namingNeedsDoorBinding?'Connect this door to a trigger below first; naming alone must not change automatic operation.':'Optional exact native script/engine binding. Display name and identity stay separate; blank restores the generated name.'}
               onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}
               onBlur={e=>{e.currentTarget.value=applyNativeBinding(e.currentTarget.value)?e.currentTarget.value.trim():nativeBindingName;}}/>
             {namingNeedsDoorBinding&&<small className="forge-hint">Connect the door to a trigger below before assigning its native name. Automatic operation is preserved.</small>}
             <small className="forge-hint">Standard scenario name; handwritten scripts are not rewritten.
               A native binding does not enable a game mode. Extraction also needs both controls, both volumes and a compatible runtime.</small>
           </label>}
+          {vehicleSelected&&<>
+            {vehicleNamingUnavailable?<p className="forge-hint">Vehicle script names require editable solo source. Use the matching native source editor for recovered maps; multiplayer collections do not expose these bindings.</p>:<div className="button-row" aria-label="Forerunner transport vehicle roles">
+              {['extraction_pelican','extraction_spirit'].map(name=><button key={name} disabled={node?.value.locked||nativeBindingName===name} onClick={()=>applyNativeBinding(name)}>{name==='extraction_pelican'?'Bind UNSC Pelican':'Bind Covenant Spirit'}</button>)}
+            </div>}
+            {nativeBindingName&&<button disabled={node?.value.locked} onClick={()=>applyNativeBinding('')}>Clear native vehicle name</button>}
+            <p className="forge-hint">A native vehicle name is not a flight controller. In Forerunner Extraction, declaring either transport requires physical boarding: provide the correct craft, usable seats, pilot, approach/landing/return scripts and crew callbacks. Spark does not grant loot, teleport passengers or verify flight here. Duplicate copies start unnamed.</p>
+          </>}
           {(node?.type==='trigger'||controlSelected)&&<div className="button-row" aria-label="Forerunner native Extraction marker roles">
             {(node?.type==='trigger'?
               [['extraction_zone','Activation zone'],['extraction_return','Safe return zone']]:
@@ -177,7 +186,7 @@ export default function LogicEvents({
           </div>
           {controlSelected&&<p className="forge-hint">Control terminal: use its native binding and power settings here.
             Choose a touched-by-player control tag for Extraction. Runtime mode activation remains separate.</p>}
-          {!controlSelected&&<>
+          {!controlSelected&&!vehicleSelected&&<>
           {!doors.length && (
             <p className="forge-hint">
               In the Asset library, choose Show → Doors & devices and drag in a door. Drop a Trigger volume

@@ -658,9 +658,9 @@ pub fn run_prepared_job(
         if let Some(markers)=crate::native_logic::verify_compiled(document,&inspected,&output)? {
             project::atomic_write(&workspace.join("native-logic-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
                 "schemaVersion":1,"cacheSha256":inspected.sha256,"markers":markers,
-                "scope":"Compiled marker names, device bindings/positions and rotational volume geometry; not activation, collision or gameplay acceptance."
+                "scope":"Compiled marker names, device and vehicle bindings/poses and rotational volume geometry; not activation, collision or gameplay acceptance."
             }))?,false)?;
-            emit("verify",format!("Native marker readback passed: {} named devices and {} oriented volumes. Actual use, collision and gameplay still need a runtime test.",markers.names.len(),markers.volumes.len()),94,"info");
+            emit("verify",format!("Native marker readback passed: {} named objects and {} oriented volumes. Actual use, collision and gameplay still need a runtime test.",markers.names.len(),markers.volumes.len()),94,"info");
         }
         if let Ok(Some(binding))=&mission {crate::creative::verify_native_mission(binding,&inspected,&output)?;}
         if let Some(plan)=&native_round {crate::firefight::verify_native_round(plan,&inspected,&output)?;}

@@ -15,7 +15,7 @@ fn native_field_publication_placement_order_and_author_inverses() {
     let j1=j.propose(&id(),&a,0,field).unwrap();
     let mut publish=j.document.clone();let asset=Asset{id:id(),name:"Rock".into(),sha256:j.document.native.as_ref().unwrap().source.template_sha256.clone(),bytes:vec![0;64]};publish.native.as_mut().unwrap().assets.push(asset.clone());
     let j2=j1.propose(&id(),&b,0,publish).unwrap();assert_eq!(j2.revision,2);
-    let mut placed=j2.document.clone();placed.placements.push(quickforge::ForgePlacement{published_asset_id:Some(asset.id.clone()),id:id(),name:"Rock".into(),tag_path:asset.tag_path(),tag_class:"scen".into(),position:[1.,1.,0.],rotation:[0.;3],team:0,respawn_seconds:0,tag_id:Some(10),source_project_id:None,source_sha256:Some("d".repeat(64)),visible:true,locked:false});
+    let mut placed=j2.document.clone();placed.placements.push(quickforge::ForgePlacement{native_name:None,published_asset_id:Some(asset.id.clone()),id:id(),name:"Rock".into(),tag_path:asset.tag_path(),tag_class:"scen".into(),position:[1.,1.,0.],rotation:[0.;3],team:0,respawn_seconds:0,tag_id:Some(10),source_project_id:None,source_sha256:Some("d".repeat(64)),visible:true,locked:false});
     let j3=j2.propose(&id(),&c,2,placed).unwrap();
     let j4=j3.reverse(&id(),&a,false).unwrap();assert!(j4.document.native.as_ref().unwrap().fields.is_empty());assert_eq!(j4.document.placements.len(),1);assert_eq!(j4.document.native.as_ref().unwrap().assets.len(),1);
     assert!(j4.reverse(&id(),&b,false).unwrap_err().to_string().contains("still placed"));

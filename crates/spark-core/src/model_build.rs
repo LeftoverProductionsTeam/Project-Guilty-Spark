@@ -363,7 +363,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
         };
         // Rotation and nonuniform scale are baked into BOTH native meshes. Halo
         // scenario placement uses the preserved origin, with unit transform.
-        doc.placements.push(ForgePlacement {
+        doc.placements.push(ForgePlacement { native_name: None,
             id: format!(
                 "obj_{}",
                 &crate::hex_bytes(Sha256::digest(object.id.as_bytes()))[..24]
