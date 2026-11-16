@@ -5,6 +5,7 @@ import {
   addHandwrittenSource,
   centerDoorTrigger,
   connectDoor,
+  connectVehicleCrew,
   copyDeviceBehavior,
   isLogicTarget,
   logicDocument,
@@ -34,6 +35,8 @@ export default function LogicEvents({
   commit: (doc: QuickForgeDocument, description: string) => void;
   onSelect: (id: string) => void;
 }) {
+  const [crewEncounter,setCrewEncounter]=useState(''),[crewSeat,setCrewSeat]=useState('');
+  useEffect(()=>{setCrewEncounter('');setCrewSeat('');},[node?.value.id]);
   const [open, setOpen] = useState(false),
     [error, setError] = useState('');
   const [triggerId, setTriggerId] = useState(''),
@@ -93,6 +96,7 @@ export default function LogicEvents({
     try{const next=setNativeTransportSignals(latestDocument.current,node,enabled);if(next!==latestDocument.current)commit(next,'Change native transport groups');setError('');}
     catch(problem){setError(String(problem));}
   };
+  const createCrewConnection=(atStart:boolean)=>{if(node?.type!=='placement'||node.value.tagClass!=='vehi')return;try{commit(connectVehicleCrew(latestDocument.current,node.value.id,crewEncounter,crewSeat,atStart?{kind:'timer',seconds:.1}:{kind:'enter',triggerId:trigger}),'Connect native AI vehicle seating');setError('');}catch(problem){setError(String(problem));}};
   const createExtractionZone=(role:'activation'|'return')=>{
     try {
       const added=addExtractionZone(latestDocument.current,role);
@@ -157,6 +161,14 @@ export default function LogicEvents({
               {transportSignalNames(nativeBindingName).map(name=><div key={name}><code>{name}</code> · initial value 0 · repeatable</div>)}
               <p className="forge-hint">The compatible Forerunner host updates these dedicated groups. Native HaloScript can read them with device_group_get; never share them with device power or position. A legacy engine can retain the zero definitions without driving them. Actual boarding, recall and flight need game verification.</p>
             </details>}
+            <details className="native-ai-vehicle-seating"><summary>AI vehicle seating</summary>
+              {doc.gameMode!=='campaign'||vehicleNamingUnavailable?<p className="forge-hint">Use editable Campaign source with authored encounters. Recovered maps and survival controllers retain their native script workflow.</p>:<>
+              <div className="forge-logic-pair"><label>AI encounter<select aria-label="AI crew encounter" value={crewEncounter} onChange={event=>setCrewEncounter(event.target.value)}><option value="">Choose an authored campaign group</option>{doc.campaignEncounters?.map(group=><option key={group.name} value={group.name}>{group.name} · {group.count??1} authored starts</option>)}</select></label>
+              <label>Native seat text<input aria-label="AI crew seat text" maxLength={31} value={crewSeat} placeholder="Exact text from a vehicle seat label" onChange={event=>setCrewSeat(event.target.value)}/></label></div>
+              <div className="button-row"><button type="button" disabled={node?.value.locked||!nativeBindingName||!crewEncounter||!crewSeat} onClick={()=>createCrewConnection(true)}>Seat AI at level start</button><button type="button" disabled={node?.value.locked||!nativeBindingName||!crewEncounter||!crewSeat||!trigger} onClick={()=>createCrewConnection(false)}>Enter → seat AI crew</button></div>
+              <p className="forge-hint">Inspect the vehicle under Tag editor → the vehicle’s Native Output → Invader · native checks & reviewed edits → Native vehicle seats. Copy its label or a matching part, preserving case. Build refuses missing or insufficient seats. One enabled seating owner per encounter. The rule waits for existing live AI and a living vehicle; the encounter startup flag or mission still owns creation. If either is unavailable, this rule keeps waiting. It loads AI only; it does not board players, unload passengers or control a flight. Test seat occupancy and driver behavior in the game.</p>
+              </>}
+            </details>
             <p className="forge-hint">A native vehicle name is not a flight controller. In Forerunner Extraction, declaring either transport requires physical boarding: provide the correct craft, usable seats, pilot, approach/landing/return scripts and crew callbacks. Spark does not grant loot, teleport passengers or verify flight here. Duplicate copies start unnamed.</p>
           </>}
           {(node?.type==='trigger'||controlSelected)&&<div className="button-row" aria-label="Forerunner native Extraction marker roles">
@@ -440,7 +452,12 @@ export default function LogicEvents({
                         }
                       />
                     </label>
-                  ) : (
+                  ) : action.kind==='aiVehicleLoad' ? <>
+                    <label>AI encounter<select aria-label="Connection AI crew" value={action.encounterName} onChange={event=>changeRule(rule.id,r=>({...r,actions:r.actions.map((a,i)=>i===index&&a.kind==='aiVehicleLoad'?{...a,encounterName:event.target.value}:a)}))}>{!doc.campaignEncounters?.some(group=>group.name===action.encounterName)&&<option value={action.encounterName}>{action.encounterName} · missing source</option>}{doc.campaignEncounters?.map(group=><option key={group.name} value={group.name}>{group.name}</option>)}</select></label>
+                    <label>Named vehicle<select aria-label="Connection crew vehicle" value={action.targetId} onChange={event=>changeRule(rule.id,r=>({...r,actions:r.actions.map((a,i)=>i===index&&a.kind==='aiVehicleLoad'?{...a,targetId:event.target.value}:a)}))}>{doc.placements.filter(p=>p.tagClass==='vehi'&&p.nativeName).map(p=><option key={p.id} value={p.id}>{p.name} · {p.nativeName}</option>)}</select></label>
+                    <label>Seat label text<input aria-label="Connection crew seat text" maxLength={31} value={action.seat} onChange={event=>changeRule(rule.id,r=>({...r,actions:r.actions.map((a,i)=>i===index&&a.kind==='aiVehicleLoad'?{...a,seat:event.target.value}:a)}))}/></label>
+                    <small className="forge-hint">Seat existing AI after the event. Native seat capacity is checked on build; flight and live occupancy need game testing.</small>
+                  </> : (
                     <>
                       <label>
                         Action

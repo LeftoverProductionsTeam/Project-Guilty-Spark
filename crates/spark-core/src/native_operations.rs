@@ -7,6 +7,17 @@ use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 pub use command_lists::{NativeCommand,NativeCommandList,NativeCommandSource,COMMAND_ATOMS};
 pub fn native_command_source(fields:&str)->Result<NativeCommandSource>{command_lists::source(fields)}
+/// Read-only native seat labels; duplicates retain distinct capacity slots.
+pub fn native_vehicle_seats(fields:&str)->Result<Vec<String>> {
+ let seats=array_listing(fields,"seats")?;if seats.count>16{return invalid("Native vehicle exceeds16seats");}
+ let mut labels=vec![];for item in array_items(&seats,"seats")?{
+  let row=direct_struct_fields(item)?;let values=row.lines().filter_map(|line|line.strip_prefix("label (")).collect::<Vec<_>>();
+  if values.len()!=1{return invalid("Native vehicle seat label is missing or ambiguous");}
+  let(label,kind)=values[0].rsplit_once(')').ok_or_else(||crate::SparkError::Invalid("Native seat label is malformed".into()))?;
+  if kind.trim()!="string"||label.len()>31||label.chars().any(char::is_control){return invalid("Native seat label has an unsupported shape");}labels.push(label.into());
+ }Ok(labels)
+}
+
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]

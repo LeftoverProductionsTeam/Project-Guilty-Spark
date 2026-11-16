@@ -417,6 +417,20 @@ fn installed_invader_writes_transport_names_to_fresh_native_source(){
         let reverse=invoke(&["-G".into(),"vehicles[1].name".into(),tag.clone()]);assert_eq!(reverse.trim(),if pair{"1"}else{"0"});
         let groups=invoke(&["-C".into(),"device_groups".into(),tag]);assert_eq!(groups.trim(),if pair{"4"}else{"0"});
     }
+    let vehicle="vehicles/crew_probe.vehicle".to_owned();std::fs::create_dir_all(tags.join("vehicles")).unwrap();
+    invoke(&["-N".into(),vehicle.clone()]);invoke(&["-I".into(),"seats".into(),"3".into(),"end".into(),"-S".into(),"seats[0].label".into(),"P-driver".into(),"-S".into(),"seats[1].label".into(),"P-passenger".into(),"-S".into(),"seats[2].label".into(),"P-passenger".into(),vehicle.clone()]);
+    let before=spark_core::maps::hash_file(&tags.join(&vehicle)).unwrap();let fields=invoke(&["-L".into(),vehicle.clone()]);let labels=spark_core::native_operations::native_vehicle_seats(&fields).unwrap();assert_eq!(labels,vec!["P-driver","P-passenger","P-passenger"]);
+    l::verify_vehicle_crew_seats(&crew_level(),"ship",&labels).unwrap();assert_eq!(before,spark_core::maps::hash_file(&tags.join(&vehicle)).unwrap());eprintln!("Fresh native seat inventory {:?}, unchanged vehicle SHA256 {before}",labels);
+
+    // Native compiler proof only: fresh scenario symbols, no borrowed map or AI-combat claim.
+    let mut crew=crew_level();crew.placements.retain(|p|p.id=="ship");let logic=crew.logic.as_mut().unwrap();logic.devices.clear();logic.triggers.clear();logic.rules.retain(|rule|rule.id=="crew");
+    let scenario="crew";let tag="crew.scenario".to_owned();invoke(&["-N".into(),tag.clone()]);invoke(&["-I".into(),"vehicles".into(),"1".into(),"end".into(),"-I".into(),"encounters".into(),"1".into(),"end".into(),"-S".into(),"encounters[0].name".into(),"pilot".into(),tag.clone()]);
+    for command in l::scenario_commands(&crew,scenario).unwrap(){invoke(&command.args);}
+    l::export(&crew,temp.path(),scenario).unwrap();
+    let compiler=tool.parent().unwrap().join("invader-script.exe");let compiler_sha=spark_core::maps::hash_file(&compiler).unwrap();
+    let result=Command::new(&compiler).args(["-t"]).arg(&tags).arg("-d").arg(temp.path().join("data")).args(["-g","gbx-custom","-E",scenario]).current_dir(temp.path()).output().unwrap();assert!(result.status.success(),"Native AI crew script compilation: {}",String::from_utf8_lossy(&result.stderr));
+    let fields=invoke(&["-L".into(),tag.clone()]);assert!(fields.contains(&l::generate(&crew).unwrap().unwrap().regions[0].native_name));assert!(fields.contains("gs_logic_init"));
+    eprintln!("Native CE crew HSC compiled; scenario SHA256 {}; source SHA256 {}; compiler SHA256 {}",spark_core::maps::hash_file(&tags.join(tag)).unwrap(),spark_core::maps::hash_file(&l::script_path(temp.path(),scenario).unwrap()).unwrap(),compiler_sha);assert_eq!(compiler_sha,spark_core::maps::hash_file(&compiler).unwrap());
     assert_eq!(tool_sha,spark_core::maps::hash_file(&tool).unwrap());eprintln!("Fresh native single/pair vehicle name source readback passed; writer SHA256 {tool_sha}");
 }
 
@@ -476,4 +490,36 @@ fn installed_transport_scenario_writer_compiles_and_reads_back_native_vehicle_na
         eprintln!("Fresh CE609 transport signals {enabled}: cache SHA256 {}; names {}, vehicles {}, devices {}, groups {}; borrowed BSP/original inputs unchanged",map.sha256,read.names.len(),read.vehicles.len(),read.devices.len(),read.groups.len());hashes.push(map.sha256);
     }
     assert_ne!(hashes[0],hashes[1]);assert_eq!(before,protected.iter().map(|file|maps::hash_file(file).unwrap()).collect::<Vec<_>>());assert_eq!(original_hash,maps::hash_file(&cache).unwrap());
+}
+
+
+fn crew_level()->q::QuickForgeDocument {
+ let mut doc=level();doc.game_mode="campaign".into();doc.runtime_id=spark_core::runtime::RuntimeId::ChupathingyCe;
+ let mut ship=doc.placements[0].clone();ship.id="ship".into();ship.tag_class="vehi".into();ship.tag_path="vehicles/pelican/pelican".into();ship.native_name=Some("extraction_pelican".into());doc.placements.push(ship);
+ doc.campaign_encounters=vec![serde_json::from_value(serde_json::json!({"name":"pilot","actorPath":"characters/marine_armored/marine_armored","position":[0,0,0],"startActive":true,"count":1,"spacing":1})).unwrap()];
+ doc.logic.as_mut().unwrap().rules.push(serde_json::from_value(serde_json::json!({"id":"crew","name":"Seat pilot","enabled":true,"once":true,"event":{"kind":"timer","seconds":0.1},"actions":[{"kind":"aiVehicleLoad","targetId":"ship","encounterName":"pilot","seat":"P-driver"}]})).unwrap());doc
+}
+#[test]
+fn native_ai_crew_uses_existing_living_actors_and_exact_seat_text_without_spawning_ownership(){
+ let doc=crew_level();l::validate(&doc).unwrap();let source=l::generate(&doc).unwrap().unwrap().content;
+ assert!(source.contains("(ai_living_count pilot)"));assert!(source.contains("(unit_get_health (unit extraction_pelican))"));assert!(source.contains("(vehicle_load_magic (unit extraction_pelican) \"P-driver\" (ai_actors pilot))"));assert!(!source.contains("ai_place"));
+ let value=serde_json::to_value(&doc).unwrap();assert_eq!(doc,serde_json::from_value(value).unwrap());
+ let mut disabled=doc.clone();disabled.logic.as_mut().unwrap().rules.last_mut().unwrap().enabled=false;assert!(!l::generate(&disabled).unwrap().unwrap().content.contains("vehicle_load_magic"));
+}
+#[test]
+fn native_ai_seating_rejects_missing_capacity_overlapping_owners_and_changed_source(){
+ let doc=crew_level();l::verify_vehicle_crew_seats(&doc,"ship",&["P-driver".into(),"P-passenger".into()]).unwrap();
+ assert!(l::verify_vehicle_crew_seats(&doc,"ship",&["p-driver".into()]).is_err());assert!(l::verify_vehicle_crew_seats(&doc,"ship",&[]).is_err());
+ let mut crew=doc.clone();crew.campaign_encounters[0].count=2;assert!(l::verify_vehicle_crew_seats(&crew,"ship",&["P-driver".into()]).is_err());
+ l::verify_vehicle_crew_seats(&crew,"ship",&["P-driver".into(),"P-driver".into()]).unwrap();
+ let mut other=crew.campaign_encounters[0].clone();other.name="passengers".into();other.count=1;crew.campaign_encounters.push(other);let mut rule=crew.logic.as_ref().unwrap().rules.last().unwrap().clone();rule.id="other-crew".into();rule.actions[0]=l::Action::AiVehicleLoad{target_id:"ship".into(),encounter_name:"passengers".into(),seat:"P-".into()};crew.logic.as_mut().unwrap().rules.push(rule);
+ assert!(l::verify_vehicle_crew_seats(&crew,"ship",&["P-driver".into(),"P-driver".into(),"P-passenger".into()]).unwrap_err().to_string().contains("overlap"));
+ for fault in 0..5{let mut bad=doc.clone();match fault{0=>bad.campaign_encounters.clear(),1=>bad.placements.retain(|p|p.id!="ship"),2=>bad.placements.last_mut().unwrap().native_name=None,3=>bad.campaign_encounters[0].difficulty=Some(spark_core::native_operations::EncounterDifficulty{normal:0,insane:1}),_=>{let mut copy=bad.logic.as_ref().unwrap().rules.last().unwrap().clone();copy.id="duplicate".into();bad.logic.as_mut().unwrap().rules.push(copy);}}assert!(l::validate(&bad).is_err(),"crew fault {fault}");}
+}
+#[test]
+fn native_seat_reader_preserves_duplicate_capacity_and_refuses_ambiguous_listings(){
+ use spark_core::native_operations::native_vehicle_seats;
+ let fields="seats[3] array\n    seats[0] struct\n        label (P-driver) string\n    seats[1] struct\n        label (P-passenger) string\n    seats[2] struct\n        label (P-passenger) string\n";
+ assert_eq!(native_vehicle_seats(fields).unwrap(),vec!["P-driver","P-passenger","P-passenger"]);
+ assert!(native_vehicle_seats(&fields.replace("seats[3]","seats[17]")).is_err());assert!(native_vehicle_seats(&fields.replace("label (P-driver)","other (P-driver)")).is_err());assert!(native_vehicle_seats(&format!("{fields}{fields}")).is_err());assert!(native_vehicle_seats(&fields.replace("string","enum")).is_err());
 }

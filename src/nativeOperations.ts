@@ -105,6 +105,8 @@ export interface NativeTagContext {
   cameraEditIssue?:string|null;
   scenarioCommandLists?:{index:number;name:string;commands:number}[];
   commandListIssue?:string|null;
+  vehicleSeats?:string[]|null;
+  vehicleSeatIssue?:string|null;
   commandSource?:NativeCommandSource|null;
   commandSourceIssue?:string|null;
   protectedCommandLists?:number[];

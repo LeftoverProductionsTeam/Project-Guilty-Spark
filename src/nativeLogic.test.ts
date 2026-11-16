@@ -8,6 +8,7 @@ import {
   addHandwrittenSource,
   centerDoorTrigger,
   connectDoor,
+  connectVehicleCrew,
   copyDeviceBehavior,
   extractionLayout,
 } from './nativeLogic';
@@ -284,4 +285,26 @@ it('authors dedicated transport groups through history, sharing and copying with
  const duplicate=duplicateForgeNodes(enabled,['ship']);expect(duplicate.document.placements[1].nativeName).toBeUndefined();expect(duplicate.document.placements[1].transportSignals).toBeUndefined();expect(duplicate.document.placements[0]).toEqual(enabled.placements[0]);
  const disabled=setNativeTransportSignals(enabled,forgeNodes(enabled).find(n=>n.value.id==='ship')!,false);expect(disabled.placements[0].transportSignals).toBe(false);
  expect(setNativeLogicName(disabled,forgeNodes(disabled).find(n=>n.value.id==='ship')!,'extraction_spirit').placements[0].nativeName).toBe('extraction_spirit');
+});
+
+
+it('connects named campaign aircraft to existing AI through immutable source and project history',()=>{
+ const original=structuredClone(base);original.gameMode='campaign';original.placements=[{...original.placements[0],id:'ship',tagClass:'vehi',name:'Aircraft',tagPath:'vehicles/pelican/pelican',nativeName:'extraction_pelican'}];
+ original.campaignEncounters=[{name:'pilot',actorPath:'characters/marine_armored/marine_armored',position:[0,0,0],startActive:true,count:1,spacing:1}];
+ const next=connectVehicleCrew(original,'ship','pilot','P-driver');
+ expect(original.logic?.rules??[]).toHaveLength(0);expect(next.logic?.rules[0]).toMatchObject({enabled:true,once:true,event:{kind:'timer',seconds:.1},actions:[{kind:'aiVehicleLoad',targetId:'ship',encounterName:'pilot',seat:'P-driver'}]});
+ let h=historyReducer(historyReducer(initialHistory,{type:'load',project:project(original)}),{type:'edit',project:project(next),description:'Seat pilot'});
+ h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.logic?.rules??[]).toHaveLength(0);h=historyReducer(h,{type:'redo'});expect(h.current?.quickForge?.logic?.rules).toEqual(next.logic?.rules);
+ expect(JSON.parse(JSON.stringify(h.current)).quickForge.logic.rules).toEqual(next.logic?.rules);expect(mergeForge(original,next,original).logic?.rules).toEqual(next.logic?.rules);
+ expect(removeForgeNodes(next,['ship']).logic?.rules).toHaveLength(0);
+ expect(()=>setNativeLogicName(next,forgeNodes(next).find(node=>node.value.id==='ship')!,'')).toThrow(/seating connections/);
+ expect(()=>connectVehicleCrew(next,'ship','pilot','P-passenger')).toThrow(/owner/);
+});
+it('refuses invalid AI seating without changing the original generated or manual source',()=>{
+ const doc=structuredClone(base);doc.gameMode='campaign';doc.placements=[{...doc.placements[0],id:'ship',tagClass:'vehi',nativeName:'extraction_spirit'}];doc.campaignEncounters=[{name:'crew',actorPath:'characters/elite/elite',position:[0,0,0],startActive:false,count:2,spacing:1,difficulty:{normal:2,insane:2}}];
+ const before=JSON.stringify(doc);
+ for(const seat of ['', ' ', '\n', '"driver"', 'x'.repeat(32)])expect(()=>connectVehicleCrew(doc,'ship','crew',seat)).toThrow();
+ expect(()=>connectVehicleCrew(doc,'missing','crew','driver')).toThrow();expect(()=>connectVehicleCrew(doc,'ship','missing','driver')).toThrow();expect(()=>connectVehicleCrew(doc,'ship','crew','driver',{kind:'enter',triggerId:'missing'})).toThrow();
+ expect(JSON.stringify(doc)).toBe(before);doc.campaignEncounters[0].difficulty!.normal=0;expect(()=>connectVehicleCrew(doc,'ship','crew','driver')).toThrow(/every difficulty/);doc.campaignEncounters[0].difficulty!.normal=2;
+ doc.logic={schemaVersion:1,triggers:[],devices:[],rules:[],manualSource:'; owned source'};expect(()=>connectVehicleCrew(doc,'ship','crew','driver')).toThrow(/manual/);expect(doc.logic.manualSource).toBe('; owned source');
 });

@@ -84,6 +84,7 @@ pub enum Event {
 pub enum Action {
     DevicePosition { target_id: String, value: f32 },
     DevicePower { target_id: String, value: f32 },
+    AiVehicleLoad { target_id: String, encounter_name: String, seat: String },
     Delay { seconds: f32 },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -171,6 +172,27 @@ pub fn validate_handwritten_sources(sources: &[HandwrittenSource]) -> Result<()>
     }
     Ok(())
 }
+fn crew_population(doc:&QuickForgeDocument,target:&str,encounter:&str,seat:&str)->Result<usize>{
+ if doc.native.is_some()||doc.game_mode!="campaign"||!matches!(doc.runtime_id,crate::runtime::RuntimeId::MccSteam|crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe){return invalid("AI seating requires editable native Campaign source");}
+ let vehicle=doc.placements.iter().find(|p|p.id==target&&p.tag_class=="vehi").ok_or_else(||crate::SparkError::Invalid("AI seating vehicle is missing".into()))?;
+ if vehicle.native_name.is_none(){return invalid("AI seating vehicle needs a native scenario name");}
+ if seat.is_empty()||seat.len()>31||seat.trim().is_empty()||seat.bytes().any(|b|!(32..=126).contains(&b)||b==b'"'||b==b'\\'){return invalid("AI seat text must be1–31 printable ASCII characters without quotes/backslashes");}
+ if encounter.is_empty()||encounter.len()>31||!encounter.as_bytes()[0].is_ascii_alphabetic()&&encounter.as_bytes()[0]!=b'_'||!encounter.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_'){return invalid("AI seating needs an exact native encounter identifier");}
+ let group=doc.campaign_encounters.iter().find(|g|g.name==encounter).ok_or_else(||crate::SparkError::Invalid("AI seating encounter is missing; its original spawning owner must create it".into()))?;
+ let normal=group.difficulty.as_ref().map(|d|d.normal).unwrap_or(group.count);let insane=group.difficulty.as_ref().map(|d|d.insane).unwrap_or(group.count);
+ if group.count==0||group.count>32||normal>group.count||insane>group.count||normal==0||insane==0{return invalid("AI seating encounter must have actors on every difficulty");}Ok(normal.max(insane) as usize)
+}
+/// Compare authored AI seating with independently read native seat labels.
+pub fn verify_vehicle_crew_seats(doc:&QuickForgeDocument,vehicle_id:&str,labels:&[String])->Result<()> {
+ validate(doc)?;if labels.len()>16{return invalid("Native vehicle exceeds16seats");}
+ let mut reserved=BTreeSet::new();
+ for rule in doc.logic.iter().flat_map(|l|&l.rules).filter(|r|r.enabled){for action in &rule.actions{if let Action::AiVehicleLoad{target_id,encounter_name,seat}=action{if target_id!=vehicle_id{continue;}
+  let required=crew_population(doc,target_id,encounter_name,seat)?;
+  let matches=labels.iter().enumerate().filter_map(|(i,label)|label.contains(seat).then_some(i)).collect::<Vec<_>>();
+  if matches.len()<required{return invalid(format!("AI encounter {encounter_name} needs {required} seats matching '{seat}'. Available native labels: {}. No vehicle tag was changed",labels.join(", ")));}
+  for i in matches{if !reserved.insert(i){return invalid("Enabled AI seating connections overlap the same vehicle seats. Use distinct labels or combine the crew into one encounter; no source was changed");}}
+ }}}Ok(())
+}
 pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     if let Some(profile)=crate::quickforge::campaign_profile(doc) {
         crate::firefight::native_player_profile_arguments(profile,0,crate::quickforge::CAMPAIGN_PROFILE_NAME)?;
@@ -257,6 +279,7 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
             return invalid("A logic device must reference one existing device_machine or device_control placement with position 0–1");
         }
     }
+    let mut crew_owners=BTreeSet::new();
     for rule in &logic.rules {
         if !text(&rule.id, 72)
             || !ids.insert(&rule.id)
@@ -281,6 +304,10 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
                             rule.name
                         ));
                     }
+                }
+                Action::AiVehicleLoad{target_id,encounter_name,seat}=>{
+                    crew_population(doc,target_id,encounter_name,seat)?;
+                    if rule.enabled&&!crew_owners.insert(encounter_name){return invalid("One enabled AI seating owner per encounter; disable or edit the existing connection");}
                 }
                 Action::Delay { seconds: s } if !seconds(*s) => {
                     return invalid("Logic delays must be finite within one hour")
@@ -401,6 +428,12 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
             ));
         }
         for action in &rule.actions {
+            if let Action::AiVehicleLoad{target_id,encounter_name,seat}=action {
+                let vehicle=doc.placements.iter().find(|p|p.id==*target_id).unwrap().native_name.as_deref().unwrap();
+                lines.push(format!("  (sleep_until (and (> (ai_living_count {encounter_name}) 0) (> (unit_get_health (unit {vehicle})) 0)) 1)"));
+                lines.push(format!("  (vehicle_load_magic (unit {vehicle}) \"{seat}\" (ai_actors {encounter_name}))"));
+                continue;
+            }
             lines.push(match action {
                 Action::DevicePosition { target_id, value } => format!(
                     "  (device_set_position {} {})",
@@ -413,6 +446,7 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
                     real(*value)
                 ),
                 Action::Delay { seconds } => format!("  (sleep {})", ticks(*seconds)),
+                Action::AiVehicleLoad{..}=>unreachable!("handled above"),
             });
         }
         if rule.condition.is_some() {
@@ -779,6 +813,15 @@ pub(crate) fn compile(
     // trusted merely because a setter returned zero.
     let effective=effective_logic(doc);
     let logic = effective.as_deref().ok_or_else(||crate::SparkError::Invalid("Generated native startup has no source document".into()))?;
+    if !source.manual {
+        let mut seat_labels=std::collections::BTreeMap::new();let mut reviewed_vehicles=BTreeSet::new();
+        for rule in logic.rules.iter().filter(|rule|rule.enabled){for action in &rule.actions{if let Action::AiVehicleLoad{target_id,..}=action{
+            if !reviewed_vehicles.insert(target_id){continue;}
+            let vehicle=doc.placements.iter().find(|p|p.id==*target_id).unwrap();
+            if !seat_labels.contains_key(&vehicle.tag_path){let fields=runner.run(edit,&["-t".into(),tags.clone(),"-L".into(),format!("{}.vehicle",vehicle.tag_path)],workspace,"crew-seats-review",72)?;seat_labels.insert(vehicle.tag_path.clone(),crate::native_operations::native_vehicle_seats(&fields)?);}
+            verify_vehicle_crew_seats(doc,target_id,&seat_labels[&vehicle.tag_path])?;
+        }}}
+    }
     for (i, binding) in logic.devices.iter().enumerate() {
         let placement = doc.placements.iter().find(|p| p.id == binding.placement_id).unwrap();
         let array = if placement.tag_class == "ctrl" { "controls" } else { "machines" };

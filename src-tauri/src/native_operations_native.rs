@@ -188,6 +188,7 @@ pub(super) struct Context {
     scenario_cameras:Vec<maps::NativeCameraPoint>,
     camera_edit_issue:Option<String>,
     command_source:Option<recipes::NativeCommandSource>,command_source_issue:Option<String>,protected_command_lists:Vec<u16>,
+    vehicle_seats:Option<Vec<String>>,vehicle_seat_issue:Option<String>,
     scenario_command_lists:Vec<recipes::ScenarioCommandListChoice>,
     command_list_issue:Option<String>,
     start_edit_issue:Option<String>,
@@ -566,6 +567,7 @@ pub(super) async fn native_tag_context(
         let(command_source,command_source_issue)=if source.class=="scnr"{match recipes::native_command_source(&values){Ok(rows)=>(Some(rows),studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
         let(scenario_command_lists,command_list_issue)=if source.class=="scnr"{match recipes::scenario_command_list_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_combat,mut combat_edit_issue)=if source.class=="scnr"{match recipes::scenario_combat_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
+        let(vehicle_seats,vehicle_seat_issue)=if source.class=="vehi"{match recipes::native_vehicle_seats(&values){Ok(rows)=>(Some(rows),None),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
         let radius = recipes::number(&values, "bounding_radius").ok();
         let flare = recipes::number(&values, "rotation_function_scale").ok();
         let edit_issue = executable(&state, &source.project, "invaderNative").err();
@@ -605,7 +607,7 @@ pub(super) async fn native_tag_context(
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
         Ok(Context {
-            firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,command_source,command_source_issue,protected_command_lists,scenario_devices,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
+            vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,command_source,command_source_issue,protected_command_lists,scenario_devices,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,

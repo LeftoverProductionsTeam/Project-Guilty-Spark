@@ -15,6 +15,7 @@ export interface LogicTrigger {
 export type LogicEvent = { kind: 'enter' | 'exit'; triggerId: string } | { kind: 'timer'; seconds: number };
 export type LogicAction =
   | { kind: 'devicePosition' | 'devicePower'; targetId: string; value: number }
+  | { kind: 'aiVehicleLoad'; targetId: string; encounterName: string; seat: string }
   | { kind: 'delay'; seconds: number };
 export interface LogicRule {
   id: string;
@@ -60,6 +61,7 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
   const existing=vehicle?.nativeName??trigger?.nativeName??logic.devices.find(d=>d.placementId===device?.id)?.nativeName;
   if(value===(existing??''))return doc;
   if(vehicle?.transportSignals)throw Error('Disable boarding & recall groups before changing this vehicle name; handwritten references are never rewritten.');
+  if(vehicle&&!value&&logic.rules.some(rule=>rule.actions.some(a=>a.kind==='aiVehicleLoad'&&a.targetId===vehicle.id)))throw Error('Remove the vehicle’s AI seating connections before clearing its native name.');
   if(value&&[...logic.triggers.filter(t=>t.id!==trigger?.id).map(t=>t.nativeName),
       ...logic.devices.filter(d=>d.placementId!==device?.id).map(d=>d.nativeName),
       ...doc.placements.filter(p=>p.id!==vehicle?.id).map(p=>p.nativeName)].includes(value))
@@ -233,6 +235,22 @@ export function connectDoor(
     actions: [{ kind: 'devicePosition', targetId, value: position }],
   });
   return { ...doc, logic };
+}
+/** Seat only existing native AI. Spawning stays with its encounter/mission owner. */
+export function connectVehicleCrew(doc:QuickForgeDocument,targetId:string,encounterName:string,seat:string,event:LogicEvent={kind:'timer',seconds:.1}):QuickForgeDocument {
+ const logic=logicDocument(doc),vehicle=doc.placements.find(p=>p.id===targetId&&p.tagClass==='vehi');
+ if(doc.native||doc.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe','mccSteam'].includes(doc.runtimeId)||logic.manualSource!=null)
+  throw Error('AI seating needs editable Campaign source and generated Logic / Events. Keep native/manual source in its existing workflow.');
+ if(!vehicle||vehicle.locked||!vehicle.nativeName)throw Error('Choose an unlocked vehicle with a unique native scenario name first.');
+ if(!/^[\x20-\x7e]{1,31}$/.test(seat)||!seat.trim()||/["\\]/.test(seat))throw Error('Seat text must match the native vehicle label:1–31 printable ASCII characters without quotes or backslashes. Inspect Native vehicle seats; the build verifies available matching seats.');
+ const group=doc.campaignEncounters?.find(group=>group.name===encounterName),count=group?.count??1;
+ if(!group||!/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(encounterName)||Math.min(group.difficulty?.normal??count,group.difficulty?.insane??count)<1)
+  throw Error('Choose an authored campaign encounter with at least one actor on every difficulty. Its existing startup flag or mission still owns creation.');
+ if(logic.rules.length>=32)throw Error('Native logic supports at most32 connections.');
+ if(logic.rules.some(rule=>rule.enabled&&rule.actions.some(a=>a.kind==='aiVehicleLoad'&&a.encounterName===encounterName)))throw Error('This encounter already has an enabled seating owner. Disable or edit that connection first.');
+ if(event.kind==='timer'?(!Number.isFinite(event.seconds)||event.seconds<0||event.seconds>3600):!logic.triggers.some(t=>t.id===event.triggerId))throw Error('Choose an existing trigger or a finite startup delay within one hour.');
+ logic.rules.push({id:crypto.randomUUID(),name:'Seat '+encounterName+' in '+vehicle.name,enabled:true,once:true,event,actions:[{kind:'aiVehicleLoad',targetId,encounterName,seat}]});
+ return {...doc,logic};
 }
 /** Explicit template reuse. Clone the complete self-contained behavior with
  * new trigger/rule identities; never share hidden bindings between instances. */
