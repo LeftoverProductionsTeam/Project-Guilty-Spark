@@ -6,6 +6,7 @@ use sha2::{Digest,Sha256};
 use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 pub use command_lists::{NativeCommand,NativeCommandList,NativeCommandSource,COMMAND_ATOMS};
+fn command_append_is_false(value:&bool)->bool{!*value}
 pub fn native_command_source(fields:&str)->Result<NativeCommandSource>{command_lists::source(fields)}
 /// Read-only native seat labels; duplicates retain distinct capacity slots.
 pub fn native_vehicle_seats(fields:&str)->Result<Vec<String>> {
@@ -22,7 +23,7 @@ pub fn native_vehicle_seats(fields:&str)->Result<Vec<String>> {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Operation {
-    CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String},
+    CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     Dependencies,
     DevicePlacement {device:NativeDevicePlacement,#[serde(rename="sourceSha256")] source_sha256:String},
     TriggerVolume {index:u16,name:String,geometry:crate::maps::ScenarioLogicVolumeGeometry,#[serde(rename="sourceSha256")] source_sha256:String},
@@ -211,7 +212,7 @@ impl Operation {
             return invalid("Native tag path is too long or begins with a command option");
         }
         match self {
-            Self::CommandList{list,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
+            Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source and finite position/rotation");}}
             Self::TriggerVolume{index,name,geometry,source_sha256}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
             Self::CutsceneCamera{point,source_sha256}=>{
@@ -438,7 +439,7 @@ pub fn verify_encounter_revision_base(expected:&str,actual:&str)->Result<()> {
 impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
-        if let Self::CommandList{list,..}=self{return command_lists::arguments(tags,tag,before,list);}
+        if let Self::CommandList{list,append,..}=self{return if *append{command_lists::append_arguments(tags,tag,before,list)}else{command_lists::arguments(tags,tag,before,list)};}
         if let Self::DevicePlacement{device,..}=self{
             let rows=native_device_fields(before)?;let original=rows.iter().find(|(row,_)|row.class==device.class&&row.index==device.index).ok_or_else(||crate::SparkError::Invalid("Native device index missing".into()))?;
             if !original.0.same_identity(device)||original.0.same_pose(device){return invalid("Device source identity changed or already matches");}
@@ -748,7 +749,7 @@ pub fn reviewed_difference(
     after: &str,
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
-    if let Operation::CommandList{list,..}=operation{return command_lists::reviewed(before,after,list);}
+    if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}
     if let Operation::DevicePlacement{device,..}=operation{return reviewed_device(before,after,device);}
     if let Operation::TriggerVolume{index,name,geometry,..}=operation{return reviewed_volume(before,after,*index,name,geometry);}
     if let Operation::CutsceneCamera{point,..}=operation{return reviewed_camera(before,after,point);}

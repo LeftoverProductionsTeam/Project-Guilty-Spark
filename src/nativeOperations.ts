@@ -8,20 +8,27 @@ export const NATIVE_COMMAND_VIEW='world.command-list';
 export interface NativeCommandDraft {
  key:string;projectId:string;buildId:string;tag:string;sourceSha256:string;
  original:NativeCommandList;list:NativeCommandList;point:number;
- active:boolean;focus:number;locked:boolean;reviewRequest?:number;frameRoute?:boolean;
+ active:boolean;focus:number;locked:boolean;reviewRequest?:number;frameRoute?:boolean;append?:boolean;
 }
 export function nativeCommandKey(context:NativeTagContext,list:NativeCommandList):string {
  return JSON.stringify([context.projectId,context.buildId,context.tag.replaceAll('\\','/'),context.tagSha256,list]);
 }
 export function nativeCommandMatches(draft:NativeCommandDraft,context:NativeTagContext):boolean {
- const original=context.commandSource?.lists.find(row=>row.index===draft.original?.index);
- return context.class==='scnr'&&!context.commandSourceIssue&&!!original&&
+ const rows=context.commandSource?.lists,original=draft.append?draft.original:rows?.find(row=>row.index===draft.original?.index);
+ const appendValid=!!draft.append&&!!rows&&rows.length<256&&draft.original.index===rows.length&&/^[A-Za-z][A-Za-z0-9_]{0,30}$/.test(draft.original.name)&&!rows.some(row=>row.name.toLowerCase()===draft.original.name.toLowerCase())&&draft.list.points.length>0&&draft.list.points.length<=64&&draft.list.commands.length>0&&draft.list.commands.length<=64;
+ return context.class==='scnr'&&!context.commandSourceIssue&&!!original&&(!draft.append||appendValid)&&
   /^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&draft.projectId===context.projectId&&draft.buildId===context.buildId&&
   draft.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&draft.sourceSha256===context.tagSha256&&
   draft.key===nativeCommandKey(context,original)&&JSON.stringify(draft.original)===JSON.stringify(original)&&
-  draft.list.index===original.index&&draft.list.name===original.name&&draft.list.commands.length===original.commands.length&&
-  draft.list.points.length===original.points.length&&!context.protectedCommandLists?.includes(original.index);
+  draft.list.index===original.index&&draft.list.name===original.name&&(draft.append||draft.list.commands.length===original.commands.length&&draft.list.points.length===original.points.length)&&!context.protectedCommandLists?.includes(original.index);
 }
+export function nativeRouteCommand(point:number):NativeCommand{return{atom:'go_to',modifier:0,parameters:[0,0],point1:point,point2:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1};}
+export function newNativeCommandRoute(context:NativeTagContext,name:string,position:[number,number,number]):NativeCommandDraft{
+ if(context.class!=='scnr'||context.commandSourceIssue||!context.commandSource||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')||context.commandSource.lists.length>=256||position.length!==3||!/^[A-Za-z][A-Za-z0-9_]{0,30}$/.test(name)||context.commandSource.lists.some(row=>row.name.toLowerCase()===name.toLowerCase())||position.some(v=>!Number.isFinite(v)||Math.abs(v)>1e6))throw Error('Choose a unique native route name and finite initial world coordinates in current editable scenario source.');
+ const original:NativeCommandList={index:context.commandSource.lists.length,name,flags:[false,false,false,false,false,false],bsp:-1,commands:[nativeRouteCommand(0)],points:[[...position]]};
+ return {key:nativeCommandKey(context,original),projectId:context.projectId,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256!,original,list:structuredClone(original),point:0,active:false,focus:0,locked:false,append:true};
+}
+
 export function nativeCommandPoint(draft:NativeCommandDraft|null):[number,number,number]|null {
  const point=draft?.list.points[draft.point];return draft&&Number.isInteger(draft.point)&&draft.point>=0&&draft.point<64&&
   Array.isArray(point)&&point.length===3&&point.every(v=>Number.isFinite(v)&&Math.abs(v)<=1e6)?point:null;
@@ -74,7 +81,7 @@ export interface NativeCameraPoint {index:number;name:string;position:[number,nu
 export interface NativeVolumeGeometry {forward:[number,number,number];up:[number,number,number];corner:[number,number,number];dimensions:[number,number,number]}
 export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVolumeGeometry|null}
 export interface NativeDevicePlacement {class:'ctrl'|'mach';index:number;nameIndex:number;name:string;tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
-export type NativeOperation = {kind:'commandList';list:NativeCommandList;sourceSha256:string} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
+export type NativeOperation = {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null;commandList?:number|null}

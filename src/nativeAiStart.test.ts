@@ -114,7 +114,7 @@ it('binds a command draft to the same original native start and cancels drags af
 
 // Command-list waypoints use the same overlay, but retain their own real indices
 // and original command source rather than masquerading as encounter starts.
-import {nativeCommandKey,nativeCommandMatches,nativeCommandPoint,nativeCommandDrag} from './nativeOperations';
+import {nativeCommandKey,nativeCommandMatches,nativeCommandPoint,nativeCommandDrag,newNativeCommandRoute,nativeRouteCommand} from './nativeOperations';
 import type {NativeCommandDraft,NativeCommandList} from './nativeOperations';
 const commandList=():NativeCommandList=>({index:2,name:'pilot_return',flags:[false,false,false,false,false,false],bsp:-1,commands:[{atom:'go_to',modifier:0,parameters:[0,0],point1:0,point2:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1}],points:[[1,2,3],[4,5,6]]});
 function commandFixture(){const source={...context(),commandSource:{lists:[commandList()],atoms:['go_to'],referenceCounts:[0,0,0,0,1] as [number,number,number,number,number]}};const original=commandList();const view:NativeCommandDraft={key:nativeCommandKey(source,original),projectId:source.projectId,buildId:source.buildId,tag:source.tag,sourceSha256:source.tagSha256!,original,list:structuredClone(original),point:1,active:true,focus:1,locked:false};return {source,view};}
@@ -131,4 +131,14 @@ it('moves only the selected command point and rejects stale, locked, hidden or i
  for(const patch of [{active:false},{locked:true},{point:0},{key:'other'},{focus:2},{frameRoute:true},{sourceSha256:'b'.repeat(64)},{list:{...view.list,flags:[true,false,false,false,false,false] as NativeCommandList['flags']}}])expect(nativeCommandDrag(view,{...view,...patch},[7,8,9],true)).toBeNull();
  for(const next of [undefined,[],[1,2],[1,2,3,4],[NaN,2,3],[Infinity,2,3],[1000001,2,3]])expect(nativeCommandDrag(view,view,next,true)).toBeNull();
  for(const point of [-1,64,1.5])expect(nativeCommandPoint({...view,point})).toBeNull();expect(nativeCommandPoint({...view,list:{...view.list,points:[[NaN,2,3]]},point:0})).toBeNull();
+});
+
+
+it('new native routes share source-checked viewport drafts without accepting stale or colliding indices',()=>{
+ const {source}=commandFixture();source.commandSource.lists[0].index=0;const draft=newNativeCommandRoute(source,'pelican_approach',[1,2,3]);expect(draft.append).toBe(true);expect(draft.list.index).toBe(1);expect(nativeCommandMatches(draft,source)).toBe(true);expect(nativeCommandPoint(draft)).toEqual([1,2,3]);
+ const expanded={...draft,active:true,list:{...draft.list,points:[[1,2,3],[4,5,6]] as [number,number,number][],commands:[nativeRouteCommand(0),nativeRouteCommand(1)]},point:1};expect(nativeCommandMatches(expanded,source)).toBe(true);expect(nativeCommandDrag(expanded,expanded,[7,8,9],true)?.list.points[1]).toEqual([7,8,9]);
+ for(const patch of [{tagSha256:'b'.repeat(64)},{commandSource:{...source.commandSource,lists:[...source.commandSource.lists,draft.list]}},{commandSourceIssue:'Changed source'},{protectedCommandLists:[1]}])expect(nativeCommandMatches(expanded,{...source,...patch})).toBe(false);
+ expect(()=>newNativeCommandRoute(source,'bad name',[1,2,3])).toThrow();expect(()=>newNativeCommandRoute(source,'other',[NaN,2,3])).toThrow();expect(()=>newNativeCommandRoute(source,source.commandSource.lists[0].name.toUpperCase(),[1,2,3])).toThrow();
+ expect(nativeCommandMatches({...expanded,list:{...expanded.list,points:[]}},source)).toBe(false);expect(source.commandSource.lists).toHaveLength(1);
+ const empty={...source,commandSource:{...source.commandSource,lists:[]}};expect(nativeCommandMatches(newNativeCommandRoute(empty,'pilot_insertion',[1,2,3]),empty)).toBe(true);
 });

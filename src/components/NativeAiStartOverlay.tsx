@@ -42,7 +42,7 @@ export default function NativeAiStartOverlay({project,enabled,snap,mode,onSelect
     window.addEventListener('guilty-spark-native-source-changed',changed);return()=>window.removeEventListener('guilty-spark-native-source-changed',changed);
   },[project.id]);
   const position=isCommand?nativeCommandPoint(command):nativeAiStartPosition(draft?.values);
-  const original=isCommand?command.original.points[command.point]:draft?.original;
+  const original=isCommand?(command.append?command.list.points[command.point]:command.original.points[command.point]):draft?.original;
   const focus=isCommand?command.focus:draft?.focus,locked=isCommand?command.locked:draft?.locked,buildId=isCommand?command.buildId:draft?.buildId;
   const facing=nativeAiStartFacing(draft?.facingDegrees);
   const knownFacing=typeof draft?.originalFacingRadians==='number'&&Number.isFinite(draft.originalFacingRadians);

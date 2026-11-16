@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 5695a95676552a6ce8674947492d99429ec63f8c, canonical local master.
-Latest verified revision: 5695a95 + native AI seating source; manifests identify scope.
-Next action: complete Black Echo pilot/approach/landing/return content; native42/restart/37944 pending desktop prerequisite. No push.
+Starting revision: 5d8afd4a31c21a1f2e64760db324db02306bb61a, canonical local master.
+Latest verified revision: 5d8afd4 + native route creation; manifests identify scope.
+Next action: bind native pilot/routes and landing/return volumes; supply matching CE tag inputs for full candidate. No push.
 
 ## Acceptance
 
@@ -29,7 +29,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-P1 seating stash1c2c73f5e04619ae4dc29c3f80b2eb47c68962fc restored; recovery retained. UI/history/Save/native HSC/seat readback connected; unit34+guide4/browser2/core16+4skip/installed1/web/Windows check pass. Full flight/Black Echo/game not accepted; next repair real routes. Exact proof in RUNTIME_INTEGRATION_20261107.
+P1 crew5d8afd4 integrated; stash1c2c73f recovery retained. Route creation now uses existing viewport/review/Restore/Save; frontend19/browser3/core2+2skip/native1/web pass. QA61530/run-gPlQeK CLOSED386760909logicalB; root absent. RUNTIME_INTEGRATION_20261107 has exact proof. Full CE cache/native Windows/flight/Black Echo and P0 acceptance OPEN.
 
 Native CE source handoff (parentcfe6832): imported standard CE609 now uses its explicit reviewed CE tagset and existing Build→native script editor path. Dependency-sized staging3305/3307tags, native compile/independent readback, project Save/reopen and recovered-script rebuild pass; identical mapSHA91151b1af3fde6046020d48a506b2e7609f3dfcadeeb0af01b2d13a6479197ee. Build11/working14/TypeScript/Windows check pass. No new app/UI/game acceptance. Existing ownership/settlement source proof remains in RUNTIME_INTEGRATION_20261107; complete Spark Black Echo mission/HUD handoff,15warnings and37944 stay open. Historical patrol WIP is integrated in the16Nov source/native milestone above; actual AI gameplay remains open. All original files/475IDs preserved.
 
