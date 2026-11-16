@@ -123,7 +123,15 @@ export default function RuntimeDock({
     'hosting.runtime',
     project?.quickForge?.runtimeId ?? settings.preferredHalo ?? PREFERRED_RUNTIME,
   );
-  const [report, setReport] = useState<RuntimeWorkbenchReport | null>(null);
+  const reportKey=JSON.stringify([project?.id??null,runtime]);
+  const [reportState,setReportState]=useState<{key:string;value:RuntimeWorkbenchReport}|null>(null);
+  const report=reportState?.key===reportKey?reportState.value:null;
+  function setReport(next:RuntimeWorkbenchReport|null|((previous:RuntimeWorkbenchReport|null)=>RuntimeWorkbenchReport|null)){
+    setReportState(previous=>{const current=previous?.key===reportKey?previous.value:null;
+      const value=typeof next==='function'?next(current):next;
+      return value?{key:reportKey,value}:null;});
+  }
+
   const [details, setDetails] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -443,7 +451,7 @@ export default function RuntimeDock({
     try {
       const value=await call<WorkingScriptSources>('working_script_sources',{projectId:project.id,expectedBuildId:source.buildId,
         expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,...(includeCameras?{includeCameras:true}:{})});
-      if(request!==moduleRequest.current||key!==currentScriptSourceKey.current)return;
+      if(request!==moduleRequest.current||key!==currentScriptSourceKey.current){if(currentProject.current?.id===project.id)setNotice('The runtime or editable source changed while reading modules. Use List recovered modules for the current source.');return;}
       if(!sourceSelectionMatches(value,source))throw Error('The recovered script listing belongs to a different source revision. Refresh its selection.');
       setModuleInventory({key,value});
       setModuleName(name=>value.modules.some(module=>module.filename===name)?name:value.modules.find(module=>!module.unavailable)?.filename??value.modules[0]?.filename??'');

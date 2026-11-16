@@ -1,3 +1,6 @@
+export interface NativeCommand {atom:string;modifier:number;parameters:[number,number];point1:number;point2:number;animation:number;script:number;recording:number;command:number;objectName:number}
+export interface NativeCommandList {index:number;name:string;flags:[boolean,boolean,boolean,boolean,boolean,boolean];bsp:number;commands:NativeCommand[];points:[number,number,number][]}
+export interface NativeCommandSource {lists:NativeCommandList[];atoms:string[];referenceCounts:[number,number,number,number,number]}
 import type { FirefightConfig } from './firefight';
 export const campaignAiStates=['sleeping','alert','guarding','searching','fleeing','moving_repeat_same_position','moving_loop','moving_loop_back_and_forth','moving_loop_randomly','moving_randomly'] as const;
 export type CampaignAiState=typeof campaignAiStates[number];
@@ -41,7 +44,7 @@ export interface NativeCameraPoint {index:number;name:string;position:[number,nu
 export interface NativeVolumeGeometry {forward:[number,number,number];up:[number,number,number];corner:[number,number,number];dimensions:[number,number,number]}
 export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVolumeGeometry|null}
 export interface NativeDevicePlacement {class:'ctrl'|'mach';index:number;nameIndex:number;name:string;tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
-export type NativeOperation = {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
+export type NativeOperation = {kind:'commandList';list:NativeCommandList;sourceSha256:string} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null;commandList?:number|null}
@@ -72,6 +75,9 @@ export interface NativeTagContext {
   cameraEditIssue?:string|null;
   scenarioCommandLists?:{index:number;name:string;commands:number}[];
   commandListIssue?:string|null;
+  commandSource?:NativeCommandSource|null;
+  commandSourceIssue?:string|null;
+  protectedCommandLists?:number[];
   scenarioCombat?:NativeScenarioCombat[];
   combatEditIssue?:string|null;
   startEditIssue?:string|null;

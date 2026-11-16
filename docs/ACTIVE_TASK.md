@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — compact mission UI and recovered native device source checkpoint
+Task: Operation110 — existing native AI command actions/waypoints creator workflow
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: parent11f58497d7d2a48113101099cbbc540fae4828cb; current scoped source/native checks pass. App6c88b0c4fcce985216eec8e5561a08a319061b72fa18399e6d89be5a927cf2af; exact output hashes in runtime evidence.
-Next action: approved private Black Echo gameplay when desktop control works; otherwise continue existing campaign command-list authoring. Native Restore != project Undo. QA98092 CLOSED; no game/push.
+Latest verified revision: parentabcd2e7aa12aed6f62a16bb7f36d19be3a443a64; current command source/UI/CE readback pass. Appa0c2e005d1cfcf52ce2eb08e5bd08aed02824c23d6c2e8f6668eac5f54e4b128; exact evidence in runtime record.
+Next action: verify updated Forerunner build identity/capabilities (16Nov06:06:37) under existing approval, then private Black Echo gameplay if desktop control works. QA70350 CLOSED,4015740905logicalB disposed; no push/Forerunner writes.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current checkpoint: terminal reference→actual model Move/Rotate→review/Restore/Save/3restarts→CE complete-device readback passes;0page errors. Frontend22/core22+2skips/browser4+toolbar/Windows checks pass. One wrapping bar fixes native overlap. QA98092/run-uKcX8S CLOSED:4718760219logicalB disposed, physical unavailable. Compact36px/HUD151px/42rapid-edit proof retained;37944/game/fullGoal open.
+16Nov current checkpoint: command actions/flags/refs/points→review/Restore/Save/reopen→CE full readback passes;0page errors. Fixed runtime report ownership/module route; native continuation passes. Frontend33/core22+2skips/native2+cache1/browser1+5/Windows pass. Initial startup/module failures retained in runtime evidence. Originals/475IDs unchanged; structural commands/game/37944/fullGoal open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 

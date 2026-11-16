@@ -10,9 +10,9 @@ let viewWindow:string|null=null;
 /** Camera/selection/scroll are window-local. The last shared snapshot is still
  * written for an explicit handoff/new window, never used to reset a live peer. */
 export function configureMapViewWindow(label:string|null){viewWindow=label&&/^[\w-]{1,60}$/.test(label)?label:null;}
-const transientViewKeys=['world.ai-start','world.cutscene-camera','world.trigger-volume','world.device-placement'];
+const transientViewKeys=['world.ai-start','world.cutscene-camera','world.trigger-volume','world.device-placement','world.command-list'];
 const transientKey=(key:string)=>transientViewKeys.includes(key);
-const viewKey=(key:string)=>/^(hud:|bitmap\.hud\.|camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|bitmap\.(image|face)\.|tags\.(selection|focus|query|filter|classes|limit|contexts|context-selection|preview\.animation)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start|ai-start|cutscene-camera|trigger-volume|device-placement)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|smart-edit\.open$|build\.(inputsOpen|resourcesOpen|reportOpen|historyOpen)$|bsp\.(view\.|selection$|tool$|maximized$|edgeTarget$|edgePicks$)|creator-(studio-pane|mission-expanded)$|scenario\.(query|selection)$)/.test(key);
+const viewKey=(key:string)=>/^(hud:|bitmap\.hud\.|camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|bitmap\.(image|face)\.|tags\.(selection|focus|query|filter|classes|limit|contexts|context-selection|preview\.animation)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start|ai-start|cutscene-camera|trigger-volume|device-placement|command-list)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|smart-edit\.open$|build\.(inputsOpen|resourcesOpen|reportOpen|historyOpen)$|bsp\.(view\.|selection$|tool$|maximized$|edgeTarget$|edgePicks$)|creator-(studio-pane|mission-expanded)$|scenario\.(query|selection)$)/.test(key);
 // Browsing/category choices are independent UI state even without an active map.
 // Appearance, input preferences, shared source and collaboration stay shared.
 const windowUiKey=(key:string)=>/^(scroll\.|library\.|learning\.|community\.|interface\.section$|tools\.(advanced|dashboard|enginePackage|downloadOpen|connectRuntime)$|workspace\.layoutName$|hosting\.runtime$|director\.docked$)/.test(key);

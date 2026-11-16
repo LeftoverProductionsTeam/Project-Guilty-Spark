@@ -1,3 +1,4 @@
+import NativeCommandLists from './NativeCommandLists';
 import NativeDevicePlacements from './NativeDevicePlacements';
 import {NATIVE_DEVICE_VIEW} from '../nativeDevicePlacement';
 import type {NativeDeviceView} from '../nativeDevicePlacement';
@@ -319,6 +320,7 @@ export default function NativeTagOperations({
             </>:!context.squadEditIssue&&<p className="subtle">This native scenario has no existing squads. Use encounter authoring to add them.</p>}
             {!!context.scenarioSquads?.length&&<NativeSquadScaling context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           </details>}
+          {context.class==='scnr'&&<NativeCommandLists context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='scnr'&&<NativeDevicePlacements context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeTriggerVolumes context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeCutsceneCameras context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}

@@ -141,3 +141,23 @@ mod tests {
         let mut broken=bytes;broken[0xb0c..0xb10].copy_from_slice(&99u32.to_le_bytes());assert!(parse(&Reader(&broken),&space,0,&tags).is_err());
     }
 }
+
+/// Standard H1 command-list block (scenario+0x438); fixed-layout native data.
+/// Runtime-generated BSP/surface cache fields are deliberately not source edits.
+pub fn scenario_command_readback(path:&Path,inspection:&MapInspection)->Result<Vec<crate::native_operations::NativeCommandList>>{with_scenario(path,inspection,parse_commands)}
+fn parse_commands(r:&Reader,space:&Space,sc:usize)->Result<Vec<crate::native_operations::NativeCommandList>>{
+ use crate::native_operations::{NativeCommandList,NativeCommand};
+ let(at,n)=space.block(r,sc+0x438,96,256)?;let mut lists=vec![];
+ for index in 0..n{let p=at+index*96;let bits=r.u32(p+32)?;if bits&!63!=0{return invalid("Compiled command list has unknown flags");}let(c,cn)=space.block(r,p+48,32,64)?;let(points,pn)=space.block(r,p+60,20,64)?;let mut commands=vec![];
+  for i in 0..cn{let a=c+i*32;let atom=crate::native_operations::COMMAND_ATOMS.get(r.u16(a)? as usize).ok_or_else(||SparkError::Invalid("Compiled command action unsupported".into()))?;commands.push(NativeCommand{atom:(*atom).into(),modifier:r.u16(a+2)? as i16,parameters:[r.f32(a+4)?,r.f32(a+8)?],point1:r.u16(a+12)? as i16,point2:r.u16(a+14)? as i16,animation:r.u16(a+16)? as i16,script:r.u16(a+18)? as i16,recording:r.u16(a+20)? as i16,command:r.u16(a+22)? as i16,object_name:r.u16(a+24)? as i16});}
+  let mut positions=vec![];for i in 0..pn{positions.push(vec3(r,points+i*20)?);}let list=NativeCommandList{index:index as u16,name:r.string(p,32)?,flags:std::array::from_fn(|i|bits&(1<<i)!=0),bsp:r.u16(p+44)? as i16,commands,points:positions};list.validate()?;lists.push(list);
+ }Ok(lists)
+}
+
+#[cfg(test)]mod command_tests{
+ use super::*;
+ #[test]fn native_command_cache_uses_bounded_actions_parameters_references_and_points(){
+  let mut bytes=vec![0u8;4096];for(at,value)in [(0x438,1u32),(0x43c,0x800),(0x830,1),(0x834,0x900),(0x83c,1),(0x840,0xa00)]{bytes[at..at+4].copy_from_slice(&value.to_le_bytes());}bytes[0x800..0x805].copy_from_slice(b"route");bytes[0x82c..0x82e].copy_from_slice(&65535u16.to_le_bytes());bytes[0x900..0x902].copy_from_slice(&1u16.to_le_bytes());for at in [0x90e,0x910,0x912,0x914,0x916,0x918]{bytes[at..at+2].copy_from_slice(&65535u16.to_le_bytes());}bytes[0x904..0x908].copy_from_slice(&1.25f32.to_le_bytes());for(i,n)in [1f32,2.,3.].into_iter().enumerate(){bytes[0xa00+i*4..0xa04+i*4].copy_from_slice(&n.to_le_bytes());}let space=Space{begin:0,end:bytes.len(),address:0};let read=parse_commands(&Reader(&bytes),&space,0).unwrap();assert_eq!(read[0].commands[0].atom,"go_to");assert_eq!(read[0].commands[0].parameters,[1.25,0.]);assert_eq!(read[0].commands[0].point1,0);assert_eq!(read[0].points,[[1.,2.,3.]]);
+  let mut bad=bytes.clone();bad[0x900..0x902].copy_from_slice(&28u16.to_le_bytes());assert!(parse_commands(&Reader(&bad),&space,0).is_err());bad=bytes.clone();bad[0x834..0x838].copy_from_slice(&4090u32.to_le_bytes());assert!(parse_commands(&Reader(&bad),&space,0).is_err());bad=bytes.clone();bad[0x90c..0x90e].copy_from_slice(&1u16.to_le_bytes());assert!(parse_commands(&Reader(&bad),&space,0).is_err());bad=bytes;bad[0xa00..0xa04].copy_from_slice(&f32::NAN.to_le_bytes());assert!(parse_commands(&Reader(&bad),&space,0).is_err());
+ }
+}
