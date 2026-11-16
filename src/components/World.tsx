@@ -646,7 +646,7 @@ export default function World({
   const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
   const ortho=!cinematic&&savedOrtho;
   function setMode(next:'translate'|'rotate'|'scale') {
-    if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI starts support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.');return;}
+    if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI points support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.');return;}
     setModeState(next);
     if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
   }
@@ -1577,11 +1577,11 @@ export default function World({
             </Suspense>
           </ViewportBoundary>
           {!cinematic&&nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
-            <strong>{nativeAiStart.kind==='firing'?'AI firing draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
+            <strong>{nativeAiStart.kind==='firing'?'AI firing draft':nativeAiStart.kind==='patrol'?'AI patrol draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
             <span>{nativeAiStart.kind==='firing'?'Unsaved XYZ/group proposal · Move (W), then review in Native source controls':'Unsaved pose · Move (W) / Rotate (E), then review in Native source controls'}</span>
             <button disabled={fly||cameraLocked||externalCameraAuthority} title="Frame the coordinate proposal. Release fly navigation or camera ownership first."
-              onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>{nativeAiStart.kind==='firing'?'Frame AI firing position':'Frame AI start'}</button>
-            {onReviewAiStart&&<button onClick={onReviewAiStart}>{nativeAiStart.kind==='firing'?'Review AI firing source':'Review AI start source'}</button>}
+              onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>{nativeAiStart.kind==='firing'?'Frame AI firing position':nativeAiStart.kind==='patrol'?'Frame AI patrol point':'Frame AI start'}</button>
+            {onReviewAiStart&&<button onClick={onReviewAiStart}>{nativeAiStart.kind==='firing'?'Review AI firing source':nativeAiStart.kind==='patrol'?'Review AI patrol source':'Review AI start source'}</button>}
             <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>
           </div>}
           {!cinematic && chosen && (

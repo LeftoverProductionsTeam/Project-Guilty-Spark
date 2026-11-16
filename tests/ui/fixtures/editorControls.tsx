@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import NativeSquadBehaviorEditor from '../../../src/components/NativeSquadBehavior';
+import NativeSquadPatrol from '../../../src/components/NativeSquadPatrol';
 import NativeStartingPositions from '../../../src/components/NativeStartingPositions';
 import {useMapState} from '../../../src/mapSession';
 import {NATIVE_AI_START_VIEW} from '../../../src/nativeAiStart';
@@ -36,4 +37,12 @@ function NativeBehaviorFixture(){
  const context={projectId:'behavior-fixture',buildId:'build',class:'scnr',tag:'level.scenario',tagSha256:(revision?'b':'a').repeat(64)} as NativeTagContext;
  return <><button onClick={()=>setDirty(!dirty)}>Toggle project dirty</button><button onClick={()=>setRevision(revision+1)}>Refresh source revision</button><output data-testid="behavior-original">{JSON.stringify(source)}</output><output data-testid="behavior-operation">{JSON.stringify(operation)}</output><NativeSquadBehaviorEditor context={context} squadChoice={{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1}} source={source} issue={null} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)}/></>;
 }
-createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);
+function NativePatrolFixture(){
+ const [dirty,setDirty]=useState(false),[revision,setRevision]=useState(0),[protectedGroup,setProtected]=useState(false),[operation,setOperation]=useState<unknown>(null);
+ const source={points:[{sourceIndex:0,position:[1,2,3] as [number,number,number],facingRadians:0,weight:1,waitSeconds:[0,2] as [number,number],animation:7,sequenceId:-4},{sourceIndex:1,position:[4,2,3] as [number,number,number],facingRadians:.5,weight:2,waitSeconds:[1,3] as [number,number],animation:-1,sequenceId:0}]};
+ const behavior={initialState:'moving_loop',returnState:'alert',patrolCount:2,starts:[]};
+ const context={projectId:'patrol-fixture',buildId:'build',class:'scnr',tag:'level.scenario',tagSha256:(revision?'b':'a').repeat(64),protectedSquadEncounters:protectedGroup?['guards']:[],scenarioCombat:[{encounter:0,name:'guards',points:[],squads:[{index:0,name:'original',patrol:source,behavior,groups:{attacking:[],attackingSearch:[],attackingGuard:[],defending:[],defendingSearch:[],defendingGuard:[]}}]}]} as NativeTagContext;
+ const [draft]=useMapState<NativeAiStartView|null>(context.projectId,NATIVE_AI_START_VIEW,()=>null);
+ return <><button onClick={()=>setDirty(!dirty)}>Toggle project dirty</button><button onClick={()=>{setRevision(revision+1);setOperation(null);}}>Refresh source revision</button><button onClick={()=>{setProtected(!protectedGroup);setOperation(null);}}>Toggle source protection</button><output data-testid="patrol-source">{JSON.stringify(source)}</output><output data-testid="patrol-operation">{JSON.stringify(operation)}</output><output data-testid="patrol-draft">{JSON.stringify(draft)}</output><NativeSquadPatrol context={context} squadChoice={{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1}} source={source} behavior={behavior} issue={protectedGroup?'Recipe-owned source retained':null} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)}/></>;
+}
+createRoot(document.getElementById('root')!).render(location.search.startsWith('?native-patrol')?<NativePatrolFixture/>:location.search.startsWith('?native-behavior')?<NativeBehaviorFixture/>:location.search.startsWith('?native-ai')?<NativeAiDraftFixture/>:<Fixture/>);

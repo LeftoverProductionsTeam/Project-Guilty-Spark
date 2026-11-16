@@ -18,6 +18,7 @@ pub enum Operation {
     EncounterStartPosition {encounter:u16,squad:u16,start:u16,#[serde(rename="encounterName")] encounter_name:String,
         #[serde(rename="squadName")] squad_name:String,position:[f32;3],#[serde(rename="sourceSha256")] source_sha256:String,
         #[serde(rename="facingRadians",default,skip_serializing_if="Option::is_none")] facing_radians:Option<f32>},
+    EncounterSquadPatrol {encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,route:ScenarioPatrolRoute,#[serde(rename="sourceSha256")] source_sha256:String},
     EncounterSquadBehavior {encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,behavior:ScenarioSquadBehavior,#[serde(rename="sourceSha256")] source_sha256:String},
     EncounterFiringPosition {encounter:u16,point:u16,#[serde(rename="encounterName")] encounter_name:String,position:[f32;3],group:String,#[serde(rename="sourceSha256")] source_sha256:String},
     EncounterSquadFiringGroups {encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,groups:FiringGroups,#[serde(rename="sourceSha256")] source_sha256:String},
@@ -130,8 +131,8 @@ fn actor_spacing()->f32{0.75}
 impl Operation {
     pub fn is_squad_start_edit(&self)->bool{matches!(self,Self::EncounterStartPosition{..})}
     pub fn is_scenario_ai_edit(&self)->bool{self.is_squad_count_edit()||self.is_squad_start_edit()||self.combat_target_key().is_some()}
-    pub fn combat_target_key(&self)->Option<(u8,u16,u16)>{match self{Self::EncounterSquadBehavior{encounter,squad,..}=>Some((2,*encounter,*squad)),Self::EncounterFiringPosition{encounter,point,..}=>Some((0,*encounter,*point)),Self::EncounterSquadFiringGroups{encounter,squad,..}=>Some((1,*encounter,*squad)),_=>None}}
-    pub fn combat_encounter_name(&self)->Option<&str>{match self{Self::EncounterSquadBehavior{encounter_name,..}|Self::EncounterFiringPosition{encounter_name,..}|Self::EncounterSquadFiringGroups{encounter_name,..}=>Some(encounter_name),_=>None}}
+    pub fn combat_target_key(&self)->Option<(u8,u16,u16)>{match self{Self::EncounterSquadPatrol{encounter,squad,..}=>Some((3,*encounter,*squad)),Self::EncounterSquadBehavior{encounter,squad,..}=>Some((2,*encounter,*squad)),Self::EncounterFiringPosition{encounter,point,..}=>Some((0,*encounter,*point)),Self::EncounterSquadFiringGroups{encounter,squad,..}=>Some((1,*encounter,*squad)),_=>None}}
+    pub fn combat_encounter_name(&self)->Option<&str>{match self{Self::EncounterSquadPatrol{encounter_name,..}|Self::EncounterSquadBehavior{encounter_name,..}|Self::EncounterFiringPosition{encounter_name,..}|Self::EncounterSquadFiringGroups{encounter_name,..}=>Some(encounter_name),_=>None}}
     pub fn is_squad_count_edit(&self)->bool {matches!(self,Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..})}
     pub fn squad_count_edits(&self)->Result<Vec<SquadCountEdit>> {
         match self {
@@ -157,20 +158,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -204,6 +205,7 @@ impl Operation {
                 }
                 if total>128{return invalid("One reviewed encounter group operation supports at most 128 starting locations");}
             }
+            Self::EncounterSquadPatrol{encounter,squad,encounter_name,squad_name,route,source_sha256}=>{if class!="scnr"||*encounter>=128||*squad>=4096||[encounter_name,squad_name].iter().any(|n|n.len()>32||n.chars().any(char::is_control))||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Native patrol needs exact source/squad identities");}route.validate()?;},
             Self::EncounterSquadBehavior{encounter,squad,encounter_name,squad_name,behavior,source_sha256}=>{if class!="scnr"||*encounter>=128||*squad>=4096||[encounter_name,squad_name].iter().any(|n|n.len()>32||n.chars().any(char::is_control))||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Native behavior needs exact source/squad identities");}behavior.validate()?;}
             Self::EncounterFiringPosition{encounter,point,encounter_name,position,group,source_sha256}=>{
                 if class!="scnr"||*encounter>=128||*point>=512||encounter_name.len()>32||encounter_name.chars().any(char::is_control)||position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||group.len()!=1||!group.as_bytes()[0].is_ascii_lowercase()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Firing-position editing needs exact native identity, finite XYZ and group A–Z");}
@@ -265,7 +267,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
+            Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -476,7 +478,7 @@ impl Operation {
         if overhead>=LIMIT{return invalid("Native source path leaves no checked command-line capacity");}
         let mut result=vec![];let mut batch=base.clone();let mut used=overhead;let mut i=2;
         while i<end {
-            let width=match(args[i].as_str(),readback){("-G",true)=>2,("-S",false)=>3,("-I",false)=>4,("-E",false)=>2,_=>return invalid("Unknown action in native encounter batch")};
+            let width=match(args[i].as_str(),readback){("-G",true)=>2,("-C",true) if matches!(self,Self::EncounterSquadPatrol{..})=>2,("-S",false)=>3,("-I",false)=>4,("-E",false)=>2,("-M"|"-c",false) if matches!(self,Self::EncounterSquadPatrol{..})=>3,_=>return invalid("Unknown action in native encounter batch")};
             if i+width>end{return invalid("Incomplete native encounter action");}
             let action=&args[i..i+width];let bytes=action.iter().map(|v|cost(v)).sum::<usize>();
             if bytes>LIMIT-overhead{return invalid("One native action exceeds its checked command-line capacity");}
@@ -490,22 +492,24 @@ impl Operation {
     /// Reuse the exact emitted scalar keys for bounded native -G readback.
     pub fn readback_arguments(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Option<Vec<String>>> {
         if !self.is_encounter_append()&&!self.is_scenario_ai_edit() {return Ok(None);}
+        if let Self::EncounterSquadPatrol{encounter,squad,route,..}=self{self.arguments_with_fields(tags,class,tag,before)?;let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-C".into(),format!("encounters[{encounter}].squads[{squad}].move_positions")];for(key,_)in patrol_scalar_fields(*encounter,*squad,route){args.extend(["-G".into(),key]);}args.push(tag.into());return Ok(Some(args));}
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut i=2;
-        while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{args.extend(["-G".into(),written[i+1].clone()]);i+=3;},_=>return invalid("Unexpected native append recipe")}}
+        while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-E"=>i+=2,"-M"|"-c"=>i+=3,"-S"=>{args.extend(["-G".into(),written[i+1].clone()]);i+=3;},_=>return invalid("Unexpected native append recipe")}}
         args.push(tag.into());Ok(Some(args))
     }
     pub fn verify_readback(&self,tags:&Path,class:&str,tag:&str,before:&str,output:&str)->Result<()> {
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut expected=vec![];let mut i=2;
-        while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{expected.push((&written[i+1],&written[i+2]));i+=3;},_=>return invalid("Unexpected native append recipe")}}
+        if let Self::EncounterSquadPatrol{encounter,squad,route,..}=self{expected.push((format!("encounters[{encounter}].squads[{squad}].move_positions"),route.points.len().to_string()));expected.extend(patrol_scalar_fields(*encounter,*squad,route));}
+        else{while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{expected.push((written[i+1].clone(),written[i+2].clone()));i+=3;},_=>return invalid("Unexpected native append recipe")}}}
         let actual=output.lines().collect::<Vec<_>>();if actual.len()!=expected.len(){return invalid("Native encounter scalar readback count differs from the append recipe");}
         for ((key,value),actual) in expected.into_iter().zip(actual) {
             let same=if key.ends_with(".facing"){
                 match(value.parse::<f32>(),actual.parse::<f32>()){(Ok(expected),Ok(degrees))=>facings_close(expected,degrees.to_radians()),_=>false}
             }else if key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight") {
                 let parse=|s:&str|s.split(',').map(|v|v.trim().parse::<f64>().ok().filter(|v|v.is_finite())).collect::<Option<Vec<_>>>();
-                match(parse(value),parse(actual)){(Some(a),Some(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|(a-b).abs()<=0.000001f64.max(a.abs()*f64::from(f32::EPSILON)*2.)),_=>false}
+                match(parse(&value),parse(actual)){(Some(a),Some(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|(a-b).abs()<=0.000001f64.max(a.abs()*f64::from(f32::EPSILON)*2.)),_=>false}
             }else if key.ends_with(".reference"){actual.replace('\\',"/").eq_ignore_ascii_case(&value.replace('\\',"/"))}
             else if value.as_str()=="-1"{actual=="-1"||actual=="65535"}else{actual==value.as_str()};
             if !same{return invalid(format!("Native encounter readback differs at {key}: {actual}"));}
@@ -831,7 +835,7 @@ impl ScenarioSquadReadback {
         if self.source_sha256.len()!=64||!self.source_sha256.bytes().all(|c|c.is_ascii_hexdigit())||self.squads.len()>4096 {
             return invalid("Native squad readback needs an exact source SHA256 and bounded inventory");
         }
-        if self.combat.len()>4096{return invalid("Native combat readback exceeds4096selected targets");}let mut targets=std::collections::BTreeSet::new();for op in &self.combat{let key=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unsupported combat readback operation".into()))?;if !targets.insert(key){return invalid("Duplicate native combat readback target");}op.validate("scnr","readback.scenario")?;let source=match op{Operation::EncounterSquadBehavior{source_sha256,..}|Operation::EncounterFiringPosition{source_sha256,..}|Operation::EncounterSquadFiringGroups{source_sha256,..}=>source_sha256,_=>unreachable!()};if !source.eq_ignore_ascii_case(&self.source_sha256){return invalid("Combat readback source identity differs from its snapshot");}}
+        if self.combat.len()>4096{return invalid("Native combat readback exceeds4096selected targets");}let mut targets=std::collections::BTreeSet::new();for op in &self.combat{let key=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unsupported combat readback operation".into()))?;if !targets.insert(key){return invalid("Duplicate native combat readback target");}op.validate("scnr","readback.scenario")?;let source=match op{Operation::EncounterSquadPatrol{source_sha256,..}|Operation::EncounterSquadBehavior{source_sha256,..}|Operation::EncounterFiringPosition{source_sha256,..}|Operation::EncounterSquadFiringGroups{source_sha256,..}=>source_sha256,_=>return invalid("Unsupported native combat readback source binding")};if !source.eq_ignore_ascii_case(&self.source_sha256){return invalid("Combat readback source identity differs from its snapshot");}}
         let mut seen=std::collections::BTreeSet::new();let mut starts=0usize;
         for row in &self.squads {
             if row.encounter>=128||row.squad>=4096||!seen.insert((row.encounter,row.squad))||
@@ -959,10 +963,80 @@ fn scenario_squad_inventory(fields:&str,include_starts:bool)->Result<Vec<Scenari
 pub struct ScenarioFiringChoice {pub index:u16,pub position:[f32;3],pub group:String,#[serde(skip)] position_line:usize,#[serde(skip)] group_lines:Vec<usize>}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct ScenarioFiringSquadChoice {pub index:u16,pub name:String,pub groups:FiringGroups,#[serde(default,skip_serializing_if="Option::is_none")] pub behavior:Option<ScenarioSquadBehavior>,#[serde(default,skip_serializing_if="Option::is_none")] pub behavior_issue:Option<String>,#[serde(skip)] group_lines:Vec<Vec<usize>>}
+pub struct ScenarioFiringSquadChoice {pub index:u16,pub name:String,pub groups:FiringGroups,#[serde(default,skip_serializing_if="Option::is_none")] pub behavior:Option<ScenarioSquadBehavior>,#[serde(default,skip_serializing_if="Option::is_none")] pub behavior_issue:Option<String>,#[serde(default,skip_serializing_if="Option::is_none")] pub patrol:Option<ScenarioPatrolRoute>,#[serde(default,skip_serializing_if="Option::is_none")] pub patrol_issue:Option<String>,#[serde(skip)] group_lines:Vec<Vec<usize>>}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioCombatChoice {pub encounter:u16,pub name:String,pub points:Vec<ScenarioFiringChoice>,pub squads:Vec<ScenarioFiringSquadChoice>}
+/// Original movement rows keep their native identity through copy/move/erase.
+/// Source indices select records, never animation or scenario references to rewrite.
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct ScenarioPatrolPoint {
+    pub source_index:Option<u16>,pub position:[f32;3],pub facing_radians:f32,
+    pub weight:f32,pub wait_seconds:[f32;2],pub animation:i16,pub sequence_id:i8,
+    #[serde(skip)] fields:Vec<String>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct ScenarioPatrolRoute {pub points:Vec<ScenarioPatrolPoint>,#[serde(skip)] start:usize,#[serde(skip)] end:usize}
+impl ScenarioPatrolRoute {
+    fn validate(&self)->Result<()> {
+        if self.points.len()>32{return invalid("Native patrol exceeds32movement positions");}
+        for p in &self.points {
+            if p.source_index.is_some_and(|i|i>=32)||p.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!p.facing_radians.is_finite()||p.facing_radians.abs()>1e6||!p.weight.is_finite()||p.weight<0.||p.weight>1e6||p.wait_seconds.iter().any(|v|!v.is_finite()||*v<0.||*v>1e6)||p.wait_seconds[0]>p.wait_seconds[1]{return invalid("Invalid native patrol pose, weight or wait bounds");}
+        }Ok(())
+    }
+}
+fn native_patrol(fields:&str,offset:usize)->Result<ScenarioPatrolRoute>{
+    let array=array_listing(fields,"move_positions")?;if array.count>32{return invalid("Native patrol exceeds32positions");}let mut points=vec![];
+    for(i,item)in array_items(&array,"move_positions")?.iter().enumerate(){
+        let fields=direct_struct_fields(item)?;let(position,_)=native_position(&fields)?;let time=fields.lines().find_map(|s|s.strip_prefix("time (").and_then(|s|s.split_once(')').map(|p|p.0))).ok_or_else(||crate::SparkError::Invalid("Patrol wait bounds unavailable".into()))?;
+        let values=time.split(',').map(|s|s.trim().parse::<f32>()).collect::<std::result::Result<Vec<_>,_>>().map_err(|_|crate::SparkError::Invalid("Patrol wait bounds invalid".into()))?;if values.len()!=2{return invalid("Patrol wait bounds unavailable");}
+        let animation=number(&fields,"animation")?;let sequence=number(&fields,"sequence_id")?;if animation.fract()!=0.||!(0. ..=65535.).contains(&animation)||sequence.fract()!=0.||!(-128. ..=127.).contains(&sequence){return invalid("Patrol animation/sequence telemetry unsupported");}
+        points.push(ScenarioPatrolPoint{source_index:Some(i as u16),position,facing_radians:number(&fields,"facing")?.to_radians() as f32,weight:number(&fields,"weight")? as f32,wait_seconds:[values[0],values[1]],animation:animation as u16 as i16,sequence_id:sequence as i8,fields:fields.lines().map(str::to_owned).collect()});
+    }
+    let route=ScenarioPatrolRoute{points,start:offset+array.start,end:offset+array.end};route.validate()?;Ok(route)
+}
+fn patrol_point_close(a:&ScenarioPatrolPoint,b:&ScenarioPatrolPoint)->bool{
+    positions_close(a.position,b.position)&&facings_close(a.facing_radians,b.facing_radians)&&positions_close([a.weight,a.wait_seconds[0],a.wait_seconds[1]],[b.weight,b.wait_seconds[0],b.wait_seconds[1]])&&a.animation==b.animation&&a.sequence_id==b.sequence_id
+}
+fn patrol_arguments(encounter:u16,squad:u16,route:&ScenarioPatrolRoute,old:&ScenarioPatrolRoute,behavior:Option<&ScenarioSquadBehavior>)->Result<Vec<String>>{
+    route.validate()?;let mut args=vec![];let prefix=format!("encounters[{encounter}].squads[{squad}].move_positions");
+    if route.points.len()!=old.points.len(){let behavior=behavior.ok_or_else(||crate::SparkError::Invalid("Native state inventory unavailable; cannot change patrol count".into()))?;for(a,b)in behavior.states(){source_state_route(a,route.points.len())?;source_state_route(b,route.points.len())?;}}
+    for p in &route.points{if let Some(index)=p.source_index{let source=old.points.get(usize::from(index)).ok_or_else(||crate::SparkError::Invalid("Patrol source index changed".into()))?;if p.animation!=source.animation||p.sequence_id!=source.sequence_id{return invalid("Existing patrol animation and sequence references must be preserved");}}else if p.animation!=-1||p.sequence_id!=0{return invalid("New patrol points require no animation and default sequence0");}}
+    // Remove unused rows first so intermediate arrays never exceed the final bound.
+    let mut order=(0..old.points.len()).map(|i|Some(i as u16)).collect::<Vec<_>>();
+    for i in (0..order.len()).rev(){if !route.points.iter().any(|p|p.source_index==order[i]){args.extend(["-E".into(),format!("{prefix}[{i}]")]);order.remove(i);}}
+    for(i,p)in route.points.iter().enumerate(){
+        if let Some(source)=p.source_index{let from=order.iter().enumerate().skip(i).find_map(|(j,v)|(*v==Some(source)).then_some(j));if let Some(from)=from{if from!=i{args.extend(["-M".into(),format!("{prefix}[{from}]"),i.to_string()]);order.swap(from,i);}}else{let from=order.iter().position(|v|*v==Some(source)).ok_or_else(||crate::SparkError::Invalid("Patrol copy source unavailable".into()))?;args.extend(["-c".into(),format!("{prefix}[{from}]"),i.to_string()]);order.insert(i,Some(source));}}
+        else{args.extend(["-I".into(),prefix.clone(),"1".into(),i.to_string()]);order.insert(i,None);}
+    }
+    for(i,p)in route.points.iter().enumerate(){
+        let old=p.source_index.and_then(|i|old.points.get(usize::from(i)));let key=format!("{prefix}[{i}]");
+        let mut set=|field:&str,value:String|args.extend(["-S".into(),format!("{key}.{field}"),value]);
+        if old.is_none_or(|o|!positions_close(o.position,p.position)){set("position",p.position.map(|v|v.to_string()).join(","));}
+        if old.is_none_or(|o|!facings_close(o.facing_radians,p.facing_radians)){set("facing",p.facing_radians.to_string());}
+        if old.is_none_or(|o|o.weight!=p.weight){set("weight",p.weight.to_string());}
+        if old.is_none_or(|o|o.wait_seconds!=p.wait_seconds){set("time",p.wait_seconds.map(|v|v.to_string()).join(","));}
+        if old.is_none(){set("animation","-1".into());set("sequence_id","0".into());}
+    }Ok(args)
+}
+fn patrol_scalar_fields(encounter:u16,squad:u16,route:&ScenarioPatrolRoute)->Vec<(String,String)>{
+    let mut result=vec![];for(i,p)in route.points.iter().enumerate(){let prefix=format!("encounters[{encounter}].squads[{squad}].move_positions[{i}]");for(key,value)in[("position",p.position.map(|v|v.to_string()).join(",")),("facing",p.facing_radians.to_string()),("weight",p.weight.to_string()),("time",p.wait_seconds.map(|v|v.to_string()).join(",")),("animation",p.animation.to_string()),("sequence_id",p.sequence_id.to_string())]{result.push((format!("{prefix}.{key}"),value));}}result
+}
+fn reviewed_patrol(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDifference>>{
+    let Operation::EncounterSquadPatrol{encounter,squad,squad_name,route,..}=op else{return invalid("Not a patrol edit");};
+    let find=|text:&str|->Result<ScenarioPatrolRoute>{scenario_combat_choices(text)?.into_iter().find(|r|r.encounter==*encounter&&Some(r.name.as_str())==op.combat_encounter_name()).and_then(|r|r.squads.into_iter().find(|r|r.index==*squad&&r.name==*squad_name)).and_then(|s|s.patrol).ok_or_else(||crate::SparkError::Invalid("Native patrol source unavailable".into()))};
+    let old=find(before)?;let new=find(after)?;let outside=|text:&str,r:&ScenarioPatrolRoute|text.lines().enumerate().filter(|(i,_)|*i<r.start||*i>=r.end).map(|(_,line)|line).collect::<Vec<_>>().join("\n");
+    if outside(before,&old)!=outside(after,&new)||new.points.len()!=route.points.len(){return invalid("Patrol edit changed unrelated source or requested point count");}
+    let allowed=["position","facing","weight","time"];for(p,n)in route.points.iter().zip(&new.points){if !patrol_point_close(p,n){return invalid("Patrol fields differ from reviewed request");}
+        let fields=|p:&ScenarioPatrolPoint|p.fields.iter().filter(|line|!allowed.iter().any(|field|line.starts_with(&format!("{field} (")))).cloned().collect::<Vec<_>>();
+        if let Some(i)=p.source_index{if fields(old.points.get(usize::from(i)).ok_or_else(||crate::SparkError::Invalid("Patrol source index unavailable".into()))?)!=fields(n){return invalid("Patrol edit changed preserved native metadata");}}
+        else if n.fields.len()!=6||n.animation!=-1||n.sequence_id!=0{return invalid("Unexpected new native patrol fields");}
+    }
+    if before==after{return invalid("Patrol already matches; no changed source");}
+    Ok(vec![FieldDifference{before:format!("{} native patrol points; existing animation/sequence references preserved",old.points.len()),after:format!("{} reviewed native patrol points; exact XYZ/facing/weight/waits verified",new.points.len())}])
+}
 pub const NATIVE_SOURCE_STATES:[&str;12]=["none","sleeping","alert","moving_repeat_same_position","moving_loop","moving_loop_back_and_forth","moving_loop_randomly","moving_randomly","guarding","guarding_at_guard_position","searching","fleeing"];
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -990,17 +1064,18 @@ pub fn scenario_combat_choices(fields:&str)->Result<Vec<ScenarioCombatChoice>>{
     for(e,item)in array_items(&encounters,"encounters")?.iter().enumerate(){let root=direct_struct_fields(item)?;let firing=array_listing(&root,"firing_positions")?;total_points+=firing.count;if firing.count>512||total_points>4096{return invalid("Native firing inventory exceeds its bounded source capacity");}let mut points=vec![];let mut point_line=encounter_line+1+firing.start+1;
         for(i,item)in array_items(&firing,"firing_positions")?.iter().enumerate(){let fields=direct_struct_fields(item)?;let(position,line)=native_position(&fields)?;let(_,children)=native_children(&fields,"group_index","enum",26)?;let mut selected=None;let mut group_lines=vec![];for(bit,(line,text))in children.iter().enumerate(){let g=char::from(b'a'+bit as u8).to_string();let tokens=text.split_whitespace().collect::<Vec<_>>();if tokens!=[g.as_str(),"enum","value"]&&tokens!=[g.as_str(),"(*)","enum","value"]{return invalid("Unknown native firing-group enum");}if tokens.len()==4{if selected.replace(g).is_some(){return invalid("Ambiguous native firing group");}}group_lines.push(point_line+1+line);}points.push(ScenarioFiringChoice{index:i as u16,position,group:selected.ok_or_else(||crate::SparkError::Invalid("Native firing group is unavailable".into()))?,position_line:point_line+1+line,group_lines});point_line+=item.len();}
         let members=array_listing(&root,"squads")?;let mut squad_line=encounter_line+1+members.start+1;let mut squads=vec![];total_squads+=members.count;if total_squads>4096{return invalid("Native combat review exceeds4096squads");}
-        for(i,item)in array_items(&members,"squads")?.iter().enumerate(){let fields=direct_struct_fields(item)?;let mut selections=vec![];let mut group_lines=vec![];for field in TACTICAL_FIELDS{let(_,children)=native_children(&fields,field,"bitmask",26)?;let mut values=vec![];let mut lines=vec![];for(bit,(line,text))in children.iter().enumerate(){let g=char::from(b'a'+bit as u8).to_string();let tokens=text.split_whitespace().collect::<Vec<_>>();if tokens.len()!=3||tokens[0]!=g||!matches!(tokens[1],"(0)"|"(1)")||tokens[2]!="bitfield"{return invalid("Unknown native tactical group field");}if tokens[1]=="(1)"{values.push(g);}lines.push(squad_line+1+line);}selections.push(values);group_lines.push(lines);}let mut values=selections.into_iter();let groups=FiringGroups{attacking:values.next().unwrap(),attacking_search:values.next().unwrap(),attacking_guard:values.next().unwrap(),defending:values.next().unwrap(),defending_search:values.next().unwrap(),defending_guard:values.next().unwrap()};let(behavior,behavior_issue)=match native_squad_behavior(&fields,squad_line+1){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(issue.to_string()))};squads.push(ScenarioFiringSquadChoice{index:i as u16,name:native_name(&fields)?,groups,group_lines,behavior,behavior_issue});squad_line+=item.len();}
+        for(i,item)in array_items(&members,"squads")?.iter().enumerate(){let fields=direct_struct_fields(item)?;let mut selections=vec![];let mut group_lines=vec![];for field in TACTICAL_FIELDS{let(_,children)=native_children(&fields,field,"bitmask",26)?;let mut values=vec![];let mut lines=vec![];for(bit,(line,text))in children.iter().enumerate(){let g=char::from(b'a'+bit as u8).to_string();let tokens=text.split_whitespace().collect::<Vec<_>>();if tokens.len()!=3||tokens[0]!=g||!matches!(tokens[1],"(0)"|"(1)")||tokens[2]!="bitfield"{return invalid("Unknown native tactical group field");}if tokens[1]=="(1)"{values.push(g);}lines.push(squad_line+1+line);}selections.push(values);group_lines.push(lines);}let mut values=selections.into_iter();let groups=FiringGroups{attacking:values.next().unwrap(),attacking_search:values.next().unwrap(),attacking_guard:values.next().unwrap(),defending:values.next().unwrap(),defending_search:values.next().unwrap(),defending_guard:values.next().unwrap()};let(behavior,behavior_issue)=match native_squad_behavior(&fields,squad_line+1){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(issue.to_string()))};let(patrol,patrol_issue)=match native_patrol(&fields,squad_line+1){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(issue.to_string()))};squads.push(ScenarioFiringSquadChoice{patrol,patrol_issue,index:i as u16,name:native_name(&fields)?,groups,group_lines,behavior,behavior_issue});squad_line+=item.len();}
         result.push(ScenarioCombatChoice{encounter:e as u16,name:native_name(&root)?,points,squads});encounter_line+=item.len();
     }Ok(result)
 }
 /// Refresh selected readback targets from current source after Accept or Restore.
 /// Historical receipts select scope only; their old values are never replayed.
 pub fn current_combat_targets(fields:&str,source_sha:&str,targets:&[Operation])->Result<Vec<Operation>>{
-    if targets.is_empty(){return Ok(vec![]);}let rows=scenario_combat_choices(fields)?;let mut result=vec![];let mut seen=std::collections::BTreeSet::new();for old in targets{let key=old.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unknown combat readback target".into()))?;if !seen.insert(key){continue;}let row=rows.iter().find(|r|r.encounter==key.1).ok_or_else(||crate::SparkError::Invalid("Combat source encounter is unavailable".into()))?;if Some(row.name.as_str())!=old.combat_encounter_name(){return invalid("Combat source encounter identity changed");}let op=match old{Operation::EncounterFiringPosition{point,..}=>{let p=row.points.iter().find(|p|p.index==*point).ok_or_else(||crate::SparkError::Invalid("Combat source firing point is unavailable".into()))?;Operation::EncounterFiringPosition{encounter:row.encounter,point:*point,encounter_name:row.name.clone(),position:p.position,group:p.group.clone(),source_sha256:source_sha.into()}},Operation::EncounterSquadBehavior{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native behavior squad identity changed".into()))?;let behavior=member.behavior.clone().ok_or_else(||crate::SparkError::Invalid(member.behavior_issue.clone().unwrap_or_else(||"Native behavior unavailable".into())))?;Operation::EncounterSquadBehavior{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),behavior,source_sha256:source_sha.into()}},Operation::EncounterSquadFiringGroups{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Combat source squad identity changed".into()))?;Operation::EncounterSquadFiringGroups{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),groups:member.groups.clone(),source_sha256:source_sha.into()}},_=>unreachable!()};result.push(op);}Ok(result)
+    if targets.is_empty(){return Ok(vec![]);}let rows=scenario_combat_choices(fields)?;let mut result=vec![];let mut seen=std::collections::BTreeSet::new();for old in targets{let key=old.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unknown combat readback target".into()))?;if !seen.insert(key){continue;}let row=rows.iter().find(|r|r.encounter==key.1).ok_or_else(||crate::SparkError::Invalid("Combat source encounter is unavailable".into()))?;if Some(row.name.as_str())!=old.combat_encounter_name(){return invalid("Combat source encounter identity changed");}let op=match old{Operation::EncounterSquadPatrol{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad&&r.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native patrol squad identity changed".into()))?;let route=member.patrol.clone().ok_or_else(||crate::SparkError::Invalid(member.patrol_issue.clone().unwrap_or_else(||"Native patrol unavailable".into())))?;Operation::EncounterSquadPatrol{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),route,source_sha256:source_sha.into()}},Operation::EncounterFiringPosition{point,..}=>{let p=row.points.iter().find(|p|p.index==*point).ok_or_else(||crate::SparkError::Invalid("Combat source firing point is unavailable".into()))?;Operation::EncounterFiringPosition{encounter:row.encounter,point:*point,encounter_name:row.name.clone(),position:p.position,group:p.group.clone(),source_sha256:source_sha.into()}},Operation::EncounterSquadBehavior{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native behavior squad identity changed".into()))?;let behavior=member.behavior.clone().ok_or_else(||crate::SparkError::Invalid(member.behavior_issue.clone().unwrap_or_else(||"Native behavior unavailable".into())))?;Operation::EncounterSquadBehavior{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),behavior,source_sha256:source_sha.into()}},Operation::EncounterSquadFiringGroups{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Combat source squad identity changed".into()))?;Operation::EncounterSquadFiringGroups{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),groups:member.groups.clone(),source_sha256:source_sha.into()}},_=>unreachable!()};result.push(op);}Ok(result)
 }
 fn combat_arguments(op:&Operation,tags:&Path,tag:&str,before:&str)->Result<Vec<String>>{
     let current=current_combat_targets(before,"",std::slice::from_ref(op))?.remove(0);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];match(op,&current){
+        (Operation::EncounterSquadPatrol{encounter,squad,route,..},Operation::EncounterSquadPatrol{route:old,..})=>{let rows=scenario_combat_choices(before)?;let behavior=rows.iter().find(|r|r.encounter==*encounter).and_then(|r|r.squads.iter().find(|r|r.index==*squad)).and_then(|s|s.behavior.as_ref());args.extend(patrol_arguments(*encounter,*squad,route,old,behavior)?);},
         (Operation::EncounterSquadBehavior{encounter,squad,behavior,..},Operation::EncounterSquadBehavior{behavior:old,..})=>{if behavior.starts.len()!=old.starts.len()||behavior.patrol_count!=old.patrol_count{return invalid("Native behavior cannot alter source start indices or patrol inventory");}let prefix=format!("encounters[{encounter}].squads[{squad}]");for(i,((a,b),(x,y)))in behavior.states().zip(old.states()).enumerate(){let target=if i==0{prefix.clone()}else{format!("{prefix}.starting_locations[{}]",i-1)};for(field,value,original)in[("initial_state",a,x),("return_state",b,y)]{if value!=original{source_state_route(value,behavior.patrol_count)?;args.extend(["-S".into(),format!("{target}.{field}"),value.into()]);}}}},
         (Operation::EncounterFiringPosition{encounter,point,position,group,..},Operation::EncounterFiringPosition{position:old,group:old_group,..})=>{let p=format!("encounters[{encounter}].firing_positions[{point}]");if !positions_close(*position,*old){args.extend(["-S".into(),format!("{p}.position"),position.map(|v|v.to_string()).join(",")]);}if group!=old_group{args.extend(["-S".into(),format!("{p}.group_index"),group.clone()]);}},
         (Operation::EncounterSquadFiringGroups{encounter,squad,groups,..},Operation::EncounterSquadFiringGroups{groups:old,..})=>{let expected=groups.masks()?;let prior=old.masks()?;for(i,field)in TACTICAL_FIELDS.iter().enumerate(){for bit in 0..26{let mask=1u32<<bit;if expected[i]&mask!=prior[i]&mask{args.extend(["-S".into(),format!("encounters[{encounter}].squads[{squad}].{field}.{}",char::from(b'a'+bit)),if expected[i]&mask!=0{"1"}else{"0"}.into()]);}}}},_=>return invalid("Unknown combat native operation")}
@@ -1009,11 +1084,13 @@ fn combat_arguments(op:&Operation,tags:&Path,tag:&str,before:&str)->Result<Vec<S
 fn verify_native_combat(op:&Operation,map:&crate::maps::MapInspection)->Result<()>{
     op.validate("scnr","readback.scenario")?;
     let(_,e,index)=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Not a native combat edit".into()))?;let region=map.encounters.get(usize::from(e)).filter(|r|Some(r.name.as_str())==op.combat_encounter_name()).ok_or_else(||crate::SparkError::Invalid("Compiled combat encounter identity differs from source".into()))?;let details=region.details.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled combat telemetry unavailable".into()))?;match op{
+        Operation::EncounterSquadPatrol{squad_name,route,..}=>{let native=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).and_then(|s|s.move_positions.as_ref()).ok_or_else(||crate::SparkError::Invalid("Compiled patrol unavailable".into()))?;if native.len()!=route.points.len(){return invalid("Compiled patrol count differs from source");}for(p,n)in route.points.iter().zip(native){let value=ScenarioPatrolPoint{source_index:None,position:n.position,facing_radians:n.facing,weight:n.weight,wait_seconds:n.wait_seconds,animation:n.animation,sequence_id:n.sequence_id,fields:vec![]};if !patrol_point_close(p,&value){return invalid("Compiled patrol fields differ from source");}}},
         Operation::EncounterFiringPosition{position,group,..}=>{let p=details.firing_positions.get(usize::from(index)).ok_or_else(||crate::SparkError::Invalid("Compiled firing position unavailable".into()))?;if !positions_close(*position,p.position)||p.group_index!=u16::from(group.as_bytes()[0]-b'a'){return invalid("Compiled firing position/group differs from reviewed native source");}},
         Operation::EncounterSquadBehavior{squad_name,behavior,..}=>{let member=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Compiled behavior squad identity differs".into()))?;if member.initial_state!=source_state(&behavior.initial_state)?||member.return_state!=source_state(&behavior.return_state)?||member.starting_locations.len()!=behavior.starts.len(){return invalid("Compiled squad behavior/start inventory differs from source");}let route=member.move_positions.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled patrol count unavailable".into()))?;if route.len()!=behavior.patrol_count{return invalid("Compiled patrol inventory differs from source");}for(p,n)in behavior.starts.iter().zip(&member.starting_locations){if n.initial_state!=source_state(&p.initial_state)?||n.return_state!=source_state(&p.return_state)?{return invalid("Compiled starting-location behavior differs from source");}}},
         Operation::EncounterSquadFiringGroups{squad_name,groups,..}=>{let squad=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Compiled tactical squad identity differs".into()))?;let g=squad.firing_groups.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled tactical telemetry unavailable".into()))?;let actual=[g.attacking,g.attacking_search,g.attacking_guard,g.defending,g.defending_search,g.defending_guard];if groups.masks()?!=actual{return invalid(format!("Compiled tactical masks differ from reviewed native source: actual{actual:?}. Review target compiler search-group requirements; output was not accepted"));}},_=>return invalid("Not a native combat edit")};Ok(())
 }
 fn reviewed_combat(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDifference>>{
+    if matches!(op,Operation::EncounterSquadPatrol{..}){return reviewed_patrol(before,after,op);}
     op.validate("scnr","readback.scenario")?;
     let(_,e,index)=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Not a native combat edit".into()))?;let old=scenario_combat_choices(before)?;let new=scenario_combat_choices(after)?;let a=old.iter().find(|r|r.encounter==e).ok_or_else(||crate::SparkError::Invalid("Original combat encounter unavailable".into()))?;let b=new.iter().find(|r|r.encounter==e).filter(|r|Some(r.name.as_str())==op.combat_encounter_name()&&r.name==a.name).ok_or_else(||crate::SparkError::Invalid("Revised combat encounter identity changed".into()))?;let mut allowed=std::collections::BTreeSet::new();match op{
         Operation::EncounterFiringPosition{position,group,..}=>{let old=a.points.get(usize::from(index)).ok_or_else(||crate::SparkError::Invalid("Original firing point unavailable".into()))?;let new=b.points.get(usize::from(index)).ok_or_else(||crate::SparkError::Invalid("Revised firing point unavailable".into()))?;if old.position_line!=new.position_line||old.group_lines!=new.group_lines||!positions_close(*position,new.position)||*group!=new.group{return invalid("Revised firing point/structure differs from request");}if !positions_close(old.position,*position){allowed.insert(old.position_line);}if old.group!=*group{allowed.insert(old.group_lines[usize::from(old.group.as_bytes()[0]-b'a')]);allowed.insert(old.group_lines[usize::from(group.as_bytes()[0]-b'a')]);}},
@@ -1283,6 +1360,19 @@ mod tests {
         println!("Native behavior fixture:5groups/all5initial+return states; authoredSHA={authored_sha}; scalarReadbackSHA={}",Sha256::digest(result.as_bytes()).iter().map(|b|format!("{b:02x}")).collect::<String>());
         let patrol_json=serde_json::json!({"name":"patrol_fixture","actorPath":"actors/behavior","position":[0,0,0],"startActive":false,"count":2,"behavior":{"initialState":"moving_loop","returnState":"moving_loop_back_and_forth"},"patrol":{"points":[{"id":"p0","position":[1,2,3],"facingRadians":0.0,"waitSeconds":[0.25,1.5],"weight":2.5},{"id":"p1","position":[4,5,3],"facingRadians":1.5707964,"waitSeconds":[0.0,0.0],"weight":1.0,"visible":false,"locked":true}]}});
         let entry:EncounterAppend=serde_json::from_value(patrol_json).unwrap();let patrol=Operation::AppendEncounters{encounters:vec![entry],source_rules:None};let prior=fs::read(&file).unwrap();run(patrol.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let after=fields();assert_eq!(reviewed_difference(&before,&after,&patrol).unwrap().len(),1);let values=run(patrol.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());patrol.verify_readback(&tags,"scnr",tag,&before,&values).unwrap();
+        let authored_patrol_bytes=fs::read(&file).unwrap();let source=scenario_combat_choices(&after).unwrap();let row=source.iter().find(|r|r.name=="patrol_fixture").unwrap();let member=&row.squads[0];let original_route=member.patrol.clone().unwrap();assert_eq!(original_route.points.len(),2);
+        let mut changed=original_route.points[1].clone();changed.position=[8.,9.,3.];changed.facing_radians=-0.5;changed.weight=0.75;changed.wait_seconds=[1.,2.];
+        let mut created=changed.clone();created.source_index=None;created.position=[10.,9.,3.];created.animation=-1;created.sequence_id=0;
+        let revised_route=ScenarioPatrolRoute{points:vec![changed,created,original_route.points[0].clone(),original_route.points[1].clone()],start:0,end:0};
+        let patrol_edit=Operation::EncounterSquadPatrol{encounter:row.encounter,squad:member.index,encounter_name:row.name.clone(),squad_name:member.name.clone(),route:revised_route.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};
+        for batch in patrol_edit.argument_batches(patrol_edit.arguments_with_fields(&tags,"scnr",tag,&after).unwrap(),false).unwrap(){run(batch);}let route_after=fields();reviewed_difference(&after,&route_after,&patrol_edit).unwrap();assert!(reviewed_difference(&after,&route_after.replace("name (original_0)","name (bad)"),&patrol_edit).is_err());
+        let mut scalar=vec![];for batch in patrol_edit.argument_batches(patrol_edit.readback_arguments(&tags,"scnr",tag,&after).unwrap().unwrap(),true).unwrap(){scalar.extend(run(batch).lines().map(str::to_owned));}let scalar=scalar.join("\n");patrol_edit.verify_readback(&tags,"scnr",tag,&after,&scalar).unwrap();
+        let refreshed=current_combat_targets(&route_after,&crate::maps::hash_file(&file).unwrap(),std::slice::from_ref(&patrol_edit)).unwrap();if let Operation::EncounterSquadPatrol{route,..}=&refreshed[0]{assert_eq!(route.points.len(),4);assert!(route.points.iter().enumerate().all(|(i,p)|p.source_index==Some(i as u16)));}else{panic!("Wrong patrol readback scope");}
+        let binding=ScenarioSquadReadback{source_sha256:crate::maps::hash_file(&file).unwrap(),squads:scenario_squad_start_choices(&route_after).unwrap(),include_starts:true,combat:refreshed};binding.validate().unwrap();let mut stale=binding.clone();stale.source_sha256="f".repeat(64);assert!(stale.validate().is_err());
+        println!("Original patrol source: insert/copy/move/erase/pose/weight/waits; tagSHA={}; scalarSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(scalar.as_bytes())));
+        let mut invalid=patrol_edit.clone();if let Operation::EncounterSquadPatrol{route,..}=&mut invalid{route.points[0].animation=7;}assert!(invalid.arguments_with_fields(&tags,"scnr",tag,&after).is_err());
+        if let Operation::EncounterSquadPatrol{route,..}=&mut invalid{*route=revised_route.clone();route.points.truncate(1);}assert!(invalid.arguments_with_fields(&tags,"scnr",tag,&after).is_err());
+        fs::write(&file,authored_patrol_bytes).unwrap();
         println!("Native patrol fixture:2ordered points/loop+back-and-forth/XYZ/facing/weight/wait; tagSHA={}; readbackSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(values.as_bytes())));fs::write(&file,prior).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let combat_json=serde_json::json!({"name":"combat_fixture","actorPath":"actors/behavior","position":[0,0,0],"startActive":false,"count":2,"combat":{"points":[{"id":"f0","position":[2,1,0.1],"group":"a"},{"id":"f1","position":[4,1,0.1],"group":"z","visible":false,"locked":true},{"id":"f2","position":[6,1,0.1],"group":"b"}],"groups":{"attacking":["a","z"],"attackingSearch":["b"],"attackingGuard":["z"],"defending":["a"],"defendingSearch":[],"defendingGuard":["b","z"]}}});
         let entry:EncounterAppend=serde_json::from_value(combat_json).unwrap();assert_eq!(entry.combat.as_ref().unwrap().groups.masks().unwrap(),[33554433,2,33554432,1,0,33554434]);let combat=Operation::AppendEncounters{encounters:vec![entry],source_rules:None};let prior=fs::read(&file).unwrap();for batch in combat.argument_batches(combat.arguments_with_fields(&tags,"scnr",tag,&before).unwrap(),false).unwrap(){run(batch);}let after=fields();assert_eq!(reviewed_difference(&before,&after,&combat).unwrap().len(),1);let mut values=vec![];for batch in combat.argument_batches(combat.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap(),true).unwrap(){values.extend(run(batch).lines().map(str::to_owned));}let scalar=values.join("\n");combat.verify_readback(&tags,"scnr",tag,&before,&scalar).unwrap();println!("Native combat fixture:3independent firing points/2starts/6tactical contexts/high groupZ/empty selection; tagSHA={}; scalarSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(scalar.as_bytes())));fs::write(&file,prior).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
@@ -1309,6 +1399,12 @@ mod tests {
         let unavailable=before.replace("position (1,2,3)","position (NaN,2,3)");
         assert!(scenario_squad_choices(&unavailable).is_ok(),"count-only inspection must not require position telemetry");
         assert!(scenario_squad_start_choices(&unavailable).is_err());
+    }
+    #[test]
+    fn original_patrol_snapshot_validates_its_source_binding_without_panicking(){
+        let operation:Operation=serde_json::from_value(serde_json::json!({"kind":"encounterSquadPatrol","encounter":0,"squad":0,"encounterName":"original_0","squadName":"squad_0","route":{"points":[]},"sourceSha256":"a".repeat(64)})).unwrap();
+        let mut snapshot=ScenarioSquadReadback{source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![operation.clone()]};snapshot.validate().unwrap();
+        snapshot.source_sha256="b".repeat(64);assert!(snapshot.validate().is_err());snapshot.source_sha256="a".repeat(64);snapshot.combat.push(operation);assert!(snapshot.validate().is_err());
     }
     #[test]
     fn campaign_difficulty_defaults_and_bounds_reach_existing_native_writer(){

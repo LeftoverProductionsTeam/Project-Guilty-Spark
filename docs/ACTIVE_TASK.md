@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — CE609 Black Echo to Forerunner breakthrough; patrol WIP preserved
+Task: Operation110 — recovered native patrol creator workflow; CE609 Black Echo / full roadmap retained
 Status: implementation incomplete
 Starting revision: 5f9cc0ad6104313cfb229924650a02ecb4a74e47, canonical D:/Project Guilty Spark local master.
-Latest verified revision: 42095f7cd02b06a947ddfae2e43a56ffbf909147 parent; this containing commit verifies the async Build-readiness/fresh native HUD milestone. Patrol WIP remains separate.
-Next action: Continue broader Save37944 and native Black Echo integration after the scoped freeze/compact gate below. Private Forerunner gameplay remains authorized but unrun because Windows controls cannot initialize; advance independent work safely. Preserve full roadmap and separate patrol WIP.
+Latest verified revision: e3f0e2dbe757294286bb3ef92c3689c7b9ce91b4 parent; containing patrol commit verifies native source/viewport/Save/restart/CE build/readback. No gameplay acceptance.
+Next action: exercise the approved private Black Echo candidate in Forerunner when desktop control is available; verify actual objectives/HUD/AI route-following/settlement. Do not retry unchanged computer-control initialization failure. Otherwise advance independent campaign/creator requirements.37944 and full M1–M6 remain open.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-15Nov freeze follow-up: actual native trace182 launch_readiness calls/60876ms window time exposed retained Build audit bursts. Existing queue now coalesces reports; readiness runs on workers; runtime discovery drops its lock before hashing. Dev SHA256 median2.4575562s→.0530798s for106461560B with identical digest. Focused Rust51/browser4/TypeScript/Vite/Windows build pass. Fresh42-edit/HUD/script Undo/Redo/Save/3normal restarts/CE609/independent scenario-HSC-HMT readback PASS; replies5/2/2ms, objective151px/no horizontal overflow. App34cb333e783c1c910a9994c3bee95c97a13f00624697349667d83e6900858058 includes unchanged patrol WIP. Map057a9839 matches prior native output;14warnings/game/peers/37944 remain open. Exact hashes, earlier failed runs, safety and source locations: RUNTIME_INTEGRATION_20261107 final section. No failed run reclassified, game/Forerunner write or push.
+16Nov patrol creator now passes actual Windows form/viewport drag/Review/Preview/Accept/Restore/Save/3normal restarts/recovered script Undo/Redo/CE609 build/Invader route readback;0page errors. Fixed Review squad focus, benign-refresh module cancellation and patrol snapshot admission panic. Frontend49/core15(including1installed Invader)/browser12unique/TypeScript/Vite/Windows build pass. App5c1e356b, receiptbc5596fa, map3cf9214b; full hashes/failures/capture in RUNTIME_INTEGRATION_20261107. No gameplay or37944 closure. Two-file patrol WIP is now integrated, not discarded. Previous compact151px/freeze182blocking-check repair remains accepted; all475IDs/originals/history protected. No push/publication.
 
 Reuse historical evidence; run proportionate focused checks under the updated policy:
 
@@ -27,7 +27,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Native CE source handoff (parentcfe6832): imported standard CE609 now uses its explicit reviewed CE tagset and existing Build→native script editor path. Dependency-sized staging3305/3307tags, native compile/independent readback, project Save/reopen and recovered-script rebuild pass; identical mapSHA91151b1af3fde6046020d48a506b2e7609f3dfcadeeb0af01b2d13a6479197ee. Build11/working14/TypeScript/Windows check pass. No new app/UI/game acceptance. Existing ownership/settlement source proof remains in RUNTIME_INTEGRATION_20261107; complete Spark Black Echo mission/HUD handoff,15warnings and37944 stay open. Patrol backend WIP remains only native_operations.rs/native_operations_native.rs;14native tests pass, no patrol UI/cache/game acceptance. All original files/475IDs preserved.
+Native CE source handoff (parentcfe6832): imported standard CE609 now uses its explicit reviewed CE tagset and existing Build→native script editor path. Dependency-sized staging3305/3307tags, native compile/independent readback, project Save/reopen and recovered-script rebuild pass; identical mapSHA91151b1af3fde6046020d48a506b2e7609f3dfcadeeb0af01b2d13a6479197ee. Build11/working14/TypeScript/Windows check pass. No new app/UI/game acceptance. Existing ownership/settlement source proof remains in RUNTIME_INTEGRATION_20261107; complete Spark Black Echo mission/HUD handoff,15warnings and37944 stay open. Historical patrol WIP is integrated in the16Nov source/native milestone above; actual AI gameplay remains open. All original files/475IDs preserved.
 
 
 Original tactical milestone: native source/UI/Save/restart and current-source compiled firing/squad masks pass. Exact hashes, test counts, original-preservation proof and boundaries remain in Git50f2f77:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. Structural/state/patrol/command-list/full native Undo, stock campaign breadth, other targets and AI/gameplay remain open.
@@ -105,9 +105,9 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA29134/run-aHsnhS CLOSED; all owned apps/tools exited,5,461,853,359logicalB disposed; final physical reclamation unavailable (peak allocation5,278,712,672B). Only137606B PNG retained; no binary/map/SDK/cache/archive retained.
+QA6610/run-eIdY0c CLOSED; all owned apps/tools exited;5235740324logicalB disposed, peak allocation5088738656B; final physical reclamation unavailable. One1591000B native PNG retained; no map/app/SDK/cache/archive. Prior QA29134 closure/evidence remains in Git/RUNTIME_INTEGRATION_20261107.
 
-QA21402/run-9LXS9l CLOSED: owned apps/tools exited and output disposed4,488,883,429logicalB; final physical reclamation unavailable. Only the two small source-owned before/after PNGs remain. Final app351dd043 uses worker-thread Save/update, releases journal locks before UI events and reuses latestRefresh to bound native inspections. Browser3/3, frontend history10/10, Rust history11/11, TypeScript/Vite/Windows build pass. Native continued seven-stage HUD case:42rapid edits/Undo/Save/status5/2/2ms/151px panel/3normal closes/CE609 map057a9839/independent readback pass,0page errors. Initial two fresh Save timeouts remain documented; final fresh Save/restart passed, then source-panel auto-wait failed; explicit readiness/strict continued run passes. Do not relabel the failed earlier run or claim broad37944 closure. Existing RUNTIME_INTEGRATION_20261107 has exact app/map/scenario/HSC/HMT hashes and preserved before/after PNGs. One2355tag extraction, no SDK copy/game/Forerunner writes/push. Original inputs/475CSV/legacy checkpoint and two patrol WIP files unchanged. Commit only scoped verified work; full Operation110 remains incomplete.
+QA21402/run-9LXS9l CLOSED: owned apps/tools exited and output disposed4,488,883,429logicalB; final physical reclamation unavailable. Only the two small source-owned before/after PNGs remain. Final app351dd043 uses worker-thread Save/update, releases journal locks before UI events and reuses latestRefresh to bound native inspections. Browser3/3, frontend history10/10, Rust history11/11, TypeScript/Vite/Windows build pass. Native continued seven-stage HUD case:42rapid edits/Undo/Save/status5/2/2ms/151px panel/3normal closes/CE609 map057a9839/independent readback pass,0page errors. Initial two fresh Save timeouts remain documented; final fresh Save/restart passed, then source-panel auto-wait failed; explicit readiness/strict continued run passes. Do not relabel the failed earlier run or claim broad37944 closure. Existing RUNTIME_INTEGRATION_20261107 has exact app/map/scenario/HSC/HMT hashes and preserved before/after PNGs. One2355tag extraction, no SDK copy/game/Forerunner writes/push. Original inputs/475CSV/legacy checkpoint unchanged; patrol WIP integration is recorded in16Nov milestone. Full Operation110 remains incomplete.
 
 Historical QA29199 disposal/original preservation evidence remains in Gitcfe6832:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no old jobs were revived.
 

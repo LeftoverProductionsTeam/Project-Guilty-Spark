@@ -51,7 +51,10 @@ export default function NativeAiStartOverlay({project,enabled,snap,mode,onSelect
   useEffect(()=>()=>{if(drag.current){drag.current=null;dragMode.current=null;callbacks.current.onEnd?.();}},[scope,ready,enabled,draft?.locked,mode]);
   if(!ready||!draft||!position)return null;
   const writable=enabled&&!draft.locked&&mode!=='scale'&&(mode!=='rotate'||knownFacing);
+  const route=draft.kind==='patrol'?draft.patrol?.route.points.map((p,i)=>i===draft.start?position:p.position):undefined;
   return <>
+    {route&&route.length>1&&<Line points={route} color="#608b9c" depthTest={false}/>}
+    {route?.map((p,i)=>i===draft.start?null:<mesh key={i} position={p}><sphereGeometry args={[.07,8,6]}/><meshBasicMaterial color="#608b9c" depthTest={false}/></mesh>)}
     <mesh position={draft.original}><sphereGeometry args={[.1,8,6]}/><meshBasicMaterial color="#a7afb6" wireframe depthTest={false}/></mesh>
     {knownFacing&&<Line points={[draft.original,[draft.original[0]+.65*Math.cos(draft.originalFacingRadians!),draft.original[1]+.65*Math.sin(draft.originalFacingRadians!),draft.original[2]]]} color="#a7afb6" depthTest={false}/>}
     <Line points={[draft.original,position]} color="#82ded0" depthTest={false}/>
@@ -72,7 +75,7 @@ export default function NativeAiStartOverlay({project,enabled,snap,mode,onSelect
         }else{
           const values=nativeAiStartDragValues(drag.current,latest.draft,next,enabled);
           if(values&&latest.draft)setDraft({...latest.draft,values,mode:'translate'});
-          else if(next&&!nativeAiStartPosition(next.map(String)))notify('AI start coordinates must be finite and within the supported range. The proposal was kept unchanged.');
+          else if(next&&!nativeAiStartPosition(next.map(String)))notify('AI point coordinates must be finite and within the supported range. The proposal was kept unchanged.');
         }
         dragMode.current=null;
         drag.current=null;onEnd?.();

@@ -16,9 +16,10 @@ import './nativeTools.css';
 import BaboonTools from './BaboonTools';
 import NativeSquadScaling from './NativeSquadScaling';
 import NativeSquadBehaviorEditor from './NativeSquadBehavior';
+import NativeSquadPatrol from './NativeSquadPatrol';
 import NativeStartingPositions from './NativeStartingPositions';
 import {useMapState} from '../mapSession';
-import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
+import {NATIVE_AI_START_VIEW,nativeAiStartMatches} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
 
 /** Lazy, map-bound native operations. Reading a compiled tag does not grant
@@ -85,6 +86,7 @@ export default function NativeTagOperations({
   const selectedTagId = tagId ?? nativeTag;
   const [aiDraft]=useMapState<NativeAiStartView|null>(project.id,NATIVE_AI_START_VIEW,()=>null);
   useEffect(()=>{if(tagId===undefined&&aiDraft?.reviewRequest){setNativeTag(null);setExpanded(true);}},[project.id,tagId,aiDraft?.reviewRequest]);
+  useEffect(()=>{if(context&&aiDraft?.kind==='patrol'&&aiDraft.reviewRequest&&nativeAiStartMatches(aiDraft,context))setSquadKey(`${aiDraft.encounter}:${aiDraft.squad}`);},[context,aiDraft?.reviewRequest]);
   useEffect(() => {
     setNativeTag(null);
     setChoices([]);
@@ -286,6 +288,7 @@ export default function NativeTagOperations({
                 <button disabled={busy||dirty||!!squadEditIssue||!validCounts||!populationChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
                   onClick={()=>makePreview({kind:'encounterSquadCounts',encounter:squadChoice.encounter,squad:squadChoice.squad,
                     encounterName:squadChoice.encounterName,squadName:squadChoice.name,normalCount:Number(normalCount),insaneCount:Number(insaneCount),sourceSha256:context.tagSha256!})}>Preview squad counts</button>
+                <NativeSquadPatrol context={context} squadChoice={squadChoice} source={tacticalSource?.patrol} behavior={tacticalSource?.behavior} issue={tacticalSource?.patrolIssue??context.combatEditIssue??squadEditIssue} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>
                 <NativeSquadBehaviorEditor context={context} squadChoice={squadChoice} source={tacticalSource?.behavior} issue={tacticalSource?.behaviorIssue??context.combatEditIssue??squadEditIssue} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>
                 <details className="native-tactical-groups"><summary>Native tactical firing groups</summary>
                   <p className="subtle">Choose which existing encounter firing groups this squad may use when attacking/searching/guarding/defending. This does not create positions or force movement, cover or line of sight.</p>

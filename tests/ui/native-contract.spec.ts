@@ -4379,3 +4379,40 @@ test('build audits serialize rapid mission edits without discarding history',asy
   await page.keyboard.press('Control+s');
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions[0].title)).toBe('Mission edit 19');
 });
+
+
+for(const phase of ['unchanged','listing','opening','admission'] as const)test('recovered module requests '+(phase==='unchanged'?'survive unchanged runtime inspection refresh':phase==='admission'?'show native admission errors during refresh':'reject changed source during '+phase),async({page})=>{
+ const changedSource=phase==='listing';
+ await mockCampaignHud(page);
+ await page.evaluate(async()=>{
+  const w=window as any,internal=w.__TAURI_INTERNALS__,invoke=internal.invoke.bind(internal),content='(script dormant recovered (sleep 1))';
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(content)),sha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+  const selection={projectId:'a',buildId:'owned-ce-source',tagsDirectory:'owned/tags',projectFingerprint:'c'.repeat(64),sourceSha256:'e'.repeat(64),modules:[{filename:'recovered.hsc',sha256,bytes:content.length,unavailable:null}]};
+  w.__moduleRefresh={changed:false,list:[],open:[],content};
+  internal.invoke=async(command:string,args:any)=>{
+   if(command==='runtime_workbench_report'){const value=await invoke(command,args);if(w.__moduleRefresh.changed)value.workingSource={...value.workingSource,buildId:'different-source',tagsDirectory:'owned/other-tags'};return value;}
+   if(command==='working_script_sources')return new Promise(resolve=>w.__moduleRefresh.list.push(()=>resolve(structuredClone(selection))));
+   if(command==='working_script_source')return new Promise(resolve=>w.__moduleRefresh.open.push(()=>resolve({selection:structuredClone(selection),script:{filename:'recovered.hsc',content,sha256,replacesSha256:sha256}})));
+   return invoke(command,args);
+  };
+ });
+ await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();const editor=page.locator('.native-script-attachment');await revealPagedControl(editor.locator('> summary'));await editor.locator('> summary').click();
+ await editor.getByRole('button',{name:'List recovered modules',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__moduleRefresh.list.length)).toBe(1);
+ if(changedSource)await page.evaluate(()=>(window as any).__moduleRefresh.changed=true);
+ const refresh=page.getByRole('button',{name:'Refresh inspection',exact:true});await refresh.click();await expect(refresh).toBeEnabled();
+ await page.evaluate(()=>(window as any).__moduleRefresh.list.shift()());
+ if(changedSource){await expect(editor.getByRole('button',{name:'Edit selected module',exact:true})).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved?.scenarioScriptDraft)).toBeFalsy();return;}
+ const edit=editor.getByRole('button',{name:'Edit selected module',exact:true});await expect(edit).toBeEnabled();await edit.click();await expect.poll(()=>page.evaluate(()=>(window as any).__moduleRefresh.open.length)).toBe(1);
+ if(phase==='opening')await page.evaluate(()=>(window as any).__moduleRefresh.changed=true);
+ await refresh.click();await expect(refresh).toBeEnabled();await page.evaluate(()=>(window as any).__moduleRefresh.open.shift()());
+ if(phase==='opening'){await expect(editor.getByRole('textbox',{name:'Edit source',exact:true})).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved?.scenarioScriptDraft)).toBeFalsy();return;}
+ const text=editor.getByRole('textbox',{name:'Edit source',exact:true});await expect(text).toHaveValue('(script dormant recovered (sleep 1))');const expected='(script dormant recovered (sleep 1))'+(phase==='admission'?'\n; Reviewed source change':'');if(phase==='admission')await text.fill(expected);await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.scenarioScriptDraft?.content)).toBe(expected);
+ if(phase==='admission'){
+  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke.bind(w.__TAURI_INTERNALS__);w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='build_working_tags'?new Promise((_,reject)=>{w.__moduleRefresh.rejectBuild=()=>reject(Error('Synthetic native admission refused; previous-good retained'));}):invoke(command,args);});
+  const review=editor.getByRole('checkbox',{name:'I reviewed this source and its native scenario references.',exact:true});await revealPagedControl(review);await review.check();
+  await editor.getByRole('button',{name:'Build reviewed script revision',exact:true}).click();await expect.poll(()=>page.evaluate(()=>typeof (window as any).__moduleRefresh.rejectBuild)).toBe('function');
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}})));await expect(refresh).toBeEnabled();await page.evaluate(()=>(window as any).__moduleRefresh.rejectBuild());
+  await expect(page.getByRole('alert')).toContainText('Synthetic native admission refused; previous-good retained');expect(await page.evaluate(()=>(window as any).__sparkMock.hudBuilds.length)).toBe(0);
+ }
+});

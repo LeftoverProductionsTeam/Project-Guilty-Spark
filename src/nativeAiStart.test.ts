@@ -1,3 +1,5 @@
+import {nativePatrolIssue,nativePatrolEqual} from './nativeOperations';
+import type {NativeSourcePatrolRoute,NativeSquadBehavior} from './nativeOperations';
 import {expect,it} from 'vitest';
 import {nativeAiStartMatches,nativeAiStartPosition,nativeAiStartDragValues,nativeAiStartKey,nativeAiStartFacing,nativeAiFacingDegrees,nativeAiFacingClose,nativeAiStartDragFacing} from './nativeAiStart';
 import type {NativeAiStartView} from './nativeAiStart';
@@ -67,3 +69,35 @@ it('reuses source-bound position drafts for encounter firing points without inve
 it('keeps every native behavior state and gates new moving choices on existing source routes',async()=>{const {nativeSourceAiStates,nativeSourceStateReady}=await import('./nativeOperations');expect(nativeSourceAiStates).toHaveLength(12);for(const s of ['none','sleeping','guarding_at_guard_position','fleeing'])expect(nativeSourceStateReady(s,0)).toBe(true);for(const s of ['moving_loop','moving_loop_randomly','moving_loop_back_and_forth']){expect(nativeSourceStateReady(s,1)).toBe(false);expect(nativeSourceStateReady(s,2)).toBe(true);}expect(nativeSourceStateReady('moving_randomly',0)).toBe(false);expect(nativeSourceStateReady('moving_randomly',1)).toBe(true);expect(nativeSourceStateReady('unknown',32)).toBe(false);});
 
 it('preserves existing scripted moving states but refuses copying them to new starts without a route',async()=>{const {nativeBehaviorIssue}=await import('./nativeOperations');const source={initialState:'moving_loop',returnState:'alert',patrolCount:0,starts:[{index:0,initialState:'none',returnState:'none'}]};expect(nativeBehaviorIssue({...source,returnState:'guarding'},source)).toBeNull();expect(nativeBehaviorIssue({...source,starts:[{index:0,initialState:'moving_loop',returnState:'alert'}]},source)).toContain('authored source route');});
+
+
+const patrolSource=():NativeSourcePatrolRoute=>({points:[0,1,2].map(i=>({sourceIndex:i,position:[i,2,3],facingRadians:i/4,weight:1,waitSeconds:[0,2],animation:i===0?7:-1,sequenceId:i===0?-4:0}))});
+it('edits ordered native patrol rows while retaining copied animation and sequence identities',()=>{
+ const source=patrolSource(),original=JSON.stringify(source),route=structuredClone(source);
+ route.points=[route.points[2],route.points[0],structuredClone(route.points[0]),{sourceIndex:null,position:[9,2,3],facingRadians:1,weight:2,waitSeconds:[1,4],animation:-1,sequenceId:0}];
+ const behavior:NativeSquadBehavior={initialState:'moving_loop',returnState:'alert',starts:[],patrolCount:3};
+ expect(nativePatrolIssue(route,source,behavior)).toBeNull();expect(nativePatrolEqual(route,source)).toBe(false);
+ for(const mutate of [(r:NativeSourcePatrolRoute)=>r.points[1].animation=8,(r:NativeSourcePatrolRoute)=>r.points[1].sequenceId=4,(r:NativeSourcePatrolRoute)=>r.points[3].animation=2,(r:NativeSourcePatrolRoute)=>r.points[0].weight=NaN,(r:NativeSourcePatrolRoute)=>r.points[0].waitSeconds=[4,1],(r:NativeSourcePatrolRoute)=>r.points[0].position[0]=Infinity,(r:NativeSourcePatrolRoute)=>r.points[0].sourceIndex=31]){const changed=structuredClone(route);mutate(changed);expect(nativePatrolIssue(changed,source,behavior)).not.toBeNull();}
+ expect(JSON.stringify(source)).toBe(original);
+ expect(nativePatrolEqual(source,{points:source.points.map(p=>({...p,facingRadians:p.facingRadians+2*Math.PI}))})).toBe(true);
+});
+it('refuses route shortening that invalidates squad or starting-location movement behavior',()=>{
+ const source=patrolSource(),route={points:source.points.slice(0,1)};
+ expect(nativePatrolIssue(route,source)).toContain('unavailable');
+ const behavior:NativeSquadBehavior={initialState:'alert',returnState:'none',patrolCount:3,starts:[{index:0,initialState:'moving_loop',returnState:'none'}]};
+ expect(nativePatrolIssue(route,source,behavior)).toContain('every starting-location');
+ expect(nativePatrolIssue({points:source.points.slice(0,2)},source,behavior)).toBeNull();
+ expect(nativePatrolIssue({points:[]},source,{...behavior,starts:[]})).toBeNull();
+ expect(nativePatrolIssue({points:Array.from({length:33},()=>source.points[0])},source,behavior)).toContain('at most32');
+});
+it('binds patrol viewport proposals to the complete original route and cancels stale drags',()=>{
+ const source=context(),route=patrolSource();source.scenarioCombat=[{encounter:0,name:'original',points:[],squads:[{index:0,name:'guards',groups:{attacking:[],attackingSearch:[],attackingGuard:[],defending:[],defendingSearch:[],defendingGuard:[]},patrol:route}]}];
+ const view:NativeAiStartView={...draft(),kind:'patrol',patrol:{source:structuredClone(route),route:structuredClone(route)},originalFacingRadians:0,facingDegrees:'0',start:0};
+ expect(nativeAiStartMatches(view,source)).toBe(true);expect(nativeAiStartMatches({...view,patrol:{source:route,route:{points:[]}}},source)).toBe(true);
+ for(const patch of [{tagSha256:'b'.repeat(64)},{combatEditIssue:'Missing'},{protectedSquadEncounters:['original']}])expect(nativeAiStartMatches(view,{...source,...patch})).toBe(false);
+ const changed=structuredClone(source);changed.scenarioCombat![0].squads[0].patrol!.points[1].animation=9;expect(nativeAiStartMatches(view,changed)).toBe(false);
+ const current=structuredClone(view);current.patrol!.route.points.reverse();expect(nativeAiStartDragValues(view,current,[1,2,3],true)).toBeNull();expect(nativeAiStartDragFacing(view,current,.5,true)).toBeNull();
+ expect(nativeAiStartDragValues(view,view,[1,2,3],true)).toEqual(['1','2','3']);
+ expect(nativeAiStartKey(source,0,0,0,'patrol')).not.toBe(nativeAiStartKey(source,0,0,0));
+ expect(nativeAiStartKey(source,0,0,0,'patrol')).not.toBe(nativeAiStartKey(source,0,0,0,'firing'));
+});

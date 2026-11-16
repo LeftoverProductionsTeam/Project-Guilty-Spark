@@ -375,7 +375,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   function setMode(next:'translate'|'rotate'|'scale') {
     if(next==='rotate'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&node.type==='campaignFiring')){notify('Native firing positions support XYZ movement only.','info');return;}
     if(next==='scale'&&forgeNodes(doc).some(node=>selected.includes(node.value.id)&&(node.type==='campaignStart'||node.type==='campaignPatrol'||node.type==='campaignFiring'))){notify('Native AI points cannot be scaled. Starts and patrol points support Move and Z facing; firing positions support XYZ only.','info');return;}
-    if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI starts support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.','info');return;}
+    if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI points support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.','info');return;}
     setModeState(next);
     if(next!=='scale')setNativeAiStart(current=>current?.active&&current.mode!==next?{...current,mode:next}:current);
   }
@@ -1908,10 +1908,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   onError={(message) => notify(message, 'error')}
                 />
                 {nativeAiStart?.active&&<div className="viewport-object-actions" role="status">
-                  <strong>{nativeAiStart.kind==='firing'?'AI firing draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
+                  <strong>{nativeAiStart.kind==='firing'?'AI firing draft':nativeAiStart.kind==='patrol'?'AI patrol draft':'AI start draft'} · {nativeAiStart.encounterName} / {nativeAiStart.kind==='firing'?'Group '+nativeAiStart.group?.toUpperCase():nativeAiStart.squadName} / {nativeAiStart.start}</strong>
                   <span>{nativeAiStart.kind==='firing'?'Unsaved XYZ/group proposal · Move (W), then review in Native source controls':'Unsaved pose · Move (W) / Rotate (E), then review in Native source controls'}</span>
-                  <button disabled={cameraMode!=='orbit'||assetBusy} onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>{nativeAiStart.kind==='firing'?'Frame AI firing position':'Frame AI start'}</button>
-                  {props.onReviewAiStart&&<button onClick={props.onReviewAiStart}>{nativeAiStart.kind==='firing'?'Review AI firing source':'Review AI start source'}</button>}
+                  <button disabled={cameraMode!=='orbit'||assetBusy} onClick={()=>setNativeAiStart({...nativeAiStart,focus:Date.now()})}>{nativeAiStart.kind==='firing'?'Frame AI firing position':nativeAiStart.kind==='patrol'?'Frame AI patrol point':'Frame AI start'}</button>
+                  {props.onReviewAiStart&&<button onClick={props.onReviewAiStart}>{nativeAiStart.kind==='firing'?'Review AI firing source':nativeAiStart.kind==='patrol'?'Review AI patrol source':'Review AI start source'}</button>}
                   <button onClick={()=>setNativeAiStart({...nativeAiStart,active:false})}>Hide handles</button>
                 </div>}
                 {assetDrag.dragging && (

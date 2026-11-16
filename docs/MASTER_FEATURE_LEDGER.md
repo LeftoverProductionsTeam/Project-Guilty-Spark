@@ -193,3 +193,6 @@ Owner addendum: full in-game HUD editor is required, not just Firefight text or 
 
 
 15Nov Black Echo ownership/settlement source and exact reviewed x64 Forerunner admission: implemented with focused frontend/Rust/Windows compilation and actual CE HSC readback; input-only CE609 baseline compiles with15warnings. Full Spark-authored native mission, imported-source handoff, Save/restart and engine execution remain open. Evidence: RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. All475CSV requirement records unchanged; no Operation110/M1–M6 acceptance promoted.
+
+
+16Nov recovered native patrol milestone: original-source route add/copy/reorder/remove, pose/weight/waits and preserved animation/sequence now connect existing AI viewport/review/Accept/Restore/Save/restart/native CE609 build/independent readback. Fixed exact-squad Review focus, same-source module refresh cancellation and patrol snapshot admission panic. Actual Windows3normal restarts/0page errors, frontend49/core15/browser12unique/TypeScript/Vite/Windows compilation pass. All475CSV IDs unchanged. Native source proof does not establish AI path-following, navigation, combat, Forerunner gameplay, full native Undo, other targets or broad37944. Exact evidence/failures: RUNTIME_INTEGRATION_20261107; human actions: HUMAN_TEST_PLAN. M1–M6/Operation110 remain incomplete.

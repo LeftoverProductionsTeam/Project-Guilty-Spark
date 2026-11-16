@@ -18,6 +18,8 @@ if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh ou
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
 const ceMissionReview=process.env.SPARK_NATIVE_CE_MISSION_REVIEW==='1';
 const ceMissionHudReview=process.env.SPARK_NATIVE_CE_MISSION_HUD_REVIEW==='1';
+const cePatrolReview=process.env.SPARK_NATIVE_CE_MISSION_PATROL_REVIEW==='1';
+if(cePatrolReview&&(!ceMissionReview||ceMissionHudReview))throw Error('Recovered patrol review uses its isolated CE source variant');
 if(ceMissionHudReview&&!ceMissionReview)throw Error('Campaign HUD native UI requires the CE mission review');
 const ceMissionHudSteps=[
  {
@@ -162,7 +164,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     const originalSha=await hash(source),scenario='levels/forerunner/be_native/be_native';
     let fork,record,parent,flood,safe;
     const context=()=>call('native_tag_context',{projectId:fork.id});
-    const waitBuild=async(previous)=>{let build;await expect.poll(async()=>{build=(await call('project_build_history',{id:fork.id})).builds.find(row=>!previous.includes(row.id));if(build)report.failedNativeJobId=build.id;if(['failed','blocked','cancelled'].includes(build?.status))throw Error(build.message);const issue=(await page.locator('.toast.error,.toast.warning').allTextContents()).find(text=>/blocked compilation|Error:|refused|changed after/i.test(text));if(issue)throw Error(issue);return build?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');return build;};
+    const waitBuild=async(previous)=>{let build;await expect.poll(async()=>{build=(await call('project_build_history',{id:fork.id})).builds.find(row=>!previous.includes(row.id));if(build)report.failedNativeJobId=build.id;if(['failed','blocked','cancelled'].includes(build?.status))throw Error(build.message);const admission=(await page.locator('.runtime-details-dialog > [role=alert]').allTextContents()).find(text=>text.trim());const issue=admission??(await page.locator('.toast.error,.toast.warning').allTextContents()).find(text=>/blocked compilation|Error:|refused|changed after/i.test(text));if(issue)throw Error(issue);return build?.status;},{timeout:300000,intervals:[1000,2000]}).toBe('validated');return build;};
 
     if(!prior){
     const [imported]=await call('import_paths',{paths:[source]});expect(imported.inspection.header.version).toBe(609);expect(imported.inspection.header.scenarioType).toBe(0);expect(imported.inspection.scenarioPath.replaceAll('\\','/')).toBe(scenario);
@@ -182,6 +184,24 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     await panel.getByRole('button',{name:'Preview AI starting position',exact:true}).click();const accept=panel.getByRole('button',{name:'Accept as new source revision',exact:true});await expect(accept).toBeEnabled();expect((await context()).tagSha256).toBe(before.tagSha256);await accept.click();
     let accepted;await expect.poll(async()=>{accepted=await context();return accepted.tagSha256;},{timeout:180000}).not.toBe(before.tagSha256);record.acceptedSourceSha256=accepted.tagSha256;
     expect(accepted.scenarioStartSquads.find(row=>row.encounter===flood.encounter&&row.squad===flood.squad).starts[0].position).toEqual(safe.position);await save(fork.id);
+    if(cePatrolReview){
+     record.stage='edit recovered native patrol';const original=await context(),encounter=original.scenarioCombat.find(r=>r.name==='be_covenant'),member=encounter?.squads[0];expect(member?.patrol).toBeTruthy();expect(member.patrolIssue??null).toBeNull();
+     const difficulty=panel.locator('.native-squad-difficulty');await difficulty.locator('> summary').click();await difficulty.getByRole('combobox',{name:'Native source squad',exact:true}).selectOption(encounter.encounter+':'+member.index);
+     let patrol=panel.locator('.native-squad-patrol');await patrol.locator('> summary').click();
+     for(let i=member.patrol.points.length;i<2;i++)await patrol.getByRole('button',{name:'Add patrol point',exact:true}).click();
+     for(let point=0;point<2;point++){await patrol.getByRole('combobox',{name:'Native patrol point',exact:true}).selectOption(String(point));for(const [i,axis]of ['X','Y','Z'].entries())await patrol.getByRole('spinbutton',{name:'Native patrol '+axis,exact:true}).fill(String(safe.position[i]+(i===0?point*.25:0)));}
+     await patrol.getByRole('combobox',{name:'Native patrol point',exact:true}).selectOption('0');
+     await patrol.getByRole('button',{name:'Duplicate patrol point',exact:true}).click();await patrol.getByRole('button',{name:'Move point earlier',exact:true}).click();
+     await patrol.getByRole('spinbutton',{name:'Native patrol weight',exact:true}).fill('2.5');await patrol.getByRole('spinbutton',{name:'Native patrol minimum wait',exact:true}).fill('0.25');await patrol.getByRole('spinbutton',{name:'Native patrol maximum wait',exact:true}).fill('1.5');await patrol.getByRole('spinbutton',{name:'Native patrol facing degrees',exact:true}).fill('45');
+     await patrol.getByRole('button',{name:'Show patrol handles in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame AI patrol point',exact:true})).toBeEnabled();
+     const canvas=page.locator('canvas[data-gs-gizmo]');await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(s=>s?JSON.parse(s).mode:null)).toBe('translate');
+     const frame=await canvas.evaluate(e=>{const r=e.getBoundingClientRect(),g=JSON.parse(e.dataset.gsGizmo);return{x:r.x,y:r.y,w:r.width,h:r.height,handle:g.handles.X,origin:g.origin};});const px=frame.x+(frame.handle[0]+1)*frame.w/2,py=frame.y+(1-frame.handle[1])*frame.h/2,dx=(frame.handle[0]-frame.origin[0])*frame.w/2,dy=-(frame.handle[1]-frame.origin[1])*frame.h/2,len=Math.hypot(dx,dy);expect(len).toBeGreaterThan(1);
+     await page.mouse.move(px,py);await page.mouse.down();await page.mouse.move(px+dx/len*40,py+dy/len*40,{steps:12});await page.mouse.up();expect((await context()).tagSha256).toBe(original.tagSha256);await page.screenshot({path:path.join(output,'native-patrol-viewport.png')});
+     await page.getByRole('button',{name:'Review AI patrol source',exact:true}).click();patrol=page.locator('.native-squad-patrol');await expect(patrol.getByRole('spinbutton',{name:'Native patrol X',exact:true})).toBeFocused();expect(Math.abs(Number(await patrol.getByRole('spinbutton',{name:'Native patrol X',exact:true}).inputValue())-safe.position[0])).toBeGreaterThan(.001);
+     await patrol.getByRole('button',{name:'Preview native patrol',exact:true}).click();const accept=page.getByRole('button',{name:'Accept as new source revision',exact:true});await expect(accept).toBeEnabled();expect((await context()).tagSha256).toBe(original.tagSha256);await accept.click();await expect.poll(async()=>(await context()).tagSha256).not.toBe(original.tagSha256);const after=await context();
+     await page.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(async()=>(await context()).tagSha256).toBe(original.tagSha256);await accept.click();await expect.poll(async()=>(await context()).tagSha256).toBe(after.tagSha256);
+     record.nativePatrol={encounter:encounter.encounter,squad:member.index,source:after.scenarioCombat.find(r=>r.encounter===encounter.encounter).squads.find(r=>r.index===member.index).patrol,beforeSha256:original.tagSha256,afterSha256:after.tagSha256,realMouseViewport:true,restoreReaccept:true,gameplayVerified:false};record.acceptedSourceSha256=after.tagSha256;await save(fork.id);
+    }
     if(ceMissionHudReview){
      record.stage='author campaign HUD through Creator Studio';await chooseTool(page,'Creator Studio');
      for(const [i,step]of ceMissionHudSteps.entries()){
@@ -259,6 +279,11 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
     const reopenedBuilds=(await call('project_build_history',{id:fork.id})).builds;expect(reopenedBuilds.find(row=>row.id===built.id)).toEqual(built);record.compiledBuildRestart=true;
     const readback=path.join(output,'ce-mission-readback');await fs.mkdir(readback);await run(path.join(invader,'invader-extract.exe'),['-t',readback,'-s',scenario+'.scenario',built.output]);
     const position=(await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-G','encounters['+flood.encounter+'].squads['+flood.squad+'].starting_locations[0].position',scenario+'.scenario'])).stdout.trim().split(',').map(Number);safe.position.forEach((v,i)=>expect(position[i]).toBeCloseTo(v,5));
+    if(cePatrolReview){const p=record.nativePatrol,key='encounters['+p.encounter+'].squads['+p.squad+'].move_positions';const field=async name=>(await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-G',name,scenario+'.scenario'])).stdout.trim();
+     const count=Number((await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-C',key,scenario+'.scenario'])).stdout.trim());expect(count).toBe(p.source.points.length);
+     for(const [i,point]of p.source.points.entries()){const prefix=key+'['+i+']',position=(await field(prefix+'.position')).split(',').map(Number),wait=(await field(prefix+'.time')).split(',').map(Number);point.position.forEach((v,j)=>expect(position[j]).toBeCloseTo(v,4));expect(Number(await field(prefix+'.weight'))).toBeCloseTo(point.weight,5);wait.forEach((v,j)=>expect(v).toBeCloseTo(point.waitSeconds[j],5));expect(Number(await field(prefix+'.facing'))).toBeCloseTo(point.facingRadians*180/Math.PI,3);const animation=Number(await field(prefix+'.animation'));expect(animation>32767?animation-65536:animation).toBe(point.animation);expect(Number(await field(prefix+'.sequence_id'))).toBe(point.sequenceId);}
+     const receipt=JSON.parse(await fs.readFile(path.join(library,'jobs',built.id,'working-tags-receipt.json'),'utf8'));expect(receipt.scenarioSquadReadback.combat.some(op=>op.kind==='encounterSquadPatrol')).toBe(true);p.compiledIndependentReadback=true;
+    }
     const recovered=path.join(readback,'data');await fs.mkdir(recovered);await run(path.join(invader,'invader-recover.exe'),['-t',readback,'-d',recovered,'-b',scenario+'.scenario']);const compiledSource=await fs.readFile(path.join(recovered,'levels/forerunner/be_native/scripts/extracted.hsc'),'utf8');expect(compiledSource).toMatch(/\(sleep 90\)\s*\(ai_place be_defense\)/);expect(compiledSource).toContain('(unit_has_weapon');expect(compiledSource).toContain('(script dormant forerunner_extraction_complete');
     if(ceMissionHudReview){
      const receipt=JSON.parse(await fs.readFile(path.join(library,'jobs',built.id,'working-tags-receipt.json'),'utf8')),hud=receipt.generatedMissionHud;expect(hud.messages).toHaveLength(7);expect(hud.ownedNames).toEqual(record.hud.messages.map(row=>row.name));

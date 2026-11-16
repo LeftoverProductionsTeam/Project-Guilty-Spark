@@ -17,11 +17,31 @@ export function nativeBehaviorIssue(draft:NativeSquadBehavior,source:NativeSquad
  if(draft.patrolCount!==source.patrolCount||draft.starts.length!==source.starts.length||draft.starts.some((p,i)=>p.index!==source.starts[i].index))return 'Refresh the source; starting-location or route indices changed.';
  const pairs=[[draft,source],...draft.starts.map((p,i)=>[p,source.starts[i]])];for(const [next,before]of pairs)for(const f of ['initialState','returnState'] as const){if(!nativeSourceAiStates.includes(next[f] as typeof nativeSourceAiStates[number]))return 'Native state is unavailable.';if(next[f]!==before[f]&&!nativeSourceStateReady(next[f],source.patrolCount))return 'A new moving state needs an authored source route. Restore this draft choice or prepare the native route first.';}return null;
 }
-export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null}[]}
+export interface NativeSourcePatrolPoint {sourceIndex:number|null;position:[number,number,number];facingRadians:number;weight:number;waitSeconds:[number,number];animation:number;sequenceId:number}
+export interface NativeSourcePatrolRoute {points:NativeSourcePatrolPoint[]}
+export function nativePatrolIssue(route:NativeSourcePatrolRoute,source:NativeSourcePatrolRoute,behavior?:NativeSquadBehavior|null):string|null{
+ if(route.points.length>32)return 'A native squad supports at most32 movement positions.';
+ for(const p of route.points){
+  if(p.position.length!==3||p.position.some(v=>!Number.isFinite(v)||Math.abs(v)>1e6)||!Number.isFinite(p.facingRadians)||Math.abs(p.facingRadians)>1e6||!Number.isFinite(p.weight)||p.weight<0||p.weight>1e6||p.waitSeconds.length!==2||p.waitSeconds.some(v=>!Number.isFinite(v)||v<0||v>1e6)||p.waitSeconds[0]>p.waitSeconds[1])return 'Use finite XYZ/facing, nonnegative weight and ordered wait bounds within the native limits.';
+  if(p.sourceIndex!==null){const old=source.points[p.sourceIndex];if(!Number.isInteger(p.sourceIndex)||!old||p.animation!==old.animation||p.sequenceId!==old.sequenceId)return 'Existing patrol animation and sequence references must stay with their source row.';}
+  else if(p.animation!==-1||p.sequenceId!==0)return 'New patrol points require no animation and sequence0.';
+ }
+ if(route.points.length!==source.points.length){
+  if(!behavior)return 'Native behavior is unavailable; changing the point count is unsafe.';
+  if([behavior,...behavior.starts].some(p=>!nativeSourceStateReady(p.initialState,route.points.length)||!nativeSourceStateReady(p.returnState,route.points.length)))return 'Keep enough route points for the squad and every starting-location movement state. Change behavior first.';
+ }
+ return null;
+}
+export function nativePatrolEqual(a:NativeSourcePatrolRoute,b:NativeSourcePatrolRoute):boolean{
+ const close=(x:number,y:number)=>Number.isFinite(x)&&Number.isFinite(y)&&Math.abs(x-y)<=Math.max(1e-6,Math.max(Math.abs(x),Math.abs(y))*2**-22);
+ return a.points.length===b.points.length&&a.points.every((p,i)=>{const q=b.points[i];return p.sourceIndex===q.sourceIndex&&p.animation===q.animation&&p.sequenceId===q.sequenceId&&p.position.every((v,j)=>close(v,q.position[j]))&&close(p.weight,q.weight)&&p.waitSeconds.every((v,j)=>close(v,q.waitSeconds[j]))&&Number.isFinite(p.facingRadians)&&Number.isFinite(q.facingRadians)&&Math.abs(Math.atan2(Math.sin(p.facingRadians-q.facingRadians),Math.cos(p.facingRadians-q.facingRadians)))<=.000002;});
+}
+export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null;patrol?:NativeSourcePatrolRoute|null;patrolIssue?:string|null}[]}
 export type NativeOperation = { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null}
+  | {kind:'encounterSquadPatrol';encounter:number;squad:number;encounterName:string;squadName:string;route:NativeSourcePatrolRoute;sourceSha256:string}
   | {kind:'encounterSquadBehavior';encounter:number;squad:number;encounterName:string;squadName:string;behavior:NativeSquadBehavior;sourceSha256:string}
   | {kind:'encounterFiringPosition';encounter:number;point:number;encounterName:string;position:[number,number,number];group:string;sourceSha256:string}
   | {kind:'encounterSquadFiringGroups';encounter:number;squad:number;encounterName:string;squadName:string;groups:NativeCombatSource['groups'];sourceSha256:string}

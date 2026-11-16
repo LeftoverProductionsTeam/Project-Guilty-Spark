@@ -181,6 +181,7 @@ export default function RuntimeDock({
   const pickedModule=modules?.modules.find(module=>module.filename===moduleName);
   useEffect(()=>{
     moduleRequest.current++;setModuleBusy(false);
+    return()=>{moduleRequest.current++;};
   },[scriptSourceKey]);
   const [firefightActivation,setFirefightActivation]=useState<'manual'|'startup'>('manual');
   const [firefightSource,setFirefightSource]=useState<{sourceKey:string;plan:FirefightSourcePlan;script:NativeScriptAttachment;reviewed:boolean}|null>(null);
@@ -191,6 +192,8 @@ export default function RuntimeDock({
   const currentReport = useRef(report);
   currentReport.current = report;
   const detailsDialog = useRef<HTMLElement | null>(null);
+  const errorNotice=useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(details&&error)errorNotice.current?.scrollIntoView({block:'nearest'});},[details,error]);
   const planDialog = useRef<HTMLElement | null>(null);
   const busyRef = useRef(busy);
   busyRef.current = busy;
@@ -271,8 +274,10 @@ export default function RuntimeDock({
     window.addEventListener('guilty-spark-native-source-changed', listener);
     return () => window.removeEventListener('guilty-spark-native-source-changed', listener);
   }, [project?.id, refresh]);
+  // A refresh of the same map/runtime must not erase its verified source key.
+  // Busy still fences actions; changed source identities invalidate selections.
+  useEffect(()=>{setReport(null);},[runtime,project?.id]);
   useEffect(() => {
-    setReport(null);
     setPlan(null);
     setConsent(false);
     setNotice('');
@@ -425,23 +430,23 @@ export default function RuntimeDock({
   }
   async function listScriptModules() {
     const source=report?.workingSource;if(!native||!project||!source?.projectFingerprint||dirty||busy||working||moduleBusy)return;
-    const request=++moduleRequest.current,scope=generation.current,key=scriptSourceKey;
+    const request=++moduleRequest.current,key=scriptSourceKey;
     setModuleBusy(true);setError('');
     try {
       const value=await call<WorkingScriptSources>('working_script_sources',{projectId:project.id,expectedBuildId:source.buildId,
         expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint});
-      if(request!==moduleRequest.current||scope!==generation.current||key!==currentScriptSourceKey.current)return;
+      if(request!==moduleRequest.current||key!==currentScriptSourceKey.current)return;
       if(!sourceSelectionMatches(value,source))throw Error('The recovered script listing belongs to a different source revision. Refresh its selection.');
       setModuleInventory({key,value});
       setModuleName(name=>value.modules.some(module=>module.filename===name)?name:value.modules.find(module=>!module.unavailable)?.filename??value.modules[0]?.filename??'');
-    } catch(problem){if(request===moduleRequest.current&&scope===generation.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    } catch(problem){if(request===moduleRequest.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{if(request===moduleRequest.current)setModuleBusy(false);}
   }
   async function openScriptModule() {
     const source=report?.workingSource,inventory=modules,module=pickedModule,draft=currentProject.current?.scenarioScriptDraft;
     if(!native||!project||!source?.projectFingerprint||!inventory||!module||module.unavailable||dirty||busy||working||moduleBusy)return;
     if(draft&&!window.confirm('Replace the current project script draft with this recovered module? Project Undo can restore the previous draft.'))return;
-    const request=++moduleRequest.current,scope=generation.current,key=scriptSourceKey,selection=++scriptSelection.current;
+    const request=++moduleRequest.current,key=scriptSourceKey,selection=++scriptSelection.current;
     setModuleBusy(true);setError('');
     try {
       const value=await call<WorkingScriptSource>('working_script_source',{projectId:project.id,expectedBuildId:source.buildId,
@@ -451,13 +456,13 @@ export default function RuntimeDock({
       if(!bytes.length||bytes.length>1048576)throw Error('The recovered module exceeded its editor limit; the previous draft was retained.');
       const digest=await crypto.subtle.digest('SHA-256',bytes);
       const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
-      if(request!==moduleRequest.current||scope!==generation.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
+      if(request!==moduleRequest.current||selection!==scriptSelection.current||key!==currentScriptSourceKey.current)return;
       if(currentProject.current?.scenarioScriptDraft!==draft)throw Error('The project draft changed while opening source; the current draft was retained.');
       if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||
         value.script.filename!==module.filename||value.script.sha256!==module.sha256||sha256!==module.sha256||
         value.script.replacesSha256!==module.sha256)throw Error('Recovered source identity changed; refresh the module list before editing.');
       keepScriptDraft({...value.script,fileSha256:sha256,sourceKey:key,reviewed:false});
-    } catch(problem){if(request===moduleRequest.current&&scope===generation.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    } catch(problem){if(request===moduleRequest.current&&selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{if(request===moduleRequest.current)setModuleBusy(false);}
   }
   function keepScriptDraft(input:ScriptEditorAttachment|null) {
@@ -551,7 +556,7 @@ export default function RuntimeDock({
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
     if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||selectedScript.replacesSha256!==attachment.replacesSha256||!report?.workingSource))return;
     if(mission&&(!selectedMissionHud?.reviewed||mission!==selectedMissionHud||firefight||!!attachment&&!compileScripts))return;
-    const request = generation.current;
+    const sourceKey = scriptSourceKey;
     setBusy(true);
     setError('');
     try {
@@ -559,7 +564,7 @@ export default function RuntimeDock({
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
         ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256,...(attachment.replacesSha256?{replacesSha256:attachment.replacesSha256}:{})}}:{}),
         ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:{}) });
-      if (request === generation.current) {
+      if (sourceKey === currentScriptSourceKey.current) {
         setDetails(false);
         setNotice(
           compileScripts?'Compiling reviewed scenario HaloScript, then a separate native map. Missing original modules or compiler/readback failures leave the previous-good cache unchanged.':'Compiling a separate map from saved working tags, retaining their existing compiled scripts. To apply edited .hsc source, use Compile scripts & build.',
@@ -567,9 +572,9 @@ export default function RuntimeDock({
         onNavigate('build');
       }
     } catch (e) {
-      if (request === generation.current) {setError(String(e));if(firefight)setFirefightSource(null);}
+      if (sourceKey === currentScriptSourceKey.current) {setError(String(e));if(firefight)setFirefightSource(null);}
     } finally {
-      if (request === generation.current) setBusy(false);
+      if (sourceKey === currentScriptSourceKey.current) setBusy(false);
     }
   }
   const selected = Object.hasOwn(runtimeNames, runtime) ? runtime : 'mccSteam';
@@ -694,7 +699,7 @@ export default function RuntimeDock({
           )}
           {sourceLink&&<Notice tone="info">Edit source opens {sourceLink.title} with its retained document history. {sourceLink.authoringChanged?'The authoring revision has changed since this build. ':''}Current native source may also contain later tool edits. This compiled inspection remains a separate map.</Notice>}
           {sourceError&&<Notice>Editable source: {sourceError}. Use File → Open saved project for manual selection; this cache is not reconstructed source.</Notice>}
-          {error && <Notice>{error}</Notice>}
+          {error && <div ref={errorNotice} role="alert"><Notice>{error}</Notice></div>}
           {dirty && (
             <Notice tone="info">
               This map has unsaved changes.{' '}

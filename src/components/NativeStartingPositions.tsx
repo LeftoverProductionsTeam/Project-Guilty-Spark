@@ -41,7 +41,7 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
   },[sourceLocked,key,draft]);
   useEffect(()=>{
     const request=draft?.reviewRequest??0;
-    if((draft?.kind==='firing')!==firing||!request||lastReview.current===request||!draft||!nativeAiStartMatches(draft,context))return;
+    if((draft?.kind??'start')!==kind||!request||lastReview.current===request||!draft||!nativeAiStartMatches(draft,context))return;
     lastReview.current=request;setSquadKey(`${draft.encounter}:${draft.squad}`);setStartIndex(String(draft.start));
     if(detail.current){detail.current.open=true;detail.current.querySelector<HTMLInputElement>(firing?'[aria-label="AI firing X"]':draft.mode==='rotate'?'[aria-label="AI start facing degrees"]':'[aria-label="AI start X"]')?.focus();}
   },[context,draft?.reviewRequest]);
