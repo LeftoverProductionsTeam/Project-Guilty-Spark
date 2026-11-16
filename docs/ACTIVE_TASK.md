@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — existing command-route viewport authoring/native proof
-Status: implementation incomplete
-Starting revision: c51309f99ad982da15bd6c2cb69af8c6e1049e05, canonical local master.
-Latest verified revision: c51309f base; current route source/browser/CE609 readback passes; checkpoint commit in Git.
-Next action: author native pilot/seat/approach/landing content in existing systems; resolve out-of-BSP routes before game acceptance. Desktop/37944 remain open; no bypass/push.
+Task: Operation110 — P0 Save ordering and freeze reliability
+Status: awaiting human verification
+Starting revision: c9d1d119e67bb93e5a64edd442b0f2eba3802450, canonical local master.
+Latest verified revision: c9d1d11 + scoped P0 Save repair; commit manifests identify source.
+Next action: Windows42-edit/restart/37944 pending desktop prerequisite. Resume preserved P1 seating, complete dropship mission; no push.
 
 ## Acceptance
 
@@ -14,7 +14,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-16Nov current command route: existing form→shared viewport→review/Restore/Save source wiring; frontend37/browser4/web/guard1/nativeCE4list readback pass. Fixed marker-bar obstruction and52px overflow. Native fixture21warnings (incl0BSP routes); not playable/flight acceptance. Hashes/failures/scope in RUNTIME_INTEGRATION_20261107. QA44344/run-dtMFHl CLOSED411106496logicalB; original hashes/475IDs preserved. Prior compactc51309f/37944/fullGoal remain recorded/open.
+16Nov P0: frozen Save/native history ordering and paint-dependent keyboard Save/Undo repaired. Unit24/browser11/native storage13/TypeScript-Vite pass; exact causes/failures/hashes in RUNTIME_INTEGRATION_20261107. Actual Windows42-edit/full restart/37944 remain OPEN. QA47527/run-hJ8LWQ CLOSED500400313logicalB; root absent. Prior c9d1d11 command-route proof remains there; flight/mission acceptance open.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
@@ -28,6 +28,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+P1 AI seating WIP preserved in Git stash1c2c73f5e04619ae4dc29c3f80b2eb47c68962fc;7source blobs verified. TypeScript/Vite only; Rust/native/UI/game unverified. Do not discard or claim accepted. Priority Reset: P0 reliability → full P1 dropship → CE609 Black Echo → P3roadmap.
 
 Native CE source handoff (parentcfe6832): imported standard CE609 now uses its explicit reviewed CE tagset and existing Build→native script editor path. Dependency-sized staging3305/3307tags, native compile/independent readback, project Save/reopen and recovered-script rebuild pass; identical mapSHA91151b1af3fde6046020d48a506b2e7609f3dfcadeeb0af01b2d13a6479197ee. Build11/working14/TypeScript/Windows check pass. No new app/UI/game acceptance. Existing ownership/settlement source proof remains in RUNTIME_INTEGRATION_20261107; complete Spark Black Echo mission/HUD handoff,15warnings and37944 stay open. Historical patrol WIP is integrated in the16Nov source/native milestone above; actual AI gameplay remains open. All original files/475IDs preserved.
 

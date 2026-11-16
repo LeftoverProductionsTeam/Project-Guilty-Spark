@@ -189,3 +189,25 @@ fn imported_origin_publication_keeps_the_attached_source_history_editable() {
     let protected=fs::read(&file).unwrap();assert!(library.save_with_history(&mut history,&source).is_err());assert_eq!(fs::read(&file).unwrap(),protected);
     assert_eq!(fs::read(&input).unwrap(),bytes);
 }
+
+
+#[test]
+fn seven_objectives_forty_two_edits_keep_saved_boundaries_and_restart_undo() {
+    let temp=tempfile::tempdir().unwrap();let (library,mut p,mut history,dir)=accepted(temp.path());
+    p.studio=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"missions":(0..7).map(|i|serde_json::json!({"id":format!("beat-{i}"),"title":format!("Objective {}",i+1),"objective":"Preserve authored work","trigger":"manual","encounterName":"","hudObjective":true,"hudText":format!("HUD {}",i+1)})).collect::<Vec<_>>(),"shots":[],"playtests":[],"server":{"name":"Private","runtime":"haloCustomEdition","maxPlayers":1,"publicListing":false,"rotation":[]}})).unwrap());
+    select(&mut history,&dir,&p);library.save_with_history(&mut history,&p).unwrap();let descriptor=dir.parent().unwrap().join("project.gsproject");let mut first_saved=None;
+    for i in 0..42 {
+        p.studio.as_mut().unwrap().missions[i/6].title=format!("Beat {} revision {}",i/6+1,i%6+1);select(&mut history,&dir,&p);
+        if i==20 {library.save_with_history(&mut history,&p).unwrap();first_saved=Some(fs::read(&descriptor).unwrap());}
+        if i>20 {assert_eq!(fs::read(&descriptor).unwrap(),*first_saved.as_ref().unwrap(),"Later unsaved edits must not change the earlier explicit Save");}
+    }
+    assert!(history.read(&dir,&p).unwrap().unwrap().head.dirty);let intermediate=project::load_project(&descriptor).unwrap();assert_eq!(intermediate.studio.unwrap().missions[6].title,"Objective 7");
+    library.save_with_history(&mut history,&p).unwrap();let saved=history.read(&dir,&p).unwrap().unwrap();assert!(!saved.head.dirty);
+    let mut undo=saved.head;undo.future.insert(0,undo.current.clone());undo.current=undo.past.pop().unwrap();undo.dirty=true;
+    history.commit(&dir,&p,saved.revision,undo,vec![]).unwrap();let undone=history.read(&dir,&p).unwrap().unwrap();assert_eq!(current(&undone).studio.as_ref().unwrap().missions[6].title,"Beat 7 revision 5");
+    let mut redo=undone.head;redo.past.push(redo.current.clone());redo.current=redo.future.remove(0);redo.dirty=true;history.commit(&dir,&p,undone.revision,redo,vec![]).unwrap();library.save_with_history(&mut history,&p).unwrap();
+    let id=p.id.clone();drop(history);drop(library);let reopened=Library::workspace(temp.path()).unwrap();let stored=reopened.get(&id).unwrap();
+    let restored=Session::default().read(&dir,&stored).unwrap().unwrap();assert!(!restored.head.dirty);assert!(restored.head.past.len()>=42);
+    for(i,beat)in stored.studio.as_ref().unwrap().missions.iter().enumerate(){assert_eq!(beat.title,format!("Beat {} revision 6",i+1));}
+    assert_eq!(serde_json::to_value(&current(&restored).studio).unwrap(),serde_json::to_value(&stored.studio).unwrap());println!("Native file Save/reopen:7objectives/42edits, earlier saved boundary unchanged, Undo/Redo and clean restart retained; descriptor SHA256 {}",spark_core::maps::hash_file(&descriptor).unwrap());
+}

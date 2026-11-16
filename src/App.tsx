@@ -343,7 +343,7 @@ export default function App() {
       flushSync(()=>dispatchDocument({type:'history',id:targetId,action:{type}}));};
     if(native&&targetId&&!windowHistories.current.writable(targetId))return;
     if(active instanceof HTMLInputElement&&['number','range'].includes(active.type)){
-      active.blur();requestAnimationFrame(apply);
+      flushSync(()=>active.blur());apply();
     }else apply();
   },[]);
   const notice = useCallback((message: string, tone = 'info') => {
@@ -412,17 +412,25 @@ export default function App() {
       // source edit is validating, wait for that transaction before selecting
       // its immutable snapshot. A queued Save still cannot consume later edits.
       const snapshot = afterProjectMutation(p.id, () => {
-        const latest = documentsRef.current.documents.find(document => document.id === p.id)?.history.current;
-        if (!latest) throw Error('The project closed before its pending source edit could be saved.');
-        return latest;
-      }).then(project => ({project}), error => ({error}));
+        const history=documentsRef.current.documents.find(document=>document.id===p.id)?.history,project=history?.current;
+        if(!project||!history)throw Error('The project closed before its pending source edit could be saved.');
+        const publish=async()=>{
+          if(native&&windowWritersRef.current[project.id]===false)throw Error('This window follows another editor. Choose Edit here in Changes before saving; your draft remains open.');
+          return checkedSaveReceipt(project,await call<LibraryEntry>(announce||!native?'save_project':'update_project',{project}));
+        };
+        // Reserve the native Save at capture, before later edits can enter the
+        // journal. The UI receipt queue must not flush past this frozen head.
+        const nativeSave=native?windowHistories.current.save(project.id,history,publish).then(entry=>({entry}),error=>({error})):null;
+        return {project,nativeSave,publish};
+      }).then(snapshot=>({snapshot}),error=>({error}));
       const operation = saveQueue.current.then(async () => {
         try {
           const settled = await snapshot;
           if ('error' in settled) throw settled.error;
-          const p = settled.project;
-          if(native){if(windowWritersRef.current[p.id]===false)return;const h=documentsRef.current.documents.find(d=>d.id===p.id)?.history;if(h?.current===p)await windowHistories.current.persist(p.id,h);await windowHistories.current.flush(p.id);}
-          const entry=checkedSaveReceipt(p,await call<LibraryEntry>(announce||!native?'save_project':'update_project', { project: p }));
+          const {project:p,nativeSave,publish}=settled.snapshot;
+          const result=nativeSave?await nativeSave:{entry:await publish()};
+          if('error' in result)throw result.error;
+          const entry=result.entry;
           setData(data=>applyLibraryReceipt(data,entry));
           void libraryRefresh.current?.invalidateActive()?.catch(error=>notice(String(error),'error'));
           if(announce)dispatchDocument({type:'saved',id:p.id,project:p});
@@ -764,11 +772,11 @@ export default function App() {
           const field=document.activeElement instanceof HTMLElement?document.activeElement:null;
           const id=(e.target instanceof HTMLElement?e.target.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject:undefined)??documentsRef.current.activeId;
           if(!id)return;
-          field?.blur();
-          requestAnimationFrame(()=>{
-            void save(true,id).catch(() => {});
-            if(field?.isConnected&&document.activeElement===document.body)field.focus();
-          });
+          // Commit the focused field before capturing Save, without waiting
+          // for painting (an occluded native WebView may suspend its frames).
+          flushSync(()=>field?.blur());
+          void save(true,id).catch(() => {});
+          if(field?.isConnected&&document.activeElement===document.body)field.focus();
         }
         if (e.key.toLowerCase() === 'z') {
           const text=e.target instanceof Element?e.target.closest('input,textarea,[contenteditable="true"]'):null;

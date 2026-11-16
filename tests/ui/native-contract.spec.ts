@@ -4638,3 +4638,54 @@ test('native command routes refuse recipe ownership and hide handles after chang
  await page.evaluate(()=>{(window as any).__sparkMock.commandSha='b'.repeat(64);window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}}));});await expect(page.getByRole('button',{name:'Frame command point',exact:true})).toHaveCount(0);
  await page.evaluate(()=>(window as any).__sparkMock.commandProtected=[0,1]);await chooseTool(page,'Level editor');await chooseTool(page,'AI & scenario');const native=page.locator('.native-tag-operations:visible');if(await native.getAttribute('open')===null)await native.locator(':scope > summary').click();await native.getByRole('button',{name:'Refresh source',exact:true}).click();if(await form.getAttribute('open')===null)await form.locator(':scope > summary').click();await expect(form).toContainText('recipe-owned AI group');await expect(form.getByRole('button',{name:'Show command route in Level Editor',exact:true})).toBeDisabled();
 });
+
+
+test('keyboard Save commits a focused field without depending on a render frame',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('71');
+ await page.evaluate(()=>{const w=window as any;w.__savePaint={original:window.requestAnimationFrame,callbacks:[],next:100000};window.requestAnimationFrame=callback=>{w.__savePaint.callbacks.push(callback);return ++w.__savePaint.next;};});
+ try{
+  await field.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits.find((row:any)=>row.fieldKey==='velocity')?.value)).toBe(71);
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((row:any)=>row.command==='save_project').length)).toBe(1);
+ }finally{
+  console.log('SAVE_PAINT_DIAGNOSTIC',await page.evaluate(()=>{const w=window as any;const result={heldFrames:w.__savePaint.callbacks.length,saves:w.__sparkMock.calls.filter((row:any)=>row.command==='save_project').length,historyCommits:w.__sparkMock.calls.filter((row:any)=>row.command==='commit_workspace_history').length};window.requestAnimationFrame=w.__savePaint.original;for(const callback of w.__savePaint.callbacks)window.requestAnimationFrame(callback);delete w.__savePaint;return result;}));
+ }
+});
+
+
+test('seven-objective 42-edit Save boundaries preserve later work and reopened history',async({page})=>{
+ test.setTimeout(60000);const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));await mockDesktop(page);
+ await page.evaluate(()=>{
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;
+  p.studio={schemaVersion:1,missions:Array.from({length:7},(_,i)=>({id:'save-beat-'+i,title:'Objective '+(i+1),objective:'Preserve '+i,trigger:'manual',encounterName:'',hudObjective:true,hudText:'HUD '+(i+1)})),shots:[],playtests:[],server:{name:'Private',runtime:'haloCustomEdition',maxPlayers:1,publicListing:false,rotation:[]}};
+  const snapshots=new Map<string,any>(),race=w.__saveBoundary={held:false,release:null,mismatches:0,published:[],read:()=>invoke('read_workspace_history',{projectId:'a'})};
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='commit_workspace_history'&&args.projectId==='a'){
+    for(const row of args.snapshots)snapshots.set(row.key,structuredClone(row.project));const current=snapshots.get(args.head.current);
+    if(!race.held&&current?.studio?.missions[3].title==='Beat 4 revision 3'){race.held=true;await new Promise<void>(resolve=>race.release=resolve);}
+   }
+   if((command==='save_project'||command==='update_project')&&args.project.id==='a'){
+    const status=await race.read(),current=status.history?.snapshots.find((row:any)=>row.key===status.history.head.current)?.project;
+    if(!current||JSON.stringify(current.studio)!==JSON.stringify(args.project.studio)){race.mismatches++;throw Error('Save differs from the acknowledged Undo selection');}
+    if(command==='save_project')race.published.push(structuredClone(args.project.studio));
+   }
+   return invoke(command,args);
+  };
+ });
+ await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);const rows=page.locator('.studio-mission-record');await expect(rows).toHaveCount(7);
+ for(let i=0;i<42;i++){
+  const title=rows.nth(Math.floor(i/6)).getByRole('textbox',{name:'Title',exact:true});await title.fill('Beat '+(Math.floor(i/6)+1)+' revision '+(i%6+1));
+  if(i===20){await expect.poll(()=>page.evaluate(()=>(window as any).__saveBoundary.held)).toBe(true);await title.press('Control+s');await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));}
+ }
+ await page.evaluate(()=>(window as any).__saveBoundary.release());
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[3].title)).toBe('Beat 4 revision 3');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.saved.studio.missions[6].title)).toBe('Objective 7');
+ await expect(rows.nth(6).getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Beat 7 revision 6');
+ await expect.poll(()=>page.evaluate(async()=>(await (window as any).__saveBoundary.read()).history?.head.dirty)).toBe(true);
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[6].title)).toBe('Beat 7 revision 6');
+ await expect.poll(()=>page.evaluate(async()=>(await (window as any).__saveBoundary.read()).history?.head.dirty)).toBe(false);
+ const tab=page.getByRole('tab',{name:'Mission director',exact:true});await tab.focus();await page.keyboard.press('Control+z');await expect(rows.nth(6).getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Beat 7 revision 5');await tab.focus();await page.keyboard.press('Control+y');await expect(rows.nth(6).getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Beat 7 revision 6');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(async()=>(await (window as any).__saveBoundary.read()).history?.head.dirty)).toBe(false);
+ await page.getByRole('button',{name:'Close map Synthetic baseline',exact:true}).click();await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
+ for(let i=0;i<7;i++)await expect(rows.nth(i).getByRole('textbox',{name:'Title',exact:true})).toHaveValue('Beat '+(i+1)+' revision 6');
+ expect(await page.evaluate(()=>(window as any).__saveBoundary.mismatches)).toBe(0);expect(errors).toEqual([]);
+});

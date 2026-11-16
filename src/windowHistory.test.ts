@@ -71,3 +71,50 @@ it('native metadata refreshes preserve acknowledged snapshot keys and redo acros
   h=historyReducer(h,{type:'edit',project:{...h.current!,title:'Third'},description:'Actual authored edit'});await broker.persist(p.id,h);expect(view.head.current).not.toBe(accepted.head.future[0]);
   const beforeSourceChange=view.head.current;h={...h,current:{...h.current!,source:{...h.current!.source!,sha256:'c'.repeat(64)}}};await broker.persist(p.id,h);expect(view.head.current).not.toBe(beforeSourceChange); // Native source validators independently refuse this identity change.
 });
+
+it('reproduces a frozen Save being overtaken when flush alone waits for later history',async()=>{
+ const p=project(),first=historyReducer(historyReducer(initialHistory,{type:'load',project:p}),{type:'edit',project:{...p,title:'first'},description:'First edit'}),second=historyReducer(first,{type:'edit',project:{...p,title:'second'},description:'Later edit'});
+ let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);let title='',revision=0;const snapshots=new Map<string,Project>();
+ call.mockImplementation(async(command:string,args:any)=>{
+  if(command==='read_workspace_history')return{writable:true,owner:'main',history:null};
+  if(command==='commit_workspace_history'){if(revision===0)await gate;expect(args.revision).toBe(revision);for(const row of args.snapshots)snapshots.set(row.key,row.project);title=snapshots.get(args.head.current)!.title;return ++revision;}
+  if(command==='save_project'){if(args.project.title!==title)throw Error('Save differs from the acknowledged Undo selection');return args.project.title;}
+  throw Error(command);
+ });
+ const broker=new WindowHistories();await broker.attach(p.id);
+ const frozen=first.current!;const oldSave=broker.persist(p.id,first).then(async()=>{await broker.flush(p.id);return call('save_project',{project:frozen});});
+ const rejected=expect(oldSave).rejects.toThrow('Save differs from the acknowledged Undo selection');const later=broker.persist(p.id,second);release();await rejected;await later;
+ expect(title).toBe('second');expect([...snapshots.values()].map(p=>p.title)).toEqual(expect.arrayContaining(['one','first','second']));
+});
+
+it('publishes a frozen Save before later edits without losing their dirty head or Undo snapshots',async()=>{
+ const p=project(),first=historyReducer(historyReducer(initialHistory,{type:'load',project:p}),{type:'edit',project:{...p,title:'first'},description:'First edit'}),second=historyReducer(first,{type:'edit',project:{...p,title:'second'},description:'Later edit'});
+ let release!:()=>void,finish!:()=>void;const commitGate=new Promise<void>(r=>release=r),saveGate=new Promise<void>(r=>finish=r);let revision=0,title='';const snapshots=new Map<string,Project>(),events:string[]=[];
+ call.mockImplementation(async(command:string,args:any)=>{
+  if(command==='read_workspace_history')return{writable:true,owner:'main',history:null};
+  if(command==='commit_workspace_history'){if(revision===0)await commitGate;expect(args.revision).toBe(revision);for(const row of args.snapshots)snapshots.set(row.key,row.project);title=snapshots.get(args.head.current)!.title;events.push('commit:'+title);return ++revision;}
+  throw Error(command);
+ });
+ const broker=new WindowHistories();await broker.attach(p.id);
+ const saved=broker.save(p.id,first,async()=>{expect(title).toBe(first.current!.title);events.push('save:first');await saveGate;return 'saved first';});
+ const later=broker.persist(p.id,second);release();await vi.waitFor(()=>expect(events).toEqual(['commit:first','save:first']));expect(revision).toBe(1);finish();expect(await saved).toBe('saved first');await later;
+ expect(events).toEqual(['commit:first','save:first','commit:second']);expect(title).toBe('second');expect(second.dirty).toBe(true);expect([...snapshots.values()].map(p=>p.title)).toEqual(expect.arrayContaining(['one','first','second']));
+});
+it('serializes repeated explicit Saves with intervening edits on the same native journal',async()=>{
+ const p=project(),broker=new WindowHistories();let revision=0,title='';const snapshots=new Map<string,Project>(),saved:string[]=[];
+ call.mockImplementation(async(command:string,args:any)=>{if(command==='read_workspace_history')return{writable:true,owner:'main',history:null};if(command==='commit_workspace_history'){expect(args.revision).toBe(revision);for(const row of args.snapshots)snapshots.set(row.key,row.project);title=snapshots.get(args.head.current)!.title;return ++revision;}throw Error(command);});
+ await broker.attach(p.id);let history=historyReducer(initialHistory,{type:'load',project:p});const operations:Promise<void>[]=[];
+ for(let i=0;i<42;i++){history=historyReducer(history,{type:'edit',project:{...history.current!,title:'edit '+i},description:'Edit objective '+(i%7+1)});const frozen=history.current!;operations.push(broker.save(p.id,history,async()=>{expect(title).toBe(frozen.title);saved.push(frozen.title);}));}
+ await Promise.all(operations);await broker.flush(p.id);expect(saved).toEqual(Array.from({length:42},(_,i)=>'edit '+i));expect(title).toBe('edit 41');expect(snapshots.size).toBe(43);
+});
+it('reports publication failure once while preserving safe editing and blocking a failed history commit',async()=>{
+ const p=project(),history=historyReducer(initialHistory,{type:'load',project:p}),next=historyReducer(history,{type:'edit',project:{...p,title:'retained'},description:'Keep editing'}),broker=new WindowHistories();let revision=0;
+ call.mockImplementation(async(command:string,args:any)=>{if(command==='read_workspace_history')return{writable:true,owner:'main',history:null};if(command==='commit_workspace_history'){expect(args.revision).toBe(revision);return ++revision;}throw Error(command);});
+ await broker.attach(p.id);const publish=vi.fn(async()=>{throw Error('Disk publication failed');});await expect(broker.save(p.id,history,publish)).rejects.toThrow('Disk publication failed');expect(publish).toHaveBeenCalledOnce();expect(broker.writable(p.id)).toBe(true);await broker.persist(p.id,next);await broker.flush(p.id);expect(publish).toHaveBeenCalledOnce();
+ call.mockImplementation(async(command:string)=>{if(command==='read_workspace_history')return{writable:true,owner:'main',history:null};throw Error('Native source conflict; recovery retained');});
+ const conflicted=new WindowHistories();await conflicted.attach(p.id);const forbidden=vi.fn(async()=>{});await expect(conflicted.save(p.id,history,forbidden)).rejects.toThrow('Native source conflict');expect(forbidden).not.toHaveBeenCalled();expect(conflicted.writable(p.id)).toBe(false);await expect(conflicted.flush(p.id)).rejects.toThrow('Native source conflict');
+});
+it('refuses an observer or unattached journal instead of resolving an unsaved document',async()=>{
+ const broker=new WindowHistories(),p=project(),history=historyReducer(initialHistory,{type:'load',project:p}),publish=vi.fn(async()=>{});
+ await expect(broker.save(p.id,history,publish)).rejects.toThrow('No writable native history');call.mockResolvedValue({writable:false,owner:'other',history:null});await broker.attach(p.id);await expect(broker.save(p.id,history,publish)).rejects.toThrow('No writable native history');expect(publish).not.toHaveBeenCalled();expect(call.mock.calls.map(c=>c[0])).toEqual(['read_workspace_history']);
+});

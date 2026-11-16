@@ -87,5 +87,17 @@ export class WindowHistories {
     // The caller reports the failure. Attach/close must still observe it.
     void entry.tail.catch(()=>{});return operation;
   }
+  /** Reserve document publication in the same journal queue as edits. A later
+   * commit must not overtake a frozen Save and change its acknowledged head. */
+  save<T>(id:string,history:HistoryState,publish:()=>Promise<T>):Promise<T>{
+    const entry=this.entries.get(id);
+    if(!entry||entry.blocked||!history.current)return Promise.reject(Error('No writable native history is attached. Keep this draft open; use Edit here in Changes if another window owns it.'));
+    const ready=this.persist(id,history);
+    const operation=ready.then(()=>{if(entry.blocked)throw Error('Window history is awaiting conflict review. Your draft remains open.');return publish();});
+    // Publication errors remain visible to Save, without silently retrying or
+    // preventing further safe edits. A failed history commit stays blocked.
+    entry.tail=operation.then(()=>{},error=>{if(entry.blocked)throw error;});
+    void entry.tail.catch(()=>{});return operation;
+  }
   async flush(id?:string){if(id)await this.entries.get(id)?.tail;else await Promise.all([...this.entries.values()].map(e=>e.tail));}
 }
