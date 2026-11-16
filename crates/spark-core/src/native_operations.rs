@@ -1937,7 +1937,7 @@ pub struct NativeTransportVehicle {
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>,#[serde(skip_serializing_if="Option::is_none")] pub flight_routes:Option<Vec<TransportFlightRoute>>}
+pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>,pub script_created_pilots:Vec<String>,#[serde(skip_serializing_if="Option::is_none")] pub flight_routes:Option<Vec<TransportFlightRoute>>}
 /// Reuse the existing bounded Invader field inventory, never a second tag reader.
 pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  let table=array_listing(fields,"object_names")?;if table.count>512{return invalid("Transport names exceed512entries");}
@@ -1962,10 +1962,12 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  }
  for array in ["machines","controls"]{let table=array_listing(fields,array)?;for row in array_items(&table,array)?{let root=direct_struct_fields(row)?;for key in ["power_group","position_group"]{if indices.contains(&native_index(&root,key)?){return invalid("Transport groups must not drive device power or position");}}}}
  let routes=scenario_command_list_choices(fields)?.into_iter().filter(|route|route.commands>0).map(|route|route.name).collect();
- let squads=scenario_squad_choices(fields)?;let mut pilots=vec![];
- for squad in &squads{if squad.normal_count==1&&squad.insane_count==1{pilots.push(format!("{}/{}",squad.encounter_name,squad.name));}}
- for name in squads.iter().map(|s|&s.encounter_name).collect::<std::collections::BTreeSet<_>>(){let rows=squads.iter().filter(|s|&s.encounter_name==name).collect::<Vec<_>>();if rows.iter().all(|s|s.normal_count>=0&&s.insane_count>=0)&&rows.iter().map(|s|i32::from(s.normal_count)).sum::<i32>()==1&&rows.iter().map(|s|i32::from(s.insane_count)).sum::<i32>()==1{pilots.push(name.clone());}}
- Ok(NativeTransportChoices{vehicles,groups,routes,pilots,flight_routes:None})
+ let squads=scenario_squad_start_choices(fields)?;let mut pilots=vec![];
+ let has_start=|squad:&&ScenarioSquadChoice|squad.starts.as_ref().is_some_and(|starts|!starts.is_empty())||(squad.normal_count==0&&squad.insane_count==0);
+ for squad in &squads{if squad.normal_count==1&&squad.insane_count==1&&has_start(&squad){pilots.push(format!("{}/{}",squad.encounter_name,squad.name));}}
+ for name in squads.iter().map(|s|&s.encounter_name).collect::<std::collections::BTreeSet<_>>(){let rows=squads.iter().filter(|s|&s.encounter_name==name).collect::<Vec<_>>();if rows.iter().all(|s|s.normal_count>=0&&s.insane_count>=0&&has_start(s))&&rows.iter().map(|s|i32::from(s.normal_count)).sum::<i32>()==1&&rows.iter().map(|s|i32::from(s.insane_count)).sum::<i32>()==1{pilots.push(name.clone());}}
+ let initial=native_mission_encounters(fields)?;let script_created_pilots=pilots.iter().filter(|pilot|{let name=pilot.split('/').next().unwrap();let matches=initial.iter().filter(|row|row.name==name).collect::<Vec<_>>();matches.len()==1&&!matches[0].initially_created}).cloned().collect();
+ Ok(NativeTransportChoices{vehicles,groups,routes,pilots,script_created_pilots,flight_routes:None})
 }
 
 #[cfg(test)]mod mission_source_flags_tests {

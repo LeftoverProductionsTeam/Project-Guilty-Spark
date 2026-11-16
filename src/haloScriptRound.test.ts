@@ -168,6 +168,10 @@ describe('Forerunner native transport source',()=>{
   }
   expect(()=>exportHaloCeTransport({...options,returnAfterInsertion:'yes'} as any)).toThrow('whether');
  });
+ it('creates only an explicitly deferred pilot once without erasing existing actors',()=>{
+  const original=exportHaloCeTransport(options);expect(original.content).not.toContain('(ai_place pilot)');
+  const script=exportHaloCeTransport({...options,createPilot:true});expect(readNativeTransportSource(script.content).createPilot).toBe(true);expect(script.content).toContain('(if (= (ai_living_count pilot) 0) (ai_place pilot))');expect(script.content.indexOf('(ai_place pilot)')).toBeLessThan(script.content.indexOf('(vehicle_load_magic'));expect(script.content).not.toMatch(/ai_erase|object_destroy/);expect(()=>exportHaloCeTransport({...options,createPilot:'yes' as any})).toThrow('ownership');
+ });
  it('keeps factions distinct and rejects handwritten source regeneration and injected refs',()=>{
   const script=exportHaloCeTransport({...options,faction:'covenant',pilotSeat:'CD-driver',departureCue:'depart_cue',arrivalCue:'arrive_cue'});
   expect(script.content).toContain('forerunner_spirit_complete');expect(script.content).toContain('(depart_cue)');expect(script.content).toContain('(arrive_cue)');

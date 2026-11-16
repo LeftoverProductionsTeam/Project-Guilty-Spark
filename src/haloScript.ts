@@ -815,11 +815,14 @@ export interface NativeTransportOptions {
   departureCue?:string; arrivalCue?:string;
   /** Reuse the reviewed return/insertion routes for empty hub return and recall. */
   returnAfterInsertion?:boolean;
+  /** Explicit ownership of a not-initially-created native pilot. */
+  createPilot?:boolean;
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','createPilot'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
+  if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
   const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
   const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
@@ -840,6 +843,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '(global boolean '+stem+'_ready false)',
     '(global boolean '+stem+'_settled false)',
     '(script startup '+stem+'_pilot',
+    ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
     '  (vehicle_load_magic (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))',
     '  (sleep_until '+crew+' 1)',
@@ -888,7 +892,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
-      'The scenario must create exactly one living pilot in the selected encounter/squad, provide its exact seat label and author reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
+      'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
       'Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};
 }
