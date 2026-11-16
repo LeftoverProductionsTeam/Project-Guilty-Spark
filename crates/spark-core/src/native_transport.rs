@@ -109,6 +109,33 @@ pub fn validate_vehicle_source(fields:&str)->Result<()>{
  if drivers.len()!=1||labels.len()<2||labels.iter().any(|label|label.is_empty()){return invalid("Transport needs one real driver seat and at least one labeled passenger seat; repair or import the matching native vehicle source");}Ok(())
 }
 
+/// A conservative source profile for generated physical flights. Advanced native
+/// programs remain editable through the manual HaloScript path; no simulation.
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct TransportFlightRoute {pub name:String,pub points:usize,pub commands:usize,pub final_position:Option<[f32;3]>,pub arrival_volumes:Vec<String>,pub issue:Option<String>}
+pub fn flight_route(route:&NativeCommandList,volumes:&[crate::maps::ScenarioLogicVolume])->TransportFlightRoute {
+ let check=||->Result<[f32;3]>{
+  route.validate()?;
+  for(index,command)in route.commands.iter().enumerate(){
+   match command.atom.as_str(){
+    "go_to" if [0,1].contains(&command.modifier)&&command.point1>=0=>{},
+    "go_to_and_face" if command.modifier==0&&command.point1>=0&&command.point2>=0=>{},
+    "set_radius" if command.parameters[0]>0.=>{},
+    "pause" if command.parameters[0]>=0.=>{},
+    _=>return invalid(format!("Route {} action{} ({}) is outside the generated physical-flight profile. Use go-to (stop/keep-moving), go-to-and-face (stop with Point2), positive set-radius or pause; advanced source remains available manually",route.name,index,command.atom)),
+   }
+  }
+  let final_step=route.commands.iter().rfind(|command|matches!(command.atom.as_str(),"go_to"|"go_to_and_face")).ok_or_else(||crate::SparkError::Invalid(format!("Route {} has no physical go-to actions",route.name)))?;
+  if final_step.modifier!=0{return invalid(format!("Route {} must end with a go-to Stop at point; a keep-moving point or completed command is not a landing",route.name));}
+  route.points.get(final_step.point1 as usize).copied().ok_or_else(||crate::SparkError::Invalid(format!("Route {} final landing point is unavailable",route.name)))
+ };
+ let (final_position,issue)=match check(){Ok(point)=>(Some(point),None),Err(issue)=>(None,Some(issue.to_string()))};
+ let mut names=std::collections::BTreeMap::new();for volume in volumes{*names.entry(volume.name.as_str()).or_insert(0usize)+=1;}
+ let arrival_volumes=final_position.map(|point|volumes.iter().filter(|v|names.get(v.name.as_str())==Some(&1)&&v.geometry.as_ref().is_some_and(|g|g.contains(point))).map(|v|v.name.clone()).collect()).unwrap_or_default();
+ TransportFlightRoute{name:route.name.clone(),points:route.points.len(),commands:route.commands.len(),final_position,arrival_volumes,issue}
+}
+
 #[cfg(test)]
 mod tests{
  use super::*;
@@ -124,6 +151,18 @@ mod tests{
   for wrong in [after.replace("name (original)","name (changed)"),after.replace("initial_value (1)","initial_value (0)"),after.replace("source_metadata (retained)","source_metadata (lost)"),after.replace("position (1,2,3)","position (2,2,3)"),after.replace("can_change_only_once (0)","can_change_only_once (1)"),after.replace("body_vitality (1)","body_vitality (0)")]{assert!(reviewed(&before,&wrong,&value).is_err());}
   assert!(arguments(Path::new("tags"),"level.scenario",&after,&value).is_err());
   let partial=before.replace("name (original_power)","name (extraction_pelican_landed)");assert!(arguments(Path::new("tags"),"level.scenario",&partial,&value).is_err());
+ }
+ #[test]fn flight_route_profile_checks_physical_commands_and_rotated_pad_bounds(){
+  let command=|point,modifier|NativeCommand{atom:"go_to".into(),modifier,parameters:[0.;2],point1:point,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1};
+  let route=NativeCommandList{index:0,name:"approach".into(),flags:[false;6],bsp:-1,points:vec![[2.,2.,8.],[2.,2.,1.]],commands:vec![command(0,1),command(1,0)]};
+  let pad=crate::maps::ScenarioLogicVolume{name:"pad".into(),kind:1,geometry:Some(crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[4.,0.,0.],dimensions:[4.;3]})};
+  let ready=flight_route(&route,&[pad.clone()]);assert!(ready.issue.is_none());assert_eq!(ready.final_position,Some([2.,2.,1.]));assert_eq!(ready.arrival_volumes,vec!["pad"]);
+  let mut wrong=route.clone();wrong.points[1]=[5.,2.,1.];assert!(flight_route(&wrong,&[pad.clone()]).arrival_volumes.is_empty());
+  for fault in 0..7{let mut wrong=route.clone();match fault{0=>wrong.commands[1].modifier=1,1=>wrong.commands[0].atom="teleport".into(),2=>wrong.commands[0].atom="loop".into(),3=>wrong.commands[1].point1=-1,4=>wrong.commands[0].atom="script".into(),5=>wrong.commands[0].modifier=2,_=>wrong.commands.clear()};assert!(flight_route(&wrong,&[pad.clone()]).issue.is_some(),"Unsupported route fault {fault}");}
+  let mut facing=route.clone();facing.commands[1].atom="go_to_and_face".into();facing.commands[1].point2=0;assert!(flight_route(&facing,&[pad.clone()]).issue.is_none());facing.commands[1].point2=-1;assert!(flight_route(&facing,&[pad.clone()]).issue.is_some());
+  let mut radius=command(-1,0);radius.atom="set_radius".into();radius.parameters[0]=4.;let mut with_radius=route.clone();with_radius.commands.insert(1,radius.clone());assert!(flight_route(&with_radius,&[pad.clone()]).issue.is_none());with_radius.commands[1].parameters[0]=0.;assert!(flight_route(&with_radius,&[pad.clone()]).issue.is_some());
+  let mut paused=route.clone();let mut pause=command(-1,0);pause.atom="pause".into();pause.parameters[0]=1.;paused.commands.push(pause);assert!(flight_route(&paused,&[pad.clone()]).issue.is_none());
+  assert!(flight_route(&route,&[pad.clone(),pad.clone()]).arrival_volumes.is_empty());let mut fixed=pad;fixed.geometry=None;assert!(flight_route(&route,&[fixed]).arrival_volumes.is_empty());
  }
  #[test]fn flight_fields_preserve_every_other_field_and_bound_native_values(){
   let before="ai_throttle_maximum (0.65) float32\nai_avoidance_distance (4) float32\nai_pathfinding_radius (1.8) float32\nunrelated (retained) string\n";
@@ -179,10 +218,17 @@ mod installed {
   reviewed_difference(&before_flight,&after_flight,&operation).unwrap();let scalar=run(&editor,operation.readback_arguments(&tags,"vehi",vehicle_tag,&before_flight).unwrap().unwrap());operation.verify_readback(&tags,"vehi",vehicle_tag,&before_flight,&scalar).unwrap();
   let modified_vehicle_sha=crate::maps::hash_file(&vehicle_file).unwrap();let original_vehicle_sha=crate::maps::hash_file(&shared.join(vehicle_tag)).unwrap();
   let hashes=protected.iter().map(|p|crate::maps::hash_file(p).unwrap()).collect::<Vec<_>>();
+  let route_before=fields();let command_source=native_command_source(&route_before).unwrap();let volumes=scenario_volume_choices(&route_before).unwrap();
+  let end=snapshots(&route_before,&selected).unwrap()[0].transport.position;let pad=volumes.iter().find(|v|v.geometry.as_ref().is_some_and(|g|g.contains(end))&&volumes.iter().filter(|p|p.name==v.name).count()==1).expect("native flight fixture needs a readable unique pad containing its authored aircraft origin");
+  let command=|point,modifier|NativeCommand{atom:"go_to".into(),modifier,parameters:[0.;2],point1:point,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1};
+  let route=NativeCommandList{index:command_source.lists.len() as u16,name:"gs_native_flight".into(),flags:[false,false,false,false,false,true],bsp:0,points:vec![[end[0],end[1],end[2]+8.],end],commands:vec![command(0,1),command(1,0)]};
+  let mut route=route;route.points.push([end[0]+2.,end[1],end[2]]);route.commands[1].atom="go_to_and_face".into();route.commands[1].point2=2;
+  let op=Operation::CommandList{list:route.clone(),append:true,source_sha256:crate::maps::hash_file(&file).unwrap()};for args in op.argument_batches(op.arguments_with_fields(&tags,"scnr",tag,&route_before).unwrap(),false).unwrap(){run(&editor,args);}let route_after=fields();reviewed_difference(&route_before,&route_after,&op).unwrap();let review=native_transport_routes(&route_after).unwrap().into_iter().find(|r|r.name==route.name).unwrap();assert!(review.issue.is_none());assert!(review.arrival_volumes.contains(&pad.name));assert_eq!(review.final_position,Some(end));
   let reviewed=fields();let mut snapshots=snapshots(&reviewed,&selected).unwrap();snapshots[0].flight=Some(flight.clone());let source_sha=crate::maps::hash_file(&file).unwrap();
   run(&tools.join("invader-build.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-m".into(),output.to_string_lossy().into_owned(),"be_native".into()]);
   let cache=output.join("be_native.map");let map=crate::maps::inspect_map(&cache,None).unwrap();assert_eq!(map.header.version,609);assert_eq!(map.header.scenario_type,0);verify_cache(&snapshots,&cache,&map).unwrap();
-  let snapshot=ScenarioSquadReadback{transports:Some(snapshots.clone()),command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:source_sha.clone(),squads:original_squads,include_starts:true,combat:vec![]};snapshot.verify_cache(&cache,&map).unwrap();
+  let snapshot=ScenarioSquadReadback{transports:Some(snapshots.clone()),command_lists:Some(native_command_source(&reviewed).unwrap().lists),devices:None,volumes:Some(volumes),cameras:None,source_sha256:source_sha.clone(),squads:original_squads,include_starts:true,combat:vec![]};snapshot.verify_cache(&cache,&map).unwrap();
+  let compiled_routes=crate::maps::scenario_command_readback(&cache,&map).unwrap();assert!(compiled_routes.iter().find(|r|r.name==route.name).unwrap().close(&route));eprintln!("Native physical-flight route source/readback PASS: {review:?}; geometry is authored source only, not flight acceptance");
   for field in 0..3{let mut wrong=flight.clone();match field{0=>wrong.throttle+=0.1,1=>wrong.avoidance_distance+=0.1,_=>wrong.pathfinding_radius+=0.1};assert!(wrong.verify_map(&map,"forerunner/transport/pelican").is_err());}
   for field in 0..4{let mut wrong=snapshots.clone();match field{0=>wrong[0].transport.position[0]+=1.,1=>wrong[0].transport.rotation_radians[0]+=0.5,2=>wrong[0].name_index+=1,_=>wrong[0].groups[0]+=1};assert!(verify_cache(&wrong,&cache,&map).is_err(),"Compiled aircraft readback accepted a wrong pose/name/group");}
 

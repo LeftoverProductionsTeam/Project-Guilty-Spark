@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: e2879a6081f9fa37fe29b7ce59d9e65a6497e7cc, canonical local master.
-Latest verified revision: parent e2879a6081f9fa37fe29b7ce59d9e65a6497e7cc plus scoped native-flight source identified by hashes in RUNTIME_INTEGRATION_20261107; local milestone commit follows this checkpoint.
-Next action: complete Black Echo native pilot/approach/landing/recall/departure and mission composition using existing editors/builders. Repair candidate out-of-BSP/bitmap/HUD diagnostics, independently compile/read back the full mission. Native Windows42-edit/Save37944 and approved Forerunner gameplay remain open while desktop control is unavailable; do not repeat unchanged initialization.
+Starting revision: 78c01b2aef5d56cded6ba65a90d3f4242b2f0e5a, canonical local master.
+Latest verified revision: parent78c01b2aef5d56cded6ba65a90d3f4242b2f0e5a plus native-flight route source hashes in RUNTIME_INTEGRATION_20261107; scoped local commit follows this checkpoint.
+Next action: compose full Black Echo pilot/crew, physical routes, mission/controller scripts and dependencies through existing builders; repair candidate BSP/bitmap/HUD diagnostics, compile/read back. Native Windows Save37944/42-edit/full restart and approved Forerunner flight/gameplay remain open while desktop control cannot initialize; no unchanged retry.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov route (parent78c01b2): CE609 cachee5711810ca6b2deba4b7802fce4e07c9eff851029b554029c7c7482f61122e71 independently matches cruise/final-facing commands,3points, all pads and original routes/AI/scripts. Viewport/source/history and bad-route/pad refusal pass browser controls separately. No actual flight/full Black Echo handoff acceptance; exact evidence in RUNTIME_INTEGRATION_20261107.
 
 16Nov flight (parent e2879a6): CE609 cache52f5fef0490a138f3461379fda71f64d5835054ff7474d517b7055c5a328db03 independently verifies tuned .5/5/2 and refuses mismatches for all3values; exact source/vehicle Restore passes. Real driver-seat choices and disabled/unread tuning refusal pass browser controls. Full mission/flight/native restart remain open; source hashes, warnings and detailed checks in RUNTIME_INTEGRATION_20261107.
 
@@ -33,7 +35,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Native flight workflow implemented and scoped checks PASS: real human-plane throttle/avoidance/pathfinding Preview/Accept/Restore; exact source/scenario binding pins; saved working revision; mandatory three-field compiled readback retained through script/HUD staging. Controller source reads actual tuning and driver flags, refuses unread/disabled/unsupported flight and passenger-seat pilots without discarding the draft. Core27+15, frontend21+4, browser2, TypeScript/Vite/Windows all-target check and installed CE609/readback1 pass; explicit opt-in skips5+1 are separate. No native app/restart/flight/gameplay acceptance. Exact precursor failures/output/source hashes in RUNTIME_INTEGRATION_20261107. No push.
+Native flight tuning78c01b2 remains verified in scope. Current route workflow: existing command/volume readers check physical movement, final-stop/facing references and final craft-origin containment by readable selected pads; unread/unsupported/bad-pad programs refuse generated preparation, manual source remains available. Existing route editor exposes Stop/Keep moving while preserving unknown values; viewport/Preview/Accept/Restore/Save/reopen continue. Only two selected route reviews render. Core28/browser3distinct/guide4/TypeScript/Vite/Windows and installed CE609 route/volume/aircraft/tuning readback1 pass. Native Windows/full restart/flight/gameplay remain unrun. Exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No push.
 
 Observed parallel-QA ENOENT root-retirement race reproduced after the final receipt read and repaired. Only an already-absent completed root is tolerated; existing-root/missing-child, changed ownership, EIO and hashing still fail closed. Storage42/42 pass. All owned output auto-disposed; development runs/issues both empty. Protected475CSV/legacy checkpoint unchanged; no runtime/Forerunner/SDK writes or push.
 
@@ -123,7 +125,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA51538/run-1p589v CLOSED;1398146244logicalB disposed automatically, root absent, development runs[]/issues[]. No active owned test/app/game, SDK/cache/archive retained, protected file writes or remote action. Physical reclaimed space unavailable.475CSV/legacy previous checkpoint hashes unchanged; do not create previous copies.
+QA11425/run-YyqF8H CLOSED;1398210322logicalB disposed, root absent, development runs[]/issues[]. All owned tools/tests terminal; no map/binary/SDK/cache/archive retained, game/original/Forerunner/remote writes or physical-reclamation claim. Earlier QA51538 closure remains in Git78c01b2/RUNTIME_INTEGRATION_20261107.475CSV/legacy checkpoint hashes unchanged.
 
 QA9851/run-EBRqKl CLOSED; owned apps/tools exited;4337096416logicalB disposed, peak allocation4128882920B; final physical reclamation unavailable. No new screenshot/map/app/SDK/cache/archive retained. Earlier QA21477/QA6610/QA29134 closures remain in Git/RUNTIME_INTEGRATION_20261107.
 
@@ -141,7 +143,7 @@ QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete tempor
 
 Earlier Forerunner review8d2cbb07, contract1ed7398d and disposed24,318,648B browser42810 evidence remain in Git248b5e4:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. Latest approved capability query is recorded above; historical review is not current engine/game acceptance.
 
-All newly owned operations terminal; no active test/app/game. Final root36441/run-aMCXpM exited0 and disposed3,615,422,165B (peak allocated3,421,368,016B). Initial failed root44809 disposed2,373,490,221B; Library root35481 disposed2,272,377,622B. Focused baseline run6826 disposed378,121,413B; earlier unit compiler run25659 disposed1,314,216,170B, wrong forge_reuse filter selected0 and is not a pass. Only small selected receipts/PNGs retained externally; no binary, map, SDK or archive exported. Original maps/SDK/runtimes/Forerunner/remotes untouched; no game/push/publication. Native followups/probes20439/93320/56728/74983/53123/29810/48805 are terminal; their failures/pass distinctions remain in UI_INTERACTION_AUDIT.md.
+Historical QA36441/44809/35481 and focused followup closures, scoped UI/native passes/failures and original preservation evidence remain in Git78c01b2:docs/ACTIVE_TASK.md and UI_INTERACTION_AUDIT/RUNTIME_INTEGRATION_20261107; no old workspace revived.
 
 Historical H1A append/restore/native UI restart/readback scope, hashes and initial failures remain in Gite2879a6:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. It does not close actual AI/game/peer or later Save37944 acceptance.
 

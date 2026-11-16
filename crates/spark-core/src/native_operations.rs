@@ -6,7 +6,8 @@ use sha2::{Digest,Sha256};
 use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
-pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning};
+pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,TransportFlightRoute};
+pub fn native_transport_routes(fields:&str)->Result<Vec<TransportFlightRoute>>{let routes=native_command_source(fields)?;let volumes=scenario_volume_choices(fields)?;Ok(routes.lists.iter().map(|route|transport::flight_route(route,&volumes)).collect())}
 pub fn native_vehicle_flight(fields:&str)->Result<VehicleFlightTuning>{transport::flight_source(fields)}
 pub fn scenario_transport_snapshots(fields:&str,names:&[String])->Result<Vec<TransportSnapshot>>{transport::snapshots(fields,names)}
 pub fn complete_transport_snapshots(fields:&str)->Result<Vec<TransportSnapshot>>{let values=scenario_transport_choices(fields)?;let names=values.vehicles.iter().filter(|vehicle|["boarded","called","landed"].iter().all(|suffix|values.groups.contains(&format!("{}_{suffix}",vehicle.name)))).map(|v|v.name.clone()).collect::<Vec<_>>();transport::snapshots(fields,&names)}
@@ -1883,7 +1884,7 @@ pub struct NativeTransportVehicle {
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>}
+pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>,#[serde(skip_serializing_if="Option::is_none")] pub flight_routes:Option<Vec<TransportFlightRoute>>}
 /// Reuse the existing bounded Invader field inventory, never a second tag reader.
 pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  let table=array_listing(fields,"object_names")?;if table.count>512{return invalid("Transport names exceed512entries");}
@@ -1911,5 +1912,5 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  let squads=scenario_squad_choices(fields)?;let mut pilots=vec![];
  for squad in &squads{if squad.normal_count==1&&squad.insane_count==1{pilots.push(format!("{}/{}",squad.encounter_name,squad.name));}}
  for name in squads.iter().map(|s|&s.encounter_name).collect::<std::collections::BTreeSet<_>>(){let rows=squads.iter().filter(|s|&s.encounter_name==name).collect::<Vec<_>>();if rows.iter().all(|s|s.normal_count>=0&&s.insane_count>=0)&&rows.iter().map(|s|i32::from(s.normal_count)).sum::<i32>()==1&&rows.iter().map(|s|i32::from(s.insane_count)).sum::<i32>()==1{pilots.push(name.clone());}}
- Ok(NativeTransportChoices{vehicles,groups,routes,pilots})
+ Ok(NativeTransportChoices{vehicles,groups,routes,pilots,flight_routes:None})
 }

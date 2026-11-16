@@ -414,6 +414,7 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
                         Ok(flight)=>{vehicle.flight_issue=flight.validate().err().map(error);vehicle.flight=Some(flight);},
                         Err(issue)=>vehicle.flight_issue=Some(error(issue)),
                     }}
+                choices.flight_routes=Some(core::native_operations::native_transport_routes(&values).map_err(error)?);
                 view.transport_review=Some(choices);
             }
             let latest=lock(&state.library)?.get(&project_id).map_err(error)?;if latest.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Saved authoring changed during camera review".into());}let current=source_context(&state,&latest)?;
