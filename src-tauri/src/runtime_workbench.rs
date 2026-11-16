@@ -356,7 +356,11 @@ pub(super) struct WorkingScriptSources {
     source_sha256:String,modules:Vec<WorkingScriptModule>,
     #[serde(skip_serializing_if="Option::is_none")] camera_review:Option<WorkingCameraReview>,
     #[serde(skip_serializing_if="Option::is_none")] transport_review:Option<core::native_operations::NativeTransportChoices>,
+    #[serde(skip_serializing_if="Option::is_none")] mission_review:Option<WorkingMissionReview>,
 }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct WorkingMissionReview {encounters:Vec<core::native_operations::NativeMissionEncounter>,squads:Vec<core::native_operations::ScenarioSquadChoice>,devices:Vec<core::native_operations::NativeDevicePlacement>,protected_encounters:Vec<String>}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub(super) struct WorkingCameraReview {tag_identity:String,cameras:Vec<maps::NativeCameraPoint>,script_names:Vec<String>,trigger_volumes:Vec<String>,scenario_type:u16}
@@ -391,21 +395,24 @@ fn working_script_inventory(state:&AppState,project_id:&str,build_id:&str,tags:&
         modules.push(WorkingScriptModule{filename:filename.into(),sha256,bytes,unavailable});
     }
     Ok((WorkingScriptSources{project_id:project.id,build_id:context.build.id,tags_directory:context.tags,
-        project_fingerprint:fingerprint.into(),source_sha256:identity,modules,camera_review:None,transport_review:None},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
+        project_fingerprint:fingerprint.into(),source_sha256:identity,modules,camera_review:None,transport_review:None,mission_review:None},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
 }
 #[tauri::command]
 pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:String,expected_build_id:String,
-    expected_source_directory:PathBuf,expected_project_fingerprint:String,include_cameras:Option<bool>,include_transport:Option<bool>)->Reply<WorkingScriptSources> {
+    expected_source_directory:PathBuf,expected_project_fingerprint:String,include_cameras:Option<bool>,include_transport:Option<bool>,include_mission:Option<bool>)->Reply<WorkingScriptSources> {
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();
         let(mut view,_)=working_script_inventory(&state,&project_id,&expected_build_id,&expected_source_directory,&expected_project_fingerprint)?;
-        if include_cameras==Some(true)||include_transport==Some(true){
+        if include_cameras==Some(true)||include_transport==Some(true)||include_mission==Some(true){
             let project=lock(&state.library)?.get(&project_id).map_err(error)?;let context=source_context(&state,&project)?;
             if context.build.id!=expected_build_id||context.tags!=expected_source_directory||project.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Native camera source selection changed; read it again".into());}
             let identity=core::working_tags::source_identity(&context.tags,&AtomicBool::new(false)).map_err(error)?;
             let values=native_operations_native::fields(&state,&project,&context.tags,&format!("{}.scenario",context.scenario_path))?;
             let cameras=core::native_operations::scenario_camera_choices(&values).map_err(error)?;let script_names=core::native_operations::scenario_script_names(&values).map_err(error)?;
             let trigger_volumes=core::native_operations::scenario_trigger_volume_names(&values).map_err(error)?;let scenario_type=source_scenario_type(&state,&project)?;
+            if include_mission==Some(true){
+                view.mission_review=Some(WorkingMissionReview{encounters:core::native_operations::native_mission_encounters(&values).map_err(error)?,squads:core::native_operations::scenario_squad_choices(&values).map_err(error)?,devices:core::native_operations::scenario_device_choices(&values).map_err(error)?,protected_encounters:native_operations_native::protected_mission_encounters(&state,&project,&context.build)?.into_iter().collect()});
+            }
             if include_transport==Some(true){
                 let mut choices=core::native_operations::scenario_transport_choices(&values).map_err(error)?;
                 for vehicle in &mut choices.vehicles{let tag=format!("{}.vehicle",vehicle.tag_path);let listing=native_operations_native::fields(&state,&project,&context.tags,&tag)?;vehicle.seats=core::native_operations::native_vehicle_seats(&listing).map_err(error)?;

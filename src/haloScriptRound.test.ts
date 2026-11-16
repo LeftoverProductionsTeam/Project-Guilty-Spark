@@ -1,5 +1,6 @@
-import {exportHaloCeTransport,readNativeTransportSource} from './haloScript';
+import {exportHaloCeTransport,readNativeTransportSource,recoveredCampaignMission,readRecoveredMissionSource} from './haloScript';
 import { describe, expect, it } from 'vitest';
+import {emptyCreatorStudio} from './creatorStudio';
 import { attachNativeFirefightRound, exportHaloCeFirefightRound, exportPlannedFirefightRound, nativeRoundBinding, nativeSoloFirefightRules } from './haloScript';
 import type { Project } from './types';
 import { defaultNativePlayerProfile, type FirefightConfig } from './firefight';
@@ -174,5 +175,14 @@ describe('Forerunner native transport source',()=>{
   expect(()=>readNativeTransportSource(script.content+'; Handwritten change\n')).toThrow('edited');
   expect(()=>readNativeTransportSource('(script startup old (sleep 1))')).toThrow('handwritten');
   for(const change of [{pilot:'pilot) (object_destroy all)'},{pilotSeat:'P-driver"'},{pilotSeat:'P-driver\\bad'},{outbound:options.inbound},{hub:options.field},{arrivalCue:'bad function'}])expect(()=>exportHaloCeTransport({...options,...change})).toThrow();
+ });
+});
+
+describe('recovered campaign source preparation',()=>{
+ it('has reversible source ownership and preserves bootstrap identity without requiring QuickForge initialization',()=>{
+  const studio={...emptyCreatorStudio(),missions:[{id:'one',title:'Arrival',objective:'Reach the pad',trigger:'triggerVolume' as const,triggerRef:'pad',encounterName:''}]};
+  const manual=recoveredCampaignMission(studio,'manual',false),startup=recoveredCampaignMission(studio,'startup',false);
+  expect(manual.content).not.toContain('gs_logic_ready');expect(startup.content).not.toContain('gs_logic_ready');expect(manual.content).toContain('(script startup gs_mission_bootstrap\n  (sleep -1)');expect(startup.content).toContain('(sleep_until (> (list_count (players)) 0) 1)\n  (wake gs_mission)');expect(readRecoveredMissionSource(startup.content).missions).toEqual(studio.missions);
+  expect(()=>readRecoveredMissionSource(startup.content+'; handwritten change\n')).toThrow(/edited/);expect(()=>readRecoveredMissionSource('(script startup old (sleep 1))')).toThrow(/unchanged/);
  });
 });

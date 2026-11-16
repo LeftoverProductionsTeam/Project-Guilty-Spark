@@ -185,6 +185,8 @@ pub struct WorkingTagsInput {
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub mission_readback:Option<crate::creative::NativeMissionBinding>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub generated_mission_hud:Option<GeneratedHudSource>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
@@ -283,6 +285,7 @@ struct Prepared {
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
     parent_generated_firefight:Option<GeneratedFirefightSource>,
     parent_generated_mission_hud:Option<GeneratedHudSource>,
+    parent_mission_readback:Option<crate::creative::NativeMissionBinding>,
     hud_readback_targets:Vec<crate::native_operations::HudSourceTarget>,
     scenario_squad_readback:Option<crate::native_operations::ScenarioSquadReadback>,
     encounter_expectations:Vec<crate::native_operations::Operation>,
@@ -362,7 +365,7 @@ fn same_record(a: &BuildRecord, b: &BuildRecord) -> bool {
 }
 
 /// Resolve an immutable native input snapshot without declaring its cache
-/// compiled for newer authoring rules. Only recovered Firefight metadata may differ.
+/// compiled for newer authoring rules. Only recovered Firefight/Studio authoring metadata may differ.
 pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: &Path) -> Result<Project> {
     project.validate()?;
     let _ = native_profile(&build.target)?;
@@ -375,7 +378,7 @@ pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: 
         return Ok(project.clone());
     }
     if project.source.is_none() || project.quick_forge.is_some() {
-        return invalid("Only recovered source can retain a native parent across Firefight authoring edits; editable geometry must use its normal build");
+        return invalid("Only recovered source can retain a native parent across campaign/Firefight authoring edits; editable geometry must use its normal build");
     }
     uuid::Uuid::parse_str(&build.id)
         .map_err(|_| SparkError::Invalid("Native source parent ID is invalid".into()))?;
@@ -392,16 +395,20 @@ pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: 
     if parent.id != project.id || parent.fingerprint()? != build.project_fingerprint {
         return invalid("Native project snapshot does not match its original compiled revision");
     }
+    // Studio also holds applied recording inputs. They still require their
+    // existing native camera/source build, never authoring-only parent reuse.
+    let camera_inputs=|value:&Project|serde_json::to_value(value.studio.as_ref().and_then(|studio|studio.engine_machinima.as_ref().filter(|options|options.enabled).map(|options|(options,&studio.shots))));
+    if camera_inputs(&parent)?!=camera_inputs(project)?{return invalid("Native recording inputs changed; use the existing camera/source build before reusing this parent");}
     let mut before = serde_json::to_value(&parent)?;
     let mut after = serde_json::to_value(project)?;
-    for key in ["firefight", "history", "builds", "modifiedAt", "scenarioScriptDraft"] {
+    for key in ["firefight", "studio", "history", "builds", "modifiedAt", "scenarioScriptDraft"] {
         // Project's serialized representation is a struct/object. Only these
         // authoring and bookkeeping fields may differ, including on Undo.
         before.as_object_mut().ok_or_else(|| SparkError::Invalid("Invalid native project snapshot".into()))?.remove(key);
         after.as_object_mut().ok_or_else(|| SparkError::Invalid("Invalid current project snapshot".into()))?.remove(key);
     }
     if before != after {
-        return invalid("Geometry, tags, assets, paths or other source inputs changed; Firefight-only parent reuse was refused");
+        return invalid("Geometry, tags, assets, paths or other source inputs changed; Authoring-only parent reuse was refused");
     }
     parent.builds = project.builds.clone();
     Ok(parent)
@@ -426,9 +433,9 @@ fn parent_native_identity(
     input: &WorkingTagsInput,
     parent: &Path,
     tool_hash: &str,
-) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>,Option<crate::native_operations::ScenarioSquadReadback>,Option<GeneratedHudSource>)> {
+) -> Result<(Option<PathBuf>,Option<crate::firefight::NativeControllerBinding>,Vec<crate::native_operations::Operation>,Option<GeneratedFirefightSource>,Vec<crate::native_operations::HudSourceTarget>,Option<crate::native_operations::ScenarioSquadReadback>,Option<GeneratedHudSource>,Option<crate::creative::NativeMissionBinding>)> {
     let (_, _, compiler_key) = native_profile(&input.parent_build.target)?;
-    let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut generated_mission_hud=None;let mut hud_readback_targets=vec![];let mut scenario_squad_readback=None;
+    let mut mission_readback=None;let mut controller_binding=None;let mut encounter_expectations=vec![];let mut generated_firefight=None;let mut generated_mission_hud=None;let mut hud_readback_targets=vec![];let mut scenario_squad_readback=None;
     let working_receipt = parent.join("working-tags-receipt.json");
     let forge_receipt = parent.join("quickforge-receipt.json");
     let conversion_receipt = parent.join("conversion-manifest.json");
@@ -455,7 +462,7 @@ fn parent_native_identity(
         retain_hud_targets(&mut hud_readback_targets,receipt.hud_readback_targets)?;
         scenario_squad_readback=receipt.scenario_squad_readback;
         controller_binding=receipt.controller_binding;
-        generated_firefight=receipt.generated_firefight;generated_mission_hud=receipt.generated_mission_hud;
+        generated_firefight=receipt.generated_firefight;generated_mission_hud=receipt.generated_mission_hud;mission_readback=receipt.mission_readback;
         for expectation in receipt.encounter_expectations.into_iter().chain(receipt.expected_encounter){retain_encounter_expectation(&mut encounter_expectations,expectation)?;}
         receipt.workspace
     } else if forge_receipt.exists() {
@@ -498,9 +505,9 @@ fn parent_native_identity(
         if !data.starts_with(parent) {
             return invalid("Parent native script source escaped its job");
         }
-        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback,generated_mission_hud))
+        Ok((Some(data),controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback,generated_mission_hud,mission_readback))
     } else {
-        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback,generated_mission_hud))
+        Ok((None,controller_binding,encounter_expectations,generated_firefight,hud_readback_targets,scenario_squad_readback,generated_mission_hud,mission_readback))
     }
 }
 
@@ -530,7 +537,7 @@ fn prepare(
     let (_, cache_version, compiler_key) = native_profile(&input.parent_build.target)?;
     let source_project=source_parent_project(project,&input.parent_build,jobs_root)?;
     let authoring_pending=source_project.fingerprint()?!=project.fingerprint()?;
-    if authoring_pending&&!input.compile_scripts{return invalid("Firefight authoring rules changed. Attach/review the matching controller and explicitly compile scripts; a tag-only rebuild cannot apply them");}
+    if authoring_pending&&!input.compile_scripts{return invalid("Campaign or Firefight authoring changed. Attach/review the matching source and explicitly compile scripts; a tag-only rebuild cannot apply them");}
     if input.parent_build.status != "validated"
         || input.parent_build.project_fingerprint != source_project.fingerprint()?
         || !project
@@ -632,7 +639,7 @@ fn prepare(
     if input.mission_hud.is_some()&&(input.scenario_type!=0||input.encounter_append.is_some()) {
         return invalid("Campaign HUD requires a solo target; prepare Firefight messages in a separate revision");
     }
-    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets,parent_squad_readback,parent_generated_mission_hud) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
+    let (source_data,parent_controller_binding,mut encounter_expectations,parent_generated_firefight,mut hud_readback_targets,parent_squad_readback,parent_generated_mission_hud,parent_mission_readback) = parent_native_identity(&source_project, input, &parent, &tools[compiler_key])?;
     retain_hud_targets(&mut hud_readback_targets,input.hud_readback_targets.clone())?;
     if !hud_readback_targets.is_empty(){
         for (key,name) in [("invaderEdit","invader-edit"),("invaderExtract","invader-extract")] {
@@ -710,6 +717,7 @@ fn prepare(
         parent_controller_binding,
         parent_generated_firefight,
         parent_generated_mission_hud,
+        parent_mission_readback,
         hud_readback_targets,
         scenario_squad_readback,
         encounter_expectations,
@@ -1225,6 +1233,7 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        mission_readback:prepared.parent_mission_readback.clone(),
         generated_firefight:prepared.parent_generated_firefight.clone(),
         generated_mission_hud:prepared.parent_generated_mission_hud.clone(),
         hud_readback_targets:prepared.hud_readback_targets.clone(),
@@ -1342,12 +1351,19 @@ fn run_with(
         if input.compile_scripts {
             let script_directory=Path::new(&receipt.scenario_path).parent().unwrap_or(Path::new("")).join("scripts");
             let prefix=format!("{}/",script_directory.to_string_lossy().replace('\\',"/"));
-            let mut controller=None;
+            let mut controller=None;let mut mission=None;
             for (relative,hash) in staged_scripts.iter().filter(|(path,_)|path.starts_with(&prefix)&&!path[prefix.len()..].contains('/')) {
                 let path=checked_file(&workspace.join("data").join(safe_relative(relative)?))?;
                 let mut bytes=vec![];fs::File::open(path)?.take(8*1024*1024+1).read_to_end(&mut bytes)?;
                 if bytes.len()>8*1024*1024{return invalid("Controller source exceeded the existing script-file bound");}
                 let beginning=bytes.strip_prefix(&[0xef,0xbb,0xbf]).unwrap_or(&bytes);
+                if beginning.starts_with(crate::creative::RECOVERED_MISSION_PREFIX.as_bytes()) {
+                    if !relative[prefix.len()..].eq_ignore_ascii_case("gs_mission.hsc")||mission.is_some(){return invalid("Recovered mission module was renamed or duplicated; no compiler ran");}
+                    if input.scenario_type!=0{return invalid("Recovered mission source requires a native solo scenario");}
+                    if crate::hex_bytes(Sha256::digest(&bytes))!=*hash{return invalid("Recovered mission source changed after staging");}
+                    let source=std::str::from_utf8(beginning).map_err(|_|SparkError::Invalid("Recovered mission metadata needs valid UTF8 source".into()))?;
+                    mission=crate::creative::recovered_mission_binding(project,source)?;
+                }
                 if !beginning.starts_with(b"; Spark source encounter bindings: "){continue;}
                 if crate::hex_bytes(Sha256::digest(&bytes))!=*hash{return invalid("Controller module changed after staging");}
                 let source=std::str::from_utf8(&bytes).map_err(|_|SparkError::Invalid("Bound controller metadata needs valid UTF8 source".into()))?;
@@ -1362,11 +1378,14 @@ fn run_with(
             // A tag-only rebuild, or a removed authoring comment, cannot silently
             // drop an accepted native actor/count readback requirement.
             if controller.is_some(){receipt.controller_binding=controller;}
+            if mission.is_some(){receipt.mission_readback=mission;}
         }
-        if prepared.source_project.fingerprint()?!=fingerprint {
+        if prepared.source_project.firefight!=project.firefight {
             let binding=receipt.controller_binding.as_ref().ok_or_else(||SparkError::Invalid("Changed Firefight authoring needs a reviewed bound controller; no compiler ran".into()))?;
             if binding.rules.as_ref()!=project.firefight.as_ref()||binding.rules.is_none(){return invalid("Controller source was generated for different Firefight rules. Export/review the current controller before compiling");}
         }
+        if prepared.source_project.studio.as_ref().map(|studio|studio.missions.as_slice()).unwrap_or(&[])!=project.studio.as_ref().map(|studio|studio.missions.as_slice()).unwrap_or(&[]) && receipt.mission_readback.is_none(){return invalid("Changed campaign authoring needs reviewed recovered mission source; no compiler ran");}
+        if let Some(binding)=&receipt.mission_readback {crate::creative::validate_working_mission(project,binding)?;}
         if !staged_scripts.is_empty() {
             receipt.input_script_hashes = Some(save_hash_manifest(
                 &directory,
@@ -1489,6 +1508,10 @@ fn run_with(
             .any(|script| !inspected.scripts.iter().any(|s| s.name == script.name))
         {
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
+        }
+        if let Some(binding)=&receipt.mission_readback {
+            crate::creative::verify_native_mission_with_hud(binding,&inspected,&output,receipt.generated_mission_hud.as_ref().map(|hud|hud.tag_path.as_str()))?;
+            if binding.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled")&&!crate::creative::compiled_extraction_mode(&output,&inspected)? {return invalid("Compiled Forerunner Extraction callback is missing");}
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
         if let Some(snapshot)=&receipt.scenario_squad_readback{
@@ -1994,6 +2017,21 @@ mod tests {
             fs::read(c.input.tags_directory.join("edited.weapon")).unwrap(),
             b"saved while staging"
         );
+    }
+    #[test]
+    fn campaign_metadata_keeps_immutable_parent_but_never_admits_changed_assets_or_tag_only_builds() {
+        let mut c=case();let parent=c.jobs.join(&c.input.parent_build.id);
+        project::save_project(&parent.join("project.gsproject"),&c.project).unwrap();
+        let old_fp=c.project.fingerprint().unwrap();c.project.studio=mission_project("Reach the pad.").studio;
+        assert_eq!(c.project.fingerprint().unwrap(),old_fp,"Studio drafts are authoring, not applied native input");
+        c.project.firefight=Some(crate::firefight::default_config());
+        assert_ne!(c.project.fingerprint().unwrap(),old_fp);
+        let snapshot=source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap();assert_eq!(snapshot.fingerprint().unwrap(),old_fp);assert!(snapshot.studio.is_none());
+        assert!(prepare(&c.project,&c.input,&c.jobs,&uuid::Uuid::new_v4().to_string()).err().unwrap().to_string().contains("explicitly compile scripts"));
+        let studio=c.project.studio.as_mut().unwrap();studio.shots.push(serde_json::from_value(serde_json::json!({"id":"camera","name":"Intro","durationMs":1000,"cameraPosition":[0.,0.,2.],"lookAt":[1.,0.,2.],"fov":70.,"subtitle":""})).unwrap());studio.engine_machinima=Some(crate::creative::EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,auto_start:false});
+        assert!(source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap_err().to_string().contains("Native recording inputs changed"));c.project.studio=mission_project("Reach the pad.").studio;
+        c.project.title="Changed source identity".into();assert!(source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap_err().to_string().contains("other source inputs changed"));
+        assert_eq!(project::load_project(&parent.join("project.gsproject")).unwrap().fingerprint().unwrap(),old_fp);
     }
     #[test]
     fn parent_job_hsc_sources_are_preserved_but_geometry_data_is_not_recopied() {

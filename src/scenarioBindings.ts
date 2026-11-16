@@ -7,7 +7,7 @@ import type { ScriptExport } from './haloScript';
 import type { QuickForgeDocument } from './forge';
 export type BindingStatus = 'presentInImportedCache'|'absentInImportedCache'|'presentInAuthoringSource'|'absentInAuthoringSource'|'presentInNativeSource'|'absentInNativeSource'|'notInspectable';
 export interface BindingResult { dependency: string; status: BindingStatus; detail: string }
-export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[],nativeDevices?:readonly {name:string;class:string}[]): BindingResult[] {
+export function inspectScenarioBindings(scripts: ScriptExport[], inspection: MapInspection | null, source?:QuickForgeDocument|null,plannedCameras:readonly string[]=[],nativeVolumes?:readonly {name:string}[],nativeDevices?:readonly {name:string;class:string}[],nativeSquads?:readonly {encounter:number;encounterName:string;name:string}[]): BindingResult[] {
   const dependencies=[...new Set(scripts.flatMap(s=>s.dependencies))];
   return dependencies.map(dependency=>{
     if(nativeDevices&&dependency.startsWith('device_control:')&&!(source?.gameMode==='campaign'&&!source.native)){
@@ -24,7 +24,7 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
       return {dependency,status:present?'presentInAuthoringSource' as const:'absentInAuthoringSource' as const,
         detail:present?'Planned native camera point from the saved shots. Preparation, native compilation/readback and gameplay remain separate gates.':'No unique planned native camera point matches this scene. Review its saved shots and point names before preparing.'};
     }
-    if(source?.gameMode==='campaign'&&dependency.startsWith('ai_encounter:')) {
+    if(source?.gameMode==='campaign'&&!source.native&&dependency.startsWith('ai_encounter:')) {
       const [name,squad,...extra]=dependency.slice('ai_encounter:'.length).split(':')[0].split('/');
       const found=(source.campaignEncounters??[]).filter(entry=>entry.name===name);
       const present=extra.length===0&&found.length===1&&(!squad||squad==='source_squad');
@@ -63,6 +63,11 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
       detail:'Mission preparation checks the exact included one-shot sound; native staging rechecks its owned import receipt and compiled tag. Game playback, sound class and multiplayer delivery need separate testing.'};
     if(dependency.startsWith('hud_message:'))return {dependency,status:'notInspectable' as const,
       detail:'Prepared campaign builds generate this standard HUD message tag. Script-only exports require the matching native HMT asset; compilation/readback still need validation.'};
+    if(nativeSquads&&dependency.startsWith('ai_encounter:')){
+      const ref=dependency.slice('ai_encounter:'.length).split(':')[0],parts=ref.split('/'),rows=nativeSquads.filter(row=>row.encounterName===parts[0]&&(!parts[1]||row.name===parts[1]));
+      const present=parts.length<=2&&rows.length>0&&new Set(rows.map(row=>row.encounter)).size===1&&(!parts[1]||rows.length===1);
+      return {dependency,status:present?'presentInNativeSource' as const:'absentInNativeSource' as const,detail:present?'Encounter/squad read from current native scenario source. Source activation, compilation and gameplay are separate gates.':'Native encounter/squad is missing or ambiguous. Use the existing native encounter editor, then read source again.'};
+    }
     if(!inspection) return {dependency,status:'notInspectable' as const,detail:'No imported source map; requires an editable scenario tag.'};
     if(dependency.startsWith('ai_encounter:')) {
       const full=dependency.slice('ai_encounter:'.length).split(':')[0];

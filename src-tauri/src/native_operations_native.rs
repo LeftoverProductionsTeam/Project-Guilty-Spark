@@ -148,6 +148,7 @@ fn encounter_review_metadata(state:&AppState,project:&Project,build:&BuildRecord
     }
     Ok((counts,starts,combat,protected,cameras,volumes,devices,commands,transports,flight_tags))
 }
+pub(super) fn protected_mission_encounters(state:&AppState,project:&Project,build:&BuildRecord)->Reply<std::collections::BTreeSet<String>>{Ok(encounter_review_metadata(state,project,build)?.3)}
 pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path,force_cameras:bool)->Reply<Option<recipes::ScenarioSquadReadback>> {
     let (required,include_starts,combat,_,include_cameras,include_volumes,include_devices,include_commands,include_transports,flight_tags)=encounter_review_metadata(state,project,build)?;
     let include_cameras=include_cameras||force_cameras;

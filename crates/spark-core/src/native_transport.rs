@@ -218,12 +218,22 @@ mod installed {
   reviewed_difference(&before_flight,&after_flight,&operation).unwrap();let scalar=run(&editor,operation.readback_arguments(&tags,"vehi",vehicle_tag,&before_flight).unwrap().unwrap());operation.verify_readback(&tags,"vehi",vehicle_tag,&before_flight,&scalar).unwrap();
   let modified_vehicle_sha=crate::maps::hash_file(&vehicle_file).unwrap();let original_vehicle_sha=crate::maps::hash_file(&shared.join(vehicle_tag)).unwrap();
   let hashes=protected.iter().map(|p|crate::maps::hash_file(p).unwrap()).collect::<Vec<_>>();
-  let route_before=fields();let command_source=native_command_source(&route_before).unwrap();let volumes=scenario_volume_choices(&route_before).unwrap();
+  let route_before=fields();let mission_encounters=native_mission_encounters(&route_before).unwrap();assert!(!mission_encounters.is_empty());eprintln!("Native recovered mission flags: {mission_encounters:?}");let command_source=native_command_source(&route_before).unwrap();let volumes=scenario_volume_choices(&route_before).unwrap();
   let end=snapshots(&route_before,&selected).unwrap()[0].transport.position;let pad=volumes.iter().find(|v|v.geometry.as_ref().is_some_and(|g|g.contains(end))&&volumes.iter().filter(|p|p.name==v.name).count()==1).expect("native flight fixture needs a readable unique pad containing its authored aircraft origin");
   let command=|point,modifier|NativeCommand{atom:"go_to".into(),modifier,parameters:[0.;2],point1:point,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1};
   let route=NativeCommandList{index:command_source.lists.len() as u16,name:"gs_native_flight".into(),flags:[false,false,false,false,false,true],bsp:0,points:vec![[end[0],end[1],end[2]+8.],end],commands:vec![command(0,1),command(1,0)]};
   let mut route=route;route.points.push([end[0]+2.,end[1],end[2]]);route.commands[1].atom="go_to_and_face".into();route.commands[1].point2=2;
   let op=Operation::CommandList{list:route.clone(),append:true,source_sha256:crate::maps::hash_file(&file).unwrap()};for args in op.argument_batches(op.arguments_with_fields(&tags,"scnr",tag,&route_before).unwrap(),false).unwrap(){run(&editor,args);}let route_after=fields();reviewed_difference(&route_before,&route_after,&op).unwrap();let review=native_transport_routes(&route_after).unwrap().into_iter().find(|r|r.name==route.name).unwrap();assert!(review.issue.is_none());assert!(review.arrival_volumes.contains(&pad.name));assert_eq!(review.final_position,Some(end));
+  let mission=std::env::var_os("SPARK_NATIVE_RECOVERED_MISSION").map(|fixture|{
+   let fixture=std::path::PathBuf::from(fixture);crate::reject_links(&fixture).unwrap();assert!(std::fs::metadata(&fixture).unwrap().len()<512*1024);
+   let fixture_sha=crate::maps::hash_file(&fixture).unwrap();let value:serde_json::Value=serde_json::from_slice(&std::fs::read(&fixture).unwrap()).unwrap();let source=value["content"].as_str().unwrap();
+   let mut project=crate::project::Project::new("Generated recovered mission native fixture");project.studio=Some(serde_json::from_value(value["studio"].clone()).unwrap());
+   let binding=crate::creative::recovered_mission_binding(&project,source).unwrap().unwrap();let data=root.join("data");std::fs::create_dir(&data).unwrap();
+   run(&tools.join("invader-recover.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),tag.into()]);
+   let target=data.join("scripts/gs_mission.hsc");assert!(!target.exists(),"Never replace an original recovered source module");std::fs::create_dir_all(target.parent().unwrap()).unwrap();std::fs::write(&target,source).unwrap();
+   run(&tools.join("invader-script.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-E".into(),"be_native".into()]);
+   assert_eq!(fixture_sha,crate::maps::hash_file(&fixture).unwrap());eprintln!("Generated recovered mission source {}",crate::maps::hash_file(&target).unwrap());binding
+  });
   let reviewed=fields();let mut snapshots=snapshots(&reviewed,&selected).unwrap();snapshots[0].flight=Some(flight.clone());let source_sha=crate::maps::hash_file(&file).unwrap();
   run(&tools.join("invader-build.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-m".into(),output.to_string_lossy().into_owned(),"be_native".into()]);
   let cache=output.join("be_native.map");let map=crate::maps::inspect_map(&cache,None).unwrap();assert_eq!(map.header.version,609);assert_eq!(map.header.scenario_type,0);verify_cache(&snapshots,&cache,&map).unwrap();
@@ -232,7 +242,9 @@ mod installed {
   for field in 0..3{let mut wrong=flight.clone();match field{0=>wrong.throttle+=0.1,1=>wrong.avoidance_distance+=0.1,_=>wrong.pathfinding_radius+=0.1};assert!(wrong.verify_map(&map,"forerunner/transport/pelican").is_err());}
   for field in 0..4{let mut wrong=snapshots.clone();match field{0=>wrong[0].transport.position[0]+=1.,1=>wrong[0].transport.rotation_radians[0]+=0.5,2=>wrong[0].name_index+=1,_=>wrong[0].groups[0]+=1};assert!(verify_cache(&wrong,&cache,&map).is_err(),"Compiled aircraft readback accepted a wrong pose/name/group");}
 
-  let names=map.scripts.iter().map(|s|s.name.clone()).collect::<Vec<_>>();assert_eq!(original_scripts,names);
+  let names=map.scripts.iter().map(|s|s.name.clone()).collect::<Vec<_>>();
+  if let Some(binding)=&mission{crate::creative::verify_native_mission(binding,&map,&cache).unwrap();assert!(original_scripts.iter().all(|name|names.contains(name)));assert_eq!(names.len(),original_scripts.len()+2);eprintln!("Generated recovered mission CE609 compile/readback PASS: {} scripts {:?}; no mission/gameplay acceptance",map.sha256,names);}else{assert_eq!(original_scripts,names);}
+
   assert_eq!(hashes,protected.iter().map(|p|crate::maps::hash_file(p).unwrap()).collect::<Vec<_>>());assert_eq!(original_sha,crate::maps::hash_file(&input).unwrap());
   std::fs::write(&vehicle_file,&original_vehicle).unwrap();assert_eq!(crate::maps::hash_file(&vehicle_file).unwrap(),crate::maps::hash_file(&shared.join(vehicle_tag)).unwrap());
   std::fs::write(&file,&original).unwrap();assert_eq!(original_sha,crate::maps::hash_file(&file).unwrap());

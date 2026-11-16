@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 78c01b2aef5d56cded6ba65a90d3f4242b2f0e5a, canonical local master.
-Latest verified revision: parent78c01b2aef5d56cded6ba65a90d3f4242b2f0e5a plus native-flight route source hashes in RUNTIME_INTEGRATION_20261107; scoped local commit follows this checkpoint.
-Next action: compose full Black Echo pilot/crew, physical routes, mission/controller scripts and dependencies through existing builders; repair candidate BSP/bitmap/HUD diagnostics, compile/read back. Native Windows Save37944/42-edit/full restart and approved Forerunner flight/gameplay remain open while desktop control cannot initialize; no unchanged retry.
+Starting revision: a2d0aa074e7ecdadeee9cc723bfdba3d0d85b7d0, canonical local master.
+Latest verified revision: this checkpoint commit (parent a2d0aa074e7ecdadeee9cc723bfdba3d0d85b7d0); recovered campaign source integration has focused browser/core/native readback evidence, not full mission acceptance.
+Next action: compose the full reviewed Black Echo mission using repaired recovered Mission Director source, existing campaign HUD/audio/technology/AI/pad/dropship tools; fix real out-of-BSP route points and Flood start without relaxing checks, compile/read back. Native Windows42-edit/Save37944/full restart and approved Forerunner mission/gameplay remain open while desktop initialization is unavailable. Continue independent authoring; no unchanged desktop bypass retry.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov recovered mission (parent a2d0aa0): Creator Studio → current-window RuntimeDock native reference review → generated saved draft/history/reopen → pinned working-tag compilation/readback. Original source/recipe ownership, stale metadata and handwritten/function conflicts refuse replacement; recovered camera poses remain source-owned. Existing native mission/HUD/Extraction validators now retained in working-tag receipt. Final7browser/35frontend/60Rust(+7opt-in skips)/guide20contexts/TypeScript/Vite/Windows all-target checks PASS. Installed native1PASS: generated startup two-objective CE609 cache7cbf2941ef5e99ed4affc051e0245694dd314797a96207b0bf7e54a25961ce04, original/restored SCNR1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207. Native HSC manual/startup syntax separately passes. be_flood start and2/3flight points outsideBSP0 plus legacy asset warnings remain; NOT full Black Echo/flight/gameplay/native desktop acceptance. Exact source/test hashes, failures/repair and How To in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT/HUMAN_TEST_PLAN.
 
 16Nov route (parent78c01b2): CE609 cachee5711810ca6b2deba4b7802fce4e07c9eff851029b554029c7c7482f61122e71 independently matches cruise/final-facing commands,3points, all pads and original routes/AI/scripts. Viewport/source/history and bad-route/pad refusal pass browser controls separately. No actual flight/full Black Echo handoff acceptance; exact evidence in RUNTIME_INTEGRATION_20261107.
 
@@ -125,35 +127,11 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA11425/run-YyqF8H CLOSED;1398210322logicalB disposed, root absent, development runs[]/issues[]. All owned tools/tests terminal; no map/binary/SDK/cache/archive retained, game/original/Forerunner/remote writes or physical-reclamation claim. Earlier QA51538 closure remains in Git78c01b2/RUNTIME_INTEGRATION_20261107.475CSV/legacy checkpoint hashes unchanged.
+QA98579/run-yCym7t CLOSED; all owned tools/tests terminal and log handles closed.1399116590logicalB disposed, root absent, development runs[]/issues[]. No physical-reclaimed claim. No retained map/test executable/SDK/archive, game/Forerunner/original/remote writes or app/release build.475CSV SHA b82ed1f392f70030d5e0a6bad930eeaaa8807eb58886c831275c89a448609643 and ACTIVE_TASK.previous SHA afc29077c1f71a4481044c220fa84136bae79604653c9e8a3d84b1e0c11c5607 unchanged. Both manifest aliases remain required and must be regenerated from staged source; no source archive.
 
-QA9851/run-EBRqKl CLOSED; owned apps/tools exited;4337096416logicalB disposed, peak allocation4128882920B; final physical reclamation unavailable. No new screenshot/map/app/SDK/cache/archive retained. Earlier QA21477/QA6610/QA29134 closures remain in Git/RUNTIME_INTEGRATION_20261107.
+Prior QA11425/run-YyqF8H closed1398210322logicalB; earlier native UI/Save/restart/geometry/actor/cache/source evidence, exact hashes and cleanup remain in existing RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git a2d0aa0/78c01b2/e2879a6/351dd043/057a9839/50f2f77. Historical checkpoint detail is preserved by Git, not copied to ACTIVE_TASK.previous. No old jobs revived. Save37944 and complete mission/flight/human/real-peer/platform acceptance remain OPEN.
 
-QA21402/run-9LXS9l CLOSED4488883429logicalB. Actual42edit/sevenHUD/Save/three normal restarts/CE609/readback evidence, initial failures, exact app/cache hashes and preservation remain in RUNTIME_INTEGRATION_20261107 (351dd043/057a9839). No broad37944 or game acceptance.
-
-Historical QA29199 disposal/original preservation evidence remains in Gitcfe6832:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no old jobs were revived.
-
-Earlier QA50620 disposal2,949,414,002B and unchanged originals remain in Git50f2f77 and existing runtime evidence.
-
-Earlier QA24142 disposal381,534,231B is retained in Git50f2f77 and RUNTIME_INTEGRATION_20261107.
-
-QA46827/run-epWsfu is terminal; all owned apps/compilers closed. Complete temporary output disposed3,969,093,068 logical bytes; allocated-file disposal unavailable (not a physical-reclaimed claim). No SDK/map/binary/screenshot/archive retained. Originals and Git recovery unchanged.
-
-15Nov native18083 terminal PASS; source SDK subset2540tags/139258159B,92 copied support tags, production builder128356ms. All original map/bank/SDK and immutable import hashes unchanged. Output680095713logicalB disposed, peak1276892015B; focused77190 disposed375880052B. No active run, game or Forerunner access; detailed hashes/failures/warnings in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. Concurrent QA admission was safely refused; no storage-limit bypass.
-
-Earlier Forerunner review8d2cbb07, contract1ed7398d and disposed24,318,648B browser42810 evidence remain in Git248b5e4:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. Latest approved capability query is recorded above; historical review is not current engine/game acceptance.
-
-Historical QA36441/44809/35481 and focused followup closures, scoped UI/native passes/failures and original preservation evidence remain in Git78c01b2:docs/ACTIVE_TASK.md and UI_INTERACTION_AUDIT/RUNTIME_INTEGRATION_20261107; no old workspace revived.
-
-Historical H1A append/restore/native UI restart/readback scope, hashes and initial failures remain in Gite2879a6:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. It does not close actual AI/game/peer or later Save37944 acceptance.
-
-Historical long-path, inventory-key and validated source-baseline repairs/protected hashes remain in Gite2879a6:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107. No original data or historical evidence removed.
-
-Historical original-viewport WIP is completed by the scoped original AI position/facing milestone above. Authored campaign pose milestone extends the existing source/viewport; original recipe protections remain. Neither establishes gameplay acceptance.
-
-New94e66e4b full prompt preserved exactly in Master Engineering Prompts/GS_2026-11-14_MegaWorld_Operations_Creator.txt. Reuse Creator Studio/Mission Director/Logic Events/audio/native source; original Operation Black Echo needs deployment→Marine rescue→Covenant facility→technology recovery→optional Flood emergency→extraction defense→survivor/equipment extraction with branches, rewards and radio/HUD cues. 6-player squads/128players/19regions and Forerunner runtime execution are separate unproven capabilities. No invented runtime importer or source tag extensions.
-
-Interrupted legacy run-8Ak6hz remains protected. PID11588 was reused by unrelated conhost; do not kill/recover it. SOURCE_SHA256SUMS/SOURCE_MANIFEST remain required byte-identical compatibility aliases; package verifier/tests depend on both. Legacy ACTIVE_TASK.previous stays unchanged; current updates never duplicate it. Historical evidence remains in Git; no replacement tracking system/archive. Full Operation110/M1–M6/475IDs/master Goal remain incomplete.
+Interrupted legacy run-8Ak6hz remains protected; PID11588 was reused by unrelated conhost, never kill/recover it. SOURCE_SHA256SUMS/SOURCE_MANIFEST remain required byte-identical compatibility aliases; package verifier/tests depend on both. Legacy ACTIVE_TASK.previous stays unchanged. Preserve all Git refs/stashes, C49/preview5, source/originals and all475IDs. No replacement tracking system/archive. Full Operation110/M1–M6/master Goal remain incomplete.
 
 ## Deferred requests
 

@@ -1,8 +1,10 @@
+import {inspectScenarioBindings} from '../scenarioBindings';
+import {emptyCreatorStudio} from '../creatorStudio';
 import {appendNativeCameraShot,nativeCinematicSource,nativeCinematicPrefix,nativeCinematicTakeKey} from '../nativeCinematic';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {beginProjectMutation} from '../projectMutation';
 import {createLatestRefresh} from '../latestRefresh';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   Play,
   TestTube2,
@@ -19,7 +21,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix } from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,recoveredCampaignMission,readRecoveredMissionSource,recoveredMissionPrefix } from '../haloScript';
 import type {NativeTransportOptions} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
 import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
@@ -194,11 +196,21 @@ export default function RuntimeDock({
   const [cinematicPlan,setCinematicPlan]=useState<{key:string;shotsKey:string;name:string;tagIdentity:string;content:string;original?:string}|null>(null);
   const [transport,setTransport]=useMapState<NativeTransportOptions>(id,'sourceScripts.transport',{faction:'unsc',pilot:'',pilotSeat:'',outbound:'',inbound:'',hub:'extraction_return',field:'extraction_zone'});
   const latestTransport=useRef(transport);latestTransport.current=transport;
+  const [recoveredMissionOpen,setRecoveredMissionOpen]=useState(false);
+  const [recoveredActivation,setRecoveredActivation]=useMapState<'manual'|'startup'>(id,'sourceScripts.missionActivation','manual');
+  const [recoveredMissionPlan,setRecoveredMissionPlan]=useState<{key:string;tagIdentity:string;content:string;studioKey:string;activation:'manual'|'startup'}|null>(null);
+  const recoveredStudioKey=useMemo(()=>JSON.stringify({missions:project?.studio?.missions??[],shots:project?.studio?.shots??[]}),[project?.studio?.missions,project?.studio?.shots]);
+  useEffect(()=>{
+    const open=(event:Event)=>{const detail=(event as CustomEvent<{projectId:string;activation:'manual'|'startup'}>).detail;if(detail?.projectId!==project?.id)return;setDetails(true);setScriptsOpen(true);setRecoveredMissionOpen(true);setRecoveredActivation(detail.activation);};
+    window.addEventListener('guilty-spark-open-native-mission',open);return()=>window.removeEventListener('guilty-spark-open-native-mission',open);
+  },[project?.id]);
   const nativeCameras=modules?.cameraReview;
   const takeCamera=nativeCameras?.cameras.find(p=>String(p.index)===cinematicCamera)??nativeCameras?.cameras[0];
   const currentCinematic=cinematicPlan?.key===scriptSourceKey&&cinematicPlan.tagIdentity===nativeCameras?.tagIdentity&&cinematicPlan.shotsKey===nativeCinematicTakeKey(project?.studio)&&cinematicPlan.name===cinematicName.trim()&&cinematicPlan.content===selectedScript?.content?cinematicPlan:null;
   const nativeCinematicDraft=selectedScript?.content.startsWith(nativeCinematicPrefix)??false;
   const nativeTransportDraft=selectedScript?.content.startsWith(nativeTransportPrefix)??false;
+  const nativeRecoveredMissionDraft=selectedScript?.content.startsWith(recoveredMissionPrefix)??false;
+  const currentRecoveredMissionIdentity=nativeRecoveredMissionDraft&&recoveredMissionPlan?.key===scriptSourceKey&&recoveredMissionPlan.content===selectedScript?.content&&recoveredMissionPlan.studioKey===recoveredStudioKey&&recoveredMissionPlan.activation===recoveredActivation&&recoveredMissionPlan.tagIdentity===nativeCameras?.tagIdentity?recoveredMissionPlan.tagIdentity:null;
   function transportFlightIssue(options:NativeTransportOptions){
     const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
     const vehicles=modules?.transportReview?.vehicles.filter(vehicle=>vehicle.name===name);
@@ -291,9 +303,9 @@ export default function RuntimeDock({
   }, [details, !!plan]);
   useEffect(()=>{
     if(!details||!scriptsOpen)return;
-    const frame=requestAnimationFrame(()=>scriptEditor.current?.querySelector<HTMLInputElement>('input[type="file"]')?.focus());
+    const frame=requestAnimationFrame(()=>{const target=recoveredMissionOpen?scriptEditor.current?.querySelector<HTMLElement>('.native-recovered-mission-source button:not([disabled])'):scriptEditor.current?.querySelector<HTMLInputElement>('input[type="file"]');target?.focus();});
     return()=>cancelAnimationFrame(frame);
-  },[details,scriptsOpen,report?.workingSource?.buildId]);
+  },[details,scriptsOpen,recoveredMissionOpen,report?.workingSource?.buildId]);
   const reportRefresh=useRef<ReturnType<typeof createLatestRefresh<{runtimeId:RuntimeId;projectId:string|null},RuntimeWorkbenchReport>>|null>(null);
   useEffect(()=>{
     // Source admission hashes native inputs. Reuse the shared trailing-refresh
@@ -481,13 +493,13 @@ export default function RuntimeDock({
     return selection.projectId===project?.id&&selection.buildId===source.buildId&&selection.tagsDirectory===source.tagsDirectory
       &&selection.projectFingerprint===source.projectFingerprint;
   }
-  async function listScriptModules(includeCameras=false,includeTransport=false) {
+  async function listScriptModules(includeCameras=false,includeTransport=false,includeMission=false) {
     const source=report?.workingSource;if(!native||!project||!source?.projectFingerprint||dirty||busy||working||moduleBusy)return;
     const request=++moduleRequest.current,key=scriptSourceKey;
-    setModuleBusy(true);setError('');if(includeTransport)setModuleInventory(null);
+    setModuleBusy(true);setError('');if(includeTransport||includeMission)setModuleInventory(null);if(includeMission)setRecoveredMissionPlan(null);
     try {
       const value=await call<WorkingScriptSources>('working_script_sources',{projectId:project.id,expectedBuildId:source.buildId,
-        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,...(includeCameras?{includeCameras:true}:{}),...(includeTransport?{includeTransport:true}:{})});
+        expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,...(includeCameras?{includeCameras:true}:{}),...(includeTransport?{includeTransport:true}:{}),...(includeMission?{includeMission:true}:{})});
       if(request!==moduleRequest.current||key!==currentScriptSourceKey.current){if(currentProject.current?.id===project.id)setNotice('The runtime or editable source changed while reading modules. Use List recovered modules for the current source.');return;}
       if(!sourceSelectionMatches(value,source))throw Error('The recovered script listing belongs to a different source revision. Refresh its selection.');
       setModuleInventory({key,value});
@@ -520,6 +532,54 @@ export default function RuntimeDock({
     }catch(problem){if(selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
     finally{release();if(request===moduleRequest.current)setModuleBusy(false);}
   }
+  async function prepareRecoveredMission(){
+    const input=currentProject.current,source=report?.workingSource,inventory=modules,review=nativeCameras,refs=modules?.missionReview;
+    if(!input||!source||!inventory||!review||!refs||dirty||busy||working||moduleBusy)return;
+    const studio=input.studio??emptyCreatorStudio(),studioKey=JSON.stringify({missions:studio.missions,shots:studio.shots}),activation=recoveredActivation;
+    const request=++moduleRequest.current,selection=++scriptSelection.current,key=scriptSourceKey,draft=input.scenarioScriptDraft;
+    setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
+    try {
+      if(!['gbx-custom','mcc-cea'].includes(source.target??'')||review.scenarioType!==0)throw Error('Recovered mission source requires reviewed CE609 or MCC solo source.');
+      const generated=recoveredCampaignMission(studio,activation,source.target==='gbx-custom');
+      const bindings=inspectScenarioBindings([generated],null,null,[],review.triggerVolumes.map(name=>({name})),refs.devices,refs.squads);
+      for(const row of bindings){
+        if(['hud_message:','sound:','weapon:','forerunner_extraction:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
+        if(row.dependency.startsWith('cutscene_camera_point:')){if(review.cameras.filter(camera=>camera.name===row.dependency.slice('cutscene_camera_point:'.length)).length!==1)throw Error('Native camera reference is missing or ambiguous: '+row.dependency);continue;}
+        if(row.status!=='presentInNativeSource')throw Error('Native mission reference is missing or ambiguous: '+row.dependency);
+      }
+      for(const beat of studio.missions.filter(beat=>beat.trigger==='encounterCleared'||beat.trigger==='escort')){
+        const name=beat.encounterName.split('/')[0],matches=refs.encounters.filter(row=>row.name===name);
+        if(matches.length!==1)throw Error('Native encounter is missing or ambiguous: '+name);
+        if(matches[0].initiallyCreated)throw Error('Mission encounters must be script-created; disable initial actor creation through the reviewed native source editor.');
+        if(refs.protectedEncounters.includes(name))throw Error('This encounter is recipe-owned; use its existing controller instead of a second spawn owner.');
+      }
+      if(studio.missions.some(beat=>beat.trigger==='forerunnerExtractionSettled')){
+        for(const name of ['extraction_zone','extraction_return'])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Native extraction pad is missing or ambiguous: '+name);
+        for(const name of ['extraction_deploy','extraction_activate'])if(refs.devices.filter(value=>value.name===name&&value.class==='ctrl').length!==1)throw Error('Native extraction control is missing or ambiguous: '+name);
+      }
+      const previous=inventory.modules.find(module=>module.filename.toLowerCase()===generated.filename.toLowerCase());
+      let original:string|undefined;
+      if(previous){
+        if(previous.unavailable)throw Error(previous.unavailable);
+        const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:previous.filename,expectedSha256:previous.sha256});
+        if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Native mission source changed during mission preparation.');
+        readRecoveredMissionSource(value.script.content);original=value.script.content;
+      }
+      const names=(text:string)=>[...text.matchAll(/\(script (?:startup|continuous|dormant|static void|static boolean) ([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1]);
+      const previousNames=original?names(original):[];
+      if(names(generated.content).some(name=>review.scriptNames.some(value=>value.toLowerCase()===name.toLowerCase())&&!previousNames.some(value=>value.toLowerCase()===name.toLowerCase())))throw Error('A mission function already belongs to another source module; original source was retained.');
+      if(previousNames.some(name=>!names(generated.content).some(value=>value.toLowerCase()===name.toLowerCase())))throw Error('The revised mission would remove an existing native function. Preserve/reconcile it through the manual source editor.');
+      if(draft&&!draft.content.startsWith(recoveredMissionPrefix))throw Error('Another script draft is open. Preserve it through the existing editor before preparing this mission.');
+      const fresh=await call<WorkingScriptSources>('working_script_sources',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,includeCameras:true,includeMission:true});
+      if(!sourceSelectionMatches(fresh,source)||fresh.sourceSha256!==inventory.sourceSha256||fresh.cameraReview?.tagIdentity!==review.tagIdentity)throw Error('Native source changed during mission preparation; read source again.');
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(generated.content)),sha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+      if(selection!==scriptSelection.current||key!==currentScriptSourceKey.current||currentProject.current?.id!==input.id||JSON.stringify({missions:currentProject.current.studio?.missions??[],shots:currentProject.current.studio?.shots??[]})!==studioKey||currentProject.current.scenarioScriptDraft!==draft)return;
+      keepScriptDraft({filename:generated.filename,content:generated.content,sha256,fileSha256:previous?.sha256??sha256,sourceKey:key,reviewed:false,...(previous?{replacesSha256:previous.sha256}:{})});
+      setRecoveredMissionPlan({key,tagIdentity:review.tagIdentity,content:generated.content,studioKey,activation});
+      setNotice('Recovered mission draft prepared. Save, review and compile. Camera points keep their native source poses. Startup waits for players; manual activation needs another script. Native readback and gameplay remain separate checks.');
+    }catch(problem){if(selection===scriptSelection.current&&key===currentScriptSourceKey.current)setError(String(problem));}
+    finally{release();if(request===moduleRequest.current)setModuleBusy(false);}
+  }
   async function prepareTransportSource(){
     const input=currentProject.current,source=report?.workingSource,inventory=modules,review=nativeCameras;
     if(!input||!source||!inventory||!review||dirty||busy||working||moduleBusy)return;
@@ -540,9 +600,9 @@ export default function RuntimeDock({
         if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.sha256!==previous.sha256)throw Error('Native transport module changed; read the current source again.');
         readNativeTransportSource(value.script.content);original=value.script.content;
       }
-      const names=(text:string)=>[...text.matchAll(/\(script (?:startup|continuous|static void|static boolean) ([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1]);
+      const names=(text:string)=>[...text.matchAll(/\(script (?:startup|continuous|dormant|static void|static boolean) ([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1]);
       const previousNames=original?names(original):[];
-      if(names(generated.content).some(name=>review.scriptNames.includes(name)&&!previousNames.includes(name)))throw Error('A transport function already belongs to another native module. Preserve that source and use Edit selected module; no replacement was made.');
+      if(names(generated.content).some(name=>review.scriptNames.some(value=>value.toLowerCase()===name.toLowerCase())&&!previousNames.some(value=>value.toLowerCase()===name.toLowerCase())))throw Error('A transport function already belongs to another native module. Preserve that source and use Edit selected module; no replacement was made.');
       if(draft&&draft.content!==generated.content&&!window.confirm('Replace the current project script draft with the transport controller? Project Undo restores it; original native source remains in its previous build.'))return;
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(generated.content)),sha256=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
       if(selection!==scriptSelection.current||key!==currentScriptSourceKey.current||currentProject.current?.id!==input.id||latestTransport.current!==options||currentProject.current.scenarioScriptDraft!==draft)return;
@@ -661,10 +721,11 @@ export default function RuntimeDock({
     )
       return;
     if(!report?.workingSource||!workingSourceAvailable)return;
-    if(authoringPending&&!compileScripts){setError('Firefight rules changed. For new or recorded generated groups and their controller, review Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
+    if(authoringPending&&!compileScripts){setError('Campaign or Firefight authoring changed. For recovered missions, prepare the current mission source. For new or recorded generated groups and their controller, review Firefight groups & controller. For existing encounters, review their bound source and choose Attach source & compile or Compile scripts & build.');return;}
     if(firefight&&(!selectedFirefightSource?.reviewed||firefight!==selectedFirefightSource||attachment?.sha256!==firefight.script.sha256))return;
     if(attachment&&!firefight&&(!selectedScript?.reviewed||selectedScript.sha256!==attachment.sha256||selectedScript.replacesSha256!==attachment.replacesSha256||!report?.workingSource))return;
     if(attachment?.content.startsWith(nativeCinematicPrefix)&&!currentCinematic){setError('The take or source changed. Read native cameras and prepare its cinematic source again.');return;}
+    if(nativeRecoveredMissionDraft&&!currentRecoveredMissionIdentity){setError('Read native mission source and prepare again after changing missions, camera references or source. Preserve handwritten changes through the explicit manual route.');return;}
     if(nativeTransportDraft&&!currentTransportIdentity){setError('Read native transport source again and check both pad volumes before compiling generated transport source. Preserve handwritten changes through the manual source route.');return;}
     if(mission&&(!selectedMissionHud?.reviewed||mission!==selectedMissionHud||firefight||!!attachment&&!compileScripts))return;
     const sourceKey = scriptSourceKey;
@@ -674,7 +735,7 @@ export default function RuntimeDock({
       await call<string>('build_working_tags', { projectId: project.id, compileScripts, ...(bspAudio ? { bspAudio } : {}),...(mission?{missionHud:mission.plan.hud.review}:{}),
         expectedBuildId:report.workingSource.buildId,expectedSourceDirectory:report.workingSource.tagsDirectory,
         ...(attachment?{scriptAttachment:{filename:attachment.filename,content:attachment.content,sha256:attachment.sha256,...(attachment.replacesSha256?{replacesSha256:attachment.replacesSha256}:{})}}:{}),
-        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:nativeCinematicDraft&&currentCinematic?{expectedTagIdentity:currentCinematic.tagIdentity}:nativeTransportDraft&&currentTransportIdentity?{expectedTagIdentity:currentTransportIdentity}:{}) });
+        ...(firefight?{encounterAppend:firefight.plan.request,expectedTagIdentity:firefight.plan.tagIdentity}:nativeCinematicDraft&&currentCinematic?{expectedTagIdentity:currentCinematic.tagIdentity}:nativeTransportDraft&&currentTransportIdentity?{expectedTagIdentity:currentTransportIdentity}:nativeRecoveredMissionDraft&&currentRecoveredMissionIdentity?{expectedTagIdentity:currentRecoveredMissionIdentity}:{}) });
       if (sourceKey === currentScriptSourceKey.current) {
         setDetails(false);
         setNotice(
@@ -867,7 +928,7 @@ export default function RuntimeDock({
           </div>
           {workingSourceAvailable && <small>Working source: {workingTarget==='gbx-custom'?'Custom Edition · Invader native rebuild':'MCC Halo 1 · H1A native rebuild'}. Source format is independent of the hosting runtime.</small>}
           {authoringPending && report?.workingSource && <Notice>
-            Firefight rules are saved but not compiled. The retained source belongs to the earlier build; it is available for a reviewed controller rebuild only. For new encounters, use Build new Firefight groups & controller below to review and stage groups plus source together. For existing encounters, export the current bound controller in Firefight rules → Advanced script export, then attach it below. For an existing controller, edit/review its original module through Open script source folder and choose Compile scripts &amp; build. A tag-only build cannot apply these rules.
+            Campaign or Firefight authoring is saved but not compiled. The retained source belongs to the earlier build. For campaign objectives, use Creator Studio → Prepare recovered mission source, then review and compile below. For new encounters, use Build new Firefight groups & controller below to review and stage groups plus source together. For existing encounters, export the current bound controller in Firefight rules → Advanced script export, then attach it below. For an existing controller, edit/review its original module through Open script source folder and choose Compile scripts &amp; build. A tag-only build cannot apply these rules.
             <details><summary>Source and authored revisions</summary><p className="wrap-code">Compiled source: {report.workingSource.sourceProjectFingerprint}<br/>Saved authoring: {report.workingSource.projectFingerprint}</p></details>
           </Notice>}
           {project && report?.workingSource && h1aSource && !authoringPending && <WorkingTagChanges {...toolTags} />}
@@ -993,6 +1054,14 @@ export default function RuntimeDock({
               </fieldset>}
               <p className="subtle">Use CE609 solo source. Create pilot AI and real seats with the existing AI/tag tools; routes with Invader · native checks & reviewed edits → Map scenario → Existing AI command lists. Pad volumes must already exist. Read native transport source again after restarting or changing source; generated builds pin the current tag identity. Load transport configuration from draft restores its saved choices. Bind the matching craft and three dedicated boarding/recall/landing groups. The source waits for both real landing and its pad; it never treats hover or time as arrival. Optional camera/dialogue functions must already exist and end cinematics. Players disembark normally; returning craft stays closed until Forerunner wakes its crew-settlement callback. Native compilation checks references; pilot failure/recovery, clearances, repeat trips and multiplayer need actual game acceptance. Hand-edited modules are preserved and require Edit selected module.</p>
             </details>
+            {(!project.quickForge||project.quickForge.native)&&<details className="native-recovered-mission-source" open={recoveredMissionOpen} onToggle={event=>setRecoveredMissionOpen(event.currentTarget.open)}><summary>Recovered campaign mission source</summary>
+              <p>Use saved Mission Director objectives with this native solo scenario. Read the current references, prepare, Save and review the draft, then Attach source &amp; compile. Native camera points own their poses; use the existing cinematic/source tools to edit them. Missing dependencies stop the build.</p>
+              <button type="button" disabled={busy||working||dirty||moduleBusy} onClick={()=>void listScriptModules(true,false,true)}>Read native mission source</button>
+              <label>Recovered mission activation<select value={recoveredActivation} onChange={event=>setRecoveredActivation(event.target.value as 'manual'|'startup')}><option value="manual">Manual · wake gs_mission from another script</option><option value="startup">Startup · wait for players</option></select></label>
+              <button type="button" disabled={busy||working||dirty||moduleBusy||!modules?.missionReview||!nativeCameras} onClick={()=>void prepareRecoveredMission()}>Prepare recovered mission draft</button>
+              {nativeRecoveredMissionDraft&&<button type="button" disabled={busy||working||moduleBusy} onClick={()=>{if(selectedScript){const end=selectedScript.content.indexOf('\n',recoveredMissionPrefix.length);keepScriptDraft({...selectedScript,content:selectedScript.content.slice(end+1),reviewed:false});setRecoveredMissionPlan(null);}}}>Use mission draft as manual HaloScript</button>}
+              {nativeRecoveredMissionDraft&&!currentRecoveredMissionIdentity&&<small>Mission or source review is stale. Read source and prepare again before compiling.</small>}
+            </details>}
             <details className="native-cinematic-source"><summary>Timed cinematic · existing cameras</summary>
               <p className="subtle">Use native camera names and poses with the saved Machinima timeline. Source review pins the complete tag library. Choose manual invocation or a native trigger area below.</p>
               <button disabled={!native||busy||working||moduleBusy||dirty} onClick={()=>void listScriptModules(true)}>Read native cameras &amp; modules</button>
@@ -1046,7 +1115,7 @@ export default function RuntimeDock({
               <p className="subtle">{dirty?'Save the project before reviewing or compiling this draft.':'Project draft saved. Review its source before compiling.'} Use project Undo/Redo to restore draft edits; compiled native revisions stay separate.</p>
               <label><input type="checkbox" checked={selectedScript.reviewed} disabled={busy||working||dirty} onChange={event=>{if(event.target.checked){void reviewScriptSource();}else{scriptSelection.current++;setScriptReview(null);}}}/>I reviewed this source and its native scenario references.</label>
               <div className="button-row">
-                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||nativeCinematicDraft&&!currentCinematic||nativeTransportDraft&&!currentTransportIdentity||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
+                <button disabled={!native||busy||working||dirty||!selectedScript.reviewed||!/^[a-f0-9]{64}$/.test(selectedScript.sha256)||selectedScript.sha256===selectedScript.replacesSha256||nativeCinematicDraft&&!currentCinematic||nativeTransportDraft&&!currentTransportIdentity||nativeRecoveredMissionDraft&&!currentRecoveredMissionIdentity||toolTags.report?.status==='saving'||integrityBlocks(toolTags.report?.integrity)||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')}
                   onClick={()=>void buildWorkingTags(undefined,true,selectedScript)}>{selectedScript.replacesSha256?'Build reviewed script revision':'Attach source & compile'}</button>
                 <button disabled={busy||working} onClick={()=>keepScriptDraft(null)}>Remove project draft</button>
               </div>

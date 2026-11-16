@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { blackEchoMission, emptyCreatorStudio } from '../src/creatorStudio.ts';
-import { exportHaloCeTransport, attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
+import { recoveredCampaignMission, exportHaloCeTransport, attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
 const studio=emptyCreatorStudio();
 studio.missions=[
   {id:'one',title:'First Contact',objective:'Move to the bridge',trigger:'triggerVolume',triggerRef:'gs_bridge',encounterName:''},
@@ -216,6 +216,8 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
    }
    results.push({returnAfterInsertion,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
   }
-  console.log(JSON.stringify({nativeTransportSyntax:'pass',results,cacheBuilt:false,gameplayVerified:false}));
+  const recoveredStudio={...emptyCreatorStudio(),missions:[{id:'arrive',title:'Arrive',objective:'Reach the landing zone',trigger:'triggerVolume',triggerRef:'extraction_zone',encounterName:''},{id:'clear',title:'Clear',objective:'Defeat the authored group',trigger:'encounterCleared',encounterName:'pilot_pelican'}]};
+  const recovered=[];for(const activation of ['manual','startup']){const source=recoveredCampaignMission(recoveredStudio,activation,true);await fs.writeFile(path.join(data,'scripts',source.filename),source.content);await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);const scripts=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/),globals=(await run('invader-edit',['-G','globals[*].name',scenario])).split(/\r?\n/);assert.ok(scripts.includes('gs_mission_bootstrap')&&scripts.includes('gs_mission'));assert.ok(!globals.includes('gs_logic_ready'));recovered.push({activation,sourceSha256:crypto.createHash('sha256').update(source.content).digest('hex'),scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex'),scripts});}
+  console.log(JSON.stringify({nativeTransportSyntax:'pass',results,recoveredMissionSyntax:recovered,cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }

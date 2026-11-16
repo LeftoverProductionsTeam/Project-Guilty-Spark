@@ -93,6 +93,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [includingSound,setIncludingSound]=useState(false);
   const [cueSources,setCueSources]=useMapState<Record<string,string>>(project.id,'mission-cue-sources',{});
   const studio = useMemo(()=>project.studio ?? emptyCreatorStudio(),[project.studio]);
+  const recoveredSource=!project.quickForge||!!project.quickForge.native;
+  const forerunnerMission=['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')||!!(recoveredSource&&nativeAreas?.sourceTarget==='gbx-custom'&&nativeAreas.canAppendEncounter);
   const branchDecisions=useMemo(()=>{try{return [...missionBranchGroups(studio.missions)];}catch{return [];}},[studio.missions]);
   const earlierRescues=(index:number)=>studio.missions.slice(0,index).filter(beat=>beat.trigger==='escort'&&beat.escortFailure==='continue');
   function changeConditionVolume(beat:MissionBeat,volume:string){
@@ -109,11 +111,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   // Opening/collapsing controls must not regenerate every mission script and binding.
   const bindingChecks = useMemo(() => {
     const scripts: ScriptExport[]=[];
-    try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')})); } catch { /* incomplete authoring has no safe export yet */ }
+    try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:forerunnerMission})); } catch { /* incomplete authoring has no safe export yet */ }
     try { if(studio.shots.length) scripts.push(exportHaloCeCinematic(studio)); } catch { /* unresolved marker */ }
     try { if(project.firefight&&project.quickForge?.gameMode!=='campaign') scripts.push(exportHaloCeFirefight(project.firefight)); } catch { /* invalid/endless wave authoring */ }
-    return inspectScenarioBindings(scripts,sourceInspection,project.quickForge,studio.missions.some(beat=>beat.cinematicCue!=null)?studio.shots.map(cinematicMarker):[],nativeAreas?.scenarioVolumes,nativeAreas?.scenarioDevices);
-  },[studio,project.firefight,project.quickForge,sourceInspection,nativeAreas]);
+    return inspectScenarioBindings(scripts,sourceInspection,project.quickForge,studio.missions.some(beat=>beat.cinematicCue!=null)?studio.shots.map(cinematicMarker):[],nativeAreas?.scenarioVolumes,nativeAreas?.scenarioDevices,nativeAreas?.scenarioSquads);
+  },[studio,project.firefight,project.quickForge,sourceInspection,nativeAreas,forerunnerMission]);
   const change = (next: CreatorStudioDocument, label: string) => {
     const problems = validateCreatorStudio(next);
     if (problems.length) { setError(problems.join('; ')); return; }
@@ -128,7 +130,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   }
   function exportScript(kind: 'mission' | 'cinematic' | 'firefight', manifest = false) {
     try {
-      const exported: ScriptExport = kind === 'mission' ? exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')})
+      const exported: ScriptExport = kind === 'mission' ? exportHaloCeMission(studio,{forerunner:forerunnerMission})
         : kind === 'cinematic' ? exportHaloCeCinematic(studio)
         : exportHaloCeFirefight(project.firefight ?? (() => { throw new Error('Create Firefight waves first'); })());
       if(manifest) safeDownload(exported.filename + '.manifest.json', scriptManifest(exported), 'application/json');
@@ -140,7 +142,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   function exportSourcePack() {
     try {
       const scripts: ScriptExport[] = [];
-      if (studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')}));
+      if (studio.missions.length) scripts.push(exportHaloCeMission(studio,{forerunner:forerunnerMission}));
       if (studio.shots.length) scripts.push(exportHaloCeCinematic(studio));
       if (project.firefight) scripts.push(exportHaloCeFirefight(project.firefight));
       if (!scripts.length) throw new Error('Create a mission, cinematic, or finite Firefight configuration first.');
@@ -174,6 +176,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     const input=latestProject.current,activation=missionActivation;
     const release=beginProjectMutation(input.id);setPreparingMission(true);setError('');
     try {
+      if(!input.quickForge||input.quickForge.native){
+        if(!native)throw Error('Open the desktop app to read recovered native mission source.');
+        window.dispatchEvent(new CustomEvent('guilty-spark-open-native-mission',{detail:{projectId:input.id,activation}}));notify('Recovered mission source review opened in Runtime & Tools. Save changes, read source and prepare its reviewed draft there.','info');return;
+      }
       const candidate=await attachNativeCampaignMission(input,activation,missionCinematic);
       if(activeProject.current!==input.id||latestProject.current.id!==input.id||
         latestProject.current.quickForge!==input.quickForge||latestProject.current.studio!==input.studio)
@@ -351,22 +357,21 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <label>Activation for next preparation<select aria-label="Native mission activation" value={missionActivation}
           disabled={preparingMission} onChange={event=>setMissionActivation(event.target.value as 'manual'|'startup')}>
           <option value="manual">Manual — another script starts the mission</option>
-          <option value="startup">Startup — after native logic and loadout initialization</option>
+          <option value="startup">{recoveredSource?'Startup — wait for players in recovered source':'Startup — after native logic and loadout initialization'}</option>
         </select></label>
-        <label className="checkbox-label"><input type="checkbox" checked={missionCinematic} disabled={preparingMission}
+        {project.quickForge&&!project.quickForge.native&&<><label className="checkbox-label"><input type="checkbox" checked={missionCinematic} disabled={preparingMission}
           onChange={event=>setNextCinematic(event.target.checked?'enabled':'disabled')}/>Play saved camera shots as the mission intro</label>
         <p className="studio-hint">{studio.shots.length} saved shots. Preparation snapshots position, look-at, roll and FOV into native camera points. Objective camera scenes also use these saved shots, independently of the intro checkbox.
           The intro waits for a player, then restores input and camera before objectives. Cut snaps; other moves use native interpolation.
-          Subtitles are rehearsal notes. Disable Machinima in-game recording first; edited shots require preparation again. Native playback still needs game testing.</p>
+          Subtitles are rehearsal notes. Disable Machinima in-game recording first; edited shots require preparation again. Native playback still needs game testing.</p></>}
+        {(!project.quickForge||project.quickForge.native)&&<p className="studio-hint">Recovered source uses the existing reviewed HaloScript editor. Scene camera points must already exist in native source; author their poses with the native camera editor. Use the existing native cinematic source controls for an intro. Original startup scripts remain active until explicitly revised.</p>}
         <button type="button" disabled={preparingMission||!studio.missions.length}
-          onClick={()=>void prepareNativeMission()}> {preparingMission?'Preparing source…':'Prepare mission for native build'} </button>
-        <p className="studio-hint">{project.quickForge?.logic?.handwrittenSources?.some(source=>
+          onClick={()=>void prepareNativeMission()}> {preparingMission?'Preparing source…':!project.quickForge||project.quickForge.native?'Prepare recovered mission source…':'Prepare mission for native build'} </button>
+        <p className="studio-hint">{recoveredSource?'Recovered mission source stays in the saved project draft until reviewed and compiled through Runtime & Tools. Read and prepare again after source changes or restart.':project.quickForge?.logic?.handwrittenSources?.some(source=>
           source.filename.toLowerCase()==='gs_mission.hsc'&&source.content.startsWith(nativeMissionBinding))
           ?'A mission binding is attached. Changed mission or included intro shots require preparation again; edited source is preserved and blocks automatic replacement.'
           :'No generated mission binding is attached. Separate exported script packs are not attached automatically.'}</p>
-        <p className="studio-hint">Save before Build &amp; playtest. The build checks the saved mission binding,
-          module hash, encounter/volume names, HUD messages and compiled script identities. Actual HUD display,
-          accepted checkpoint restoration and native level progression require separate game acceptance.</p>
+        <p className="studio-hint">{recoveredSource?'Save the recovered draft, review native references and objective HUD messages, then attach/compile through the source editor. Existing startup code remains active until explicitly revised.':'Save before Build & playtest. The build checks the saved mission binding, module hash, encounter/volume names, HUD messages and compiled script identities.'} Actual HUD display, checkpoint restoration and native level progression require separate game acceptance.</p>
         <MissionSourceReview project={project} edit={edit} onActivation={setMissionActivation} onCinematic={enabled=>setNextCinematic(enabled?'enabled':'disabled')} exportLocal={report}/>
       </details>
       <CampaignEncounters project={project} edit={edit} onSelectStart={onLevelEditor?selectSourceObject:undefined}/>
@@ -393,7 +398,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <div className="studio-fields studio-beat-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
         <label title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Later objectives use this rescue result. Remove those conditions before changing its trigger.':'Choose what completes this objective after it starts. Use matching native source names for volumes, encounters and controls.'}>Trigger<select value={beat.trigger} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'],...(e.target.value!=='escort'?{escortFailure:undefined}:{}),...(e.target.value==='forerunnerExtractionSettled'?{triggerRef:'extraction_activate'}:{}) })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
-          <option value="weaponOwned">Native weapon collected (actual ownership)</option><option value="forerunnerExtractionSettled" disabled={!['haloCustomEdition','chupathingyCe'].includes(project.quickForge?.runtimeId??'')}>Forerunner extraction settled (engine callback)</option><option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
+          <option value="weaponOwned">Native weapon collected (actual ownership)</option><option value="forerunnerExtractionSettled" disabled={!forerunnerMission}>Forerunner extraction settled (engine callback)</option><option value="deviceActivated">Terminal activated (native control)</option><option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="escort">Survivor escort to area (native AI)</option><option value="timer">Timer (needs script binding)</option></select></label>
         <label title="Choose an authored campaign group below or an exact encounter from the imported scenario. This reference alone does not place actors.">Encounter name (optional)<input list={encounterChoices} maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label><button className="studio-beat-remove" type="button" aria-label={`Remove beat ${i + 1}`} disabled={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)} title={studio.missions.some(row=>row.conditionResult?.beatId===beat.id)?'Remove dependent rescue-result conditions first.':'Remove this mission beat'} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
         {(beat.trigger === 'triggerVolume'||beat.trigger==='escort'||beat.trigger==='manual'&&beat.triggerRef!=null) && <label>{beat.trigger==='manual'?'Reference area · authoring only':beat.trigger==='escort'?'Survivor destination volume':'Scenario trigger-volume identifier'}<input list={volumeChoices} maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}

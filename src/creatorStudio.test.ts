@@ -1,3 +1,4 @@
+import {inspectScenarioBindings} from './scenarioBindings';
 import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
 import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission} from './haloScript';
@@ -287,4 +288,11 @@ it('connects Forerunner Black Echo to real ownership and settled-return source w
 it('refuses injected collection paths and early or conditional Forerunner settlement',()=>{
  const studio=emptyCreatorStudio();studio.missions=[{id:'collect',title:'Collect',objective:'Acquire',trigger:'weaponOwned',weaponPath:'bad" ) (ai_erase_all)',encounterName:''}];expect(()=>exportHaloCeMission(studio)).toThrow();
  studio.missions=[{id:'settle',title:'Return',objective:'Settle',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',conditionVolume:'branch'}];expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow(/unconditional/);
+});
+
+it('recovered mission encounters use actual native source instead of stale imported cache names',()=>{
+ const source={...emptyCreatorStudio(),missions:[{id:'one',title:'Clear',objective:'Clear',trigger:'encounterCleared' as const,encounterName:'guards/patrol'}]},script=exportHaloCeMission(source);
+ const squads=[{encounter:0,encounterName:'guards',name:'patrol'}];expect(inspectScenarioBindings([script],null,null,[],[],[],squads).find(row=>row.dependency.startsWith('ai_encounter:'))?.status).toBe('presentInNativeSource');
+ expect(inspectScenarioBindings([script],null,null,[],[],[],[]).find(row=>row.dependency.startsWith('ai_encounter:'))?.status).toBe('absentInNativeSource');
+ expect(inspectScenarioBindings([script],null,null,[],[],[],[...squads,{...squads[0],encounter:1}]).find(row=>row.dependency.startsWith('ai_encounter:'))?.status).toBe('absentInNativeSource');
 });

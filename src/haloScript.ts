@@ -185,6 +185,29 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
 }
 
 /** Binding comments remain source metadata; engines execute ordinary HaloScript. */
+/** Recovered source uses the same mission exporter without QuickForge's
+ * gs_logic_ready global. The existing reviewed-module transaction owns writes. */
+export const recoveredMissionPrefix='; Spark recovered campaign mission v1\n';
+export function recoveredCampaignMission(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean):ScriptExport {
+ if(!['manual','startup'].includes(activation)||typeof forerunner!=='boolean')throw Error('Choose manual or startup recovered mission activation.');
+ const source=exportHaloCeMission(studio,{forerunner});
+ const configuration={activation,forerunner,missions:studio.missions,shots:studio.shots};
+ const bootstrap='\n(script startup gs_mission_bootstrap\n'+(activation==='startup'?'  (sleep_until (> (list_count (players)) 0) 1)\n  (wake gs_mission)':'  (sleep -1)')+'\n)\n';
+ const header=JSON.stringify(configuration).replace(/[\u007f-\uffff]/g,character=>'\\u'+character.charCodeAt(0).toString(16).padStart(4,'0'));
+ const content=recoveredMissionPrefix+'; configuration: '+header+'\n'+source.content+bootstrap;
+ if(new TextEncoder().encode(content).length>256*1024)throw Error('Recovered mission source exceeds the256KiB native file budget; no source was replaced.');
+ return {...source,content,activation:activation==='startup'?'Level startup':'(wake gs_mission)'};
+}
+export function readRecoveredMissionSource(content:string){
+ if(!content.startsWith(recoveredMissionPrefix))throw Error('This is not an unchanged generated recovered mission. Use the explicit manual source editor.');
+ const line=content.slice(recoveredMissionPrefix.length).split('\n',1)[0];if(!line.startsWith('; configuration: '))throw Error('Recovered mission configuration is missing.');
+ const configuration=JSON.parse(line.slice('; configuration: '.length));
+ if(!configuration||Object.keys(configuration).some(key=>!['activation','forerunner','missions','shots'].includes(key)))throw Error('Unknown recovered mission configuration.');
+ const studio={...emptyCreatorStudio(),missions:configuration.missions,shots:configuration.shots};
+ if(recoveredCampaignMission(studio,configuration.activation,configuration.forerunner).content!==content)throw Error('Recovered mission source was edited. Preserve it through the manual source workflow; regeneration refused.');
+ return configuration as {activation:'manual'|'startup';forerunner:boolean;missions:CreatorStudioDocument['missions'];shots:CreatorStudioDocument['shots']};
+}
+
 export const nativeMissionBinding = '; Spark native mission configuration: ';
 export interface NativeMissionBinding {
   schemaVersion:1;

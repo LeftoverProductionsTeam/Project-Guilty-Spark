@@ -206,6 +206,67 @@ pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
         Ok(name)
     }).collect()
 }
+/// Authoring metadata does not replace source/geometry or compiled-cache checks.
+pub(crate) fn validate_working_mission(project:&crate::project::Project,binding:&NativeMissionBinding)->Result<()> {
+    if binding.schema_version!=1||!["manual","startup"].contains(&binding.activation.as_str())||binding.source_sha256.len()!=64||!binding.source_sha256.bytes().all(|value|value.is_ascii_hexdigit()){return invalid("Unsupported prepared mission binding or source hash");}
+    let studio=project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?;
+    studio.validate()?;
+    let current=&studio.missions;
+    if binding.missions.is_empty() || &binding.missions!=current {
+        return invalid("Mission beats changed after preparing native source. In Creator Studio, prepare the mission again; the old module and previous-good build remain intact");
+    }
+    if (binding.cinematic_intro.is_some()||binding.missions.iter().any(|beat|beat.cinematic_cue.is_some()))&&binding.cinematic.is_none() {
+        return invalid("Prepared mission scenes are missing their reviewed camera shots");
+    }
+    if binding.cinematic_intro==Some(false)&&!binding.missions.iter().any(|beat|beat.cinematic_cue.is_some()){return invalid("Prepared shots have no selected mission scene; prepare the mission again");}
+    if let Some(shots)=&binding.cinematic {
+        let studio=project.studio.as_ref().unwrap();
+        if shots.is_empty()||shots.len()>256||shots!=&studio.shots {
+            return invalid("Cinematic shots changed after preparing the mission. Prepare again; the previous-good build remains intact");
+        }
+        if studio.engine_machinima.as_ref().is_some_and(|options|options.enabled){return invalid("Disable in-game recording before preparing a story scene; both would own the game camera");}
+        cinematic_markers(shots)?;
+    }
+    for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)||beat.condition_volume.is_some()||beat.condition_result.is_some()) {
+            return invalid("Native level completion must be the final beat, without a checkpoint or optional condition on the same beat");
+        }
+        if beat.sound_cue.as_ref().is_some_and(|cue|!cue.included(project)) {
+            return invalid(format!("Mission '{}' needs its exact included native sound; choose the imported sound again before preparing",beat.title));
+        }
+    }
+    let _=native_mission_hud(binding)?;
+    Ok(())
+}
+
+pub const RECOVERED_MISSION_PREFIX:&str="; Spark recovered campaign mission v1";
+/// Read the existing generated source's intent. The working-tag transaction pins
+/// the complete file bytes, preserves native inputs, and checks the compiled map.
+pub fn recovered_mission_binding(project:&crate::project::Project,source:&str)->Result<Option<NativeMissionBinding>> {
+    let mut lines=source.splitn(3,'\n');
+    if lines.next().unwrap_or("").trim_end_matches('\r')!=RECOVERED_MISSION_PREFIX{return Ok(None);}
+    if source.len()>256*1024{return invalid("Recovered mission source exceeds256KiB");}
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Configuration {activation:String,forerunner:bool,missions:Vec<MissionBeat>,shots:Vec<CameraShot>}
+    let header=lines.next().unwrap_or("").trim_end_matches('\r').strip_prefix("; configuration: ")
+        .ok_or_else(||crate::SparkError::Invalid("Recovered mission configuration is missing".into()))?;
+    let config:Configuration=serde_json::from_str(header)?;
+    let body=lines.next().filter(|body|!body.trim().is_empty()).ok_or_else(||crate::SparkError::Invalid("Recovered mission source body is missing".into()))?;
+    if !["manual","startup"].contains(&config.activation.as_str()){return invalid("Unsupported recovered mission activation");}
+    let scenes=config.missions.iter().any(|beat|beat.cinematic_cue.is_some());
+    let binding=NativeMissionBinding {schema_version:1,missions:config.missions,activation:config.activation,
+        source_sha256:crate::studio_native::digest(body.as_bytes()),cinematic:if scenes{Some(config.shots.clone())}else{None},cinematic_intro:if scenes{Some(false)}else{None}};
+    validate_working_mission(project,&binding)?;
+    if project.studio.as_ref().is_none_or(|studio|studio.shots!=config.shots){return invalid("Recovered mission camera references changed; prepare again");}
+    for (index,beat) in binding.missions.iter().enumerate() {
+        if beat.trigger=="forerunnerExtractionSettled" && (!config.forerunner||index+1!=binding.missions.len()||beat.trigger_ref.as_deref()!=Some("extraction_activate")||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)) {
+            return invalid("Forerunner settlement must be the final unconditional objective on a reviewed CE solo target");
+        }
+    }
+    Ok(Some(binding))
+}
+
 /// Validate the generated module's intent and bytes, not a second HSC writer.
 /// Editable mission drafts may be saved while stale; native builds must stop.
 pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quickforge::QuickForgeDocument)->Result<Option<NativeMissionBinding>> {
@@ -226,34 +287,11 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         binding.source_sha256.len()!=64 || !binding.source_sha256.bytes().all(|value|value.is_ascii_hexdigit()) {
         return invalid("Unsupported prepared mission binding or source hash");
     }
-    let studio=project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?;
-    studio.validate()?;
-    let current=&studio.missions;
-    if binding.missions.is_empty() || &binding.missions!=current {
-        return invalid("Mission beats changed after preparing native source. In Creator Studio, prepare the mission again; the old module and previous-good build remain intact");
-    }
-    if (binding.cinematic_intro.is_some()||binding.missions.iter().any(|beat|beat.cinematic_cue.is_some()))&&binding.cinematic.is_none() {
-        return invalid("Prepared mission scenes are missing their reviewed camera shots");
-    }
-    if binding.cinematic_intro==Some(false)&&!binding.missions.iter().any(|beat|beat.cinematic_cue.is_some()){return invalid("Prepared shots have no selected mission scene; prepare the mission again");}
-    if let Some(shots)=&binding.cinematic {
-        let studio=project.studio.as_ref().unwrap();
-        if shots.is_empty()||shots.len()>256||shots!=&studio.shots {
-            return invalid("Cinematic shots changed after preparing the mission. Prepare again; the previous-good build remains intact");
-        }
-        if studio.engine_machinima.as_ref().is_some_and(|options|options.enabled){return invalid("Disable in-game recording before preparing a story scene; both would own the game camera");}
-        cinematic_markers(shots)?;
-    }
+    validate_working_mission(project,&binding)?;
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
     }
-    for (index,beat) in binding.missions.iter().enumerate() {
-        if beat.complete_mission==Some(true) && (index+1!=binding.missions.len()||beat.checkpoint==Some(true)||beat.condition_volume.is_some()||beat.condition_result.is_some()) {
-            return invalid("Native level completion must be the final beat, without a checkpoint or optional condition on the same beat");
-        }
-        if beat.sound_cue.as_ref().is_some_and(|cue|!cue.included(project)) {
-            return invalid(format!("Mission '{}' needs its exact included native sound; choose the imported sound again before preparing",beat.title));
-        }
+    for beat in &binding.missions {
         if let Some(name)=&beat.condition_volume {
             if !script_ident(name)||!doc.logic.as_ref().is_some_and(|logic|logic.triggers.iter().any(|trigger|crate::native_logic::trigger_name(trigger)==*name)) {
                 return invalid(format!("Mission '{}' references missing optional-condition volume '{}'",beat.title,name));
@@ -334,7 +372,9 @@ pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInsp
 }
 /// Native ScriptType values follow the existing Invader scenario definition.
 /// Presence/type checks are independent readback, not gameplay acceptance.
-pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {
+pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {verify_native_mission_with_hud(binding,map,cache,None)}
+
+pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path,hud_path:Option<&str>)->Result<()> {
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
     if binding.cinematic.is_some()&&binding.cinematic_intro!=Some(false){expected.push(("gs_cinematic".into(),3));}
@@ -351,6 +391,22 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
         }
     }
     for beat in &binding.missions {
+        if matches!(beat.trigger.as_str(),"encounterCleared"|"escort") {
+            let parts=beat.encounter_name.split('/').collect::<Vec<_>>();
+            let rows=map.encounters.iter().filter(|row|row.name==parts[0]).collect::<Vec<_>>();
+            if parts.len()>2||rows.len()!=1{return invalid(format!("Compiled mission encounter is missing or ambiguous: {}",beat.encounter_name));}
+            let details=rows[0].details.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled mission encounter flags and squads are unreadable".into()))?;
+            if details.flags&1==0{return invalid(format!("Mission encounter {} starts automatically; use script-created source to avoid duplicate AI ownership",parts[0]));}
+            let squads=details.squads.iter().filter(|squad|parts.len()==1||squad.name==parts[1]).collect::<Vec<_>>();
+            if squads.is_empty()||(parts.len()==2&&squads.len()!=1){return invalid("Compiled mission squad is missing or ambiguous");}
+            if beat.trigger=="escort" {
+                let minimum=beat.minimum_survivors.unwrap_or(1) as usize;
+                let normal=squads.iter().map(|squad|squad.normal_count.max(0) as usize).sum::<usize>();
+                let insane=squads.iter().map(|squad|squad.insane_count.max(0) as usize).sum::<usize>();
+                let starts=squads.iter().map(|squad|squad.starting_locations.len()).sum::<usize>();
+                if minimum==0||minimum>normal||minimum>insane||minimum>starts{return invalid("Survivor minimum exceeds compiled native starts or difficulty populations");}
+            }
+        }
         if beat.trigger=="weaponOwned"{verify_mission_collection(beat,map)?;}
         if let Some(cue)=&beat.sound_cue {
             let found=map.tags.iter().filter(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==cue.sound_path).count();
@@ -358,7 +414,7 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
         }
     }
     if let Some(hud)=native_mission_hud(binding)? {
-        let expected=format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/"));
+        let expected=hud_path.map(str::to_owned).unwrap_or_else(||format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/")));
         let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&expected)).collect::<Vec<_>>();
         if tags.len()!=1||tags[0].external||tags[0].data_offset.is_none(){return invalid("Compiled mission HUD dependency is missing, ambiguous or external");}
         let actual=crate::maps::scenario_hud_messages(cache,map)?.ok_or_else(||crate::SparkError::Invalid("Compiled mission has no scenario HUD-message reference".into()))?;
@@ -535,6 +591,10 @@ impl CreatorStudio {
 }
 
 #[cfg(test)]
+#[path = "../tests/common/mod.rs"]
+mod test_fixture;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     fn studio() -> CreatorStudio {
@@ -543,6 +603,22 @@ mod tests {
             server: ServerPlan { name: "LAN Test".into(), runtime: "haloCustomEdition".into(),
                 max_players: 8, public_listing: false, rotation: vec![], game_types: vec![] },
         }
+    }
+    #[test]
+    fn recovered_mission_metadata_uses_current_studio_and_compiled_readback() {
+        let mut project=crate::project::Project::new("Recovered mission metadata");
+        let mut document=studio();
+        document.missions.push(serde_json::from_value(serde_json::json!({"id":"one","title":"Arrival","objective":"Reach the pad","trigger":"triggerVolume","triggerRef":"pad","encounterName":""})).unwrap());
+        project.studio=Some(document.clone());
+        let source=|doc:&CreatorStudio,activation:&str|format!("{RECOVERED_MISSION_PREFIX}\n; configuration: {}\n(script dormant gs_mission (sleep 1))\n",serde_json::json!({"activation":activation,"forerunner":true,"missions":doc.missions,"shots":doc.shots}));
+        let text=source(&document,"manual");let binding=recovered_mission_binding(&project,&text).unwrap().unwrap();
+        assert_eq!(binding.source_sha256,crate::studio_native::digest(b"(script dormant gs_mission (sleep 1))\n"));
+        assert!(recovered_mission_binding(&project,"(script dormant manual (sleep 1))").unwrap().is_none());
+        assert!(recovered_mission_binding(&project,&source(&document,"unknown")).is_err());
+        document.missions[0].title="Changed".into();assert!(recovered_mission_binding(&project,&source(&document,"manual")).unwrap_err().to_string().contains("Mission beats changed"));
+        let root=tempfile::tempdir().unwrap();let map_path=root.path().join("synthetic.map");std::fs::write(&map_path,test_fixture::fixture(609)).unwrap();
+        let map=crate::maps::inspect_map(&map_path,None).unwrap();
+        assert!(verify_native_mission(&binding,&map,&map_path).is_err(),"A readable cache without the authored mission is never accepted");
     }
     #[test]
     fn native_cinematic_trigger_roundtrips_without_changing_legacy_studio_defaults(){

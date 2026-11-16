@@ -1028,6 +1028,17 @@ fn squad_count_field(fields:&str,name:&str)->Result<(i16,usize)> {
 /// Current native-tool fields only. Array order, names, unknown values and
 /// structural/script references are preserved; this does not interpret tag bytes.
 pub fn scenario_squad_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,false)}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeMissionEncounter {pub name:String,pub initially_created:bool}
+/// Project the actual encounter flag from the existing bounded field listing.
+pub fn native_mission_encounters(fields:&str)->Result<Vec<NativeMissionEncounter>>{
+ let table=array_listing(fields,"encounters")?;if table.count>128{return invalid("Native mission encounter budget exceeded");}
+ array_items(&table,"encounters")?.iter().map(|item|{let root=direct_struct_fields(item)?;let name=native_name(&root)?;let flags=root.lines().filter_map(|line|line.strip_prefix("    not_initially_created (")).collect::<Vec<_>>();
+  if flags.len()!=1{return invalid("Native encounter initial-creation flag is missing or ambiguous");}
+  let(value,kind)=flags[0].split_once(')').ok_or_else(||crate::SparkError::Invalid("Native encounter initial-creation flag is malformed".into()))?;if kind.trim()!="bitfield"{return invalid("Native encounter initial-creation flag has an unsupported type");}let initially_created=match value.trim(){"0"=>true,"1"=>false,_=>return invalid("Native encounter initial-creation flag has an unsupported value")};Ok(NativeMissionEncounter{name,initially_created})
+ }).collect()
+}
 pub fn scenario_squad_start_choices(fields:&str)->Result<Vec<ScenarioSquadChoice>> {scenario_squad_inventory(fields,true)}
 fn native_position(fields:&str)->Result<([f32;3],usize)> {native_vector(fields,"position")}
 fn native_vector(fields:&str,key:&str)->Result<([f32;3],usize)> {
@@ -1913,4 +1924,13 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  for squad in &squads{if squad.normal_count==1&&squad.insane_count==1{pilots.push(format!("{}/{}",squad.encounter_name,squad.name));}}
  for name in squads.iter().map(|s|&s.encounter_name).collect::<std::collections::BTreeSet<_>>(){let rows=squads.iter().filter(|s|&s.encounter_name==name).collect::<Vec<_>>();if rows.iter().all(|s|s.normal_count>=0&&s.insane_count>=0)&&rows.iter().map(|s|i32::from(s.normal_count)).sum::<i32>()==1&&rows.iter().map(|s|i32::from(s.insane_count)).sum::<i32>()==1{pilots.push(name.clone());}}
  Ok(NativeTransportChoices{vehicles,groups,routes,pilots,flight_routes:None})
+}
+
+#[cfg(test)]mod mission_source_flags_tests {
+ use super::*;
+ #[test]fn mission_activation_comes_from_the_actual_encounter_flag(){
+  let fields="encounters[1] array\n    encounters[0] struct\n        name (be_marines) string\n        flags bitmask\n            not_initially_created (1) bitfield\n";
+  let rows=native_mission_encounters(fields).unwrap();assert_eq!(rows[0].name,"be_marines");assert!(!rows[0].initially_created);assert!(!native_mission_encounters(&fields.replace("(1) bitfield","(1)     bitfield")).unwrap()[0].initially_created);assert!(native_mission_encounters(&fields.replace("(1) bitfield","(0) bitfield")).unwrap()[0].initially_created);
+  assert!(native_mission_encounters(&fields.replace("not_initially_created","unknown")).is_err());assert!(native_mission_encounters(&fields.replace("(1) bitfield","(2) bitfield")).is_err());assert!(native_mission_encounters(&fields.replace("not_initially_created (1) bitfield","not_initially_created (1) bitfield\n            not_initially_created (0) bitfield")).is_err());
+ }
 }
