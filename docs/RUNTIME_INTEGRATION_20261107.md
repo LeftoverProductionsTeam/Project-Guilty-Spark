@@ -1644,3 +1644,61 @@ Forerunner was read-only. Its current SPARK_INTEGRATION_CONTRACT squad/faction/t
 Final Covenant UI1PASS also verifies switching faction preserves custom encounter names while updating untouched defaults. TypeScript/Vite rerun PASS; existing compiled fixture is unchanged.
 
 QA80247/run-8nGfwZ CLOSED; root absent, runs[]/issues[], all writers finished. {"disposedLogicalBytes":1536613675,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1704919653,"lastAllocatedFileBytes":1405413864}. Disposal allocation unavailable is not measured physical reclamation. Protected475CSV/legacy checkpoint/original scenario/cache hashes and both stashes unchanged; no retained candidate/tags/SDK/browser/compiler caches/archive or engine writes.
+
+
+### 17 November — permanent native dropship crew (parent01d108b)
+
+Extended the existing transport controller, single-actor scope reader and actor→biped→animation summary cache. No second AI/parser/controller/runtime interface. Forerunner dropship controller now offers Permanent native NPC crew: group, compatible non-driver seat, optional explicit deferred creation and removal. Native source validates every difficulty/start/actor override and actual common graph labels. Recipe/mission-owned scopes, pilot/crew overlap, duplicate seats, missing graphs and exhausted non-driver passenger space refuse before draft replacement. Source ownership/identity checks remain; metadata does not create new actors or change source allegiance. Dedicated crew groups can be authored with the existing AI tools. Setup is window-local; Prepare uses existing project Undo/Redo, Save/reopen, Load configuration, review and native attachment.
+
+The existing startup optionally creates only explicitly owned deferred crew, seats only those AI and waits for each actual actor/seat. All pad/departure guards require its live bound crew; empty return counts pilot plus permanent crew. No player force-boarding, actor erasure, automatic lost-crew respawn, reward writer or raid timer. Mission/insertion troops remain a separate authoring workflow; permanent NPCs stay aboard.
+
+Found native seat-name hazard by read-only interface inspection: Forerunner source/hs/hs.c::vehicle_load_magic_definition and source/units/units.c loading use substring selectors; vehicle_test_seat_list uses the exact label. Spark now rejects selectors matching multiple actual native seats (for example P-riderLB vs P-riderLB01), with an actionable UI reason and source regression. No engine implementation/code was imported.
+
+Focused results: frontend71PASS (three files), guide4PASS, transport Rust5PASS, Windows workspace/all-target checkPASS and final affected desktop-target checkPASS, TypeScript/VitePASS. Nine distinct connected browser cases PASS: both factions with/without crew, both mission source producers, faction/camera/flag controls. Final two crew cases also pass missing graph, protected ownership, capacity, deferred ownership and substring ambiguity refusals, saved-draft/history/configuration restoration and guarded existing native build entry. Initial two crew checks queried a collapsed section after Save; corrected to reopen it through actual controls, retaining assertions. Owned composition initially had newline quoting syntax failure; corrected only its disposable runner.
+
+Actual saved UI mission/controller/relative-camera/flag/faction producers use the same recovered composer and existing native fixture. Real Marine/P-riderLF Pelican and Grunt/CD-passengerL01 Spirit each compile as CE609 solo,9scripts with original4script/global prefixes,10HUD messages including1original,5unchanged radio samples and original4encounter teams retained. The fixture stages dedicated one-actor crew through existing EncounterAppend using actual prepared SDK actor tags; independent extraction verifies compiled crew actor/biped/animation and real vehicle seats. Existing named-weapon negative checks retain previous-good output. Final guard-native runs1PASS each (10.39s/10.56s). No-crew HSC is byte-identical to01d108b for both factions. Prepared native warnings remain visible. Test executable is NOT an app or release artifact.
+
+```json
+{
+  "originalMissionSha256": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+  "testExecutableSha256": "6ec43d7cbaba1485c263408bbc180b20cdb0121f6105a2453a1e8c4ab86cb89a",
+  "candidates": {
+    "unsc": {
+      "mapSha256": "dcaf6ab6dc6da7403368c4765476ccf4416259b19b9b26ac7c94f918dfbe94ef",
+      "mapBytes": 110033640,
+      "scenarioSha256": "4238c672333b1bdc026cb583e838d8549fdeef29da4a956c70bf2734b11030f2",
+      "missionSha256": "0e09a02d2b39fe814032549cbb572473adbf43674e384f884d53ca0138c79ec9",
+      "controllerSha256": "44a4eb988a63c19bf43da81470ba3c3ca8d2f11954afef1c6a6844ff0d5feaa0",
+      "logSha256": "c03f0d874d387bb5d690769dee344a8af6f1a3a9662292b3781199891ee5c1dd",
+      "crew": [
+        {
+          "group": "aircrew",
+          "seat": "P-riderLF",
+          "create": true
+        }
+      ]
+    },
+    "covenant": {
+      "mapSha256": "6b79635407f2ecac0fcc0475daa0119c92e5264b1f9abbf0fe8d9618a127ea55",
+      "mapBytes": 110455032,
+      "scenarioSha256": "21a5f608d16d5b1af8a66a9d4d5316d2575d6a57daba36443bdd256f4958878c",
+      "missionSha256": "3e69e816fc7aec1833e80bd3433383ab32e96067a11abfa1ac22ef4bc5d8fb9f",
+      "controllerSha256": "02c6d025226d8b1e4688128f073b90b7eb7eaa4b319addb0459d180dc971bdbd",
+      "logSha256": "40bc91c941060c76114b4b4234884bad8c4f9784fe74195f93d67da881bad519",
+      "crew": [
+        {
+          "group": "aircrew",
+          "seat": "CD-passengerL01",
+          "create": true
+        }
+      ]
+    }
+  }
+}
+```
+
+Actual NPC/player seating, animation appearance, capacity for six peers, crew casualties/recovery, physical flight/boarding/disembark, combat, callbacks/banking and full Black Echo game acceptance remain OPEN. Windows37944/42-edit/full restart and desktop-control initialization remain OPEN; no unchanged control retry or game launch. Forerunner was read-only; no remote write/publication. Full Operation110/M1–M6/all475 remain active. Next: NPC mission passenger insertion/disembarkation through the same native controller/mission ownership, then remaining Black Echo handoff and independent roadmap.
+
+Final two crew browser cases also PASS actual Map library → reopen → Runtime & Tools → re-read/load saved controller → inspect crew choices before reviewed build. This is browser/synthetic IPC evidence, not Windows process restart. Final guide4PASS; protected ledger/recovery/original scenario/cache hashes unchanged.
+
+QA44071/run-kR2APy CLOSED after all writers exited; root absent, storage runs[]/issues[]. {"disposedLogicalBytes":1647154158,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1767415873,"lastAllocatedFileBytes":1515981040}. No measured physical reclamation when disposal allocation is unavailable. Protected475CSV, legacy checkpoint, original scenario/cache and both stashes unchanged. No retained candidate/tags/SDK/browser/compiler caches/archive or other-project writes.

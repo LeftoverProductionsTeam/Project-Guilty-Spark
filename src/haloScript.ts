@@ -934,7 +934,10 @@ export function nativeSoloFirefightRules(config: FirefightConfig): FirefightConf
 
 /** Original Spark source generator using the documented native Forerunner
  * contract. Native tags/AI/paths remain owned by the existing scenario editors. */
+export interface NativeTransportCrew {group:string;seat:string;create?:boolean}
 export interface NativeTransportOptions {
+  /** Permanent NPC crew, separate from issued player passengers. */
+  crew?:NativeTransportCrew[];
   faction:'unsc'|'covenant'; pilot:string; pilotSeat:string;
   outbound:string; inbound:string; hub:string; field:string;
   departureCue?:string; arrivalCue?:string;
@@ -947,7 +950,7 @@ export interface NativeTransportOptions {
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','createPilot','insertionCamera','departureCamera'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','createPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
@@ -955,8 +958,17 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
   const hub=ensureName(options.hub,'Hub volume'),field=ensureName(options.field,'Landing volume');
   if(hub===field||outbound===inbound)throw Error('Use distinct hub/landing volumes and insertion/return command lists.');
-  if(!options.pilotSeat||options.pilotSeat.length>31||!/^[\x20-\x21\x23-\x5b\x5d-\x7e]+$/.test(options.pilotSeat)||!options.pilotSeat.trim())
+  const seatLabel=(seat:unknown):seat is string=>typeof seat==='string'&&seat.length>0&&seat.length<=31&&/^[\x20-\x21\x23-\x5b\x5d-\x7e]+$/.test(seat)&&!!seat.trim();
+  if(!seatLabel(options.pilotSeat))
     throw Error('Copy a real native pilot seat label (1–31 printable characters, without quotes or backslashes).');
+  if(options.crew!=null&&(!Array.isArray(options.crew)||options.crew.length>8))throw Error('Review at most eight permanent native crew assignments.');
+  const crew=options.crew??[],groups=[pilot.toLowerCase()],seats=[options.pilotSeat.toLowerCase()];
+  for(const member of crew){
+    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create'].includes(key))||!seatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
+    const group=ensureName(member.group,'Crew encounter / squad',true).toLowerCase(),seat=member.seat.toLowerCase();
+    if(groups.some(old=>old===group||old.startsWith(group+'/')||group.startsWith(old+'/'))||seats.includes(seat))throw Error('Pilot and crew need separate, nonoverlapping native groups and unique seats.');
+    groups.push(group);seats.push(seat);
+  }
   const cues=[options.departureCue,options.arrivalCue].map((cue,index)=>cue?ensureName(cue,index?'Arrival camera/dialogue function':'Departure camera/dialogue function'):null);
   const role=options.faction==='unsc'?'pelican':'spirit',craft='extraction_'+role,stem='gs_'+role;
   const relativeCamera=(camera:NativeTransportOptions['insertionCamera'])=>{
@@ -968,9 +980,11 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   };
   const insertionCamera=relativeCamera(options.insertionCamera),departureCamera=relativeCamera(options.departureCamera);
   const health='(> (unit_get_health (unit '+craft+')) 0)';
-  const crew='(vehicle_test_seat_list (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
+  const pilotSeated='(vehicle_test_seat_list (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
   const landed='(> (device_group_get '+craft+'_landed) 0.5)';
-  const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+crew+' (volume_test_object '+name+' '+craft+') '+landed+')';
+  const crewSeated=crew.map(member=>'(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+')))');
+  const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+pilotSeated+(crewSeated.length?' '+crewSeated.join(' '):'')+' (volume_test_object '+name+' '+craft+') '+landed+')';
+  const empty='(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.length)+')';
   const enter=(enabled:boolean)=>'  (unit_set_enterable_by_player (unit '+craft+') '+enabled+')';
   const lines=[nativeTransportPrefix.trimEnd(),'; configuration: '+JSON.stringify(options),...heading('Native '+role+' insertion and evacuation'),
     '; Forerunner only: requires actual native ground contact and durable crew callback.',
@@ -981,7 +995,13 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
     '  (vehicle_load_magic (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))',
-    '  (sleep_until '+crew+' 1)',
+    '  (sleep_until '+pilotSeated+' 1)',
+    ...crew.flatMap(member=>[
+      ...(member.create?['  ; Explicit deferred NPC crew ownership; no erase or replacement.','  (if (= (ai_living_count '+member.group+') 0) (ai_place '+member.group+'))']:[]),
+      '  (sleep_until (and '+health+' (= (ai_living_count '+member.group+') 1)) 1)',
+      '  (vehicle_load_magic (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))',
+      '  (sleep_until (and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))) 1)',
+    ]),
     '  (set '+stem+'_ready true)',')','',
     '(script continuous forerunner_'+role+'_complete',
     '  (sleep -1)',
@@ -1000,13 +1020,13 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     enter(true),
     ...(options.returnAfterInsertion?[
       '  ; Empty return: every passenger disembarks normally before this flight.',
-      '  (sleep_until (and '+pad(field)+' (= (list_count (vehicle_riders (unit '+craft+'))) 1)) 1)',
+      '  (sleep_until (and '+pad(field)+' '+empty+') 1)',
       enter(false),
       ...(cues[0]?['  ('+cues[0]+')']:[]),
       '  (ai_command_list '+pilot+' '+inbound+')',
       '  (sleep_until '+pad(hub)+' 1)',
       '  ; Keep the empty ship closed while the deployed field crew requests pickup.',
-      '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_called) 0.5) (= (list_count (vehicle_riders (unit '+craft+'))) 1)) 1)',
+      '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_called) 0.5) '+empty+') 1)',
       '  (ai_command_list '+pilot+' '+outbound+')',
       '  (sleep_until '+pad(field)+' 1)',
       ...(cues[1]?['  ('+cues[1]+')']:[]),
@@ -1022,13 +1042,14 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     '  (sleep_until (and '+pad(hub)+' '+stem+'_settled) 1)',
     enter(true),
-    '  (sleep_until (and '+pad(hub)+' (= (list_count (vehicle_riders (unit '+craft+'))) 1)) 1)',
+    '  (sleep_until (and '+pad(hub)+' '+empty+') 1)',
     ')',''];
   return {filename:stem+'_transport.hsc',content:lines.join('\n'),generatedOnly:true,scenarioType:'singleplayer',
     dependencies:['native_vehicle:'+craft,'ai_encounter:'+pilot,'command_list:'+outbound,'command_list:'+inbound,
-      'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
+      ...crew.map(member=>'ai_encounter:'+member.group),'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
+      ...(crew.length?['Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats; empty return counts pilot plus crew, not player passengers. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
       'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
       'Optional relative camera coordinates are offsets in the craft frame, not world positions. These shared cinematics affect all viewers and temporarily control input; source points and restoration need game testing. Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};

@@ -236,3 +236,6 @@ test('objective flag drafts never become shared or restored native source',async
 test('Black Echo setup choices remain independent per project and native window',async()=>{
  const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('a','creator-black-echo-options',{faction:'covenant',rescue:'allies'});session.configureMapViewWindow('other');session.writeMapSession('a','creator-black-echo-options',{faction:'unsc',rescue:'marines'});session.configureMapViewWindow('main');expect(session.readMapSession('a','creator-black-echo-options',null)).toEqual({faction:'covenant',rescue:'allies'});expect(session.readMapSession('b','creator-black-echo-options',null)).toBeNull();
 });
+
+
+test('native transport choices remain independent across workspace windows',async()=>{const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('a','sourceScripts.transport',{faction:'unsc',crew:[{group:'ship_crew',seat:'P-riderLF'}]});session.configureMapViewWindow('other');session.writeMapSession('a','sourceScripts.transport',{faction:'covenant',crew:[]});session.configureMapViewWindow('main');expect(session.readMapSession('a','sourceScripts.transport',null)).toEqual({faction:'unsc',crew:[{group:'ship_crew',seat:'P-riderLF'}]});});

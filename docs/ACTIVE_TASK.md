@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 7fe4041896bf7d9242caebaf1c1a142a84b722d7, canonical master.
-Latest verified revision: 7fe4041896bf7d9242caebaf1c1a142a84b722d7; faction-role/encounter-team increment passes source/browser/native checks in the local commit containing this checkpoint. Windows/game gates OPEN.
-Next action: complete explicit non-pilot dropship crew assignment with real seat/source validation in the existing controller, then remaining Black Echo handoff. Keep Windows37944/42-edit, actual flight/combat/boarding/settlement/peer/game gates OPEN.
+Starting revision: 01d108b3696a30b305309c7b54b9e17046b4e4da, canonical master.
+Latest verified revision: 01d108b3696a30b305309c7b54b9e17046b4e4da; permanent NPC crew increment passes source/UI/native checks in the local commit containing this checkpoint. Windows/game gates OPEN.
+Next action: author NPC mission-passenger insertion/disembarkation through the existing controller and mission ownership, then remaining Black Echo handoff. Keep Windows37944/42-edit, actual seating/flight/boarding/combat/settlement/peer/game gates OPEN.
 
 ## Acceptance
 
@@ -16,7 +16,9 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov factions (parent7fe4041): Covenant/UNSC roles and explicit encounter teams → Undo/Redo/Save/reopen → same source writer → Spirit CE609 compile/readback pass. Frontend73/creative22+1skip/browser7distinct+final1/guide4/web/Windows all-target PASS; original4AIteams and scripts retained. Exact hashes/fixes: RUNTIME_INTEGRATION_20261107. Actual Windows/game gates OPEN.
+17Nov crew (parent01d108b): same source graph/controller → compatible NPC seats/ownership → UI/history/Save/reopen → Marine/Pelican and Grunt/Spirit CE609 compile/readback pass. Frontend71/guide4/transportRust5/browser9distinct+final2/web/Windows targets PASS. Substring-seat ambiguity refuses; no-crew HSC byte-identical. Exact hashes/fixes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
+
+17Nov factions01d108b: explicit encounter teams/roles → UI/history/Save/reopen → Spirit CE609 compile/readback pass. Exact tests/hashes: RUNTIME_INTEGRATION_20261107. Windows/game gates OPEN.
 
 17Nov moving targets7fe4041: UI/history/Save/reopen and native CE609 identity/asset/coordinate/readback plus negative bindings pass. Exact tests/hashes/limits: RUNTIME_INTEGRATION_20261107. Windows/game gates OPEN.
 
@@ -151,7 +153,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA80247/run-8nGfwZ CLOSED: 1536613675logicalB disposed; peak1704919653logicalB; last allocation1405413864B; disposal allocation unavailable. Root absent, runs[]/issues[], all writers finished. Protected hashes/stashes unchanged; no retained outputs or engine writes. Exact evidence: RUNTIME_INTEGRATION_20261107.
+QA44071/run-kR2APy CLOSED: 1647154158logicalB disposed; peak1767415873logicalB; last allocation1515981040B; disposal allocation unavailable. Root absent, runs[]/issues[], all writers exited. Protected hashes/stashes unchanged; no retained outputs or other-project writes. Exact proof: RUNTIME_INTEGRATION_20261107.
 
 Earlier owned QA roots remain closed; exact receipts survive in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git. No old jobs revived or checkpoint duplicated.
 
