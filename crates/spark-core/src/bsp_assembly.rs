@@ -839,7 +839,10 @@ fn add_portals(
     );
     if let Some(boundary)=trimmed_donor_min{donor_bounds.0[0]=boundary;}
     let inside = |p: V, b: (V, V)| (0..3).all(|k| p[k] >= b.0[k] - 0.1 && p[k] <= b.1[k] + 0.1);
-    let source_space=if assembly.terrain_seam.is_some(){Some(visibility_solid(mesh,slots,materials)?)}else{None};
+    // Authored sections can widen or cross the primary passage just like the
+    // outdoor terrain join. A route-sized portal cannot close that joined air
+    // volume; slice its actual source boundary and share coincident cuts.
+    let source_space=if assembly.terrain_seam.is_some() || !assembly.sections.is_empty(){Some(visibility_solid(mesh,slots,materials)?)}else{None};
     let slot = materials.len();
     let mut count = 0;
     let mut native_cuts:Vec<Vec<[u32;3]>>=vec![];
@@ -1454,6 +1457,30 @@ mod tests {
         assert!(export_jms(&geometry).unwrap().contains("+portal\r\n<none>\r\n"));
         if let crate::bsp_visibility::VisibilityZone::Tunnel{start,..}=&mut plan.visibility_zones[0]{*start=0.05;}
         assert!(add_portals(&mut MeshData::default(),&mut vec![],&mut vec![],&plan,&base,&donor,None).is_err());
+    }
+
+    #[test]
+    fn overlapping_arch_sections_cut_the_actual_joined_air_volume() {
+        let mut plan: BspAssembly = serde_json::from_value(serde_json::json!({"schemaVersion":1,"donorProjectId":uuid::Uuid::nil(),"donorTitle":"Fixture","donorSource":{"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":"a".repeat(64),"cacheVersion":609,"engine":"fixture","scenarioPath":"fixture"},"donorTagsDirectory":"fixture","donorBspIndex":0,"translation":[0.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[1.,0.,0.],[9.,0.,0.]],"tunnelWidth":2.,"tunnelHeight":2.,"tunnelShaderPath":"fixture/metal"})).unwrap();
+        let edge = SeamEdge { source_sha256: "a".repeat(64), bsp_index: 0, vertices: [[0.;3],[1.,0.,0.]], point: [0.;3] };
+        plan.sections.push(SeamSection { id: uuid::Uuid::new_v4().to_string(), name: "Wider arch".into(), points: vec![[1.,1.,0.],[9.,1.,0.]], width: 4., height: 3., shader_path: "fixture/metal".into(), open_road: false, arch_segments: Some(6), edges: [edge.clone(),edge] });
+        let narrow = tunnel_solid([1.,0.,0.],[9.,0.,0.],[0.,1.,0.],[0.,1.,0.],2.,0).unwrap();
+        let arch = seam_sections::arch_solid([1.,1.,0.],[9.,1.,0.],[0.,2.,0.],[0.,2.,0.],4.,3.,6,0).unwrap();
+        let body = checked(narrow.union(&arch), "Fixture union").unwrap();
+        let mut materials = vec![material()];
+        let (mut mesh, mut slots) = collision_layer(&body.get_mesh_gl64(-1), &mut materials).unwrap();
+        let first_portal_vertex = mesh.positions.len()/3;
+        let bounds = |lo:f32,hi:f32| MeshData { positions: vec![lo,-5.,0.,hi,5.,6.,lo,5.,0.], indices: vec![0,1,2], parts: vec![maps::MeshPart {name:"fixture".into(),index_start:0,index_count:3}], ..Default::default() };
+        let count = add_portals(&mut mesh,&mut materials,&mut slots,&plan,&bounds(0.,2.),&bounds(8.,10.),None).unwrap();
+        assert_eq!(count, 2, "The same native cut must be shared by overlapping routes");
+        // A width-two rectangle lies inside this width-four closed arch and
+        // cannot partition it. Every exported cut must reach its outer roof.
+        let mut planes = std::collections::BTreeMap::<u32,Vec<[f32;3]>>::new();
+        for p in mesh.positions[first_portal_vertex*3..].chunks_exact(3) { planes.entry(p[0].to_bits()).or_default().push([p[0],p[1],p[2]]); }
+        for points in planes.values() {
+            assert!(points.iter().any(|p| (p[1]-3.).abs()<1e-5), "Portal must reach the joined arch side");
+            assert!(points.iter().any(|p| (p[2]-5.).abs()<1e-5), "Portal must reach the joined arch roof");
+        }
     }
 
     fn material() -> AssemblyMaterial {

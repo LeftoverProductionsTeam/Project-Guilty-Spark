@@ -3578,9 +3578,16 @@ test('edge-section sliders preview an unsaved arch with an exact reported budget
  const width=await constructionControl(page,'slider','Seam preview width');await width.focus();await width.press('ArrowRight');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].width)).toBe(4.1);
  await expect(panel.getByLabel('Connector triangle budget',{exact:true})).toContainText('Connector: 60 triangles');
- expect((await page.evaluate(()=>(window as any).__sparkMock.saved)).bspAssembly.sections[0].width).toBe(4);
+ const facets=await constructionControl(page,'slider','Seam arch facets');await facets.focus();await facets.press('ArrowUp');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].archSegments)).toBe(7);
+ const height=await constructionControl(page,'slider','Seam preview height');await height.focus();await height.press('ArrowDown');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].height)).toBe(2.9);
+ const beforeApply=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);
+ expect(beforeApply.width).toBe(4);expect(beforeApply.archSegments).toBe(6);expect(beforeApply.height).toBe(3);
  await (await constructionControl(page,'button','Apply connection')).click();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0].width)).toBe(4.1);
+ const appliedSection=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);expect(appliedSection.archSegments).toBe(7);expect(appliedSection.height).toBe(2.9);
  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0].width)).toBe(4);
+ const restoredSection=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);expect(restoredSection.archSegments).toBe(6);expect(restoredSection.height).toBe(3);
  await (await constructionControl(page,'button','Pick edge in this BSP')).click();await expect(page.getByRole('button',{name:'Cancel edge selection',exact:true}).first()).toBeVisible();
 });
 

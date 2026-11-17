@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — combined Black Echo native handoff/HUD repair
+Task: Operation110 — source-edge arch seam native acceptance
 Status: implementation incomplete
-Starting revision: 5a7a53a29f803a8832bf0008efa10a164473b049, canonical master.
-Latest verified revision: parent5a7a53a29f803a8832bf0008efa10a164473b049; combined Pelican/Spirit source/browser/production CE609 readback and HUD repair verified in this checkpoint commit. Game gates OPEN.
-Next action: resume existing Timberland–Sidewinder native BSP seam diagnostics and repair through current geometry/build tools. Combined Black Echo native source gate passes; Windows/game/37944 remains OPEN under the recorded control blocker.
+Starting revision: 939cea8090ff5182161463ef68f32dcf10740b05, canonical master.
+Latest verified revision: parent939cea8090ff5182161463ef68f32dcf10740b05; scoped portal/keyboard/source/native diagnostics verified in this checkpoint commit. Exact source hashes in native-terrain fixture.
+Next action: reproduce the authored arch roof/junction needle from edgeSectionContinuation20261117 and repair native geometry without raising limits. Positive CE baseline also needs the existing explicitly reviewed stock-CE source correction. Preserve R157/H19 and all475.
 
 ## Acceptance
 
@@ -16,21 +16,13 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov combined Black Echo (parent5a7a53a): both faction insertion/radio/cameras/kits → saved source → production CE609 full snapshot/readback PASS. Fixed native retained-HUD separator comparison; wrong tag still refuses. Frontend64/Rust23+1explicit skip/browser4/types/core/native2 PASS. Five radio hashes/resources/source indices retained. Exact hashes/failure/QA: RUNTIME_INTEGRATION_20261107. Full Windows/game gates OPEN.
+17Nov seam (parent939cea8): overlapping arch portals use closed-air/shared cuts; keyboard width/height/facets preview → Apply/Save/Undo passes. Core79+2explicit installed-fixture skips/frontend7/browser1/types/examples PASS. Native baseline Tool structure/lightmaps PASS; CE fails exact known Scorpion flare index. Arch conditioning remains blocked. Exact source/QA/native hashes, coordinates and cleanup: MEGAWORLD_SEAM_ROUTES_20261108 + existing fixture.
 
-17Nov ground5a7a53a/radio4339020/recovered0b57e8c/attachedaa7c7f3 retain scoped source/browser/native proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
+17Nov Black Echo939cea8/ground5a7a53a/radio4339020/recovered0b57e8c/attachedaa7c7f3/insertion(parent234b6bb) retain scoped source/browser/production CE609 proof, full hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
 
-17Nov first insertion (parent234b6bb): UI/history/Save/reopen → exact generated transport ownership → shared escort without duplicate spawn → Pelican/Spirit CE609 compile/independent extracted scenario/actor/seat/latch readback PASS. Frontend72/guide4/creative23+1skip/transport5/browser12distinct+final8/web/Windows all-target PASS. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
+17Nov crew/factions/moving milestones234b6bb/01d108b/7fe4041: retained source/native evidence in RUNTIME_INTEGRATION_20261107; Windows/game OPEN.
 
-17Nov crew234b6bb/factions01d108b/moving7fe4041 retain scoped source/browser/CE609 proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
-
-17Nov native flag/guidance (parent1ce17fe): protected append/pose/Restore/Save and scoped marker authoring→standard parameterless HSC→CE609 compile/readback pass. Frontend70/native20+1skip/creative21+1skip/working17+1skip/browser6distinct/latest2/TypeScript-Vite/Windows all-target PASS. Exact cache/source/test-exe hashes, compiler/initialization fixes and limits: RUNTIME_INTEGRATION_20261107. Actual marker/mission/gameplay remains OPEN.
-
-16Nov independent squad missions (parent50837f2): scope→history/Save/reopen→native gate review→same HSC writer→CE609 compile/independent readback passes. Frontend49/core21+1skip/working17+1skip/browser7distinct/latest scoped1/TypeScript-Vite/Windows all-target pass. Exact hashes/fixes: RUNTIME_INTEGRATION_20261107. Windows/game gates remain OPEN.
-
-16Nov squad hub (parent c2e6797): native terminal/gate controls reuse Source Guardian, shared writer/readback and Save/build metadata. Source5/browser2/mission producers4/working17+1skip/guide10/frontend/all-target/native1 PASS. Both gated/ungated controls preserve originals and indices. Scope/hashes and unrun Windows/job/game acceptance: RUNTIME_INTEGRATION_20261107.
-
-16Nov current Forerunner: actual help/capabilities, exact build admission, compiled requirements and full7-beat Pelican→CE609 compile/readback→real private staging/3CEbanks/command/refusal/disposal pass in scope. Core20+1skip/browser3+4/guide10/frontend/all-target compilation pass. Exact hashes/errors: RUNTIME_INTEGRATION_20261107. Actual Windows/gameplay OPEN.
+16–17Nov flags/guidance(parent1ce17fe), independent squad50837f2, squad hubc2e6797 and Forerunner admission retain exact source/browser/CE609 hashes, tests, fixes and limits in RUNTIME_INTEGRATION_20261107 and Git. These native-source passes do not accept Windows/gameplay.
 
 16Nov retained HUD (parent c911f04): production CE parent→working-tags radio revision now passes with actual staged custom-HUD reference/table and no generated ownership or overwrite. Five sound hashes and original input identities preserved; conflicting edited tag refuses and keeps prior-good map. Native1/core17+1explicit skip/core all-target/browser1/guide4 pass. Exact hashes/setup corrections in RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
@@ -62,6 +54,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Current seam scope: closed-air section portals, complete slider-key previews, matching guide/browser history checks, existing native example recovery/real-edge fixture and exact negative geometry/source evidence.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -131,6 +125,8 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
+Current: real arch roof/junction needle conditioning refuses at256 refinements; no limit relaxed. Raw CE baseline Tool structure/lightmaps pass, Invader refuses the exact known Scorpion bitmap index; use existing explicitly reviewed recovery. R157 remains accepted; H19/native Windows/game gates OPEN.
+
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
 - Recovered campaign source now has scoped real Windows module selection/edit, project Undo/Redo, Save/restart, CE compile and independent readback proof. Arbitrary file/search breadth, cancel/stale/native negative outcomes, complete structural/cinematic mission editing and gameplay remain open. Native Restore is distinct from project draft Undo; no full native history acceptance inferred.
@@ -154,6 +150,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 
 QA28750/run-ftk6Wy and run-isvZ4C CLOSED: 499041826/28907163logicalB disposed; native allocation unavailable, frontend allocation29153432B. Both roots absent, runs[]/issues[], all writers exited; exact receipt: RUNTIME_INTEGRATION_20261107. Protected hashes/stashes unchanged.
 

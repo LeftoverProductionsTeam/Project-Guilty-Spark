@@ -209,5 +209,407 @@
   "screenshots": [
     "E/chupa-portal-native-r157-megaworld-seam-closeup.png",
     "E/chupa-portal-native-r157-megaworld-compiled-routes.png"
-  ]
+  ],
+  "edgeSectionContinuation20261117": {
+    "sourceParent": "939cea8090ff5182161463ef68f32dcf10740b05",
+    "acceptedR157Unchanged": true,
+    "codeHashes": {
+      "crates/spark-core/src/bsp_assembly.rs": "25d3305a010145491f46c3aff70636a607a3d73b0923eb9ec3272330a92b9b3c",
+      "crates/spark-core/examples/qa_bsp_assembly.rs": "4d808f31e6942b30ff72076ed6cc0a9a3683553b65f2e1d4b6314baed2f611d9",
+      "crates/spark-core/examples/qa_megaworld_ce.rs": "569d07e0eb43b8281b451325f1dad8923cde86d1b0e89e35cc5fc58c03da222b",
+      "src/components/BspAssembly.tsx": "4452673d0a1499589b02ac627d0ea3dc75ecf5dd09643004cb9eddeeb7f44fb6",
+      "src/featureCatalog.ts": "65782311f59aceba9146b9fa737fcddcbeb697799aa9ac0093f4349a170c8c72",
+      "tests/ui/native-contract.spec.ts": "1e618c74eaaf18bddd6a76c5032426c4055b6c332ec6a303f5c29786c4fe5f54"
+    },
+    "originalHashes": {
+      "timberland.map": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+      "sidewinder.map": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+      "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2",
+      "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041"
+    },
+    "originalsUnchanged": true,
+    "portalRegression": {
+      "before": "FAIL: four partial/duplicate cuts instead of two shared closed-air cuts",
+      "after": "PASS: 2 shared cuts reach actual arch sides and roof",
+      "evidenceLevel": "source geometry tests; not native section compilation"
+    },
+    "tests": {
+      "bspCore": {
+        "passed": 79,
+        "ignored": 2,
+        "ignoredReason": "explicit installed MCC painted-detail BSP/Invader fixtures not supplied"
+      },
+      "frontend": 7,
+      "browser": 1,
+      "typescript": true,
+      "nativeExamplesCompile": true
+    },
+    "plans": {
+      "edge-section": {
+        "translation": [
+          196.80172729492188,
+          9.3280029296875,
+          -21.232985482283567
+        ],
+        "yawDegrees": 0,
+        "primary": {
+          "points": [
+            [
+              38.811767578125,
+              34.44912338256836,
+              -21.075042829581236
+            ],
+            [
+              144.11968994140625,
+              34.44912338256836,
+              -21.075042829581236
+            ]
+          ],
+          "width": 2,
+          "height": 1.6,
+          "shader": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor"
+        },
+        "sections": [
+          {
+            "name": "Seam section 1",
+            "points": [
+              [
+                38.294206803834044,
+                34.2151684830495,
+                -21.193575227285763
+              ],
+              [
+                144.4075748381839,
+                33.35998012060601,
+                -21.075042829581236
+              ]
+            ],
+            "width": 4,
+            "height": 3,
+            "shaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor",
+            "archSegments": 6,
+            "edges": [
+              {
+                "sourceSha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+                "bspIndex": 0,
+                "vertices": [
+                  [
+                    38.43390655517578,
+                    36.20912170410156,
+                    -21.33343505859375
+                  ],
+                  [
+                    39.979591369628906,
+                    33.04161071777344,
+                    -20.63532257080078
+                  ]
+                ],
+                "point": [
+                  39.19291291150986,
+                  34.65371988485572,
+                  -20.990627902363435
+                ]
+              },
+              {
+                "sourceSha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+                "bspIndex": 0,
+                "vertices": [
+                  [
+                    -51.71256637573242,
+                    25.246479034423828,
+                    0.15794265270233154
+                  ],
+                  [
+                    -53.524784088134766,
+                    24.76746940612793,
+                    0.15794265270233154
+                  ]
+                ],
+                "point": [
+                  -52.64969847488844,
+                  24.99877408407004,
+                  0.15794265270233154
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "separated-section": {
+        "translation": [
+          196.80172729492188,
+          9.3280029296875,
+          -21.232985482283567
+        ],
+        "yawDegrees": 0,
+        "primary": {
+          "points": [
+            [
+              38.811767578125,
+              34.44912338256836,
+              -21.075042829581236
+            ],
+            [
+              144.11968994140625,
+              34.44912338256836,
+              -21.075042829581236
+            ]
+          ],
+          "width": 2,
+          "height": 1.6,
+          "shader": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor"
+        },
+        "sections": [
+          {
+            "name": "Seam section 1",
+            "points": [
+              [
+                43.55818106843838,
+                37.18694574211777,
+                -15.440553156967818
+              ],
+              [
+                156.30474430724834,
+                45.93189981001383,
+                -21.075042829581236
+              ]
+            ],
+            "width": 4,
+            "height": 3,
+            "shaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor",
+            "archSegments": 6,
+            "edges": [
+              {
+                "sourceSha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+                "bspIndex": 0,
+                "vertices": [
+                  [
+                    38.787353515625,
+                    43.85767364501953,
+                    -15.862810134887695
+                  ],
+                  [
+                    36.99848937988281,
+                    41.85067367553711,
+                    -19.591026306152344
+                  ]
+                ],
+                "point": [
+                  37.58609904124782,
+                  42.50993703090526,
+                  -18.366374417772093
+                ]
+              },
+              {
+                "sourceSha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+                "bspIndex": 0,
+                "vertices": [
+                  [
+                    -51.25210952758789,
+                    31.21158218383789,
+                    0.15794265270233154
+                  ],
+                  [
+                    -51.58348846435547,
+                    32.01157760620117,
+                    1.758055567741394
+                  ]
+                ],
+                "point": [
+                  -51.58348846435547,
+                  32.01157760620117,
+                  1.758055567741394
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "authored-branch": {
+        "translation": [
+          196.80172729492188,
+          9.3280029296875,
+          -21.232985482283567
+        ],
+        "yawDegrees": 0,
+        "primary": {
+          "points": [
+            [
+              38.811767578125,
+              34.44912338256836,
+              -21.075042829581236
+            ],
+            [
+              144.11968994140625,
+              34.44912338256836,
+              -21.075042829581236
+            ]
+          ],
+          "width": 2,
+          "height": 1.6,
+          "shader": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor"
+        },
+        "sections": [
+          {
+            "name": "Seam section 1",
+            "points": [
+              [
+                38.811767578125,
+                34.44912338256836,
+                -21.075042829581236
+              ],
+              [
+                65.13874816894531,
+                46.44912338256836,
+                -21.075042829581236
+              ],
+              [
+                117.79270935058594,
+                46.44912338256836,
+                -21.075042829581236
+              ],
+              [
+                144.11968994140625,
+                34.44912338256836,
+                -21.075042829581236
+              ]
+            ],
+            "width": 4,
+            "height": 3,
+            "shaderPath": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor",
+            "archSegments": 6,
+            "edges": [
+              {
+                "sourceSha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+                "bspIndex": 0,
+                "vertices": [
+                  [
+                    38.43390655517578,
+                    36.20912170410156,
+                    -21.33343505859375
+                  ],
+                  [
+                    39.979591369628906,
+                    33.04161071777344,
+                    -20.63532257080078
+                  ]
+                ],
+                "point": [
+                  39.19291291150986,
+                  34.65371988485572,
+                  -20.990627902363435
+                ]
+              },
+              {
+                "sourceSha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+                "bspIndex": 0,
+                "vertices": [
+                  [
+                    -51.71256637573242,
+                    25.246479034423828,
+                    0.15794265270233154
+                  ],
+                  [
+                    -53.524784088134766,
+                    24.76746940612793,
+                    0.15794265270233154
+                  ]
+                ],
+                "point": [
+                  -52.64969847488844,
+                  24.99877408407004,
+                  0.15794265270233154
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "geometryFailures": {
+      "edge-geometry.log": "Error: Invalid(\"Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material 26, 16764 triangles, 256 refinements, quality 0.00026236, points [[141.44715243597466, 35.38390369264485, -21.07813276155135], [141.57480301163451, 35.38287493171882, -21.077913821919118], [141.74409474732056, 35.38151057654945, -21.077804689972808]])\")",
+      "separated-geometry.log": "Error: Invalid(\"Seam section 1: Tunnel floor has a step higher than 0.12 world units in segment 1 near 153.32, 45.70, -21.08; add a ramp waypoint\")",
+      "authored-geometry.log": "Error: Invalid(\"Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material 26, 16882 triangles, 256 refinements, quality 0.00152164, points [[126.96120123231971, 40.58905209094147, -16.872605523157997], [127.06848327411194, 40.54491332332986, -16.868273284337313], [126.835112787155, 40.64156901972493, -16.877114210327647]])\")",
+      "material-geometry.log": "Error: Invalid(\"Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material 25, 16882 triangles, 256 refinements, quality 0.00152164, points [[126.96120123231971, 40.58905209094147, -16.872605523157997], [127.06848327411194, 40.54491332332986, -16.868273284337313], [126.835112787155, 40.64156901972493, -16.877114210327647]])\")"
+    },
+    "materialSharingTrial": "Same failing geometry; experiment removed. No quality/triangle limits relaxed.",
+    "baseline": {
+      "report": {
+        "inputTriangles": 18760,
+        "outputTriangles": 32109,
+        "connectorTriangles": 44,
+        "generatedUvFaces": 1428,
+        "walkSamples": 423,
+        "portalCount": 2,
+        "routeClearance": [
+          {
+            "label": "Primary connection",
+            "width": 2,
+            "clearHeight": 1.6,
+            "walkSamples": 423
+          }
+        ],
+        "donorScenery": 0,
+        "warnings": [
+          "Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.",
+          "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.",
+          "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+          "A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances."
+        ]
+      },
+      "donorScenery": 42,
+      "bspSha256": "d640866fd5101be08078f5986a358a7daad7b90d8e6a49f34cf4908c77221ded",
+      "jmsSha256": "521381682ce8349fe24f5745778a99e3144ac66d6be506614dd7533532745436",
+      "recoveredInputs": [
+        {
+          "requestedTag": "levels\\test\\timberland\\timberland.scenario",
+          "files": 2437,
+          "totalBytes": 77572742,
+          "sourceSha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea"
+        },
+        {
+          "requestedTag": "levels\\test\\sidewinder\\sidewinder.scenario_structure_bsp",
+          "files": 69,
+          "totalBytes": 18034422,
+          "sourceSha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+        }
+      ],
+      "haloToolStructure": true,
+      "haloToolLightmaps": true,
+      "ceCache": false,
+      "ceFailure": {
+        "stage": "compile-ce",
+        "tag": "vehicles/scorpion/headlights scorpion.lens_flare",
+        "diagnostic": "Reflection #0 bitmap index 2 is out of bounds (>= 1) in vehicles/scorpion/bitmaps/headlight_lens_flare.bitmap",
+        "knownCorrectionSourceHashes": {
+          "vehicles/warthog/warthog gunner.actor_variant": "96fead28ec58a2ad7cf7a71c363bce5a311cd037c106bb3caf6fa574cf0ed635",
+          "vehicles/scorpion/headlights scorpion.lens_flare": "ea922b11a81401005b1d6a79f3f0515a015a217bb7dd552937f7edacc9106c4f",
+          "vehicles/scorpion/secondary fire bullet.effect": "84d8518bf452c7e92f5ffff76c950b95705687a29ac6bca8a908e11810f2fc9a",
+          "vehicles/scorpion/bitmaps/headlight_lens_flare.bitmap": "030be8836308fa1a732436e458e39ce33199803a2c1737d02045bc20989aa1ff"
+        },
+        "requiredWorkflow": "Existing explicitly reviewed Stock CE source recovery; no implicit correction applied"
+      }
+    },
+    "nativeWindowsControl": false,
+    "gameLoaded": false,
+    "humanTraversal": false,
+    "extractionInputsUnchanged": true,
+    "nativeQaExecutables": {
+      "qa_bsp_assembly.exe": "f4231154df7cccd6455ccdc9b53e07fe531caa7e94e0830e1b9deba4c10b9a01",
+      "qa_megaworld_ce.exe": "a420071c4c76d763c7be75606aca039889ad03f694874fd9cd6299310ad6d3ed"
+    },
+    "nativeLogSha256": "a5d4e37eb1d7a7759d01e4de3daeb62d17c6495e51eed89593de8f9a9db8174f",
+    "qaDisposal": {
+      "workflow": "native-edge-arch-section",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 1933265960,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 1957455356,
+      "lastAllocatedBytes": 1909313696,
+      "runRemoved": true,
+      "runs": [],
+      "issues": []
+    }
+  }
 }
