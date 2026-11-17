@@ -1010,9 +1010,11 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '    (sleep_until (begin','      (set '+troopUnit+' '+troopHandle(member.index)+')','      (or (= '+troopUnit+' none) (<= (unit_get_health '+troopUnit+') 0) (not ('+aboard+')))','    ) 1)',
   ]),'    (set '+delivered+' true)','  ))']:[];
   const health='(> (unit_get_health (unit '+craft+')) 0)';
-  const pilotSeated='(vehicle_test_seat_list (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
+  // Keep the named vehicle typed as a vehicle: an explicit unit cast compiles in CE
+  // but the engine correctly rejects that downcast when validating seat checks.
+  const pilotSeated='(vehicle_test_seat_list '+craft+' "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
   const landed='(> (device_group_get '+craft+'_landed) 0.5)';
-  const crewSeated=crew.map((member,index)=>{const seated='(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+')))';return member.releaseAtInsertion?'(or '+started+' (and '+seated+' (= '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))))':seated;});
+  const crewSeated=crew.map((member,index)=>{const seated='(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list '+craft+' "'+member.seat+'" (ai_actors '+member.group+')))';return member.releaseAtInsertion?'(or '+started+' (and '+seated+' (= '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))))':seated;});
   const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+pilotSeated+(crewSeated.length?' '+crewSeated.join(' '):'')+' (volume_test_object '+name+' '+craft+') '+landed+')';
   const empty='(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.filter(member=>!member.releaseAtInsertion).length)+')';
   const enter=(enabled:boolean)=>'  (unit_set_enterable_by_player (unit '+craft+') '+enabled+')';
@@ -1030,7 +1032,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       ...(member.create?['  ; Explicit deferred NPC crew ownership; no erase or replacement.','  (if (= (ai_living_count '+member.group+') 0) (ai_place '+member.group+'))']:[]),
       '  (sleep_until (and '+health+' (= (ai_living_count '+member.group+') 1)) 1)',
       '  (vehicle_load_magic (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))',
-      '  (sleep_until (and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))) 1)',
+      '  (sleep_until (and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list '+craft+' "'+member.seat+'" (ai_actors '+member.group+'))) 1)',
       ...(member.releaseAtInsertion?['  (set '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))']:[]),
     ]),
     '  (set '+stem+'_ready true)',')','',
@@ -1091,6 +1093,10 @@ export function readNativeTransportSource(content:string):NativeTransportOptions
   if(!content.startsWith(nativeTransportPrefix))throw Error('Existing module is not generated transport source; use Edit selected module to retain its handwritten logic.');
   const row=content.split('\n')[1];if(!row?.startsWith('; configuration: '))throw Error('Transport configuration is missing; use the existing module editor.');
   const options=JSON.parse(row.slice('; configuration: '.length)) as NativeTransportOptions;
-  if(exportHaloCeTransport(options).content!==content)throw Error('Existing transport source was edited. Use Edit selected module; automatic regeneration would discard those edits.');
+  const expected=exportHaloCeTransport(options).content;
+  // Recognize the exact previous generated template for an explicit reviewed upgrade.
+  // Never rewrite stored source merely by opening it, or accept unrelated hand edits.
+  const legacy=expected.replace(/\(vehicle_test_seat_list (extraction_(?:pelican|spirit)) /g,'(vehicle_test_seat_list (unit $1) ');
+  if(expected!==content&&legacy!==content)throw Error('Existing transport source was edited. Use Edit selected module; automatic regeneration would discard those edits.');
   return options;
 }

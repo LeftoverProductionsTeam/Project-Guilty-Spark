@@ -5119,6 +5119,7 @@ test('Forerunner capability inspection displays native requirements without gran
   w.__companionQueries=[];w.__companionReviews=[];w.__companionProfile=profile;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
    if(command==='runtime_report')return[base,{...base,id:'openCe',name:'OpenCE',installation:{...profile,registrationId:profile.id,validation:'pass',identity:'userDeclared',executableSha256:sha,diagnostics:[]}}];
    if(command==='list_runtime_registrations')return[structuredClone(profile)];
+   if(command==='activate_runtime_registration'){if(w.__refuseCompanionActivation)throw Error('Reviewed executable changed; inspect and review the replacement');return[];}
    if(command==='register_runtime'){w.__companionReviews.push(structuredClone(args.registration));if(w.__companionReviewFailure)throw Error('Executable changed during review; saved profile retained');Object.assign(profile,args.registration);for(const key of ['root','executable','dataRoot'])if(profile[key as keyof typeof profile]){const value=String(profile[key as keyof typeof profile]);(profile as any)[key]=value.startsWith('\\\\?\\')?value:'\\\\?\\'+value.replaceAll('/','\\');}return[base,{...base,id:'openCe',name:'OpenCE',installation:{...profile,registrationId:profile.id,validation:'pass',identity:'userDeclared',executableSha256:sha,diagnostics:[]}}];}
    if(command==='inspect_runtime_registration')return{...args.registration,registrationId:profile.id,validation:'pass',identity:'userDeclared',executableSha256:sha,executableSha256:sha,diagnostics:[]};
    if(command==='inspect_runtime_launch')return{profileInterface:'forerunner',executableSha256:sha};
@@ -5128,6 +5129,13 @@ test('Forerunner capability inspection displays native requirements without gran
  });
  await chooseTool(page,'Settings & tools');await page.getByRole('group',{name:'Halo versions',exact:true}).getByRole('button',{name:/OpenCE/}).click();await(await pagedControl(page,'button','Runtime folders…')).click();
  const form=page.locator('.registration:visible');await(await pagedControl(page,'button','Add another OpenCE engine',form)).click();for(const[name,value]of [['Installation directory','D:/NewForerunner'],['Installed executable','D:/NewForerunner/halo.exe'],['Runtime data root','D:/SyntheticLibrary']])await(await pagedControl(page,'textbox',name,form)).fill(value);
+ await page.evaluate(()=>(window as any).__refuseCompanionActivation=true);
+ await form.getByRole('combobox',{name:'Saved engine profile',exact:true}).selectOption('native-companion');
+ await expect(form).toContainText('Saved profile opened for review; activation was refused.');
+ await expect(form.getByRole('textbox',{name:'Installation directory',exact:true})).toHaveValue('D:/SyntheticForerunner');
+ await expect(await pagedControl(page,'button','Inspect registration',form)).toBeEnabled();
+ expect(await page.evaluate(()=>(window as any).__companionProfile.root)).toBe('D:/SyntheticForerunner');
+ await page.evaluate(()=>(window as any).__refuseCompanionActivation=false);
  const read=await pagedControl(page,'button','Read Forerunner capabilities',form);await expect(read).toBeDisabled();await(await pagedControl(page,'button','Inspect registration',form)).click();await(await pagedControl(page,'button','Save registration',form)).click();await expect(form).toContainText('Registration saved.');expect(await page.evaluate(()=>(window as any).__companionProfile.root)).toMatch(/^\\\\\?\\/);await revealPagedControl(read);await expect(read).toBeEnabled();await read.click();
  await expect(form).toContainText('Declared native features: extraction.squad_objectives.v1');await expect(form).toContainText('does not confirm a loaded map');expect(await page.evaluate(()=>(window as any).__companionQueries)).toHaveLength(1);
  const review=await pagedControl(page,'button','Review and save this Forerunner build',form);await expect(review).toBeEnabled();await page.evaluate(()=>(window as any).__companionReviewFailure=true);await review.click();await expect(form).toContainText('Executable changed during review');expect(await page.evaluate(()=>(window as any).__companionProfile.reviewedCompanion)).toBeUndefined();

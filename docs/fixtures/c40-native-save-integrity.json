@@ -3011,5 +3011,90 @@
       "Normal deploy/boarding, grounded up>=.95, routes, mission objectives/radio/combat/extraction/settlement and Spirit flight remain open.",
       "Save37944 and moving/still base reflection remain open."
     ]
+  },
+  "nativeTransportSeatTyping20261117": {
+    "parentRevision": "0b7671b4f95bbb93a62bc7dbfc284456b0d8f5d5",
+    "implementation": "Existing transport generator, reviewed module editor and runtime registration; no second writer/launcher",
+    "reproduced": {
+      "mapSha256": "c388d3d69219ba5b99f53729905b81d9baa43a57582eb016cd1c636f2c636649",
+      "engineSha256": "7269f77cd4bf3474d508feb519fa7e39c432965bd6b90a2e1a94e71ff19b67c0",
+      "actualMapLoaded": "be_native@ce; 2461 tags",
+      "invalidExpressions": 24,
+      "diagnostic": "type is inconsistent with usage (you need to recompile scripts.)",
+      "droppedScripts": [
+        "gs_pelican_pilot",
+        "gs_pelican_trip"
+      ],
+      "gameplayAccepted": false
+    },
+    "repair": "Pass the native named vehicle directly to vehicle_test_seat_list; an explicit unit cast loses its vehicle type. Exact older generated modules remain readable for reviewed upgrades; handwritten changes refuse.",
+    "nativeSource": {
+      "workflow": "Actual Windows recovered-module edit, project Undo/Redo, Save, normal exit0, full restart and explicit saved-map reopen; review and Build reviewed script revision",
+      "buildId": "530f12c0-2a02-4ef4-abc5-bce979c0526d",
+      "moduleSha256": "3b582ddc1e7a7ae21efe9f6751bb61ce5b87223c02e6609d88a04ebe2649851d",
+      "mapSha256": "09bb4034f0bdc40f26b2c9977ae08aec7a0dba18c1fcf5c0e6bf743cc19ae4d4",
+      "mapBytes": 110033988,
+      "independentScenarioSha256": "56c1324a04e1397ce98b02912e05f62656776df0aaf18c9cc39482617adfd41b",
+      "correctSeatChecks": 24,
+      "incorrectSeatChecks": 0,
+      "originalScriptGlobalOrderAndPlayerStartUnchanged": true,
+      "previousGoodUnchanged": true,
+      "candidate": "releases/black-echo-review-20261117/Spark-530f12c0-2a02-4ef4-abc5-bce979c0526d",
+      "candidateBytes": 110063152
+    },
+    "runtimeReview": {
+      "engineSha256": "13de17bf09a3486e32992d721faa66e463c323921067cafe4e94f4009b6c45ab",
+      "dependencySha256": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0",
+      "build": "c2622e53",
+      "contractVersion": 1,
+      "note": "Engine changed independently between trials; no same-engine A/B claim. Existing strict capability review used; no executable allowlist addition. Older native app needed an explicit backend clear of its private QA profile review before native UI reinspection/review. Repaired selection tested in browser, not a newly embedded native executable."
+    },
+    "latestTrial": {
+      "sessionId": "ceb4ddf1-2381-40c5-9515-9743586ace5f",
+      "stagedSha256": "09bb4034f0bdc40f26b2c9977ae08aec7a0dba18c1fcf5c0e6bf743cc19ae4d4",
+      "ceBanksVerified": true,
+      "actualMapLoaded": false,
+      "blocker": "Windows Firewall prompt; input stopped, owner asked. Owned game then stopped and stage removed; no security setting changed.",
+      "gameplayAccepted": false
+    },
+    "runtimeProfileRepair": "Opening a saved engine now retains its editable draft even when strict activation fails. Inspection/capabilities reset; activation and executable/SDL/contract checks remain required.",
+    "checks": {
+      "transportUnit": 25,
+      "nativePelicanSpiritSyntax": "pass; both return modes",
+      "runtimeProfileBrowser": 1,
+      "typescript": "pass",
+      "nativePageErrors": 0,
+      "nativeUiProfileRepair": "pending new embedded app",
+      "newMapGameScripts": "pending firewall/native menus",
+      "featureWorkflow": 4
+    },
+    "preservation": {
+      "originalCompanionScenarioSha256": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207",
+      "original31505AndC388Retained": true,
+      "oldInterruptedScratchDisposedLogicalBytes": 5553559882,
+      "oldReceiptRemainingBytes": 8030,
+      "currentScratch": {
+        "status": "interrupted at owner-only Firewall prompt",
+        "disposedLogicalBytes": 1061054769,
+        "peakLogicalBytes": 2201459639,
+        "monitorError": null,
+        "physicalReclamation": null,
+        "currentAndOldRootsAbsent": true,
+        "appsClosedNormally": true
+      }
+    },
+    "remaining": [
+      "Normal five-terminal use and both factions",
+      "Pilot/crew seating and grounded up>=.95",
+      "Insertion/landing/return, cameras and radio",
+      "Combat/objectives/technology/extraction/settlement",
+      "Spirit pilot/controller/route completion",
+      "Real two-client mission loop",
+      "Save37944, moving/still gold reflection and full roadmap"
+    ],
+    "setupFailures": [
+      "Initial guide check selected nonexistent featureGuide.test.ts and found no tests; actual featureWorkflow.test.ts passed4. No zero-test pass counted.",
+      "Saved-runtime native recovery exposed activation-before-draft failure; source/browser repaired, native embedding pending."
+    ]
   }
 }

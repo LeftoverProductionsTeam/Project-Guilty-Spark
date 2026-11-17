@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - coordinated Black Echo native candidate and redesigned AI workspace
+Task: Operation110 - repaired Black Echo transport source and changed-runtime recovery
 Status: implementation incomplete
-Starting revision: 456fb33c150834dbaf43f71c42abd642097f2c33, canonical master.
-Latest verified revision: parent456fb33 plus current player-start/source/AI-workspace changes. Core3+21/1skip,frontend21,browser3,web/native build,Windows8sizes/Save-reopen,CE609 and independent two-tag bytes PASS. Exact app/source/cache:c40 nativePlayerHubAuthoring20261117 / aiScenarioWorkspace20261117.
-Next action: Commit verified source/UI/native milestone; retain c388d3d6 candidate, retire interrupted run-wsWoBU only after preservation. New bounded QA91709/run-0v0sq0 reuses app85c9657a without SDK/build copies. Review current Forerunner EXE+SDL/capabilities, then existing isolated solo test. No gameplay acceptance yet.
+Starting revision: 0b7671b4f95bbb93a62bc7dbfc284456b0d8f5d5, canonical master.
+Latest verified revision: scoped source in the commit containing this checkpoint, parent0b7671b. Transport25+guide4/browser1/TypeScript/native script compilation and actual Windows script Undo/Redo/Save/restart/rebuild/readback PASS. Exact identities:c40 nativeTransportSeatTyping20261117. Native profile repair embedding/gameplay remain OPEN.
+Next action: Build current embedded UI for native saved-profile recovery acceptance. Owner handles Windows Firewall prompt before game input. Re-review changed Forerunner via existing contract; private-load exact09bb4034 candidate, verify no dropped scripts, then normal terminal/crew/flight/objective/extraction/settlement. Spirit controller and real peers remain incomplete.
 
 ## Acceptance
 
@@ -147,7 +147,7 @@ Current: Coordinated c388d3d6 CE609 source/independent two-tag bytes pass; actua
 
 ## Operations and safe checkpoint
 
-QA61647/run-wsWoBU INTERRUPTED: owner38276/app exited; no Halo launched. Verified c388d3d6 export and exact source/readback retained outside scratch before cleanup. New QA91709/run-0v0sq0 ACTIVE4GiB; app85c9657a reused, no SDK/dependency rebuild. Retire old declared scratch through existing ownership recovery only; originals/475IDs/history protected.
+QA61647/run-wsWoBU safely recovered after preservation:5553559882logicalB disposed. QA91709/run-0v0sq0 intentionally interrupted at Firewall gate:1061054769logicalB disposed, peak2201459639B, monitor error null. Both roots now absent after existing inactive-metadata retirement. Only owned game/apps closed normally; no security setting/original changed. Candidate09bb/HSC retained in existing releases/black-echo-review-20261117/Spark-530f12c0-2a02-4ef4-abc5-bce979c0526d (110063152B).
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

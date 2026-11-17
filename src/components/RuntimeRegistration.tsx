@@ -45,13 +45,18 @@ export default function Registration({
     setBusy(true);
     setError('');
     setMessage('');
+    // A stale executable must remain editable even when strict activation refuses it.
+    // Selection opens its saved draft; activation still requires the existing checks.
+    setDraft(chosen);
+    setInspection(null);
+    setInspected('');
+    setCompanion(null);
+    companionRequest.current++;
     try {
       onRegistered(await call<RuntimeReport[]>('activate_runtime_registration', { registrationId: id }));
-      setDraft(chosen);
-      setInspection(null);
       window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
     } catch (e) {
-      setError(String(e));
+      setError('Saved profile opened for review; activation was refused. '+String(e));
     } finally {
       setBusy(false);
     }

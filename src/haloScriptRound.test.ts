@@ -149,6 +149,19 @@ describe('Forerunner native transport source',()=>{
   expect(script.content).not.toMatch(/player_add_equipment|object_teleport|vehicle_unload|ai_place/);
   expect(script.dependencies).toContain('device_group:extraction_pelican_landed');
  });
+ it('keeps pilot and crew seat checks vehicle-typed and upgrades only exact legacy generated source',()=>{
+  for(const faction of ['unsc','covenant'] as const){
+   const settings={...options,faction,crew:[{group:'aircrew',seat:'passenger',create:true}]};
+   const source=exportHaloCeTransport(settings).content,craft='extraction_'+(faction==='unsc'?'pelican':'spirit');
+   const checks=[...source.matchAll(/\(vehicle_test_seat_list ([^\n]+)/g)];
+   expect(checks.length).toBeGreaterThan(2);for(const check of checks)expect(check[1]).toMatch(new RegExp('^'+craft+' '));
+   expect(source).not.toContain('(vehicle_test_seat_list (unit ');
+   const legacy=source.replaceAll('(vehicle_test_seat_list '+craft+' ','(vehicle_test_seat_list (unit '+craft+') ');
+   expect(legacy).not.toBe(source);expect(readNativeTransportSource(legacy)).toEqual(settings);
+   expect(exportHaloCeTransport(readNativeTransportSource(legacy)).content).toBe(source);
+   expect(()=>readNativeTransportSource(legacy.replace('(set gs_'+(faction==='unsc'?'pelican':'spirit')+'_ready true)','(sleep 1)'))).toThrow('edited');
+  }
+ });
  it('authors empty return and real recall as separate phases without granting settlement',()=>{
   for(const faction of ['unsc','covenant'] as const){
    const role=faction==='unsc'?'pelican':'spirit',craft='extraction_'+role;
@@ -237,7 +250,7 @@ it('recovered radio legacy paths preserve exact original bodies and refuse handw
 
 it('seats dedicated permanent NPC crew without force-boarding players or confusing crew with empty return',()=>{
  const options={faction:'unsc' as const,pilot:'pilot',pilotSeat:'P-driver',outbound:'field_route',inbound:'hub_route',hub:'hub',field:'field',returnAfterInsertion:true,crew:[{group:'aircrew',seat:'P-riderLF',create:true}]};
- const output=exportHaloCeTransport(options);expect(readNativeTransportSource(output.content)).toEqual(options);expect(output.dependencies).toContain('ai_encounter:aircrew');expect(output.content).toContain('(if (= (ai_living_count aircrew) 0) (ai_place aircrew))');expect(output.content).toContain('(vehicle_load_magic (unit extraction_pelican) "P-riderLF" (ai_actors aircrew))');expect(output.content).toContain('(= (list_count (vehicle_riders (unit extraction_pelican))) 2)');expect(output.content).not.toContain('(= (list_count (vehicle_riders (unit extraction_pelican))) 1)');expect(output.content).toContain('(and (= (ai_living_count aircrew) 1) (vehicle_test_seat_list (unit extraction_pelican) "P-riderLF" (ai_actors aircrew)))');expect(output.content).not.toMatch(/ai_erase|object_destroy|vehicle_load_magic[^\n]*\(players\)/);
+ const output=exportHaloCeTransport(options);expect(readNativeTransportSource(output.content)).toEqual(options);expect(output.dependencies).toContain('ai_encounter:aircrew');expect(output.content).toContain('(if (= (ai_living_count aircrew) 0) (ai_place aircrew))');expect(output.content).toContain('(vehicle_load_magic (unit extraction_pelican) "P-riderLF" (ai_actors aircrew))');expect(output.content).toContain('(= (list_count (vehicle_riders (unit extraction_pelican))) 2)');expect(output.content).not.toContain('(= (list_count (vehicle_riders (unit extraction_pelican))) 1)');expect(output.content).toContain('(and (= (ai_living_count aircrew) 1) (vehicle_test_seat_list extraction_pelican "P-riderLF" (ai_actors aircrew)))');expect(output.content).not.toMatch(/ai_erase|object_destroy|vehicle_load_magic[^\n]*\(players\)/);
  expect(exportHaloCeTransport({...options,crew:[{...options.crew[0],create:false}]}).content).not.toContain('(ai_place aircrew)');
  for(const crew of [[{group:'pilot/source_squad',seat:'P-riderLF'}],[{group:'aircrew',seat:'p-driver'}],[{group:'aircrew',seat:'P-riderLF'},{group:'AIRCREW',seat:'P-riderRF'}],[{group:'a',seat:'P-riderLF'},{group:'b',seat:'p-riderlf'}],[{group:'bad) (quit)',seat:'P-riderLF'}],[{group:'aircrew',seat:'bad"'}],Array.from({length:9},(_,i)=>({group:'crew_'+i,seat:'seat_'+i}))])expect(()=>exportHaloCeTransport({...options,crew})).toThrow();
 });
