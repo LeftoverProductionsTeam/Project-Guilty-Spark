@@ -2,11 +2,13 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: bbbfe21a59ed43c24274c1d24b67ec3f1dfb491a, canonical local master.
-Latest verified revision: parent bbbfe21a59ed43c24274c1d24b67ec3f1dfb491a plus this scoped radio checkpoint, identified by its Git commit and source manifests. Native/browser evidence is scoped; Operation110 incomplete.
-Next action: verify the complete production recovered working-tag radio source job and resource-bank/launch handoff through the existing Black Echo workflow, then approved native Windows/game acceptance when desktop control works. Actual42-edit/37944/Forerunner gameplay remain OPEN; no unchanged desktop retries. Preserve7-beat mission, faction kits, aircraft-relative cameras and radio. Native solo mission variants compile/read back; no delivered or gameplay-accepted candidate.
+Starting revision: c911f042f8fdb39e7855374886db67d448f8fefc, canonical local master.
+Latest verified revision: parent c911f042f8fdb39e7855374886db67d448f8fefc plus this verified retained-HUD/native transaction checkpoint, identified by Git and source manifests. Full mission/Operation110 incomplete.
+Next action: close Black Echo resource-bank/Forerunner handoff through existing source/runtime controls; perform approved native Windows/game acceptance when desktop control works. Do not retry unchanged Computer Use failure. Source/backend radio+custom-HUD rebuild/refusal now pass; actual42-edit/37944, restart, audible playback, flight and complete mission remain OPEN. Advance independent creator work while those human/desktop gates wait.
 
 ## Acceptance
+
+Latest final-master e210fbc9 is preserved in Master Engineering Prompts/GS_2026-11-16_Final_Master_Engineering_Directive.txt; full scope remains active.
 
 Owner's current Engineering Correction d377d97b and Development & Verification/Velocity/Simplicity directives supersede code-only: prioritize implementation; focused tests and compilation after meaningful/shared changes; fix regressions; integration checks at milestones; avoid repeated full suites. Keep one primary deliverable in progress and complete connected UI/backend/native/history workflows. Comprehensive UI/multiplayer/hardware/platform/gameplay acceptance is reserved for stabilization; targeted regression smoke checks remain authorized. No push/publication or Forerunner writes. Source, automated, native, game and human evidence remain distinct.
 
@@ -14,9 +16,11 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
+16Nov retained HUD (parent c911f04): production CE parent→working-tags radio revision now passes with actual staged custom-HUD reference/table and no generated ownership or overwrite. Five sound hashes and original input identities preserved; conflicting edited tag refuses and keeps prior-good map. Native1/core17+1explicit skip/core all-target/browser1/guide4 pass. Exact hashes/setup corrections in RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
+
 16Nov recovered radio (parent bbbfe21): existing solo CE609/MCC13 UI/import/history/source build staging now includes immutable sound without replacing edited tags. Native typed sound path crash fixed; exact prior generated drafts upgrade safely. Frontend51/core17+imports4/browser1 and companion4/guide4/Windows all-target/TypeScript-Vite pass; actual Pelican+Spirit CE609 compile/readback preserves5original sample hashes. Exact source/cache/scenario/test-exe hashes, initial failures and boundaries: RUNTIME_INTEGRATION_20261107. Complete Windows working-tag job/restart/audible playback/game remain OPEN.
 
-16Nov cameras (parent b24bac4): existing protected camera operation now appends points; optional moving-aircraft insertion/departure shots reuse transport controller, current source and camera inventory. Frontend24/browser3/core34/native Pelican+Spirit2/Windows/guide20 pass in scope. Exact native/source/output hashes and failure corrections: RUNTIME_INTEGRATION_20261107. Native desktop/restart/framing/restored input/gameplay remain OPEN.
+16Nov cameras bbbfe21: append/pose/lens and relative aircraft shots retain source, review/Restore/history. Scoped source/browser/native Pelican+Spirit compilation/readback pass; exact tests/hashes in RUNTIME_INTEGRATION_20261107 and Git. Native Windows/framing/input/game acceptance OPEN.
 
 16Nov faction kits b24bac4: both native controls/profiles +7-beat mission and transports compile/read back; exact hashes/negative cases in RUNTIME_INTEGRATION_20261107. Gear/flight/native Windows/game acceptance OPEN.
 
@@ -38,7 +42,7 @@ Prior CI/setup and P0 source fixes fbcdc8d/e3f0e2d retain exact scoped evidence 
 
 Reuse historical evidence; run proportionate focused checks under the updated policy:
 
-- R689 actual Windows creator preparation, ammunition60→72/Undo/Redo, Save/two normal restarts, Halo Tool compile and independent Invader readback pass. Compact toolbar48px/expanded panel194px at1500x950; zero page errors. Changed rules refuse compiler and keep previous-good. Cache SHA256 7b3f9bcb0857d8ae6f918edc065c01c5c056c35c4349a0d6ba8d522883353d03; scenario04ad62c679816d265a83d38092a338a5a07613dea488726cd07b562041f023c9. No game launched. FIREFIGHT_ENGINE.md/UI_INTERACTION_AUDIT.md retain exact evidence.
+- R689 actual Windows ammunition/history/Save/two restarts/native Tool/independent readback accepted in scope. Exact cache/scenario hashes and compact-layout evidence remain in FIREFIGHT_ENGINE.md/UI_INTERACTION_AUDIT.md and Git. Failed changed-rules build preserves previous-good; no game acceptance.
 - R688 TypeScript/two browser paths/eight viewport sizes pass; not eight-native-display acceptance. R690 existing Firefight Rust14/14. R686 full Windows Rust960passed/0failed/9explicit opt-in skips; source835a3cf lease repair. SOURCE_ONLY_STORAGE_POLICY.md retains exact scoped preservation evidence and remaining native namespace/non-Windows limitations.
 - R691 reproduced linked Chupathingy preview choosing MCC13 instead of Xbox5; terminal exit1, original Blood Gulch SHA50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f unchanged. Owned scratch disposed. R692 fresh selector build passed four actual source/tag IPC checks (MCC13/CE609/OpenCE5/Chupa5), then failed the real Library/Create a map path before final original hash verification. See NATIVE_ASSETS_AND_SHOWCASE.md; do not promote its partial result.
 - M1 imported source editing already reached actual edit/history/Save/restart, correct source writer, dependency refresh, native CE compile/readback and exact private Chupathingy map loading (R277). NATIVE_SOURCE_TAG_EDIT_20261108.md is authoritative. Human fidelity/traversal remains independent; do not restart this accepted scope.
@@ -47,7 +51,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current recovered radio since bbbfe21: native solo availability, exact source/async guard, sound-only authoring parent deltas, missing-file staging/leases, compiled sound and original/staged byte rechecks, native HSC paths and legacy generated-module migration. Source/browser/native checks pass in scope; no full production Windows/audio/game claim. All source retained, no source WIP discarded.
+Current recovered radio/HUD: c911f04 source inclusion/staging/native paths and this actual production parent/rebuild/refusal milestone pass in scope. Custom source-owned HUD now verifies its real scenario reference and exact table without taking ownership. Existing native writers/receipt/hash protections retained; source manifest/Git identify all changes. Native Windows/restart/game acceptance stays OPEN; no discarded WIP.
 
 Current camera workflow since b24bac4: Add native camera point including empty source, name/pose/lens/viewport draft, protected Preview/Accept/Restore; relative transport camera choices and actual current-source preparation/build gating; saved controller history and native output checked. Source/browser/native proofs are distinct from actual app/game/restart. Both factions retain their kits/pilot/routes/HUD/original slots. QA31684/run-l1Q8hx CLOSED; no discarded source WIP.
 
@@ -143,7 +147,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Current QA19031/run-yHhkFT CLOSED:1417000367logicalB disposed; peak1535957123logicalB, last allocated1285648016B. Disposed allocation unavailable; no physical reclamation claim. Root absent; runs[]/issues[], owner finishing normal exit. No retained candidate/maps/SDK/cache/archive; no game/Forerunner write/push.
+Current QA86011/run-vMYcYi CLOSED:475127228logicalB disposed, peak1197311289logicalB,last allocated440604328B; disposed allocation unavailable. Root absent, runs[]/issues[], owner normal exit. No retained output or Forerunner writes/game/push. Prior19031 closed1417000367logicalB; exact evidence retained.
 
 Prior QA31684/run-l1Q8hx CLOSED:1589724440 logicalB disposed, peak1701962732 logicalB, last allocation1461488488B; disposed allocation unavailable. Root absent; runs[]/issues[], owner exited. No retained maps/SDK/caches/archive. No game launched. Exact evidence in RUNTIME_INTEGRATION_20261107.
 

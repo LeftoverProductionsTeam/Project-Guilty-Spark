@@ -676,6 +676,11 @@ fn prepare(
             tools.insert(key.into(),maps::hash_file(&path)?);
         }
     }
+    if parent_mission_readback.as_ref().map(crate::creative::native_mission_hud).transpose()?.flatten().is_some()&&parent_generated_mission_hud.is_none(){
+        let edit=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"}))?;
+        if fs::metadata(&edit)?.len()>256*1024*1024{return invalid("Native mission HUD reader exceeds its identity limit");}
+        tools.insert("invaderEdit".into(),maps::hash_file(&edit)?);
+    }
     if let Some(binding)=&parent_controller_binding{binding.verify_map(&parent_inspection)?;}
     for expectation in &encounter_expectations{expectation.verify_compiled_encounter(&parent_inspection)?;}
     if let Some(hud)=&parent_generated_mission_hud{verify_generated_hud(hud,&parent_output,&parent_inspection)?;}
@@ -1521,6 +1526,16 @@ fn run_with(
         };
         // Use Runner's existing protected write phase: cancellation/timeout is
         // observed after native Tool exits, never by forcefully killing it.
+        // A recovered native mission may already reference an author-owned HUD
+        // at any native path. Snapshot that exact table without claiming its
+        // names as generated/editable ownership or replacing the source tag.
+        let retained_mission_hud=if receipt.generated_mission_hud.is_none()&&receipt.mission_readback.as_ref().map(crate::creative::native_mission_hud).transpose()?.flatten().is_some(){
+            let fields=read_hud_fields(input,&prepared,&tags,&format!("{}.scenario",receipt.scenario_path),&workspace,&runner,&invoke,48)?;
+            let reference=scenario_hud_reference(&fields)?.ok_or_else(||SparkError::Invalid("Authored mission HUD needs the scenario's native message reference; prepare/review its messages first".into()))?;
+            let path=reference.strip_suffix(".hud_message_text").unwrap().to_owned();
+            let source=maps::read_hud_source_tag(&checked_file(&tags.join(safe_relative(&reference)?))?)?;
+            Some((path,source))
+        }else{None};
         let hud_sources=snapshot_hud_sources(input,&prepared,&tags,&workspace,&runner,&invoke)?;
         if prepared.scenario_squad_readback.is_some(){
             let native_scenario=format!("{}.scenario",receipt.scenario_path);
@@ -1590,7 +1605,10 @@ fn run_with(
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
         if let Some(binding)=&receipt.mission_readback {
-            crate::creative::verify_native_mission_with_hud(binding,&inspected,&output,receipt.generated_mission_hud.as_ref().map(|hud|(hud.tag_path.as_str(),hud.messages.as_slice())))?;
+            let retained=receipt.generated_mission_hud.as_ref().map(|hud|(hud.tag_path.as_str(),hud.messages.as_slice()))
+                .or_else(||retained_mission_hud.as_ref().map(|(path,source)|(path.as_str(),source.messages.as_slice())));
+            crate::creative::verify_native_mission_with_hud(binding,&inspected,&output,retained)?;
+            if let Some((path,source))=&retained_mission_hud{if maps::read_hud_source_tag(&tags.join(safe_relative(&format!("{path}.hud_message_text"))?))?.sha256!=source.sha256{return invalid("Retained mission HUD changed during compilation; no output was accepted");}}
             if binding.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled")&&!crate::creative::compiled_extraction_mode(&output,&inspected)? {return invalid("Compiled Forerunner Extraction callback is missing");}
         }
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}

@@ -377,6 +377,45 @@ mod installed {
    crate::native_asset_imports::verify_compiled(project,&map).unwrap();let binding=&project.native_asset_imports[0];let sound=map.tags.iter().find(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==binding.native_path).unwrap();let actual=crate::audio::inspect_sound(&cache,&map.sha256,sound.id).unwrap();
    let signatures=|audio:&crate::audio::SoundInspection|audio.permutations.iter().map(|p|(p.pitch_range,p.permutation,p.next_permutation,p.format.clone(),p.channels,p.sample_rate,p.byte_length,p.sha256.clone())).collect::<Vec<_>>();assert_eq!(signatures(audio),signatures(&actual));assert!(actual.permutations.iter().all(|p|p.available));assert_eq!(*hashes,crate::native_asset_imports::source_hashes(managed,project).unwrap());assert_eq!(*source_sha,crate::maps::hash_file(source).unwrap());eprintln!("Compiled mission radio sample identity/readback PASS: {} real native permutations; {}",actual.permutations.len(),serde_json::to_string(&actual).unwrap());
   }
+  // Optional continuation consumes another generated UI source revision through
+  // the actual production parent/source builder and working-tag transaction.
+  if let (Some((radio,managed,source,_,audio,_)),Some(revision))=(&radio_inputs,mission_input.as_ref().and_then(|(_,_,v)|v.get("workingRadioRevision"))){
+   let native_tags=managed.join("recovered-native-tags");std::fs::create_dir(&native_tags).unwrap();
+   let cancel=std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));let event=|_|{};let extraction_id=uuid::Uuid::new_v4().to_string();
+   let native_runner=crate::build::Runner{id:&extraction_id,project:&radio.id,cancel:&cancel,event:&event};
+   native_runner.run(&tools.join("invader-extract.exe"),&["-n".into(),"-e".into(),tag.into(),"-t".into(),native_tags.to_string_lossy().into_owned(),cache.to_string_lossy().into_owned()],root,"extract",10).unwrap();
+   // Cache extraction cannot recover stripped source modules. Keep the exact
+   // authored scenario instead of pretending bytecode is editable HaloScript.
+   crate::native_staging::copy_file(&file,&native_tags.join(tag),std::fs::metadata(&file).unwrap().len(),Some(&source_sha),&cancel).unwrap();
+   let jobs=managed.join("jobs");std::fs::create_dir(&jobs).unwrap();
+   let mut parent=radio.clone();parent.native_asset_imports.clear();parent.studio=None;parent.scene=map.objects.clone();
+   parent.source=Some(crate::project::Source{original_path:cache.clone(),preserved_path:cache.clone(),sha256:map.sha256.clone(),cache_version:609,engine:map.header.engine.clone(),scenario_path:map.scenario_path.clone(),archive:None,resource_directory:None,resource_sha256:Default::default(),audio_resources:None});
+   let target_id=uuid::Uuid::new_v4().to_string();parent.build_targets=vec![crate::project::EngineBuildTarget{id:target_id.clone(),name:"Reviewed recovered CE source".into(),runtime_id:crate::runtime::RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:None,hek_flavor:None,tags_directory:Some(native_tags.clone()),invader_directory:Some(tools.to_path_buf()),ce_compatible_tagset:true,open_sauce:false}];parent.active_build_target=Some(target_id);
+   let toolchain=crate::build::Toolchain{invader_directory:Some(tools.to_path_buf()),base_tags_directory:Some(native_tags),..Default::default()};
+   let baseline=crate::build::run_build(&parent,&map,&toolchain,&jobs,&uuid::Uuid::new_v4().to_string(),cancel.clone(),|e|{if e.severity=="error"{eprintln!("{}: {}",e.phase,e.message);}}).unwrap();assert_eq!(baseline.status,"validated","{}",baseline.message);parent.builds.push(baseline.clone());
+   let mut current=parent.clone();current.studio=Some(serde_json::from_value(revision["studio"].clone()).unwrap());
+   let cue=current.studio.as_ref().unwrap().missions.iter().find_map(|beat|beat.sound_cue.as_ref()).unwrap().clone();
+   let source_inspection=crate::maps::inspect_map(source,None).unwrap();let mut origin=crate::project::Project::new("Preserved original mission radio source");origin.source=radio.source.clone();
+   let selected=source_inspection.tags.iter().find(|tag|tag.class=="snd!"&&tag.id==radio.native_asset_imports[0].tag_id).expect("Exact original native sound ID");assert_eq!(selected.path,radio.native_asset_imports[0].tag_path);
+   let extracted=crate::tag_exchange::extract_selected_tag(&origin,&source_inspection,&toolchain,managed,&uuid::Uuid::new_v4().to_string(),selected.id,cancel.clone(),|_|{}).unwrap();
+   let binding=crate::native_asset_imports::prepare(&current,&origin,&source_inspection,&extracted,&toolchain,managed,&cue.import_id,selected.id,&cancel,|_|{}).unwrap();assert_eq!(binding.native_path,cue.sound_path);current.native_asset_imports.push(binding.clone());
+   let filename=revision["filename"].as_str().unwrap();let content=revision["content"].as_str().unwrap();let parent_job=jobs.join(&baseline.id);let parent_tags=parent_job.join("tags");
+   let attachment=crate::working_tags::ScriptAttachment{filename:filename.into(),content:content.into(),sha256:crate::hex_bytes(sha2::Sha256::digest(content.as_bytes())),replaces_sha256:Some(revision["replacesSha256"].as_str().unwrap().into())};
+   let input=crate::working_tags::WorkingTagsInput{mission_hud:None,hud_readback_targets:vec![],scenario_squad_readback:None,encounter_append:None,script_attachment:Some(attachment),expected_encounter:None,compile_scripts:true,expected_tag_identity:Some(crate::working_tags::source_identity(&parent_tags,&cancel).unwrap()),bsp_audio:None,parent_build:baseline.clone(),tags_directory:parent_tags.clone(),scenario_path:map.scenario_path.clone(),scenario_type:0,tool:tools.join("invader-build.exe"),invader_info:tools.join("invader-info.exe")};
+   let before=crate::working_tags::source_identity(&parent_tags,&cancel).unwrap();let source_hashes=crate::native_asset_imports::source_hashes(managed,&current).unwrap();
+   let rebuilt=crate::working_tags::run(&current,&input,&jobs,&uuid::Uuid::new_v4().to_string(),cancel.clone(),|e|{if e.severity=="error"{eprintln!("{}: {}",e.phase,e.message);}}).unwrap();assert_eq!(rebuilt.status,"validated","{}",rebuilt.message);
+   let output=rebuilt.output.as_ref().unwrap();let inspection=crate::maps::inspect_map(output,None).unwrap();crate::native_asset_imports::verify_compiled(&current,&inspection).unwrap();
+   let tag=inspection.tags.iter().find(|tag|tag.class=="snd!"&&tag.path.replace('\\',"/")==binding.native_path).unwrap();let read=crate::audio::inspect_sound(output,&inspection.sha256,tag.id).unwrap();
+   assert_eq!(audio.permutations.iter().map(|p|(&p.sha256,p.byte_length)).collect::<Vec<_>>(),read.permutations.iter().map(|p|(&p.sha256,p.byte_length)).collect::<Vec<_>>());
+   assert_eq!(before,crate::working_tags::source_identity(&parent_tags,&cancel).unwrap());assert_eq!(source_hashes,crate::native_asset_imports::source_hashes(managed,&current).unwrap());assert_eq!(map.sha256,crate::maps::hash_file(&cache).unwrap());
+   // A conflicting loose tag is preserved, and the previous validated output
+   // must remain byte-identical when the next production transaction refuses it.
+   let edited=parent_tags.join(format!("{}.sound",binding.native_path));std::fs::create_dir_all(edited.parent().unwrap()).unwrap();assert!(!edited.exists());std::fs::write(&edited,b"edited source must never be overwritten").unwrap();
+   let mut bad=input.clone();bad.expected_tag_identity=Some(crate::working_tags::source_identity(&parent_tags,&cancel).unwrap());
+   let refused=crate::working_tags::run(&current,&bad,&jobs,&uuid::Uuid::new_v4().to_string(),cancel.clone(),|_|{}).unwrap();assert_eq!(refused.status,"failed");assert!(refused.message.contains("edited tags were preserved"),"{}",refused.message);assert!(refused.output.is_none());
+   assert_eq!(std::fs::read(&edited).unwrap(),b"edited source must never be overwritten");assert_eq!(inspection.sha256,crate::maps::hash_file(output).unwrap());
+   eprintln!("Production recovered radio source/rebuild PASS: parent {} revised {} source {} sample hashes {} preserved; conflicting-tag refusal keeps previous-good map; no Windows/game acceptance",baseline.sha256.unwrap(),inspection.sha256,crate::hex_bytes(sha2::Sha256::digest(content.as_bytes())),read.permutations.len());
+  }
   if let Some((pilot,routes,controller_sha,graph_inputs))=&controller{
    verify_compiled_append(pilot,&map).unwrap();let actual=crate::maps::scenario_command_readback(&cache,&map).unwrap();for route in routes{assert!(actual.iter().any(|row|row==route));}
    for name in [format!("gs_{role}_pilot"),format!("forerunner_{role}_complete"),format!("gs_{role}_trip")]{assert_eq!(names.iter().filter(|value|**value==name).count(),1);}
