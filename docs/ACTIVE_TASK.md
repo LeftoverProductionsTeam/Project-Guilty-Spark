@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 08500da58ce9b0145ee67a81479ee592dcb63f78, canonical local master.
-Latest verified revision: this deferred-pilot/native integration checkpoint (parent08500da58ce9b0145ee67a81479ee592dcb63f78); final commit/source manifests identify its exact revision.
-Next action: complete Covenant/Spirit pilot/controller and mission resource/camera/audio handoff in the existing native tools, then approved Forerunner gameplay when desktop control is restored. UNSC7-beat mission + actual saved controller/pilot/two routes compile/read back; actual flight/boarding/collection/settlement and Windows42-edit/Save37944/full restart stay OPEN. Do not retry unchanged desktop initialization or equate the disposable native fixture with an adopted playable candidate.
+Starting revision: 027c8c0466bceb0acb0789d70a50bfbc299a70ca, canonical local master.
+Latest verified revision: this pilot-animation/Spirit integration checkpoint (parent027c8c0466bceb0acb0789d70a50bfbc299a70ca); final source manifests/Git identify its exact commit.
+Next action: finish faction-specific mission objectives/actor alignment/loadouts and native resource/camera/audio handoff using existing writers. Both transport variants now compile/read back with exact pilot graph labels; no complete Covenant mission/gameplay claim. Actual Windows42-edit/37944/restart and approved Forerunner flight/boarding/collection/settlement remain OPEN under unchanged desktop control failure; continue independent source work, no bypass retry.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov pilot animation/Spirit (parent027c8c0): actual base/start actor → biped → exact graph driver-label review, bounded native count/label reads and saved-draft refusal. Both actual UI controller payloads +7-objective mission compile CE609 and independently read back pilot/graph/routes/original slots. Pelicancachee122b840495e9ec8ad6288f3bbc1a500963d93d77a6612f144bab95224f42b9c; Spirit985df7845e18d27194984ec52029bd80d1a757a6fef0eda3621c4de230287d8f. Core5+2/browser3/native2/Windows reader3/all-target/TypeScript-Vite/guide20contexts PASS. Exact hashes/errors/limits: RUNTIME_INTEGRATION_20261107. No game/faction-mission acceptance.
 
 16Nov deferred pilot (parent08500da): actual native flags/starts → explicit source ownership → UI/history/Save/reload → guarded ai_place → real compiled pilot/two routes and saved transport controller with7objectives. CE609cacheff8e24c9aa02d554159f0a61637e01f340b9f7845f5eb1b5b0e0a661204ef765, exact SCNR/HSC/source/test-exe hashes in RUNTIME_INTEGRATION_20261107. Frontend41/core4/native1/browser1/TypeScript/Vite/Windows all-target/guide20contexts PASS; originals/original indices retained. UNSC/Pelican source proof, not complete dropship/faction/flight/gameplay acceptance.
 
@@ -45,7 +47,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current checkpoint: deferred-pilot native source eligibility, existing transport writer/RuntimeDock/history/review, combined native mission/AI/routes/controller fixture and existing regression/guide updates. All scoped source verified; no discarded WIP. No duplicate writer, engine edit or new requirement tracker.
+Current checkpoint: pilot graph/seat source review, bounded shared native reader, RuntimeDock preparation/build refusal and both faction native mission integration; existing tests/guides updated. Scoped checks pass; no discarded WIP. No duplicate writer, engine edit or new requirement tracker.
 
 Native flight tuning78c01b2 remains verified in scope. Current route workflow: existing command/volume readers check physical movement, final-stop/facing references and final craft-origin containment by readable selected pads; unread/unsupported/bad-pad programs refuse generated preparation, manual source remains available. Existing route editor exposes Stop/Keep moving while preserving unknown values; viewport/Preview/Accept/Restore/Save/reopen continue. Only two selected route reviews render. Core28/browser3distinct/guide4/TypeScript/Vite/Windows and installed CE609 route/volume/aircraft/tuning readback1 pass. Native Windows/full restart/flight/gameplay remain unrun. Exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No push.
 
@@ -137,7 +139,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA52052/run-DTU067 CLOSED; owner exited, root absent, storage runs[]/issues[].1399707522logicalB disposed; allocated disposal unavailable. Reused prepared input/target; no retained binary/map/SDK/archive or original/runtime/Forerunner writes. Exact evidence and final source hashes: RUNTIME_INTEGRATION_20261107. Next work starts from this local commit, not deleted scratch.
+QA52570/run-ttbH55 CLOSED:2248427795logicalB disposed; allocation disposal unavailable. Root absent, owner exited, storage runs[]/issues[]. No retained test binaries/maps/SDK/archive or original/runtime/Forerunner writes. Exact native/checkpoint evidence: RUNTIME_INTEGRATION_20261107. Resume from local commit, not retired scratch.
 
 Prior QA59805/run-n5CPtL closed1398599599logicalB; QA98579/run-yCym7t closed1399116590logicalB; earlier native UI/Save/restart/geometry/actor/source evidence, exact hashes and cleanup remain in existing RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git74c16ac/bb8e906/a2d0aa0/78c01b2/e2879a6/351dd043/057a9839/50f2f77. Git preserves checkpoint detail; never copy it into ACTIVE_TASK.previous. No old jobs revived. Save37944 and complete mission/flight/human/peer/platform acceptance stay OPEN.
 

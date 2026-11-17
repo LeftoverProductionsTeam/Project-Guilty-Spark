@@ -6,7 +6,8 @@ use sha2::{Digest,Sha256};
 use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
-pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,TransportFlightRoute};
+pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,TransportFlightRoute,NativeTransportPilotBinding};
+pub fn native_transport_pilot_bindings(fields:&str,choices:&NativeTransportChoices,read:impl FnMut(&str)->Result<String>,graph:impl FnMut(&str)->Result<Vec<String>>)->Result<Vec<NativeTransportPilotBinding>>{transport::pilot_bindings(fields,choices,read,graph)}
 pub fn native_transport_routes(fields:&str)->Result<Vec<TransportFlightRoute>>{let routes=native_command_source(fields)?;let volumes=scenario_volume_choices(fields)?;Ok(routes.lists.iter().map(|route|transport::flight_route(route,&volumes)).collect())}
 pub fn native_vehicle_flight(fields:&str)->Result<VehicleFlightTuning>{transport::flight_source(fields)}
 pub fn scenario_transport_snapshots(fields:&str,names:&[String])->Result<Vec<TransportSnapshot>>{transport::snapshots(fields,names)}
@@ -1050,17 +1051,21 @@ pub struct NativeMissionWeaponObject {pub index:u16,pub name:Option<String>,pub 
 pub struct NativeMissionSource {pub encounters:Vec<NativeMissionEncounter>,pub weapons:Vec<NativeMissionWeapon>}
 /// Current native placements and every starting profile, never a stale cache's
 /// palette alone. This is source selection, not a claim that an item spawns.
+/// One checked native reader reference shape, shared by weapons and pilot chains.
+fn native_dependency_path(root:&str,key:&str,extension:&str)->Result<Option<String>>{
+ let prefix=format!("{key} (");let lines=root.lines().collect::<Vec<_>>();let rows=lines.iter().enumerate().filter_map(|(i,line)|line.strip_prefix(&prefix).map(|value|(i,value))).collect::<Vec<_>>();
+ if rows.len()!=1{return invalid(format!("Native {key} reference is missing or ambiguous"));}
+ let (index,text)=rows[0];let(value,kind)=text.rsplit_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native tag reference".into()))?;
+ // Invader omits its type column on long values. The installed native reader
+ // still validates the tag; require the known field's exact extension below.
+ let kind=kind.trim();let kind=if kind.is_empty()&&lines.get(index+1).is_some_and(|line|line.trim()=="dependency"){"dependency"}else{kind};
+ if !kind.is_empty()&&kind!="dependency"{return invalid(format!("Unsupported native {key} reference type"));}if value.is_empty()||value=="null"{return Ok(None);}
+ let value=value.replace('\\',"/");let suffix=format!(".{extension}");let path=value.strip_suffix(&suffix).ok_or_else(||crate::SparkError::Invalid(format!("Native {key} reference has another tag class")))?;
+ safe_relative(path)?;if path.len()>240||path.starts_with('-'){return invalid("Native tag path exceeds its safety bounds");}Ok(Some(path.into()))
+}
 pub fn native_mission_source(fields:&str)->Result<NativeMissionSource>{
  let encounters=native_mission_encounters(fields)?;
- let reference=|root:&str,key:&str|->Result<Option<String>>{
-  let prefix=format!("{key} (");let rows=root.lines().filter_map(|line|line.strip_prefix(&prefix)).collect::<Vec<_>>();
-  if rows.len()!=1{return invalid("Native mission weapon reference is missing or ambiguous");}
-  let(value,kind)=rows[0].rsplit_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native weapon reference".into()))?;
-  if kind.trim()!="dependency"{return invalid("Unsupported native weapon reference type");}
-  if value.is_empty()||value=="null"{return Ok(None);}
-  let value=value.replace('\\',"/");let path=value.strip_suffix(".weapon").ok_or_else(||crate::SparkError::Invalid("Native weapon reference has another tag class".into()))?;
-  crate::safe_relative(path)?;if path.len()>240{return invalid("Native mission weapon path exceeds240bytes");}Ok(Some(path.into()))
- };
+ let reference=|root:&str,key:&str|native_dependency_path(root,key,"weapon");
  let palette=array_listing(fields,"weapon_palette")?;let placed=array_listing(fields,"weapons")?;let profiles=array_listing(fields,"player_starting_profile")?;
  if palette.count>256||placed.count>4096||profiles.count>256{return invalid("Native mission weapon inventory exceeds its review bounds");}
  let refs=array_items(&palette,"weapon_palette")?.iter().map(|item|reference(&direct_struct_fields(item)?,"name")).collect::<Result<Vec<_>>>()?;
@@ -1937,7 +1942,7 @@ pub struct NativeTransportVehicle {
 }
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>,pub script_created_pilots:Vec<String>,#[serde(skip_serializing_if="Option::is_none")] pub flight_routes:Option<Vec<TransportFlightRoute>>}
+pub struct NativeTransportChoices {pub vehicles:Vec<NativeTransportVehicle>,pub groups:Vec<String>,pub routes:Vec<String>,pub pilots:Vec<String>,pub script_created_pilots:Vec<String>,pub pilot_bindings:Vec<NativeTransportPilotBinding>,#[serde(skip_serializing_if="Option::is_none")] pub flight_routes:Option<Vec<TransportFlightRoute>>}
 /// Reuse the existing bounded Invader field inventory, never a second tag reader.
 pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  let table=array_listing(fields,"object_names")?;if table.count>512{return invalid("Transport names exceed512entries");}
@@ -1967,7 +1972,7 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
  for squad in &squads{if squad.normal_count==1&&squad.insane_count==1&&has_start(&squad){pilots.push(format!("{}/{}",squad.encounter_name,squad.name));}}
  for name in squads.iter().map(|s|&s.encounter_name).collect::<std::collections::BTreeSet<_>>(){let rows=squads.iter().filter(|s|&s.encounter_name==name).collect::<Vec<_>>();if rows.iter().all(|s|s.normal_count>=0&&s.insane_count>=0&&has_start(s))&&rows.iter().map(|s|i32::from(s.normal_count)).sum::<i32>()==1&&rows.iter().map(|s|i32::from(s.insane_count)).sum::<i32>()==1{pilots.push(name.clone());}}
  let initial=native_mission_encounters(fields)?;let script_created_pilots=pilots.iter().filter(|pilot|{let name=pilot.split('/').next().unwrap();let matches=initial.iter().filter(|row|row.name==name).collect::<Vec<_>>();matches.len()==1&&!matches[0].initially_created}).cloned().collect();
- Ok(NativeTransportChoices{vehicles,groups,routes,pilots,script_created_pilots,flight_routes:None})
+ Ok(NativeTransportChoices{vehicles,groups,routes,pilots,script_created_pilots,pilot_bindings:vec![],flight_routes:None})
 }
 
 #[cfg(test)]mod mission_source_flags_tests {

@@ -44,14 +44,22 @@ pub(super) fn fields(
     tags: &Path,
     relative: &str,
 ) -> Reply<(bool, String, bool)> {
+    read_keys(executable,tags,relative,&["-L".into()])
+}
+/// Read only the real seat table, not megabytes of unrelated animation frames.
+pub(super) fn animation_seats(executable:&Path,tags:&Path,relative:&str)->Reply<Vec<String>>{
+    if !relative.ends_with(".model_animations"){return Err("Pilot seat review requires a native animation graph".into());}
+    let(valid,text,cut)=read_keys(executable,tags,relative,&["-C".into(),"units".into()])?;
+    if !valid||cut{return Err(format!("Native animation seat count unavailable: {}",text.chars().take(240).collect::<String>()));}
+    let count=text.trim().parse::<usize>().map_err(|_|"Native animation seat count is invalid")?;if count>32{return Err("Native graph exceeds32unit seats".into());}if count==0{return Ok(vec![]);}
+    let keys=(0..count).flat_map(|index|["-G".into(),format!("units[{index}].label")]).collect::<Vec<_>>();
+    let(valid,text,cut)=read_keys(executable,tags,relative,&keys)?;if !valid||cut{return Err(format!("Native animation seat labels unavailable: {}",text.chars().take(240).collect::<String>()));}
+    let labels=text.lines().map(str::to_owned).collect::<Vec<_>>();if labels.len()!=count||labels.iter().any(|label|label.len()>31||label.chars().any(char::is_control)){return Err("Native animation seat labels differ from their count or shape".into());}Ok(labels)
+}
+fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(bool,String,bool)>{
     let tags = reader_root(tags, relative)?;
     let mut command = Command::new(executable);
-    command.args([
-        "-t",
-        tags.to_str().ok_or("Tag path is not Unicode")?,
-        "-L",
-        relative,
-    ]);
+    command.args(["-t",tags.to_str().ok_or("Tag path is not Unicode")?]).args(keys).arg(relative);
     command
         .current_dir(executable.parent().ok_or("Validator has no directory")?)
         .stdin(Stdio::null())
@@ -108,6 +116,16 @@ mod path_tests {
         let dir = tempfile::tempdir().unwrap();
         assert!(reader_root(dir.path(), "../outside.weapon").is_err());
         assert!(reader_root(dir.path(), "-L").is_err());
+    }
+    #[test]
+    #[ignore="Requires explicit installed Invader and legitimate read-only prepared pilot graphs"]
+    fn installed_pilot_seat_projection_preserves_sources_and_stream_bounds(){
+        let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_INVADER_EDIT").expect("Explicit installed native reader"));let tags=PathBuf::from(std::env::var_os("SPARK_NATIVE_PILOT_TAG_ROOT").expect("Explicit read-only native tagset"));
+        for (tag,seat,large) in [("characters/marine/marine.model_animations","P-driver",true),("forerunner/transport/spirit_pilot.model_animations","c_dropship driver",false)]{
+            let file=tags.join(tag);let before=maps::hash_file(&file).unwrap();let labels=animation_seats(&executable,&tags,tag).unwrap();assert!(labels.len()<=32);assert_eq!(labels.iter().filter(|label|label.as_str()==seat).count(),1);
+            if large{let(valid,_,cut)=fields(&executable,&tags,tag).unwrap();assert!(valid&&cut,"Large full inventory must retain its existing truncation guard");}
+            assert_eq!(before,maps::hash_file(&file).unwrap());println!("Installed bounded pilot seats PASS: {tag}; {}labels; exact={seat}; sourceSHA={before}; originals unchanged",labels.len());
+        }
     }
     #[test]
     #[cfg(windows)]

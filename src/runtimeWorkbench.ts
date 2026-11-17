@@ -113,7 +113,7 @@ export interface MissionHudSourcePlan {
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string;replacesSha256?:string|null }
 export interface WorkingScriptSources {
   missionReview?:{weapons?:import('./nativeOperations').NativeMissionWeapon[];encounters:{name:string;initiallyCreated:boolean}[];squads:import('./nativeOperations').NativeScenarioSquad[];devices:import('./nativeOperations').NativeDevicePlacement[];protectedEncounters:string[]};
-  transportReview?:{vehicles:{name:string;tagPath:string;seats:string[];pilotSeats?:string[];flight?:import('./nativeOperations').NativeVehicleFlight;flightIssue?:string}[];groups:string[];routes:string[];pilots:string[];scriptCreatedPilots?:string[];flightRoutes?:{name:string;points:number;commands:number;finalPosition:[number,number,number]|null;arrivalVolumes:string[];issue:string|null}[]};
+  transportReview?:{vehicles:{name:string;tagPath:string;seats:string[];pilotSeats?:string[];flight?:import('./nativeOperations').NativeVehicleFlight;flightIssue?:string}[];groups:string[];routes:string[];pilots:string[];scriptCreatedPilots?:string[];pilotBindings?:{aircraft:string;pilot:string;actors:string[];animationGraphs:string[];seats:string[];issue:string|null}[];flightRoutes?:{name:string;points:number;commands:number;finalPosition:[number,number,number]|null;arrivalVolumes:string[];issue:string|null}[]};
   cameraReview?:{tagIdentity:string;cameras:import('./nativeOperations').NativeCameraPoint[];scriptNames:string[];triggerVolumes:string[];scenarioType:number};
   projectId:string;buildId:string;tagsDirectory:string;projectFingerprint:string;sourceSha256:string;
   modules:{filename:string;sha256:string;bytes:number;unavailable:string|null}[];

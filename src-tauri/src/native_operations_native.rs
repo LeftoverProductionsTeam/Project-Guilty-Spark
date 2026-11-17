@@ -357,15 +357,16 @@ fn require_flight_transport(state:&AppState,source:&Source)->Reply<()> {
     Ok(())
 }
 pub(super) fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str) -> Reply<String> {
+    checked_read(state,project,tags,tag,|parser,tags,tag|{let(valid,text,cut)=native_tag_parser::fields(parser,tags,tag)?;if !valid||cut{return Err(format!("The reviewed native reader could not validate this tag: {text}"));}Ok(text)})
+}
+pub(super) fn animation_seats(state:&AppState,project:&Project,tags:&Path,tag:&str)->Reply<Vec<String>>{
+    checked_read(state,project,tags,tag,native_tag_parser::animation_seats)
+}
+fn checked_read<T>(state:&AppState,project:&Project,tags:&Path,tag:&str,read:impl FnOnce(&Path,&Path,&str)->Reply<T>)->Reply<T>{
     let file = tags.join(core::safe_relative(tag).map_err(error)?);
     let before = maps::hash_file(&file).map_err(error)?;
     let parser = native_tag_parser::installed(state, project)?;
-    let (valid, text, cut) = native_tag_parser::fields(&parser, tags, tag)?;
-    if !valid || cut {
-        return Err(format!(
-            "The reviewed native reader could not validate this tag: {text}"
-        ));
-    }
+    let text=read(&parser,tags,tag)?;
     if maps::hash_file(&file).map_err(error)? != before {
         return Err(
             "The tag changed during native validation. Wait for the external save to finish."

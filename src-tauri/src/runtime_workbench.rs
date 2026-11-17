@@ -422,6 +422,7 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
                         Ok(flight)=>{vehicle.flight_issue=flight.validate().err().map(error);vehicle.flight=Some(flight);},
                         Err(issue)=>vehicle.flight_issue=Some(error(issue)),
                     }}
+                choices.pilot_bindings=core::native_operations::native_transport_pilot_bindings(&values,&choices,|tag|native_operations_native::fields(&state,&project,&context.tags,tag).map_err(core::SparkError::Invalid),|tag|native_operations_native::animation_seats(&state,&project,&context.tags,tag).map_err(core::SparkError::Invalid)).map_err(error)?;
                 choices.flight_routes=Some(core::native_operations::native_transport_routes(&values).map_err(error)?);
                 view.transport_review=Some(choices);
             }
