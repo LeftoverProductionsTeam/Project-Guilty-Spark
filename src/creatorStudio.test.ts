@@ -2,7 +2,7 @@ import type {NativeTagContext} from './nativeOperations';
 import {inspectScenarioBindings} from './scenarioBindings';
 import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
-import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission,nativeMissionBinding} from './haloScript';
+import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,reviewRecoveredCampaignMission,recoveredCampaignMission,composeRecoveredCampaignMission,readRecoveredMissionSource,sameMissionData,exportHaloCeMission,nativeMissionBinding} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
 import { connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, defaultBlackEchoOptions, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
@@ -417,4 +417,30 @@ it('reviews reapplies and regenerates explicit encounter teams without losing so
  const handoff=structuredClone(project);handoff.studio!.missions[0].transportInsertion='pelican';const handoffBefore=JSON.stringify(handoff);await expect(attachNativeCampaignMission(handoff,'startup')).rejects.toThrow(/CE609 working tags/);expect(JSON.stringify(handoff)).toBe(handoffBefore);
  const unexpected=structuredClone(saved),module=unexpected.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!;module.content=module.content.replace('"encounterTeam":"covenant"','"encounterTeam":"covenant","unknownMissionAction":true');await expect(reviewNativeCampaignMission(unexpected)).rejects.toThrow(/unsupported beat fields/);
  const invalid=structuredClone(saved);invalid.quickForge!.logic!.handwrittenSources!.find(source=>source.filename==='gs_mission.hsc')!.content=review.module.content.replace('"encounterTeam":"covenant"','"encounterTeam":"unknown"');await expect(reviewNativeCampaignMission(invalid)).rejects.toThrow();
+});
+
+
+it('restores recovered mission and shot data through the existing review history without rewriting source',async()=>{
+ const hash=async(value:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(n=>n.toString(16).padStart(2,'0')).join('');
+ const project=campaignDraft();project.history=[];project.quickForge=null;project.source={sha256:'c'.repeat(64)} as Project['source'];project.scenarioScriptDraft={filename:'other.hsc',content:'; keep this draft',fileSha256:'e'.repeat(64),sourceKey:'owned',replaceExisting:false};
+ project.studio!.missions=[{id:'local',title:'Local draft',objective:'Keep until reviewed',trigger:'manual',encounterName:''}];project.studio!.shots=[{id:'local-shot',name:'Local camera',durationMs:1000,cameraPosition:[0,0,2],lookAt:[1,0,2],fov:60,subtitle:''}];
+ const studio=emptyCreatorStudio();studio.missions=[{id:'rescue',title:'Rescue',objective:'Escort',trigger:'escort',encounterName:'guards',encounterTeam:'covenant',triggerRef:'rally',minimumSurvivors:1,escortFailure:'continue'}];
+ const original='; Preserve authored ownership and notices.\n(global short legacy_index 7)\n(script startup original_owner (sleep 1))\n'.replaceAll('\\n','\n');
+ for(const composed of [false,true]){
+  const output=composed?await composeRecoveredCampaignMission(studio,'startup',false,original,{filename:'original.hsc',sourceSha256:await hash(original),retiredStartups:['original_owner'],replaceExtractionCallback:false}):recoveredCampaignMission(studio,'startup',false);
+  const module={filename:output.filename,content:output.content,sha256:await hash(output.content)},before=JSON.stringify(project),review=await reviewRecoveredCampaignMission(project,module,'gbx-custom');
+  expect(review.recovered?.composition?.retiredStartups).toEqual(composed?['original_owner']:undefined);expect(review.binding.cinematic).toEqual([]);const restored=applyNativeCampaignMission(project,review);expect(restored.studio!.missions).toEqual(studio.missions);expect(restored.studio!.shots).toEqual([]);expect(restored.scenarioScriptDraft).toBe(project.scenarioScriptDraft);expect(restored.source).toBe(project.source);expect(restored.quickForge).toBeNull();expect(JSON.stringify(project)).toBe(before);expect(review.module.content).toBe(module.content);
+  let history=historyReducer({...initialHistory,current:project},{type:'edit',project:restored,description:'Use reviewed recovered mission data'});history=historyReducer(history,{type:'undo'});expect(history.current).toEqual(project);history=historyReducer(history,{type:'redo'});expect(JSON.parse(JSON.stringify(history.current)).studio).toEqual(restored.studio);
+  const stale={...project,studio:{...project.studio!,missions:[{...project.studio!.missions[0],title:'Changed during review'}]}};expect(()=>applyNativeCampaignMission(stale,review)).toThrow(/changed after review/);
+  expect((await readRecoveredMissionSource(output.content)).missions).toEqual(studio.missions);expect((await reviewRecoveredCampaignMission(project,module,'mcc-cea')).binding.missions).toEqual(studio.missions);
+ }
+});
+
+it('refuses corrupted unknown or incompatible recovered mission data without replacing the draft',async()=>{
+ const hash=async(value:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(n=>n.toString(16).padStart(2,'0')).join('');const project=campaignDraft();project.quickForge=null;
+ const studio=emptyCreatorStudio();studio.missions=[{id:'end',title:'Extraction',objective:'Return',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:''}];const output=recoveredCampaignMission(studio,'startup',true),module={filename:output.filename,content:output.content,sha256:await hash(output.content)},before=JSON.stringify(project);
+ await expect(reviewRecoveredCampaignMission(project,module,'mcc-cea')).rejects.toThrow(/CE609/);await expect(reviewRecoveredCampaignMission(project,{...module,sha256:'0'.repeat(64)},'gbx-custom')).rejects.toThrow(/identity changed/);await expect(reviewRecoveredCampaignMission(project,{...module,filename:'../original.hsc'},'gbx-custom')).rejects.toThrow(/identity changed/);
+ const unknown=module.content.replace('"id":"end"','"id":"end","futureUnreviewedField":true');await expect(reviewRecoveredCampaignMission(project,{...module,content:unknown,sha256:await hash(unknown)},'gbx-custom')).rejects.toThrow(/unsupported beat fields/);
+ const changed=module.content+'; manual change\n';await expect(reviewRecoveredCampaignMission(project,{...module,content:changed,sha256:await hash(changed)},'gbx-custom')).rejects.toThrow(/edited/);
+ const wrong=module.content.replace('"shots":[]','"shots":[{"id":"shot","unknownCameraField":true}]');await expect(reviewRecoveredCampaignMission(project,{...module,content:wrong,sha256:await hash(wrong)},'gbx-custom')).rejects.toThrow();expect(JSON.stringify(project)).toBe(before);
 });

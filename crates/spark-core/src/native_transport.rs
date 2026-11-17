@@ -335,8 +335,13 @@ mod installed {
    let filename=value["filename"].as_str().unwrap_or("gs_mission.hsc");let binding=crate::creative::recovered_mission_binding_for_module(&project,source,filename,value["replacesSha256"].as_str()).unwrap().unwrap();let data=root.join("data");std::fs::create_dir(&data).unwrap();
    run(&tools.join("invader-recover.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),tag.into()]);
    let target=data.join("scripts").join(crate::safe_relative(filename).unwrap());
-   if let Some(expected)=value["replacesSha256"].as_str(){assert_eq!(crate::maps::hash_file(&target).unwrap(),expected,"Only the exact reviewed recovered module may be revised in owned scratch");}else{assert!(!target.exists(),"Never replace an original recovered source module without its reviewed hash");}
-   std::fs::create_dir_all(target.parent().unwrap()).unwrap();std::fs::write(&target,source).unwrap();
+   let recovered_prior=value.get("previousGeneratedSource");
+   if let Some(prior)=recovered_prior{
+    assert_eq!(prior["filename"].as_str(),Some(filename));assert_eq!(prior["sha256"].as_str(),value["replacesSha256"].as_str());assert_eq!(Some(crate::maps::hash_file(&target).unwrap().as_str()),prior["replacesSha256"].as_str(),"Prior generated source must start from the exact original module");let content=prior["content"].as_str().unwrap();assert!(content.starts_with("; Spark recovered campaign mission v1\n")&&content.len()<=256*1024);std::fs::write(&target,content).unwrap();assert_eq!(Some(crate::maps::hash_file(&target).unwrap().as_str()),prior["sha256"].as_str());
+   }else{
+    if let Some(expected)=value["replacesSha256"].as_str(){assert_eq!(crate::maps::hash_file(&target).unwrap(),expected,"Only the exact reviewed recovered module may be revised in owned scratch");}else{assert!(!target.exists(),"Never replace an original recovered source module without its reviewed hash");}
+    std::fs::create_dir_all(target.parent().unwrap()).unwrap();std::fs::write(&target,source).unwrap();
+   }
    if let Some(transport)=value.get("transportSource"){
     // Consume the actual saved UI controller, using existing native append and
     // command writers for its missing content. No second mission/AI writer.
@@ -377,6 +382,10 @@ mod installed {
    if let Some(hud)=&hud{compile_hud(&hud.review.output_tag_path,&hud.source);if value["seedHud"].as_bool()==Some(true){assert_eq!(hud.original_count,1);assert_eq!(hud.input_messages[0].name,"legacy_objective");assert_eq!(hud.messages[0],hud.input_messages[0]);}}
 
    run(&tools.join("invader-script.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-E".into(),"be_native".into()]);
+   if let Some(prior)=recovered_prior{
+    let recovered=root.join("prior-source-readback");std::fs::create_dir(&recovered).unwrap();run(&tools.join("invader-recover.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-d".into(),recovered.to_string_lossy().into_owned(),tag.into()]);let readback=recovered.join("scripts").join(filename);assert_eq!(Some(crate::maps::hash_file(&readback).unwrap().as_str()),prior["sha256"].as_str(),"Native recovered-source receipt must match the actual reviewed UI module");assert!(scenario_script_names(&fields()).unwrap().starts_with(&original_scripts));assert!(global_names(&fields()).starts_with(&original_globals));eprintln!("Previous generated module compiled and independently recovered before reviewed adoption PASS: {}",prior["sha256"]);
+    std::fs::write(&target,source).unwrap();run(&tools.join("invader-script.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-d".into(),data.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-E".into(),"be_native".into()]);
+   }
    assert_eq!(fixture_sha,crate::maps::hash_file(&fixture).unwrap());eprintln!("Generated recovered mission source {}",crate::maps::hash_file(&target).unwrap());(binding,hud)
   });
   let squad_query=std::env::var_os("SPARK_NATIVE_SQUAD_QUERY").is_some();

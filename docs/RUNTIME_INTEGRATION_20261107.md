@@ -1847,3 +1847,52 @@ Final measured browser comparison widths (not native Windows): [{"viewport":{"wi
 
 QA90295/run-iawAiy CLOSED after all writers exited; root absent, runs[]/issues[]. {"workflow":"frontend-mission-review","temporaryOutputDisposed":true,"disposedLogicalBytes":53136247,"disposedAllocatedFileBytes":53473288,"peakLogicalBytes":53141981,"allocatedBytes":53481480,"monitoringSamples":53,"monitoringMs":3230.358100000125,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62029442,"peakLogicalBytes":62029442,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
 Measured disposed allocated-file bytes: 53473288 (filesystem overhead and unrelated volume changes excluded). Protected475CSV/legacy checkpoint/original scenario/cache hashes and both stashes unchanged. No retained generated outputs, archives, other-project writes or push.
+
+
+## 17 November — recovered Black Echo authoring round trip (parentaa7c7f3)
+
+Connected the existing pinned working_script_source reader to the existing mission review/adopter and project history. The normalized view never executes or rewrites source. Review/Apply verify module bytes/SHA, build, source directory, project/library identity and stable local state; Apply re-reads before committing. The existing project-mutation lease covers verification and adoption so queued Save captures the resulting revision. All saved mission/shot fields restore explicitly, including clearing an empty source take, while original files, source imports and unrelated drafts remain. Missing radio import receipts are reported with the existing include/select route, never fabricated. Controller retirement/callback ownership stays a separate review. A single existing activation preference is now shared by Creator Studio and runtime preparation; legacy runtime values remain fallback data.
+
+Recovered metadata shares the exhaustive typed beat allowlist and camera validation with existing readers, enforcing the256KiB generated-source budget and rejecting unknown fields/changed bodies/corrupt identity/incompatible targets. Existing composition/retained-source checks remain. Shared UI keeps explicit consent, current-source checks, errors, Undo/Redo and readable comparisons; no new writer, manager, tracking system or native format.
+
+Frontend79PASS (including How To4), final guide4PASS and TypeScript/Vite PASS. Browser attached review at800x600/1920x1080 passes; intro/scene-only and Pelican/Spirit insertion journeys pass. Complete seven-objective plain/composed recovery passes Keep local, actual source-change refusal, queued Save with zero premature save_project calls, adoption, history, Save/reopen, team edit, original-source ownership review and exact reviewed-revision build request. Actual original HSC from the protected native fixture was also used in the composed browser producer. Browser IPC is synthetic, and reopening is not a native Windows process restart. Final no-op legacy-source regression verifies activation stays startup and identical preparation keeps the saved draft unchanged with Save disabled.
+
+Actual native proof uses the existing installed transport/mission fixture and unchanged read-only prepared SDK. An optional prior-generated-source input now compiles the preceding UI module into the owned scenario, independently recovers its exact SHA and original script/global prefixes, then compiles the reviewed UI edit. This verifies the expected previous module exists as native scenario source rather than substituting a different original hash. Final standard CE609 map and independent extraction pass:6scripts with original4prefix, original4global prefix,9HUDmessages including1original, original encounter indices/counts and staged start poses (including the previously reviewed Flood support repair), plus existing aircraft/route/tuning/source checks. Negative named-creation/readback cases retain the previous-good cache. The candidate and test executable are disposable QA output, not a release or game acceptance. Exact identities follow.
+
+Initial failures: missing history in a new test fixture and an untyped unknown-metadata callback (fixed, not production bypasses); first browser build step used Attach source & compile for an existing unchanged module (corrected to make a real team edit and use Build reviewed script revision); an older regression expected a dirty Save after identical preparation because activation previously reset between workspaces (strengthened to assert coherent startup, identical saved draft and disabled no-op Save). Assertions/source guards were not weakened. Native compile passed first execution; existing SDK bitmap compression/A8/AY8, LoD, minor sound/effect and anniversary HUD warnings remain and were not suppressed.
+
+No native Windows app/game/Forerunner process was launched; desktop initialization, Save37944/42-edit/full restart, actual flight/AI/rescue/banking/peers and full Operation110 acceptance stay OPEN. Forerunner/original Halo inputs remain read-only; no push/publication or new source archive.
+
+```json
+{
+  "parent": "aa7c7f37f7ab89b5860ddb508d708c31dd55a0ba",
+  "mapSha256": "88bf8eb7f0880ff94f1beb2038a254bdc91a92b241d1a022b5de1a50071370f5",
+  "mapBytes": 110028800,
+  "sourceScenarioSha256": "2c9e13b31caef7eaefe542c8e9682ceef2d17ccc6efdaf5b8518928dbc702714",
+  "extractedScenarioSha256": "9784d3c54c7975ae0705efe1a5f35ed4aa2a6af5d50c3755b92bfa92328e6022",
+  "originalModuleSha256": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+  "reviewedPreviousModuleSha256": "3360c74bf83f78e82c0047ebc63d75cacb09d9362266921015accf8a6c0a5074",
+  "editedModuleSha256": "30d45e547b4d92a5ac5a3bac79b5a4c8c6bf03077682d6743182f3cea948fe99",
+  "testExecutableSha256": "98b8d7020e993835888d46f3b7ac74273df0cc8594e409f6392abc4225e67534",
+  "nativeLogSha256": "df0e928717faf1aaabfd5b35e13d965c10e0f68e27503939e9fe2bc61da1b144",
+  "fixtureSha256": "97cefa35d391416ab210b2e38fe9ac3d2cc3fe9dcc69de557cc86743081309ab"
+}
+```
+
+Focused log SHA256 identities (including the documented initial no-op Save test failure):
+```json
+{
+  "source-final.log": "4c0e5c535bab4ef35425ce5b1a9965ec9b1b3fee3c61e21ff49e2b5444fd8c65",
+  "guides-final.log": "b792f805e0522c3ce66885da1edd2ca4d6aae32af994358acff35174e8e655bd",
+  "web-last.log": "5e2b53ab007a52e83e098b1316ec48c85d09e57fb9f3002757608ea5cafa8649",
+  "browser2.log": "22904048d349910aa0b67bc2d12357085d6a8f4d079da3a37abdd5520434fd27",
+  "native-browser.log": "00fd8db8d317fa6df9f628ba292023cd0fedc41000aae0b419622d6a24fb83dc",
+  "regressions.log": "d1f53d8af2ec3e6920e92d691c0144dfb609b0375e8aade2f37c82a0aac51564",
+  "save-regressions.log": "4e48a965adb05a8ceed6bd2624a153be16210c3193f094a49d35a37b3ed9e1a1"
+}
+```
+Final TypeScript check PASS; protected475CSV/legacy checkpoint/original scenario/cache hashes unchanged. Both original stashes remain. No source/executable/package publication.
+
+Native QA28750/run-ftk6Wy CLOSED: {"workflow":"native-recovered-mission-adoption","temporaryOutputDisposed":true,"disposedLogicalBytes":499041826,"disposedAllocatedFileBytes":null,"peakLogicalBytes":499067352,"allocatedBytes":463677136,"monitoringSamples":62,"monitoringMs":6081.648000000394,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62072170,"peakLogicalBytes":62072170,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Frontend QA28750/run-isvZ4C CLOSED: {"workflow":"frontend-recovered-mission-review","temporaryOutputDisposed":true,"disposedLogicalBytes":28907163,"disposedAllocatedFileBytes":29153432,"peakLogicalBytes":28990363,"allocatedBytes":29161624,"monitoringSamples":115,"monitoringMs":6730.14150000002,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62072938,"peakLogicalBytes":62072938,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Both roots absent, all writers exited, development runs[]/issues[]. Disposal allocation is reported only where measured; native disposal allocation is unavailable, so no combined physical-reclamation claim. No retained candidates, compiler/browser caches, SDK duplicates or replacement archives.

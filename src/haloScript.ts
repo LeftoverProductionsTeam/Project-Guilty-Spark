@@ -385,10 +385,13 @@ export async function composeRecoveredCampaignMission(studio:CreatorStudioDocume
  return recoveredMissionDocument(studio,activation,forerunner,{...composition,retainedSha256:await nativeMissionHash(retained)},retained);
 }
 export async function readRecoveredMissionSource(content:string){
+ if(new TextEncoder().encode(content).length>256*1024)throw Error('Recovered mission source exceeds its256KiB review budget. Preserve it through the manual source editor.');
  if(!content.startsWith(recoveredMissionPrefix))throw Error('This is not an unchanged generated recovered mission. Use the explicit manual source editor.');
  const line=content.slice(recoveredMissionPrefix.length).split('\n',1)[0];if(!line.startsWith('; configuration: '))throw Error('Recovered mission configuration is missing.');
  const configuration=JSON.parse(line.slice('; configuration: '.length));
  if(!configuration||Object.keys(configuration).some(key=>!['activation','forerunner','missions','shots','composition'].includes(key)))throw Error('Unknown recovered mission configuration.');
+ if(!Array.isArray(configuration.missions)||configuration.missions.some((beat:unknown)=>!beat||typeof beat!=='object'||Array.isArray(beat)||Object.keys(beat).some(key=>!Object.hasOwn(nativeMissionBeatFields,key))))throw Error('Recovered mission contains unsupported beat fields. No data was adopted.');
+ if(!Array.isArray(configuration.shots))throw Error('Recovered mission camera data is missing.');if(configuration.shots.length)validateNativeCinematic(configuration.shots);
  const studio={...emptyCreatorStudio(),missions:configuration.missions,shots:configuration.shots};
  const retained=configuration.composition?retainedMissionSource(content):undefined;
  if(configuration.composition&&(!content.includes(retainedMissionMarker)||await nativeMissionHash(retained!)!==configuration.composition.retainedSha256))throw Error('Retained module source was edited or its checksum is missing. Preserve it through the manual source editor.');
@@ -408,6 +411,8 @@ export interface NativeMissionBinding {
   cinematicIntro?:boolean;
 }
 
+// Exhaustive against the saved beat type: new creator fields must remain reviewable.
+const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
 async function nativeMissionHash(body:string):Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
     .map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -428,10 +433,9 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  // Exhaustive against the saved beat type: new creator fields must remain reviewable.
-  const beatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
+
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
-    Object.keys(beat).some(key=>!Object.hasOwn(beatFields,key))||
+    Object.keys(beat).some(key=>!Object.hasOwn(nativeMissionBeatFields,key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||(beat.weaponPath!=null&&typeof beat.weaponPath!=='string')||
     (beat.createWeaponObject!=null&&typeof beat.createWeaponObject!=='string')||
@@ -469,7 +473,8 @@ export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissi
 }
 export interface NativeMissionReview {
   projectId:string;
-  document:NonNullable<Project['quickForge']>;
+  document:Project['quickForge'];
+  recovered?:{project:Project;sha256:string;target:string;composition?:RecoveredMissionComposition};
   module:{filename:string;content:string};
   binding:NativeMissionBinding;
   localMissions:NativeMissionBinding['missions'];
@@ -484,15 +489,27 @@ export async function reviewNativeCampaignMission(project:Project):Promise<Nativ
   const module=owned[0],binding=await readNativeMissionModule(module);
   return {projectId:project.id,document,module,binding,localMissions,localShots:structuredClone(project.studio?.shots??[])};
 }
+/** Read the existing recovered metadata without executing or rewriting native source.
+ * The caller owns pinned native I/O and must recheck that source before adoption. */
+export async function reviewRecoveredCampaignMission(project:Project,module:{filename:string;content:string;sha256:string},target:string):Promise<NativeMissionReview>{
+  if(project.quickForge&&!project.quickForge.native||!['gbx-custom','mcc-cea'].includes(target))throw Error('Recovered mission review requires CE609 or MCC working source.');
+  if(!/^[A-Za-z0-9_-]{1,31}\.hsc$/.test(module.filename)||!/^[a-f0-9]{64}$/.test(module.sha256)||new TextEncoder().encode(module.content).length>256*1024||await nativeMissionHash(module.content)!==module.sha256)throw Error('Recovered mission module identity changed. No project data was adopted.');
+  const config=await readRecoveredMissionSource(module.content);
+  if(config.composition?config.composition.filename!==module.filename:module.filename.toLowerCase()!=='gs_mission.hsc')throw Error('Recovered mission filename does not match its reviewed ownership.');
+  if(config.forerunner&&target!=='gbx-custom')throw Error('This Forerunner mission requires CE609 source; no incompatible data was adopted.');
+  return {projectId:project.id,document:project.quickForge,module:{filename:module.filename,content:module.content},binding:{schemaVersion:1,missions:structuredClone(config.missions),activation:config.activation,sourceSha256:module.sha256,cinematic:structuredClone(config.shots),cinematicIntro:false},localMissions:structuredClone(project.studio?.missions??[]),localShots:structuredClone(project.studio?.shots??[]),recovered:{project,sha256:module.sha256,target,composition:config.composition}};
+}
 /** Explicit replacement of mission data only. Source modules and unrelated
  * Studio settings remain unchanged; normal project history owns Undo/Redo. */
 export function applyNativeCampaignMission(project:Project,review:NativeMissionReview):Project {
   const document=project.quickForge;
-  if(project.id!==review.projectId||!document||document!==review.document||!sameMissionData(project.studio?.missions??[],review.localMissions)||review.binding.cinematic!==undefined&&!sameCinematicData(project.studio?.shots??[],review.localShots))
+  if(project.id!==review.projectId||document!==review.document||!!review.recovered&&project!==review.recovered.project||!sameMissionData(project.studio?.missions??[],review.localMissions)||review.binding.cinematic!==undefined&&!sameCinematicData(project.studio?.shots??[],review.localShots))
     throw Error('Source or local mission data changed after review. Review again; no stale data was applied.');
-  const owned=document.logic?.handwrittenSources?.filter(source=>source.content.startsWith(nativeMissionBinding))??[];
-  if(owned.length!==1||owned[0].filename!==review.module.filename||owned[0].content!==review.module.content)
-    throw Error('The attached mission changed after review. Existing drafts remain intact.');
+  if(!review.recovered){
+    if(!document)throw Error('The attached mission source is missing. Existing drafts remain intact.');
+    const owned=document.logic?.handwrittenSources?.filter(source=>source.content.startsWith(nativeMissionBinding))??[];
+    if(owned.length!==1||owned[0].filename!==review.module.filename||owned[0].content!==review.module.content)throw Error('The attached mission changed after review. Existing drafts remain intact.');
+  }
   const studio={...(project.studio??emptyCreatorStudio()),missions:structuredClone(review.binding.missions),...(review.binding.cinematic?{shots:structuredClone(review.binding.cinematic)}:{})};
   const errors=validateCreatorStudio(studio);
   if(errors.length)throw Error('Cannot combine attached missions with current Studio data: '+errors.join('; '));

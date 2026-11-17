@@ -1,5 +1,6 @@
 import {inspectScenarioBindings} from '../scenarioBindings';
-import {emptyCreatorStudio} from '../creatorStudio';
+import {emptyCreatorStudio,exportStudioEvidence} from '../creatorStudio';
+import MissionSourceReview from './MissionSourceReview';
 import {appendNativeCameraShot,nativeCinematicSource,nativeCinematicPrefix,nativeCinematicTakeKey} from '../nativeCinematic';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {beginProjectMutation} from '../projectMutation';
@@ -21,10 +22,10 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix } from '../haloScript';
-import type {NativeTransportOptions} from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission } from '../haloScript';
+import type {NativeTransportOptions,NativeMissionReview} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
-import { useMapState, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
+import { useMapState, readMapSession, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
 import type {
   RuntimeWorkbenchReport,
@@ -197,7 +198,7 @@ export default function RuntimeDock({
   const [transport,setTransport]=useMapState<NativeTransportOptions>(id,'sourceScripts.transport',{faction:'unsc',pilot:'',pilotSeat:'',outbound:'',inbound:'',hub:'extraction_return',field:'extraction_zone'});
   const latestTransport=useRef(transport);latestTransport.current=transport;
   const [recoveredMissionOpen,setRecoveredMissionOpen]=useState(false);
-  const [recoveredActivation,setRecoveredActivation]=useMapState<'manual'|'startup'>(id,'sourceScripts.missionActivation','manual');
+  const [recoveredActivation,setRecoveredActivation]=useMapState<'manual'|'startup'>(id,'native-mission-startup',()=>readMapSession<unknown>(id,'sourceScripts.missionActivation','manual')==='startup'?'startup':'manual');
   const [missionModule,setMissionModule]=useMapState<string>(id,'sourceScripts.missionModule','');
   const pickedMissionModule=modules?.modules.find(module=>module.filename===missionModule);
   const [missionOriginal,setMissionOriginal]=useState<{key:string;filename:string;sha256:string;content:string}|null>(null);
@@ -537,6 +538,31 @@ export default function RuntimeDock({
   function sourceSelectionMatches(selection:WorkingScriptSources,source:NonNullable<RuntimeWorkbenchReport['workingSource']>) {
     return selection.projectId===project?.id&&selection.buildId===source.buildId&&selection.tagsDirectory===source.tagsDirectory
       &&selection.projectFingerprint===source.projectFingerprint;
+  }
+  async function readRecoveredMissionReview(input:Project):Promise<NativeMissionReview>{
+    const source=report?.workingSource,inventory=modules,module=pickedMissionModule,key=scriptSourceKey;
+    if(!source||!inventory||!module||module.unavailable||dirty||busy||working||moduleBusy||inventory.cameraReview?.scenarioType!==0)throw Error('Save, read native mission source and choose an available generated campaign module first.');
+    const request=++moduleRequest.current;setModuleBusy(true);setError('');
+    try{
+      const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:module.filename,expectedSha256:module.sha256});
+      if(request!==moduleRequest.current||key!==currentScriptSourceKey.current||currentProject.current!==input)throw Error('Source or project changed during mission review. No data was adopted.');
+      if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.filename!==module.filename||value.script.sha256!==module.sha256||value.script.replacesSha256!==module.sha256)throw Error('Recovered mission source identity changed. Read source again.');
+      const review=await reviewRecoveredCampaignMission(input,value.script,source.target??'');
+      if(request!==moduleRequest.current||key!==currentScriptSourceKey.current||currentProject.current!==input)throw Error('Source or project changed during mission review. No data was adopted.');
+      return review;
+    }finally{if(request===moduleRequest.current)setModuleBusy(false);}
+  }
+  async function verifyRecoveredMissionReview(input:Project,review:NativeMissionReview){
+    const fresh=await readRecoveredMissionReview(input);
+    if(!review.recovered||fresh.recovered?.sha256!==review.recovered.sha256||fresh.recovered?.target!==review.recovered.target||fresh.module.filename!==review.module.filename||fresh.module.content!==review.module.content)throw Error('Recovered mission changed after review. No local data was adopted.');
+  }
+  function recoveredMissionAdopted(review:NativeMissionReview){
+    const composition=review.recovered?.composition;
+    setRecoveredMissionPlan(null);setMissionOwnershipConfirmed(false);
+    setMissionModule(composition?review.module.filename:'');
+    setMissionOriginal(composition?{key:scriptSourceKey,filename:review.module.filename,sha256:review.recovered!.sha256,content:review.module.content}:null);
+    setRetiredStartups(composition?.retiredStartups??[]);setReplaceMissionCallback(composition?.replaceExtractionCallback??false);
+    setNotice('Recovered mission data applied through project history. Save, then read source again and review controller ownership before preparing its next native revision. Camera geometry and native files were not edited.');
   }
   async function listScriptModules(includeCameras=false,includeTransport=false,includeMission=false) {
     const source=report?.workingSource;if(!native||!project||!source?.projectFingerprint||dirty||busy||working||moduleBusy)return;
@@ -1159,6 +1185,10 @@ export default function RuntimeDock({
               <button type="button" disabled={busy||working||dirty||moduleBusy} onClick={()=>void listScriptModules(true,false,true)}>Read native mission source</button>
               <label>Recovered mission activation<select value={recoveredActivation} disabled={busy||working||moduleBusy} onChange={event=>setRecoveredActivation(event.target.value as 'manual'|'startup')}><option value="manual">Manual · wake gs_mission from another script</option><option value="startup">Startup · wait for players</option></select></label>
               <label>Mission source destination<select aria-label="Mission source destination" value={missionModule} disabled={busy||working||moduleBusy} onChange={event=>{setMissionModule(event.target.value);setMissionOriginal(null);setMissionOwnershipConfirmed(false);setRecoveredMissionPlan(null);}}><option value="">New gs_mission.hsc module</option>{missionModule&&(!pickedMissionModule||pickedMissionModule.unavailable)&&<option value={missionModule}>{pickedMissionModule?'Unavailable':'Missing'} selected module · {missionModule}</option>}{modules?.modules.filter(row=>!row.unavailable).map(row=><option key={row.filename} value={row.filename}>Reviewed revision · {row.filename}</option>)}</select></label>
+              <p className="subtle">To restore editable objectives from an existing Spark-authored native module, choose it above and review its recovered mission data. Apply rechecks source and uses project Undo/Redo; it does not execute HaloScript or change native files.</p>
+              <MissionSourceReview project={project} edit={onEdit} onActivation={setRecoveredActivation}
+                exportLocal={()=>downloadLocalText('mission-draft.json',exportStudioEvidence(project.studio??emptyCreatorStudio(),project),'application/json')}
+                nativeSource={{key:JSON.stringify([scriptSourceKey,missionModule,pickedMissionModule?.sha256,modules?.sourceSha256,nativeCameras?.tagIdentity]),disabled:busy||working||dirty||moduleBusy||!pickedMissionModule||!!pickedMissionModule.unavailable||!workingSourceAvailable||nativeCameras?.scenarioType!==0,read:readRecoveredMissionReview,verify:verifyRecoveredMissionReview,applied:recoveredMissionAdopted}}/>
               {missionModule&&<details open><summary>Review original controller ownership</summary>
                 <button type="button" disabled={busy||working||dirty||moduleBusy||!pickedMissionModule||!!pickedMissionModule.unavailable} onClick={()=>void readMissionComposition()}>Read original mission module</button>
                 {(!pickedMissionModule||pickedMissionModule.unavailable)&&<p>{pickedMissionModule?.unavailable??'The selected module is unavailable in this source. Read native mission source, then choose an available module or the new-module workflow.'}</p>}
