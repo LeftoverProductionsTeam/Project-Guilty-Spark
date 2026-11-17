@@ -17,7 +17,7 @@ fn source_for_import(state:&AppState,id:&str)->Reply<Project>{
 /// their owned receipts/payload hashes are still checked during native staging.
 pub(super) fn guard_import_sources(state:&AppState,project:&Project)->Reply<()> {
     let mut origins=std::collections::BTreeMap::<String,Option<Project>>::new();
-    for binding in project.native_asset_imports.iter().filter(|binding|core::native_asset_imports::is_used(project,binding)) {
+    for binding in project.native_asset_imports.iter().filter(|binding|core::native_asset_imports::is_used(project,binding)||binding.tag_class=="actv"&&project.source.is_some()&&project.quick_forge.is_none()) {
         if !origins.contains_key(&binding.source_project_id) {
             let present={
                 let library=lock(&state.library)?;

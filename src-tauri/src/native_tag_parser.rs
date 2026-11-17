@@ -11,22 +11,23 @@ const VERSION: &str = "Invader 0.55.0.r4134.33518109";
 pub(super) struct Cache {
     results: BTreeMap<String, (String, Finding)>,
 }
-fn output<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(String, bool)> {
-    std::thread::spawn(move || {
-        let mut data = Vec::new();
-        let mut cut = false;
-        let mut block = [0; 4096];
-        loop {
-            match reader.read(&mut block) {
-                Ok(0) | Err(_) => break,
-                Ok(n) => {
-                    let room = (512 * 1024usize).saturating_sub(data.len());
-                    cut |= n > room;
-                    data.extend_from_slice(&block[..n.min(room)]);
-                }
+const MAX_FIELD_STREAM:u64=64*1024*1024;
+fn output<R: Read + Send + 'static>(mut reader:R,identity:bool)->std::thread::JoinHandle<(String,bool)> {
+    std::thread::spawn(move||{
+        use sha2::{Digest,Sha256};
+        let mut digest=Sha256::new();let mut bytes=0u64;
+        let mut data=Vec::new();let mut cut=false;let mut block=[0;4096];
+        loop {match reader.read(&mut block) {
+            Ok(0)=>break,
+            Err(_)=>{cut=true;break;},
+            Ok(n)=>{
+                bytes=bytes.saturating_add(n as u64);
+                if identity {cut|=bytes>MAX_FIELD_STREAM;if !cut{digest.update(&block[..n]);}}
+                else{let room=(512*1024usize).saturating_sub(data.len());cut|=n>room;data.extend_from_slice(&block[..n.min(room)]);}
             }
-        }
-        (String::from_utf8_lossy(&data).replace("\r\n", "\n"), cut)
+        }}
+        if identity {(format!("{}:{bytes}",core::hex_bytes(digest.finalize())),cut)}
+        else{(String::from_utf8_lossy(&data).replace("\r\n","\n"),cut)}
     })
 }
 pub(super) fn reader_root(tags: &Path, relative: &str) -> Reply<PathBuf> {
@@ -56,7 +57,11 @@ pub(super) fn animation_seats(executable:&Path,tags:&Path,relative:&str)->Reply<
     let(valid,text,cut)=read_keys(executable,tags,relative,&keys)?;if !valid||cut{return Err(format!("Native animation seat labels unavailable: {}",text.chars().take(240).collect::<String>()));}
     let labels=text.lines().map(str::to_owned).collect::<Vec<_>>();if labels.len()!=count||labels.iter().any(|label|label.len()>31||label.chars().any(char::is_control)){return Err("Native animation seat labels differ from their count or shape".into());}Ok(labels)
 }
-fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(bool,String,bool)>{
+fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(bool,String,bool)>{read_keys_mode(executable,tags,relative,keys,false)}
+// Full native deserialization and field traversal, bounded in time and total
+// bytes. Hash every emitted field instead of retaining a truncated listing.
+fn field_identity(executable:&Path,tags:&Path,relative:&str)->Reply<(bool,String,bool)>{read_keys_mode(executable,tags,relative,&["-L".into()],true)}
+fn read_keys_mode(executable:&Path,tags:&Path,relative:&str,keys:&[String],identity:bool)->Reply<(bool,String,bool)>{
     let tags = reader_root(tags, relative)?;
     let mut command = Command::new(executable);
     command.args(["-t",tags.to_str().ok_or("Tag path is not Unicode")?]).args(keys).arg(relative);
@@ -71,8 +76,8 @@ fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(b
         command.creation_flags(0x08000000);
     }
     let mut child = command.spawn().map_err(error)?;
-    let stdout = output(child.stdout.take().ok_or("Missing validator stdout")?);
-    let stderr = output(child.stderr.take().ok_or("Missing validator stderr")?);
+    let stdout = output(child.stdout.take().ok_or("Missing validator stdout")?,identity);
+    let stderr = output(child.stderr.take().ok_or("Missing validator stderr")?,false);
     let began = Instant::now();
     let status = loop {
         if let Some(status) = child.try_wait().map_err(error)? {
@@ -111,6 +116,17 @@ fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(b
 #[cfg(test)]
 mod path_tests {
     use super::*;
+    #[test]
+    fn full_field_identity_covers_large_tail_without_weakening_display_or_stream_limits(){
+        let data=vec![b'x';600*1024];
+        assert!(output(std::io::Cursor::new(data.clone()),false).join().unwrap().1);
+        let (before,cut)=output(std::io::Cursor::new(data.clone()),true).join().unwrap();assert!(!cut);
+        let mut changed=data;*changed.last_mut().unwrap()=b'y';
+        let (after,cut)=output(std::io::Cursor::new(changed),true).join().unwrap();assert!(!cut);assert_ne!(before,after);
+        assert!(output(std::io::repeat(0).take(MAX_FIELD_STREAM+1),true).join().unwrap().1);
+        struct Broken;impl Read for Broken{fn read(&mut self,_:&mut [u8])->std::io::Result<usize>{Err(std::io::Error::other("simulated read failure"))}}
+        assert!(output(Broken,true).join().unwrap().1);
+    }
     #[test]
     fn reader_rejects_traversal_and_option_tags_before_process_launch() {
         let dir = tempfile::tempdir().unwrap();
@@ -215,7 +231,7 @@ impl Cache {
                 let finding = if fs::metadata(&file).map_err(error)?.len() > 64 * 1024 * 1024 {
                     Finding{path:path.clone(),state:"unverified".into(),detail:"Tag exceeds the 64 MiB live native-parser bound; review/compile it through its native kit.".into()}
                 } else {
-                    let (valid, values, truncated) = fields(&executable, root, path)?;
+                    let (valid, values, truncated) = field_identity(&executable, root, path)?;
                     if maps::hash_file(&file).map_err(error)? != *hash {
                         report.pending_files += 1;
                         continue;
@@ -230,7 +246,7 @@ impl Cache {
                         let trusted = expected_hashes.get(path).is_some_and(|expected| {
                             maps::hash_file(&starting.join(path)).is_ok_and(|h| &h == expected)
                         });
-                        let (old_valid, old_values, old_cut) = fields(&executable, starting, path)?;
+                        let (old_valid, old_values, old_cut) = field_identity(&executable, starting, path)?;
                         if !trusted || !old_valid || old_cut {
                             ("unverified",format!("{VERSION} parsed this save, but cannot establish a complete comparison against its starting source."))
                         } else if old_values == values {

@@ -389,6 +389,19 @@ fn encounter_row(line:&str,index:usize)->bool {
     line.strip_prefix(&format!("    encounters[{index}]"))
         .is_some_and(|tail|tail.starts_with(' ')&&tail.trim()=="struct")
 }
+/// Read the current source palette, including newly accepted actors that are
+/// not in the original cache index. The existing array reader owns bounds/depth.
+pub fn scenario_actor_sources(fields:&str)->Result<Vec<String>> {
+    let palette=array_listing(fields,"actor_palette")?;
+    if palette.count>64{return invalid("Native actor palette exceeds its supported source limit");}
+    let mut paths=std::collections::BTreeSet::new();
+    for line in palette.body {
+        if let Some(path)=line.strip_prefix("        reference (").and_then(|value|value.split_once(')').map(|(path,_)|path)) {
+            if let Some(path)=path.replace('\\',"/").strip_suffix(".actor_variant") {crate::safe_relative(path)?;paths.insert(path.to_string());}
+        }
+    }
+    Ok(paths.into_iter().collect())
+}
 fn encounter_append_layout(fields:&str,name:&str,actor:&str)->Result<(ArrayListing,ArrayListing,usize)> {
     let encounters=array_listing(fields,"encounters")?;let palette=array_listing(fields,"actor_palette")?;
     if encounters.count>=128||palette.count>64{return invalid("The scenario has no checked encounter/palette capacity for an append");}
@@ -1726,6 +1739,15 @@ mod tests {
         for index in [-2,2,256]{if let Operation::EncounterStartPosition{command_list,..}=&mut op{*command_list=Some(index);}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",&before).is_err());}
         let missing=before.replace("                        command_list (65535) index\n","");if let Operation::EncounterStartPosition{command_list,..}=&mut op{*command_list=Some(-1);}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",&missing).is_err());assert!(scenario_command_list_choices(&before.replace("command_lists[2]","command_lists[257]")).is_err());
         let legacy:ScenarioStartChoice=serde_json::from_value(serde_json::json!({"index":0,"position":[1,2,3]})).unwrap();assert!(legacy.command_list.is_none());
+    }
+    #[test]
+    fn native_actor_palette_reads_accepted_source_not_only_the_cache_index(){
+        let fields="actor_palette[2] array\n    actor_palette[0] struct\n        reference (actors/grunt.actor_variant) tagref\n    actor_palette[1] struct\n        reference (gs_assets_owned/actors/pilot.actor_variant) tagref\nencounters[0] array\n";
+        assert_eq!(scenario_actor_sources(fields).unwrap(),vec!["actors/grunt","gs_assets_owned/actors/pilot"]);
+        let actual="actor_palette[1]                                                        array\n └──actor_palette[0]                                                  struct\n     └──reference (gs_assets_owned\\actors\\pilot.actor_variant)               \nencounters[0]                                                         array\n";
+        assert_eq!(scenario_actor_sources(actual).unwrap(),vec!["gs_assets_owned/actors/pilot"]);
+        assert!(scenario_actor_sources("actor_palette[65] array\n").is_err());
+        assert!(scenario_actor_sources("actor_palette[1] array\n    actor_palette[0] struct\n        reference (../pilot.actor_variant) tagref\n").is_err());
     }
     #[test]
     fn native_trigger_geometry_edit_preserves_identity_and_refuses_unrelated_changes(){

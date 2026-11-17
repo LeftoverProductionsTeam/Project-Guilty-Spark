@@ -12,7 +12,9 @@ import {NATIVE_VOLUME_VIEW} from '../nativeTriggerVolume';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
-import type { Project } from '../types';
+import type { Project, OpenProject, NativeAssetImport } from '../types';
+import AssetSourceBrowser from './AssetSourceBrowser';
+import {prepareAssetImport} from '../nativeAssetImport';
 import {
   notifyNativeSource, campaignTacticalModes,campaignMccSearchReview,
   type NativeCombatSource,
@@ -65,6 +67,14 @@ export default function NativeTagOperations({
   const [encounterName,setEncounterName]=useState('gs_source_actor'),[actorPath,setActorPath]=useState(''),
     [actorPosition,setActorPosition]=useState<[string,string,string]>(['0','0','0']),[startActive,setStartActive]=useState(false),
     [actorCount,setActorCount]=useState('1'),[actorSpacing,setActorSpacing]=useState('0.75');
+  const [actorImport,setActorImport]=useMapState<NativeAssetImport|null>(project.id,'native.encounter.actorImport',()=>null);
+  const [actorSource,setActorSource]=useState<OpenProject|null>(null),[sourceActor,setSourceActor]=useState(''),[actorQuery,setActorQuery]=useState('');
+  const actorSourceRef=useRef(actorSource);actorSourceRef.current=actorSource;
+  const pendingActor=actorImport?.tagClass==='actv'&&typeof actorImport.nativePath==='string'?actorImport:null;
+  const nativeActorChoices=[...new Set([...(context?.actorVariants??[]),...(pendingActor?[pendingActor.nativePath]:[])])];
+  const sourceActors=(actorSource?.inspection?.tags??[]).filter(tag=>tag.class==='actv');
+  const actorMatches=sourceActors.filter(tag=>tag.path.replace(/\\/g,'/').toLowerCase().includes(actorQuery.replace(/\\/g,'/').toLowerCase()));
+  useEffect(()=>{setActorSource(null);setSourceActor('');setActorQuery('');},[project.id]);
   const [squadKey,setSquadKey]=useState(''),[normalCount,setNormalCount]=useState(''),[insaneCount,setInsaneCount]=useState('');
   const [normalScale,setNormalScale]=useState(1),[insaneScale,setInsaneScale]=useState(1);
   const [tacticalGroups,setTacticalGroups]=useState<NativeCombatSource['groups']|null>(null),[tacticalMode,setTacticalMode]=useState<typeof campaignTacticalModes[number]>('attacking');
@@ -92,7 +102,7 @@ export default function NativeTagOperations({
   const canDuplicateHudDraft=!!context?.canDuplicateHud&&/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&hudIndex.trim()!==''&&!!hudGroup&&hudGroup.count!=null&&hudGroup.count>0&&hudGroup.count<hudGroup.maximum&&Number.isInteger(Number(hudIndex))&&Number(hudIndex)>=0&&Number(hudIndex)<hudGroup.count;
   const [encounterQueue,setEncounterQueue]=useState<NativeEncounterAppend[]>([]);
   const queuedActors=encounterQueue.reduce((sum,entry)=>sum+(entry.count??1),0);
-  const validEncounterDraft=!!context?.canAppendEncounter&&context.actorVariants?.includes(actorPath)&&/^[A-Za-z0-9_]{1,31}$/.test(encounterName)&&Number.isInteger(Number(actorCount))&&Number(actorCount)>=1&&Number(actorCount)<=32&&actorSpacing.trim()!==''&&Number.isFinite(Number(actorSpacing))&&Number(actorSpacing)>=0.25&&Number(actorSpacing)<=16&&actorPosition.every(v=>v.trim()!==''&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=2048);
+  const validEncounterDraft=!!context?.canAppendEncounter&&nativeActorChoices.includes(actorPath)&&/^[A-Za-z0-9_]{1,31}$/.test(encounterName)&&Number.isInteger(Number(actorCount))&&Number(actorCount)>=1&&Number(actorCount)<=32&&actorSpacing.trim()!==''&&Number.isFinite(Number(actorSpacing))&&Number(actorSpacing)>=0.25&&Number(actorSpacing)<=16&&actorPosition.every(v=>v.trim()!==''&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=2048);
   const encounterDraft=():NativeEncounterAppend=>({name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive,count:Number(actorCount),spacing:Number(actorSpacing)});
   const generation = useRef(0),proposalGeneration=useRef(0);
   function invalidateProposal(){proposalGeneration.current++;if(!accepted)setPreview(null);}
@@ -173,6 +183,21 @@ export default function NativeTagOperations({
       if (current === generation.current) setBusy(false);
     }
   }
+  function includeActorSource(){
+    if(busy||dirty||!actorSource||!sourceActor||!context?.canAppendEncounter)return;
+    const origin=actorSource,tag=sourceActors.find(tag=>String(tag.id)===sourceActor);
+    if(!tag||!origin.project.source||origin.inspection?.sha256!==origin.project.source.sha256)return;
+    if(pendingActor&&encounterQueue.some(entry=>entry.actorPath===pendingActor.nativePath)&&
+      (pendingActor.sourceSha256!==origin.inspection.sha256||pendingActor.tagId!==tag.id)){
+      setError('Review and accept the queued groups for this imported actor before choosing another actor source.');return;
+    }
+    void perform(async current=>{
+      const queryProject=pendingActor?{...project,nativeAssetImports:[...(project.nativeAssetImports??[]).filter(binding=>binding.id!==pendingActor.id),pendingActor]}:project;
+      const binding=await prepareAssetImport(queryProject,{key:'native-actor:'+origin.project.id+':'+tag.id,name:tag.path,path:tag.path,class:tag.class,tagId:tag.id,sourceProjectId:origin.project.id,sourceSha256:origin.inspection!.sha256,cacheVersion:origin.inspection!.header.version});
+      if(current!==generation.current||actorSourceRef.current!==origin)return;
+      setActorImport(binding);setActorPath(binding.nativePath);setPreview(null);setAccepted(null);
+    });
+  }
   function makePreview(operation: NativeOperation) {
     if (dirty) return;
     const proposal=++proposalGeneration.current;
@@ -181,6 +206,7 @@ export default function NativeTagOperations({
         projectId,
         tagId: selectedTagId,
         operation,
+        ...(pendingActor&&!context?.actorVariants?.includes(pendingActor.nativePath)&&(operation.kind==='appendEncounter'?operation.actorPath===pendingActor.nativePath:operation.kind==='appendEncounters'&&operation.encounters.some(entry=>entry.actorPath===pendingActor.nativePath))?{actorImport:pendingActor}:{}),
       });
       if (current !== generation.current||proposal!==proposalGeneration.current) return;
       setPreview(result);
@@ -367,9 +393,19 @@ export default function NativeTagOperations({
             </div>
             {context.firefightPlan&&<p className="subtle">{context.firefightPlan.encounters.length} saved groups · {context.firefightPlan.encounters.reduce((sum,entry)=>sum+(entry.count??1),0)} starts. Shared zones use partitioned grids. Existing player equipment is retained; review all source positions and native navigation before gameplay.</p>}
             {context.firefightPlanIssue&&<p className="subtle">Saved-group preparation: {context.firefightPlanIssue}. Manual encounter authoring remains separate.</p>}
+            {project.source&&!project.quickForge&&<details className="native-actor-import"><summary>Import actor from another map</summary>
+              <AssetSourceBrowser actionLabel="Read native encounter actor source" onLoaded={source=>{setActorSource(source);setSourceActor('');setActorQuery('');}}/>
+              {actorSource&&<><p className="subtle">{actorSource.project.title} · cache {actorSource.inspection?.header.version??'unavailable'}</p>
+                <label>Find actor<input type="search" aria-label="Find native source actor" value={actorQuery} disabled={busy} onChange={event=>setActorQuery(event.target.value)}/></label>
+                <label>Source actor<select aria-label="Imported native encounter actor" value={sourceActor} disabled={busy} onChange={event=>setSourceActor(event.target.value)}><option value="">Choose an actor variant</option>{sourceActors.filter(tag=>String(tag.id)===sourceActor&&!actorMatches.slice(0,100).includes(tag)).map(tag=><option key={tag.id} value={tag.id}>{tag.path}</option>)}{actorMatches.slice(0,100).map(tag=><option key={tag.id} value={tag.id}>{tag.path}</option>)}</select></label>
+                <small>{actorMatches.length} matches · search to narrow the first100.</small>
+                <button type="button" disabled={busy||dirty||!sourceActor||!context.canAppendEncounter} onClick={includeActorSource}>Prepare actor dependencies</button></>}
+              {pendingActor&&<p className="subtle">Prepared actor: <code>{pendingActor.nativePath}</code>. {pendingActor.fileCount} native files. <button disabled={busy} onClick={()=>{setActorImport(null);setPreview(null);setAccepted(null);}}>Clear actor selection</button></p>}
+              <p className="subtle">Preparation preserves the original map and does not place an actor. Choose it below, set the encounter and positions, then Preview → review → Accept. Its verified actor/model/animation/sound closure joins the same separate source revision. Native Restore restores the scenario while keeping other source files. Save and rebuild; target compatibility, spawning, flight and gameplay need their own checks.</p>
+            </details>}
             <label>Encounter name<input aria-label="Native encounter name" maxLength={31} value={encounterName} disabled={busy||dirty} onChange={e=>{setEncounterName(e.target.value);if(!accepted)setPreview(null);}}/></label>
             <label>Actor variant<select aria-label="Native encounter actor" value={actorPath} disabled={busy||dirty} onChange={e=>{setActorPath(e.target.value);if(!accepted)setPreview(null);}}>
-              <option value="">Choose an actor from this source…</option>{context.actorVariants?.map(path=><option key={path} value={path}>{path}</option>)}
+              <option value="">Choose an actor from this source…</option>{nativeActorChoices.map(path=><option key={path} value={path}>{path}</option>)}
             </select></label>
             {!context.actorVariants?.length&&<p className="subtle">No indexed actor variant has an available file in this working tagset. Recover/build compatible actor source with its dependencies first.</p>}
             <div className="native-encounter-squad">
@@ -391,7 +427,7 @@ export default function NativeTagOperations({
                 <span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>{entry.position.join(' / ')} · spacing {entry.spacing} · {entry.startActive?'initially active':'script activation'}</small></span>
                 <button aria-label={'Remove queued encounter '+entry.name} disabled={busy||dirty} onClick={()=>{setEncounterQueue(rows=>rows.filter((_,i)=>i!==index));setPreview(null);setAccepted(null);}}>Remove</button>
               </li>)}</ol>
-              <button disabled={busy||dirty||!context.canAppendEncounter||encounterQueue.some(entry=>!context.actorVariants?.includes(entry.actorPath))} onClick={()=>makePreview({kind:'appendEncounters',encounters:encounterQueue})}>Preview all queued encounters</button>
+              <button disabled={busy||dirty||!context.canAppendEncounter||encounterQueue.some(entry=>!nativeActorChoices.includes(entry.actorPath))} onClick={()=>makePreview({kind:'appendEncounters',encounters:encounterQueue})}>Preview all queued encounters</button>
               <button disabled={busy||dirty} onClick={()=>{setEncounterQueue([]);setPreview(null);setAccepted(null);}}>Clear review list</button>
             </section>}
           </details>}

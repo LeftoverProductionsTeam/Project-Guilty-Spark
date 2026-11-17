@@ -45,6 +45,10 @@ struct Receipt {
     operation: recipes::Operation,
     #[serde(default)]
     source_dependencies:BTreeMap<String,String>,
+    #[serde(default)]
+    actor_import:Option<core::native_asset_imports::Binding>,
+    #[serde(default)]
+    imported_dependencies:BTreeMap<String,String>,
     tool_id: String,
     executable_sha256: String,
     before_sha256: String,
@@ -69,7 +73,7 @@ pub(super) fn encounter_expectation(state:&AppState,project:&Project,build:&Buil
     let hash=maps::hash_file(&file).map_err(error)?;
     if hash==receipt.before_sha256{return Ok(None);}// Exact recovery revision intentionally removes the append.
     if hash!=receipt.after_sha256||receipt.parent_build_id!=build.id{return Err("Accepted encounter source changed; review it before building".into());}
-    check_dependency_pins(&tags,&receipt.source_dependencies)?;
+    check_dependency_pins(&tags,&receipt.source_dependencies)?;check_dependency_pins(&tags,&receipt.imported_dependencies)?;
     Ok(Some(receipt.operation))
 }
 
@@ -461,7 +465,20 @@ fn check_dependency_pins(tags:&Path,pins:&BTreeMap<String,String>)->Reply<()> {
     }
     Ok(())
 }
-fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path)->Reply<BTreeMap<String,String>> {
+fn checked_actor_import(state:&AppState,source:&Source,operation:&recipes::Operation,binding:&core::native_asset_imports::Binding)->Reply<(Project,PathBuf)> {
+    if source.class!="scnr"||source.project.source.is_none()||source.project.quick_forge.is_some()||!operation.is_encounter_append() {
+        return Err("Imported actor review requires the existing recovered solo encounter workflow".into());
+    }
+    let path=binding.native_path.replace('\\',"/");
+    if !operation.encounter_appends().map_err(error)?.iter().any(|entry|entry.actor_path.replace('\\',"/").eq_ignore_ascii_case(&path)) {
+        return Err("The imported actor is not used by this encounter proposal".into());
+    }
+    let mut selected=source.project.clone();selected.native_asset_imports=vec![binding.clone()];
+    asset_import_native::guard_import_sources(state,&selected)?;
+    let tags=core::native_asset_imports::checked_actor_source(&state.root,&selected,binding).map_err(error)?;
+    Ok((selected,tags))
+}
+fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path,actor_import:Option<(&core::native_asset_imports::Binding,&Path)>)->Reply<BTreeMap<String,String>> {
     if matches!(operation,recipes::Operation::HudDuplicate{..}) {
         studio_native_source::require_unshared(state,&source.project.id)?;
         let dependency=executable(state,&source.project,"invaderDependency")?;
@@ -511,17 +528,18 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
     let mut pins=BTreeMap::new();let mut actors=std::collections::BTreeSet::new();
     for (actor,class) in roots {
         if !actors.insert(actor.to_ascii_lowercase()){continue;}
-        let file=source.tags.join(core::safe_relative(&actor).map_err(error)?);core::reject_links(&file).map_err(error)?;
-        let hash=maps::hash_file(&file).map_err(error)?;verify_bytes(&source.tags,&actor,&hash)?;
-        let _=fields(state,&source.project,&source.tags,&actor)?;
-        let(ok,stdout,stderr)=run(&dependency,&recipes::Operation::Dependencies.arguments(&source.tags,class,&actor).map_err(error)?)?;
+        let actor_root=actor_import.filter(|(binding,_)|class=="actv"&&actor.eq_ignore_ascii_case(&format!("{}.actor_variant",binding.native_path.replace('\\',"/")))).map(|(_,root)|root).unwrap_or(&source.tags);
+        let file=actor_root.join(core::safe_relative(&actor).map_err(error)?);core::reject_links(&file).map_err(error)?;
+        let hash=maps::hash_file(&file).map_err(error)?;verify_bytes(actor_root,&actor,&hash)?;
+        let _=fields(state,&source.project,actor_root,&actor)?;
+        let(ok,stdout,stderr)=run(&dependency,&recipes::Operation::Dependencies.arguments(actor_root,class,&actor).map_err(error)?)?;
         if !ok{return Err(format!("Native actor/aircraft dependency traversal failed: {stderr}"));}
         let rows=recipes::dependency_lines(&stdout).map_err(error)?;
         if rows.len()>2047{return Err("Actor/aircraft closure exceeds2048checked native tags".into());}
         let mut current=BTreeMap::from([(actor,hash)]);
         for row in rows {
             if row.reported_broken{return Err(format!("Actor/aircraft dependency is broken: {}",row.path));}
-            let path=source.tags.join(core::safe_relative(&row.path).map_err(error)?);core::reject_links(&path).map_err(error)?;
+            let path=actor_root.join(core::safe_relative(&row.path).map_err(error)?);core::reject_links(&path).map_err(error)?;
             let hash=maps::hash_file(&path).map_err(error)?;
             if current.get(&row.path).is_some_and(|before|before!=&hash){return Err("An actor dependency changed during group review".into());}
             current.insert(row.path,hash);
@@ -533,7 +551,11 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         }
     }
     if maps::hash_file(&dependency).map_err(error)?!=dependency_hash{return Err("The dependency reader changed during review".into());}
-    check_dependency_pins(&source.tags,&pins)?;Ok(pins)
+    let prefix=actor_import.map(|(binding,_)|format!("gs_assets_{}/",binding.id.replace('-',"")));
+    let original=pins.iter().filter(|(path,_)|prefix.as_ref().is_none_or(|prefix|!path.starts_with(prefix))).map(|(p,h)|(p.clone(),h.clone())).collect();
+    check_dependency_pins(&source.tags,&original)?;
+    if let Some((_,root))=actor_import {let imported=pins.iter().filter(|(path,_)|prefix.as_ref().is_some_and(|prefix|path.starts_with(prefix))).map(|(p,h)|(p.clone(),h.clone())).collect();check_dependency_pins(root,&imported)?;}
+    Ok(pins)
 }
 // Saved-rule plans are authoring metadata, not authority supplied by a caller.
 // Recompute them against the current saved revision and actual native fields.
@@ -548,7 +570,7 @@ pub(super) fn review_encounter_dependencies(state:&AppState,project:&Project,bui
     let source=Source{project:project.clone(),build:build.clone(),tags:tags.to_path_buf(),tag:format!("{}.scenario",project.scenario_path().map_err(error)?),class:"scnr".into()};
     operation.validate(&source.class,&source.tag).map_err(error)?;
     let edit=executable(state,project,"invaderNative")?;
-    operation_dependencies(state,&source,operation,&edit).map(|_|())
+    operation_dependencies(state,&source,operation,&edit,None).map(|_|())
 }
 fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply<Receipt> {
     let file = root(state, id)?.join("operation.json");
@@ -597,6 +619,7 @@ pub(super) async fn native_tag_context(
                     if source.tags.join(relative).is_file(){actor_variants.push(tag.path.replace('\\',"/"));}
                 }
             }
+            for path in recipes::scenario_actor_sources(&values).map_err(error)? {if source.tags.join(core::safe_relative(&format!("{path}.actor_variant")).map_err(error)?).is_file(){actor_variants.push(path);}}
             for tag in inspection.tags.iter().filter(|tag|tag.class=="vehi") {let path=tag.path.replace('\\',"/");if let Ok(relative)=core::safe_relative(&format!("{path}.vehicle")){if source.tags.join(relative).is_file(){vehicle_sources.push(path);}}}
             for entry in source.project.native_asset_imports.iter().filter(|entry|entry.tag_class=="vehi"){if let Ok(relative)=core::safe_relative(&format!("{}.vehicle",entry.native_path)){if source.tags.join(relative).is_file(){vehicle_sources.push(entry.native_path.clone());}}}
             for tag in inspection.tags.iter().filter(|tag|["ctrl","weap"].contains(&tag.class.as_str())){let path=tag.path.replace('\\',"/");let extension=if tag.class=="ctrl"{"device_control"}else{"weapon"};if let Ok(relative)=core::safe_relative(&format!("{path}.{extension}")){if source.tags.join(relative).is_file(){if tag.class=="ctrl"{control_sources.push(path);}else{weapon_sources.push(path);}}}}
@@ -767,6 +790,7 @@ pub(super) async fn native_operation_preview(
     project_id: String,
     tag_id: Option<u32>,
     operation: recipes::Operation,
+    actor_import:Option<core::native_asset_imports::Binding>,
 ) -> Reply<Preview> {
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
@@ -794,17 +818,35 @@ pub(super) async fn native_operation_preview(
     let exe=executable(&state,&source.project,operation.tool_id())?;let executable_sha256=maps::hash_file(&exe).map_err(error)?;
     let before_fields=fields(&state,&source.project,&source.tags,&source.tag)?;
     verify_firefight_plan(&source.project,&source.build,&before_fields,&operation)?;
-    let source_dependencies=operation_dependencies(&state,&source,&operation,&exe)?;
+    let imported_source=actor_import.as_ref().map(|binding|checked_actor_import(&state,&source,&operation,binding)).transpose()?;
+    let imported_dependencies=if let Some((selected,_))=&imported_source{core::native_asset_imports::source_hashes(&state.root,selected).map_err(error)?}else{BTreeMap::new()};
+    let mut source_dependencies=operation_dependencies(&state,&source,&operation,&exe,actor_import.as_ref().zip(imported_source.as_ref()).map(|(binding,(_,root))|(binding,root.as_path())))?;
+    for (path,hash) in &imported_dependencies {if let Some(pin)=source_dependencies.remove(path){if &pin!=hash{return Err("Imported actor dependency changed during preview".into());}}}
+    for (path,hash) in &imported_dependencies {let existing=source.tags.join(core::safe_relative(path).map_err(error)?);core::reject_links(&existing).map_err(error)?;if existing.exists()&&maps::hash_file(&existing).map_err(error)?!=*hash{return Err("This actor namespace contains edited source. Keep it and import a new actor revision instead of overwriting it.".into());}}
     if let Some(field)=operation.field(){if recipes::number(&before_fields,field).map_err(error)?==operation.target().unwrap(){return Err("This native value already matches. No serialization or repair was performed.".into());}}
     if matches!(operation,recipes::Operation::LensFlareScaleRepair)&&!recipes::broken_lens_scale(recipes::number(&before_fields,"rotation_function_scale").map_err(error)?){return Err("This lens flare does not have the reviewed 360-to-zero repair precondition. No repair ran.".into());}
     let relative=core::safe_relative(&source.tag).map_err(error)?;let before=bounded_read(&source.tags.join(&relative),MAX_TAG)?;
     let before_sha256=hash_bytes(&before);
     if let Some(source_sha256)=operation.expected_source_sha256() {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native source changed after selection; refresh before editing. No writer ran.".into());}}
-    let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;fs::create_dir(&directory).map_err(error)?;
+    let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;
+    let import_lease=if let Some((selected,_))=&imported_source {
+        let inventory=core::native_asset_imports::staging_inventory(&state.root,selected).map_err(error)?;
+        let bytes=inventory.bytes.saturating_add((before.len()*2+before_fields.len()*2) as u64).saturating_add(4*1024*1024);
+        Some(core::storage::Store::for_output(&directory).map_err(error)?.reserve(&directory,Some(&source.tags),core::storage::estimate_copy(inventory.files.len()+4,bytes),core::storage::Category::Staging,"Reviewed native actor closure and encounter preview").map_err(error)?)
+    }else{None};
+    fs::create_dir(&directory).map_err(error)?;if let Some(lease)=&import_lease{lease.mark_owned().map_err(error)?;}
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
-    let candidate=directory.join("candidate/tags");fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;
-    // Reuse the reader path contract: this pinned Windows writer also needs
-    // the extended-length root for deeply nested owned candidates.
+    let candidate=directory.join("candidate/tags");
+    if let Some((_,imported))=&imported_source {
+        // Reuse the existing reviewed merge: one owned reservation, exact file
+        // inventories, and ownership markers outside the native tag tree.
+        let original=directory.join("original/tags");fs::create_dir_all(original.join(&relative).parent().unwrap()).map_err(error)?;
+        project::atomic_write(&original.join(&relative),&before,false).map_err(error)?;
+        let original_files=BTreeMap::from([(source.tag.replace('\\',"/"),before_sha256.clone())]);
+        fs::create_dir_all(candidate.parent().unwrap()).map_err(error)?;
+        transaction::reconcile(&BTreeMap::new(),&original,imported,&candidate,&original_files,&imported_dependencies,true,Arc::new(AtomicBool::new(false))).map_err(error)?;
+    }else{fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;}
+    // The pinned Windows reader also needs an extended-length root for deep tags.
     let candidate=native_tag_parser::reader_root(&candidate,&source.tag)?;
     let failed=|ok:bool,out:&str,err:&str|!ok||out.lines().chain(err.lines()).any(|line|line.trim().to_ascii_lowercase().starts_with("error:"));
     let args=operation.arguments_with_fields(&candidate,&source.class,&source.tag,&before_fields).map_err(error)?;
@@ -842,10 +884,14 @@ pub(super) async fn native_operation_preview(
     let after_fields=fields(&state,&source.project,&candidate,&source.tag)?;let field_changes=recipes::reviewed_difference(&before_fields,&after_fields,&operation).map_err(error)?;
     let after=bounded_read(&candidate.join(&relative),MAX_TAG)?;let after_sha256=hash_bytes(&after);verify_bytes(&candidate,&source.tag,&after_sha256)?;
     if maps::hash_file(&source.tags.join(&relative)).map_err(error)?!=before_sha256{return Err("Working source changed during preview. The candidate is retained; refresh before making another preview.".into());}
-    if transaction::inventory(&candidate).map_err(error)?!=BTreeMap::from([(source.tag.replace('\\',"/"),after_sha256.clone())]){return Err("The native operation changed unexpected candidate files; no revision was selected".into());}
+    let mut expected_candidate=imported_dependencies.clone();expected_candidate.insert(source.tag.replace('\\',"/"),after_sha256.clone());
+    if transaction::inventory(&candidate).map_err(error)?!=expected_candidate{return Err("The native operation changed unexpected candidate files; no revision was selected".into());}
     let changed_bytes=before.iter().zip(&after).filter(|(a,b)|a!=b).count()+before.len().abs_diff(after.len());
-    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields,after_fields,field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
-    project::atomic_write(&directory.join("operation.json"),&serde_json::to_vec_pretty(&receipt).map_err(error)?,false).map_err(error)?;
+    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,actor_import,imported_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields,after_fields,field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
+    let receipt_bytes=serde_json::to_vec_pretty(&receipt).map_err(error)?;
+    if receipt_bytes.len()>4*1024*1024{return Err("Native preview exceeds its existing recovery receipt limit; no source was selected".into());}
+    project::atomic_write(&directory.join("operation.json"),&receipt_bytes,false).map_err(error)?;
+    if let Some(lease)=import_lease{lease.finish(true,Some(receipt.fingerprint.clone())).map_err(error)?;}
     history.push(id.clone());lock(&state.library)?.set_setting(&history_key(&project_id),&history).map_err(error)?;
     preview_view(&receipt,&before_sha256)
 }).await.map_err(error)?
@@ -890,13 +936,20 @@ pub(super) async fn native_operation_accept(
     fs::create_dir_all(revision.parent().unwrap()).map_err(error)?;
     if fs::read_dir(revision.parent().unwrap()).map_err(error)?.count()>=100{return Err("This native operation retains 100 revisions. Start a fresh preview; previous revisions remain preserved.".into());}
     fs::create_dir(&revision).map_err(error)?;
-    let tags=revision.join("tags");let baseline=transaction::fork(&current,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;
+    let tags=revision.join("tags");let baseline=transaction::inventory(&current).map_err(error)?;
+    let imported=if !restore {if let Some(binding)=&receipt.actor_import {
+        let source=Source{project:project.clone(),build:build.clone(),tags:current.clone(),tag:receipt.tag.clone(),class:receipt.class.clone()};
+        let(selected,imported)=checked_actor_import(&state,&source,&receipt.operation,binding)?;
+        let hashes=core::native_asset_imports::source_hashes(&state.root,&selected).map_err(error)?;
+        if hashes!=receipt.imported_dependencies{return Err("Imported actor changed after preview; no source revision was selected".into());}
+        transaction::reconcile(&BTreeMap::new(),&current,&imported,&tags,&baseline,&hashes,true,Arc::new(AtomicBool::new(false))).map_err(error)?;hashes
+    }else{if !receipt.imported_dependencies.is_empty(){return Err("Native actor provenance is missing; preserve the preview and review again".into());}transaction::fork(&current,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;BTreeMap::new()}}else{transaction::fork(&current,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;BTreeMap::new()};
     let bytes=if restore{before}else{bounded_read(&candidate.join(&relative),MAX_TAG)?};project::atomic_write(&tags.join(&relative),&bytes,false).map_err(error)?;
-    let expected_hash=if restore{&receipt.before_sha256}else{&receipt.after_sha256};let mut wanted=baseline.clone();wanted.insert(receipt.tag.replace('\\',"/"),expected_hash.clone());
+    let expected_hash=if restore{&receipt.before_sha256}else{&receipt.after_sha256};let mut wanted=baseline.clone();wanted.extend(imported);wanted.insert(receipt.tag.replace('\\',"/"),expected_hash.clone());
     if transaction::inventory(&tags).map_err(error)?!=wanted||transaction::inventory(&current).map_err(error)?!=baseline{return Err("Native source changed while staging. The staged copy is retained but was not selected.".into());}
     let restored_fields=fields(&state,&project,&tags,&receipt.tag)?;if restored_fields!=if restore{receipt.before_fields.clone()}else{receipt.after_fields.clone()}{return Err("Staged native field readback differs; no source was selected".into());}
     if runtime_workbench::native_operation_source(&state,&project)?.1!=current{return Err("The selected native source changed while staging; refresh before accepting".into());}
-    if !restore{check_dependency_pins(&tags,&receipt.source_dependencies)?;check_dependency_pins(&current,&receipt.source_dependencies)?;}
+    if !restore{check_dependency_pins(&tags,&receipt.source_dependencies)?;check_dependency_pins(&tags,&receipt.imported_dependencies)?;check_dependency_pins(&current,&receipt.source_dependencies)?;}
     if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("Native writer changed while selecting the revision; no source was selected".into());}
     let selection=native_source_revisions::Selection{project_id:project_id.clone(),fingerprint:receipt.fingerprint,parent_build_id:build.id,job_id:operation_id.clone(),revision_id:revision_id.clone(),baboon_revision_at_selection:legacy};
     let tags=native_source_revisions::publish(&state,&project,selection,expected)?;

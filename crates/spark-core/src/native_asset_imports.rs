@@ -531,6 +531,13 @@ fn receipt(root: &Path, project: &Project, binding: &Binding) -> Result<(PathBuf
     }
     Ok((tags, receipt))
 }
+/// Native encounter review can consume the same immutable actor closure without
+/// adding a placed editor object or changing the original map. Ownership, receipt
+/// identity and every payload byte are checked by the existing import reader.
+pub fn checked_actor_source(root:&Path,project:&Project,binding:&Binding)->Result<PathBuf> {
+    if binding.tag_class!="actv" {return invalid("Choose an imported actor variant for native encounter source");}
+    receipt(root,project,binding).map(|(tags,_)|tags)
+}
 pub fn available_files(root: &Path, project: &Project) -> Result<BTreeSet<String>> {
     Ok(source_hashes(root, project)?.into_keys().collect())
 }

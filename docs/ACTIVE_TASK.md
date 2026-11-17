@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - repaired Black Echo transport source and changed-runtime recovery
+Task: Operation110 - recovered actor workflow accepted in native scope; build metadata persistence next
 Status: implementation incomplete
 Starting revision: 0b7671b4f95bbb93a62bc7dbfc284456b0d8f5d5, canonical master.
-Latest verified revision: scoped source in the commit containing this checkpoint, parent0b7671b. Transport25+guide4/browser1/TypeScript/native script compilation and actual Windows script Undo/Redo/Save/restart/rebuild/readback PASS. Exact identities:c40 nativeTransportSeatTyping20261117. Native profile repair embedding/gameplay remain OPEN.
-Next action: Build current embedded UI for native saved-profile recovery acceptance. Owner handles Windows Firewall prompt before game input. Re-review changed Forerunner via existing contract; private-load exact09bb4034 candidate, verify no dropped scripts, then normal terminal/crew/flight/objective/extraction/settlement. Spirit controller and real peers remain incomplete.
+Latest verified revision: a066617ea9914310a1e1baefe0d082d4567eb194 plus current scoped native actor milestone (c40 recoveredActorImport20261117).426imports, source review/Restore/Save/restart, CE609 ef98e780 and4tag byte readback/UI export pass. App efce4c2e; game/physical input OPEN.
+Next action: Commit verified actor workflow/evidence/manifests locally. Reproduce and repair recovered source build metadata persistence without an implicit authored Save; reuse QA50103. Then finish Spirit controller/routes through existing native source UI. Owner clears Firewall before private mission gameplay. Exact ef98e780 candidate retained in new releases/black-echo-spirit-pilot-source-20261117; no full mission acceptance.
 
 ## Acceptance
 
@@ -147,7 +147,7 @@ Current: Coordinated c388d3d6 CE609 source/independent two-tag bytes pass; actua
 
 ## Operations and safe checkpoint
 
-QA61647/run-wsWoBU safely recovered after preservation:5553559882logicalB disposed. QA91709/run-0v0sq0 intentionally interrupted at Firewall gate:1061054769logicalB disposed, peak2201459639B, monitor error null. Both roots now absent after existing inactive-metadata retirement. Only owned game/apps closed normally; no security setting/original changed. Candidate09bb/HSC retained in existing releases/black-echo-review-20261117/Spark-530f12c0-2a02-4ef4-abc5-bce979c0526d (110063152B).
+QA61647/run-wsWoBU and91709/run-0v0sq0 CLOSED/absent. QA50103/node12444/run-kXE610 ACTIVE12GiB, same prepared offline output. App19156/current efce4c2e open, no game. Actor accepted/source/readback/export, profile result and2embedded screenshots preserved in existing c40/RUNTIME and new111MB candidate. Keep owned inputs until build-history repair; wrapper cleans after operation.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

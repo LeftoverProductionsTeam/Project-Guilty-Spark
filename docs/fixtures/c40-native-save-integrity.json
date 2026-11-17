@@ -3096,5 +3096,150 @@
       "Initial guide check selected nonexistent featureGuide.test.ts and found no tests; actual featureWorkflow.test.ts passed4. No zero-test pass counted.",
       "Saved-runtime native recovery exposed activation-before-draft failure; source/browser repaired, native embedding pending."
     ]
+  },
+  "recoveredActorImport20261117": {
+    "parentRevision": "a066617ea9914310a1e1baefe0d082d4567eb194",
+    "appSha256": "efce4c2e08e53eff14d454688a94863949504d3e477c4d26e58bc0eab1c63f83",
+    "sourceProjectId": "b83fa42b-8a8c-4b20-8463-9121f8658521",
+    "sourceCacheSha256": "09bb4034f0bdc40f26b2c9977ae08aec7a0dba18c1fcf5c0e6bf743cc19ae4d4",
+    "donorCacheSha256": "bc2b80b52d519e166c318bd1d8c24a585c1b94a7965222a3fb10524ddc2b5f25",
+    "operationId": "0f1af705-4661-43eb-b701-f6965db7f670",
+    "importId": "dbc466fb-114a-4fa7-b922-43697f64b4d4",
+    "importedFiles": 426,
+    "actorPath": "gs_assets_dbc466fb114a4fa7b92243697f64b4d4/forerunner/transport/spirit_pilot",
+    "beforeScenarioSha256": "56c1324a04e1397ce98b02912e05f62656776df0aaf18c9cc39482617adfd41b",
+    "acceptedScenarioSha256": "6df110a6ef6b79f69354af9531adfdef3a8299ba0ac8575a4e609060964af9a7",
+    "readback": {
+      "be_native.scenario": "6df110a6ef6b79f69354af9531adfdef3a8299ba0ac8575a4e609060964af9a7",
+      "gs_assets_dbc466fb114a4fa7b92243697f64b4d4/forerunner/transport/spirit_pilot.actor_variant": "c34a7f7a93d8225cc9378b6c3a86c954b6e6d6f564e0b33031efc5fd415fab6f",
+      "gs_assets_dbc466fb114a4fa7b92243697f64b4d4/forerunner/transport/spirit_pilot.biped": "24497cee7e8002f141b9456ea875beffd8102f62911d8f0516a5fe8b82698d3d",
+      "gs_assets_dbc466fb114a4fa7b92243697f64b4d4/forerunner/transport/spirit_pilot.model_animations": "441c31468831620b34f4195786ea0d86ee8a26812b7bde3ce0713910128c50e2"
+    },
+    "driverLabel": "c_dropship driver",
+    "driverLabelMatches": 1,
+    "build": {
+      "id": "09b19c08-47a9-4670-aebc-e70179c1c32a",
+      "timestamp": "2026-11-17T22:15:17.300709900+00:00",
+      "status": "validated",
+      "target": "gbx-custom",
+      "output": "D:/Project Guilty Spark/releases/black-echo-spirit-pilot-source-20261117/be_native.map",
+      "sha256": "ef98e780c041a95c7014f60a4bc68dcb86fefe0ef073e14a2768a174013004b2",
+      "message": "Current working tags compiled without re-extraction; source identities and native cache checks passed. Existing compiled scripts are retained; edited .hsc files require Compile scripts & build. Gameplay and peers remain untested.",
+      "projectFingerprint": "c87400760cb1fb01f6618e956bbab9ba3af1786de156fc931b79b8be9bd61c90",
+      "bytes": 111465172,
+      "cacheVersion": 609
+    },
+    "nativeUi": {
+      "embeddedWindows": true,
+      "physicalMouseKeyboard": false,
+      "acceptRestoreReaccept": true,
+      "restoreExactBeforeTag": true,
+      "saveRestart": true,
+      "actorVisibleAfterClearingDraft": true,
+      "pageErrors": [],
+      "compiledRevisionAfterSameBuildRestart": true
+    },
+    "negative": {
+      "forgedReceipt": {
+        "rejected": "Error: page.evaluate: Native import receipt changed; no map build is allowed"
+      },
+      "mutatedPayload": {
+        "rejected": "Error: page.evaluate: Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+      }
+    },
+    "gameplayAccepted": false,
+    "export": {
+      "ui": true,
+      "destination": "owned QA library/Mods",
+      "sha256": "ef98e780c041a95c7014f60a4bc68dcb86fefe0ef073e14a2768a174013004b2",
+      "retainedCopy": "D:/Project Guilty Spark/releases/black-echo-spirit-pilot-source-20261117/be_native.map"
+    },
+    "nativeWarnings": [
+      "WARNING: Bitmap 'effects\\particles\\solid\\bitmaps\\wood chips.bitmap' uses",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING (minor): Function scale is set to 20626.480625° (360 radians). This is",
+      "WARNING (minor): Part #0 of event #0 contains a null sound tag reference. The",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING (minor): Part #0 of event #0 contains a null sound tag reference. The",
+      "WARNING: Bitmap",
+      "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+      "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+      "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+      "WARNING: Encounter #4 (pilot) is partially outside of BSP #0",
+      "WARNING: Encounter #5 (spirit_pilot) was found in 0 BSPs",
+      "WARNING: Command list #1 (field_route) is completely outside of BSP #0 (0 / 3",
+      "WARNING: Command list #2 (hub_route) is completely outside of BSP #0 (0 / 4",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: HUDGlobals::anniversary_hud_remaps exceeds the legacy stock limit of 0"
+    ],
+    "tests": {
+      "nativeImports": {
+        "passed": 4
+      },
+      "nativeOperations": {
+        "passed": 22,
+        "ignored": 1
+      },
+      "actorClosure": {
+        "passed": 5
+      },
+      "reviewedMerge": {
+        "passed": 3
+      },
+      "actualPaletteFormat": {
+        "passed": 1
+      },
+      "nativeParser": {
+        "passed": 3,
+        "ignored": 1
+      },
+      "browserActorImport": {
+        "passed": 1
+      },
+      "typeScript": "passed",
+      "fieldGuide": "passed",
+      "windowsDebugNoBundle": "passed"
+    },
+    "resolvedFailures": [
+      "Recursive Invader extraction rejected ParticleSystem::particle_types #0 despite exit0; direct extraction2464/2464 and independent native closure426 succeed. Extraction errors/missing references still refuse.",
+      "Per-file storage ownership markers polluted native candidates and made staging slow. Reused existing native transaction reconciliation; exact inventories stay mandatory.",
+      "Owned preview parent missing before reconciliation: created inside its owned job.",
+      "Real Invader Unicode palette lists omit synthetic tagref suffix: accepted actors now discovered from actual native source.",
+      "Source Guardian512KiB full-list truncation rejected valid large imported models/animations. Complete field identity now streams within64MiB/5seconds; UI diagnostics retain512KiB truncation guards; read errors, timeout and excess stream still refuse.",
+      "First native parser unit invocation omitted existing embeddedFrontendConfig; corrected invocation3pass/1explicit skip."
+    ],
+    "remaining": [
+      "Physical Windows input blocked by owner-handled Firewall prompt; embedded controls are not native desktop mouse/keyboard acceptance.",
+      "Spirit actor is deferred at the existing vehicle pose; controller, coordinated Spirit routes/landing and gameplay remain incomplete.",
+      "Normal five-terminal/Pelican flight/mission objectives/radio/combat/extraction/settlement and real peers remain OPEN.",
+      "Native bitmap format/LoD/function-scale/null-sound warnings remain for review.",
+      "Non-QuickForge source build metadata was lost on restart before an explicit post-build Save; Save plus compiled-revision restart passes. Automatic metadata persistence remains open.",
+      "Save37944, moving/still gold reflection, full Object Tags and complete475-requirement M1-M6/Operation110 remain OPEN."
+    ],
+    "originalHashes": {
+      "retainedOriginalMap": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+      "companionSourceScenario": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207"
+    },
+    "screenshots": [
+      "docs/screenshots/workspaces/native-actor-import-review-embedded-20261117.jpg"
+    ]
+  },
+  "nativeProfileRecovery20261117": {
+    "sourceRevision": "a066617ea9914310a1e1baefe0d082d4567eb194",
+    "appSha256": "07699624a5545b13685d4fa8e949e880123204d77644c5e17b40b393b0e188d4",
+    "engineSha256": "3f51171baf57051fda6a98c1147e977a07c434633849f23ced33e3e81cfff237",
+    "changedOwnedCopySha256": "259e1dd7a826894ef1c7a636667dc526379a80bb25b92caf34a17b2a4aacbc42",
+    "restored": true,
+    "reviewPersisted": true,
+    "embeddedControls": true,
+    "realDesktopInput": false,
+    "blocker": "Windows Firewall prompt",
+    "pageErrors": []
   }
 }

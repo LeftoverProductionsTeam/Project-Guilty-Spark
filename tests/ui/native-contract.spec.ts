@@ -5325,3 +5325,35 @@ test('unchanged CE cache uses native validation then the existing export control
  await expect(history.getByRole('status')).toContainText('Native map exported and hash-verified');
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='storage_export_map').map((c:any)=>c.args))).toEqual([{projectId:'a',buildId:'ce-check',runtimeId:'openCe'}]);
 });
+
+
+test('recovered native encounters import an actor through the existing reviewed source revision',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project,origin=w.__sparkMock.projects.b;
+  p.quickForge=null;p.builds=[{id:'actor-parent',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'a'.repeat(64),timestamp:'',message:'Synthetic native parent'}];
+  origin.project.source={...origin.project.source,sha256:'b'.repeat(64)};origin.inspection.sha256='b'.repeat(64);origin.inspection.header.version=609;
+  origin.inspection.tags=[{id:77,class:'actv',path:'forerunner\\transport\\spirit_pilot',fields:[],references:[]}];
+  w.__actorBinding={id:'87654321-1234-4234-8234-123456789012',sourceProjectId:origin.project.id,sourceSha256:'b'.repeat(64),tagId:77,tagClass:'actv',tagPath:origin.inspection.tags[0].path,nativePath:'gs_assets_87654321123442348234123456789012/forerunner/transport/spirit_pilot',receiptSha256:'c'.repeat(64),fileCount:100};
+  w.__actorAccepted=false;w.__actorPreviewCalls=[];
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'be_native'}];
+   if(command==='native_tag_context')return{projectId:'a',buildId:'actor-parent',tag:'be_native.scenario',class:'scnr',sourceTarget:'gbx-custom',tagsDirectory:'owned/tags',tagSha256:(w.__actorAccepted?'d':'a').repeat(64),canEdit:false,canRepair:false,boundingRadius:null,lensFlareScale:null,canAppendEncounter:true,actorVariants:w.__actorAccepted?[w.__actorBinding.nativePath]:[],history:[]};
+   if(command==='discover_asset_sources')return{maps:[{id:'spirit-actor',name:'Spirit source',location:'Synthetic owned cache',engine:'Custom Edition',cacheVersion:609,archive:false,bytes:100}],notices:[],elapsedMs:1};
+   if(command==='open_asset_source')return[structuredClone(origin)];
+   if(command==='prepare_native_asset_import')return structuredClone(w.__actorBinding);
+   if(command==='native_operation_preview'){w.__actorPreviewCalls.push(structuredClone(args));return{id:'actor-review',tag:'be_native.scenario',toolId:'synthetic',beforeSha256:'a'.repeat(64),afterSha256:'d'.repeat(64),changedBytes:100,fieldChanges:[{before:'Original encounters preserved',after:'New imported pilot encounter'}],detail:'Synthetic source contract only',currentState:'before'};}
+   if(command==='native_operation_accept'){w.__actorAccepted=!args.restore;return{operationId:'actor-review',revisionId:'actor-revision',tagsDirectory:'owned/revision/tags',files:101,restored:!!args.restore,detail:'Synthetic source revision only'};}
+   return invoke(command,args);
+  };
+ });await openFixture(page);await chooseTool(page,'AI & scenario');const native=page.locator('.scenario-page .native-tag-operations');if(await native.getAttribute('open')===null)await native.locator(':scope > summary').click();
+ const encounter=native.locator('.native-encounter-authoring');await encounter.locator(':scope > summary').click();const imported=encounter.locator('.native-actor-import');await imported.locator(':scope > summary').click();
+ const browser=imported.locator('.asset-source-browser');await browser.locator(':scope > summary').click();await browser.getByRole('combobox',{name:'Discovered asset source',exact:true}).selectOption('spirit-actor');await browser.getByRole('button',{name:'Read native encounter actor source',exact:true}).click();
+ await imported.getByRole('searchbox',{name:'Find native source actor',exact:true}).fill('forerunner/transport/spirit_pilot'); await imported.getByRole('combobox',{name:'Imported native encounter actor',exact:true}).selectOption('77');await imported.getByRole('button',{name:'Prepare actor dependencies',exact:true}).click();
+ const actor=await page.evaluate(()=>(window as any).__actorBinding.nativePath);await expect(encounter.getByRole('combobox',{name:'Native encounter actor',exact:true})).toHaveValue(actor);
+ await encounter.getByRole('textbox',{name:'Native encounter name',exact:true}).fill('spirit_pilot');await encounter.getByRole('button',{name:'Preview encounter append',exact:true}).click();
+ const request=await page.evaluate(()=>(window as any).__actorPreviewCalls.at(-1));expect(request.operation).toMatchObject({kind:'appendEncounter',name:'spirit_pilot',actorPath:actor,count:1});expect(request.actorImport).toMatchObject({tagClass:'actv',sourceSha256:'b'.repeat(64)});
+ await native.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__actorAccepted)).toBe(true);
+ await native.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__actorAccepted)).toBe(false);await native.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await imported.getByRole('button',{name:'Clear actor selection',exact:true}).click();await expect(encounter.getByRole('combobox',{name:'Native encounter actor',exact:true}).locator('option',{hasText:actor})).toHaveCount(1);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.project.nativeAssetImports??[])).toEqual([]);
+});
