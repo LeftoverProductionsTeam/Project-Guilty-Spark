@@ -208,6 +208,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         const ref=ensureName(beat.encounterName,'Beat '+(i+1)+' survivor encounter',true),destination=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' survivor destination');
         const minimum=beat.minimumSurvivors??1;
         deps.push('ai_encounter:'+ref,'trigger_volume:'+destination,'hud_message:gs_mission_fail_'+(i+1));
+        if(beat.transportInsertion){if(scope||!options.forerunner)throw Error('Dropship troop handoff requires shared Forerunner campaign scope. Independent squad delivery remains unsupported.');deps.push('transport_insertion:'+beat.transportInsertion+':'+ref);}
         if(scope){
           scripted.push('  (ai_place '+ref+')',...wait('(> (ai_living_count '+ref+') 0)',15,300),'  (if (not gs_aborted) (begin',...(beat.encounterTeam&&beat.encounterTeam!=='source'?['  (ai_set_team '+ref+' '+beat.encounterTeam+')']:[]),
             '  (sleep_until (begin','    (if (> (list_count (players)) 0) (ai_follow_target_unit '+ref+' (unit (list_get (players) 0))))',
@@ -220,7 +221,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
           if(beat.escortFailure==='continue')scripted.push('  (if (not gs_result_'+(i+1)+'_failed) (begin');
           break;
         }
-        scripted.push('  (ai_place '+ref+')','  (sleep_until (> (ai_living_count '+ref+') 0) 15 300)',
+        scripted.push(...(beat.transportInsertion?['  (sleep_until gs_'+beat.transportInsertion+'_insertion_complete 1)']:['  (ai_place '+ref+')']),'  (sleep_until (> (ai_living_count '+ref+') 0) 15 300)',
           ...(beat.encounterTeam==null?['  (ai_allegiance player human)','  (ai_set_team '+ref+' human)']:beat.encounterTeam==='source'?[]:['  (ai_set_team '+ref+' '+beat.encounterTeam+')']),'  (ai_follow_target_players '+ref+')',
           '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') (volume_test_objects_all '+destination+' (ai_actors '+ref+'))) 15)',
           '  (if (< (ai_living_count '+ref+') '+minimum+') (begin',
@@ -461,7 +462,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,guidance:beat.guidance?{flag:beat.guidance.flag??null,object:beat.guidance.object??null,height:beat.guidance.height}:null,
-    encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
+    transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
@@ -934,9 +935,9 @@ export function nativeSoloFirefightRules(config: FirefightConfig): FirefightConf
 
 /** Original Spark source generator using the documented native Forerunner
  * contract. Native tags/AI/paths remain owned by the existing scenario editors. */
-export interface NativeTransportCrew {group:string;seat:string;create?:boolean}
+export interface NativeTransportCrew {group:string;seat:string;create?:boolean;releaseAtInsertion?:boolean}
 export interface NativeTransportOptions {
-  /** Permanent NPC crew, separate from issued player passengers. */
+  /** NPC seat assignments, optionally released at first campaign insertion. */
   crew?:NativeTransportCrew[];
   faction:'unsc'|'covenant'; pilot:string; pilotSeat:string;
   outbound:string; inbound:string; hub:string; field:string;
@@ -964,7 +965,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   if(options.crew!=null&&(!Array.isArray(options.crew)||options.crew.length>8))throw Error('Review at most eight permanent native crew assignments.');
   const crew=options.crew??[],groups=[pilot.toLowerCase()],seats=[options.pilotSeat.toLowerCase()];
   for(const member of crew){
-    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create'].includes(key))||!seatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
+    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create','releaseAtInsertion'].includes(key))||!seatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean'||member.releaseAtInsertion!=null&&typeof member.releaseAtInsertion!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
     const group=ensureName(member.group,'Crew encounter / squad',true).toLowerCase(),seat=member.seat.toLowerCase();
     if(groups.some(old=>old===group||old.startsWith(group+'/')||group.startsWith(old+'/'))||seats.includes(seat))throw Error('Pilot and crew need separate, nonoverlapping native groups and unique seats.');
     groups.push(group);seats.push(seat);
@@ -979,28 +980,39 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       '  (camera_set_relative '+marker+' 0 (unit '+craft+'))','  (sleep '+ticks(camera.durationMs)+')','  (camera_control false)','  (player_enable_input true)','  (cinematic_stop)'];
   };
   const insertionCamera=relativeCamera(options.insertionCamera),departureCamera=relativeCamera(options.departureCamera);
+  const troops=crew.flatMap((member,index)=>member.releaseAtInsertion?[{...member,index}]:[]),started=stem+'_insertion_started',delivered=stem+'_insertion_complete',troopUnit=stem+'_troop_unit',riders=stem+'_troop_riders',aboard=stem+'_troop_aboard';
+  const troopHandle=(index:number)=>stem+'_troop_'+index;
+  const riderTests=Array.from({length:32},(_,index)=>'(= '+troopUnit+' (unit (list_get '+riders+' '+index+')))');
+  const riderChunks=Array.from({length:4},(_,index)=>'(or '+riderTests.slice(index*8,index*8+8).join(' ')+')');
+  const troopGlobals=troops.length?['(global boolean '+started+' false)','(global boolean '+delivered+' false)','(global unit '+troopUnit+' none)','(global object_list '+riders+' (list_get (players) 32767))',...troops.map(member=>'(global unit '+troopHandle(member.index)+' none)'),
+    '(script static boolean '+aboard,'  (set '+riders+' (vehicle_riders (unit '+craft+')))','  (and (!= '+troopUnit+' none) (or '+riderChunks.join(' ')+'))',')','']:[];
+  const releaseTroops=troops.length?['  ; First campaign insertion: release only the captured NPC units, never players.','  (if (not '+delivered+') (begin',...troops.flatMap(member=>[
+    '    (set '+troopUnit+' '+troopHandle(member.index)+')','    (if (and (!= '+troopUnit+' none) (> (unit_get_health '+troopUnit+') 0) ('+aboard+')) (unit_exit_vehicle '+troopUnit+'))',
+    '    (sleep_until (begin','      (set '+troopUnit+' '+troopHandle(member.index)+')','      (or (= '+troopUnit+' none) (<= (unit_get_health '+troopUnit+') 0) (not ('+aboard+')))','    ) 1)',
+  ]),'    (set '+delivered+' true)','  ))']:[];
   const health='(> (unit_get_health (unit '+craft+')) 0)';
   const pilotSeated='(vehicle_test_seat_list (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
   const landed='(> (device_group_get '+craft+'_landed) 0.5)';
-  const crewSeated=crew.map(member=>'(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+')))');
+  const crewSeated=crew.map((member,index)=>{const seated='(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+')))';return member.releaseAtInsertion?'(or '+started+' (and '+seated+' (= '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))))':seated;});
   const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+pilotSeated+(crewSeated.length?' '+crewSeated.join(' '):'')+' (volume_test_object '+name+' '+craft+') '+landed+')';
-  const empty='(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.length)+')';
+  const empty='(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.filter(member=>!member.releaseAtInsertion).length)+')';
   const enter=(enabled:boolean)=>'  (unit_set_enterable_by_player (unit '+craft+') '+enabled+')';
   const lines=[nativeTransportPrefix.trimEnd(),'; configuration: '+JSON.stringify(options),...heading('Native '+role+' insertion and evacuation'),
     '; Forerunner only: requires actual native ground contact and durable crew callback.',
     '; No player force-boarding, loot grant, banking, teleport or raid timer.',
     '(global boolean '+stem+'_ready false)',
-    '(global boolean '+stem+'_settled false)',
+    '(global boolean '+stem+'_settled false)',...troopGlobals,
     '(script startup '+stem+'_pilot',
     ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
     '  (vehicle_load_magic (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))',
     '  (sleep_until '+pilotSeated+' 1)',
-    ...crew.flatMap(member=>[
+    ...crew.flatMap((member,index)=>[
       ...(member.create?['  ; Explicit deferred NPC crew ownership; no erase or replacement.','  (if (= (ai_living_count '+member.group+') 0) (ai_place '+member.group+'))']:[]),
       '  (sleep_until (and '+health+' (= (ai_living_count '+member.group+') 1)) 1)',
       '  (vehicle_load_magic (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))',
       '  (sleep_until (and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))) 1)',
+      ...(member.releaseAtInsertion?['  (set '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))']:[]),
     ]),
     '  (set '+stem+'_ready true)',')','',
     '(script continuous forerunner_'+role+'_complete',
@@ -1012,10 +1024,11 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_boarded) 0.5)) 1)',
     enter(false),
     '  (set '+stem+'_settled false)',
+    ...(troops.length?['  (set '+started+' true)']:[]),
     ...(cues[0]?['  ('+cues[0]+')']:[]),
     '  (ai_command_list '+pilot+' '+outbound+')',
     ...insertionCamera,
-    '  (sleep_until '+pad(field)+' 1)',
+    '  (sleep_until '+pad(field)+' 1)',...releaseTroops,
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     enter(true),
     ...(options.returnAfterInsertion?[
@@ -1049,7 +1062,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       ...crew.map(member=>'ai_encounter:'+member.group),'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
-      ...(crew.length?['Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats; empty return counts pilot plus crew, not player passengers. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
+      ...(crew.length?[troops.length?'NPC assignments use dedicated source groups and compatible seats. First insertion releases only captured troops after landing; permanent crew remains seated. Empty return counts pilot plus permanent crew. Missing/dead delivered troops still fail the mission survivor minimum. This is one shared campaign delivery, not repeatable squad insertion, automatic casualty recovery or proven gameplay.':'Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats; empty return counts pilot plus crew, not player passengers. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
       'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
       'Optional relative camera coordinates are offsets in the craft frame, not world positions. These shared cinematics affect all viewers and temporarily control input; source points and restoration need game testing. Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};

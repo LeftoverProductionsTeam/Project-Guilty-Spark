@@ -62,6 +62,8 @@ export interface MissionBeat {
   encounterName: string;
   /** Explicit runtime team for this encounter only; absent retains legacy behavior. */
   encounterTeam?:'source'|'human'|'covenant'|'flood'|null;
+  /** Native controller owns spawn and first-insertion delivery; escort owns follow after handoff. */
+  transportInsertion?:'pelican'|'spirit'|null;
   triggerRef?: string | null;
   weaponPath?: string | null;
   /** Existing named scenario weapon, created once when this collection step starts. */
@@ -288,6 +290,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
       (m.weaponPath!=null&&m.weaponPath!==''&&(typeof m.weaponPath!=='string'||!validMissionWeaponPath(m.weaponPath))) ||
       (m.createWeaponObject!=null&&(typeof m.createWeaponObject!=='string'||!scriptIdent.test(m.createWeaponObject)||m.trigger!=='weaponOwned')) ||
+      (m.transportInsertion!=null&&(m.trigger!=='escort'||m.squadNumber!=null||!['pelican','spirit'].includes(m.transportInsertion))) ||
       (m.encounterTeam!=null&&(!['escort','encounterCleared'].includes(m.trigger)||!['source','human','covenant','flood'].includes(m.encounterTeam))) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||

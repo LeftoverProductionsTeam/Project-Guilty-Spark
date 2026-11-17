@@ -70,6 +70,7 @@ pub struct MissionBeat {
     pub trigger: String,
     pub encounter_name: String,
     #[serde(default,skip_serializing_if="Option::is_none")] pub encounter_team:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub transport_insertion:Option<String>,
     #[serde(default)]
     pub trigger_ref: Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -336,6 +337,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Unsupported prepared mission binding or source hash");
     }
     validate_working_mission(project,&binding)?;
+    if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){return invalid("Troop delivery needs the reviewed CE609 working-tag transport module; build/open the base map and use recovered source");}
     if binding.missions.iter().any(|beat|beat.squad_number.is_some()){return invalid("Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates; preserve mission data and use the recovered source workflow");}
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
@@ -457,6 +459,7 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
 
 pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path,retained_hud:Option<(&str,&[crate::maps::NativeHudMessage])>)->Result<()> {
     validate_mission_scopes(&binding.missions)?;
+    if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){if map.header.version!=609||map.header.extended{return invalid("Dropship troop handoff needs standard Forerunner CE609 source");}let globals=crate::maps::scenario_global_readback(cache,map)?;for role in binding.missions.iter().filter_map(|beat|beat.transport_insertion.as_ref()){let name=format!("gs_{role}_insertion_complete");if globals.iter().filter(|g|g.name==name&&g.value_type==5).count()!=1||globals.iter().filter(|g|g.name.eq_ignore_ascii_case(&name)).count()!=1{return invalid("Compiled native troop delivery global is missing, ambiguous or not boolean");}let helper=format!("gs_{role}_troop_aboard");if map.scripts.iter().filter(|s|s.name==helper&&s.script_type==3&&s.return_type==5).count()!=1{return invalid("Compiled native troop rider helper is missing or has the wrong type");}}}
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
     let scoped=binding.missions.iter().filter_map(|beat|beat.squad_number).collect::<std::collections::BTreeSet<_>>();
@@ -649,6 +652,7 @@ impl CreatorStudio {
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
+            if beat.transport_insertion.as_deref().is_some_and(|role|beat.trigger!="escort"||beat.squad_number.is_some()||!["pelican","spirit"].contains(&role)){return invalid("Dropship troop handoff requires shared native campaign rescue scope");}
             if beat.encounter_team.as_deref().is_some_and(|team|!matches!(beat.trigger.as_str(),"escort"|"encounterCleared")||!["source","human","covenant","flood"].contains(&team)){return invalid("Encounter team needs a native combat or survivor objective");}
             if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}
             if let Some(result)=&beat.condition_result {
@@ -801,6 +805,10 @@ mod tests {
         assert!(doc.validate().is_err());
         doc.playtests[0].evidence="Observed in real Halo CE session".into();
         assert!(doc.validate().is_ok());
+    }
+    #[test]
+    fn insertion_handoff_persists_and_rejects_wrong_scope_or_trigger(){
+        let mut document=studio();document.missions=serde_json::from_value(serde_json::json!([{"id":"rescue","title":"Rescue","objective":"Escort landed troops","trigger":"escort","encounterName":"marines","triggerRef":"rally","transportInsertion":"pelican"}])).unwrap();document.validate().unwrap();let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(document.missions,restored.missions);document.missions[0].squad_number=Some(1);assert!(document.validate().is_err());document.missions[0].squad_number=None;document.missions[0].trigger="manual".into();assert!(document.validate().is_err());document.missions[0].trigger="escort".into();document.missions[0].transport_insertion=Some("bad) (quit)".into());assert!(document.validate().is_err());
     }
     #[test]
     fn encounter_allegiance_persists_and_rejects_non_ai_or_injected_teams(){

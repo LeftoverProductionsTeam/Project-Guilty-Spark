@@ -1702,3 +1702,83 @@ Actual NPC/player seating, animation appearance, capacity for six peers, crew ca
 Final two crew browser cases also PASS actual Map library → reopen → Runtime & Tools → re-read/load saved controller → inspect crew choices before reviewed build. This is browser/synthetic IPC evidence, not Windows process restart. Final guide4PASS; protected ledger/recovery/original scenario/cache hashes unchanged.
 
 QA44071/run-kR2APy CLOSED after all writers exited; root absent, storage runs[]/issues[]. {"disposedLogicalBytes":1647154158,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1767415873,"lastAllocatedFileBytes":1515981040}. No measured physical reclamation when disposal allocation is unavailable. Protected475CSV, legacy checkpoint, original scenario/cache and both stashes unchanged. No retained candidate/tags/SDK/browser/compiler caches/archive or other-project writes.
+
+
+## 17 November — shared first-insertion troops to native escort (parent234b6bb)
+
+Completed the connected authoring slice in the existing controller and mission systems. Optional releaseAtInsertion on NPC seat assignments captures each real AI unit once, waits for the first valid field landing, calls native unit_exit_vehicle only for captured living NPCs actually aboard this craft, and waits until they leave its complete rider list. Permanent crew and player passengers are not unloaded. Dedicated parameterless rider helper uses one snapshot per check and32 bounded comparisons; native vehicle source reader already limits seats to16. No player force-boarding, group erase, actor replacement or inventory/persistence system. Empty return counts pilot plus permanent crew. Death after departure can reach the landing handoff; delivery-complete means the disembark phase ended, not rescue success. Existing escort minimum/failure logic remains authoritative.
+
+MissionBeat.transportInsertion is saved/history-backed and optional; legacy mission/transport defaults remain. Shared CE609 Forerunner escort waits for the correct delivery global instead of ai_place. UI requires the exact built generated transport source, correct role and exact matching release group; handwritten/modified/missing modules remain protected. Recipe ownership, actor/difficulty/animation source, unique substring-safe seat selectors, pilot ownership and passenger reserve checks remain. Unsupported squad/repeated troop delivery refuses explicitly; the one first-delivery latch does not rearm on later trips. Rust rejects incompatible exports and independently reads the canonical boolean global/type and static rider helper from the compiled scenario. Independent actor graph checks now use the extracted compiled scenario's references, not source scenario fields. Existing rescue encounter groups are retained without append/replacement.
+
+Verification: frontend72/72; How To4/4; creative Rust23PASS/1explicit native opt-in skip; transport Rust5/5; Windows all-target cargo check PASS; TypeScript/Vite PASS (preexisting chunk/dynamic-import warnings). Browser12distinct journeys PASS, final8affected legacy/permanent/insertion/controller/mission journeys PASS after the final control assertions. Synthetic IPC browser checks prove controls/history/Save/reopen, not Windows process restart or gameplay. Generated original/permanent crew HSC is byte-identical to234b6bb for both faction configurations. Actual UI-produced Pelican/Spirit controllers and seven-objective missions each compile using the real Invader CE609 toolchain and prepared read-only dependencies. Both independent readbacks preserve the original4script/4global prefix and original four AI groups/starts, verify10scripts,10HUDmessages including1original,5original radio samples, compatible pilot/rescue actor-biped-animation-seat references, route/pad/faction/flag/camera poses and exact named technology behavior. Wrong delivery role refuses; previous-good cache stays unchanged under negative source/readback checks.
+
+No source/compiler regression failed. Verification setup corrections: Invader recovery initially refused an absent owned destination (created that directory); temporary composer used a Windows drive path as an ESM URL (changed it to file URL). Both failed setup attempts are retained in evidence, not counted as native failures or passes. An initial unit command also named nonexistent featureCatalog.test.ts; only its actual three files/72tests are counted; the correct featureWorkflow.test.ts separately passed4tests. No tests weakened. Full native desktop/UI/game/peers and broad release suites were not run. Native compiler retains existing SDK bitmap compression/A8/AY8, LoD cutoff and anniversary HUD-remap warnings; no out-of-BSP troop/route error or missing dependency was suppressed, and original SDK content was not rewritten to hide warnings.
+
+Exact final identities below: revised source scenario and independently extracted cache scenario hashes are distinct. The Rust executable is a test harness, not a Spark app or release. Owned candidates/readbacks/tools output are disposable, not published or retained user builds.
+
+```json
+{
+  "parent": "234b6bb515220f474da3c8b5f161bc36578ef16c",
+  "testExecutable": {
+    "sha256": "102de67b8e59883098b94a1b605bd701f2a825e8a922a0ceee1f8edfb56bbbf0",
+    "bytes": 46072832
+  },
+  "cases": {
+    "unsc": {
+      "mapSha256": "bdba4d0eb525f59c75ee57e5283e0e47c310ae350cdbcf44cc384aa3a79535d5",
+      "mapBytes": 110033896,
+      "missionSha256": "602645e7d3118b1ae2d885281d0e923b16d54388e8c1eed8be806aa42ff68914",
+      "controllerSha256": "3acc47bf18b001a2bcddeb56e478f0f110459c1283492d5de4e2d4f1026cc556",
+      "logSha256": "ecea8c783acb3e889f8b5821b6d1a8767ac6ad0e652b2054a9c401fd09fe5961",
+      "crew": [
+        {
+          "group": "be_marines",
+          "seat": "P-riderLF",
+          "create": true,
+          "releaseAtInsertion": true
+        }
+      ],
+      "revisedSourceScenarioSha256": "c06dc27121d8d9bf3010f9d17b5ea34619faf6de820b181895e953870acb82ba",
+      "extractedScenarioSha256": "dbd9802066776c6ec1880d30ee4e2cef63713e0702f8aa727166206a37c139d5"
+    },
+    "covenant": {
+      "mapSha256": "5c3ba089feecda2b1b50e06aa83ee791b3d7dd50d08a61d33f85c884399b71cd",
+      "mapBytes": 110455284,
+      "missionSha256": "99764f02d1c2504ee34e6e87d8ec76d2c2ca27eb77555381b10a463df3e964c0",
+      "controllerSha256": "0a161aa6ee30622897ddeb329e4c89757f0f2f752dc89e1abdbfad4a9aaae1af",
+      "logSha256": "9ea471c9e7f210d891c2baf46c5c69f6226792c2a82999f78cb7722caeecb656",
+      "crew": [
+        {
+          "group": "be_covenant",
+          "seat": "CD-passengerL01",
+          "create": true,
+          "releaseAtInsertion": true
+        }
+      ],
+      "revisedSourceScenarioSha256": "ed3d2867c7eadc0cf920fdd7b94c863246d20e32a284013ddd119525fc7e935e",
+      "extractedScenarioSha256": "af9686ad3fa0f5cc693e9315f4f64e66d3424f0411d3e9f3f6bbb31f2669b122"
+    }
+  }
+}
+```
+
+Final log SHA-256 identities (owned output removed after capture):
+```json
+{
+  "source-final.log": "e51f4cfffd684afadfb55e04506b91053cfa1464942acd9fde3efb652d7416ad",
+  "guides.log": "29562bdaba301f00ce9aad814680c5f5e42bb12e6c36cea3ca9922e3beb2e955",
+  "core.log": "47b9c1f359fa21b3311203ea15a91f4a9a4a909ef9ac2e6da9987e2cfc58dcb6",
+  "transport-core.log": "ee74ae3bed63a92333966c3c8c1925baaf9f0441d8758de46ee345b9ee453398",
+  "all-targets.log": "159a7036ea8f36f2d0535d22d0afe7c4e5b415e3327e04ce937097d448b9df19",
+  "web-final.log": "a570addbe1da76758b14818bd0c378d658986cb45d10e2b36b43d6f9cfdbafea",
+  "browser.log": "78fcaec93b8f0b4d7a89e0fca15c71c7ab0fa41ef72cb53d72d69d5ef03ebad8",
+  "supporting-browser.log": "fe8a3ec4ec140b33c1982de985a98ccd56becc1a2c2eab062766c710fb5e8413",
+  "final-browser.log": "14542bf9c0a9e327d0ce1d2816a40806aad9fd25f9a3005ca9014587b1553325",
+  "readback-unsc.log": "dcd79b9d73a91ce0e879ffa13f0065430c2e6e4c1c4806e3efd5bf6d6280b6f0",
+  "readback-covenant.log": "a1d4af816b49fe678c6b00a20adcef89c64652e1a5e194e178bd3625b9ef4b3f"
+}
+```
+Protected475CSV/legacy checkpoint/original scenario/cache hashes unchanged. Both original stashes unchanged. Actual Windows42-edit/Save37944/full restart, native flight/disembark/rescue, game peers and full Black Echo acceptance remain OPEN; existing Computer Use initialization failure prevents that interaction, with no unchanged retry or engine launch. Operation110/M1–M6/all475 remain active. Next: remaining mission aircraft/camera/boarding/settlement game acceptance when desktop access is restored; meanwhile advance source-backed mission/creator gaps using existing systems.
+
+QA53079/run-yX5vEu CLOSED after all writers exited; root absent, storage runs[]/issues[]. {"workflow":"native-troop-insertion","temporaryOutputDisposed":true,"disposedLogicalBytes":1657025256,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1744923441,"allocatedBytes":1529060304,"monitoringSamples":104,"monitoringMs":25029.68839999959,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62004866,"peakLogicalBytes":62004866,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Disposal allocation unavailable: no physical-reclamation claim. No retained test candidates/readbacks/caches, replacement archive, Forerunner modification or remote write.

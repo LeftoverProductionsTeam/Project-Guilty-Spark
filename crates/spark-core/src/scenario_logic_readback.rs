@@ -74,6 +74,10 @@ fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Rea
     if at<space.begin||at.checked_add(0x5b0).is_none_or(|end|end>space.end){return invalid("Compiled Logic scenario body escapes its tag region");}
     decode(&r,&space,at)
 }
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeScriptGlobal {pub name:String,pub value_type:u16}
+pub fn scenario_global_readback(path:&Path,map:&MapInspection)->Result<Vec<NativeScriptGlobal>>{with_scenario(path,map,|r,space,sc|{let(at,count)=space.block(r,sc+0x4a8,92,4096)?;(0..count).map(|index|{let p=at+index*92;Ok(NativeScriptGlobal{name:r.string(p,32)?,value_type:r.u16(p+32)?})}).collect()})}
 pub fn scenario_volume_readback(path:&Path,inspection:&MapInspection)->Result<Vec<ScenarioLogicVolume>> {with_scenario(path,inspection,parse_volumes)}
 fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolume>> {
     let (at,count)=space.block(r,at+0x360,96,4096)?;let mut volumes=vec![];
