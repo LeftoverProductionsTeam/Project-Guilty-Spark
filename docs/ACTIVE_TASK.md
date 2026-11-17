@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
+Task: Operation110 — campaign source review and Black Echo handoff
 Status: implementation incomplete
-Starting revision: 234b6bb515220f474da3c8b5f161bc36578ef16c, canonical master.
-Latest verified revision: parent234b6bb515220f474da3c8b5f161bc36578ef16c; first-insertion source/browser/CE609 readback verified in this checkpoint commit. Native Windows/game acceptance OPEN.
-Next action: complete the remaining Black Echo native aircraft handoff/boarding/mission dependencies; run isolated flight/disembark/rescue gameplay only when desktop control is restored. Advance independent creator code meanwhile; Windows37944/42-edit gates remain OPEN.
+Starting revision: 2a5839c3013a43fa3f20cede3de47aed23739c1c, canonical master.
+Latest verified revision: parent2a5839c3013a43fa3f20cede3de47aed23739c1c; attached campaign review/re-preparation repair verified in this checkpoint commit. Native Windows/game gates OPEN.
+Next action: connect existing explicit mission review/adoption to recovered CE609 modules through pinned working-source APIs; preserve source/mission/shot ownership, history/Save and stale checks. Native Windows/game/37944 gates OPEN.
 
 ## Acceptance
 
@@ -16,13 +16,13 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
+17Nov attached review (parent2a5839c): reproduced self-generated team rejection; strict typed reader → complete gameplay comparison → consent/history/Save/reopen/re-prepare PASS. Frontend77/browser final4+camera2+measured2/TypeScript-Vite PASS;800/1920 comparison scroll widths725/1845 equal clients. Native writer6-team output unchanged; no native rerun. Exact proof: RUNTIME_INTEGRATION_20261107.
+
 17Nov first insertion (parent234b6bb): UI/history/Save/reopen → exact generated transport ownership → shared escort without duplicate spawn → Pelican/Spirit CE609 compile/independent extracted scenario/actor/seat/latch readback PASS. Frontend72/guide4/creative23+1skip/transport5/browser12distinct+final8/web/Windows all-target PASS. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
 17Nov crew (parent01d108b): same source graph/controller → compatible NPC seats/ownership → UI/history/Save/reopen → Marine/Pelican and Grunt/Spirit CE609 compile/readback pass. Frontend71/guide4/transportRust5/browser9distinct+final2/web/Windows targets PASS. Substring-seat ambiguity refuses; no-crew HSC byte-identical. Exact hashes/fixes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
-17Nov factions01d108b: explicit encounter teams/roles → UI/history/Save/reopen → Spirit CE609 compile/readback pass. Exact tests/hashes: RUNTIME_INTEGRATION_20261107. Windows/game gates OPEN.
-
-17Nov moving targets7fe4041: UI/history/Save/reopen and native CE609 identity/asset/coordinate/readback plus negative bindings pass. Exact tests/hashes/limits: RUNTIME_INTEGRATION_20261107. Windows/game gates OPEN.
+17Nov factions01d108b/moving targets7fe4041 scoped source/browser/CE609 proof and exact hashes remain in RUNTIME_INTEGRATION_20261107 and Git; native Windows/game gates OPEN.
 
 17Nov native flag/guidance (parent1ce17fe): protected append/pose/Restore/Save and scoped marker authoring→standard parameterless HSC→CE609 compile/readback pass. Frontend70/native20+1skip/creative21+1skip/working17+1skip/browser6distinct/latest2/TypeScript-Vite/Windows all-target PASS. Exact cache/source/test-exe hashes, compiler/initialization fixes and limits: RUNTIME_INTEGRATION_20261107. Actual marker/mission/gameplay remains OPEN.
 
@@ -155,7 +155,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA53079/run-yX5vEu CLOSED: 1657025256logicalB disposed; peak1744923441logicalB; last allocation1529060304B; disposal allocation unavailable. Root absent, runs[]/issues[], all writers exited. Protected hashes/stashes unchanged; exact identities/receipts: RUNTIME_INTEGRATION_20261107.
+QA90295/run-iawAiy CLOSED: 53136247logicalB/53473288allocated-fileB disposed; peak53141981logicalB. Root absent, runs[]/issues[], all writers exited. Protected hashes/stashes unchanged; exact receipt: RUNTIME_INTEGRATION_20261107.
 
 Earlier owned QA roots remain closed; exact receipts survive in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git. No old jobs revived or checkpoint duplicated.
 

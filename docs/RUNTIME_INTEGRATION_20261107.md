@@ -1782,3 +1782,68 @@ Protected475CSV/legacy checkpoint/original scenario/cache hashes unchanged. Both
 
 QA53079/run-yX5vEu CLOSED after all writers exited; root absent, storage runs[]/issues[]. {"workflow":"native-troop-insertion","temporaryOutputDisposed":true,"disposedLogicalBytes":1657025256,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1744923441,"allocatedBytes":1529060304,"monitoringSamples":104,"monitoringMs":25029.68839999959,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62004866,"peakLogicalBytes":62004866,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
 Disposal allocation unavailable: no physical-reclamation claim. No retained test candidates/readbacks/caches, replacement archive, Forerunner modification or remote write.
+
+
+## 17 November — repeatable campaign mission review (parent2a5839c)
+
+A focused regression reproduced the native attached-source reader refusing the encounterTeam field written by its own current generator after the first preparation (before a native build was required). Fixed the exhaustive native metadata whitelist, with the saved MissionBeat type now making future missing reader fields a compilation error. Existing unknown-field, value validation, body checksum, exact generator equality, ownership and stale-project guards remain. Blank-map troop insertion gets a direct supported CE609 working-source route, matching the existing native restriction, without dropping fields or rewriting source. This repair does not resolve Save37944.
+
+Completed explicit review → consent → adopt → Undo/Redo → Save → reopen → edit → re-prepare. MissionSourceReview now exposes all current gameplay fields, including team/squad/presentation, delivery, survivor/failure rules, weapons, area/result conditions, sound and guidance alongside existing identity/objective/HUD/camera fields. Changed gameplay opens for comparison, narrow grids fit the panel and no additional paging/state manager is introduced. Corrected scene-only camera adoption and permanent-versus-insertion-crew/spawn-ownership instructions. How To matches the actual controls.
+
+Final frontend77/77 and TypeScript/Vite PASS; final browser4/4: Pelican/Spirit insertion plus complete attached campaign review at800x600 and1920x1080, including no horizontal overflow in the open comparison. Two existing intro/scene-only browser flows separately PASS. Synthetic IPC browser reopening is not native Windows restart. Source tests exercise all4 explicit teams plus omitted/null legacy values, initial/prepared review, repeated generation, source preservation, history/serialization, stale-team refusal, unknown-field/invalid-team refusal and unsupported handoff routing. Initial regression1FAIL reproduced unsupported beat fields. First web check exposed test-fixture type errors (nonexistent encounter id and untyped JSON callbacks), corrected before final tests; no production check/assertion weakened.
+
+Native HSC writers/backends/formats were not changed. Measured initial attached and recovered mission output is byte-identical to2a5839c for omitted/null legacy and source/human/covenant/flood team settings; exact identities below. Prior CE609/native readback evidence remains scoped to its original revision. No Rust/native compiler, application executable, game launch, peer or full release suite was rerun for this frontend reader/comparison repair. Vite retains its preexisting chunk/dynamic-import warnings. Native Windows42-edit/Save37944/full restart and all gameplay acceptance remain OPEN behind the existing desktop-control initialization failure. Forerunner and protected Halo files stay read-only; no remote writes.
+
+```json
+{
+  "logSha256": {
+    "repro.log": "6a0d706a0dc45c35eb47c0a6a9fb9211e3826269757f06da893eaf10f062744d",
+    "source-final.log": "922471a831767e3b3f7938b3e34167040ada8d62978983b4772a3d996f5d7615",
+    "web.log": "e4a7fd02d26c057dae2869be625eab2671c359dfa80d963a4ba6db1a32b6b094",
+    "web-final.log": "704603d073cecaa158881eec36b8ac3eb21ce825e7d8657b3ea25f8661e23938",
+    "browser.log": "d9416a61a21b79f45be1bcd539dacea4b191be05d06d7f75e5313268634457cf",
+    "browser-final.log": "aceedc48a4688eb9dff546fc217c603c11f47c59e381774af359363a803117ac",
+    "writer.log": "5427e94ee49e4ae635bb532654591dba8e22cfb3944415ae7079ae09522a4035"
+  },
+  "writerComparison": {
+    "parent": "2a5839c3013a43fa3f20cede3de47aed23739c1c",
+    "attachedAndRecoveredByteIdentical": [
+      {
+        "team": "omitted",
+        "sha256": "588a50c544a13fc3249eab26e31b95315141224e4065bce39ac6e368830f87a9",
+        "sourceBytes": 1486
+      },
+      {
+        "team": "null",
+        "sha256": "1c3ada1de26d2039cb354f0c71ff618f96de442611bbc2f80e740500244aacf7",
+        "sourceBytes": 1507
+      },
+      {
+        "team": "source",
+        "sha256": "8779f7a2fc9a9963091db8a46e4b19ca253a6ed78f13e8fce3852db46f93359b",
+        "sourceBytes": 1449
+      },
+      {
+        "team": "human",
+        "sha256": "2279120ec108e3a8f6b29c98fc1e671d0dcabda3d14d59064aa99e9a14720677",
+        "sourceBytes": 1478
+      },
+      {
+        "team": "covenant",
+        "sha256": "22c0354de59f9f7eac1e81db07460e9c1daf4c4e2c12f09a1782359438536c33",
+        "sourceBytes": 1484
+      },
+      {
+        "team": "flood",
+        "sha256": "a3c33bf990cfe3ca2fbbebec3b11e6a581718f42bb5caa0e44b5cdb22bd8ec5e",
+        "sourceBytes": 1478
+      }
+    ]
+  }
+}
+```
+
+Final measured browser comparison widths (not native Windows): [{"viewport":{"width":800,"height":600},"clientWidth":725,"scrollWidth":725},{"viewport":{"width":1920,"height":1080},"clientWidth":1845,"scrollWidth":1845}]. Final measured workflow2PASS; log SHA256 999f93f5ae5aba44bf1d8064aa10df6b1e76b3be1bd79b776fd859ae973b2bd1.
+
+QA90295/run-iawAiy CLOSED after all writers exited; root absent, runs[]/issues[]. {"workflow":"frontend-mission-review","temporaryOutputDisposed":true,"disposedLogicalBytes":53136247,"disposedAllocatedFileBytes":53473288,"peakLogicalBytes":53141981,"allocatedBytes":53481480,"monitoringSamples":53,"monitoringMs":3230.358100000125,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62029442,"peakLogicalBytes":62029442,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Measured disposed allocated-file bytes: 53473288 (filesystem overhead and unrelated volume changes excluded). Protected475CSV/legacy checkpoint/original scenario/cache hashes and both stashes unchanged. No retained generated outputs, archives, other-project writes or push.

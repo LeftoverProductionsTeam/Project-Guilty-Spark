@@ -62,7 +62,7 @@ export interface MissionBeat {
   encounterName: string;
   /** Explicit runtime team for this encounter only; absent retains legacy behavior. */
   encounterTeam?:'source'|'human'|'covenant'|'flood'|null;
-  /** Native controller owns spawn and first-insertion delivery; escort owns follow after handoff. */
+  /** Reviewed source/controller owns spawn; transport owns boarding/release, escort owns follow. */
   transportInsertion?:'pelican'|'spirit'|null;
   triggerRef?: string | null;
   weaponPath?: string | null;

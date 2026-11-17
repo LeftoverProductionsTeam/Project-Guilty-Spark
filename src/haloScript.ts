@@ -428,9 +428,10 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['guidance','squadNumber','allowSharedPresentation','id','title','objective','trigger','encounterName','triggerRef','weaponPath','createWeaponObject','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
+  // Exhaustive against the saved beat type: new creator fields must remain reviewable.
+  const beatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
-    Object.keys(beat).some(key=>!beatFields.includes(key))||
+    Object.keys(beat).some(key=>!Object.hasOwn(beatFields,key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
     (beat.triggerRef!=null&&typeof beat.triggerRef!=='string')||(beat.weaponPath!=null&&typeof beat.weaponPath!=='string')||
     (beat.createWeaponObject!=null&&typeof beat.createWeaponObject!=='string')||
@@ -551,6 +552,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
   if(missions.some(beat=>beat.squadNumber!=null))throw Error('Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates. Build a base map, open its compiled source and use Prepare recovered mission source. The saved mission fields are preserved.');
+  if(missions.some(beat=>beat.transportInsertion!=null))throw Error('Dropship troop handoff requires reviewed CE609 working tags with the matching built transport module. Build/open a base map and use Prepare recovered mission source; the saved mission fields are preserved.');
   const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
   const shots=project.studio?.shots??[];
   const forerunner=missions.some(beat=>beat.trigger==='forerunnerExtractionSettled');

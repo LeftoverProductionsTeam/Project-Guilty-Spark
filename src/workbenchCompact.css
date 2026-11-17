@@ -509,3 +509,8 @@ html[data-gs-reduced-motion=true] .gs-spark-emblem{transition:none;}@media(prefe
 .application .gs-tools-menu .gs-page-body>section:last-child{border-bottom:0;}
 .application .gs-tools-menu .gs-page-body>section>strong{display:block;font-size:9px;padding:2px 7px;}
 .application .gs-tools-menu [role^=menuitem]{display:flex;align-items:center;gap:7px;width:100%;min-height:25px;padding:3px 7px;text-align:left;}
+
+.application .mission-source-review .mission-review-gameplay {margin:6px 0;min-width:0;}
+.application .mission-source-review [data-changed] {border-inline-start:2px solid var(--accent);padding-inline-start:6px;}
+.application .mission-source-review .mission-review-gameplay textarea {width:100%;min-width:0;resize:vertical;}
+.application .mission-source-review .mission-review-gameplay .studio-fields {grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));margin-top:6px;}

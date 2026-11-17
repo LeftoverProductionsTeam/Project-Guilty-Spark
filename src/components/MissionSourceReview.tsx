@@ -5,18 +5,42 @@ import type { NativeMissionReview } from '../haloScript';
 import type { Project } from '../types';
 import { Notice } from './ui';
 
-function BeatView({side,beat,index}:{side:string;beat?:MissionBeat;index:number}) {
+function BeatView({side,beat,other,index}:{side:string;beat?:MissionBeat;other?:MissionBeat;index:number}) {
+  const changed=(field:keyof MissionBeat)=>JSON.stringify(beat?.[field]??null)!==JSON.stringify(other?.[field]??null);
+  const gameplay: {field:keyof MissionBeat;label:string;value:string}[]=beat?[
+    {field:'encounterTeam',label:'Encounter team',value:beat.encounterTeam?{source:'Preserve authored team',human:'Human / UNSC',covenant:'Covenant',flood:'Flood'}[beat.encounterTeam]:beat.trigger==='escort'?'Legacy human team and player alliance':'Preserve authored team'},
+    {field:'squadNumber',label:'Objective scope',value:beat.squadNumber==null?'Shared mission':'Forerunner squad '+beat.squadNumber},
+    {field:'allowSharedPresentation',label:'Shared HUD / radio',value:beat.allowSharedPresentation?'Explicitly allowed':'Not opted in'},
+    {field:'transportInsertion',label:'Rescue troop source',value:beat.transportInsertion?'First '+(beat.transportInsertion==='pelican'?'Pelican':'Spirit')+' insertion':beat.trigger==='escort'?'Mission spawns this group':'Not applicable'},
+    {field:'minimumSurvivors',label:'Minimum survivors',value:beat.trigger==='escort'?String(beat.minimumSurvivors??1):'Not applicable'},
+    {field:'escortFailure',label:'On rescue failure',value:beat.trigger!=='escort'?'Not applicable':beat.escortFailure==='continue'?'Continue to authored failure handling':'Stop mission; world stays active'},
+    {field:'weaponPath',label:'Collected native weapon',value:beat.weaponPath||'Not selected'},
+    {field:'conditionVolume',label:'Optional branch area',value:beat.conditionVolume||'No area condition'},
+    {field:'conditionGroup',label:'Shared area decision',value:beat.conditionGroup||'Evaluate this objective separately'},
+    {field:'conditionOutside',label:'Area condition',value:beat.conditionVolume==null?'No area condition':beat.conditionOutside?'Outside':'Inside'},
+    {field:'conditionResult',label:'Earlier rescue result',value:beat.conditionResult?(beat.conditionResult.failed?'Failure':'Success')+' of '+beat.conditionResult.beatId:'No rescue-result condition'},
+    {field:'guidance',label:'Objective waypoint',value:beat.guidance?(beat.guidance.object!=null?'Moving object: '+beat.guidance.object:'Location flag: '+beat.guidance.flag)+' · height '+beat.guidance.height:'Off'},
+    {field:'soundCue',label:'Radio / native sound',value:beat.soundCue?[beat.soundCue.phase+' · gain '+beat.soundCue.gain+' · delay '+beat.soundCue.delayMs+' ms',beat.soundCue.soundPath,'Included asset: '+beat.soundCue.importId,'Caption: '+beat.soundCue.caption].join('\n'):'No sound cue'},
+  ]:[];
+  const differences=gameplay.filter(row=>changed(row.field)).length;
   return <section>
     <h4>{side}{beat?' · beat '+(index+1):''}</h4>
     {!beat?<p>No matching beat.</p>:<>
-      {(['id','title','trigger','encounterName','triggerRef','timerSeconds','hudObjective','checkpoint','completeMission'] as const).map(field=><label key={field}>
+      {(['id','title','trigger','encounterName','triggerRef','timerSeconds','hudObjective','checkpoint','completeMission'] as const).map(field=><label key={field} data-changed={changed(field)||undefined}>
         {{id:'Identity',title:'Title',trigger:'Trigger',encounterName:'Encounter',triggerRef:'Volume',timerSeconds:'Delay (seconds)',hudObjective:'Native HUD objective',checkpoint:'Checkpoint request',completeMission:'Level completion request'}[field]}
         <input aria-label={side+' mission '+field} readOnly value={String(beat[field]??'')}/>
       </label>)}
-      {beat.createWeaponObject&&<label>Create native weapon<input aria-label={side+' mission create weapon'} readOnly value={beat.createWeaponObject}/></label>}
-      {beat.cinematicCue&&<label>Camera scene<input aria-label={side+' mission camera scene'} readOnly value={beat.cinematicCue.phase+' · '+beat.cinematicCue.firstShotId+' → '+beat.cinematicCue.lastShotId}/></label>}
-      <label>Objective / direction<textarea aria-label={side+' mission objective'} rows={3} readOnly value={beat.objective}/></label>
-      <label>HUD objective text<textarea aria-label={side+' mission HUD text'} rows={2} readOnly value={beat.hudText??''}/></label>
+      {beat.createWeaponObject&&<label data-changed={changed('createWeaponObject')||undefined}>Create native weapon<input aria-label={side+' mission create weapon'} readOnly value={beat.createWeaponObject}/></label>}
+      {beat.cinematicCue&&<label data-changed={changed('cinematicCue')||undefined}>Camera scene<input aria-label={side+' mission camera scene'} readOnly value={beat.cinematicCue.phase+' · '+beat.cinematicCue.firstShotId+' → '+beat.cinematicCue.lastShotId}/></label>}
+      <label data-changed={changed('objective')||undefined}>Objective / direction<textarea aria-label={side+' mission objective'} rows={3} readOnly value={beat.objective}/></label>
+      <label data-changed={changed('hudText')||undefined}>HUD objective text<textarea aria-label={side+' mission HUD text'} rows={2} readOnly value={beat.hudText??''}/></label>
+      <details className="mission-review-gameplay" open={differences>0}>
+        <summary>Gameplay & conditions{differences?' · '+differences+' differences':''}</summary>
+        <div className="studio-fields">{gameplay.map(({field,label,value})=><label key={field} data-changed={changed(field)||undefined}>
+          {label}{changed(field)&&<small>Different from {side==='Local'?'attached source':'local draft'}</small>}
+          <textarea aria-label={side+' mission '+field} rows={field==='soundCue'?4:2} readOnly value={value}/>
+        </label>)}</div>
+      </details>
     </>}
   </section>;
 }
@@ -58,7 +82,7 @@ export default function MissionSourceReview({project,edit,onActivation,onCinemat
       setReview(null);setConfirmed(false);setError('');
     } catch(problem) {setError(String(problem));}
   }
-  return <details>
+  return <details className="mission-source-review">
     <summary>Review attached mission data</summary>
     <p className="studio-hint">A shared source module can contain mission data different from your local draft.
       Review its data and checksum before choosing. This review does not execute or replace source modules.</p>
@@ -79,8 +103,8 @@ export default function MissionSourceReview({project,edit,onActivation,onCinemat
           return <option key={id} value={id}>Local {left<0?'—':left+1} / Attached {right<0?'—':right+1} · {beat?.title||id}</option>;
         })}</select></label>
       <div className="studio-fields">
-        <BeatView side="Local" beat={local} index={review.localMissions.findIndex(beat=>beat.id===identity)}/>
-        <BeatView side="Attached" beat={attached} index={review.binding.missions.findIndex(beat=>beat.id===identity)}/>
+        <BeatView side="Local" beat={local} other={attached} index={review.localMissions.findIndex(beat=>beat.id===identity)}/>
+        <BeatView side="Attached" beat={attached} other={local} index={review.binding.missions.findIndex(beat=>beat.id===identity)}/>
       </div>
       {!differs?<p>Mission data already matches. No replacement is needed.</p>:<>
         <button type="button" onClick={exportLocal}>Export local creator evidence</button>
@@ -89,7 +113,7 @@ export default function MissionSourceReview({project,edit,onActivation,onCinemat
         <button type="button" disabled={!confirmed} onClick={adopt}>Use attached mission data</button>
       </>}
       <button type="button" onClick={()=>{setReview(null);setConfirmed(false);}}>Keep local mission data</button>
-      <p className="studio-hint">Cameras change only when the attached source includes an intro. Server settings, source modules and runtime selection stay unchanged.
+      <p className="studio-hint">Camera shots change only when the attached source includes reviewed shots, whether used as an intro or an objective scene. Server settings, source modules and runtime selection stay unchanged.
         Keeping a different local draft still requires Prepare mission before a build; stale-source checks remain active.</p>
     </>}
   </details>;
