@@ -280,6 +280,8 @@ fn verify_hash_manifest(parent: &Path, manifest: &Option<TagHashManifest>) -> Re
 }
 
 struct Prepared {
+    radio_imports:Vec<crate::native_asset_imports::Binding>,
+    radio_hashes:BTreeMap<String,String>,
     tags: PathBuf,
     source_data: Option<PathBuf>,
     parent_controller_binding:Option<crate::firefight::NativeControllerBinding>,
@@ -364,8 +366,28 @@ fn same_record(a: &BuildRecord, b: &BuildRecord) -> bool {
         && a.output == b.output
 }
 
+// Only a paired mission sound may enter/leave recovered authoring metadata.
+// Existing identities/order cannot change; every new closure is receipt/hash
+// checked and staged separately before compilation, never into the parent.
+fn mission_radio_import_delta(parent:&Project,current:&Project)->Result<Vec<crate::native_asset_imports::Binding>> {
+    let before=&parent.native_asset_imports;let after=&current.native_asset_imports;
+    if before==after{return Ok(vec![]);}
+    let common_before=before.iter().filter(|old|after.iter().any(|new|new.id==old.id)).collect::<Vec<_>>();
+    let common_after=after.iter().filter(|new|before.iter().any(|old|old.id==new.id)).collect::<Vec<_>>();
+    if common_before!=common_after{return invalid("Existing native import identities or order changed; retained source was not reused");}
+    for old in before.iter().filter(|old|!after.iter().any(|new|new.id==old.id)){if !crate::native_asset_imports::mission_sound_used(parent,old){return invalid("Only a reviewed mission sound can be removed from authoring metadata; source tags remain protected");}}
+    let added=after.iter().filter(|new|!before.iter().any(|old|old.id==new.id)).cloned().collect::<Vec<_>>();
+    if added.iter().any(|new|!crate::native_asset_imports::mission_sound_used(current,new)){return invalid("New assets need their normal native source workflow; only exact included mission sounds may use this rebuild");}
+    Ok(added)
+}
+fn verify_staged_radio(tags:&Path,hashes:&BTreeMap<String,String>)->Result<()> {
+    for(path,expected)in hashes{let file=checked_file(&tags.join(safe_relative(path)?))?;if maps::hash_file(&file)?!=*expected{return invalid("Staged mission sound differs from its reviewed immutable input; output was not accepted");}}Ok(())
+}
+fn radio_import_project(project:&Project,bindings:&[crate::native_asset_imports::Binding])->Project {let mut selected=project.clone();selected.native_asset_imports=bindings.to_vec();selected}
+
 /// Resolve an immutable native input snapshot without declaring its cache
-/// compiled for newer authoring rules. Only recovered Firefight/Studio authoring metadata may differ.
+/// compiled for newer authoring rules. Recovered authoring metadata and narrowly
+/// reviewed mission-sound imports may differ; native inputs are staged separately.
 pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: &Path) -> Result<Project> {
     project.validate()?;
     let _ = native_profile(&build.target)?;
@@ -399,9 +421,11 @@ pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: 
     // existing native camera/source build, never authoring-only parent reuse.
     let camera_inputs=|value:&Project|serde_json::to_value(value.studio.as_ref().and_then(|studio|studio.engine_machinima.as_ref().filter(|options|options.enabled).map(|options|(options,&studio.shots))));
     if camera_inputs(&parent)?!=camera_inputs(project)?{return invalid("Native recording inputs changed; use the existing camera/source build before reusing this parent");}
+    if crate::native_audio::fingerprint_inputs(&parent)!=crate::native_audio::fingerprint_inputs(project){return invalid("Native sound placements changed; use their normal source build before reusing this parent");}
+    mission_radio_import_delta(&parent,project)?;
     let mut before = serde_json::to_value(&parent)?;
     let mut after = serde_json::to_value(project)?;
-    for key in ["firefight", "studio", "history", "builds", "modifiedAt", "scenarioScriptDraft"] {
+    for key in ["firefight", "studio", "history", "builds", "modifiedAt", "scenarioScriptDraft", "nativeAssetImports", "audioPreview"] {
         // Project's serialized representation is a struct/object. Only these
         // authoring and bookkeeping fields may differ, including on Undo.
         before.as_object_mut().ok_or_else(|| SparkError::Invalid("Invalid native project snapshot".into()))?.remove(key);
@@ -536,6 +560,10 @@ fn prepare(
     }
     let (_, cache_version, compiler_key) = native_profile(&input.parent_build.target)?;
     let source_project=source_parent_project(project,&input.parent_build,jobs_root)?;
+    let radio_imports=mission_radio_import_delta(&source_project,project)?;
+    if !radio_imports.is_empty()&&(input.scenario_type!=0||!input.compile_scripts){return invalid("Included mission sounds require an explicitly compiled solo source revision");}
+    let radio_project=radio_import_project(project,&radio_imports);
+    let radio_hashes=if radio_imports.is_empty(){BTreeMap::new()}else{crate::native_asset_imports::source_hashes(jobs_root.parent().ok_or_else(||SparkError::Invalid("Native import root is missing".into()))?,&radio_project)?};
     let authoring_pending=source_project.fingerprint()?!=project.fingerprint()?;
     if authoring_pending&&!input.compile_scripts{return invalid("Campaign or Firefight authoring changed. Attach/review the matching source and explicitly compile scripts; a tag-only rebuild cannot apply them");}
     if input.parent_build.status != "validated"
@@ -717,6 +745,7 @@ fn prepare(
     if let Some(append)=&input.encounter_append {if tools.get("invaderEdit")!=Some(&append.writer_sha256){return invalid("The native encounter writer changed after source review");}}
     preserved_source(project)?;
     Ok(Prepared {
+        radio_imports,radio_hashes,
         tags,
         source_data,
         parent_controller_binding,
@@ -1249,7 +1278,11 @@ fn run_with(
     let prepared = prepare(project, input, jobs_root, job_id)?;
     let directory = checked_directory(jobs_root)?.join(job_id);
     let staging=crate::native_staging::inventory(&prepared.tags,&cancel)?;
-    let estimate=crate::storage::estimate_copy(staging.files.len(),staging.bytes).saturating_add(1024*1024*1024);
+    let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Native import root is missing".into()))?;
+    let radio_project=radio_import_project(project,&prepared.radio_imports);
+    let radio_staging=if prepared.radio_imports.is_empty(){None}else{Some(crate::native_asset_imports::staging_inventory(import_root,&radio_project)?)};
+    let extra_bytes=radio_staging.as_ref().map_or(0,|i|crate::storage::estimate_copy(i.files.len(),i.bytes));
+    let estimate=extra_bytes.saturating_add(crate::storage::estimate_copy(staging.files.len(),staging.bytes)).saturating_add(1024*1024*1024);
     let storage_lease=crate::storage::Store::for_output(&directory)?.reserve(&directory,Some(&prepared.tags),estimate,crate::storage::Category::Staging,"Reviewed native working-tag rebuild; isolated full-source fallback")?;
     crate::reject_links(&directory)?;
     fs::create_dir(&directory)?; // exclusive: existing jobs are never reused
@@ -1347,6 +1380,10 @@ fn run_with(
             "working-tags-input.json",
             &input_hashes,
         )?);
+        if !prepared.radio_imports.is_empty(){
+            if crate::native_asset_imports::stage_working(import_root,&radio_project,&tags)?!=prepared.radio_hashes{return invalid("Included mission sound inputs changed during staging; no compiler ran");}
+            verify_staged_radio(&tags,&prepared.radio_hashes)?;
+        }
         fs::create_dir_all(workspace.join("data"))?;
         for (relative, expected) in &input_scripts {
             let source = prepared
@@ -1531,6 +1568,7 @@ fn run_with(
         if cache_version == 13 { fs::copy(&compiled, &output)?; }
         let inspected = maps::inspect_map(&output, None)?;
         let sound_classes=crate::audio_rules::verify(&output,&inspected)?;
+        if !prepared.radio_imports.is_empty(){crate::native_asset_imports::verify_compiled(&radio_project,&inspected)?;}
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         if inspected.sha256 != compiled_hash
             || inspected.header.version != cache_version
@@ -1627,6 +1665,7 @@ fn run_with(
         if maps::hash_file(&output)? != inspected.sha256 {
             return invalid("Compiled cache changed during validation");
         }
+        if !prepared.radio_imports.is_empty()&&crate::native_asset_imports::source_hashes(import_root,&radio_project)?!=prepared.radio_hashes{return invalid("Included mission sound changed during compilation; previous source/output remain protected");}
         preserved_source(project)?;
         if script_hashes(prepared.source_data.as_deref(), &cancel)? != input_scripts {
             return invalid(
@@ -1645,6 +1684,7 @@ fn run_with(
                 recheck_tools(input,&prepared.tools)?;
             }
         }
+        verify_staged_radio(&tags,&prepared.radio_hashes)?;
         let final_hashes = tree_hashes(&tags, &cancel)?;
         receipt.final_tag_hashes = Some(save_hash_manifest(
             &directory,
@@ -2077,6 +2117,24 @@ mod tests {
         c.project.title="Changed source identity".into();assert!(source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap_err().to_string().contains("other source inputs changed"));
         assert_eq!(project::load_project(&parent.join("project.gsproject")).unwrap().fingerprint().unwrap(),old_fp);
     }
+    #[test]
+    fn recovered_radio_admits_only_paired_sound_deltas_and_preserves_parent_inputs(){
+        let mut c=case();let parent=c.jobs.join(&c.input.parent_build.id);project::save_project(&parent.join("project.gsproject"),&c.project).unwrap();
+        let id=uuid::Uuid::new_v4().to_string();let binding=crate::native_asset_imports::Binding{id:id.clone(),source_project_id:uuid::Uuid::new_v4().to_string(),source_sha256:"a".repeat(64),tag_id:42,tag_class:"snd!".into(),tag_path:"sound/radio".into(),native_path:format!("gs_assets_{}/sound/radio",id.replace('-',"")),receipt_sha256:"b".repeat(64),file_count:1};
+        c.project.studio=mission_project("Hear the briefing.").studio;c.project.studio.as_mut().unwrap().missions[0].sound_cue=Some(crate::creative::MissionSoundCue{import_id:binding.id.clone(),sound_path:binding.native_path.clone(),phase:"start".into(),gain:0.75,delay_ms:0,caption:"Briefing.".into()});c.project.native_asset_imports.push(binding.clone());
+        let original=source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap();assert!(original.native_asset_imports.is_empty());assert_eq!(mission_radio_import_delta(&original,&c.project).unwrap(),vec![binding.clone()]);
+        let mut wrong=c.project.clone();wrong.native_asset_imports[0].tag_class="weap".into();assert!(source_parent_project(&wrong,&c.input.parent_build,&c.jobs).is_err());wrong=c.project.clone();wrong.studio.as_mut().unwrap().missions[0].sound_cue=None;assert!(source_parent_project(&wrong,&c.input.parent_build,&c.jobs).is_err());
+        let mut prior=c.project.clone();prior.native_asset_imports[0].receipt_sha256="c".repeat(64);assert!(mission_radio_import_delta(&prior,&c.project).is_err());assert!(mission_radio_import_delta(&c.project,&original).unwrap().is_empty());
+        assert!(prepare(&c.project,&c.input,&c.jobs,&uuid::Uuid::new_v4().to_string()).err().unwrap().to_string().contains("compiled solo"));
+        // Rehearsal edits are metadata; native emitter inputs still require the
+        // established geometry/source build and cannot enter this exception.
+        let buses=["ambience","music","effects","dialogue"].map(|key|(key.into(),crate::audio_preview::Bus{gain:1.,muted:false,solo:false})).into_iter().collect();
+        c.project.audio_preview=Some(crate::audio_preview::SoundScene{schema_version:1,master:0.5,muted:false,max_voices:24,buses,emitters:vec![]});source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap();
+        let emitter:crate::audio_preview::Emitter=serde_json::from_value(serde_json::json!({"id":uuid::Uuid::new_v4().to_string(),"name":"Original loop","tagId":42,"sourceProjectId":binding.source_project_id,"sourceSha256":binding.source_sha256,"pitchRange":0,"permutation":0,"event":"ambient","bus":"ambience","position":[0,0,0],"gain":1,"pitch":1,"loop":true,"enabled":true,"minDistance":1,"maxDistance":30,"rolloff":1,"priority":1,"cooldownMs":0,"spatial":true,"loopingSource":{"tagId":42,"track":0},"nativePlacement":true})).unwrap();c.project.audio_preview.as_mut().unwrap().emitters.push(emitter);assert!(source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap_err().to_string().contains("Native sound placements changed"));
+        let staged=c._root.path().join("radio-staging");fs::create_dir(&staged).unwrap();fs::write(staged.join("radio.sound"),b"reviewed native sound").unwrap();let hashes=BTreeMap::from([("radio.sound".into(),maps::hash_file(&staged.join("radio.sound")).unwrap())]);verify_staged_radio(&staged,&hashes).unwrap();fs::write(staged.join("radio.sound"),b"unexpected compiler edit").unwrap();assert!(verify_staged_radio(&staged,&hashes).is_err());
+        assert!(project::load_project(&parent.join("project.gsproject")).unwrap().native_asset_imports.is_empty());
+    }
+
     #[test]
     fn parent_job_hsc_sources_are_preserved_but_geometry_data_is_not_recopied() {
         let c = case();

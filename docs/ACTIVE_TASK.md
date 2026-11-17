@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: b24bac4d9d371cee4d9201a56151184806932078, canonical local master.
-Latest verified revision: this native camera/relative transport checkpoint (parent b24bac4d9d371cee4d9201a56151184806932078); final manifests/Git identify exact source.
-Next action: finish native Black Echo radio/audio, faction mission/actor alignment and reviewed resource-bank handoff in existing systems. Camera creation/relative transport choices now pass source/browser/CE609 compile/readback separately. Actual Windows42-edit/37944/restart and approved Forerunner gameplay remain OPEN under unchanged desktop control failure. No bypass retry.
+Starting revision: bbbfe21a59ed43c24274c1d24b67ec3f1dfb491a, canonical local master.
+Latest verified revision: parent bbbfe21a59ed43c24274c1d24b67ec3f1dfb491a plus this scoped radio checkpoint, identified by its Git commit and source manifests. Native/browser evidence is scoped; Operation110 incomplete.
+Next action: verify the complete production recovered working-tag radio source job and resource-bank/launch handoff through the existing Black Echo workflow, then approved native Windows/game acceptance when desktop control works. Actual42-edit/37944/Forerunner gameplay remain OPEN; no unchanged desktop retries. Preserve7-beat mission, faction kits, aircraft-relative cameras and radio. Native solo mission variants compile/read back; no delivered or gameplay-accepted candidate.
 
 ## Acceptance
 
@@ -14,11 +14,13 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
+16Nov recovered radio (parent bbbfe21): existing solo CE609/MCC13 UI/import/history/source build staging now includes immutable sound without replacing edited tags. Native typed sound path crash fixed; exact prior generated drafts upgrade safely. Frontend51/core17+imports4/browser1 and companion4/guide4/Windows all-target/TypeScript-Vite pass; actual Pelican+Spirit CE609 compile/readback preserves5original sample hashes. Exact source/cache/scenario/test-exe hashes, initial failures and boundaries: RUNTIME_INTEGRATION_20261107. Complete Windows working-tag job/restart/audible playback/game remain OPEN.
+
 16Nov cameras (parent b24bac4): existing protected camera operation now appends points; optional moving-aircraft insertion/departure shots reuse transport controller, current source and camera inventory. Frontend24/browser3/core34/native Pelican+Spirit2/Windows/guide20 pass in scope. Exact native/source/output hashes and failure corrections: RUNTIME_INTEGRATION_20261107. Native desktop/restart/framing/restored input/gameplay remain OPEN.
 
-16Nov faction kits (parent defc08c): both authored native controls/equipment profiles compile with7-beat mission and transport. Pelican cachef4a0c82c15f7e60d1d21d0d7396655ac5e4b8868dc74e38b63bcd2d1fa555d65; Spiritcb475b1430e227327d1234bb0419ba3e3fb3fa1c6db88602e3f095a0b58201af. Exact negative cases/source/cache/test-exe hashes and current contract reference in RUNTIME_INTEGRATION_20261107. Actual gear/flight/complete faction mission and native UI/Save37944 remain OPEN.
+16Nov faction kits b24bac4: both native controls/profiles +7-beat mission and transports compile/read back; exact hashes/negative cases in RUNTIME_INTEGRATION_20261107. Gear/flight/native Windows/game acceptance OPEN.
 
-16Nov pilot animation/Spirit (parent027c8c0): actual base/start actor → biped → exact graph driver-label review, bounded native count/label reads and saved-draft refusal. Both actual UI controller payloads +7-objective mission compile CE609 and independently read back pilot/graph/routes/original slots. Pelicancachee122b840495e9ec8ad6288f3bbc1a500963d93d77a6612f144bab95224f42b9c; Spirit985df7845e18d27194984ec52029bd80d1a757a6fef0eda3621c4de230287d8f. Core5+2/browser3/native2/Windows reader3/all-target/TypeScript-Vite/guide20contexts PASS. Exact hashes/errors/limits: RUNTIME_INTEGRATION_20261107. No game/faction-mission acceptance.
+16Nov pilot/Spirit defc08c: actual source actor/biped/graph/seat admission and both generated controllers compile/read back. Exact hashes/tests/errors in RUNTIME_INTEGRATION_20261107 and Git; game/faction acceptance OPEN.
 
 Deferred pilot/named technology/deployment milestones027c8c0/08500da retain exact scoped tests, hashes and native evidence in RUNTIME_INTEGRATION_20261107 and Git. They remain accepted in scope, not gameplay.
 
@@ -30,9 +32,7 @@ Prior recovered7-beat/native collection authoring (74c16ac) and mission source�
 
 Native flight/route milestones78c01b2/e2879a6 retain exact scoped hashes/tests/clearance limits in RUNTIME_INTEGRATION_20261107 and Git. Gameplay remains OPEN.
 
-16Nov CI/setup fbcdc8d: all3 stale native verifier calls repaired; Windows workspace/all-target check, dependency core6/frontend8/browser4+3/TypeScript pass. Runtime pickers/downloads, source tags before map creation and external tool/SDK links connected. Hosted/Linux run pending owner push. Final master e210fbc9 retained exactly. Evidence: RUNTIME_INTEGRATION_20261107.
-
-16Nov P0: frozen Save/native history ordering and paint-dependent keyboard Save/Undo repaired. Unit24/browser11/native storage13/TypeScript-Vite pass; exact causes/failures/hashes in RUNTIME_INTEGRATION_20261107. Actual Windows42-edit/full restart/37944 remain OPEN. QA47527/run-hJ8LWQ CLOSED500400313logicalB; root absent. Prior c9d1d11 command-route proof remains there; flight/mission acceptance open.
+Prior CI/setup and P0 source fixes fbcdc8d/e3f0e2d retain exact scoped evidence in RUNTIME_INTEGRATION_20261107 and Git. Hosted CI, actual Windows42-edit/full restart/Save37944 remain OPEN.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
@@ -46,6 +46,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Current recovered radio since bbbfe21: native solo availability, exact source/async guard, sound-only authoring parent deltas, missing-file staging/leases, compiled sound and original/staged byte rechecks, native HSC paths and legacy generated-module migration. Source/browser/native checks pass in scope; no full production Windows/audio/game claim. All source retained, no source WIP discarded.
 
 Current camera workflow since b24bac4: Add native camera point including empty source, name/pose/lens/viewport draft, protected Preview/Accept/Restore; relative transport camera choices and actual current-source preparation/build gating; saved controller history and native output checked. Source/browser/native proofs are distinct from actual app/game/restart. Both factions retain their kits/pilot/routes/HUD/original slots. QA31684/run-l1Q8hx CLOSED; no discarded source WIP.
 
@@ -141,7 +143,9 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Current QA31684/run-l1Q8hx CLOSED:1589724440 logicalB disposed, peak1701962732 logicalB, last allocation1461488488B; disposed allocation unavailable. Root absent; runs[]/issues[], owner exited. No retained maps/SDK/caches/archive. No game launched. Exact evidence in RUNTIME_INTEGRATION_20261107.
+Current QA19031/run-yHhkFT CLOSED:1417000367logicalB disposed; peak1535957123logicalB, last allocated1285648016B. Disposed allocation unavailable; no physical reclamation claim. Root absent; runs[]/issues[], owner finishing normal exit. No retained candidate/maps/SDK/cache/archive; no game/Forerunner write/push.
+
+Prior QA31684/run-l1Q8hx CLOSED:1589724440 logicalB disposed, peak1701962732 logicalB, last allocation1461488488B; disposed allocation unavailable. Root absent; runs[]/issues[], owner exited. No retained maps/SDK/caches/archive. No game launched. Exact evidence in RUNTIME_INTEGRATION_20261107.
 
 Prior QA52570/run-ttbH55 CLOSED:2248427795logicalB disposed; allocation disposal unavailable. Root absent, owner exited, storage runs[]/issues[]. No retained test binaries/maps/SDK/archive or original/runtime/Forerunner writes. Exact native/checkpoint evidence: RUNTIME_INTEGRATION_20261107. Resume from local commit, not retired scratch.
 

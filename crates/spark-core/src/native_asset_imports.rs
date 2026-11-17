@@ -155,6 +155,12 @@ pub fn find_source<'a>(project: &'a Project, sha256: &str, class: &str, path: &s
     project.native_asset_imports.iter().find(|binding|
         binding.source_sha256 == sha256 && binding.tag_class == class && key(&binding.tag_path) == key(path))
 }
+/// The same exact cue identity drives origin checks and working-source staging.
+pub fn mission_sound_used(project:&Project,binding:&Binding)->bool {
+    (project.quick_forge.as_ref().is_some_and(|doc|doc.game_mode=="campaign")||project.quick_forge.is_none()&&project.source.is_some())&&
+        binding.tag_class=="snd!"&&project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.sound_cue.as_ref().is_some_and(|cue|
+            cue.import_id==binding.id&&cue.sound_path==binding.native_path.replace('\\',"/"))))
+}
 /// Current placements select immutable imports; older unused receipts remain
 /// available to Undo but must not block a replacement's newer source revision.
 pub fn is_used(project: &Project, binding: &Binding) -> bool {
@@ -173,9 +179,7 @@ pub fn is_used(project: &Project, binding: &Binding) -> bool {
             _ => false,
         }
     });
-    let mission=project.quick_forge.as_ref().is_some_and(|doc|doc.game_mode=="campaign")&&
-        project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.sound_cue.as_ref().is_some_and(|cue|
-            cue.import_id==binding.id&&binding.tag_class=="snd!"&&cue.sound_path==binding.native_path.replace('\\',"/"))));
+    let mission=mission_sound_used(project,binding);
     firefight || mission || project.scene.iter().any(|object| {
         object.source_model.as_ref().and_then(|source| find(project, source))
             .is_some_and(|value| value.id == binding.id)
@@ -561,11 +565,11 @@ pub fn staging_inventory(root: &Path, project: &Project) -> Result<crate::native
     }
     Ok(crate::native_staging::Inventory { files, bytes })
 }
-pub fn stage(
-    root: &Path,
-    project: &Project,
-    destination: &Path,
-) -> Result<BTreeMap<String, String>> {
+pub fn stage(root:&Path,project:&Project,destination:&Path)->Result<BTreeMap<String,String>> {stage_impl(root,project,destination,false)}
+/// New reviewed imports may reuse byte-identical staged inputs. Never overwrite
+/// an edited or unrelated tag, including inside the import's owned namespace.
+pub(crate) fn stage_working(root:&Path,project:&Project,destination:&Path)->Result<BTreeMap<String,String>> {stage_impl(root,project,destination,true)}
+fn stage_impl(root:&Path,project:&Project,destination:&Path,reuse_exact:bool)->Result<BTreeMap<String,String>> {
     let mut hashes = BTreeMap::new();
     for binding in &project.native_asset_imports {
         let (tags, receipt) = receipt(root, project, binding)?;
@@ -577,23 +581,25 @@ pub fn stage(
         {
             return invalid("Native import files escaped their owned namespace");
         }
-        let path = destination.join(&prefix);
-        let bytes = receipt.files.iter().map(|file| file.bytes).sum();
-        let lease = crate::storage::Store::for_output(&path)?.reserve(
-            &path,
-            Some(&tags),
-            crate::storage::estimate_copy(receipt.files.len(), bytes),
-            crate::storage::Category::Staging,
-            "Native asset compiler inputs",
-        )?;
-        copy_new(&tags, destination, &receipt.files)?;
+        if reuse_exact {
+            for file in &receipt.files {let to=destination.join(safe_relative(&file.path)?);reject_links(&to)?;if to.try_exists()?&&(fs::metadata(&to)?.len()!=file.bytes||maps::hash_file(&to)?!=file.sha256){return invalid("A staged native import differs from its reviewed bytes; edited tags were preserved");}}
+            // The storage store requires a NEW owned output. Existing identical
+            // files need no reservation; each missing file gets its own lease.
+            for file in &receipt.files {let relative=safe_relative(&file.path)?;let to=destination.join(&relative);if to.try_exists()?{continue;}let from=tags.join(relative);
+                let lease=crate::storage::Store::for_output(&to)?.reserve(&to,Some(&from),crate::storage::estimate_copy(1,file.bytes),crate::storage::Category::Staging,"Reviewed missing native mission sound input")?;
+                copy_new(&tags,destination,std::slice::from_ref(file))?;lease.finish(false,Some(file.sha256.clone()))?;
+            }
+        }else{
+            let path=destination.join(&prefix);let bytes=receipt.files.iter().map(|file|file.bytes).sum();
+            let lease=crate::storage::Store::for_output(&path)?.reserve(&path,Some(&tags),crate::storage::estimate_copy(receipt.files.len(),bytes),crate::storage::Category::Staging,"Native asset compiler inputs")?;
+            copy_new(&tags,destination,&receipt.files)?;if tag_exchange::inventory(&tags)?.0!=receipt.files{return invalid("Native asset import changed during build staging");}lease.finish(false,Some(binding.receipt_sha256.clone()))?;
+        }
         for file in &receipt.files {
             hashes.insert(file.path.clone(), file.sha256.clone());
         }
-        if tag_exchange::inventory(&tags)?.0 != receipt.files {
+        if reuse_exact&&tag_exchange::inventory(&tags)?.0 != receipt.files {
             return invalid("Native asset import changed during build staging");
         }
-        lease.finish(false, Some(binding.receipt_sha256.clone()))?;
     }
     Ok(hashes)
 }
@@ -911,6 +917,9 @@ mod tests {
         assert_eq!(planned.files.len(), 1);
         assert_eq!(planned.bytes, b"source identity".len() as u64);
         assert_eq!(planned.files[0].path, receipt.files[0].path);
+        let staged=root.path().join("working-tags");fs::create_dir(&staged).unwrap();
+        assert_eq!(stage_working(root.path(),&project,&staged).unwrap(),expected);assert_eq!(stage_working(root.path(),&project,&staged).unwrap(),expected);
+        let edited=staged.join(&receipt.files[0].path);fs::write(&edited,b"edited source must stay").unwrap();assert!(stage_working(root.path(),&project,&staged).is_err());assert_eq!(fs::read(&edited).unwrap(),b"edited source must stay");assert_eq!(fs::read(&file).unwrap(),b"source identity");
         fs::write(&file, b"changed payload").unwrap();
         assert!(source_hashes(root.path(), &project).is_err());
         assert!(staging_inventory(root.path(), &project).is_err(), "Admission must rehash payloads, not trust old receipt sizes");

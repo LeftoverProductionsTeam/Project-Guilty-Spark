@@ -227,3 +227,9 @@ it('creates only the selected named collection weapon inside its eligible missio
  expect(haloSourceDeclarations(after.content).map(row=>[row.kind,row.type,row.name])).toEqual(haloSourceDeclarations(before.content).map(row=>[row.kind,row.type,row.name]));
  for(const value of ['', 'bad) (quit)', '../weapon', 'a'.repeat(32)])expect(()=>exportHaloCeMission({...make(),missions:[{...make().missions[0],createWeaponObject:value}]})).toThrow();expect(()=>exportHaloCeMission({...make(),missions:[{...make().missions[0],trigger:'manual',createWeaponObject:'be_technology'}]})).toThrow();
 });
+
+it('recovered radio legacy paths preserve exact original bodies and refuse handwritten changes',async()=>{
+ const studio=emptyCreatorStudio();studio.missions=[{id:'brief',title:'Briefing',objective:'Advance',trigger:'manual',encounterName:'',soundCue:{importId:'radio',soundPath:'sound/voice',phase:'start',gain:1,delayMs:0,caption:''}}];
+ const source=recoveredCampaignMission(studio,'manual',false),legacy=source.content.replaceAll('(sound_impulse_start "sound\\voice"','(sound_impulse_start "sound/voice"').replaceAll('(sound_impulse_time "sound\\voice"','(sound_impulse_time "sound/voice"');
+ expect(legacy).not.toBe(source.content);expect((await readRecoveredMissionSource(legacy)).missions).toEqual(studio.missions);await expect(readRecoveredMissionSource(legacy+'; handwritten\n')).rejects.toThrow(/edited/);
+});

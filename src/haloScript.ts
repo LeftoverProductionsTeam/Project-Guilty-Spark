@@ -52,11 +52,12 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
   const cueLines=(beat:CreatorStudioDocument['missions'][number],index:number,phase:'start'|'complete'):string[]=>{
     const cue=beat.soundCue;if(!cue||cue.phase!==phase)return [];
     deps.push('sound:'+cue.soundPath);
+    const nativePath=cue.soundPath.replaceAll('/','\\');
     const text:string[]=[];
     if(cue.delayMs)text.push('  (sleep '+ticks(cue.delayMs)+')');
     if(cue.caption){deps.push('hud_message:gs_mission_cue_'+(index+1));text.push('  (hud_set_help_text gs_mission_cue_'+(index+1)+')','  (show_hud_help_text true)');}
-    text.push('  (sound_impulse_start "'+cue.soundPath+'" none '+cue.gain+')',
-      '  (sleep_until (<= (sound_impulse_time "'+cue.soundPath+'") 0) 1 18000)');
+    text.push('  (sound_impulse_start "'+nativePath+'" none '+cue.gain+')',
+      '  (sleep_until (<= (sound_impulse_time "'+nativePath+'") 0) 1 18000)');
     if(cue.caption)text.push('  (show_hud_help_text false)');
     return text;
   };
@@ -219,9 +220,13 @@ export function haloSourceDeclarations(source:string):HaloSourceDeclaration[]{
 function validateMissionComposition(value:RecoveredMissionComposition,requireRetained=false){
  if(!value||Object.keys(value).some(key=>!['filename','sourceSha256','retainedSha256','retiredStartups','replaceExtractionCallback'].includes(key))||!/^([A-Za-z0-9_-]{1,31})\.hsc$/.test(value.filename)||value.filename.toLowerCase()==='global_scripts.hsc'||!/^[a-f0-9]{64}$/i.test(value.sourceSha256)||!Array.isArray(value.retiredStartups)||value.retiredStartups.length>16||value.retiredStartups.some(name=>!ident.test(name))||new Set(value.retiredStartups.map(name=>name.toLowerCase())).size!==value.retiredStartups.length||typeof value.replaceExtractionCallback!=='boolean'||requireRetained&&!/^[a-f0-9]{64}$/i.test(value.retainedSha256??''))throw Error('Invalid reviewed mission source composition.');
 }
-function recoveredMissionDocument(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean,composition?:RecoveredMissionComposition,retained?:string):ScriptExport{
+function legacyMissionRadioSource(content:string,missions:CreatorStudioDocument['missions']):string {
+ for(const beat of missions){const cue=beat.soundCue;if(!cue)continue;for(const op of ['sound_impulse_start','sound_impulse_time'])content=content.replaceAll('('+op+' "'+cue.soundPath.replaceAll('/','\\')+'"','('+op+' "'+cue.soundPath+'"');}return content;
+}
+function recoveredMissionDocument(studio:CreatorStudioDocument,activation:'manual'|'startup',forerunner:boolean,composition?:RecoveredMissionComposition,retained?:string,legacyRadioPaths=false):ScriptExport{
  if(!['manual','startup'].includes(activation)||typeof forerunner!=='boolean')throw Error('Choose manual or startup recovered mission activation.');
  const source=exportHaloCeMission(studio,{forerunner});
+ if(legacyRadioPaths)source.content=legacyMissionRadioSource(source.content,studio.missions);
  const bootstrap='\n(script startup gs_mission_bootstrap\n'+(activation==='startup'?'  (sleep_until (> (list_count (players)) 0) 1)\n  (wake gs_mission)':'  (sleep -1)')+'\n)\n';
  const configuration={activation,forerunner,missions:studio.missions,shots:studio.shots,...(composition?{composition}:{})};
  let body=source.content+bootstrap;
@@ -270,7 +275,7 @@ export async function readRecoveredMissionSource(content:string){
  const studio={...emptyCreatorStudio(),missions:configuration.missions,shots:configuration.shots};
  const retained=configuration.composition?retainedMissionSource(content):undefined;
  if(configuration.composition&&(!content.includes(retainedMissionMarker)||await nativeMissionHash(retained!)!==configuration.composition.retainedSha256))throw Error('Retained module source was edited or its checksum is missing. Preserve it through the manual source editor.');
- if(recoveredMissionDocument(studio,configuration.activation,configuration.forerunner,configuration.composition,retained).content!==content)throw Error('Recovered mission source was edited. Preserve it through the manual source workflow; regeneration refused.');
+ if(recoveredMissionDocument(studio,configuration.activation,configuration.forerunner,configuration.composition,retained).content!==content&&recoveredMissionDocument(studio,configuration.activation,configuration.forerunner,configuration.composition,retained,true).content!==content)throw Error('Recovered mission source was edited. Preserve it through the manual source workflow; regeneration refused.');
  return configuration as {activation:'manual'|'startup';forerunner:boolean;missions:CreatorStudioDocument['missions'];shots:CreatorStudioDocument['shots'];composition?:RecoveredMissionComposition};
 }
 
@@ -331,7 +336,8 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
   const body=module.content.slice(end+1);
   if((await nativeMissionHash(body)).toLowerCase()!==binding.sourceSha256.toLowerCase())
     throw Error('Attached mission source differs from its checksum. No mission data was adopted or regenerated.');
-  if(body!==nativeMissionBody(binding.missions,binding.activation,binding.cinematic,binding.cinematicIntro))
+  const expectedBody=nativeMissionBody(binding.missions,binding.activation,binding.cinematic,binding.cinematicIntro);
+  if(body!==expectedBody&&body!==legacyMissionRadioSource(expectedBody,binding.missions))
     throw Error('Attached mission data differs from the current generated source, or uses another generator. Preserve/export the module in Logic / Events before explicit reconciliation.');
   return binding;
 }
@@ -405,9 +411,10 @@ function nativeMissionBody(missions:NativeMissionBinding['missions'],activation:
     '  (sleep_until gs_logic_ready 1)', '  (wake gs_mission)', ')', '',
   ].join('\r\n'):'');
 }
-async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[],cinematicIntro=true):Promise<string> {
+async function nativeMissionModule(missions:NativeMissionBinding['missions'],activation:NativeMissionBinding['activation'],cinematic?:CameraShot[],cinematicIntro=true,legacyRadioPaths=false):Promise<string> {
   if(!['manual','startup'].includes(activation))throw Error('Choose manual or startup mission activation.');
-  const body=nativeMissionBody(missions,activation,cinematic,cinematicIntro);
+  const currentBody=nativeMissionBody(missions,activation,cinematic,cinematicIntro);
+  const body=legacyRadioPaths?legacyMissionRadioSource(currentBody,missions):currentBody;
   const sourceSha256=await nativeMissionHash(body);
   const binding:NativeMissionBinding={schemaVersion:1,missions,activation,sourceSha256,...(cinematic?{cinematic,...(!cinematicIntro?{cinematicIntro:false}:{})}:{})};
   const header=JSON.stringify(binding).replace(/[\u007f-\uffff]/g,character=>
@@ -463,7 +470,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
       if(old.schemaVersion!==1||!['manual','startup'].includes(old.activation)||!Array.isArray(old.missions))throw Error('Invalid binding');
       original=await nativeMissionModule(old.missions,old.activation,old.cinematic,old.cinematicIntro);
     } catch {throw Error('The existing mission binding cannot be regenerated safely. Preserve/export it before explicitly removing it from the build.');}
-    if(existing.content!==original)
+    if(existing.content!==original&&existing.content!==await nativeMissionModule(old.missions,old.activation,old.cinematic,old.cinematicIntro,true))
       throw Error('Mission source contains edits or uses a different generator. Preserve/export it before explicitly removing and regenerating it.');
   }
   const cinematicIntro=includeCinematic??previousCinematic;

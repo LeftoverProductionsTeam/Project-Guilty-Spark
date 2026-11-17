@@ -62,9 +62,9 @@ console.log('PASS: Black Echo starter, optional native objective guard, HUD/AI g
 // audio must follow its guarded encounter wait and precede native progression.
 const radio=emptyCreatorStudio();radio.missions=[{id:'radio',title:'Evac',objective:'Defend',trigger:'encounterCleared',encounterName:'defense',conditionVolume:'evac',
  soundCue:{importId:'owned_sound',soundPath:'gs_assets_owned/sound/radio distress',phase:'complete',gain:.5,delayMs:500,caption:'Evac is ready.'}}];
-const cue=exportHaloCeMission(radio),cleared=cue.content.indexOf('(sleep_until (= (ai_living_count defense) 0) 15)'),audio=cue.content.indexOf('(sound_impulse_start "gs_assets_owned/sound/radio distress" none 0.5)');
+const cue=exportHaloCeMission(radio),cleared=cue.content.indexOf('(sleep_until (= (ai_living_count defense) 0) 15)'),audio=cue.content.indexOf('(sound_impulse_start "gs_assets_owned\\sound\\radio distress" none 0.5)');
 assert.ok(audio>cleared);assert.ok(cue.content.indexOf('(hud_set_help_text gs_mission_cue_1)')>cleared);
-assert.ok(cue.content.includes('(sleep 15)'));assert.ok(cue.content.includes('(sleep_until (<= (sound_impulse_time "gs_assets_owned/sound/radio distress") 0) 1 18000)'));
+assert.ok(cue.content.includes('(sleep 15)'));assert.ok(cue.content.includes('(sleep_until (<= (sound_impulse_time "gs_assets_owned\\sound\\radio distress") 0) 1 18000)'));
 assert.ok(cue.dependencies.includes('sound:gs_assets_owned/sound/radio distress'));assert.ok(cue.dependencies.includes('hud_message:gs_mission_cue_1'));
 assert.ok(cue.content.indexOf('(show_hud_help_text false)',audio)<cue.content.indexOf('  ))',audio));
 radio.missions[0].soundCue.soundPath='sound/" ) (quit)';assert.throws(()=>exportHaloCeMission(radio),/Invalid mission beat/);

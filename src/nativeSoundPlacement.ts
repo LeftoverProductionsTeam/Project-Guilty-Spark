@@ -2,7 +2,7 @@ import { call } from './api';
 import { attachAssetImport, prepareAssetImport } from './nativeAssetImport';
 import type { SoundEmitter } from './spatialAudio';
 import { emptySoundScene } from './spatialAudio';
-import type { OpenProject, Project } from './types';
+import type { MapInspection, OpenProject, Project } from './types';
 
 export function nativeSoundUnavailable(project: Project, emitter: SoundEmitter): string | null {
   if (!project.quickForge || project.quickForge.runtimeId !== 'mccSteam')
@@ -92,10 +92,13 @@ export function includePreparedSound(
 
 /** Mission radio uses the existing recursive import and owned source identity.
  * Custom WAVs/looping tracks remain in their original editor workflow. */
-export async function prepareMissionSound(project:Project,emitter:SoundEmitter) {
-  if(!project.quickForge||project.quickForge.native||project.quickForge.gameMode!=='campaign'||
-    !['mccSteam','haloCustomEdition','chupathingyCe'].includes(project.quickForge.runtimeId))
-    throw Error('Mission radio needs editable Campaign / scripted solo source.');
+export function missionSoundUnavailable(project:Project,inspection?:MapInspection|null):string|null {
+  if(project.quickForge){if(project.quickForge.native||project.quickForge.gameMode!=='campaign'||!['mccSteam','haloCustomEdition','chupathingyCe'].includes(project.quickForge.runtimeId))return 'Mission radio needs local editable Campaign source; shared native imports use their negotiated publication.';return null;}
+  if(!project.source||inspection?.sha256!==project.source.sha256||inspection.header.scenarioType!==0||![609,13].includes(inspection.header.version))return 'Recovered mission radio needs the matching CE609 or MCC13 solo source. Open its native campaign first; other formats need their supported conversion.';
+  return null;
+}
+export async function prepareMissionSound(project:Project,emitter:SoundEmitter,inspection?:MapInspection|null) {
+  const unavailable=missionSoundUnavailable(project,inspection);if(unavailable)throw Error(unavailable);
   if(emitter.customSound||emitter.loopingSource)
     throw Error('Choose a native one-shot sound. Custom recordings need a compiled sound tag; loops stay in Map sounds.');
   const id=emitter.sourceProjectId??project.id,hash=emitter.sourceSha256??project.source?.sha256;

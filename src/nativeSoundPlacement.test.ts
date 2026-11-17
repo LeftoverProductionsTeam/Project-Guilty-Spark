@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createEmitter, emptySoundScene } from './spatialAudio';
-import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound, prepareMissionSound } from './nativeSoundPlacement';
+import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound, prepareMissionSound,missionSoundUnavailable } from './nativeSoundPlacement';
 import {prepareCampaignActor} from './nativeAssetImport';
 import { editRevisionKey, changedEditInputs } from './smartEdit';
 import { historyReducer, initialHistory } from './editor';
@@ -199,4 +199,13 @@ it('includes a genuine Xbox-cache actor identity through the existing source imp
  expect(api.call).toHaveBeenLastCalledWith('prepare_native_asset_import',{projectId:project.id,sourceProjectId:sourceId,sourceSha256:hash,tagId:42,existing:null});
  expect(JSON.stringify(project)).toBe(original);await expect(prepareCampaignActor(project,source,43)).rejects.toThrow(/actor variant/);
  const stale=structuredClone(source);stale.inspection!.sha256='c'.repeat(64);await expect(prepareCampaignActor(project,stale,42)).rejects.toThrow(/exact source map/);
+});
+
+it('includes recovered solo mission audio without QuickForge and refuses stale or unsupported destinations',async()=>{
+ const {project,emitter}=fixture();project.quickForge=null;project.source={sha256:hash,cacheVersion:609} as Project['source'];const inspection={sha256:hash,header:{version:609,scenarioType:0}} as import('./types').MapInspection;
+ const radio={...emitter,loopingSource:undefined,tagId:8},sound={...binding,tagClass:'snd!',tagId:8,tagPath:'sound/radio',nativePath:'gs_assets_owned/sound/radio'};
+ api.call.mockImplementation(async(command:string)=>{if(command==='open_project')return{project:{id:sourceId,source:{sha256:hash}},inspection:{sha256:hash,header:{version:609},tags:[{id:8,class:'snd!',path:'sound/radio'}]}};if(command==='prepare_native_asset_import')return sound;throw Error(command);});
+ const before=JSON.stringify(project);expect(missionSoundUnavailable(project,inspection)).toBeNull();expect(await prepareMissionSound(project,radio,inspection)).toEqual(sound);expect(JSON.stringify(project)).toBe(before);
+ for(const next of [{...inspection,sha256:'c'.repeat(64)},{...inspection,header:{...inspection.header,scenarioType:1}},{...inspection,header:{...inspection.header,version:5}}])await expect(prepareMissionSound(project,radio,next)).rejects.toThrow(/matching CE609 or MCC13 solo/);
+ await expect(prepareMissionSound(project,radio)).rejects.toThrow(/matching CE609/);
 });

@@ -1185,6 +1185,7 @@ pub(super) async fn build_working_tags(
         let hud_readback_targets=native_operations_native::hud_readback_targets(&state,&context.source_project,&context.build)?;
         let scenario_squad_readback=native_operations_native::squad_readback_targets(&state,&context.source_project,&context.build,&context.tags,expected_tag_identity.is_some()&&compile_scripts.unwrap_or(false))?;
         let source_project=context.source_project;
+        asset_import_native::guard_import_sources(&state,&project)?;
         let mut input=core::working_tags::WorkingTagsInput{mission_hud,hud_readback_targets,scenario_squad_readback,encounter_append,script_attachment,expected_encounter,compile_scripts:compile_scripts.unwrap_or(false),expected_tag_identity,bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));

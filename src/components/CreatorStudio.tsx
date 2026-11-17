@@ -31,7 +31,7 @@ import type {NativeAiStartView} from '../nativeAiStart';
 import {useMapState,readMapSession,writeMapSession} from '../mapSession';
 import SoundAudition from './SoundAudition';
 import {attachAssetImport} from '../nativeAssetImport';
-import {prepareMissionSound} from '../nativeSoundPlacement';
+import {prepareMissionSound,missionSoundUnavailable} from '../nativeSoundPlacement';
 import type {NativeAssetImport} from '../types';
 import ExternalBrowserLink from './ExternalBrowserLink';
 
@@ -260,9 +260,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     if(!beat||!emitter){setError('Choose a saved native one-shot sound from Map sounds first.');return;}
     const release=beginProjectMutation(input.id);setIncludingSound(true);setError('');
     try{
-      const binding=await prepareMissionSound(input,emitter),latest=latestProject.current;
+      const binding=await prepareMissionSound(input,emitter,sourceInspection),latest=latestProject.current;
       if(activeProject.current!==input.id||latest.id!==input.id||latest.studio!==input.studio||
-        latest.quickForge!==input.quickForge||latest.audioPreview!==input.audioPreview)
+        latest.source!==input.source||latest.quickForge!==input.quickForge||latest.audioPreview!==input.audioPreview)
         throw Error('The map, mission or sound changed during inclusion. No older cue was applied; prepared tags remain available for retry.');
       const cue={importId:binding.id,soundPath:binding.nativePath.replaceAll('\\','/'),phase:'start' as const,
         gain:Math.max(0,Math.min(1,emitter.gain)),delayMs:0,caption:''};
@@ -486,10 +486,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
             onChange={event=>setCueSources({...cueSources,[beat.id]:event.target.value})}>
             <option value="">Choose a saved one-shot</option>
             {(project.audioPreview?.emitters??[]).filter(emitter=>!emitter.loopingSource&&!emitter.customSound).map(emitter=><option key={emitter.id} value={emitter.id}>{emitter.name}</option>)}
-          </select></label><button type="button" disabled={includingSound||!cueSources[beat.id]||!project.quickForge||!!project.quickForge.native||project.quickForge.gameMode!=='campaign'}
+          </select></label><button type="button" disabled={includingSound||!cueSources[beat.id]||!!missionSoundUnavailable(project,sourceInspection)}
             onClick={()=>void includeMissionSound(beat.id)}>Include sound for objective {i+1}</button></div>
+          {missionSoundUnavailable(project,sourceInspection)&&<Notice tone="info">{missionSoundUnavailable(project,sourceInspection)}</Notice>}
           <p className="studio-hint">Drag an owned native sound from Asset library into Level Editor → Map sounds first, or choose an already included sound.
-            Creator recordings need native sound tags; importing a WAV for rehearsal alone does not compile it.</p>
+            For recovered solo source, inclusion retains an immutable sound copy; Save, read native mission source, prepare/review and compile to stage it without replacing edited tags. Creator recordings need native sound tags; importing a WAV for rehearsal alone does not compile it.</p>
           {beat.soundCue&&<>
             <div className="studio-fields"><label>Play cue<select aria-label={'Cue timing '+(i+1)} value={beat.soundCue.phase}
               onChange={event=>updateBeat(beat.id,{soundCue:{...beat.soundCue!,phase:event.target.value as 'start'|'complete'}})}>
