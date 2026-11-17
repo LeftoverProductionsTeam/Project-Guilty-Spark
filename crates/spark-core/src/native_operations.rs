@@ -52,7 +52,7 @@ pub enum Operation {
     Dependencies,
     DevicePlacement {device:NativeDevicePlacement,#[serde(rename="sourceSha256")] source_sha256:String},
     TriggerVolume {index:u16,name:String,geometry:crate::maps::ScenarioLogicVolumeGeometry,#[serde(rename="sourceSha256")] source_sha256:String},
-    CutsceneCamera {point:crate::maps::NativeCameraPoint,#[serde(rename="sourceSha256")] source_sha256:String},
+    CutsceneCamera {point:crate::maps::NativeCameraPoint,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32,
         #[serde(default,skip_serializing_if="Option::is_none")] difficulty:Option<EncounterDifficulty> },
@@ -246,7 +246,7 @@ impl Operation {
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source and finite position/rotation");}}
             Self::TriggerVolume{index,name,geometry,source_sha256}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
-            Self::CutsceneCamera{point,source_sha256}=>{
+            Self::CutsceneCamera{point,source_sha256,..}=>{
                 if class!="scnr"||point.index>=512||point.name.len()>32||point.name.chars().any(char::is_control)||point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.orientation_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU+1e-6)||!point.fov_radians.is_finite()||!(5f32.to_radians()..=150f32.to_radians()).contains(&point.fov_radians)||source_sha256.len()!=64||!source_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return invalid("Native camera editing needs exact source/index/name, finite pose and5–150degree FOV");}
             }
             Self::AppendEncounter {name,actor_path,position,count,spacing,difficulty,..} => {
@@ -334,7 +334,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::FactionKits{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
+            Self::FactionKits{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("This native edit requires the original scenario or asset field inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -484,10 +484,16 @@ impl Operation {
             if row.name!=*name||row.kind!=1||row.geometry.as_ref().is_none_or(|g|volume_geometry_close(g,geometry)){return invalid("Trigger source changed, is unsupported or already matches");}
             let prefix=format!("trigger_volumes[{index}]");let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];for(field,value)in volume_values(geometry){args.extend(["-S".into(),format!("{prefix}.{field}"),value.map(|v|v.to_string()).join(",")]);}args.push(tag.into());return Ok(args);
         }
-        if let Self::CutsceneCamera{point,..}=self{
-            let original=native_camera_fields(before)?.into_iter().find(|(p,_)|p.index==point.index&&p.name==point.name).ok_or_else(||crate::SparkError::Invalid("Selected native camera index/name changed".into()))?.0;
-            if camera_points_close(&original,point){return invalid("Native camera already matches; no candidate was written");}
+        if let Self::CutsceneCamera{point,append,..}=self{
+            let points=native_camera_fields(before)?;
             let prefix=format!("cutscene_camera_points[{}]",point.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+            if *append {
+                if point.index as usize!=points.len()||!crate::creative::script_ident(&point.name)||points.iter().any(|(p,_)|p.name.eq_ignore_ascii_case(&point.name)){return invalid("Append a uniquely named camera at the end of the current native inventory");}
+                args.extend(["-I".into(),"cutscene_camera_points".into(),"1".into(),"end".into(),"-S".into(),format!("{prefix}.name"),point.name.clone()]);
+            }else{
+                let original=points.into_iter().find(|(p,_)|p.index==point.index&&p.name==point.name).ok_or_else(||crate::SparkError::Invalid("Selected native camera index/name changed".into()))?.0;
+                if camera_points_close(&original,point){return invalid("Native camera already matches; no candidate was written");}
+            }
             for(field,value)in crate::engine_machinima::camera_point_values(point.position,point.orientation_radians,point.fov_radians){args.extend(["-S".into(),format!("{prefix}.{field}"),value]);}args.push(tag.into());return Ok(args);
         }
         if self.combat_target_key().is_some(){return combat_arguments(self,tags,tag,before);}
@@ -789,7 +795,14 @@ pub fn reviewed_difference(
     if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}
     if let Operation::DevicePlacement{device,..}=operation{return reviewed_device(before,after,device);}
     if let Operation::TriggerVolume{index,name,geometry,..}=operation{return reviewed_volume(before,after,*index,name,geometry);}
-    if let Operation::CutsceneCamera{point,..}=operation{return reviewed_camera(before,after,point);}
+    if let Operation::CutsceneCamera{point,append,..}=operation{
+        if *append {
+            let old=scenario_camera_choices(before)?;let new=scenario_camera_choices(after)?;
+            if point.index as usize!=old.len()||!crate::creative::script_ident(&point.name)||old.iter().any(|p|p.name.eq_ignore_ascii_case(&point.name))||new.len()!=old.len()+1||!new.last().is_some_and(|p|camera_points_close(p,point)){return invalid("Appended camera differs from reviewed source/name/pose");}
+            transport::preserved_arrays(before,after,&[("cutscene_camera_points",1)])?;
+            return Ok(vec![FieldDifference{before:format!("{} native cameras",old.len()),after:format!("Append {} at index{}; original points and source retained",point.name,point.index)}]);
+        }return reviewed_camera(before,after,point);
+    }
 
     if operation.combat_target_key().is_some(){return reviewed_combat(before,after,operation);}
     if operation.is_squad_start_edit(){return reviewed_start_position(before,after,operation);}
@@ -1571,7 +1584,7 @@ mod tests {
         let combined=pose([2.,3.,4.],std::f32::consts::PI);run(combined.arguments_with_fields(&tags,"scnr",tag,&rotated).unwrap());let after_pose=fields();assert_eq!(reviewed_difference(&rotated,&after_pose,&combined).unwrap().len(),2);let read=run(combined.readback_arguments(&tags,"scnr",tag,&rotated).unwrap().unwrap());combined.verify_readback(&tags,"scnr",tag,&rotated,&read).unwrap();
         let original=pose([1.,1.,1.],std::f32::consts::FRAC_PI_4);run(original.arguments_with_fields(&tags,"scnr",tag,&after_pose).unwrap());assert_eq!(before,fields());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let original_bytes=fs::read(&file).unwrap();
-        run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"cutscene_camera_points".into(),"2".into(),"end".into(),"-S".into(),"cutscene_camera_points[1].name".into(),"native_camera".into(),"-S".into(),"cutscene_camera_points[1].field_of_view".into(),70f32.to_radians().to_string(),tag.into()]);let camera_before=fields();let mut point=scenario_camera_choices(&camera_before).unwrap()[1].clone();point.position=[4.25,-5.5,6.75];point.orientation_radians=[1.25,-0.2,0.4];point.fov_radians=80f32.to_radians();let edit=Operation::CutsceneCamera{point:point.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};run(edit.arguments_with_fields(&tags,"scnr",tag,&camera_before).unwrap());let camera_after=fields();assert_eq!(reviewed_difference(&camera_before,&camera_after,&edit).unwrap().len(),3);let result=run(edit.readback_arguments(&tags,"scnr",tag,&camera_before).unwrap().unwrap());edit.verify_readback(&tags,"scnr",tag,&camera_before,&result).unwrap();assert!(camera_points_close(&point,&scenario_camera_choices(&camera_after).unwrap()[1]));println!("Native cutscene camera:index/name preserved; pose/lens roundtrip; sourceSHA={}",crate::maps::hash_file(&file).unwrap());fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"cutscene_camera_points".into(),"2".into(),"end".into(),"-S".into(),"cutscene_camera_points[1].name".into(),"native_camera".into(),"-S".into(),"cutscene_camera_points[1].field_of_view".into(),70f32.to_radians().to_string(),tag.into()]);let camera_before=fields();let mut point=scenario_camera_choices(&camera_before).unwrap()[1].clone();point.position=[4.25,-5.5,6.75];point.orientation_radians=[1.25,-0.2,0.4];point.fov_radians=80f32.to_radians();let edit=Operation::CutsceneCamera{append:false,point:point.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};run(edit.arguments_with_fields(&tags,"scnr",tag,&camera_before).unwrap());let camera_after=fields();assert_eq!(reviewed_difference(&camera_before,&camera_after,&edit).unwrap().len(),3);let result=run(edit.readback_arguments(&tags,"scnr",tag,&camera_before).unwrap().unwrap());edit.verify_readback(&tags,"scnr",tag,&camera_before,&result).unwrap();assert!(camera_points_close(&point,&scenario_camera_choices(&camera_after).unwrap()[1]));println!("Native cutscene camera:index/name preserved; pose/lens roundtrip; sourceSHA={}",crate::maps::hash_file(&file).unwrap());fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"trigger_volumes".into(),"1".into(),"end".into(),"-S".into(),"trigger_volumes[0].type".into(),"rotational".into(),"-S".into(),"trigger_volumes[0].name".into(),"native_volume".into(),"-S".into(),"trigger_volumes[0].rotation_vector_forward".into(),"1,0,0".into(),"-S".into(),"trigger_volumes[0].rotation_vector_up".into(),"0,0,1".into(),"-S".into(),"trigger_volumes[0].starting_corner".into(),"0,0,0".into(),"-S".into(),"trigger_volumes[0].ending_corner_offset".into(),"4,4,4".into(),tag.into()]);let volume_before=fields();let volume=Operation::TriggerVolume{index:0,name:"native_volume".into(),geometry:crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.25,-2.5,3.75],dimensions:[6.,7.,8.]},source_sha256:crate::maps::hash_file(&file).unwrap()};run(volume.arguments_with_fields(&tags,"scnr",tag,&volume_before).unwrap());let volume_after=fields();assert_eq!(reviewed_difference(&volume_before,&volume_after,&volume).unwrap().len(),3);let read=run(volume.readback_arguments(&tags,"scnr",tag,&volume_before).unwrap().unwrap());volume.verify_readback(&tags,"scnr",tag,&volume_before,&read).unwrap();fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
 
         run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"command_lists".into(),"2".into(),"end".into(),"-S".into(),"command_lists[0].name".into(),"guard".into(),"-S".into(),"command_lists[1].name".into(),"patrol".into(),tag.into()]);
@@ -1656,7 +1669,7 @@ mod tests {
     #[test]
     fn original_cutscene_camera_review_retains_indices_names_scripts_and_other_fields(){
         let before="cutscene_camera_points[1] array\n    cutscene_camera_points[0] struct\n        name (intro) tagstring\n        position (1,2,3) point3d\n        orientation (45,0,10) euler3d\n        field_of_view (70) angle\nscript_marker (preserve) tagstring\n";
-        let mut point=scenario_camera_choices(before).unwrap().remove(0);point.position=[4.,5.,6.];point.orientation_radians=[std::f32::consts::FRAC_PI_2,0.,0.];point.fov_radians=80f32.to_radians();let op=Operation::CutsceneCamera{point:point.clone(),source_sha256:"a".repeat(64)};
+        let mut point=scenario_camera_choices(before).unwrap().remove(0);point.position=[4.,5.,6.];point.orientation_radians=[std::f32::consts::FRAC_PI_2,0.,0.];point.fov_radians=80f32.to_radians();let op=Operation::CutsceneCamera{append:false,point:point.clone(),source_sha256:"a".repeat(64)};
         assert_eq!(op.expected_source_sha256(),Some("a".repeat(64).as_str()));let after=before.replace("position (1,2,3)","position (4,5,6)").replace("orientation (45,0,10)","orientation (90,0,0)").replace("field_of_view (70)","field_of_view (80)");assert_eq!(reviewed_difference(before,&after,&op).unwrap().len(),3);op.verify_readback(Path::new("owned"),"scnr","level.scenario",before,"4,5,6\n90,0,0\n80").unwrap();
         for changed in [after.replace("name (intro)","name (other)"),after.replace("script_marker (preserve)","script_marker (lost)"),after.replace("orientation (90,0,0)","orientation (0,0,0)")]{assert!(reviewed_difference(before,&changed,&op).is_err());}
         for fov in [f32::NAN,0.,180f32.to_radians()]{let mut bad=op.clone();if let Operation::CutsceneCamera{point,..}=&mut bad{point.fov_radians=fov;}assert!(bad.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",before).is_err());}
@@ -1871,6 +1884,16 @@ mod tests {
         for value in [f32::NAN,2049.] {wrong=custom.clone();wrong.starts.as_mut().unwrap()[0].position[0]=value;assert!(wrong.poses().is_err());}
         wrong=custom.clone();wrong.starts.as_mut().unwrap()[0].facing_radians=7.;assert!(wrong.poses().is_err());wrong=custom;wrong.starts.as_mut().unwrap()[1].id="grid-0".into();assert!(wrong.poses().is_err());
     }
+    #[test]
+    fn camera_append_retains_originals_and_legacy_edit_shape(){
+        let before="cutscene_camera_points[0] array\noriginal_metadata (preserved) string\n";
+        let point=crate::maps::NativeCameraPoint{index:0,name:"new_camera".into(),position:[1.,2.,3.],orientation_radians:[0.;3],fov_radians:60f32.to_radians()};
+        let op=Operation::CutsceneCamera{point:point.clone(),append:true,source_sha256:"a".repeat(64)};let args=op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",before).unwrap();assert!(args.windows(3).any(|w|w==["-I","cutscene_camera_points","1"]));
+        let after="cutscene_camera_points[1] array\n    cutscene_camera_points[0] struct\n        name (new_camera) string\n        position (1,2,3) point3d\n        orientation (0,0,0) euler3d\n        field_of_view (60) angle\noriginal_metadata (preserved) string\n";
+        assert_eq!(reviewed_difference(before,after,&op).unwrap().len(),1);assert!(op.arguments_with_fields(Path::new("owned"),"scnr","level.scenario",after).is_err());assert!(reviewed_difference(before,&after.replace("preserved","lost"),&op).is_err());
+        let legacy:Operation=serde_json::from_value(serde_json::json!({"kind":"cutsceneCamera","point":point,"sourceSha256":"a".repeat(64)})).unwrap();assert!(matches!(&legacy,Operation::CutsceneCamera{append:false,..}));assert!(serde_json::to_value(legacy).unwrap().get("append").is_none());
+    }
+
     #[test]
     fn native_start_pose_changes_only_requested_position_and_heading_with_degree_readback() {
         let before=ai_fields();let mut operation=start_edit();if let Operation::EncounterStartPosition{position,facing_radians,..}=&mut operation{*position=[1.,2.,3.];*facing_radians=Some(0.);}

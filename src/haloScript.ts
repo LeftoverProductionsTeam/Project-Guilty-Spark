@@ -813,6 +813,8 @@ export interface NativeTransportOptions {
   faction:'unsc'|'covenant'; pilot:string; pilotSeat:string;
   outbound:string; inbound:string; hub:string; field:string;
   departureCue?:string; arrivalCue?:string;
+  insertionCamera?:{marker:string;durationMs:number};
+  departureCamera?:{marker:string;durationMs:number};
   /** Reuse the reviewed return/insertion routes for empty hub return and recall. */
   returnAfterInsertion?:boolean;
   /** Explicit ownership of a not-initially-created native pilot. */
@@ -820,7 +822,7 @@ export interface NativeTransportOptions {
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','createPilot'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','createPilot','insertionCamera','departureCamera'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
@@ -832,6 +834,14 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     throw Error('Copy a real native pilot seat label (1–31 printable characters, without quotes or backslashes).');
   const cues=[options.departureCue,options.arrivalCue].map((cue,index)=>cue?ensureName(cue,index?'Arrival camera/dialogue function':'Departure camera/dialogue function'):null);
   const role=options.faction==='unsc'?'pelican':'spirit',craft='extraction_'+role,stem='gs_'+role;
+  const relativeCamera=(camera:NativeTransportOptions['insertionCamera'])=>{
+    if(camera==null)return [];
+    if(typeof camera!=='object'||Array.isArray(camera)||Object.keys(camera).some(key=>!['marker','durationMs'].includes(key))||!Number.isInteger(camera.durationMs)||camera.durationMs<100||camera.durationMs>30000)throw Error('Relative transport camera needs a native marker and a 100–30000 ms duration.');
+    const marker=ensureName(camera.marker,'Relative transport camera point');
+    return ['  ; Shared aircraft-relative camera; does not grant a private squad view.','  (cinematic_start)','  (player_enable_input false)','  (camera_control true)',
+      '  (camera_set_relative '+marker+' 0 (unit '+craft+'))','  (sleep '+ticks(camera.durationMs)+')','  (camera_control false)','  (player_enable_input true)','  (cinematic_stop)'];
+  };
+  const insertionCamera=relativeCamera(options.insertionCamera),departureCamera=relativeCamera(options.departureCamera);
   const health='(> (unit_get_health (unit '+craft+')) 0)';
   const crew='(vehicle_test_seat_list (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))';
   const landed='(> (device_group_get '+craft+'_landed) 0.5)';
@@ -859,6 +869,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '  (set '+stem+'_settled false)',
     ...(cues[0]?['  ('+cues[0]+')']:[]),
     '  (ai_command_list '+pilot+' '+outbound+')',
+    ...insertionCamera,
     '  (sleep_until '+pad(field)+' 1)',
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     enter(true),
@@ -881,6 +892,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     ...(cues[0]?['  ('+cues[0]+')']:[]),
     ...(options.returnAfterInsertion?['  (set '+stem+'_settled false)']:[]),
     '  (ai_command_list '+pilot+' '+inbound+')',
+    ...departureCamera,
     '  (sleep_until '+pad(hub)+' 1)',
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     '  (sleep_until (and '+pad(hub)+' '+stem+'_settled) 1)',
@@ -890,11 +902,11 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   return {filename:stem+'_transport.hsc',content:lines.join('\n'),generatedOnly:true,scenarioType:'singleplayer',
     dependencies:['native_vehicle:'+craft,'ai_encounter:'+pilot,'command_list:'+outbound,'command_list:'+inbound,
       'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
-      ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue)],
+      ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
       'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
-      'Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};
+      'Optional relative camera coordinates are offsets in the craft frame, not world positions. These shared cinematics affect all viewers and temporarily control input; source points and restoration need game testing. Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};
 }
 
 export function readNativeTransportSource(content:string):NativeTransportOptions {

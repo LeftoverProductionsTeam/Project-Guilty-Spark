@@ -15,3 +15,7 @@ it('refuses invalid draft values and stale original camera/source identities',()
  for(const patch of [{tagSha256:'b'.repeat(64)},{cameraEditIssue:'Unavailable'},{scenarioCameras:[{...point,name:'renamed'}]},{scenarioCameras:[{...point,index:2}]}])expect(nativeCameraMatches(view,{...context,...patch})).toBe(false);
  for(const patch of [{position:['','0','0']},{angles:['361','0','0']},{fov:'NaN'},{fov:'0'},{fov:'151'}])expect(cameraPoint({...draft,...patch} as typeof draft)).toBeNull();
 });
+it('keeps a pending appended camera editable until its pinned source or tail index changes',()=>{
+ const original={...point,index:0,name:'new_camera'},context={projectId:'p',buildId:'b',tag:'level.scenario',tagSha256:'a'.repeat(64),class:'scnr',scenarioCameras:[],tagsDirectory:'owned',boundingRadius:null,lensFlareScale:null,canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[]} satisfies NativeTagContext;
+ const view={...cameraDraft(original),original,projectId:'p',buildId:'b',tag:'level.scenario',sourceSha256:'a'.repeat(64),active:false,focus:0,append:true};expect(nativeCameraMatches(view,context)).toBe(true);expect(nativeCameraMatches({...view,original:{...original,name:''}},context)).toBe(true);expect(nativeCameraMatches(view,{...context,scenarioCameras:[original]})).toBe(false);expect(nativeCameraMatches(view,{...context,tagSha256:'b'.repeat(64)})).toBe(false);
+});

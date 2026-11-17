@@ -2,10 +2,10 @@ import {PerspectiveCamera,Quaternion,Vector3} from 'three';
 import type {NativeCameraPoint,NativeTagContext} from './nativeOperations';
 import type {CameraPose} from './machinima';
 export const NATIVE_CAMERA_VIEW='world.cutscene-camera';
-export interface NativeCameraView {projectId:string;buildId:string;tag:string;sourceSha256:string;original:NativeCameraPoint;position:[string,string,string];angles:[string,string,string];fov:string;active:boolean;focus:number;reviewRequest?:number}
+export interface NativeCameraView {projectId:string;buildId:string;tag:string;sourceSha256:string;original:NativeCameraPoint;position:[string,string,string];angles:[string,string,string];fov:string;active:boolean;focus:number;reviewRequest?:number;append?:boolean}
 export function nativeCameraMatches(view:NativeCameraView,context:NativeTagContext):boolean{
  const point=context.scenarioCameras?.find(p=>p.index===view.original.index);
- return context.class==='scnr'&&!context.cameraEditIssue&&view.projectId===context.projectId&&view.buildId===context.buildId&&view.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&view.sourceSha256===context.tagSha256&&JSON.stringify(point)===JSON.stringify(view.original);
+ return context.class==='scnr'&&!context.cameraEditIssue&&view.projectId===context.projectId&&view.buildId===context.buildId&&view.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&view.sourceSha256===context.tagSha256&&(view.append?view.original.index===(context.scenarioCameras?.length??0):JSON.stringify(point)===JSON.stringify(view.original));
 }
 export function cameraDraft(point:NativeCameraPoint):Pick<NativeCameraView,'position'|'angles'|'fov'>{
  const degrees=(v:number)=>String(Number((Math.atan2(Math.sin(v),Math.cos(v))*180/Math.PI).toFixed(6)));

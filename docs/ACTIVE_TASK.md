@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: defc08c7d815023a6f88368f0cc954e8737ee51f, canonical local master.
-Latest verified revision: this native faction-kit checkpoint, parent defc08c7d815023a6f88368f0cc954e8737ee51f; manifests/Git identify exact source.
-Next action: continue native Black Echo relative-craft cameras/radio and faction mission/actor alignment using existing writers; faction kit source/browser/native compile/readback now pass separately. Actual Windows42-edit/37944/restart, complete handoff and approved Forerunner gameplay remain OPEN under unchanged desktop failure. No bypass retry.
+Starting revision: b24bac4d9d371cee4d9201a56151184806932078, canonical local master.
+Latest verified revision: this native camera/relative transport checkpoint (parent b24bac4d9d371cee4d9201a56151184806932078); final manifests/Git identify exact source.
+Next action: finish native Black Echo radio/audio, faction mission/actor alignment and reviewed resource-bank handoff in existing systems. Camera creation/relative transport choices now pass source/browser/CE609 compile/readback separately. Actual Windows42-edit/37944/restart and approved Forerunner gameplay remain OPEN under unchanged desktop control failure. No bypass retry.
 
 ## Acceptance
 
@@ -13,6 +13,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov cameras (parent b24bac4): existing protected camera operation now appends points; optional moving-aircraft insertion/departure shots reuse transport controller, current source and camera inventory. Frontend24/browser3/core34/native Pelican+Spirit2/Windows/guide20 pass in scope. Exact native/source/output hashes and failure corrections: RUNTIME_INTEGRATION_20261107. Native desktop/restart/framing/restored input/gameplay remain OPEN.
 
 16Nov faction kits (parent defc08c): both authored native controls/equipment profiles compile with7-beat mission and transport. Pelican cachef4a0c82c15f7e60d1d21d0d7396655ac5e4b8868dc74e38b63bcd2d1fa555d65; Spiritcb475b1430e227327d1234bb0419ba3e3fb3fa1c6db88602e3f095a0b58201af. Exact negative cases/source/cache/test-exe hashes and current contract reference in RUNTIME_INTEGRATION_20261107. Actual gear/flight/complete faction mission and native UI/Save37944 remain OPEN.
 
@@ -26,9 +28,7 @@ d5870e1 BSP/native point surface repair retains its exact native/cache/source ha
 
 Prior recovered7-beat/native collection authoring (74c16ac) and mission source→CE609 readback (bb8e906) retain their exact scoped native/browser/history/Save evidence in RUNTIME_INTEGRATION_20261107 and Git. Source/path/recipe/handwritten ownership and all475IDs preserved. No complete Black Echo/flight/gameplay acceptance was inferred.
 
-16Nov route (parent78c01b2): CE609 cachee5711810ca6b2deba4b7802fce4e07c9eff851029b554029c7c7482f61122e71 independently matches cruise/final-facing commands,3points, all pads and original routes/AI/scripts. Viewport/source/history and bad-route/pad refusal pass browser controls separately. No actual flight/full Black Echo handoff acceptance; exact evidence in RUNTIME_INTEGRATION_20261107.
-
-16Nov flight (parent e2879a6): CE609 cache52f5fef0490a138f3461379fda71f64d5835054ff7474d517b7055c5a328db03 independently verifies tuned .5/5/2 and refuses mismatches for all3values; exact source/vehicle Restore passes. Real driver-seat choices and disabled/unread tuning refusal pass browser controls. Full mission/flight/native restart remain open; source hashes, warnings and detailed checks in RUNTIME_INTEGRATION_20261107.
+Native flight/route milestones78c01b2/e2879a6 retain exact scoped hashes/tests/clearance limits in RUNTIME_INTEGRATION_20261107 and Git. Gameplay remains OPEN.
 
 16Nov CI/setup fbcdc8d: all3 stale native verifier calls repaired; Windows workspace/all-target check, dependency core6/frontend8/browser4+3/TypeScript pass. Runtime pickers/downloads, source tags before map creation and external tool/SDK links connected. Hosted/Linux run pending owner push. Final master e210fbc9 retained exactly. Evidence: RUNTIME_INTEGRATION_20261107.
 
@@ -47,7 +47,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current native faction kits since defc08c: UI → protected append/review → source revision → compiled profile/control/groups/interaction verification implemented. Native dependency-null parser and staged snapshot retention repaired. Source tests33/working16/profile1, browser4, installed CE609 Pelican+Spirit2, TypeScript/Vite/Windows/guide20 pass separately. No actual desktop/restart/gameplay claim. QA31684/run-l1Q8hx remains live for next connected work; dispose via owner only.
+Current camera workflow since b24bac4: Add native camera point including empty source, name/pose/lens/viewport draft, protected Preview/Accept/Restore; relative transport camera choices and actual current-source preparation/build gating; saved controller history and native output checked. Source/browser/native proofs are distinct from actual app/game/restart. Both factions retain their kits/pilot/routes/HUD/original slots. QA31684/run-l1Q8hx CLOSED; no discarded source WIP.
 
 Current checkpoint: pilot graph/seat source review, bounded shared native reader, RuntimeDock preparation/build refusal and both faction native mission integration; existing tests/guides updated. Scoped checks pass; no discarded WIP. No duplicate writer, engine edit or new requirement tracker.
 
@@ -141,7 +141,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Current QA31684/run-l1Q8hx ACTIVE, bounded external output under existing owner; focused jobs finished. Reuse for connected work, collect receipts then finish owner and verify cleanup. No game launched.
+Current QA31684/run-l1Q8hx CLOSED:1589724440 logicalB disposed, peak1701962732 logicalB, last allocation1461488488B; disposed allocation unavailable. Root absent; runs[]/issues[], owner exited. No retained maps/SDK/caches/archive. No game launched. Exact evidence in RUNTIME_INTEGRATION_20261107.
 
 Prior QA52570/run-ttbH55 CLOSED:2248427795logicalB disposed; allocation disposal unavailable. Root absent, owner exited, storage runs[]/issues[]. No retained test binaries/maps/SDK/archive or original/runtime/Forerunner writes. Exact native/checkpoint evidence: RUNTIME_INTEGRATION_20261107. Resume from local commit, not retired scratch.
 
