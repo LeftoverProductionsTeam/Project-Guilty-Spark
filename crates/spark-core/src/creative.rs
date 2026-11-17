@@ -522,7 +522,7 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
         }
     }
     if let Some(hud)=native_mission_hud(binding)? {
-        let expected=retained_hud.map(|(path,_)|path.to_owned()).unwrap_or_else(||format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/")));
+        let expected=retained_hud.map(|(path,_)|path.replace('\\',"/")).unwrap_or_else(||format!("{}/gs_mission_messages",map.scenario_path.replace('\\',"/")));
         let tags=map.tags.iter().filter(|tag|tag.class=="hmt "&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&expected)).collect::<Vec<_>>();
         if tags.len()!=1||tags[0].external||tags[0].data_offset.is_none(){return invalid("Compiled mission HUD dependency is missing, ambiguous or external");}
         let actual=crate::maps::scenario_hud_messages(cache,map)?.ok_or_else(||crate::SparkError::Invalid("Compiled mission has no scenario HUD-message reference".into()))?;

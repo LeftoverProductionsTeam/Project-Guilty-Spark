@@ -2061,3 +2061,77 @@ Exact SHA-256/coordinate evidence:
 
 QA76192/run-B4X974 CLOSED: {"workflow":"native-ground-authoring","temporaryOutputDisposed":true,"disposedLogicalBytes":1514176509,"disposedAllocatedFileBytes":null,"peakLogicalBytes":2189878558,"allocatedBytes":1385880424,"monitoringSamples":90,"monitoringMs":32388.945500000133,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62129542,"peakLogicalBytes":62129542,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
 Owned root absent, all writers exited, development runs[]/issues[]. Disposal allocation is reported only where measured; no physical-reclamation claim, retained map/SDK/compiler cache or archive. Protected475CSV/legacy checkpoint/original map/scenario hashes and stashes remain unchanged.
+
+
+## 17 November — combined Pelican/Spirit Black Echo native handoff (parent5a7a53a)
+
+Closed the combined source/native gate rather than treating isolated sound inclusion as a complete mission. The existing recovered-radio browser journey now carries each faction’s first-insertion rescue source and matching generated transport module, relative insertion/departure cameras and retained seven-objective ownership. Its actual saved radio revision, plus existing UI camera/faction-kit append requests, feeds the existing installed native fixture. Original input modules, source namespaces, Save/Undo/Redo and separate native-controller ownership remain intact.
+
+Initial Pelican failed after compilation, during independent mission-HUD verification: creative::verify_native_mission_with_hud normalized only the inspected native path; retained_hud supplied native backslashes. The expected path now uses the identical separator normalization. This does not rewrite tags or relax class/count/residency/ID/scenario-reference/message checks. Real-cache backslash and slash forms both pass; a different HUD tag still refuses. That one-line production repair is covered by the complete native follow-through.
+
+Final frontend64/64, Rust creative23PASS/1explicit installed-HUD skip, browser4/4, TypeScript and current core test compilation PASS. Browser proves both seven-beat Pelican/Spirit recovered-source read/review/Save/reopen/build requests, source sound reconnection/timing/caption/history/pending Save, plus native camera append/Restore and faction-kit profiles/poses. Browser IPC is synthetic; native source operations are rebound to and independently validated against the actual staged scenario. No Windows process-restart/gameplay claim.
+
+Actual installed Invader/native builder tests2PASS: Spirit121.20s and final Pelican118.75s. Each includes native aircraft/pilot/compatible existing insertion crew, two reviewed command routes/pads, two authored relative-camera points, UNSC/Covenant terminals and loadouts, actual technology placement/collection conditions, deployment/extraction-settled source, original script/global prefixes, HUD and five genuine radio permutations. Existing source geometry query supplies the measured route/AI heights. After recovered-radio re-inclusion and production working-tag compilation, the full scenario snapshot and native aircraft/pilot/crew/routes/cameras/profiles/HUD/source indices are independently rechecked, not only the sound. Wrong-role insertion latch, wrong HUD dependency, automatic collectible placement and conflicting edited loose tag negatives retain strict refusal/previous-good protection.
+
+Both initial/revised candidate inspections report no referenced bitmaps.map/sounds.map/loc.map payload dependencies and no unverified resource descriptors. This describes these compiled maps, not a replacement for the runtime’s legal installation/UI content. The same native Marine voice is a sample-fidelity fixture in both variants; native rendering, appropriate final faction dialogue and actual behavior still require creator/game acceptance. Existing SDK A8/AY8/height-compression/LoD/sound/effect/anniversary-HUD warnings remain visible and are not waived. Exports below are initial caches; productionRevised identifies the independently inspected radio revision. All remain disposable test output.
+
+Native Windows42-edit/full restart/Save37944, actual Forerunner loading of these expanded revisions, flight/landing/boarding/disembark/recall, cameras/input restoration, AI combat/collection/settlement and real peers remain OPEN. The recorded Computer Use initialization failure (kernel assets/path/os error3) is unresolved; no unchanged retry or bypass, game launch or Forerunner write occurred. Do not call full Black Echo playable or Operation110 complete. Continue the next independently actionable native visual/BSP workflow while preserving these exact mission recipes/gates. No app executable, installer/package, source archive, push or publication was created. testExe below is only the Rust test harness.
+
+Exact SHA-256 evidence:
+```json
+{
+  "parentRevision": "5a7a53a29f803a8832bf0008efa10a164473b049",
+  "testExe": "b06d566c4883c9736c314837a6428dce9365e7f9b7ead1d1052db8f8afb7f0ff",
+  "cameraRequest": "af71bc9b4e7a408a74a15cbe9df0fca46f54d2dea8fcb5720bdc671136cfe112",
+  "factionRequest": "db5c9cbdceca88605694b9f7bca0136805f6022c2cf6df449f47cee89e7501e8",
+  "variants": {
+    "pelican": {
+      "input": "9db40ea8a3a57ce953c07b2013946f0e0eee915dcabd6efe91615a118c3a6a0c",
+      "controller": "f01243cf31644555b42ab6dcb0733bf26fa8211c55da99046a0da90bbbec357e",
+      "initialCache": "b5a56f28d902e7c1cb397d3ec9c62738f61708b4423b4f3e529734352de11299",
+      "productionParent": "697047751b2f267755034c04a611a6980f199c1989c8946bbda121756b1fe6f1",
+      "productionRevised": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+      "missionSource": "35a6ee40340aad2244b79b90753da537ce1e9db2f5948aa3d75da80cb5e9df40",
+      "radioPermutations": 5,
+      "exportedInitialCache": "b5a56f28d902e7c1cb397d3ec9c62738f61708b4423b4f3e529734352de11299",
+      "checks": [
+        "Complete CE609 candidate resource descriptors PASS: [{\"name\":\"bitmaps.map\",\"required\":false,\"found\":false,\"reason\":\"No external reference observed in supported native descriptors; extraction still validates dependencies\"},{\"name\":\"sounds.map\",\"required\":false,\"found\":false,\"reason\":\"No external reference observed in supported native descriptors; extraction still validates dependencies\"},{\"name\":\"loc.map\",\"required\":false,\"found\":false,\"reason\":\"No external reference observed in supported native descriptors; extraction still validates dependencies\"}]",
+        "Complete recovered pelican candidate revision PASS: 7 objectives; pilot/crew/aircraft/routes/cameras/source indices/HUD/radio/resources retained",
+        "Combined native mission/transport PASS: pilot=pilot initial=false normal=1 insane=1; outbound/return routes=2, startup/landing/recall/settlement controllerSHA=f01243cf31644555b42ab6dcb0733bf26fa8211c55da99046a0da90bbbec357e; no flight/gameplay acceptance"
+      ],
+      "exportedInitialBytes": 110033720
+    },
+    "spirit": {
+      "input": "901233871bc383e7b936045bd2cfcb074052d6245f501897e7b524f5443ac953",
+      "controller": "f9be65b02d014eb6dcdddaf927933bffb047ade69a354fff13a0c94f60ec525e",
+      "initialCache": "2fa351e6a49433c41b6dd7e85b7da0becd5e37572e65a6b87dd9cbf0d27d4f0d",
+      "productionParent": "e8da2976cc6d3293b74e944f37f4eb415ec8c18dfeb7ae9e30ff8b72bae94ca7",
+      "productionRevised": "2d6b31b57f43a33a244884a0e1dbfd702b1df9ae26e24f3358e03d989df0b176",
+      "missionSource": "cb2ae93982ae67562b3998abbf830742a12d819bc4157027bd9deee04cec885c",
+      "radioPermutations": 5,
+      "exportedInitialCache": "2fa351e6a49433c41b6dd7e85b7da0becd5e37572e65a6b87dd9cbf0d27d4f0d",
+      "checks": [
+        "Complete CE609 candidate resource descriptors PASS: [{\"name\":\"bitmaps.map\",\"required\":false,\"found\":false,\"reason\":\"No external reference observed in supported native descriptors; extraction still validates dependencies\"},{\"name\":\"sounds.map\",\"required\":false,\"found\":false,\"reason\":\"No external reference observed in supported native descriptors; extraction still validates dependencies\"},{\"name\":\"loc.map\",\"required\":false,\"found\":false,\"reason\":\"No external reference observed in supported native descriptors; extraction still validates dependencies\"}]",
+        "Complete recovered spirit candidate revision PASS: 7 objectives; pilot/crew/aircraft/routes/cameras/source indices/HUD/radio/resources retained",
+        "Combined native mission/transport PASS: pilot=pilot initial=false normal=1 insane=1; outbound/return routes=2, startup/landing/recall/settlement controllerSHA=f9be65b02d014eb6dcdddaf927933bffb047ade69a354fff13a0c94f60ec525e; no flight/gameplay acceptance"
+      ],
+      "exportedInitialBytes": 110455104
+    }
+  },
+  "logs": {
+    "recover.log": "952900618cbc4c2311c22833b521725a73d98b6f597b488f093332a9512fdb15",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "types-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit.log": "0afe2531b443b9cf8b4ab6809889a459bae01334a961901976fdc6aaf23fa36b",
+    "creative.log": "f300484bea12a2f81dbd7e348c1aee4332d3f101bc829e46d47d91554f98c2fa",
+    "core-compile.log": "bbf7b409813d71c77f5a4d004fe994a91b952d44fc5014f6009f91f3686ebecf",
+    "browser.log": "9d4fc46b4a02f83695c211516082312bb8ec0757a2590f7f2d0a6201736843b3",
+    "pelican.log": "1584bbda438b4c6a6aa3a3f054399fc8e38dd83dae38ed512ed952bc651d1aed",
+    "pelican-final.log": "63db03d714044795543e27e2bce799a2bc6756224a7deb858f066fcba6b8bf52",
+    "spirit.log": "c13eb56984e45aeaf901e3c91828a3ce0aadf1a3583315f14e95e212b10985d7"
+  }
+}
+```
+
+QA28356/run-tRm24j CLOSED: {"workflow":"black-echo-complete-candidates","temporaryOutputDisposed":true,"disposedLogicalBytes":633731977,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1310017638,"allocatedBytes":598483736,"monitoringSamples":107,"monitoringMs":34436.77329999938,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62148506,"peakLogicalBytes":62148506,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Owned root absent, all writers exited, development runs[]/issues[]. No retained map/SDK/compiler/browser cache or replacement archive. Disposal allocation is unavailable where null; logical/last-measured/peak values are distinct and do not prove physical reclamation. Protected originals/475CSV/legacy checkpoint/stashes remain unchanged.

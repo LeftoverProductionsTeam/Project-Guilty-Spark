@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native mission route/AI ground repair
+Task: Operation110 — combined Black Echo native handoff/HUD repair
 Status: implementation incomplete
-Starting revision: 4339020e816691f3102b82dd359a83bc0af68b13, canonical master.
-Latest verified revision: parent4339020e816691f3102b82dd359a83bc0af68b13; ground repair source/browser/Windows compilation/CE609 readback verified in this checkpoint commit. Game gates OPEN.
-Next action: assemble the complete Pelican/Spirit Black Echo handoff with recovered radio and collision-derived routes; close remaining native dependency/source diagnostics. Actual Windows/game/37944 remains OPEN; advance independent creator work if blocked.
+Starting revision: 5a7a53a29f803a8832bf0008efa10a164473b049, canonical master.
+Latest verified revision: parent5a7a53a29f803a8832bf0008efa10a164473b049; combined Pelican/Spirit source/browser/production CE609 readback and HUD repair verified in this checkpoint commit. Game gates OPEN.
+Next action: resume existing Timberland–Sidewinder native BSP seam diagnostics and repair through current geometry/build tools. Combined Black Echo native source gate passes; Windows/game/37944 remains OPEN under the recorded control blocker.
 
 ## Acceptance
 
@@ -16,9 +16,9 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov ground repair (parent4339020): bounded compiled-BSP ground → route/AI draft → review/Restore/Save/reopen → CE609 compile/readback PASS. Frontend21/core10/browser5distinct/final ground2/types-Vite/Windows check/native1 PASS. Actual sloped floor0.046889074 replaces assumed source height;5radio hashes retained. Exact hashes/failures/QA disposal: RUNTIME_INTEGRATION_20261107. Windows/game acceptance OPEN.
+17Nov combined Black Echo (parent5a7a53a): both faction insertion/radio/cameras/kits → saved source → production CE609 full snapshot/readback PASS. Fixed native retained-HUD separator comparison; wrong tag still refuses. Frontend64/Rust23+1explicit skip/browser4/types/core/native2 PASS. Five radio hashes/resources/source indices retained. Exact hashes/failure/QA: RUNTIME_INTEGRATION_20261107. Full Windows/game gates OPEN.
 
-17Nov radio4339020/recovered0b57e8c/attachedaa7c7f3 retain scoped source/browser/native proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
+17Nov ground5a7a53a/radio4339020/recovered0b57e8c/attachedaa7c7f3 retain scoped source/browser/native proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
 
 17Nov first insertion (parent234b6bb): UI/history/Save/reopen → exact generated transport ownership → shared escort without duplicate spawn → Pelican/Spirit CE609 compile/independent extracted scenario/actor/seat/latch readback PASS. Frontend72/guide4/creative23+1skip/transport5/browser12distinct+final8/web/Windows all-target PASS. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
@@ -138,7 +138,7 @@ Owner priorities/addenda remain active:
 
 - Native mission actions WIP: HUD generation/reference/readback, source compatibility, UI/history/Save/restart, safe-save restoration, actual level completion and First Contact gameplay are UNRUN. Focused checks are now authorized; an HSC request is not a saved checkpoint or accepted ending.
 
-- Mission data handoff WIP: reconciliation/nullable-field repair is source implemented, not executed. Real independent editors, stale-review behavior, combined Studio IDs, Undo/Save/restart/native/game gates are open. Studio metadata is still not an automatically synchronized transport document; explicit review/adoption is provided.
+- Mission data reconciliation/review/adoption passes scoped source/browser/native checks (0b57e8c and current combined evidence). Independent editor synchronization, Windows history/Save/restart and game/peer gates remain OPEN. Studio metadata still needs explicit review/adoption; it is not an automatically synchronized transport document.
 
 - Mission attachment WIP: all execution/native/game/history/Save/restart gates are unrun. Peer source modules do not by themselves synchronize Creator Studio mission data; explicit reconciliation is the next implementation, not a reason to disable stale binding checks. HUD objectives/checkpoints/ending/AI viewport and combat remain incomplete.
 
