@@ -63,6 +63,7 @@ export function inspectScenarioBindings(scripts: ScriptExport[], inspection: Map
         detail:present?'One powered native control starts inactive. Native build verifies its source/name binding; actual use and mission execution still need testing.':
           'Choose one explicitly named native control in Level Editor → Logic / Events, enable startup power and set initial position below0.5. A machine, missing/duplicate binding or already-active control cannot supply this objective.'};
     }
+    if(dependency.startsWith('cutscene_flag:'))return {dependency,status:'notInspectable' as const,detail:'Read current CE609 working source. Mission preparation requires one native location flag; compilation checks its binding. A flag is not an automatically authored trigger.'};
     if(dependency.startsWith('sound:'))return {dependency,status:'notInspectable' as const,
       detail:'Mission preparation checks the exact included one-shot sound; native staging rechecks its owned import receipt and compiled tag. Game playback, sound class and multiplayer delivery need separate testing.'};
     if(dependency.startsWith('hud_message:'))return {dependency,status:'notInspectable' as const,

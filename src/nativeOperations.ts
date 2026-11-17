@@ -77,6 +77,7 @@ export function nativePatrolEqual(a:NativeSourcePatrolRoute,b:NativeSourcePatrol
  return a.points.length===b.points.length&&a.points.every((p,i)=>{const q=b.points[i];return p.sourceIndex===q.sourceIndex&&p.animation===q.animation&&p.sequenceId===q.sequenceId&&p.position.every((v,j)=>close(v,q.position[j]))&&close(p.weight,q.weight)&&p.waitSeconds.every((v,j)=>close(v,q.waitSeconds[j]))&&Number.isFinite(p.facingRadians)&&Number.isFinite(q.facingRadians)&&Math.abs(Math.atan2(Math.sin(p.facingRadians-q.facingRadians),Math.cos(p.facingRadians-q.facingRadians)))<=.000002;});
 }
 export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null;patrol?:NativeSourcePatrolRoute|null;patrolIssue?:string|null}[]}
+export interface NativeCutsceneFlag {index:number;name:string;position:[number,number,number];facingRadians:[number,number]}
 export interface NativeCameraPoint {index:number;name:string;position:[number,number,number];orientationRadians:[number,number,number];fovRadians:number}
 export interface NativeVolumeGeometry {forward:[number,number,number];up:[number,number,number];corner:[number,number,number];dimensions:[number,number,number]}
 export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVolumeGeometry|null}
@@ -87,7 +88,7 @@ export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:stri
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
 export type NativeOperation =
   | {kind:'squadTerminals';terminals:NativeSquadTerminal[];sourceSha256:string}
-  | {kind:'factionKits';kits:NativeFactionKit[];sourceSha256:string} | {kind:'vehicleFlight';tuning:NativeVehicleFlight;sourceSha256:string} | {kind:'appendTransport';transport:NativeTransportAppend;sourceSha256:string} | {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string;append?:boolean}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
+  | {kind:'factionKits';kits:NativeFactionKit[];sourceSha256:string} | {kind:'vehicleFlight';tuning:NativeVehicleFlight;sourceSha256:string} | {kind:'appendTransport';transport:NativeTransportAppend;sourceSha256:string} | {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneFlag';point:NativeCutsceneFlag;sourceSha256:string;append?:boolean}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string;append?:boolean}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
   | {kind:'encounterStartPosition';encounter:number;squad:number;start:number;encounterName:string;squadName:string;position:[number,number,number];sourceSha256:string;facingRadians?:number|null;commandList?:number|null}
@@ -118,6 +119,7 @@ export interface NativeTagContext {
   deviceEditIssue?:string|null;
   scenarioVolumes?:NativeTriggerVolume[];
   triggerEditIssue?:string|null;
+  scenarioFlags?:NativeCutsceneFlag[];flagEditIssue?:string|null;
   scenarioCameras?:NativeCameraPoint[];
   cameraEditIssue?:string|null;
   scenarioCommandLists?:{index:number;name:string;commands:number}[];

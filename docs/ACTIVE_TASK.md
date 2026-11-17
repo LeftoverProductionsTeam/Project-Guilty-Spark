@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 50837f2da6131a3cbade7e7d726d7c6e5a64a314, canonical master.
-Latest verified revision: 50837f2da6131a3cbade7e7d726d7c6e5a64a314; current squad increment passes source/browser/native checks and is sealed in the local commit containing this checkpoint. Windows/game acceptance remains OPEN.
-Next action: native per-member objective guidance through existing mission HSC/flag/object workflows, then remaining faction/Black Echo handoff. Do not repeat unchanged blocked Windows control.37944/42-edit/flight/peer/game gates remain OPEN.
+Starting revision: 1ce17fecad733af4156c448318eaee308ecda835, canonical master.
+Latest verified revision: 1ce17fecad733af4156c448318eaee308ecda835; flag/guidance increment passes source/browser/native checks in the local commit containing this checkpoint. Native Windows/game gates remain OPEN.
+Next action: complete moving-target guidance and remaining faction-specific Black Echo authoring through existing native object/actor bindings. Keep current runtime guidance-budget/admission, Windows37944/42-edit/flight/peer/game gates OPEN; no unchanged desktop retry.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+17Nov native flag/guidance (parent1ce17fe): protected append/pose/Restore/Save and scoped marker authoring→standard parameterless HSC→CE609 compile/readback pass. Frontend70/native20+1skip/creative21+1skip/working17+1skip/browser6distinct/latest2/TypeScript-Vite/Windows all-target PASS. Exact cache/source/test-exe hashes, compiler/initialization fixes and limits: RUNTIME_INTEGRATION_20261107. Actual marker/mission/gameplay remains OPEN.
 
 16Nov independent squad missions (parent50837f2): scope→history/Save/reopen→native gate review→same HSC writer→CE609 compile/independent readback passes. Frontend49/core21+1skip/working17+1skip/browser7distinct/latest scoped1/TypeScript-Vite/Windows all-target pass. Exact hashes/fixes: RUNTIME_INTEGRATION_20261107. Windows/game gates remain OPEN.
 
@@ -53,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current squad objectives reuse mission fields/writer and reviewed native terminals/gates. Per-squad combat, collection, rescue, branches and native settlement have source/browser/native proof. Successful redeployment and stopped-failure behavior are guarded. Shared HUD/radio requires consent; unsupported scenes/endings/unsafe spawn ownership refuse without losing source. Native app/game/peers remain OPEN.
+Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
 Native flight tuning78c01b2 remains verified in scope. Current route workflow: existing command/volume readers check physical movement, final-stop/facing references and final craft-origin containment by readable selected pads; unread/unsupported/bad-pad programs refuse generated preparation, manual source remains available. Existing route editor exposes Stop/Keep moving while preserving unknown values; viewport/Preview/Accept/Restore/Save/reopen continue. Only two selected route reviews render. Core28/browser3distinct/guide4/TypeScript/Vite/Windows and installed CE609 route/volume/aircraft/tuning readback1 pass. Native Windows/full restart/flight/gameplay remain unrun. Exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No push.
 
@@ -144,6 +146,8 @@ Owner priorities/addenda remain active:
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+QA15708/run-x3PzLH CLOSED:1535916810logicalB disposed, peak1550109358logicalB; last allocation1404717640B, disposal allocation unavailable. Root absent, runs[]/issues[], writers finished. No retained maps/tags/SDK/browser/compiler/cache/archive or game/engine writes. Evidence: RUNTIME_INTEGRATION_20261107.
 
 QA45018/run-9nImdg CLOSED:1645345393logicalB disposed, peak1758189218logicalB, last allocation1514157896B; disposal allocation unavailable. Root absent; runs[]/issues[]. No retained maps/tags/SDK/browser/compiler/cache/archive or game/Forerunner writes. Exact cleanup/hashes: RUNTIME_INTEGRATION_20261107.
 

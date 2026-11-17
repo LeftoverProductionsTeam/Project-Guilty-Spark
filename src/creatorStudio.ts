@@ -54,6 +54,7 @@ export interface MissionBeat {
   /** Absent: shared mission.01–22: native Forerunner operation membership. */
   squadNumber?:number|null;
   allowSharedPresentation?:boolean|null;
+  guidance?:{flag:string;height:number}|null;
   id: string;
   title: string;
   objective: string;
@@ -272,6 +273,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
       (m.squadNumber!=null&&(!Number.isInteger(m.squadNumber)||m.squadNumber<1||m.squadNumber>22)) ||
       (m.allowSharedPresentation!=null&&typeof m.allowSharedPresentation!=='boolean') ||
+      (m.guidance!=null&&(!m.guidance||typeof m.guidance!=='object'||Array.isArray(m.guidance)||Object.keys(m.guidance).some(key=>!['flag','height'].includes(key))||typeof m.guidance.flag!=='string'||m.guidance.flag!==''&&!scriptIdent.test(m.guidance.flag)||!Number.isFinite(m.guidance.height)||Math.abs(m.guidance.height)>100)) ||
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||

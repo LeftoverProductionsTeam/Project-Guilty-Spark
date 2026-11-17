@@ -29,7 +29,7 @@ import BaboonTools from './BaboonTools';
 import NativeSquadScaling from './NativeSquadScaling';
 import NativeSquadBehaviorEditor from './NativeSquadBehavior';
 import NativeSquadPatrol from './NativeSquadPatrol';
-import NativeCutsceneCameras from './NativeCutsceneCameras';
+import NativeCutsceneCameras,{NativeObjectiveFlags} from './NativeCutsceneCameras';
 import {NATIVE_CAMERA_VIEW} from '../nativeCutsceneCamera';
 import type {NativeCameraView} from '../nativeCutsceneCamera';
 import NativeStartingPositions from './NativeStartingPositions';
@@ -333,6 +333,7 @@ export default function NativeTagOperations({
           {context.class==='scnr'&&<NativeCommandLists context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeDevicePlacements context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeTriggerVolumes context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
+          {context.class==='scnr'&&<NativeObjectiveFlags context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeCutsceneCameras context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeStartingPositions kind="firing" context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}

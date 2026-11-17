@@ -80,6 +80,8 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:Mission
 function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOptions={},indices?:number[],scope=0): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.missions.length)throw new Error('Add at least one mission beat.');
+  const guided=studio.missions.some(beat=>beat.guidance!=null);
+  if(guided&&!scope)throw Error('Personal objective waypoints require Forerunner squad scope. Preserve the location choice and select its squad before preparing.');
   const extractionBeats=studio.missions.filter(beat=>beat.trigger==='forerunnerExtractionSettled');
   if(extractionBeats.length&&(!options.forerunner||extractionBeats.length!==1||studio.missions.at(-1)!==extractionBeats[0]||extractionBeats[0].conditionVolume!=null||extractionBeats[0].conditionResult!=null||extractionBeats[0].completeMission||extractionBeats[0].checkpoint))throw Error('Forerunner settled extraction must be the single final unconditional objective, without a checkpoint or level exit. Select its reviewed runtime; legacy engines cannot complete this callback.');
   const empty="(= (list_count (players)) 0)";
@@ -96,6 +98,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     sceneSources.push(source.content);deps.push(...source.dependencies);
   });
   const globals:string[]=[];
+  if(guided)globals.push('(global short gs_nav_stage 0)','(global short gs_nav_drawn_stage 0)','(global boolean gs_nav_dirty false)','(global unit gs_nav_viewer none)','(global object_list gs_nav_members (list_get (players) 32767))',...Array.from({length:6},(_,i)=>'(global unit gs_nav_'+i+' none)'));
   const manualSetters:string[]=[];
   const branches=missionBranchGroups(studio.missions);
   for(const {index} of branches.values())globals.push('(global boolean gs_branch_'+index+'_ready false)','(global boolean gs_branch_'+index+'_inside false)');
@@ -139,6 +142,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     }
     if(beat.completeMission===true&&(local+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null))
       throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
+    if(beat.guidance){deps.push('cutscene_flag:'+ensureName(beat.guidance.flag,'Objective waypoint flag'));scripted.push('  (set gs_nav_stage '+(i+1)+')');}
     scripted.push(...sceneCall(beat,i,'start'));
     if(beat.hudObjective===true) {
       const text=beat.hudText??'';
@@ -173,7 +177,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         deps.push('forerunner_extraction:'+control);const settled='gs_settled_'+(i+1),armed='gs_extraction_armed';
         globals.push('(global boolean '+armed+' false)','(global boolean '+settled+' false)');
         if(scope){
-          manualSetters.push('(script continuous forerunner_squad_'+String(scope).padStart(2,'0')+'_complete','  (sleep -1)','  (if (and '+armed+' (not gs_aborted)) (set '+settled+' true))',')','');
+          manualSetters.push('(script continuous forerunner_squad_'+String(scope).padStart(2,'0')+'_complete','  (sleep -1)',...(guided?['  (if (and '+armed+' (not gs_aborted)) (begin','    (set gs_nav_stage 0)','    (set '+settled+' true)','  ))']:['  (if (and '+armed+' (not gs_aborted)) (set '+settled+' true))']),')','');
           scripted.push('  (set '+armed+' true)','  (device_group_set extraction_squad_'+String(scope).padStart(2,'0')+'_ready 1)',...wait(settled,1,undefined,true),'  (set '+armed+' false)');
         }else{
           manualSetters.push('(script dormant forerunner_extraction_complete','  (if '+armed+' (set '+settled+' true))',')','');
@@ -243,6 +247,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     if(scope)scripted.push('  ))');
     if(beat.escortFailure==='continue')scripted.push('  ))');
     if(scope)scripted.push('  ))');
+    if(beat.guidance)scripted.push('  (set gs_nav_stage 0)');
     if(beat.conditionVolume!=null)scripted.push('  ))');
     if(beat.conditionResult!=null)scripted.push('  ))');
     if(scope)scripted.push('  ))');
@@ -256,7 +261,24 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     scripted.splice(1,0,'  (sleep_until gs_enabled 1)',...reset,'  (device_group_set '+ready+' 0)','  (sleep_until (> (list_count (players)) 0) 1)','  (set gs_running true)');
     const settled='gs_settled_'+((indices?.[studio.missions.length-1]??studio.missions.length-1)+1);
     scripted.push('  (set gs_running false)','  (set gs_extraction_armed false)','  (if '+settled+' (sleep_until (or '+empty+' (< (device_group_get '+ready+') 0.5)) 1))','  (device_group_set '+ready+' 0)','  (if gs_aborted (sleep_until '+empty+' 1))','  (sleep 1)');
-    manualSetters.push('(script continuous gs_guard','  (if (and gs_running (not '+settled+') (= (list_count (players)) 0)) (set gs_aborted true))','  (sleep 1)',')','');
+    if(guided){
+      scripted.push('  (set gs_nav_stage 0)');
+      const markers=studio.missions.flatMap((beat,local)=>beat.guidance?[{stage:(indices?.[local]??local)+1,...beat.guidance}]:[]),flags=[...new Set(markers.map(m=>m.flag))];
+      manualSetters.push('(script static void gs_nav_hide','  (if (!= gs_nav_viewer none) (begin',...flags.map(flag=>'    (deactivate_nav_point_flag gs_nav_viewer '+flag+')'),'  ))',')','',
+        '(script static void gs_nav_show','  (if (!= gs_nav_viewer none) (begin',...markers.map(m=>'    (if (= gs_nav_stage '+m.stage+') (activate_nav_point_flag default gs_nav_viewer '+m.flag+' '+m.height+'))'),'  ))',')','',
+        '(script static void gs_nav_update',
+        '  (if (and gs_running (not '+settled+') (= (list_count gs_nav_members) 0)) (set gs_aborted true))',
+        '  (if gs_aborted (set gs_nav_stage 0))',
+        '  (set gs_nav_dirty (or (!= gs_nav_stage gs_nav_drawn_stage) '+Array.from({length:6},(_,i)=>'(!= gs_nav_'+i+' (unit (list_get gs_nav_members '+i+')))').join(' ')+'))',
+        '  (if gs_nav_dirty (begin',
+        // Clear every old binding first: list reordering must not remove a newly shown member.
+        ...Array.from({length:6},(_,i)=>['    (set gs_nav_viewer gs_nav_'+i+')','    (gs_nav_hide)','    (set gs_nav_'+i+' none)']).flat(),
+        '    (set gs_nav_drawn_stage gs_nav_stage)',
+        '    (if (and (!= gs_nav_stage 0) (<= (list_count gs_nav_members) 6)) (begin',
+        ...Array.from({length:6},(_,i)=>['      (set gs_nav_'+i+' (unit (list_get gs_nav_members '+i+')))','      (set gs_nav_viewer gs_nav_'+i+')','      (gs_nav_show)']).flat(),
+        '    ))','  ))',')','',
+        '(script continuous gs_guard','  (if (or gs_running (!= gs_nav_drawn_stage 0)) (begin','    (set gs_nav_members (players))','    (gs_nav_update)','  ))','  (sleep 1)',')','');
+    }else manualSetters.push('(script continuous gs_guard','  (if (and gs_running (not '+settled+') (= (list_count (players)) 0)) (set gs_aborted true))','  (sleep 1)',')','');
   }
   scripted.push(')', '');
   lines.push(...sceneSources,...globals, '', ...manualSetters, ...scripted);
@@ -269,6 +291,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?[scope?"Numbered squad deployment is detected through the native issued-participant query. Other terminal objectives observe shared control transitions; use independent controls when interaction must be isolated. Scripts may also activate controls; no terminal reset or inventory grant is added.":'Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='escort')?[scope?"Scoped rescue preserves source AI teams and follows a current squad participant. All surviving actors must reach the destination with the required minimum alive. Failure stops this operation or follows the authored rescue-result path. AI allegiance, navigation and multiplayer behavior require gameplay testing.":'Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
+    ...(guided?['Personal location waypoints target current native squad units, requerying after bodies/membership change and removing prior markers on transitions, failure or settlement. At most six participants are supported; oversized lists refuse partial display. The standard four-marker HUD budget and engine relay cache still apply. Current compatible Forerunner is required; rendering/real peers remain unverified.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
   ],generatedOnly:true};
@@ -399,7 +422,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['squadNumber','allowSharedPresentation','id','title','objective','trigger','encounterName','triggerRef','weaponPath','createWeaponObject','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
+  const beatFields=['guidance','squadNumber','allowSharedPresentation','id','title','objective','trigger','encounterName','triggerRef','weaponPath','createWeaponObject','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
@@ -432,7 +455,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
-    squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,
+    squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,guidance:beat.guidance??null,
     triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));

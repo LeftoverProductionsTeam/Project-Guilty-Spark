@@ -360,3 +360,22 @@ it('refuses unsafe squad mission ownership and preserves the authored source fie
  studio.missions[1].trigger='manual';expect(generate).toThrow(/final native settled/);
  expect(studio.missions[0].hudText).toBe('Fight');
 });
+
+it('authors personal native flag guidance with body-change and settlement cleanup',()=>{
+ const studio=emptyCreatorStudio();studio.missions=[{id:'area',title:'Reach',objective:'Reach',trigger:'triggerVolume',triggerRef:'rally',encounterName:'',squadNumber:1,guidance:{flag:'objective',height:1}},{id:'end',title:'Return',objective:'Return',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',squadNumber:1,guidance:{flag:'hub',height:2}}];
+ const output=exportHaloCeMission(studio,{forerunner:true});expect(output.dependencies).toEqual(expect.arrayContaining(['cutscene_flag:objective','cutscene_flag:hub']));
+ expect(output.content).toContain('(script static void gs_sq01_nav_update');
+ expect(output.content).toContain('(activate_nav_point_flag default gs_sq01_nav_viewer objective 1)');
+ expect(output.content).toContain('(deactivate_nav_point_flag gs_sq01_nav_viewer hub)');
+ expect(output.content).toContain('(set gs_sq01_nav_5 (unit (list_get gs_sq01_nav_members 5)))');
+ expect(output.content).not.toContain('(list_get gs_sq01_nav_members 6)');
+ expect(output.content).toContain('(!= gs_sq01_nav_0 (unit (list_get gs_sq01_nav_members 0)))');
+ const update=output.content.slice(output.content.indexOf('(script static void gs_sq01_nav_update'));expect(update.indexOf('(set gs_sq01_nav_viewer gs_sq01_nav_5)')).toBeLessThan(update.indexOf('(gs_sq01_nav_show)'));
+ expect(output.content).toContain('(<= (list_count gs_sq01_nav_members) 6)');
+ expect(output.content).toContain('(if gs_sq01_aborted (set gs_sq01_nav_stage 0))');
+ expect(output.content).toContain('(set gs_sq01_nav_members (forerunner_squad_01_players))');
+ const callback=output.content.slice(output.content.indexOf('(script continuous forerunner_squad_01_complete'));expect(callback.indexOf('(set gs_sq01_nav_stage 0)')).toBeLessThan(callback.indexOf('(set gs_sq01_settled_2 true)'));
+ expect(exportHaloCeMission(JSON.parse(JSON.stringify(studio)),{forerunner:true})).toEqual(output);
+ studio.missions.forEach(beat=>delete beat.squadNumber);expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow(/squad scope/);
+ studio.missions[0].guidance!.flag='bad ) (quit';expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow();
+});

@@ -45,6 +45,18 @@ pub struct NativeCameraPoint {pub index:u16,pub name:String,pub position:[f32;3]
 pub fn scenario_camera_readback(path:&Path,inspection:&MapInspection)->Result<Vec<NativeCameraPoint>> {
     with_scenario(path,inspection,parse_cameras)
 }
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NativeCutsceneFlag {pub index:u16,pub name:String,pub position:[f32;3],pub facing_radians:[f32;2]}
+/// Standard92-byte H1 cutscene flags, adjacent to the existing camera block.
+pub fn scenario_flag_readback(path:&Path,inspection:&MapInspection)->Result<Vec<NativeCutsceneFlag>>{
+    with_scenario(path,inspection,|r,space,at|{
+        let(start,count)=space.block(r,at+0x4e4,92,512)?;let mut flags=vec![];
+        for index in 0..count{let p=start+index*92;let flag=NativeCutsceneFlag{index:index as u16,name:r.string(p+4,32)?,position:vec3(r,p+36)?,facing_radians:[r.f32(p+48)?,r.f32(p+52)?]};
+            if flag.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||flag.facing_radians.iter().any(|v|!v.is_finite()){return invalid("Invalid compiled cutscene flag pose");}flags.push(flag);
+        }Ok(flags)
+    })
+}
 fn parse_cameras(r:&Reader,space:&Space,at:usize)->Result<Vec<NativeCameraPoint>>{
     let(start,count)=space.block(r,at+0x4f0,104,512)?;let mut points=vec![];
     for index in 0..count {let p=start+index*104;let point=NativeCameraPoint{index:index as u16,name:r.string(p+4,32)?,position:vec3(r,p+40)?,orientation_radians:vec3(r,p+52)?,fov_radians:r.f32(p+64)?};
