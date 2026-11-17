@@ -245,6 +245,10 @@ pub struct CapabilityEvidence {
     #[test]fn forerunner_startup_requests_are_exact_pinned_basenames_and_never_live_acknowledgements(){
         assert_eq!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
         assert_eq!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_STARTUP_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
+        assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256),Some(0x8664));
+        assert_eq!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
+        assert_eq!(forerunner_windows_machine(FORERUNNER_WINDOWS_X64_SQUAD_SECONDARY_SHA256),Some(0x8664));
+        assert_eq!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_SQUAD_SECONDARY_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
         for old in [FORERUNNER_WINDOWS_X86_SHA256,FORERUNNER_WINDOWS_X64_SHA256,FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256]{assert_eq!(forerunner_solo_startup_selector(old,"be_native").unwrap(),None);}
         for bad in ["","../be_native","C:\\maps\\be_native","be_native@ce","be_native.map","map/name","with space"]{assert!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_CURRENT_SHA256,bad).is_err());}
         assert!(forerunner_solo_startup_selector(&"0".repeat(64),"be_native").is_err());
@@ -964,8 +968,15 @@ pub const FORERUNNER_WINDOWS_X64_STARTUP_SHA256:&str="9954b4c0ca2fa657f2ba05a168
 pub const FORERUNNER_WINDOWS_X64_SQUAD_PREVIOUS_SHA256:&str="351cb4dccc6c9d12315068e6e200ee69f1249c970d50fc177bcf204898a4b74d";
 /// A second owner-built a6f7b06b binary independently passed the same bounded
 /// help/discovery check. Both exact identities remain admitted; no wildcard.
-pub const FORERUNNER_WINDOWS_X64_CURRENT_SHA256:&str="30a989a048022bf08c32e2fb683f65395c9285f92df8d8eef3f369700fbb7169";
-pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_CURRENT_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_PREVIOUS_SHA256|FORERUNNER_WINDOWS_X64_STARTUP_SHA256|FORERUNNER_WINDOWS_X64_SHA256|FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256=>Some(0x8664),_=>None}}
+pub const FORERUNNER_WINDOWS_X64_SQUAD_SECONDARY_SHA256:&str="30a989a048022bf08c32e2fb683f65395c9285f92df8d8eef3f369700fbb7169";
+/// Owner-authorized17Nov help/discovery: build978169e0, Windows/x64,
+/// contract1/runtime.discover, CE609 solo startup and three declared squad
+/// features. Exact interface admission only; no mission/gameplay acceptance.
+pub const FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256:&str="2f94e8631f7a6c5278a0f36eaa219cc9b7b89562c346827a231348e67a5682df";
+/// Independently checked later owner build3446ed13; the earlier frozen snapshot
+/// remains admitted. Neither identity grants live writes or game acceptance.
+pub const FORERUNNER_WINDOWS_X64_CURRENT_SHA256:&str="b68e4710e2a258f42ae69fa183aaa05aeaf0d637d36033b30b0503847bb579d2";
+pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_CURRENT_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_SECONDARY_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_PREVIOUS_SHA256|FORERUNNER_WINDOWS_X64_STARTUP_SHA256|FORERUNNER_WINDOWS_X64_SHA256|FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256=>Some(0x8664),_=>None}}
 
 /// Only these exact reviewed binaries declare the admitted CE startup interface.
 /// The caller must still validate/stage the exact native solo cache and resources.
@@ -973,7 +984,7 @@ pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUN
 pub fn forerunner_solo_startup_selector(sha256:&str,map:&str)->Result<Option<String>>{
     if forerunner_windows_machine(sha256).is_none(){return invalid("Forerunner startup needs a reviewed executable identity");}
     if !crate::ce_host::map_selector(map){return invalid("Forerunner startup needs a native map basename, not a path or family override");}
-    Ok(matches!(sha256,FORERUNNER_WINDOWS_X64_CURRENT_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_PREVIOUS_SHA256|FORERUNNER_WINDOWS_X64_STARTUP_SHA256).then(||format!("{map}@ce")))
+    Ok(matches!(sha256,FORERUNNER_WINDOWS_X64_CURRENT_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_SECONDARY_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_PREVIOUS_SHA256|FORERUNNER_WINDOWS_X64_STARTUP_SHA256).then(||format!("{map}@ce")))
 }
 
 /// Reviewed path interfaces only. A declared version or a similarly named executable is insufficient.

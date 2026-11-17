@@ -405,6 +405,9 @@ mod installed {
   run(&tools.join("invader-build.exe"),vec!["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),"-m".into(),output.to_string_lossy().into_owned(),"be_native".into()]);
   if repair{let log=diagnostics.borrow();assert!(!log.contains("Encounter #2 (be_flood)"),"{log}");assert!(!log.contains("Command list #0 (gs_native_flight)"),"{log}");eprintln!("Native compiler confirms repaired Flood and all flight-route points have BSP surface bindings; native manual-index flags unchanged");}
   let cache=output.join("be_native.map");let map=crate::maps::inspect_map(&cache,None).unwrap();assert_eq!(map.header.version,609);assert_eq!(map.header.scenario_type,0);
+  // The deliverable follows the last independently verified production revision.
+  // Retain the initial cache for negative checks, never export it over a later edit.
+  let mut export_candidate=(cache.clone(),map.sha256.clone());
   if controller.is_some(){assert!(map.resources.iter().all(|row|!row.required),"Complete candidate needs its actual referenced resource payloads: {:?}",map.resources);assert!(!map.diagnostics.iter().any(|row|row.code=="RESOURCE_LAYOUT_UNVERIFIED"));eprintln!("Complete CE609 candidate resource descriptors PASS: {}",serde_json::to_string(&map.resources).unwrap());}
   if let Some(original_map)=std::env::var_os("SPARK_NATIVE_TRANSPORT_BASE_MAP"){let baseline=crate::maps::inspect_map(&std::path::PathBuf::from(original_map),None).unwrap();assert!(map.encounters.len()>=baseline.encounters.len());for(old,new)in baseline.encounters.iter().zip(&map.encounters){assert_eq!((&old.name,old.team),(&new.name,new.team),"Mission runtime team choices must not rewrite original scenario AI teams");}eprintln!("Original native encounter teams retained PASS: {}",baseline.encounters.len());}
   verify_cache(&snapshots,&cache,&map).unwrap();
@@ -500,6 +503,7 @@ mod installed {
    let mut bad=input.clone();bad.expected_tag_identity=Some(crate::working_tags::source_identity(&parent_tags,&cancel).unwrap());
    let refused=crate::working_tags::run(&current,&bad,&jobs,&uuid::Uuid::new_v4().to_string(),cancel.clone(),|_|{}).unwrap();assert_eq!(refused.status,"failed");assert!(refused.message.contains("edited tags were preserved"),"{}",refused.message);assert!(refused.output.is_none());
    assert_eq!(std::fs::read(&edited).unwrap(),b"edited source must never be overwritten");assert_eq!(inspection.sha256,crate::maps::hash_file(output).unwrap());
+   export_candidate=(output.to_path_buf(),inspection.sha256.clone());
    eprintln!("Production recovered radio source/rebuild PASS: parent {} revised {} source {} sample hashes {} preserved; conflicting-tag refusal keeps previous-good map; no Windows/game acceptance",baseline.sha256.unwrap(),inspection.sha256,crate::hex_bytes(sha2::Sha256::digest(content.as_bytes())),read.permutations.len());
   }
   if let Some((pilot,crew_specs,routes,controller_sha,graph_inputs))=&controller{
@@ -526,8 +530,9 @@ mod installed {
   std::fs::write(&file,&original).unwrap();assert_eq!(original_sha,crate::maps::hash_file(&file).unwrap());
   if let Some(export)=std::env::var_os("SPARK_NATIVE_MAP_EXPORT"){
    let export=std::path::PathBuf::from(export);let owned=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_TEST_ROOT").unwrap()).canonicalize().unwrap();crate::reject_links(&export).unwrap();
-   assert!(export.parent().unwrap().canonicalize().unwrap().starts_with(&owned));assert!(!export.exists());crate::native_staging::copy_file(&cache,&export,std::fs::metadata(&cache).unwrap().len(),Some(&map.sha256),&std::sync::atomic::AtomicBool::new(false)).unwrap();
-   eprintln!("Exported exact ephemeral native cache to the same bounded QA owner: {}",map.sha256);
+   assert!(export.parent().unwrap().canonicalize().unwrap().starts_with(&owned));assert!(!export.exists());crate::native_staging::copy_file(&export_candidate.0,&export,std::fs::metadata(&export_candidate.0).unwrap().len(),Some(&export_candidate.1),&std::sync::atomic::AtomicBool::new(false)).unwrap();
+   let exported=crate::maps::inspect_map(&export,None).unwrap();assert_eq!(exported.sha256,export_candidate.1);assert_eq!(exported.header.version,609);assert_eq!(exported.header.scenario_type,0);
+   eprintln!("Exported latest independently verified native candidate to the same bounded QA owner: {}",exported.sha256);
   }
   eprintln!("Native vehicle flight tag original/restored {original_vehicle_sha}; modified {modified_vehicle_sha}; all three compiled fields independently verified");
   eprintln!("Native append CE609 PASS: cache {}; revised scenario {source_sha}; original/restored {original_sha}; new transports {:?}; original AI/script identities preserved; reviewed pose edits verified separately; no flight/gameplay acceptance",map.sha256,snapshots);

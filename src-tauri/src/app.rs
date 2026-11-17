@@ -1674,7 +1674,7 @@ async fn validate_existing(app: tauri::AppHandle, id: String) -> Reply<String> {
         }
         running.insert(job_id.clone(), cancel.clone());
         drop(running);
-        let result = build::validate_existing_mcc(
+        let result = build::validate_existing_cache(
             &p,
             &i,
             &tools,
@@ -1967,7 +1967,16 @@ fn launch_readiness_state(state:&AppState,id:&str)->Reply<Readiness> {
         && install.steam_executable.is_some()
         && package_valid
         && registered;
-    let current = current_build(&state, &p);
+    let ce=p.active_build_target.as_ref().and_then(|id|p.build_targets.iter().find(|t|&t.id==id))
+        .is_some_and(|t|t.builder=="invader-ce"&&matches!(t.runtime_id,runtime::RuntimeId::HaloCustomEdition|runtime::RuntimeId::ChupathingyCe));
+    let current = current_build(&state, &p).and_then(|record|{
+        let header=maps::inspect_header(record.output.as_ref().ok_or("Validated output is missing")?).map_err(error)?;
+        let expected=if ce{609}else{13};
+        if header.version!=expected||header.extended {
+            return Err(format!("Current validated output is cache {}. This {} workflow requires standard cache {}; use the matching runtime/export controls or compile the selected target.",header.version,if ce{"CE"}else{"MCC"},expected));
+        }
+        Ok(record)
+    });
     let current_build_message = match &current {
         Ok(_) => {
             "Current saved project has an intact validated build; gameplay remains untested.".into()
@@ -3543,6 +3552,9 @@ pub fn run() {
 }
 
 #[cfg(test)]
+#[path = "../../crates/spark-core/tests/common/mod.rs"]
+mod readiness_fixture;
+#[cfg(test)]
 mod readiness_tests {
     #[test]
     fn fresh_libraries_require_shared_inbox_opt_in_and_existing_preferences_keep_their_behavior(){
@@ -3689,6 +3701,22 @@ mod readiness_tests {
             }
             lock(&state.library).unwrap().set_setting(&format!("quickforge.receipt.{}",p.id),&receipt).unwrap();
             assert_eq!(quickforge_report(&state,&p).unwrap().unwrap().current,Some(false),"{variant}");
+        }
+    }
+    #[test]
+    fn readiness_requires_the_selected_native_cache_format_not_just_a_validated_receipt() {
+        for (version,ce,accepted) in [(609,false,false),(13,false,true),(609,true,true),(13,true,false)] {
+            let (_temp,state,mut p,mut record)=fixture();
+            if ce {
+                let id=uuid::Uuid::new_v4().to_string();p.active_build_target=Some(id.clone());
+                p.build_targets.push(project::EngineBuildTarget{id,name:"CE test target".into(),runtime_id:runtime::RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:None,hek_flavor:None,tags_directory:None,invader_directory:None,ce_compatible_tagset:true,open_sauce:false});
+            }
+            fs::write(record.output.as_ref().unwrap(),super::readiness_fixture::fixture(version)).unwrap();
+            record.sha256=Some(maps::hash_file(record.output.as_ref().unwrap()).unwrap());record.project_fingerprint=p.fingerprint().unwrap();record.target=if version==609{"ce-existing"}else{"mcc-existing"}.into();
+            fs::write(state.root.join("jobs").join(&record.id).join("receipt.json"),serde_json::to_vec(&record).unwrap()).unwrap();
+            p.builds=vec![record.clone()];lock(&state.library).unwrap().save(&p,None).unwrap();
+            let report=launch_readiness_state(&state,&p.id).unwrap();assert_eq!(report.current_validated_build_id.is_some(),accepted,"version={version},ce={ce}");
+            if !accepted{assert!(report.current_build_message.contains("requires standard cache"));}
         }
     }
     #[test]

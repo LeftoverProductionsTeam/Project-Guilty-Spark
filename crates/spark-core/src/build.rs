@@ -645,7 +645,7 @@ impl Runner<'_> {
         Ok(output.trim_end_matches(['\r', '\n']).into())
     }
 }
-pub fn validate_existing_mcc(
+pub fn validate_existing_cache(
     project: &Project,
     inspection: &MapInspection,
     tools: &Toolchain,
@@ -655,13 +655,17 @@ pub fn validate_existing_mcc(
     on_event: impl Fn(JobEvent) + Send + Sync,
 ) -> Result<BuildRecord> {
     uuid::Uuid::parse_str(job_id).map_err(|_| SparkError::Invalid("Invalid job UUID".into()))?;
-    if inspection.header.version != 13
+    if !matches!(inspection.header.version, 13 | 609)
         || inspection.header.extended
+        || inspection.header.compressed
         || inspection.header.build.contains("synthetic parser fixture")
     {
-        return invalid("This operation requires an existing unextended MCC cache, not a legacy map or test fixture");
+        return invalid("This operation requires an existing standard MCC13 or CE609 cache, not an extended/compressed map or test fixture");
     }
     if !project.tag_duplicates.is_empty() || !project.tag_renames.is_empty() || !project.tag_edits.is_empty() || project.scene != inspection.objects
+        || project.quick_forge.is_some() || project.firefight.is_some() || !project.assets.is_empty()
+        || !project.native_asset_imports.is_empty() || project.native_lighting.is_some()
+        || !crate::native_audio::fingerprint_inputs(project).is_empty()
         || project.bsp_assembly.is_some() || !project.animation_assignments.is_empty() || !project.powerups.is_empty()
         || project.studio.as_ref().and_then(|s|s.engine_machinima.as_ref()).is_some_and(|take|take.enabled)
         || project.conversion_profile.as_deref().is_some_and(|profile|profile!="faithful")
@@ -672,13 +676,18 @@ pub fn validate_existing_mcc(
         .source
         .as_ref()
         .ok_or_else(|| SparkError::Invalid("No source cache".into()))?;
+    crate::source_identity::validate(source, inspection)?;
+    project.validate()?;
     if maps::hash_file(&source.preserved_path)? != source.sha256 {
         return invalid("Preserved source checksum changed");
     }
     let info=tool_path(tools,"invader-info").ok_or_else(||SparkError::Invalid("Configure invader-info in Settings to verify the source cache CRC and protection status".into()))?;
     let dir = jobs_root.join(job_id);
     crate::reject_links(&dir)?;
-    fs::create_dir_all(&dir)?;
+    let lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(&source.preserved_path),crate::storage::estimate_copy(1,fs::metadata(&source.preserved_path)?.len()).saturating_add(65536),crate::storage::Category::Staging,"Unchanged native cache validation; original source is read-only")?;
+    fs::create_dir_all(jobs_root)?;
+    fs::create_dir(&dir)?;
+    lease.mark_owned()?;
     let output_dir = dir.join("output");
     fs::create_dir(&output_dir)?;
     let runner = Runner {
@@ -704,7 +713,7 @@ pub fn validate_existing_mcc(
             60,
         )?;
         if result.trim() != expected && result.trim() != "false" {
-            return invalid(format!("Existing MCC cache failed {check}: {result}"));
+            return invalid(format!("Existing cache failed {check}: {result}"));
         }
     }
     let filename = safe_relative(&crate::mcc::package_map_name(&inspection.scenario_path)?)?;
@@ -716,12 +725,19 @@ pub fn validate_existing_mcc(
     if maps::hash_file(&output)? != source.sha256 {
         return invalid("Validated output copy does not match the preserved source");
     }
-    let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"mcc-existing".into(),output:Some(output),sha256:Some(source.sha256.clone()),message:"Existing MCC cache copied unchanged; tag/index, protection, stub and CRC checks passed. No conversion was performed. Target-game load remains pending.".into(),project_fingerprint:project.fingerprint()?};
+    let readback=maps::inspect_map(&output,source.resource_directory.as_deref())?;
+    crate::source_identity::validate(source,&readback)?;
+    if readback.header.scenario_type!=inspection.header.scenario_type || serde_json::to_value(&readback.tags)?!=serde_json::to_value(&inspection.tags)? {
+        return invalid("Validated cache readback differs from the preserved native source");
+    }
+    let ce=inspection.header.version==609;
+    let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:if ce{"ce-existing"}else{"mcc-existing"}.into(),output:Some(output),sha256:Some(source.sha256.clone()),message:format!("Existing {} cache copied unchanged; independent tag/index, protection, stub and CRC checks passed. No conversion or compilation was performed. Target-game load remains pending.",if ce{"CE609"}else{"MCC13"}),project_fingerprint:project.fingerprint()?};
     project::atomic_write(
         &dir.join("receipt.json"),
         &serde_json::to_vec_pretty(&record)?,
         false,
     )?;
+    lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated", &record.message, 100, "success");
     Ok(record)
 }

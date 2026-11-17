@@ -5225,3 +5225,34 @@ test('build badge distinguishes pending, blocked and unavailable checks',async({
  await page.evaluate(()=>(window as any).__buildBadge.mode='unavailable');await page.getByRole('button',{name:'Refresh checks',exact:true}).click();await expect(target).toContainText('Build checks unavailable');await expect(page.locator('.build-page')).toContainText('Synthetic build check unavailable');await expect(build).toBeDisabled();
  await page.evaluate(()=>(window as any).__buildBadge.mode='ready');await page.getByRole('button',{name:'Refresh checks',exact:true}).click();await expect(target).toContainText('Ready to build');await expect(build).toBeEnabled();
 });
+
+
+test('unchanged CE cache uses native validation then the existing export controls',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{
+  const w=window as any,p=w.__sparkMock.projects.a.project;p.source.cacheVersion=609;w.__sparkMock.projects.a.inspection.header.version=609;
+  const original=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='validate_existing'){
+    w.__sparkMock.calls.push({command,args:structuredClone(args)});
+    p.builds.push({id:'ce-check',timestamp:new Date().toISOString(),status:'validated',target:'ce-existing',output:'Synthetic/ce-check/test.map',sha256:p.source.sha256,message:'Existing CE609 copied unchanged; no compilation or game acceptance.',projectFingerprint:'synthetic'});
+    await w.__sparkMock.emit('spark:library-changed');
+    return 'Existing cache checked and copied unchanged. No compilation or conversion was performed.';
+   }
+   if(command==='storage_export_map'){
+    w.__sparkMock.calls.push({command,args:structuredClone(args)});
+    return {output:'Synthetic/Mods/test.map',sha256:p.source.sha256,bytes:128,cacheVersion:609,runtimeId:args.runtimeId,reused:false};
+   }
+   return original(command,args);
+  };
+ });
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Build & playtest');
+ await page.getByText('Check an unchanged CE cache',{exact:false}).click();
+ const validate=page.getByRole('button',{name:'Validate existing CE cache',exact:true});await revealPagedControl(validate);await expect(validate).toBeEnabled();await validate.click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='validate_existing').length)).toBe(1);
+ const history=page.locator('.build-history');await history.locator(':scope > summary').click();
+ await expect(history).toContainText('ce-existing');await expect(history).toContainText('no compilation or game acceptance');
+ await history.getByText(/^Export map/,{exact:true}).click();const select=history.getByRole('combobox',{name:'Map export runtime',exact:true});await revealPagedControl(select);await expect(select).toHaveValue('haloCustomEdition');await select.selectOption('openCe');await history.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+ await expect(history.getByRole('status')).toContainText('Native map exported and hash-verified');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='storage_export_map').map((c:any)=>c.args))).toEqual([{projectId:'a',buildId:'ce-check',runtimeId:'openCe'}]);
+});

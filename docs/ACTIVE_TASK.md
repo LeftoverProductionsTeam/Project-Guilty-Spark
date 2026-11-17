@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — expanded Black Echo native handoff after scoped P0/seam acceptance
+Task: Operation110 — reviewed Forerunner admission and final Black Echo handoff
 Status: implementation incomplete
-Starting revision: 54c1984cb743e80fb4a4d2d33496f958570bf1b0, canonical master.
-Latest verified revision: a2af8c9 plus current scoped source: recovered CE42-edit/HUD/Save/3restarts/native readback PASS; paint9.4ms/replies10,2,2ms. Build badge browser/native PASS; core all-targets PASS. Exact source/app/map hashes in RUNTIME_INTEGRATION_20261107/c40 fixture. No gameplay acceptance.
-Next action: Resume existing combined Black Echo Pelican/Spirit/native transport recipe and reviewed source handoff in RUNTIME_INTEGRATION_20261107. Reuse native writers/SDK selectors; verify current Forerunner admission read-only and stage the expanded candidate. Broad37944, hosted CI, traversal/game/peers/platform gates stay OPEN.
+Starting revision: 40d115eca45ee9830057705b429cb701289057ce, canonical master.
+Latest verified revision: 40d115e plus scoped handoff source; CE609 31505afb native compile/readback, Windows validation/export/File Save/reopen, two admitted private Forerunner Start/Stop PASS. Final appc370fbaa. Gameplay unconfirmed. Exact hashes/tests/limits: RUNTIME_INTEGRATION_20261107 and c40 fixture.
+Next action: Reuse the retained Pelican review map and existing CE driver; remove its hardcoded levels/forerunner prefix using the imported scenario identity, then prove complete native authoring controls. Physical flight/combat/settlement awaits working Windows control. Advance independent creator work; no SDK duplication, Forerunner writes or push.
 
 ## Acceptance
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current source: native arch geometry repair; existing native mission driver selects a distinct actual source start and reuses42-edit/paint/history checks. Build.tsx reports pending/blocked/unavailable/ready truthfully; focused browser and actual native saved-project navigation pass. Evidence: seam/runtime records and existing fixtures.
+Current source: final-production native mission export, unchanged CE609/MCC13 validation through existing Build controls, actual-format readiness and guarded ce-existing private startup. Current/previous exact Forerunner identities retained. Source/native/UI checks pass; full creator/gameplay remains open.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -125,7 +125,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-Current: named recovered42-edit/native HUD workflow PASS, broader37944 remains OPEN. Chupathingy game gate refuses installedc16096a8 versus reviewedfa999752; no bypass. Arch structural warnings and actual edge-pick/close entrances/player/Warthog/game acceptance OPEN. Expanded dropship/Forerunner gameplay, hosted CI and full product remain unaccepted.
+Current: retained Pelican review map compiles/reads back/exports/reopens and privately starts Forerunner; game revision null. Physical boarding/flight/combat/collection/settlement needs real control. Broader37944, Chupathingy c16096a8 refusal, seam gameplay, full CI/platform/peer/release gates remain OPEN.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
@@ -151,7 +151,7 @@ Current: named recovered42-edit/native HUD workflow PASS, broader37944 remains O
 
 ## Operations and safe checkpoint
 
-Current a2af8c9 + scoped delta: QA Node26367/run-aVu7Oz CLOSED. All writers exited;5,277,334,844logical bytes disposed,peak5,321,689,666,last allocation5,032,051,032; exact disposal allocation unavailable. Root absent,runs[]/issues[]. Raw2353tags,Forerunner08389ed4,5Halo inputs,475CSV,legacy checkpoint/stashes unchanged. Source/app/output hashes and limits in existing runtime/seam fixtures. No game/push.
+Current40d115e: QA39356/run-yI2DHp CLOSED; all writers exited/root absent/runs[]/issues[]. Disposed4021201188logicalB, last allocation3766279976B, disposal allocation unavailable. One review map retained: releases/black-echo-review-20261117 (110036926logicalB/110039880allocated-fileB). Evidence complete; verify manifest pair/protected475IDs and commit locally.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

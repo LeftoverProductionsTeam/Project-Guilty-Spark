@@ -117,7 +117,7 @@ pub(crate) fn checked_build(state: &AppState, project: &Project, build_id: Optio
 }
 fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>, scenario_type:u16) -> Reply<(BuildRecord,bool,Vec<String>)> {
     let build = if let Some(id) = build_id { verified_build(state, project, id)? } else { current_build(state, project)? };
-    if build.target != "gbx-custom" { return Err(if scenario_type==0{"Build the saved project as standard Custom Edition solo content for Forerunner first"}else{"Build the saved project as standard Custom Edition content for Chupathingy first"}.into()); }
+    if !matches!(build.target.as_str(),"gbx-custom"|"ce-existing") { return Err(if scenario_type==0{"Build the saved project as standard Custom Edition solo content for Forerunner first"}else{"Build the saved project as standard Custom Edition content for Chupathingy first"}.into()); }
     let output = build.output.as_ref().ok_or("Validated native output is missing")?;
     let inspection = maps::inspect_map(output, None).map_err(error)?;
     let header = &inspection.header;

@@ -412,5 +412,210 @@
     "runs": [],
     "issues": [],
     "scope": "Shared bounded owner for arch, terrain, Windows preview, recovered CE mission and build-status checks; no exact physical-reclamation claim"
+  },
+  "blackEchoHandoff20261117": {
+    "parent": "40d115eca45ee9830057705b429cb701289057ce",
+    "nativeCompileAndIndependentReadback": true,
+    "latestProductionRevisionExported": true,
+    "nativeMap": {
+      "projectId": "acf46c0a-7310-46b4-8808-b13279f46835",
+      "buildId": "871c0ad7-52b6-46d6-99df-982e1f12ddc4",
+      "projectFingerprint": "3106ad823b99552614a726586a0b87f418d5cfb1fd68ebd9235f6f51e27e0abd",
+      "output": "\\\\?\\D:\\Project Guilty Spark\\releases\\black-echo-review-20261117\\Spark-871c0ad7-52b6-46d6-99df-982e1f12ddc4\\be_native.map",
+      "sha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+      "bytes": 110033808,
+      "cacheVersion": 609,
+      "runtimeId": "openCe",
+      "reused": false
+    },
+    "apps": {
+      "initialWindows": "005d0501ea99c8febaad867918e1d54e4fd5066a6453d70370faee7d41c0da9a",
+      "newEngineWindows": "ee587e75dfdda47239bbb40d01d91667ffbe99ad7191f03bcaacd5024283958c",
+      "finalReadinessAndExport": "c370fbaad0107c5b4e6deb8915d8bf163f42bf363acce11fca38fc60d2e02956",
+      "bytes": 67688448
+    },
+    "runtimeSnapshots": [
+      {
+        "sha256": "2f94e8631f7a6c5278a0f36eaa219cc9b7b89562c346827a231348e67a5682df",
+        "build": "978169e0"
+      },
+      {
+        "sha256": "b68e4710e2a258f42ae69fa183aaa05aeaf0d637d36033b30b0503847bb579d2",
+        "build": "3446ed13"
+      }
+    ],
+    "SDL3": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0",
+    "contractSha256": "54d3a535b49516f7c4d42c10d790123ab51d649d3d96d70489d98720b2d985f7",
+    "nativeWindows": {
+      "mockedIpc": false,
+      "explicitFileSave": true,
+      "savedProjectReopened": true,
+      "buildAndProfilesAndDestinationRetained": true,
+      "automaticMapReopen": false,
+      "identicalExportReused": true,
+      "wrongMccFormatReadinessRefused": true,
+      "normalCloses": 5,
+      "errors": []
+    },
+    "playtests": [
+      {
+        "phase": "awaitingMapStartup",
+        "processId": 39124,
+        "compiledSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+        "gameSha256": null,
+        "startupMap": "be_native@ce",
+        "engineSha256": {
+          "engine/SDL3.dll": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0",
+          "engine/halo.exe": "2f94e8631f7a6c5278a0f36eaa219cc9b7b89562c346827a231348e67a5682df"
+        },
+        "ceResourceSha256": {
+          "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+          "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+          "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+        },
+        "error": null
+      },
+      {
+        "phase": "awaitingMapStartup",
+        "processId": 19572,
+        "compiledSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+        "gameSha256": null,
+        "startupMap": "be_native@ce",
+        "engineSha256": {
+          "engine/SDL3.dll": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0",
+          "engine/halo.exe": "b68e4710e2a258f42ae69fa183aaa05aeaf0d637d36033b30b0503847bb579d2"
+        },
+        "ceResourceSha256": {
+          "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+          "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+          "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+        },
+        "error": null
+      }
+    ],
+    "ownedPlaytestsStoppedAndStagingRemoved": true,
+    "gameplayAccepted": false,
+    "sourceProtected": {
+      "D:/Project Forerunner/build/native-black-echo-fixture/be_native.scenario": {
+        "before": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207",
+        "after": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207",
+        "unchanged": true
+      },
+      "D:/Project Forerunner/build/native-black-echo-fixture/maps/be_native.map": {
+        "before": "81f6f1dd2d4cc3e53ce9d837d258daefc8c2667aa244eddd295faf53c40ec230",
+        "after": "81f6f1dd2d4cc3e53ce9d837d258daefc8c2667aa244eddd295faf53c40ec230",
+        "unchanged": true
+      },
+      "D:/Project Forerunner/tools/fixtures/black_echo_native.hsc": {
+        "before": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+        "after": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+        "unchanged": true
+      },
+      "D:\\Project Forerunner\\build\\native-dropship-fixture\\tags\\forerunner\\transport\\pelican.vehicle": {
+        "before": "24e7e83af097318cc2badeea877ae64d6c71e1ff7405baaa0a3a1468f28623dd",
+        "after": "24e7e83af097318cc2badeea877ae64d6c71e1ff7405baaa0a3a1468f28623dd",
+        "unchanged": true
+      },
+      "D:\\Project Forerunner\\build\\native-dropship-fixture\\tags\\forerunner\\transport\\spirit.vehicle": {
+        "before": "a43f0eecfee98d8b702209841a28779b075816c826216c4a50727e8d171832e0",
+        "after": "a43f0eecfee98d8b702209841a28779b075816c826216c4a50727e8d171832e0",
+        "unchanged": true
+      },
+      "D:\\Project Forerunner\\build\\native-dropship-fixture\\tags\\globals\\globals.globals": {
+        "before": "58ccff63b2da901f4e65f673ed327f9ee76a467f90991a708cf093e36bbf2a20",
+        "after": "58ccff63b2da901f4e65f673ed327f9ee76a467f90991a708cf093e36bbf2a20",
+        "unchanged": true
+      },
+      "D:\\Project Guilty Spark\\Runtimes\\Halo Custom Edition\\maps\\bitmaps.map": {
+        "before": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+        "after": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+        "unchanged": true
+      },
+      "D:\\Project Guilty Spark\\Runtimes\\Halo Custom Edition\\maps\\sounds.map": {
+        "before": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2",
+        "after": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2",
+        "unchanged": true
+      },
+      "D:\\Project Guilty Spark\\Runtimes\\Halo Custom Edition\\maps\\loc.map": {
+        "before": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+        "after": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+        "unchanged": true
+      },
+      "D:\\Project Guilty Spark\\Runtimes\\Halo Custom Edition\\maps\\ui.map": {
+        "before": "0d2c6f7944b1a9c84b86b92e6f41fe386f04d0c547ed77c14d2328b807cb814c",
+        "after": "0d2c6f7944b1a9c84b86b92e6f41fe386f04d0c547ed77c14d2328b807cb814c",
+        "unchanged": true
+      }
+    },
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-review-export-20261117.png",
+        "sha256": "565565abcb057c0e65525103be56b1eeda43d4b5c0330dc2492b52c28b5efadc"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-forerunner-stage-20261117.png",
+        "sha256": "bb07e29dd6f0ead30584cab34d893d567d6fe8689ea80f883575d3658967e23a"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-saved-reopen-20261117.png",
+        "sha256": "0109ab904a10190f8808ffa9dde3005a424bcbb36a9e8e67b7628a1b5e528906"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-cache-readiness-20261117.png",
+        "sha256": "a9a935b2980c9f90926d6d224b01ad19beff7a433ebab57851be6c88011b2999"
+      }
+    ],
+    "tests": {
+      "nativeTransport": 1,
+      "existingCache": 4,
+      "coreForerunnerWithInstalledPlan": 5,
+      "companionDiscovery": 2,
+      "playtestBackend": 5,
+      "playtestBackendExplicitSkip": 1,
+      "selectedFormatRegression": 1,
+      "browserHandoffRequests": 3,
+      "finalBrowser": 2,
+      "guides": 4
+    },
+    "testCorrections": [
+      "Tag readback comparison initially used missing PartialEq; fixed serialization comparison. A fixture helper name was invalid; switched to existing Firefight defaults.",
+      "Browser fixture now emits the actual library-change event; scoped direct-child summary and accessible menu names replace incorrect test selectors.",
+      "Native first setup omitted explicit persistent Save and assumed automatic map reopen. Repeated only that portion with File Save, actual saved-project selection and retained build readback.",
+      "Initial backend filter selected zero tests; corrected filter runs five real tests plus one explicit installed-staging skip.",
+      "Readiness allowed a CE cache to satisfy the MCC validated-build row; now checks actual native format and selected target."
+    ],
+    "limits": [
+      "No loaded-map or game-revision acknowledgement. Human flight/combat/settlement and real peers remain open.",
+      "Folder picker was not controlled: destination seeded in a closed disposable database. No folder-picker acceptance claim.",
+      "Forerunner source/executable changed independently during testing; frozen snapshots were separately verified, never overwritten or mixed.",
+      "Full CI/platform/display/headset/regression and broader Save37944 acceptance remain open."
+    ],
+    "gameLaunched": true,
+    "package": {
+      "files": 4,
+      "logicalBytes": 110036926,
+      "allocatedFileBytes": 110039880,
+      "allocationMethod": "Windows FILE_STANDARD_INFO.AllocationSize; file allocation only"
+    },
+    "sourceHashes": {
+      "crates/spark-core/src/build.rs": "a5ecae25119f752ebfedffacc8e135875fc94a81654863752ee59293707ec9da",
+      "crates/spark-core/src/runtime.rs": "5e00256aca04e419ab7748a878560a14e65895492eea1ccff1ea27f6bc3cf7f7",
+      "crates/spark-core/src/native_transport.rs": "ac44c0c65ea9acf49fffc805101aefd3e73eda92ec7679f2b8bfa858a431c363",
+      "src/components/Build.tsx": "7c3739fc47b9522c622ff8dd7585680f3e787885379e05ab2bb0ced4315c416e",
+      "src/featureCatalog.ts": "05568cc414dcc8c5faa8eb473f6d4a19276cdd3be3dc04b320aec55d47e25116",
+      "src-tauri/src/app.rs": "65694a6e94dbd8ab51ab2c897c3b305330c9f96006a2b51394734acbc81ab6cf",
+      "src-tauri/src/runtime_rebuild.rs": "9865b7c44321ff599cbb93d5e23fed84701aa41f79d8bb89ea78d347da7d2d02"
+    },
+    "qaDisposal": {
+      "workflow": "black-echo-runtime-handoff",
+      "disposedLogicalBytes": 4021201188,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 5160835839,
+      "lastAllocatedBytes": 3766279976,
+      "runRemoved": true,
+      "runs": [],
+      "issues": [],
+      "scope": "All owned compiler/browser/app/game scratch disposed; one explicit review map outside scratch retained. Stdout receipt observed; temporary console-capture observer failed after successful disposal, independently checked root absent and registry empty."
+    }
   }
 }

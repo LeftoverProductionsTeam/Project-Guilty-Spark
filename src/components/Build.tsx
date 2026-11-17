@@ -114,7 +114,7 @@ export default function Build({
   const last = projectLogs.at(-1);
   const validated = dirty || checking
     ? undefined
-    : ceTarget ? project.builds.find(b=>b.status==='validated'&&b.target==='gbx-custom'&&b.id===readiness?.currentValidatedBuildId) : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
+    : ceTarget ? project.builds.find(b=>b.status==='validated'&&['gbx-custom','ce-existing'].includes(b.target)&&b.id===readiness?.currentValidatedBuildId) : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
   const steps = [
     ['validate', 'Inspect source'],
     ['extract', 'Extract tags'],
@@ -225,24 +225,24 @@ export default function Build({
               </>
             )}
           </section>
-          {project.source?.cacheVersion === 13 && !project.bspAssembly && !project.animationAssignments?.length && !project.powerups?.length && !project.tagDuplicates?.length && !project.tagRenames?.length && !project.studio?.engineMachinima?.enabled && (!project.conversionProfile || project.conversionProfile === 'faithful') && (
+          {[13,609].includes(project.source?.cacheVersion??0) && !project.quickForge && !project.firefight && !project.assets.length && !project.nativeAssetImports?.length && !project.nativeLighting && !project.bspAssembly && !project.animationAssignments?.length && !project.powerups?.length && !project.tagDuplicates?.length && !project.tagRenames?.length && !project.studio?.engineMachinima?.enabled && (!project.conversionProfile || project.conversionProfile === 'faithful') && (
             <details className="surface build-existing-cache">
-              <summary>Check an unchanged MCC cache <Pill>Cache 13</Pill></summary>
+              <summary>Check an unchanged {project.source?.cacheVersion===609?'CE':'MCC'} cache <Pill>Cache {project.source?.cacheVersion}</Pill></summary>
               <p className="subtle">
-                An unchanged MCC source can be checked and packaged directly. This verifies its structure,
-                protection flags and CRC; it does not convert a legacy map or certify in-game playability.
+                An unchanged source can be checked and exported directly. This verifies its structure,
+                protection flags and CRC; it does not compile edits, convert formats or certify in-game playability.
               </p>
               <button
                 disabled={dirty || !!activeJob || project.tagEdits.length > 0}
                 onClick={() =>
                   void onAction(
                     () => call('validate_existing', { id: project.id }),
-                    'Existing MCC cache checked and copied unchanged. No conversion was performed.',
+                    'Existing cache checked and copied unchanged. No compilation or conversion was performed.',
                   )
                 }
               >
                 <FileCheck2 size={14} />
-                Validate existing MCC cache
+                Validate existing {project.source?.cacheVersion===609?'CE':'MCC'} cache
               </button>
             </details>
           )}
