@@ -1,5 +1,7 @@
 # Canonical cumulative feature and evidence ledger
 
+17Nov native build-history persistence: compiler results and deliberate failure now survive actual embedded app restart without post-build Save, preserving previous-good output and exact saved descriptor. Library15/API2 pass; c40 nativeBuildHistoryPersistence20261117 records native hashes/evidence. This closes the metadata-loss gate, not37944/full mission/gameplay/physical input or M1–M6.
+
 17Nov recovered actor import: existing source browser/importer/native writer/reconciliation now complete Prepare → Preview/Accept/Restore → Save/restart → CE609 compile → independent four-tag byte readback → UI export.426-tag Spirit pilot closure retained in candidate ef98e780; deferred AI/controller/gameplay remain OPEN. Large-field Source Guardian validation fixed without weakening bounds. Embedded saved-profile recovery also passes; physical input blocked by owner Firewall gate. Exact evidence:c40 recoveredActorImport20261117/nativeProfileRecovery20261117 and RUNTIME_INTEGRATION_20261107.475CSV IDs/M1–M6 unchanged.
 
 17Nov coordinated Black Echo hub/player-source editing and compact AI workspace: source/Windows Save-reopen/CE609/independent two-tag byte readback pass; actual flight, mission gameplay,37944 and reflection remain open. Exact scope/hashes:c40 nativePlayerHubAuthoring20261117 and aiScenarioWorkspace20261117; all475CSV records and M1–M6 preserved.

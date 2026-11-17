@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use spark_core::{
     self as core, archive, assets, audio, quickforge, forge_build, firefight, tag_exchange,
     build::{self, JobEvent, Toolchain},
-    library::{Library, LibraryEntry},
+    library::{Library, LibraryEntry, ProjectBuildHistory},
     maps::{self, MapInspection, MeshData},
     mcc::{self, ManagedRoot},
     multiplayer,
@@ -731,19 +731,12 @@ async fn open_project(app: tauri::AppHandle, id: String) -> Reply<OpenProject> {
     .await
     .map_err(error)?
 }
-#[derive(Debug, Serialize)]
-#[serde(rename_all="camelCase")]
-struct ProjectBuildHistory {
-    project_id: String,
-    source_sha256: Option<String>,
-    builds: Vec<BuildRecord>,
-}
 fn project_build_history_state(state:&AppState,id:&str)->Reply<ProjectBuildHistory> {
     let p=lock(&state.library)?.get(id).map_err(error)?;
     // Keep exactly the preserved-source admission used by open_project. Borrow
     // its verified Arc; do not clone/serialize geometry for a status notification.
     if p.source.is_some(){let _=inspect(state,&p)?;}
-    Ok(ProjectBuildHistory{project_id:p.id,source_sha256:p.source.map(|s|s.sha256),builds:p.builds})
+    lock(&state.library)?.build_history(id).map_err(error)
 }
 #[tauri::command]
 async fn project_build_history(app:tauri::AppHandle,id:String)->Reply<ProjectBuildHistory>{
@@ -1627,13 +1620,8 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
         let state = app.state::<AppState>();
         match record {
             Ok(record) => {
-                if let Ok(lib) = state.library.lock() {
-                    if let Ok(mut current) = lib.get(&id) {
-                        current.builds.push(record);
-                        current.modified_at = chrono::Utc::now().to_rfc3339();
-                        let _ = lib.save(&current, None);
-                    }
-                }
+                let recorded=lock(&state.library).and_then(|library|library.record_build(&id,&record).map_err(error));
+                if let Err(problem)=recorded {event(&app,JobEvent{job_id:job_id.clone(),project_id:id.clone(),phase:"failed".into(),severity:"error".into(),message:format!("Native output retained, but build history could not be recorded: {problem}"),progress:100,timestamp:chrono::Utc::now().to_rfc3339()});}
             }
             Err(e) => event(
                 &app,
@@ -1687,9 +1675,7 @@ async fn validate_existing(app: tauri::AppHandle, id: String) -> Reply<String> {
         match result {
             Ok(r) => {
                 let lib = lock(&state.library)?;
-                let mut current = lib.get(&id).map_err(error)?;
-                current.builds.push(r.clone());
-                lib.save(&current, None).map_err(error)?;
+                lib.record_build(&id,&r).map_err(error)?;
                 drop(lib);
                 let _ = app.emit("spark:library-changed", ());
                 Ok(r.message)

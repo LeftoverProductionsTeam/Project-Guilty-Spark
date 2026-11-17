@@ -63,6 +63,15 @@ fn matches_native_asset_source(project:&Project,inspection:&maps::MapInspection,
     let mut original=Project::new(&project.title);original.source=project.source.clone();original.scene=inspection.objects.clone();
     Ok(project.fingerprint()?==original.fingerprint()?)
 }
+/// The existing build-history response is also the bounded compiler metadata
+/// retained by the production RAM-first workspace. It is not an authored Save.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ProjectBuildHistory {
+    pub project_id:String,
+    pub source_sha256:Option<String>,
+    pub builds:Vec<crate::project::BuildRecord>,
+}
 pub struct Library {
     pub root: PathBuf,
     db: Connection,
@@ -198,7 +207,7 @@ impl Library {
         if let Some(preview)=self.preview(id)?{return Ok(preview);}
         if let Some(session)=&self.session{
             let exists:bool=session.db.query_row("SELECT EXISTS(SELECT 1 FROM documents WHERE id=?1)",[id],|r|r.get(0))?;
-            if exists{return session.get(id);}
+            if exists{let mut project=session.get(id)?;self.restore_build_history(&mut project)?;return Ok(project);}
         }
         if self.session_only{
             let text:String=self.db.query_row("SELECT value FROM documents WHERE id=?1",[id],|row|row.get(0))?;
@@ -228,12 +237,56 @@ impl Library {
                     }
                 }
             }
+            self.restore_build_history(&mut project)?;
             // Actual native operations still validate the owned job/output,
             // source fingerprint and byte hashes through verified_build.
             session.save(&project,None)?;
             session.set_setting(&format!("savedBaseline.{id}"),&project::FileRevision::capture(&file)?)?;
         }
         Ok(project)
+    }
+    fn retained_build_history(&self,project:&Project)->Result<Option<ProjectBuildHistory>> {
+        self.project_dir(&project.id)?;
+        let encoded=match self.db.query_row("SELECT CASE WHEN length(CAST(value AS BLOB))<=4194304 THEN value ELSE NULL END FROM settings WHERE key=?1",[format!("buildHistory.{}",project.id)],|row|row.get::<_,Option<String>>(0)) {
+            Ok(Some(value))=>value,
+            Ok(None)=>return invalid("Build history exceeds4MiB; metadata retained. Editable source is intact."),
+            Err(rusqlite::Error::QueryReturnedNoRows)=>return Ok(None),
+            Err(error)=>return Err(error.into()),
+        };
+        let history:ProjectBuildHistory=serde_json::from_str(&encoded).map_err(|_|crate::SparkError::Invalid("Build history is damaged; metadata retained. Editable source is intact.".into()))?;
+        let mut ids=std::collections::BTreeSet::new();
+        if history.project_id!=project.id||history.source_sha256!=project.source.as_ref().map(|source|source.sha256.clone())||history.builds.len()>1000||history.builds.iter().any(|build|build.id.is_empty()||!ids.insert(&build.id)) {return invalid("Build history identity/count differs; retained for review, not applied to this source");}
+        Ok(Some(history))
+    }
+    fn restore_build_history(&self,project:&mut Project)->Result<()> {
+        // Damaged optional metadata must not prevent opening editable source.
+        // The build-history action reports the exact error separately.
+        match self.retained_build_history(project) {
+            Ok(Some(history))=>for build in history.builds {if !project.builds.iter().any(|known|known.id==build.id)&&project.builds.len()<1000{project.builds.push(build);}},
+            Ok(None)|Err(crate::SparkError::Invalid(_))=>{},
+            Err(problem)=>return Err(problem),
+        }
+        Ok(())
+    }
+    pub fn build_history(&self,id:&str)->Result<ProjectBuildHistory> {
+        let project=self.get(id)?;let _=self.retained_build_history(&project)?;
+        Ok(ProjectBuildHistory{project_id:project.id,source_sha256:project.source.map(|source|source.sha256),builds:project.builds})
+    }
+    /// Only compiler completion calls this. Preserve its receipts separately
+    /// from current unsaved authoring and the explicitly saved descriptor.
+    pub fn record_build(&self,id:&str,record:&crate::project::BuildRecord)->Result<LibraryEntry> {
+        let mut project=self.get(id)?;
+        let _=self.retained_build_history(&project)?;
+        if let Some(known)=project.builds.iter().find(|known|known.id==record.id) {
+            if serde_json::to_value(known)?!=serde_json::to_value(record)?{return invalid("This build identity already records another result; previous metadata retained");}
+        }else{project.builds.push(record.clone());}
+        project.validate()?;
+        if self.session.is_some()&&!self.is_preview(id)?&&self.is_saved(id)? {
+            let history=ProjectBuildHistory{project_id:project.id.clone(),source_sha256:project.source.as_ref().map(|source|source.sha256.clone()),builds:project.builds.clone()};
+            if serde_json::to_vec(&history)?.len()>4*1024*1024{return invalid("Build history exceeds4MiB; previous metadata retained");}
+            self.set_setting(&format!("buildHistory.{id}"),&history)?;
+        }
+        self.save(&project,None)
     }
     /// Read only bounded optional native build metadata. Retain malformed bytes
     /// for review; callers may still open source and separately show this error.

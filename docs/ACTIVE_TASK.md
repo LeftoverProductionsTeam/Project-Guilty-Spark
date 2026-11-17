@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - recovered actor workflow accepted in native scope; build metadata persistence next
+Task: Operation110 - build metadata persistence accepted; Spirit controller next
 Status: implementation incomplete
 Starting revision: 0b7671b4f95bbb93a62bc7dbfc284456b0d8f5d5, canonical master.
-Latest verified revision: a066617ea9914310a1e1baefe0d082d4567eb194 plus current scoped native actor milestone (c40 recoveredActorImport20261117).426imports, source review/Restore/Save/restart, CE609 ef98e780 and4tag byte readback/UI export pass. App efce4c2e; game/physical input OPEN.
-Next action: Commit verified actor workflow/evidence/manifests locally. Reproduce and repair recovered source build metadata persistence without an implicit authored Save; reuse QA50103. Then finish Spirit controller/routes through existing native source UI. Owner clears Firewall before private mission gameplay. Exact ef98e780 candidate retained in new releases/black-echo-spirit-pilot-source-20261117; no full mission acceptance.
+Latest verified revision: 139a1244b9c17b5856172f99a316052da47715a2 plus current c40 nativeBuildHistoryPersistence20261117. Library15/API2/Windows a3d39781 pass; actual CE build/restart without Save retains good+deliberate failure and exact saved descriptor. No game/physical input acceptance.
+Next action: Commit verified metadata repair locally, then use existing native transport source controls to bind the imported Spirit pilot and complete coordinated Spirit controller/routes. Reuse QA50103 and retained ef98e780 candidate. Owner Firewall gate still blocks physical game input; no repetitive retries, no Forerunner writes/push.
 
 ## Acceptance
 
@@ -147,7 +147,7 @@ Current: Coordinated c388d3d6 CE609 source/independent two-tag bytes pass; actua
 
 ## Operations and safe checkpoint
 
-QA61647/run-wsWoBU and91709/run-0v0sq0 CLOSED/absent. QA50103/node12444/run-kXE610 ACTIVE12GiB, same prepared offline output. App19156/current efce4c2e open, no game. Actor accepted/source/readback/export, profile result and2embedded screenshots preserved in existing c40/RUNTIME and new111MB candidate. Keep owned inputs until build-history repair; wrapper cleans after operation.
+QA61647/run-wsWoBU and91709/run-0v0sq0 CLOSED/absent. QA50103/node12444/run-kXE610 ACTIVE12GiB; app19084/current a3d39781 open, no game or native build active. Owned fault tag restored byte-for-byte; good ef98e780 output/descriptor hashes unchanged. Actor/native metadata evidence and screenshots preserved in existing c40/RUNTIME; new111MB candidate retained. Keep prepared inputs for Spirit workflow; wrapper cleans afterward.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

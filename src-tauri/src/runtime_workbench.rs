@@ -1201,7 +1201,7 @@ pub(super) async fn build_working_tags(
                 core::working_tags::run_build_from_tags(&project,&input,&jobs_root,&job_id,cancel,|e|event(&worker_app,e)).map_err(error)
             });
             let result=result.and_then(|record|{
-                let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;
+                let library=lock(&state.library)?;let current=library.get(&project_id).map_err(error)?;
                 if input.mission_hud.is_some() {
                     // Studio intent is not normally a native fingerprint input.
                     // A HUD transaction must not adopt older text after a user
@@ -1213,7 +1213,7 @@ pub(super) async fn build_working_tags(
                     let take=|value:&Project|->Reply<serde_json::Value>{serde_json::to_value(value.studio.as_ref().map(|studio|(&studio.shots,&studio.cinematic_trigger_volume))).map_err(error)};
                     if take(&current)?!=take(&project)?{return Err("Cinematic take or trigger changed during compilation. The candidate was not adopted; previous-good source and builds remain intact. Save and prepare a new review.".into());}
                 }
-                current.builds.push(record);current.modified_at=chrono::Utc::now().to_rfc3339();library.save(&current,None).map_err(error)
+                library.record_build(&project_id,&record).map_err(error)
             });
             if let Err(mut message)=result{
                 // Source/integrity admission may fail before core creates a job
@@ -1222,8 +1222,8 @@ pub(super) async fn build_working_tags(
                 let status=if cancelled.load(std::sync::atomic::Ordering::Relaxed){"cancelled"}else{"failed"};
                 let saved=(||->Reply<()>{
                     let record=BuildRecord{id:job_id.clone(),timestamp:chrono::Utc::now().to_rfc3339(),status:status.into(),target:input.parent_build.target.clone(),output:None,sha256:None,message:message.clone(),project_fingerprint:project.fingerprint().map_err(error)?};
-                    let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;
-                    if !current.builds.iter().any(|record|record.id==job_id){current.builds.push(record);library.save(&current,None).map_err(error)?;}
+                    let library=lock(&state.library)?;let current=library.get(&project_id).map_err(error)?;
+                    if !current.builds.iter().any(|known|known.id==job_id){library.record_build(&project_id,&record).map_err(error)?;}
                     Ok(())
                 })();
                 if let Err(issue)=saved{message.push_str(&format!(" Failed to record this outcome in build history: {issue}"));}

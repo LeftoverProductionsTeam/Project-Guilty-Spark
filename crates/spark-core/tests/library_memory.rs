@@ -221,3 +221,41 @@ fn imported_asset_origins_survive_restart_as_metadata_without_copying_maps_or_sa
     assert_eq!(maps::inspect_map(&restored.source.as_ref().unwrap().preserved_path,None).unwrap().sha256,hash);
     assert_eq!(maps::hash_file(&file).unwrap(),hash);assert_eq!(library.list().unwrap().len(),1);
 }
+
+#[test]
+fn compiler_history_survives_restart_without_saving_unsaved_authoring_or_losing_previous_good(){
+    use spark_core::project::BuildRecord;
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("application");let input=temp.path().join("owned.map");
+    let bytes=common::fixture(13);std::fs::write(&input,&bytes).unwrap();let library=Library::workspace(&root).unwrap();
+    let(mut project,_)=library.import_map(&input,None).unwrap();project.title="Explicit source Save".into();
+    let saved=library.save_explicit(&project,None).unwrap();let saved_bytes=std::fs::read(&saved.project_path).unwrap();
+    project.title="Unsaved later authoring".into();library.save(&project,None).unwrap();
+    let good=BuildRecord{id:uuid::Uuid::new_v4().to_string(),timestamp:"2026-11-17T00:00:00Z".into(),status:"validated".into(),target:"mcc-cea".into(),output:Some(temp.path().join("previous-good.map")),sha256:Some("a".repeat(64)),message:"Metadata fixture, not native acceptance".into(),project_fingerprint:project.fingerprint().unwrap()};
+    library.record_build(&project.id,&good).unwrap();library.record_build(&project.id,&good).unwrap();
+    let failed=BuildRecord{id:uuid::Uuid::new_v4().to_string(),status:"failed".into(),output:None,sha256:None,message:"Deliberately failed metadata fixture".into(),..good.clone()};
+    library.record_build(&project.id,&failed).unwrap();
+    assert_eq!(library.get(&project.id).unwrap().title,"Unsaved later authoring");
+    assert_eq!(library.get(&project.id).unwrap().modified_at,project.modified_at);
+    assert_eq!(std::fs::read(&saved.project_path).unwrap(),saved_bytes);
+    assert_eq!(std::fs::read(&input).unwrap(),bytes);
+    drop(library);let library=Library::workspace(&root).unwrap();let restored=library.get(&project.id).unwrap();
+    assert_eq!(restored.title,"Explicit source Save");assert_eq!(restored.builds.len(),2);
+    assert_eq!(restored.builds[0].id,good.id);assert_eq!(restored.builds[0].sha256,good.sha256);
+    assert_eq!(restored.builds[1].id,failed.id);assert_eq!(restored.builds[1].status,"failed");
+    let conflict=BuildRecord{sha256:Some("b".repeat(64)),..good.clone()};assert!(library.record_build(&project.id,&conflict).is_err());
+    assert_eq!(library.build_history(&project.id).unwrap().builds.len(),2);
+    assert_eq!(std::fs::read(&saved.project_path).unwrap(),saved_bytes);
+}
+#[test]
+fn damaged_or_mismatched_build_metadata_is_reported_without_hiding_source_or_overwriting_history(){
+    use spark_core::library::ProjectBuildHistory;
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("application");let input=temp.path().join("owned.map");
+    std::fs::write(&input,common::fixture(13)).unwrap();let library=Library::workspace(&root).unwrap();
+    let(project,_)=library.import_map(&input,None).unwrap();library.save_explicit(&project,None).unwrap();
+    let key=format!("buildHistory.{}",project.id);library.set_setting(&key,&serde_json::json!({"broken":true})).unwrap();
+    assert_eq!(library.get(&project.id).unwrap().id,project.id);assert!(library.build_history(&project.id).is_err());
+    assert_eq!(library.setting::<serde_json::Value>(&key).unwrap(),serde_json::json!({"broken":true}));
+    let unrelated=ProjectBuildHistory{project_id:project.id.clone(),source_sha256:Some("f".repeat(64)),builds:vec![]};
+    library.set_setting(&key,&unrelated).unwrap();assert!(library.build_history(&project.id).is_err());assert!(library.get(&project.id).is_ok());
+    assert_eq!(library.setting::<Option<ProjectBuildHistory>>(&key).unwrap().unwrap().source_sha256,unrelated.source_sha256);
+}
