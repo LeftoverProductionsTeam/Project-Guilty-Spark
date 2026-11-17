@@ -3552,7 +3552,7 @@ mod readiness_tests {
         assert_eq!(serde_json::to_value(fresh).unwrap()["watchSharedMccInbox"],false);
     }
     use super::*;
-    fn fixture() -> (tempfile::TempDir, AppState, Project, BuildRecord) {
+    pub(super) fn fixture() -> (tempfile::TempDir, AppState, Project, BuildRecord) {
         let temp = tempfile::tempdir().unwrap();
         let library = Library::open(temp.path()).unwrap();
         let mut p = library.create("Synthetic readiness fixture").unwrap();

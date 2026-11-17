@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: c911f042f8fdb39e7855374886db67d448f8fefc, canonical local master.
-Latest verified revision: parent c911f042f8fdb39e7855374886db67d448f8fefc plus this verified retained-HUD/native transaction checkpoint, identified by Git and source manifests. Full mission/Operation110 incomplete.
-Next action: close Black Echo resource-bank/Forerunner handoff through existing source/runtime controls; perform approved native Windows/game acceptance when desktop control works. Do not retry unchanged Computer Use failure. Source/backend radio+custom-HUD rebuild/refusal now pass; actual42-edit/37944, restart, audible playback, flight and complete mission remain OPEN. Advance independent creator work while those human/desktop gates wait.
+Starting revision: 0f6144220d88973311fef44c7e8180e9e88b44fd, canonical local master.
+Latest verified revision: 0f6144220d88973311fef44c7e8180e9e88b44fd plus current scoped native-feature/handoff changes; exact new revision follows in local Git/manifests. Native/game acceptance remains separate.
+Next action: complete native squad-terminal/readiness and scoped objective authoring through existing mission/native controls. Current7-beat Pelican compiles/reads back/stages safely for exact Forerunner30a989…; actual gameplay/Windows42-edit/37944 remain OPEN behind the documented desktop/profile gate.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+16Nov current Forerunner: actual help/capabilities, exact build admission, compiled requirements and full7-beat Pelican→CE609 compile/readback→real private staging/3CEbanks/command/refusal/disposal pass in scope. Core20+1skip/browser3+4/guide10/frontend/all-target compilation pass. Exact hashes/errors: RUNTIME_INTEGRATION_20261107. Actual Windows/gameplay OPEN.
 
 16Nov retained HUD (parent c911f04): production CE parent→working-tags radio revision now passes with actual staged custom-HUD reference/table and no generated ownership or overwrite. Five sound hashes and original input identities preserved; conflicting edited tag refuses and keeps prior-good map. Native1/core17+1explicit skip/core all-target/browser1/guide4 pass. Exact hashes/setup corrections in RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
@@ -51,11 +53,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current recovered radio/HUD: c911f04 source inclusion/staging/native paths and this actual production parent/rebuild/refusal milestone pass in scope. Custom source-owned HUD now verifies its real scenario reference and exact table without taking ownership. Existing native writers/receipt/hash protections retained; source manifest/Git identify all changes. Native Windows/restart/game acceptance stays OPEN; no discarded WIP.
-
-Current camera workflow since b24bac4: Add native camera point including empty source, name/pose/lens/viewport draft, protected Preview/Accept/Restore; relative transport camera choices and actual current-source preparation/build gating; saved controller history and native output checked. Source/browser/native proofs are distinct from actual app/game/restart. Both factions retain their kits/pilot/routes/HUD/original slots. QA31684/run-l1Q8hx CLOSED; no discarded source WIP.
-
-Current checkpoint: pilot graph/seat source review, bounded shared native reader, RuntimeDock preparation/build refusal and both faction native mission integration; existing tests/guides updated. Scoped checks pass; no discarded WIP. No duplicate writer, engine edit or new requirement tracker.
+Current Forerunner admission/optional native-feature gating, compiled requirements, runtime details and full Black Echo native resource staging are implemented in existing systems. Focused tests/native compilation/readback/staging/refusal pass in scope; exact hashes/failures in RUNTIME_INTEGRATION_20261107. Existing camera/radio/HUD/pilot/faction proofs remain above and in Git. No discarded WIP, new launcher/writer or Forerunner modification. Native Windows/gameplay OPEN.
 
 Native flight tuning78c01b2 remains verified in scope. Current route workflow: existing command/volume readers check physical movement, final-stop/facing references and final craft-origin containment by readable selected pads; unread/unsupported/bad-pad programs refuse generated preparation, manual source remains available. Existing route editor exposes Stop/Keep moving while preserving unknown values; viewport/Preview/Accept/Restore/Save/reopen continue. Only two selected route reviews render. Core28/browser3distinct/guide4/TypeScript/Vite/Windows and installed CE609 route/volume/aircraft/tuning readback1 pass. Native Windows/full restart/flight/gameplay remain unrun. Exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No push.
 
@@ -147,7 +145,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Current QA86011/run-vMYcYi CLOSED:475127228logicalB disposed, peak1197311289logicalB,last allocated440604328B; disposed allocation unavailable. Root absent, runs[]/issues[], owner normal exit. No retained output or Forerunner writes/game/push. Prior19031 closed1417000367logicalB; exact evidence retained.
+Current QA38892/run-hbw43J CLOSED:2534946191logicalB disposed; peak2534953300logicalB,last file allocation2407900008B. Disposal allocation unavailable; no physical reclamation claim. Root absent,runs[]/issues[]; all jobs stopped normally except the explicitly cancelled accidental broad browser tree. Exact native/log/test-exe hashes in RUNTIME_INTEGRATION_20261107. Originals/475IDs/legacy/stashes unchanged; no retained QA maps/SDK/runtime/cache/archive and no game/push.
 
 Prior QA31684/run-l1Q8hx CLOSED:1589724440 logicalB disposed, peak1701962732 logicalB, last allocation1461488488B; disposed allocation unavailable. Root absent; runs[]/issues[], owner exited. No retained maps/SDK/caches/archive. No game launched. Exact evidence in RUNTIME_INTEGRATION_20261107.
 

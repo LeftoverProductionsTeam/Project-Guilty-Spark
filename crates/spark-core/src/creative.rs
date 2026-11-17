@@ -375,15 +375,46 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
 }
 /// A recovered native mission may lack Studio metadata. Admit the existing
 /// engine mode from its compiled callback/markers, never from a project label.
-pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<bool> {
+pub const SQUAD_OBJECTIVES_FEATURE:&str="extraction.squad_objectives.v1";
+/// Native interface names from the reviewed Forerunner contract. This detects
+/// required engine behavior, not mission completion, membership or gameplay.
+fn squad_interface_number(name:&str,prefix:&str,suffix:&str)->Result<Option<u8>> {
+    let Some(number)=name.strip_prefix(prefix).and_then(|value|value.strip_suffix(suffix)) else{return Ok(None);};
+    if number.len()!=2||!number.bytes().all(|c|c.is_ascii_digit()){return invalid("Native squad bindings need their exact two-digit squad number");}
+    let number=number.parse::<u8>().unwrap();
+    if !(1..=22).contains(&number){return invalid("Native squad binding exceeds the reviewed Forerunner 01–22 interface range; this is not player-scale acceptance");}
+    Ok(Some(number))
+}
+pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<Option<Vec<String>>> {
     let callbacks=map.scripts.iter().filter(|s|s.name=="forerunner_extraction_complete").collect::<Vec<_>>();
-    if callbacks.is_empty(){return Ok(false);}
-    if callbacks.len()!=1||callbacks[0].script_type!=1||map.header.version!=609||map.header.scenario_type!=0||map.header.extended {
-        return invalid("Forerunner settled Extraction requires one dormant callback in a standard native CE609 solo map");
+    let mut queries=std::collections::BTreeSet::new();
+    for script in &map.scripts{if let Some(number)=squad_interface_number(&script.name,"forerunner_squad_","_players")?{
+        if script.script_type!=3||script.return_type!=23||!queries.insert(number){return invalid("Native squad player queries require unique static object_list declarations");}
+    }}
+    if map.header.version!=609||map.header.scenario_type!=0||map.header.extended{
+        if callbacks.is_empty()&&queries.is_empty(){return Ok(None);}
+        return invalid("Forerunner Extraction requires a standard native CE609 solo map");
     }
+    if !callbacks.is_empty()&&(callbacks.len()!=1||callbacks[0].script_type!=1){return invalid("Forerunner settled Extraction requires one dormant completion callback");}
     let markers=crate::maps::scenario_logic_readback(cache,map)?;
+    let mut ready=std::collections::BTreeSet::new();
+    for group in &markers.groups{if let Some(number)=squad_interface_number(&group.name,"extraction_squad_","_ready")?{if !ready.insert(number){return invalid("Native squad readiness groups must be unique");}}}
+    // Terminal-only and settlement-callback maps also need the reviewed squad
+    // helpers, even when no objective query or ready group was authored.
+    let mut terminals=std::collections::BTreeSet::new();
+    for (index,name) in markers.names.iter().enumerate(){if let Some(number)=squad_interface_number(&name.name,"extraction_squad_","")?{
+        if name.object_type!=8||name.object_index<0||!terminals.insert(number)||markers.devices.iter().filter(|device|device.class=="ctrl"&&device.index==name.object_index as usize&&device.name_index==index as i16).count()!=1{return invalid("Native squad terminals require unique live control bindings");}
+    }}
+    let mut settled=std::collections::BTreeSet::new();
+    for script in &map.scripts{if let Some(number)=squad_interface_number(&script.name,"forerunner_squad_","_complete")?{if !settled.insert(number){return invalid("Native squad completion callbacks must be unique");}}}
+    let squad=!queries.is_empty()||!ready.is_empty()||!terminals.is_empty()||!settled.is_empty();
+    if callbacks.is_empty()&&!squad{return Ok(None);}
     crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
-    Ok(true)
+    let features=if squad{vec![SQUAD_OBJECTIVES_FEATURE.into()]}else{vec![]};
+    Ok(Some(features))
+}
+pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<bool> {
+    Ok(compiled_extraction_requirements(cache,map)?.is_some())
 }
 /// Native ScriptType values follow the existing Invader scenario definition.
 /// Presence/type checks are independent readback, not gameplay acceptance.
@@ -934,6 +965,14 @@ mod tests {
         project.studio=Some(studio);attach(&mut doc,&binding);assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("reviewed camera shots"));
         binding.cinematic=Some(project.studio.as_ref().unwrap().shots.clone());attach(&mut doc,&binding);native_mission_binding(&project,&doc).unwrap();
         project.studio.as_mut().unwrap().shots[0].fov=80.;assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("shots changed"));
+    }
+
+    #[test]
+    fn squad_native_contract_names_are_bounded_and_do_not_guess_other_scripts(){
+        for number in [1,9,22]{assert_eq!(squad_interface_number(&format!("forerunner_squad_{number:02}_players"),"forerunner_squad_","_players").unwrap(),Some(number));}
+        for name in ["forerunner_squad_1_players","forerunner_squad_00_players","forerunner_squad_23_players","forerunner_squad_ab_players"]{assert!(squad_interface_number(name,"forerunner_squad_","_players").is_err());}
+        assert_eq!(squad_interface_number("forerunner_extraction_complete","forerunner_squad_","_players").unwrap(),None);
+        assert_eq!(squad_interface_number("extraction_squad_01_ready","extraction_squad_","_ready").unwrap(),Some(1));
     }
 
 }

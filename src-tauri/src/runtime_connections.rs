@@ -329,6 +329,8 @@ pub(super) struct CompanionCapabilities {
     simulation_hz: u16,
     network: CompanionNetwork,
     operations: Vec<String>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    native_features: Vec<String>,
     process_entrypoints: Vec<String>,
     #[serde(default, skip_serializing_if="Option::is_none")]
     startup_map: Option<CompanionStartupMap>,
@@ -394,6 +396,44 @@ fn companion_query(executable: &Path, arguments: &[&str]) -> Reply<Vec<u8>> {
     if !status.success() {return Err(format!("Runtime rejected discovery ({status}): {}",String::from_utf8_lossy(&output[1]).chars().take(512).collect::<String>()));}
     Ok(std::mem::take(&mut output[0]))
 }
+pub(super) fn query_companion_capabilities(executable:&Path,expected_sha256:&str)->Reply<CompanionCapabilities>{
+    core::reject_links(executable).map_err(error)?;
+    if maps::hash_file(executable).map_err(error)?!=expected_sha256{return Err("Runtime executable changed before capability discovery".into());}
+        let help=companion_query(executable,&["--help"])?;
+        if !String::from_utf8(help).map_err(error)?.contains("--spark-capabilities") {return Err("This engine does not advertise the Spark companion contract; no capability flag was sent".into());}
+        let bytes=companion_query(executable,&["--spark-capabilities","1"])?;
+        let capabilities:CompanionCapabilities=serde_json::from_slice(&bytes).map_err(|_|"Runtime returned invalid companion discovery JSON".to_string())?;
+    capabilities.validate()?;
+    if maps::hash_file(executable).map_err(error)?!=expected_sha256{return Err("Runtime executable changed during capability discovery".into());}
+    Ok(capabilities)
+}
+impl CompanionCapabilities {
+    fn validate(&self)->Reply<()>{
+        if self.schema!="spark-forerunner.runtime-capabilities" || self.contract_version!=1 || self.engine!="Forerunner" {
+            return Err("Unsupported companion schema or version; no downgrade or live operation was attempted".into());
+        }
+        let text=|value:&str|!value.is_empty()&&value.len()<=256&&!value.chars().any(char::is_control);
+        if !(1..=1000).contains(&self.simulation_hz) ||
+            [&self.build.upstream_version,&self.build.commit,&self.build.platform,&self.build.architecture].iter().any(|value|!text(value)) ||
+            self.operations.is_empty()||self.operations.len()>64||!self.operations.iter().any(|value|value=="runtime.discover")||
+            self.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
+            self.native_features.len()>64||self.native_features.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
+            self.native_features.iter().collect::<std::collections::BTreeSet<_>>().len()!=self.native_features.len()||
+            self.startup_map.as_ref().is_some_and(|startup|
+                startup.cache_version==0 ||
+                [&startup.setting,&startup.environment,&startup.selector,&startup.scenario_type,&startup.profile]
+                    .iter().any(|value|!text(value))) ||
+            self.process_entrypoints.len()>16||self.process_entrypoints.iter().any(|value|!text(value))||
+            self.upstream_projects.len()>16||self.upstream_projects.iter().any(|value|!text(value)) {
+            return Err("Companion discovery fields exceed the version-1 contract bounds".into());
+        }
+        Ok(())
+    }
+    pub(super) fn require_native_features(&self,required:&[String])->Reply<()>{
+        for feature in required{if !self.native_features.contains(feature){return Err(format!("This map requires native feature {feature}, which the selected Forerunner build does not advertise. Select a verified compatible build; no playtest was started"));}}
+        Ok(())
+    }
+}
 #[tauri::command]
 pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_id:String,expected_executable_sha256:String)->Reply<CompanionDiscovery>{
     tauri::async_runtime::spawn_blocking(move || {
@@ -406,26 +446,7 @@ pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_
             return Err("Installed executable changed or inspection is incomplete; inspect the saved profile again".into());
         }
         let executable=installation.executable.as_ref().ok_or("Registered executable is unavailable")?;
-        let help=companion_query(executable,&["--help"])?;
-        if !String::from_utf8(help).map_err(error)?.contains("--spark-capabilities") {return Err("This engine does not advertise the Spark companion contract; no capability flag was sent".into());}
-        let bytes=companion_query(executable,&["--spark-capabilities","1"])?;
-        let capabilities:CompanionCapabilities=serde_json::from_slice(&bytes).map_err(|_|"Runtime returned invalid companion discovery JSON".to_string())?;
-        if capabilities.schema!="spark-forerunner.runtime-capabilities" || capabilities.contract_version!=1 || capabilities.engine!="Forerunner" {
-            return Err("Unsupported companion schema or version; no downgrade or live operation was attempted".into());
-        }
-        let text=|value:&str|!value.is_empty()&&value.len()<=256&&!value.chars().any(char::is_control);
-        if !(1..=1000).contains(&capabilities.simulation_hz) ||
-            [&capabilities.build.upstream_version,&capabilities.build.commit,&capabilities.build.platform,&capabilities.build.architecture].iter().any(|value|!text(value)) ||
-            capabilities.operations.is_empty()||capabilities.operations.len()>64||!capabilities.operations.iter().any(|value|value=="runtime.discover")||
-            capabilities.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
-            capabilities.startup_map.as_ref().is_some_and(|startup|
-                startup.cache_version==0 ||
-                [&startup.setting,&startup.environment,&startup.selector,&startup.scenario_type,&startup.profile]
-                    .iter().any(|value|!text(value))) ||
-            capabilities.process_entrypoints.len()>16||capabilities.process_entrypoints.iter().any(|value|!text(value))||
-            capabilities.upstream_projects.len()>16||capabilities.upstream_projects.iter().any(|value|!text(value)) {
-            return Err("Companion discovery fields exceed the version-1 contract bounds".into());
-        }
+        let capabilities=query_companion_capabilities(executable,&expected_executable_sha256)?;
         // Same executable bytes are insufficient if the user replaced this saved
         // profile's paths or identity while the bounded query was running.
         let current_registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
@@ -438,4 +459,21 @@ pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_
         if current.executable_sha256!=installation.executable_sha256 {return Err("Runtime executable changed during capability discovery; response discarded".into());}
         Ok(CompanionDiscovery{registration_id,executable_sha256:expected_executable_sha256,capabilities})
     }).await.map_err(error)?
+}
+
+#[cfg(test)]
+mod companion_contract_tests {
+ use super::*;
+ fn capabilities()->CompanionCapabilities{serde_json::from_value(serde_json::json!({"schema":"spark-forerunner.runtime-capabilities","contract_version":1,"engine":"Forerunner","build":{"upstream_version":"0.9.1-dev","commit":"native-contract-fixture","platform":"Windows","architecture":"x64"},"simulation_hz":30,"network":{"advertised_version":45,"native_layout_version":44},"operations":["runtime.discover"],"process_entrypoints":["--help"],"upstream_projects":["OpenCE"]})).unwrap()}
+ #[test]fn optional_native_features_preserve_old_discovery_but_never_satisfy_new_map_requirements(){
+  let mut old=capabilities();old.validate().unwrap();old.require_native_features(&[]).unwrap();let required=vec![core::creative::SQUAD_OBJECTIVES_FEATURE.into()];assert!(old.require_native_features(&required).unwrap_err().contains("does not advertise"));
+  old.native_features=required.clone();old.validate().unwrap();old.require_native_features(&required).unwrap();old.native_features.push(required[0].clone());assert!(old.validate().is_err());
+  for invalid in ["", "unsafe feature", "bad\nfield"]{old.native_features=vec![invalid.into()];assert!(old.validate().is_err());}
+  old.native_features=required;old.contract_version=2;assert!(old.validate().is_err());
+ }
+ #[test]#[ignore="Owner-authorized installed Forerunner help/discovery only; no game launch"]
+ fn installed_companion_query_requires_actual_native_feature_and_preserves_binary(){
+  let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_EXE").expect("Explicit admitted runtime"));let before=maps::hash_file(&executable).unwrap();assert_eq!(before,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256);
+  let read=query_companion_capabilities(&executable,&before).unwrap();read.require_native_features(&[core::creative::SQUAD_OBJECTIVES_FEATURE.into()]).unwrap();assert!(read.require_native_features(&["unimplemented.live_edit".into()]).is_err());assert_eq!(before,maps::hash_file(&executable).unwrap());
+ }
 }

@@ -325,12 +325,13 @@ export default function Registration({
         {companion&&<details open><summary>{companion.capabilities.engine} · contract {companion.capabilities.contract_version}</summary>
           <p>{companion.capabilities.build.platform} / {companion.capabilities.build.architecture} · build <code>{companion.capabilities.build.commit}</code></p>
           <p>Advertised operations: {companion.capabilities.operations.join(', ')}</p>
+          <p>Declared native features: {companion.capabilities.native_features?.join(', ')||'None advertised'}. Map requirements are checked separately; declaration is not gameplay acceptance.</p>
           <p>Network version {companion.capabilities.network.advertised_version} · native layout {companion.capabilities.network.native_layout_version}. These values do not prove peer compatibility.</p>
           {companion.capabilities.startup_map?<>
             <p>Advertised startup: {companion.capabilities.startup_map.selector} · cache {companion.capabilities.startup_map.cache_version} · {companion.capabilities.startup_map.scenario_type}. Profile: {companion.capabilities.startup_map.profile}.</p>
             <p className="subtle">Fresh start: {companion.capabilities.startup_map.fresh_start?'yes':'no'} · hosts a network game: {companion.capabilities.startup_map.network_host?'yes':'no'}. This metadata does not enable automatic startup in Spark. The exact runtime build still needs separate validation.</p>
           </>:<p className="subtle">This build does not advertise authored-map startup. Use the native custom campaign chooser for an eligible staged solo test.</p>}
-          <p className="subtle">Discovery does not confirm a loaded map, enable live editing or establish multiplayer support. To try a built CE solo project with an admitted Forerunner build, use Level editor → Game connection → Start staged solo test, then select the map in Forerunner. That source-only workflow still awaits native acceptance.</p>
+          <p className="subtle">Discovery does not confirm a loaded map, enable live editing or establish multiplayer support. To try a built CE solo project with an admitted Forerunner build, use Level editor → Game connection → Start staged solo test, then select the map in Forerunner. Native Windows interaction and gameplay acceptance remain separate.</p>
         </details>}
       </section>}
       {error && <Notice>{error}</Notice>}

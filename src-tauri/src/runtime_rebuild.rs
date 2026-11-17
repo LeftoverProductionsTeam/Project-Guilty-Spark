@@ -28,6 +28,7 @@ pub(crate) struct View {
     runtime_id: runtime::RuntimeId,
     staged_map: String,
     startup_map:Option<String>,
+    required_native_features:Vec<String>,
     engine_sha256: std::collections::BTreeMap<String,String>,
     project_id: String,
     phase: String,
@@ -112,9 +113,9 @@ fn registration(state: &AppState) -> Reply<runtime::RuntimeRegistration> {
     Ok(registration)
 }
 pub(crate) fn checked_build(state: &AppState, project: &Project, build_id: Option<&str>) -> Reply<BuildRecord> {
-    checked_build_for(state,project,build_id,1).map(|(build,_)|build)
+    checked_build_for(state,project,build_id,1).map(|(build,_,_)|build)
 }
-fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>, scenario_type:u16) -> Reply<(BuildRecord,bool)> {
+fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>, scenario_type:u16) -> Reply<(BuildRecord,bool,Vec<String>)> {
     let build = if let Some(id) = build_id { verified_build(state, project, id)? } else { current_build(state, project)? };
     if build.target != "gbx-custom" { return Err(if scenario_type==0{"Build the saved project as standard Custom Edition solo content for Forerunner first"}else{"Build the saved project as standard Custom Edition content for Chupathingy first"}.into()); }
     let output = build.output.as_ref().ok_or("Validated native output is missing")?;
@@ -129,8 +130,9 @@ fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>
         return Err("This playtest needs a self-contained CE build. Rebuild with native embedded resources; no unrelated bitmap/sound bank is substituted".into());
     }
     if build.sha256.as_deref() != Some(inspection.sha256.as_str()) { return Err("Native output changed during inspection; the running game was left alone".into()); }
-    let extraction=core::creative::compiled_extraction_mode(output,&inspection).map_err(error)?;
-    Ok((build,extraction))
+    let requirements=core::creative::compiled_extraction_requirements(output,&inspection).map_err(error)?;
+    let extraction=requirements.is_some();
+    Ok((build,extraction,requirements.unwrap_or_default()))
 }
 fn copy_pin(source: &Path, target: &Path, expected: &str, total: &mut u64) -> Reply<()> {
     copy_pin_bounded(source,target,expected,total,COPY_LIMIT)
@@ -417,12 +419,16 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let mission_extraction=project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled"));
         if mission_extraction&&runtime_id!=runtime::RuntimeId::OpenCe{return Err("This saved mission requires Forerunner native settled extraction; another engine cannot complete its objective".into());}
-        let (build,compiled_extraction)=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{(checked_build(&state,&project,None)?,false)};
+        let (build,compiled_extraction,required_native_features)=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{(checked_build(&state,&project,None)?,false,vec![])};
+        if !required_native_features.is_empty(){
+            let sha=expected_executable_sha256.as_deref().ok_or("Inspect the required Forerunner build before starting")?;
+            runtime_connections::query_companion_capabilities(&reg.executable,sha)?.require_native_features(&required_native_features)?;
+        }
         if mission_extraction&&!compiled_extraction{return Err("The saved mission requires native settled Extraction, but this compiled revision has no admitted callback and hub layout. Rebuild the reviewed mission first".into());}
         // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
         let mut workbench=lock(&state.runtime_workbench)?;
         if workbench.rebuilds.values().any(|s|s.view.lock().is_ok_and(|v|!matches!(v.phase.as_str(),"stopped"|"failed"))) { return Err("Stop the existing Live Rebuild playtest before starting another; other windows keep their own work".into()); }
-        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),startup_map:None,engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
+        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),startup_map:None,required_native_features,engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
         let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
@@ -484,7 +490,7 @@ pub(crate) fn runtime_rebuild_stop(state: State<AppState>, window: tauri::Webvie
 mod tests {
     use super::*;
     fn session(id: &str, project: &str) -> Arc<Session> {
-        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),startup_map:None,engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
+        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),startup_map:None,required_native_features:vec![],engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
     }
     #[test]
     fn forerunner_startup_is_pinned_scoped_and_not_a_game_acknowledgement(){
@@ -538,4 +544,33 @@ mod tests {
         assert!(copy_pin(&source,&target,&maps::hash_file(&source).unwrap(),&mut total).unwrap_err().contains("512 MiB"));
         assert!(!target.exists());assert_eq!(fs::read(source).unwrap(),b"bounded");
     }
+    #[test]
+    #[ignore="Explicit installed Forerunner/owned CE content; stage and command inspection only, never launches"]
+    fn installed_forerunner_staging_verifies_real_banks_and_leaves_originals_unchanged(){
+        let (_temporary,state,_project,mut build)=super::super::readiness_tests::fixture();
+        let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_EXE").expect("Explicit runtime"));
+        let data=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_DATA").expect("Explicit Xbox UI data"));
+        let ce=PathBuf::from(std::env::var_os("SPARK_NATIVE_CE_INSTALLATION").expect("Explicit owned CE installation"));
+        let map=PathBuf::from(std::env::var_os("SPARK_NATIVE_SOLO_MAP").expect("Explicit independently compiled solo map"));
+        let registration=runtime::RuntimeRegistration{id:"native-forerunner-stage".into(),runtime_id:runtime::RuntimeId::OpenCe,root:executable.parent().unwrap().into(),executable:executable.clone(),data_root:Some(data.clone()),version:None,network_version:None};
+        let original=maps::hash_file(&executable).unwrap();assert_eq!(original,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256);
+        let ce_registration=runtime::RuntimeRegistration{id:"native-ce-source".into(),runtime_id:runtime::RuntimeId::HaloCustomEdition,root:ce.clone(),executable:ce.join("haloce.exe"),data_root:Some(ce.clone()),version:None,network_version:None};
+        lock(&state.library).unwrap().set_setting("runtimeRegistrations",&vec![ce_registration]).unwrap();
+        let mut protected=vec![executable.clone(),executable.with_file_name("SDL3.dll"),data.join("maps/ui.map"),map.clone()];for name in ["bitmaps.map","sounds.map","loc.map","ui.map"]{protected.push(ce.join("maps").join(name));}
+        let hashes=protected.iter().map(|file|maps::hash_file(file).unwrap()).collect::<Vec<_>>();
+        build.output=Some(map);build.sha256=Some(hashes[3].clone());build.target="gbx-custom".into();
+        let inspection=maps::inspect_map(build.output.as_ref().unwrap(),None).unwrap();assert_eq!((inspection.header.version,inspection.header.scenario_type,inspection.header.extended),(609,0,false));assert!(!inspection.resources.iter().any(|r|r.required)&&!inspection.tags.iter().any(|tag|tag.external),"Real candidate must meet the production self-contained-cache gate");let required=core::creative::compiled_extraction_requirements(build.output.as_ref().unwrap(),&inspection).unwrap().unwrap();
+        runtime_connections::query_companion_capabilities(&executable,&original).unwrap().require_native_features(&required).unwrap();
+        let mut staged=stage_forerunner(&state,&registration,build).unwrap();let root=staged.root.clone();
+        assert_eq!(staged.ce_resource_sha256.len(),3);for (name,sha) in &staged.ce_resource_sha256{assert_eq!(*sha,maps::hash_file(&staged.root.join("data/maps_ce").join(name)).unwrap());}
+        staged.forerunner_extraction=true;let command=forerunner_command(&state,&registration,&staged).unwrap();
+        let environment=command.get_envs().filter_map(|(key,value)|value.map(|value|(key.to_string_lossy().into_owned(),value.to_string_lossy().into_owned()))).collect::<std::collections::BTreeMap<_,_>>();
+        assert_eq!(environment.get("HALO_START_MAP").map(String::as_str),Some("be_native@ce"));assert_eq!(environment.get("HALO_EXTRACTION").map(String::as_str),Some("true"));assert_eq!(environment.get("HALO_NET_COOP_SCRIPT_ADAPTATIONS").map(String::as_str),Some("false"));assert_eq!(environment.get("HALO_NET_FIREFIGHT_ENCOUNTER").map(String::as_str),Some("false"));
+        for key in ["HALO_DATA_ROOT","HALO_SAVE_ROOT","HALO_LOG_ROOT","HALO_CACHE_ROOT"]{assert!(Path::new(&environment[key]).canonicalize().unwrap().starts_with(root.canonicalize().unwrap()));}
+        assert!(command.get_program().to_string_lossy().contains("runtime-playtests"));assert_eq!(command.get_args().count(),2);assert_eq!(command.get_args().next().unwrap(),"--config");assert!(Path::new(command.get_args().nth(1).unwrap()).canonicalize().unwrap().starts_with(root.canonicalize().unwrap()));
+        let staged_map=staged.root.join(format!("data/maps_ce/{}.map",staged.map));fs::write(&staged_map,b"changed owned candidate").unwrap();assert!(forerunner_command(&state,&registration,&staged).unwrap_err().contains("changed before launch"));
+        drop(staged);assert!(!root.exists());assert_eq!(hashes,protected.iter().map(|file|maps::hash_file(file).unwrap()).collect::<Vec<_>>());
+        eprintln!("Native Forerunner staging/command/refusal/disposal PASS: current exact executable, independent SDL3,3 real CE banks and original hashes unchanged; no process/game launched");
+    }
+
 }
