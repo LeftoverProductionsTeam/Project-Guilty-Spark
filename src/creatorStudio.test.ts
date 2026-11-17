@@ -5,7 +5,7 @@ import type {Project} from './types';
 import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,sameMissionData,exportHaloCeMission,nativeMissionBinding} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
-import { connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
+import { connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, defaultBlackEchoOptions, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
 
 describe('Project-integrated Creator Studio', () => {
   it('starts private without fabricated gameplay evidence', () => {
@@ -394,4 +394,14 @@ it('authors object guidance that waits for targets and removes the previous bind
  expect(exportHaloCeMission(JSON.parse(JSON.stringify(studio)),{forerunner:true})).toEqual(output);
  const invalid=structuredClone(studio);invalid.missions[0].guidance={flag:'both',object:'technology',height:1};expect(()=>exportHaloCeMission(invalid,{forerunner:true})).toThrow();
  expect(sameMissionData([{...studio.missions[0],guidance:{flag:null,object:'technology',height:1}}],[studio.missions[0]])).toBe(true);
+});
+
+
+it('authors faction-specific native Black Echo roles and per-encounter teams without changing original source or global alliances',()=>{
+ let id=0;const project=campaignDraft();project.history=[];project.quickForge!.runtimeId='haloCustomEdition';const options=defaultBlackEchoOptions('covenant'),draft=addBlackEchoDraft(project,()=> 'cov_'+(++id),null,options),connected=connectBlackEchoObjectives(draft,()=> 'unused');
+ const beats=connected.studio!.missions;beats[3].weaponPath='weapons/technology';expect(beats[1].encounterName).toBe('be_covenant');expect(beats[2].encounterName).toBe('be_marines');expect(beats[1].encounterTeam).toBe('covenant');expect(beats[2].encounterTeam).toBe('human');expect(beats[4].encounterTeam).toBe('flood');expect(beats[1].hudText).toBe('Rescue stranded Covenant');
+ const output=exportHaloCeMission(connected.studio!,{forerunner:true});expect(output.content).toContain('(ai_set_team be_covenant covenant)');expect(output.content).toContain('(ai_set_team be_marines human)');expect(output.content).not.toContain('(ai_allegiance');expect(output.content.indexOf('(ai_place be_covenant)')).toBeLessThan(output.content.indexOf('(ai_set_team be_covenant covenant)'));
+ let history=historyReducer({...initialHistory,current:project},{type:'edit',project:connected,description:'Author Covenant operation'});history=historyReducer(history,{type:'undo'});expect(history.current).toEqual(project);history=historyReducer(history,{type:'redo'});expect(JSON.parse(JSON.stringify(history.current)).studio.missions).toEqual(beats);expect(connected.quickForge!.logic!.handwrittenSources).toEqual(project.quickForge!.logic!.handwrittenSources);
+ const source=structuredClone(connected.studio!);source.missions[1].encounterTeam='source';const preserved=exportHaloCeMission(source,{forerunner:true});expect(preserved.content).not.toContain('(ai_set_team be_covenant');expect(sameMissionData(source.missions,source.missions.map(beat=>({...beat,encounterTeam:beat.encounterTeam??null})))).toBe(true);
+ const wrong=structuredClone(source);wrong.missions[0].encounterTeam='human';expect(validateCreatorStudio(wrong)).not.toEqual([]);expect(()=>blackEchoMission(()=> 'bad',{...options,rescue:options.facility})).toThrow(/nonconflicting/);
 });

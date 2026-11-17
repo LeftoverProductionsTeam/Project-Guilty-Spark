@@ -60,6 +60,8 @@ export interface MissionBeat {
   objective: string;
   trigger: 'manual' | 'triggerVolume' | 'encounterCleared' | 'escort' | 'deviceActivated' | 'weaponOwned' | 'forerunnerExtractionSettled' | 'timer';
   encounterName: string;
+  /** Explicit runtime team for this encounter only; absent retains legacy behavior. */
+  encounterTeam?:'source'|'human'|'covenant'|'flood'|null;
   triggerRef?: string | null;
   weaponPath?: string | null;
   /** Existing named scenario weapon, created once when this collection step starts. */
@@ -149,7 +151,11 @@ export function emptyCreatorStudio(): CreatorStudioDocument {
   };
 }
 /** An editable blueprint using existing native bindings, not a deployed game. */
-export function blackEchoMission(nextId:()=>string):MissionBeat[] {
+export interface BlackEchoOptions {faction:'unsc'|'covenant';rescue:string;facility:string;defense:string}
+export const defaultBlackEchoOptions=(faction:BlackEchoOptions['faction']='unsc'):BlackEchoOptions=>({faction,rescue:faction==='unsc'?'be_marines':'be_covenant',facility:faction==='unsc'?'be_covenant':'be_marines',defense:'be_defense'});
+export function blackEchoMission(nextId:()=>string,options?:BlackEchoOptions):MissionBeat[] {
+  const roles=options??defaultBlackEchoOptions(),covenant=roles.faction==='covenant';
+  if(!['unsc','covenant'].includes(roles.faction)||[roles.rescue,roles.facility,roles.defense].some(name=>!/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(name))||[roles.facility,roles.defense,'be_flood'].includes(roles.rescue)||roles.facility==='be_flood'||roles.defense==='be_flood')throw Error('Choose valid, nonconflicting native rescue, opposing facility and defense encounters.');
   const rows:[string,string,MissionBeat['trigger'],string,string?][]=[
     ['Squad insertion','Reach the insertion area and review the operation briefing.','triggerVolume','be_insert'],
     ['Rescue stranded Marines','Escort the surviving Marines to the rescue rally area. The native mission creates be_marines, assigns the human team and follows the closest players; all remaining survivors must arrive, with at least one alive. Loot settlement is separate.','escort','be_marines'],
@@ -159,19 +165,22 @@ export function blackEchoMission(nextId:()=>string):MissionBeat[] {
     ['Defend the extraction point','Clear the forces attacking the evacuation site.','encounterCleared','be_defense'],
     ['Extract survivors and equipment','Reach evacuation. This step waits for actual survivor/loot settlement to call gs_complete_7. The reference area alone cannot bank inventory or complete extraction; the persistent world stays active.','manual','be_extract'],
   ];
-  return rows.map(([title,objective,trigger,reference,conditionVolume])=>({
-    id:nextId(),title,objective,trigger,encounterName:trigger==='encounterCleared'||trigger==='escort'?reference:'',
+  return rows.map(([title,objective,trigger,reference,conditionVolume],index)=>({
+    id:nextId(),title:covenant&&index===1?'Rescue stranded Covenant':covenant&&index===2?'Investigate the UNSC facility':title,
+    objective:covenant&&index===1?'Escort the surviving Covenant allies to the rescue rally area. Author Covenant actors and playable navigation; physical rescue and gear settlement remain separate.':covenant&&index===2?'Clear the UNSC defenders and recover the classified package.':objective,trigger,
+    encounterName:index===1?roles.rescue:index===2?roles.facility:index===5?roles.defense:trigger==='encounterCleared'?reference:'',
+    ...(options&&(trigger==='escort'||trigger==='encounterCleared')?{encounterTeam:index===4?'flood' as const:(index===1)==covenant?'covenant' as const:'human' as const}:{}),
     ...(trigger==='escort'?{triggerRef:'be_survivors',minimumSurvivors:1}:trigger!=='encounterCleared'?{triggerRef:reference}:{}),...(conditionVolume?{conditionVolume}:{}),
-    hudObjective:true,hudText:title,
+    hudObjective:true,hudText:covenant&&index===1?'Rescue stranded Covenant':covenant&&index===2?'Investigate the UNSC facility':title,
   }));
 }
 /** Explicitly bind this known blueprint to Forerunner's existing native contract.
  * Existing objective IDs, authored text, source modules and other beats survive. */
 export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null):Project {
  const base=project.studio?.missions.length?project:addBlackEchoDraft(project,nextId,nativeSource),studio=base.studio!,beats=studio.missions;
- if(beats.length!==7||beats[1].trigger!=='escort'||beats[1].encounterName!=='be_marines'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
+ if(beats.length!==7||!['triggerVolume','deviceActivated'].includes(beats[0].trigger)||!['be_insert','extraction_deploy'].includes(beats[0].triggerRef??'')||beats[1].trigger!=='escort'||beats[1].triggerRef!=='be_survivors'||beats[2].trigger!=='encounterCleared'||beats[4].trigger!=='encounterCleared'||beats[4].encounterName!=='be_flood'||beats[5].trigger!=='encounterCleared'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
  if(!base.quickForge||base.quickForge.native){
-  requireNativeBlackEcho(base,nativeSource);if(nativeSource!.sourceTarget!=='gbx-custom')throw Error('Forerunner settlement requires reviewed standard CE609 solo source; other engines do not provide its callback.');
+  requireNativeBlackEcho(base,nativeSource,{rescue:beats[1].encounterName,facility:beats[2].encounterName,defense:beats[5].encounterName});if(nativeSource!.sourceTarget!=='gbx-custom')throw Error('Forerunner settlement requires reviewed standard CE609 solo source; other engines do not provide its callback.');
   for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
   for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
  }else if(base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
@@ -179,11 +188,11 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
 }
 /** Bind only an explicitly read existing native campaign. No native tag, marker,
  * original placement, recipe or script is changed by the metadata action. */
-function requireNativeBlackEcho(project:Project,source?:NativeTagContext|null):asserts source is NativeTagContext {
+function requireNativeBlackEcho(project:Project,source?:NativeTagContext|null,roles:Pick<BlackEchoOptions,'rescue'|'facility'|'defense'>=defaultBlackEchoOptions()):asserts source is NativeTagContext {
  if(!source||source.projectId!==project.id||source.class!=='scnr'||!['gbx-custom','mcc-cea'].includes(source.sourceTarget??'')||!source.canAppendEncounter||!/^[a-f0-9]{64}$/i.test(source.tagSha256??'')||!project.builds.some(build=>build.id===source.buildId&&build.status==='validated'))throw Error('Read the current editable native solo scenario areas before creating Black Echo.');
  if(source.missionSourceIssue||!source.missionSource)throw Error(source.missionSourceIssue??'Native mission references are unavailable; read source again.');
  for(const name of ['be_insert','be_survivors','be_artifact','be_containment','be_extract'])if(source.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Black Echo needs a unique readable native area '+name+'. Author or name it with the existing scenario tools, then read source again.');
- for(const name of ['be_marines','be_covenant','be_flood','be_defense']){
+ for(const name of new Set([roles.rescue,roles.facility,'be_flood',roles.defense])){
   const encounters=source.missionSource.encounters.filter(row=>row.name===name),squads=source.scenarioSquads?.filter(row=>row.encounterName===name)??[];
   if(encounters.length!==1||!squads.length||new Set(squads.map(row=>row.encounter)).size!==1)throw Error('Black Echo native encounter is missing or ambiguous: '+name);
   if(encounters[0].initiallyCreated)throw Error('Black Echo encounter must be script-created: '+name);
@@ -195,10 +204,10 @@ export function validMissionWeaponPath(value:string):boolean {
 }
 /** One project history action; original geometry, bindings and source modules
  * stay intact. Areas are editable source markers, not valid terrain/navigation. */
-export function addBlackEchoDraft(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null):Project {
+export function addBlackEchoDraft(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null,options?:BlackEchoOptions):Project {
   if(project.studio?.missions.length)throw Error('Preserve the current operation; use a campaign project with no mission beats.');
-  let document=project.quickForge;
-  if(!document||document.native){requireNativeBlackEcho(project,nativeSource);return {...project,studio:{...(project.studio??emptyCreatorStudio()),missions:blackEchoMission(nextId)}};}
+  const missions=blackEchoMission(nextId,options);let document=project.quickForge;
+  if(!document||document.native){requireNativeBlackEcho(project,nativeSource,options);return {...project,studio:{...(project.studio??emptyCreatorStudio()),missions}};}
   if(document.gameMode!=='campaign')throw Error('Open editable Campaign / scripted solo source before creating Black Echo.');
   if(document.logic?.manualSource!=null||document.logic?.handwrittenSources?.some(source=>source.filename.toLowerCase()==='gs_mission.hsc'))
     throw Error('Preserve and reconcile the existing mission or handwritten logic before adding a generated operation.');
@@ -220,7 +229,7 @@ export function addBlackEchoDraft(project:Project,nextId:()=>string,nativeSource
     trigger.name=label;trigger.dimensions=[width,width,3];
     document=setNativeLogicName(added.document,{type:'trigger',value:trigger},nativeName);
   }
-  return {...project,quickForge:document,studio:{...(project.studio??emptyCreatorStudio()),missions:blackEchoMission(nextId)}};
+  return {...project,quickForge:document,studio:{...(project.studio??emptyCreatorStudio()),missions}};
 }
 const commandToken = /^[A-Za-z0-9_-]{1,64}$/;
 // Stock Halo CE accepts custom game variants with spaces when safely quoted.
@@ -279,6 +288,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
       (m.weaponPath!=null&&m.weaponPath!==''&&(typeof m.weaponPath!=='string'||!validMissionWeaponPath(m.weaponPath))) ||
       (m.createWeaponObject!=null&&(typeof m.createWeaponObject!=='string'||!scriptIdent.test(m.createWeaponObject)||m.trigger!=='weaponOwned')) ||
+      (m.encounterTeam!=null&&(!['escort','encounterCleared'].includes(m.trigger)||!['source','human','covenant','flood'].includes(m.encounterTeam))) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||

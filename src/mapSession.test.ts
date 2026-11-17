@@ -231,3 +231,8 @@ test('objective flag drafts never become shared or restored native source',async
  session.configureMapViewWindow('second');expect(session.readMapSession('a','world.cutscene-flag',null)).toBeNull();expect([...data.values()].every(text=>!text.includes('world.cutscene-flag'))).toBe(true);
  vi.resetModules();const restarted=await import('./mapSession');restarted.configureMapViewWindow('main');expect(restarted.readMapSession('a','world.cutscene-flag',null)).toBeNull();expect(restarted.readMapSession('a','world.grid',false)).toBe(true);
 });
+
+
+test('Black Echo setup choices remain independent per project and native window',async()=>{
+ const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('a','creator-black-echo-options',{faction:'covenant',rescue:'allies'});session.configureMapViewWindow('other');session.writeMapSession('a','creator-black-echo-options',{faction:'unsc',rescue:'marines'});session.configureMapViewWindow('main');expect(session.readMapSession('a','creator-black-echo-options',null)).toEqual({faction:'covenant',rescue:'allies'});expect(session.readMapSession('b','creator-black-echo-options',null)).toBeNull();
+});

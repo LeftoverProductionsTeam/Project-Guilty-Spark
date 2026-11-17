@@ -69,6 +69,7 @@ pub struct MissionBeat {
     pub objective: String,
     pub trigger: String,
     pub encounter_name: String,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub encounter_team:Option<String>,
     #[serde(default)]
     pub trigger_ref: Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -648,6 +649,7 @@ impl CreatorStudio {
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
+            if beat.encounter_team.as_deref().is_some_and(|team|!matches!(beat.trigger.as_str(),"escort"|"encounterCleared")||!["source","human","covenant","flood"].contains(&team)){return invalid("Encounter team needs a native combat or survivor objective");}
             if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}
             if let Some(result)=&beat.condition_result {
                 if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.squad_number==beat.squad_number&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}
@@ -799,6 +801,11 @@ mod tests {
         assert!(doc.validate().is_err());
         doc.playtests[0].evidence="Observed in real Halo CE session".into();
         assert!(doc.validate().is_ok());
+    }
+    #[test]
+    fn encounter_allegiance_persists_and_rejects_non_ai_or_injected_teams(){
+        let mut document=studio();document.missions=serde_json::from_value(serde_json::json!([{"id":"rescue","title":"Rescue Covenant","objective":"Escort","trigger":"escort","encounterName":"allies","triggerRef":"rally","encounterTeam":"covenant"}])).unwrap();document.validate().unwrap();let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();assert_eq!(document.missions,restored.missions);
+        document.missions[0].encounter_team=Some("source".into());document.validate().unwrap();document.missions[0].encounter_team=Some("human) (ai_erase_all".into());assert!(document.validate().is_err());document.missions[0].encounter_team=Some("human".into());document.missions[0].trigger="manual".into();assert!(document.validate().is_err());
     }
     #[test]
     fn rescue_outcome_conditions_preserve_failure_routes_and_require_an_earlier_continuing_escort() {

@@ -1600,3 +1600,47 @@ Exact native evidence (test executable is NOT an app/release build):
 Native Windows42-edit/seven-objective Save/restart, Save37944 root acceptance, real HUD marker rendering/lifecycle/relay budget, dropship flight/boarding, combat, settlement/persistence, peers and complete Black Echo gameplay remain OPEN. Existing desktop-control initialization failure was not retried or bypassed; no game/Forerunner launch or remote write. Full Operation110/M1–M6/475IDs remain incomplete.
 
 QA39694/run-60rgEl CLOSED after all writers completed. Root absent; storage runs[]/issues[]. Receipt: {"disposedLogicalBytes":1536195660,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1538090194,"lastAllocatedFileBytes":1404992144}. No physical reclamation claim when disposal allocation is unavailable. Protected475 CSV, legacy checkpoint, original scenario/cache hashes and both stashes unchanged. No retained candidate/dependency/browser/compiler caches or archives.
+
+
+### 17 November — faction-aware Black Echo encounters (parent7fe4041)
+
+Existing Mission director now exposes Black Echo faction & encounters: UNSC/Pelican or Covenant/Spirit, Rescue allies, Facility opponents and Extraction opponents. Native creation uses actual current source references and refuses missing, ambiguous, initially active, recipe-owned or conflicting rescue bindings before project mutation. Covenant titles/HUD and actor-group references survive project Undo/Redo and Save/reopen. The existing Connect Forerunner Black Echo objectives action accepts either faction blueprint while retaining objective IDs, source modules, collection/settlement rules and the persistent world. It creates no new actor, aircraft, game mode or runtime subsystem. Setup view choices remain per-project/per-window.
+
+Shared rescue previously always assigned human team and player-human allegiance. The existing AI objective now exposes Encounter team: legacy behavior, Preserve authored, Human/UNSC, Covenant or Flood. Explicit choices emit standard ai_set_team only for that selected encounter; they never change global alliances or source actor assets/teams. Scoped rescue defaults to source-team preservation. Source and shared/scoped HSC validators, native binding comparison and saved-data decoding carry the optional field; non-AI/injected values refuse. Legacy data without a choice retains its prior behavior. Matching player factions, actor appearance and actual allegiance still require gameplay acceptance.
+
+Focused proof: frontend73PASS across four files; creative22PASS/1explicit installed skip; guide4PASS; TypeScript/Vite and Windows Rust workspace/all-target PASS. Seven distinct connected browser cases pass: Spirit controls, Covenant roles including missing-source refusal/history/Save/reopen/preparation, shared mission, independent moving-target mission, factions, cameras and flags. Initial fixture failures were missing history[], datalist incorrectly queried as textbox and readMapSession given a lazy fallback instead of null; fixed callers without relaxing assertions. An owned Node harness crypto name collision was corrected; no application failure was inferred from it.
+
+Actual UI-produced seven-beat Covenant mission + Spirit/pilot/routes/relative cameras/faction kits/flags compiles and independently reads back as CE609 singleplayer:1PASS in10.99s,9scripts, original4script/global prefix retained,10HUD messages including1original and5unchanged radio samples. Native pilot/actor/biped/animation/seat references, transport groups/routes/cameras and named weapon negative checks pass; all4original encounter teams remain unchanged in the compiled scenario. Prepared bitmap/LoD/HUD warnings are retained. This does not prove script execution, Covenant combat, physical boarding/flight, rewards or persistence.
+
+Exact native evidence (test executable is not an application/release package):
+
+```json
+{
+  "map": {
+    "sha256": "b21c9ea2d35d264aa442a944f28865e5c08a87adfa4387d71957ba9fcf2504d2",
+    "bytes": 110454548
+  },
+  "scenarioSha256": "33f393035e5527a697b6cbe32dba6b294a629e0edea47eeaa1ed468ba4cf9b93",
+  "missionSha256": "d2007de5423bad87273a4b92efbdb264fc9b0980f798fc608f38a161c7aa8a0b",
+  "originalMissionSha256": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+  "testExecutableSha256": "538d16cb2f794150fb86742f2af0d0a1dff8748855ad0e714711f44b2eb3cae0",
+  "logSha256": "fc4536afce9fc9ad0bff9a0ea2f66bc0e393261340813077e6e8cc5442e6b3d9",
+  "scripts": [
+    "gs_complete_4",
+    "gs_complete_7",
+    "forerunner_extraction_complete",
+    "be_operation",
+    "gs_mission",
+    "gs_mission_bootstrap",
+    "gs_spirit_pilot",
+    "forerunner_spirit_complete",
+    "gs_spirit_trip"
+  ]
+}
+```
+
+Forerunner was read-only. Its current SPARK_INTEGRATION_CONTRACT squad/faction/transport guidance was consulted; no engine code was imported, new engine interface invented or executable launched. Native Windows42-edit/37944/full restart, actual allegiance/navigation/HUD/audio/cinematics, aircraft/crew/flight/boarding, runtime marker budgets, multiplayer/settlement and complete Black Echo gameplay remain OPEN. No unchanged desktop-control retry, game launch, remote write or publication. Operation110/M1–M6/all475 remain incomplete. Next connected implementation: explicit non-pilot dropship crew assignment with real seat/source validation in the existing controller, then remaining gameplay handoff.
+
+Final Covenant UI1PASS also verifies switching faction preserves custom encounter names while updating untouched defaults. TypeScript/Vite rerun PASS; existing compiled fixture is unchanged.
+
+QA80247/run-8nGfwZ CLOSED; root absent, runs[]/issues[], all writers finished. {"disposedLogicalBytes":1536613675,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1704919653,"lastAllocatedFileBytes":1405413864}. Disposal allocation unavailable is not measured physical reclamation. Protected475CSV/legacy checkpoint/original scenario/cache hashes and both stashes unchanged; no retained candidate/tags/SDK/browser/compiler caches/archive or engine writes.

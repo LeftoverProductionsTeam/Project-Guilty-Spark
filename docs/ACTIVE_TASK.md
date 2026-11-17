@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 70e83669e8450eedfb7a88b54b21b7e2d2fe3f90, canonical master.
-Latest verified revision: 70e83669e8450eedfb7a88b54b21b7e2d2fe3f90; moving-object increment passes source/browser/native checks in the local commit containing this checkpoint. Windows/game gates remain OPEN.
-Next action: finish remaining faction-specific Black Echo authoring and runtime handoff through existing native bindings. Keep Windows37944/42-edit, actual guidance-budget/marker/flight/combat/settlement/peer/game gates OPEN; no unchanged desktop retry.
+Starting revision: 7fe4041896bf7d9242caebaf1c1a142a84b722d7, canonical master.
+Latest verified revision: 7fe4041896bf7d9242caebaf1c1a142a84b722d7; faction-role/encounter-team increment passes source/browser/native checks in the local commit containing this checkpoint. Windows/game gates OPEN.
+Next action: complete explicit non-pilot dropship crew assignment with real seat/source validation in the existing controller, then remaining Black Echo handoff. Keep Windows37944/42-edit, actual flight/combat/boarding/settlement/peer/game gates OPEN.
 
 ## Acceptance
 
@@ -16,7 +16,9 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov moving targets (parent70e8366): existing Objective waypoint → named objects → Undo/Redo/Save/reopen → reviewed source → CE609 compile/readback passes. Frontend71/native21+1skip/creative21+1skip/working17+1skip/browser7distinct+negative1/guide4/web/Windows all-target PASS; flag-only source byte-identical. Ten named bindings and deliberate drift/missing refusals pass. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
+17Nov factions (parent7fe4041): Covenant/UNSC roles and explicit encounter teams → Undo/Redo/Save/reopen → same source writer → Spirit CE609 compile/readback pass. Frontend73/creative22+1skip/browser7distinct+final1/guide4/web/Windows all-target PASS; original4AIteams and scripts retained. Exact hashes/fixes: RUNTIME_INTEGRATION_20261107. Actual Windows/game gates OPEN.
+
+17Nov moving targets7fe4041: UI/history/Save/reopen and native CE609 identity/asset/coordinate/readback plus negative bindings pass. Exact tests/hashes/limits: RUNTIME_INTEGRATION_20261107. Windows/game gates OPEN.
 
 17Nov native flag/guidance (parent1ce17fe): protected append/pose/Restore/Save and scoped marker authoring→standard parameterless HSC→CE609 compile/readback pass. Frontend70/native20+1skip/creative21+1skip/working17+1skip/browser6distinct/latest2/TypeScript-Vite/Windows all-target PASS. Exact cache/source/test-exe hashes, compiler/initialization fixes and limits: RUNTIME_INTEGRATION_20261107. Actual marker/mission/gameplay remains OPEN.
 
@@ -149,7 +151,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA39694/run-60rgEl CLOSED: 1536195660logicalB disposed, peak1538090194logicalB; last allocation1404992144B, disposal allocation unavailable. Root absent, runs[]/issues[], all writers finished. No retained outputs or engine/game writes. Exact hashes/protected checks/limits: RUNTIME_INTEGRATION_20261107.
+QA80247/run-8nGfwZ CLOSED: 1536613675logicalB disposed; peak1704919653logicalB; last allocation1405413864B; disposal allocation unavailable. Root absent, runs[]/issues[], all writers finished. Protected hashes/stashes unchanged; no retained outputs or engine writes. Exact evidence: RUNTIME_INTEGRATION_20261107.
 
 Earlier owned QA roots remain closed; exact receipts survive in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git. No old jobs revived or checkpoint duplicated.
 
