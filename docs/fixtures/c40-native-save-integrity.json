@@ -1411,5 +1411,226 @@
       "runs": [],
       "issues": []
     }
+  },
+  "privateFatalDiagnostics20261117": {
+    "parentRevision": "17d63495974037aa44941e808977d866e209aa2c",
+    "implementation": "Existing runtime_rebuild monitor and session view; no new log archive, protocol or runtime manager",
+    "bounds": {
+      "consoleBytes": 32768,
+      "privateDebugBytes": 16384,
+      "consoleDrainMs": 500
+    },
+    "checks": [
+      {
+        "name": "native8Pass1InstalledSkip",
+        "sha256": "a16efef914b39fd5c6e2d24b7ab583f0398edcc26ca537906578f9cecabd63b0",
+        "results": [
+          "test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 159 filtered out; finished in 0.02s"
+        ]
+      },
+      {
+        "name": "browser2Pass",
+        "sha256": "ff6177eacf14307c1050af31fe6e3b316e41714226c20de1f7703500e0ca0200",
+        "results": [
+          "  2 passed (10.8s)"
+        ]
+      },
+      {
+        "name": "frontendTypeScript",
+        "sha256": "c121c92685fff1e91626c4b5f3de273ba65cd149ba19f8ef7ba9d89842ff724c",
+        "results": [
+          "✓ built in 662ms"
+        ]
+      },
+      {
+        "name": "HowToGuideCatalog",
+        "sha256": "013ff2608e3be6ba487e6a6b5eeb78b08efa935f6a2038c008aed17cc6e17d28",
+        "results": [
+          " Test Files  1 passed (1)",
+          "      Tests  4 passed (4)"
+        ]
+      }
+    ],
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "sourceMapSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+    "finalNativeTestSha256": "c8a8f02da66da6783ee0d6b3e2302832815cc334e15807fc3bba25f198743bec",
+    "nativePreparationAppSha256": "c0d819787805924205b6c332b2a33dbbb9c635bac71413cf174f4ac69ede6c4b",
+    "appBoundary": "Preparation app predates final console-drain addition; final code compiles and passes native unit checks. No deliberate game crash was replayed.",
+    "nativeSession": {
+      "savedAndClosedNormally": true,
+      "exitCode": 0,
+      "tagEdits": 0,
+      "sceneMatchesOriginal": true,
+      "pageErrors": []
+    },
+    "idleReflection": {
+      "samples": [
+        {
+          "pose": {
+            "type": "PerspectiveCamera",
+            "position": [
+              46.347422,
+              -75.084864,
+              5.147998
+            ],
+            "quaternion": [
+              -0.033136,
+              0.557202,
+              0.828252,
+              -0.049255
+            ],
+            "zoom": 1,
+            "fov": 55,
+            "target": [
+              47.445212,
+              -84.282298,
+              1.379435
+            ]
+          },
+          "activity": "background",
+          "focus": true,
+          "sha256": "9a79c0091b251ba4796f8a520a00ac433d56b2821290db5bb9bf23b1fa6b4b5c"
+        },
+        {
+          "pose": {
+            "type": "PerspectiveCamera",
+            "position": [
+              46.347422,
+              -75.084864,
+              5.147998
+            ],
+            "quaternion": [
+              -0.033136,
+              0.557202,
+              0.828252,
+              -0.049255
+            ],
+            "zoom": 1,
+            "fov": 55,
+            "target": [
+              47.445212,
+              -84.282298,
+              1.379435
+            ]
+          },
+          "activity": "background",
+          "focus": true,
+          "sha256": "9a79c0091b251ba4796f8a520a00ac433d56b2821290db5bb9bf23b1fa6b4b5c"
+        },
+        {
+          "pose": {
+            "type": "PerspectiveCamera",
+            "position": [
+              46.347422,
+              -75.084864,
+              5.147998
+            ],
+            "quaternion": [
+              -0.033136,
+              0.557202,
+              0.828252,
+              -0.049255
+            ],
+            "zoom": 1,
+            "fov": 55,
+            "target": [
+              47.445212,
+              -84.282298,
+              1.379435
+            ]
+          },
+          "activity": "background",
+          "focus": true,
+          "sha256": "9a79c0091b251ba4796f8a520a00ac433d56b2821290db5bb9bf23b1fa6b4b5c"
+        },
+        {
+          "pose": {
+            "type": "PerspectiveCamera",
+            "position": [
+              46.347422,
+              -75.084864,
+              5.147998
+            ],
+            "quaternion": [
+              -0.033136,
+              0.557202,
+              0.828252,
+              -0.049255
+            ],
+            "zoom": 1,
+            "fov": 55,
+            "target": [
+              47.445212,
+              -84.282298,
+              1.379435
+            ]
+          },
+          "activity": "background",
+          "focus": true,
+          "sha256": "9a79c0091b251ba4796f8a520a00ac433d56b2821290db5bb9bf23b1fa6b4b5c"
+        },
+        {
+          "pose": {
+            "type": "PerspectiveCamera",
+            "position": [
+              46.347422,
+              -75.084864,
+              5.147998
+            ],
+            "quaternion": [
+              -0.033136,
+              0.557202,
+              0.828252,
+              -0.049255
+            ],
+            "zoom": 1,
+            "fov": 55,
+            "target": [
+              47.445212,
+              -84.282298,
+              1.379435
+            ]
+          },
+          "activity": "background",
+          "focus": true,
+          "sha256": "9a79c0091b251ba4796f8a520a00ac433d56b2821290db5bb9bf23b1fa6b4b5c"
+        }
+      ],
+      "crop": {
+        "x": 800,
+        "y": 550,
+        "width": 280,
+        "height": 180
+      },
+      "acceptance": "Identical current rear/roof samples; background activity, not isolated gold face. Reported moving and stationary gold reflection remains OPEN."
+    },
+    "forerunnerEvidence": {
+      "contract": "D:/Project Forerunner/SPARK_INTEGRATION_CONTRACT.md",
+      "observedContractSha256": "5e8d13f0250eabf1f85b497c4f1bdc562233e1868f4671bbe1ebc3c477c03751",
+      "aircraftReceiptSha256": "858d4960871dd4cabb1c8d1d8c0de2df469fbe06200c9c54b371bc91bf60ce06",
+      "aircraftReceiptEngineSha256": "f02fd1bfabc9869e52d440eb734f28195d6124409ba1129d2fb62196718145d9",
+      "accepted": false,
+      "findings": [
+        "Normal deployment approach offers passenger-seat action8 instead of control10",
+        "Stationary grounded Pelican up0.942, landed0; unchanged0.95 gate remains mandatory"
+      ],
+      "documentedStartupFixedEngine": "6744161c52be41a0c0d73cc8d83bba7245bc869ee8eaef00d37e2a8044e1cc09",
+      "observedInstalledEngine": "7413fc2bb44e060fd7929f4da9b9a56bf7bd080ddb0eecd786b23f3fae759a36",
+      "admission": "Neither old disposed b428 nor a new filename authorizes another run; explicitly review current EXE/SDL/contract through existing registration",
+      "otherProjectModified": false
+    },
+    "initialFailures": [
+      "Wrong native filter selected zero tests and was not counted",
+      "First browser failed because the synthetic IPC returned one mutable object; structuredClone now models real serialized snapshots and the stronger copy assertion passes",
+      "Requested a nonexistent catalog-test filename; selected actual featureWorkflow.test.ts afterward. No-test run was not counted."
+    ],
+    "operation": {
+      "nodeSession": 30370,
+      "ownedRoot": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-4d3zQz",
+      "active": true,
+      "nativeAppClosed": true,
+      "next": "Reuse prepared target/library for reviewed native aircraft/control placement workflow; dispose after all owned writers settle"
+    }
   }
 }

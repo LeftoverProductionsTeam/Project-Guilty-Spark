@@ -76,9 +76,17 @@ struct Running {
     process: ce_host_native::OwnedProcess,
     stage: Stage,
     tail: Arc<Mutex<Vec<u8>>>,
+    captures:Vec<std::thread::JoinHandle<()>>,
     started: Instant,
 }
 impl Running {
+    fn drain_console(&mut self)->bool{
+        let began=Instant::now();
+        while self.captures.iter().any(|reader|!reader.is_finished())&&began.elapsed()<Duration::from_millis(500){std::thread::sleep(Duration::from_millis(10));}
+        let mut complete=true;
+        for reader in self.captures.drain(..){if reader.is_finished(){complete&=reader.join().is_ok();}else{complete=false;}}
+        complete
+    }
     fn close(&mut self) {
         if self.process.child.try_wait().ok().flatten().is_some() { return; }
         #[cfg(windows)]
@@ -101,7 +109,7 @@ impl Running {
         let _ = self.process.child.wait();
     }
 }
-impl Drop for Running { fn drop(&mut self) { self.close(); } }
+impl Drop for Running { fn drop(&mut self) { self.close();self.drain_console(); } }
 
 fn registration(state: &AppState) -> Reply<runtime::RuntimeRegistration> {
     if !cfg!(all(windows, target_arch="x86_64")) { return Err("Live Rebuild currently supports the verified Windows x64 Chupathingy playtest adapter".into()); }
@@ -310,22 +318,63 @@ fn play_command(state:&AppState, reg: &runtime::RuntimeRegistration, stage: &Sta
     #[cfg(windows)] { use std::os::windows::process::CommandExt; command.creation_flags(0x08000000); }
     Ok(command)
 }
-fn capture(mut pipe: impl Read + Send + 'static, tail: Arc<Mutex<Vec<u8>>>) {
+fn capture(mut pipe: impl Read + Send + 'static, tail: Arc<Mutex<Vec<u8>>>) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut bytes = [0;4096];
         while let Ok(n) = pipe.read(&mut bytes) {
             if n==0 { break; }
             if let Ok(mut out) = tail.lock() { out.extend_from_slice(&bytes[..n]); let extra=out.len().saturating_sub(32768); out.drain(..extra); }
         }
-    });
+    })
+}
+// Keep the useful end of this owned session's log in the existing UI before
+// Stage disposes scratch. Never enumerate a runtime install or follow a link.
+const DEBUG_TAIL_BYTES:usize=16*1024;
+fn bounded_log_text(bytes:&[u8],limit:usize)->String {
+    let mut text=String::from_utf8_lossy(bytes).replace('\0', "");
+    if text.len()>limit {let mut start=text.len()-limit;while !text.is_char_boundary(start){start+=1;}text.drain(..start);}
+    text
+}
+fn private_debug_tail(root:&Path,runtime_id:runtime::RuntimeId)->Reply<String>{
+    use std::io::{Seek,SeekFrom};
+    let relative=if runtime_id==runtime::RuntimeId::OpenCe{"profile/logs/debug.txt"}else{"logs/debug.txt"};
+    let file=root.join(relative);core::reject_links(&file).map_err(error)?;
+    let mut input=match fs::File::open(&file){Ok(file)=>file,Err(e)if e.kind()==std::io::ErrorKind::NotFound=>return Ok(String::new()),Err(e)=>return Err(error(e))};
+    let metadata=input.metadata().map_err(error)?;
+    if !metadata.is_file(){return Err("Private debug log is not a regular file".into());}
+    let begin=metadata.len().saturating_sub(DEBUG_TAIL_BYTES as u64);
+    input.seek(SeekFrom::Start(begin)).map_err(error)?;let mut bytes=Vec::new();
+    std::io::Read::by_ref(&mut input).take(DEBUG_TAIL_BYTES as u64).read_to_end(&mut bytes).map_err(error)?;
+    let text=bounded_log_text(&bytes,DEBUG_TAIL_BYTES);
+    if text.is_empty(){return Ok(String::new());}
+    Ok(format!("\n--- Private {relative}{} ---\n{text}",if begin>0{" (earlier bytes omitted)"}else{""}))
+}
+fn diagnostic_tail(root:&Path,runtime_id:runtime::RuntimeId,console:&[u8])->String{
+    let mut text=bounded_log_text(console,32768);
+    match private_debug_tail(root,runtime_id){Ok(debug)=>text.push_str(&debug),Err(problem)=>{text.push_str("\n--- Private debug log unavailable: ");text.extend(problem.chars().take(300));text.push_str(" ---\n");}}
+    text
+}
+fn fatal_native_line(text:&str)->Option<String>{
+    // A conservative stop guard, not the offline QA health classifier or a
+    // claim that an unclassified/missing log proves healthy gameplay.
+    text.lines().find(|line|{let line=line.to_ascii_lowercase();["exception halt","exception assert","exception access violation","unhandled exception","crash: exception"].iter().any(|fatal|line.contains(fatal))}).map(|line|line.chars().take(512).collect())
+}
+fn finish_session(session:&Session,result:Reply<()>){
+    if let Ok(mut view)=session.view.lock(){
+        let result=match fatal_native_line(&view.console_tail){Some(fault)=>Err(format!("Native playtest failed: {fault}. Copy diagnostic tail for the full retained log. Source and previous-good builds remain available.")),None=>result};
+        view.process_id=None;view.game_build_id=None;view.game_sha256=None;view.pending_job_id=None;
+        view.phase=if result.is_ok(){"stopped"}else{"failed"}.into();view.error=result.as_ref().err().cloned();
+        view.detail=result.err().unwrap_or_else(||"Private playtest stopped; diagnostic tail, source and build history remain. Owned scratch cleanup was requested.".into());
+    }
 }
 fn launch_command(mut command: Command, stage: Stage) -> Reply<Running> {
     // Reuse the existing kill-on-owner-exit native process lifetime guard.
     let mut process=ce_host_native::OwnedProcess::spawn(&mut command)?;
     let tail=Arc::new(Mutex::new(Vec::new()));
-    if let Some(pipe)=process.child.stdout.take(){capture(pipe,tail.clone());}
-    if let Some(pipe)=process.child.stderr.take(){capture(pipe,tail.clone());}
-    Ok(Running{process,stage,tail,started:Instant::now()})
+    let mut captures=Vec::new();
+    if let Some(pipe)=process.child.stdout.take(){captures.push(capture(pipe,tail.clone()));}
+    if let Some(pipe)=process.child.stderr.take(){captures.push(capture(pipe,tail.clone()));}
+    Ok(Running{process,stage,tail,captures,started:Instant::now()})
 }
 fn launch(state:&AppState, reg: &runtime::RuntimeRegistration, stage: Stage) -> Reply<Running> {
     launch_command(play_command(state,reg,&stage)?,stage)
@@ -345,6 +394,7 @@ fn publish_forerunner(view:&mut View,startup:Option<String>,map:&str)->Reply<()>
 }
 fn publish(session: &Session, run: &Running) -> Reply<()> {
     let mut view=lock(&session.view)?;
+    view.console_tail.clear(); // The next staged revision must not display the old child's log.
     view.process_id=Some(run.process.child.id()); view.compiled_build_id=run.stage.build.id.clone(); view.compiled_sha256=run.stage.build.sha256.clone().ok_or("Missing map hash")?;
     view.ce_resource_sha256=run.stage.ce_resource_sha256.clone();
     view.staged_map=run.stage.map.clone();view.engine_sha256=run.stage.staged_sha256.iter().filter(|(name,_)|name.starts_with("engine/")).map(|(name,sha)|(name.clone(),sha.clone())).collect();
@@ -357,17 +407,25 @@ fn publish(session: &Session, run: &Running) -> Reply<()> {
 }
 fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration, session: Arc<Session>, mut run: Running) -> Reply<()> {
     let began=Instant::now(); let mut checked=Instant::now();
-    loop {
+    let result=(||{loop {
         if session.stopping.load(Ordering::Relaxed) || app.get_webview_window(&owner).is_none() { return Ok(()); }
         if began.elapsed()>Duration::from_secs(8*60*60) { return Err("Private playtest reached its eight-hour lifetime; source and builds stay saved".into()); }
         if let Some(exit)=run.process.child.try_wait().map_err(error)? { if reg.runtime_id==runtime::RuntimeId::OpenCe&&exit.success(){return Ok(());} return Err(format!("Private playtest exited ({exit}); source and previous-good native builds remain available")); }
-        if checked.elapsed()>Duration::from_secs(2) { run.stage.budget.check().map_err(error)?; checked=Instant::now(); }
+        if checked.elapsed()>Duration::from_secs(2) {
+            run.stage.budget.check().map_err(error)?;checked=Instant::now();
+            let output=diagnostic_tail(&run.stage.root,reg.runtime_id,&lock(&run.tail)?);
+            let fault=fatal_native_line(&output);lock(&session.view)?.console_tail=output;
+            if let Some(fault)=fault{return Err(format!("Native playtest reported: {fault}"));}
+        }
         if reg.runtime_id==runtime::RuntimeId::ChupathingyCe && run.started.elapsed()>Duration::from_secs(180) && lock(&session.view)?.game_build_id.is_none() {
             return Err("Chupathingy did not report gameplay ticks within three minutes. Review its native log; the compiled source and prior builds remain intact".into());
         }
         let tail=String::from_utf8_lossy(&lock(&run.tail)?).to_string();
         {
-            let mut view=lock(&session.view)?; view.console_tail=tail.clone();
+            if let Some(fault)=fatal_native_line(&tail){return Err(format!("Native playtest reported: {fault}"));}
+            let mut view=lock(&session.view)?;
+            // Preserve the last bounded file tail between its two-second reads.
+            if !view.console_tail.contains("--- Private "){view.console_tail=tail.clone();}
             if reg.runtime_id==runtime::RuntimeId::ChupathingyCe && tail.lines().any(|line|line.contains("network test: tick ") && line.contains(" player ")) {
                 view.game_build_id=Some(run.stage.build.id.clone()); view.game_sha256=run.stage.build.sha256.clone();
                 if view.pending_job_id.is_none() { view.phase="running".into(); view.detail="Native engine gameplay ticks observed for this staged revision. Human traversal and multiplayer acceptance remain separate.".into(); }
@@ -386,16 +444,17 @@ fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration
                 let candidate=stage(&state,&reg,build)?;
                 let command=play_command(&state,&reg,&candidate)?; // Validate everything before closing the old child.
                 if session.stopping.load(Ordering::Relaxed) { return Err("Playtest stopped before restart".into()); }
-                run.close();
+                run.close();run.drain_console();
                 match launch_command(command,candidate) {
                     Ok(next)=>{run=next;publish(&session,&run)?;}
                     Err(problem)=>{
                         // The previous isolated map still exists. Restart only its owned process.
                         if let Ok(mut process)=ce_host_native::OwnedProcess::spawn(&mut play_command(&state,&reg,&run.stage)?) {
                             let tail=Arc::new(Mutex::new(Vec::new()));
-                            if let Some(pipe)=process.child.stdout.take(){capture(pipe,tail.clone());}
-                            if let Some(pipe)=process.child.stderr.take(){capture(pipe,tail.clone());}
-                            run.process=process;run.tail=tail;run.started=Instant::now();publish(&session,&run)?;
+                            let mut captures=Vec::new();
+                            if let Some(pipe)=process.child.stdout.take(){captures.push(capture(pipe,tail.clone()));}
+                            if let Some(pipe)=process.child.stderr.take(){captures.push(capture(pipe,tail.clone()));}
+                            run.process=process;run.tail=tail;run.captures=captures;run.started=Instant::now();publish(&session,&run)?;
                         }
                         return Err(format!("New playtest could not start: {problem}. The previous-good native build remains available"));
                     }
@@ -406,7 +465,13 @@ fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration
             match replacement { Ok(())=>view.error=None, Err(problem)=>{view.error=Some(problem);view.phase=if view.game_build_id.is_some(){"running"}else{"loading"}.into();view.detail="Live Rebuild did not adopt an output. Source and previous-good native builds were retained; check the private playtest status before continuing.".into();} }
         }
         std::thread::sleep(Duration::from_millis(200));
-    }
+    }})();
+    run.close(); // Flush only this owned child before capturing its final log.
+    let complete=run.drain_console();
+    let mut output=diagnostic_tail(&run.stage.root,reg.runtime_id,&lock(&run.tail)?);
+    if !complete{output.push_str("\n--- Console readers did not finish within 500 ms; this diagnostic tail may be incomplete. ---\n");}
+    lock(&session.view)?.console_tail=output;
+    result
 }
 
 #[tauri::command]
@@ -434,7 +499,7 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
         let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
         match result {
-            Ok(run)=>{let answer=lock(&session.view)?.clone();std::thread::spawn(move||{let result=drive(app,owner,reg,session.clone(),run);if let Ok(mut view)=session.view.lock(){view.process_id=None;view.game_build_id=None;view.game_sha256=None;view.pending_job_id=None;view.phase=if result.is_ok(){"stopped"}else{"failed"}.into();view.detail=result.err().unwrap_or_else(||"Private playtest stopped; generated runtime scratch disposed. Source and build history remain.".into());}});Ok(answer)}
+            Ok(run)=>{let answer=lock(&session.view)?.clone();std::thread::spawn(move||{let result=drive(app,owner,reg,session.clone(),run);finish_session(&session,result);});Ok(answer)}
             Err(problem)=>{let mut view=lock(&session.view)?;view.phase="failed".into();view.error=Some(problem.clone());Err(problem)}
         }
     }).await.map_err(error)?
@@ -492,6 +557,45 @@ mod tests {
     use super::*;
     fn session(id: &str, project: &str) -> Arc<Session> {
         Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),startup_map:None,required_native_features:vec![],engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
+    }
+    #[test]fn console_reader_retains_final_fatal_bytes_and_keeps_its_original_bound(){
+        let tail=Arc::new(Mutex::new(Vec::new()));let mut bytes=vec![b'x';65536];bytes.extend_from_slice(b"\nEXCEPTION halt final native diagnostic\n");
+        let reader=capture(std::io::Cursor::new(bytes),tail.clone());reader.join().unwrap();let output=lock(&tail).unwrap();
+        assert_eq!(output.len(),32768);assert!(String::from_utf8_lossy(&output).ends_with("EXCEPTION halt final native diagnostic\n"));
+    }
+    #[test]
+    fn private_diagnostic_tail_survives_cleanup_and_zero_exit_cannot_hide_native_halt(){
+        let dir=tempfile::tempdir().unwrap();let root=dir.path();fs::create_dir_all(root.join("profile/logs")).unwrap();
+        let path=root.join("profile/logs/debug.txt");let fault="EXCEPTION halt in c:\\halo\\SOURCE\\cache\\cache_files.c,#298: expected tag group 'DeLa' but got 'schi' for e1234567";
+        let mut bytes=vec![b'x';2*DEBUG_TAIL_BYTES];bytes.extend_from_slice(format!("\n{fault}\nwindow closed\n").as_bytes());fs::write(&path,&bytes).unwrap();
+        let output=diagnostic_tail(root,runtime::RuntimeId::OpenCe,b"native startup request only\n");
+        assert!(output.contains(fault));assert!(output.contains("earlier bytes omitted"));assert!(output.len()<DEBUG_TAIL_BYTES+512);
+        assert_eq!(fs::read(&path).unwrap(),bytes);fs::remove_file(path).unwrap();
+        let session=session("owned","native");{let mut view=lock(&session.view).unwrap();view.console_tail=output;view.process_id=Some(123);}
+        finish_session(&session,Ok(()));let view=lock(&session.view).unwrap();
+        assert_eq!(view.phase,"failed");assert!(view.error.as_ref().unwrap().contains("e1234567"));assert!(view.console_tail.contains(fault));
+        assert!(view.process_id.is_none()&&view.game_build_id.is_none()&&view.game_sha256.is_none());
+        assert_eq!(view.compiled_build_id,"old-good-build");assert_eq!(view.compiled_sha256,"old-good-sha");
+    }
+    #[test]
+    fn diagnostic_capture_uses_only_fixed_owned_paths_and_bounds_invalid_utf8(){
+        let dir=tempfile::tempdir().unwrap();let root=dir.path();
+        assert_eq!(private_debug_tail(root,runtime::RuntimeId::OpenCe).unwrap(),"");assert_eq!(fs::read_dir(root).unwrap().count(),0);
+        fs::create_dir_all(root.join("logs")).unwrap();fs::write(root.join("logs/debug.txt"),"normal shutdown").unwrap();
+        assert!(diagnostic_tail(root,runtime::RuntimeId::ChupathingyCe,b"last console message").contains("normal shutdown"));
+        assert!(!diagnostic_tail(root,runtime::RuntimeId::OpenCe,b"last console message").contains("normal shutdown"));
+        fs::create_dir_all(root.join("profile/logs/debug.txt")).unwrap();let unavailable=diagnostic_tail(root,runtime::RuntimeId::OpenCe,b"kept console");
+        assert!(unavailable.contains("kept console")&&unavailable.contains("Private debug log unavailable"));
+        assert!(bounded_log_text(&vec![255;65536],32768).len()<=32768);assert!(!bounded_log_text(b"a\0b",16).contains('\0'));
+        let session=session("owned","native");lock(&session.view).unwrap().console_tail="optional intro warning\nwindow closed".into();finish_session(&session,Ok(()));
+        assert_eq!(lock(&session.view).unwrap().phase,"stopped");assert!(lock(&session.view).unwrap().error.is_none());
+        lock(&session.view).unwrap().console_tail="no fatal record".into();finish_session(&session,Err("native child exited unsuccessfully".into()));assert_eq!(lock(&session.view).unwrap().phase,"failed");
+    }
+    #[cfg(unix)]
+    #[test]fn diagnostic_capture_refuses_a_link_outside_owned_output(){
+        let dir=tempfile::tempdir().unwrap();let root=dir.path().join("owned");fs::create_dir_all(root.join("logs")).unwrap();
+        let protected=dir.path().join("protected");fs::write(&protected,b"private external bytes").unwrap();std::os::unix::fs::symlink(&protected,root.join("logs/debug.txt")).unwrap();
+        let output=diagnostic_tail(&root,runtime::RuntimeId::ChupathingyCe,b"owned console");assert!(!output.contains("private external bytes"));assert!(output.contains("unavailable"));assert_eq!(fs::read(protected).unwrap(),b"private external bytes");
     }
     #[test]
     fn forerunner_startup_is_pinned_scoped_and_not_a_game_acknowledgement(){

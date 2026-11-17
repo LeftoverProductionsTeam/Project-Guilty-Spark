@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - reviewed Forerunner handoff and viewport corrections
+Task: Operation110 - native fatal diagnostics and owned Black Echo hub correction
 Status: implementation incomplete
-Starting revision: b2d8e4c6d0cf4945c9fdcd877894374376091df9, canonical master.
-Latest verified revision: b2d8e4c6d0cf4945c9fdcd877894374376091df9 plus scoped changes in this checkpoint commit: reviewed profiles/native persistence, drawer sizing, source reflection. Focused checks/Windows build pass; gameplay and exact base appearance OPEN.
-Next action: Identify the visible base shader and reproduce the reported reflection motion; preserve source shading. Then obtain the full DeLa/schi offending datum before fixing/retrying Black Echo. Existing runtime review is verified; Forerunner read-only. No active QA; no push/hosted jobs.
+Starting revision: 17d63495974037aa44941e808977d866e209aa2c, canonical master.
+Latest verified revision: 17d6349 plus scoped changes in this checkpoint commit. Final owned console/debug capture and zero-exit fatal status: native8+1explicit skip/browser2/frontend compile pass. Full game acceptance remains OPEN; exact hashes in c40 privateFatalDiagnostics20261117.
+Next action: Extend the existing reviewed source-placement operation to aircraft; correct owned hub/control/AI/route/volume clearance using exact Forerunner evidence, then compile/read back. Preserve the5native roles. Review current EXE/SDL/contract before gameplay; old b428 is retired. Reflection both-moving/still and meaningful terminal controls remain active. Reuse QA30370/run-4d3zQz; no push.
 
 ## Acceptance
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current source: existing registration retains explicit Forerunner contract/EXE/SDL review; canonical-path Save defect repaired and native restart persisted. Source environment reflection mode/default bump loading and drawer flex restored. Focused core6+1skip/desktop3/parser1/browser9/frontend21, TypeScript and Windows build PASS. Native0page errors/5normal closes. Exact hashes, failures and screenshots: RUNTIME/c40 reviewedForerunnerAndRendering20261117. Prior root-source/CI/route proofs retained.
+Current source: existing private monitor closes only its child, bounded-drains console readers, captures final private debug/console before scratch cleanup, and retains Copy diagnostic tail. Fatal reports fail even at exit0; prior builds/source remain. Native8+1skip/browser2/frontend compile pass. No new log warehouse or protocol. Prior reviewed profile, source reflection and drawer fixes remain accepted in scope; limits and hashes:RUNTIME/c40.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -121,7 +121,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-Current: private b428/build8256a166 requested retained31505 CE map with3real banks; owner reported DeLa/schi halt #298, full datum clipped/log disposed. Game revision null; no mission/gameplay acceptance. Engine fetched map-index metadata despite private settings: not offline. Base reflection still needs exact surface/game comparison. Later Windows Security blocked a click; no input/dismissal. Broader37944, seam/CI/platform/peer/release gates OPEN.
+Current: Forerunner documents repaired profile-successor DeLa/schi startup on6744161c; installed binary advanced7413fc2b, not implicitly admitted. Exact31505 mission evidence858d4960 rejects deployment: Pelican seat action8 instead of control10, up.942/landed0 below unchanged.95 gate.5terminals intentionally bound but clustered at craft origin. Correct owned hub source. Gold reflection both-still/moving remains unaccepted; idle rear-view background sample alone is insufficient. Save37944/other native/UI/platform gates OPEN.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
@@ -147,7 +147,7 @@ Current: private b428/build8256a166 requested retained31505 CE map with3real ban
 
 ## Operations and safe checkpoint
 
-Current QA99184/run-sUIJX0 CLOSED:2576641187logicalB disposed; peak3961699290,last allocated2321803168,disposal allocation unavailable. Root absent/runs[]/issues[]; app/game closed. Trial EXE11bcb4fb; original1ae5 scenario/31505map unchanged. No retained QA cache/SDK copy/Forerunner write/push/hosted job. Exact evidence:RUNTIME/c40. Prior QA16649 receipts remain there/Git.
+Current QA30370/run-4d3zQz ACTIVE: one bounded external owner, prepared native target/library reused for next placement slice. Native Spark PID35900 closed normally (exit0),0tag edits/original scene unchanged and Save done. No Halo launched this turn. No SDK copy/Forerunner write/push/hosted job. Final cleanup pending after source work; prior99184 receipts remain RUNTIME/c40.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 
