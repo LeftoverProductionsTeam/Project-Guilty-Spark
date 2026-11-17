@@ -85,3 +85,40 @@
 .native-hud-structure .native-field-edit select{width:100%;min-width:0;max-width:100%;}
 
 .native-faction-kits fieldset{min-width:0;margin:6px 0}.native-faction-kits label{display:grid;gap:4px}.native-faction-kits input,.native-faction-kits select{min-width:0;max-width:100%}
+
+/* The full workspace uses the same source editors and transactions as Object Tags. */
+.native-source-workspace { margin:0; padding:0; border:1px solid var(--line); background:var(--panel); border-radius:8px; min-width:0; }
+.native-source-workspace[open] { padding:0 12px 12px; }
+.native-source-workspace > :not(.native-history) { min-width:0; }
+.native-source-workspace > summary { display:flex; list-style:none; align-items:center; gap:8px; min-height:40px; margin:0; padding:10px 12px; font-weight:600; }
+.native-source-workspace[open] > summary { margin-inline:-12px; border-bottom:1px solid var(--line); }
+.native-source-workspace > summary::-webkit-details-marker { display:none; }
+.native-source-workspace > summary::before { content:'▸'; color:var(--cyan); }
+.native-source-workspace[open] > summary::before { content:'▾'; }
+.native-source-workspace > summary .pill { margin-left:auto; font-weight:400; }
+.native-source-workspace > p { max-width:90ch; color:var(--muted); font-size:12px; }
+.native-source-workspace .native-tag-path { font-size:11px; color:var(--muted); margin-block:4px; }
+.native-source-workspace > .native-history { display:inline-grid; vertical-align:top; width:calc(50% - 8px); margin:6px 12px 6px 0; min-width:0; font-size:12px; gap:5px; }
+.native-source-workspace > .native-history:last-of-type { margin-right:0; }
+.native-source-workspace > .native-history select { width:100%; }
+.native-source-workspace .native-source-editors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 12px; margin-top:12px; border-top:1px solid var(--line); }
+.native-source-workspace .native-source-editors > details { min-width:0; padding:0; border:0; border-bottom:1px solid var(--line); border-radius:0; }
+.native-source-workspace .native-source-editors > details > summary { display:flex; align-items:center; list-style:none; padding:10px 4px; min-height:38px; gap:8px; font-size:12px; font-weight:500; }
+.native-source-workspace .native-source-editors > details > summary::-webkit-details-marker { display:none; }
+.native-source-workspace .native-source-editors > details > summary::before { content:'▸'; color:var(--cyan); flex:none; }
+.native-source-workspace .native-source-editors > details[open] { grid-column:1/-1; padding:0 12px 12px; background:var(--surface); border:1px solid var(--line); border-radius:6px; margin-block:6px; }
+.native-source-workspace .native-source-editors > details[open] > summary { margin-inline:-8px; border-bottom:1px solid var(--line); margin-bottom:10px; color:var(--cyan); }
+.native-source-workspace .native-source-editors > details[open] > summary::before { content:'▾'; }
+.native-source-workspace .native-source-editors p { max-width:90ch; line-height:1.6; }
+.native-source-workspace .native-source-editors > details > label { display:grid; gap:5px; margin-block:10px; max-width:640px; }
+.native-source-workspace fieldset { min-width:0; margin-block:10px; border-color:var(--line); }
+.native-source-workspace :is(input,select) { min-width:0; max-width:100%; }
+.native-source-workspace .native-field-edit { max-width:900px; }
+.native-source-workspace .native-encounter-position { max-width:900px; gap:10px; }
+.native-source-workspace .native-source-preview { margin-top:12px; border:1px solid var(--cyan); border-radius:6px; padding:12px; background:var(--surface); }
+.native-source-workspace .native-source-preview > strong { color:var(--cyan); overflow-wrap:anywhere; }
+.native-source-workspace .native-source-preview > .button-row { padding-top:10px; border-top:1px solid var(--line); }
+@media(max-width:850px) {
+ .native-source-workspace .native-source-editors { grid-template-columns:minmax(0,1fr); }
+ .native-source-workspace > .native-history { width:100%; margin-right:0; }
+}

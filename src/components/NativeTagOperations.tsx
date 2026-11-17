@@ -45,12 +45,14 @@ export default function NativeTagOperations({
   dirty = false,
   epoch = 0,
   onLevelEditor,
+  workspace = false,
 }: {
   project: Project;
   tagId?: number;
   dirty?: boolean;
   epoch?: number;
   onLevelEditor?:()=>void;
+  workspace?:boolean;
 }) {
   const [expanded, setExpanded] = useState(false),
     [busy, setBusy] = useState(false),
@@ -201,15 +203,15 @@ export default function NativeTagOperations({
     });
   }
   return (
-    <details className="native-tag-operations" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
+    <details className={'native-tag-operations'+(workspace?' native-source-workspace':'')} open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
       <summary>
-        Invader · native checks &amp; reviewed edits <Pill>Working source</Pill>
+        {workspace?'Edit native scenario & assets':'Invader · native checks & reviewed edits'} <Pill>Working source</Pill>
       </summary>
       <p className="subtle">
-        Check native dependencies or preview a specific tag edit. Accepted edits become a separate source
-        revision; use Build working tag edits to compile a new map.
+        {workspace?'Preview → review → accept a source revision. Save, then rebuild to update the map.':'Check native dependencies or preview a specific tag edit. Accepted edits become a separate source revision; use Build working tag edits to compile a new map.'}
       </p>
       {!native && <Notice tone="info">Open the desktop app to use installed native tools.</Notice>}
+      {context&&<code className="native-tag-path">{context.tag}</code>}
       {tagId === undefined && choices.length > 0 && (
         <label className="native-history">
           Native tag
@@ -230,7 +232,6 @@ export default function NativeTagOperations({
       )}
       {context && (
         <>
-          <code className="native-tag-path">{context.tag}</code>
           {!!context.history.length && (
             <label className="native-history">
               Retained previews &amp; recovery
@@ -277,6 +278,7 @@ export default function NativeTagOperations({
               Refresh source
             </button>
           </div>
+          <div className="native-source-editors">
           {context.class==='scnr'&&<details className="native-squad-difficulty">
             <summary>Existing squads, difficulty &amp; tactics</summary>
             <p className="subtle">Edit the native normal/insane population fields of an existing squad. The engine controls how those fields affect difficulty. AI damage, health and automatic player-count scaling require their own runtime support.</p>
@@ -335,6 +337,7 @@ export default function NativeTagOperations({
           {context.class==='scnr'&&<NativeTriggerVolumes context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeObjectiveFlags context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeCutsceneCameras context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
+          {context.class==='scnr'&&<NativeStartingPositions kind="player" context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeStartingPositions context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeStartingPositions kind="firing" context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {!!context.hudArrays?.length&&<details className="native-hud-structure">
@@ -392,6 +395,7 @@ export default function NativeTagOperations({
               <button disabled={busy||dirty} onClick={()=>{setEncounterQueue([]);setPreview(null);setAccepted(null);}}>Clear review list</button>
             </section>}
           </details>}
+          </div>
           {context.boundingRadius !== null && (
             <div className="native-field-edit">
               <label>
@@ -473,7 +477,7 @@ export default function NativeTagOperations({
         </section>
       )}
       {preview && (
-        <section aria-label="Native edit preview">
+        <section className="native-source-preview" aria-label="Native edit preview">
           <strong>{preview.tag}</strong>
           <p>{preview.detail}</p>
           <ul>

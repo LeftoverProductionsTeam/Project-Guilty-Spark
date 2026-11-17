@@ -289,46 +289,31 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
   return (
     <div className="scenario-page">
       <PageTitle
-        eyebrow="AI & SCENARIO"
-        title="See what makes a world tick."
-        description="Inspect the encounters, squads, and compiled script index stored in your map."
-        actions={
-          <button onClick={onWorld}>
-            <Waypoints size={15} />
-            Open placements
-          </button>
-        }
+        eyebrow="MISSION WORKSPACE"
+        title="AI & scenario"
+        description="Author encounters, placements and mission source. Inspect the compiled map below."
+        actions={<>
+          <button onClick={onWorld} title="Open this map in the Level Editor to select and move placements."><Waypoints size={15} />Open placements</button>
+          {project&&<button type="button" title="Open this map’s source recovery, HaloScript editing and native rebuild controls. Editable source must be recovered first."
+            onClick={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:project.id,actionId:'workingScripts'}}))}><Code2 size={15}/>Campaign source &amp; scripts…</button>}
+          {onFirefight&&<button onClick={onFirefight} title="Open Firefight authoring for this project. Native builds require a supported editable source level.">Wave rules</button>}
+        </>}
       />
-      {project&&<button type="button" title="Open this map’s source recovery, HaloScript editing and native rebuild controls. Editable source must be recovered first."
-        onClick={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:project.id,actionId:'workingScripts'}}))}>
-        Campaign source &amp; scripts…
-      </button>}
-      <Notice tone="info">
-        Inspect stored encounter and script definitions here. Use Wave rules for this project's Firefight plan; playable encounters require a supported native source build. Live AI and multiplayer behavior need their runtime's own verification.
-        {onFirefight&&<button onClick={onFirefight} title="Open Firefight authoring for this project. Native builds require a supported editable source level.">Wave rules</button>}
-      </Notice>
-      <div className="scenario-stats">
-        <div className="surface">
-          <Users size={21} />
-          <strong>{!inspection?'—':unreadable('AI_ENCOUNTERS_UNREADABLE')?'Unavailable':inspection.encounters.length}</strong>
-          <span>AI encounters</span>
-        </div>
-        <div className="surface">
-          <Network size={21} />
-          <strong>{!inspection?'—':unreadable('AI_ENCOUNTERS_UNREADABLE')||unreadable('AI_SQUADS_UNREADABLE')?'Unavailable':inspection.encounters.reduce((n,e)=>n+e.squads.length,0)}</strong>
-          <span>Squads indexed</span>
-        </div>
-        <div className="surface">
-          <Code2 size={21} />
-          <strong>{!inspection?'—':unreadable('SCRIPTS_UNREADABLE')?'Unavailable':inspection.scripts.length}</strong>
-          <span>Compiled scripts</span>
-        </div>
-        <div className="surface">
-          <Waypoints size={21} />
-          <strong>{!inspection?'—':unreadable('PLAYER_SPAWNS_UNREADABLE')?'Unavailable':inspection.objects.filter(o=>o.kind==='Player spawn').length}</strong>
-          <span>Player spawns</span>
-        </div>
-      </div>
+      <dl className="scenario-stats" aria-label="Compiled scenario summary">
+        {([
+          ['Encounters',!inspection?'—':unreadable('AI_ENCOUNTERS_UNREADABLE')?'Unavailable':inspection.encounters.length],
+          ['Squads',!inspection?'—':unreadable('AI_ENCOUNTERS_UNREADABLE')||unreadable('AI_SQUADS_UNREADABLE')?'Unavailable':inspection.encounters.reduce((n,e)=>n+e.squads.length,0)],
+          ['Scripts',!inspection?'—':unreadable('SCRIPTS_UNREADABLE')?'Unavailable':inspection.scripts.length],
+          ['Player starts',!inspection?'—':unreadable('PLAYER_SPAWNS_UNREADABLE')?'Unavailable':inspection.objects.filter(o=>o.kind==='Player spawn').length],
+        ] as const).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        <div className="scenario-summary-note">Compiled definitions · not live AI</div>
+      </dl>
+      {project&&project.builds.some(build=>build.status==='validated')?<section className="scenario-source" aria-label="Native source authoring">
+        <div className="scenario-section-heading"><div><h2>Native source editor</h2><p>Choose a task, review its changes, then accept and rebuild.</p></div><Pill>Originals protected</Pill></div>
+        <NativeTagOperations project={project} dirty={dirty} onLevelEditor={onWorld} workspace/>
+      </section>:<Notice tone="info">Native source editing becomes available after a supported source build. Use Campaign source &amp; scripts to recover source or configure a build.</Notice>}
+      <section className="scenario-inspection" aria-label="Compiled map inspection">
+      <div className="scenario-section-heading"><div><h2>Compiled map inspection</h2><p>Read the map’s stored definitions. Rebuild accepted source edits to update these values.</p></div><Pill>Read only</Pill></div>
       <details className="forge-details">
         <summary>Native player loadouts · {inspection?.playerStartingProfiles?.length??'Unavailable'}</summary>
         <p className="subtle">Stored scenario equipment, separate from the engine's player profile and saves. Game mode and scripts decide which loadout is used.</p>
@@ -345,7 +330,6 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
         {inspection?.playerStartingProfiles==null&&<p className="subtle">Native loadout details are unavailable. Older inspections need to be refreshed; unreadable native data is reported in map diagnostics.</p>}
         {inspection?.playerStartingProfiles?.length===0&&<p className="subtle">No player starting profiles are stored in this scenario.</p>}
       </details>
-      {project&&project.builds.some(build=>build.status==='validated')&&<NativeTagOperations project={project} dirty={dirty} onLevelEditor={onWorld}/>}
       <div className="scenario-columns">
         <section className="surface">
           <div className="section-heading">
@@ -442,6 +426,7 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
           </div>
         </section>
       </div>
+      </section>
     </div>
   );
 }

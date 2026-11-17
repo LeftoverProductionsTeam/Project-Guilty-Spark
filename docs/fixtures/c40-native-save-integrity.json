@@ -1924,5 +1924,1092 @@
       "remainingRuns": [],
       "issues": []
     }
+  },
+  "aiScenarioWorkspace20261117": {
+    "date": "2026-11-17",
+    "parentRevision": "456fb33c150834dbaf43f71c42abd642097f2c33",
+    "nativeDesktop": true,
+    "applicationSha256": "0559cda347873c0da76e3d5ba6ff47b7eb9ad405fce267b8c727b8385de9b6bd",
+    "screenBefore": "docs/screenshots/workspaces/native-scenario-before-20261117.jpg",
+    "screenAfter": "docs/screenshots/workspaces/native-scenario-after-20261117.jpg",
+    "browser": {
+      "testsPassed": 3,
+      "sizes": [
+        [
+          800,
+          600
+        ],
+        [
+          1280,
+          720
+        ],
+        [
+          1366,
+          768
+        ],
+        [
+          1500,
+          950
+        ],
+        [
+          1920,
+          1080
+        ],
+        [
+          2560,
+          1080
+        ],
+        [
+          3440,
+          1440
+        ],
+        [
+          5120,
+          1440
+        ]
+      ],
+      "overflowPixels": 0,
+      "summaryHeight": 42,
+      "editorWidthRatio": [
+        0.9677852348993289,
+        0.9952615992102666
+      ]
+    },
+    "native": {
+      "sizes": [
+        {
+          "requested": [
+            800,
+            600
+          ],
+          "actual": {
+            "width": 800,
+            "height": 600
+          },
+          "viewport": [
+            800,
+            600
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 42,
+          "editorsWidth": 721
+        },
+        {
+          "requested": [
+            1280,
+            720
+          ],
+          "actual": {
+            "width": 1280,
+            "height": 720
+          },
+          "viewport": [
+            1600,
+            900
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 42.5,
+          "editorsWidth": 1520.78125
+        },
+        {
+          "requested": [
+            1366,
+            768
+          ],
+          "actual": {
+            "width": 1366,
+            "height": 768
+          },
+          "viewport": [
+            1707,
+            960
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 42.5,
+          "editorsWidth": 1628.28125
+        },
+        {
+          "requested": [
+            1500,
+            950
+          ],
+          "actual": {
+            "width": 1500,
+            "height": 950
+          },
+          "viewport": [
+            1500,
+            950
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 42,
+          "editorsWidth": 1421
+        },
+        {
+          "requested": [
+            1920,
+            1080
+          ],
+          "actual": {
+            "width": 1920,
+            "height": 1080
+          },
+          "viewport": [
+            1920,
+            1080
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 42,
+          "editorsWidth": 1841
+        },
+        {
+          "requested": [
+            2560,
+            1080
+          ],
+          "actual": {
+            "width": 2560,
+            "height": 1080
+          },
+          "viewport": [
+            2246,
+            947
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 41.03618240356445,
+          "editorsWidth": 2167.982421875
+        },
+        {
+          "requested": [
+            3440,
+            1440
+          ],
+          "actual": {
+            "width": 3440,
+            "height": 1440
+          },
+          "viewport": [
+            3017,
+            1263
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 41.03618240356445,
+          "editorsWidth": 2939.912353515625
+        },
+        {
+          "requested": [
+            5120,
+            1440
+          ],
+          "actual": {
+            "width": 5120,
+            "height": 1440
+          },
+          "viewport": [
+            4491,
+            1263
+          ],
+          "overflow": 0,
+          "sourceOverflow": 0,
+          "formOverflow": 0,
+          "summaryHeight": 41.03618240356445,
+          "editorsWidth": 4413.5966796875
+        }
+      ],
+      "pageErrors": [],
+      "sourceReopenedSha256": "794a5ab2de3536bc5ae5ecf2eb9a48b5fa8856515e8b17248ab13c72c82aa07f"
+    },
+    "repair": "Source-first workspace, slim counts, two-column expandable tasks, distinct compiled inspection; corrected native details-content half-width layout, preserved drafts and review actions.",
+    "limits": [
+      "Native window sizes and CSS viewport differ under current scaling; both recorded.",
+      "Physical display/DPI/multiple-monitor, full control audit and gameplay acceptance remain open."
+    ],
+    "finalApplicationSha256": "85c9657a34c59d1ebf2060c268dc4ad74d0b9433733feef34ba7688fe88a95d2",
+    "finalRestart": {
+      "buildId": "d9ba1102-014a-4223-804c-e06bf7000ac3",
+      "scenarioSha256": "c314cade103b3ed48489b4d28880d9ae83a9730099000f3f3a8bf1d0d11c796c",
+      "playerStart": [
+        40,
+        -110,
+        1.430687
+      ],
+      "redundantPlayerGroupSelectors": 0,
+      "pageErrors": []
+    }
+  },
+  "nativePlayerHubAuthoring20261117": {
+    "parentRevision": "456fb33c150834dbaf43f71c42abd642097f2c33",
+    "inputMapSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+    "previousGoodMapSha256": "6e54ec61d6c7d931e9bc50028b11c3c513d6f2e1d44770080c1e7e68ff25ff57",
+    "playerOnlyMapSha256": "7294772243d4c77ea6eb3007c2a535820cdb2d88f5bd48995e7d56e2b98d9e62",
+    "playerOnlyScenarioSha256": "20e602857c05312247044bf37039f0f9c158381cc8c03e6771366e052a7c9b7d",
+    "map": "releases\\black-echo-review-20261117\\Spark-d9ba1102-014a-4223-804c-e06bf7000ac3\\be_native.map",
+    "mapSha256": "c388d3d69219ba5b99f53729905b81d9baa43a57582eb016cd1c636f2c636649",
+    "mapBytes": 110033988,
+    "scenarioSha256": "c314cade103b3ed48489b4d28880d9ae83a9730099000f3f3a8bf1d0d11c796c",
+    "vehicleSha256": "00a380373e77c98cf20d5f34a3eead658960827d020f5bfe982a01f058e221be",
+    "independentExtractedTags": 2,
+    "independentTagsMatchSourceBytes": true,
+    "compiledReadback": {
+      "cameras": [
+        {
+          "fovRadians": 1.2217304706573486,
+          "index": 0,
+          "name": "tf_insertion",
+          "orientationRadians": [
+            -0.8267295956611633,
+            -0.2798093259334564,
+            0.29145678877830505
+          ],
+          "position": [
+            -10.0,
+            10.0,
+            6.0
+          ]
+        },
+        {
+          "fovRadians": 1.2217304706573486,
+          "index": 1,
+          "name": "tf_departure",
+          "orientationRadians": [
+            0.8267295956611633,
+            -0.2798093259334564,
+            -0.29145678877830505
+          ],
+          "position": [
+            -10.0,
+            -10.0,
+            6.0
+          ]
+        }
+      ],
+      "combat": [
+        {
+          "facingRadians": 0.0,
+          "index": 0,
+          "kind": "playerStartPosition",
+          "position": [
+            40.0,
+            -110.0,
+            1.4306869506835938
+          ],
+          "sourceSha256": "c314cade103b3ed48489b4d28880d9ae83a9730099000f3f3a8bf1d0d11c796c"
+        }
+      ],
+      "commandLists": [
+        {
+          "bsp": 0,
+          "commands": [
+            {
+              "animation": -1,
+              "atom": "go_to",
+              "command": -1,
+              "modifier": 1,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 0,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "go_to_and_face",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 1,
+              "point2": 2,
+              "recording": -1,
+              "script": -1
+            }
+          ],
+          "flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            true
+          ],
+          "index": 0,
+          "name": "gs_native_flight",
+          "points": [
+            [
+              58.845611572265625,
+              -89.47212219238281,
+              0.04688899964094162
+            ],
+            [
+              49.0,
+              -87.47200012207031,
+              0.07842899858951569
+            ],
+            [
+              51.0,
+              -87.47200012207031,
+              0.07842899858951569
+            ]
+          ]
+        },
+        {
+          "bsp": 0,
+          "commands": [
+            {
+              "animation": -1,
+              "atom": "set_radius",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                8.0,
+                0.0
+              ],
+              "point1": -1,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "go_to",
+              "command": -1,
+              "modifier": 1,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 0,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "set_radius",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                4.0,
+                0.0
+              ],
+              "point1": -1,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "go_to_and_face",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 1,
+              "point2": 2,
+              "recording": -1,
+              "script": -1
+            }
+          ],
+          "flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            true
+          ],
+          "index": 1,
+          "name": "field_route",
+          "points": [
+            [
+              66.0,
+              -121.0,
+              9.0
+            ],
+            [
+              76.0,
+              -128.0,
+              2.799999952316284
+            ],
+            [
+              78.0,
+              -129.3333282470703,
+              2.799999952316284
+            ]
+          ]
+        },
+        {
+          "bsp": 0,
+          "commands": [
+            {
+              "animation": -1,
+              "atom": "set_radius",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                8.0,
+                0.0
+              ],
+              "point1": -1,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "go_to",
+              "command": -1,
+              "modifier": 1,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 0,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "go_to",
+              "command": -1,
+              "modifier": 1,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 1,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "set_radius",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                4.0,
+                0.0
+              ],
+              "point1": -1,
+              "point2": -1,
+              "recording": -1,
+              "script": -1
+            },
+            {
+              "animation": -1,
+              "atom": "go_to_and_face",
+              "command": -1,
+              "modifier": 0,
+              "objectName": -1,
+              "parameters": [
+                0.0,
+                0.0
+              ],
+              "point1": 2,
+              "point2": 3,
+              "recording": -1,
+              "script": -1
+            }
+          ],
+          "flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            true
+          ],
+          "index": 2,
+          "name": "hub_route",
+          "points": [
+            [
+              84.0,
+              -112.0,
+              10.0
+            ],
+            [
+              62.0,
+              -110.0,
+              9.0
+            ],
+            [
+              49.0,
+              -110.0,
+              2.799999952316284
+            ],
+            [
+              47.0,
+              -110.0,
+              2.799999952316284
+            ]
+          ]
+        }
+      ],
+      "devices": [
+        {
+          "class": "ctrl",
+          "index": 0,
+          "name": "extraction_deploy",
+          "nameIndex": 0,
+          "position": [
+            41.0,
+            -110.0,
+            1.420022964477539
+          ],
+          "rotationRadians": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "tagPath": "levels/b40/devices/holo control/b40_holo control"
+        },
+        {
+          "class": "ctrl",
+          "index": 1,
+          "name": "extraction_activate",
+          "nameIndex": 1,
+          "position": [
+            71.0,
+            -129.0,
+            0.7845640182495117
+          ],
+          "rotationRadians": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "tagPath": "levels/b40/devices/holo control/b40_holo control"
+        },
+        {
+          "class": "ctrl",
+          "index": 2,
+          "name": "extraction_loadout",
+          "nameIndex": 2,
+          "position": [
+            39.0,
+            -107.0,
+            1.3386800289154053
+          ],
+          "rotationRadians": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "tagPath": "levels/b40/devices/holo control/b40_holo control"
+        },
+        {
+          "class": "ctrl",
+          "index": 3,
+          "name": "extraction_unsc",
+          "nameIndex": 6,
+          "position": [
+            41.0,
+            -105.0,
+            0.7890030145645142
+          ],
+          "rotationRadians": [
+            1.5707963705062866,
+            0.0,
+            0.0
+          ],
+          "tagPath": "levels/b40/devices/holo control/b40_holo control"
+        },
+        {
+          "class": "ctrl",
+          "index": 4,
+          "name": "extraction_covenant",
+          "nameIndex": 7,
+          "position": [
+            38.0,
+            -105.0,
+            1.0698319673538208
+          ],
+          "rotationRadians": [
+            1.5707963705062866,
+            0.0,
+            0.0
+          ],
+          "tagPath": "levels/b40/devices/holo control/b40_holo control"
+        },
+        {
+          "class": "vehi",
+          "index": 0,
+          "name": "extraction_pelican",
+          "nameIndex": 4,
+          "position": [
+            49.0,
+            -110.0,
+            2.799999952316284
+          ],
+          "rotationRadians": [
+            -0.588002622127533,
+            0.0,
+            0.0
+          ],
+          "tagPath": "forerunner/transport/pelican"
+        },
+        {
+          "class": "vehi",
+          "index": 1,
+          "name": "extraction_spirit",
+          "nameIndex": 5,
+          "position": [
+            65.0,
+            -87.47200012207031,
+            0.07842899858951569
+          ],
+          "rotationRadians": [
+            0.25,
+            0.0,
+            0.0
+          ],
+          "tagPath": "forerunner/transport/spirit"
+        }
+      ],
+      "extractionSquads": null,
+      "factionControls": [
+        {
+          "controlIndex": 3,
+          "controlTag": "levels/b40/devices/holo control/b40_holo control.device_control",
+          "initiallyOff": "0",
+          "name": "extraction_unsc",
+          "triggersWhen": "touched_by_player"
+        },
+        {
+          "controlIndex": 4,
+          "controlTag": "levels/b40/devices/holo control/b40_holo control.device_control",
+          "initiallyOff": "0",
+          "name": "extraction_covenant",
+          "triggersWhen": "touched_by_player"
+        }
+      ],
+      "factionKits": [
+        {
+          "controlIndex": 3,
+          "kit": {
+            "controlTagPath": "levels/b40/devices/holo control/b40_holo control",
+            "faction": "unsc",
+            "position": [
+              41.0,
+              -105.0,
+              0.7890030145645142
+            ],
+            "profile": {
+              "fragmentationGrenades": 1,
+              "health": 0.0,
+              "plasmaGrenades": 0,
+              "primaryLoaded": 60,
+              "primaryReserved": 180,
+              "primaryWeapon": "weapons/assault rifle/assault rifle",
+              "secondaryLoaded": 0,
+              "secondaryReserved": 0,
+              "secondaryWeapon": null,
+              "shields": 0.0
+            },
+            "rotationRadians": [
+              1.5707963705062866,
+              0.0,
+              0.0
+            ]
+          },
+          "nameIndex": 6,
+          "positionGroup": 7,
+          "powerGroup": 6,
+          "profileIndex": 1
+        },
+        {
+          "controlIndex": 4,
+          "kit": {
+            "controlTagPath": "levels/b40/devices/holo control/b40_holo control",
+            "faction": "covenant",
+            "position": [
+              38.0,
+              -105.0,
+              1.0698319673538208
+            ],
+            "profile": {
+              "fragmentationGrenades": 0,
+              "health": 0.0,
+              "plasmaGrenades": 1,
+              "primaryLoaded": 0,
+              "primaryReserved": 0,
+              "primaryWeapon": "weapons/plasma pistol/plasma pistol",
+              "secondaryLoaded": 0,
+              "secondaryReserved": 0,
+              "secondaryWeapon": null,
+              "shields": 0.0
+            },
+            "rotationRadians": [
+              1.5707963705062866,
+              0.0,
+              0.0
+            ]
+          },
+          "nameIndex": 7,
+          "positionGroup": 9,
+          "powerGroup": 8,
+          "profileIndex": 2
+        }
+      ],
+      "includeStarts": true,
+      "outputSha256": "c388d3d69219ba5b99f53729905b81d9baa43a57582eb016cd1c636f2c636649",
+      "reviewedSourceSha256": "c314cade103b3ed48489b4d28880d9ae83a9730099000f3f3a8bf1d0d11c796c",
+      "scope": "All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional native command lists/actions/parameters/references/points, device identity/pose, trigger bounds and camera inventory/pose/lens are read from the compiled cache. This is not AI/cinematic/gameplay acceptance.",
+      "squads": [
+        {
+          "encounter": 0,
+          "encounterName": "be_marines",
+          "insaneCount": 1,
+          "name": "native_squad",
+          "normalCount": 1,
+          "squad": 0,
+          "starts": [
+            {
+              "commandList": -1,
+              "facingRadians": 180.0,
+              "index": 0,
+              "position": [
+                54.845611572265625,
+                -85.47212219238281,
+                0.07842899858951569
+              ]
+            }
+          ]
+        },
+        {
+          "encounter": 0,
+          "encounterName": "be_marines",
+          "insaneCount": 0,
+          "name": "be_return",
+          "normalCount": 0,
+          "squad": 1,
+          "starts": []
+        },
+        {
+          "encounter": 1,
+          "encounterName": "be_covenant",
+          "insaneCount": 1,
+          "name": "native_squad",
+          "normalCount": 1,
+          "squad": 0,
+          "starts": [
+            {
+              "commandList": -1,
+              "facingRadians": 180.0,
+              "index": 0,
+              "position": [
+                58.845611572265625,
+                -89.47212219238281,
+                0.07842899858951569
+              ]
+            }
+          ]
+        },
+        {
+          "encounter": 2,
+          "encounterName": "be_flood",
+          "insaneCount": 1,
+          "name": "native_squad",
+          "normalCount": 1,
+          "squad": 0,
+          "starts": [
+            {
+              "commandList": -1,
+              "facingRadians": 180.0,
+              "index": 0,
+              "position": [
+                58.845611572265625,
+                -89.47212219238281,
+                0.04688899964094162
+              ]
+            }
+          ]
+        },
+        {
+          "encounter": 3,
+          "encounterName": "be_defense",
+          "insaneCount": 1,
+          "name": "native_squad",
+          "normalCount": 1,
+          "squad": 0,
+          "starts": [
+            {
+              "commandList": -1,
+              "facingRadians": 180.0,
+              "index": 0,
+              "position": [
+                59.845611572265625,
+                -85.47212219238281,
+                0.07842899858951569
+              ]
+            }
+          ]
+        },
+        {
+          "encounter": 4,
+          "encounterName": "pilot",
+          "insaneCount": 1,
+          "name": "source_squad",
+          "normalCount": 1,
+          "squad": 0,
+          "starts": [
+            {
+              "commandList": -1,
+              "facingRadians": -0.588002622127533,
+              "index": 0,
+              "position": [
+                49.0,
+                -110.0,
+                2.799999952316284
+              ]
+            }
+          ]
+        }
+      ],
+      "volumes": [
+        {
+          "geometry": {
+            "corner": [
+              37.0,
+              -118.0,
+              -2.0
+            ],
+            "dimensions": [
+              22.0,
+              16.0,
+              8.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "extraction_return"
+        },
+        {
+          "geometry": {
+            "corner": [
+              68.0,
+              -135.0,
+              -2.0
+            ],
+            "dimensions": [
+              16.0,
+              14.0,
+              8.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "extraction_zone"
+        },
+        {
+          "geometry": {
+            "corner": [
+              46.845611572265625,
+              -89.47212219238281,
+              -1.9215710163116455
+            ],
+            "dimensions": [
+              5.0,
+              5.0,
+              6.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "be_insert"
+        },
+        {
+          "geometry": {
+            "corner": [
+              45.845611572265625,
+              -90.47212219238281,
+              -1.9215710163116455
+            ],
+            "dimensions": [
+              7.0,
+              7.0,
+              6.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "be_survivors"
+        },
+        {
+          "geometry": {
+            "corner": [
+              53.845611572265625,
+              -88.47212219238281,
+              -1.9215710163116455
+            ],
+            "dimensions": [
+              4.0,
+              4.0,
+              6.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "be_artifact"
+        },
+        {
+          "geometry": {
+            "corner": [
+              53.845611572265625,
+              -90.47212219238281,
+              -1.9215710163116455
+            ],
+            "dimensions": [
+              10.0,
+              6.0,
+              6.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "be_containment"
+        },
+        {
+          "geometry": {
+            "corner": [
+              68.0,
+              -135.0,
+              -2.0
+            ],
+            "dimensions": [
+              16.0,
+              14.0,
+              8.0
+            ],
+            "forward": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "up": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": 1,
+          "name": "be_extract"
+        }
+      ]
+    },
+    "sourceOperations": "Existing protected Preview/Accept/Restore for player, vehicle/control placements, three volumes, two command routes, pilot, two cameras and Pelican numeric flight fields. No new writer.",
+    "nativeUi": "Player ground check, handle/frame/review, Accept/Restore/reaccept/Save/reopen; five controls/pads/routes/pilot/cameras/flight accepted through actual UI. Pelican pose adopted through backend during the security prompt; player-only compile was backend-only. Coordinated compile and map export used actual UI. Final source restored after full app restart.",
+    "focusedTests": {
+      "playerCore": 3,
+      "nativeOperationCore": 21,
+      "installedCoreSkipped": 1,
+      "frontendDraftAndGuide": 21,
+      "browserFinal": 3,
+      "workbenchGuide": "pass",
+      "typescriptVite": "pass",
+      "nativeEmbeddedBuild": "pass"
+    },
+    "setupFailures": [
+      "Initial browser recipe-restriction fixture needed explicit Refresh source; corrected without weaker assertions.",
+      "Native details-content half-width layout discovered and repaired; width ratio regression added.",
+      "Restart requires reopening the saved map; initial absent-map selector wait did not change data.",
+      "Generic settings Save preserves mod destinations; export used the existing default owned mods folder. Standard verified export was subsequently retained at the recorded review path.",
+      "Verification PTY and owned app ended between goal turns; output was preserved and original hashes rechecked."
+    ],
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "limits": [
+      "Aircraft-origin coordinates follow current companion data; numeric references are not flight acceptance.",
+      "Original scenery, actors, technology, scripts/indices and five terminal roles retained.",
+      "Normal deploy/boarding, grounded up>=.95, routes, mission objectives/radio/combat/extraction/settlement and Spirit flight remain open.",
+      "Save37944 and moving/still base reflection remain open."
+    ]
   }
 }

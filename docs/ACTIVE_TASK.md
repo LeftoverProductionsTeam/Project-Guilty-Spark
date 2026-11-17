@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - complete native aircraft placement and coherent Black Echo hub repair
+Task: Operation110 - coordinated Black Echo native candidate and redesigned AI workspace
 Status: implementation incomplete
-Starting revision: 24e69f4b3423d3d24c588d19ab0901dc6a4eed8f, canonical master.
-Latest verified revision: 24e69f4 plus scoped aircraft placement in this checkpoint commit. Native mouse/source review/Restore/reaccept/Save/restart/CE609/independent readback/Open compiled PASS; core11+1skip/frontend7/browser4/build PASS. Exact source/app/cache hashes:c40 nativeAircraftPlacement20261117.
-Next action: Coordinate owned31505 hub/spawns/5role controls, Pelican/Spirit, pilot routes and return/LZ volumes using existing source review; vehicle-only[49,-80,.35] lies outside old return box and is NOT a mission fix. Compile/read back, then review current Forerunner EXE/SDL/contract before isolated gameplay. Reflection/Save37944 remain open; no push.
+Starting revision: 456fb33c150834dbaf43f71c42abd642097f2c33, canonical master.
+Latest verified revision: parent456fb33 plus current player-start/source/AI-workspace changes. Core3+21/1skip,frontend21,browser3,web/native build,Windows8sizes/Save-reopen,CE609 and independent two-tag bytes PASS. Exact app/source/cache:c40 nativePlayerHubAuthoring20261117 / aiScenarioWorkspace20261117.
+Next action: Commit verified source/UI/native milestone; retain c388d3d6 candidate, retire interrupted run-wsWoBU only after preservation. New bounded QA91709/run-0v0sq0 reuses app85c9657a without SDK/build copies. Review current Forerunner EXE+SDL/capabilities, then existing isolated solo test. No gameplay acceptance yet.
 
 ## Acceptance
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current source: existing DevicePlacement now covers vehicles, preserving complete native identity/non-pose fields and old receipt coverage. Object Tags directly opens selected instance source and retains matching drafts. Native actual-model drag/review/Restore/reaccept/Save/restart/CE compile/readback/Open compiled PASS; all5terminal roles unchanged. Fatal diagnostics24e69f4 retained. Exact hashes/checks/screenshot/limits:RUNTIME/c40.
+Current source: native PlayerStartPosition uses existing source writer/forms/gizmos/readback/Restore; recipe-owned spawns refuse overrides. AI workspace source-first redesign/compact tasks preserves every native action. Coordinated hub/roles/pads/flight routes/pilot/cameras/tuning now compile/read back; c388d3d6 retained. Fatal24e69f4/vehicle456fb33 preserved; game/37944/reflection OPEN.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -121,7 +121,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-Current: Aircraft source workflow passes; complete Black Echo hub/flight correction does not. Vehicle-only trial moves Pelican outside original return Y[-90.47212,-83.47212]; coordinate source spawn/controls/AI/routes/volumes before gameplay. Original31505/1ae5f619 preserved. Forerunner startup repair is upstream; current EXE/SDL needs explicit review. Landing up.95/boarding/terminal/objectives/settlement, gold reflection both-still/moving, Save37944 and broader acceptance OPEN.
+Current: Coordinated c388d3d6 CE609 source/independent two-tag bytes pass; actual Black Echo flight/gameplay does not. Current EXE/SDL requires explicit capability review. Grounded up.95/boarding/terminal/objectives/settlement, moving/still reflection,37944 and broader acceptance OPEN. Original31505/1ae5f619 unchanged.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
@@ -147,7 +147,7 @@ Current: Aircraft source workflow passes; complete Black Echo hub/flight correct
 
 ## Operations and safe checkpoint
 
-Current QA30370/run-4d3zQz CLOSED: owned apps/writers exited;4,491,428,948logicalB disposed, peak4,491,437,377, last allocated4,260,461,952; disposal allocation unavailable. Root absent/runs[]/issues[]. Native pose/scalars/screenshot retained in c40; trial tags/cache disposed, no archive.31505 map/1ae5f619 source unchanged. No Halo launch/SDK archive extraction/Forerunner write/push/hosted run.
+QA61647/run-wsWoBU INTERRUPTED: owner38276/app exited; no Halo launched. Verified c388d3d6 export and exact source/readback retained outside scratch before cleanup. New QA91709/run-0v0sq0 ACTIVE4GiB; app85c9657a reused, no SDK/dependency rebuild. Retire old declared scratch through existing ownership recovery only; originals/475IDs/history protected.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

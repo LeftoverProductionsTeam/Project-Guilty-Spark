@@ -149,3 +149,8 @@ it('retains existing route drafts when extending tails, while rejecting removals
  for(const list of [{...extended.list,points:[]},{...extended.list,commands:[]},{...extended.list,points:Array.from({length:65},()=>[1,2,3] as [number,number,number])},{...extended.list,commands:Array.from({length:65},()=>nativeRouteCommand(0))}])expect(nativeCommandMatches({...extended,list},source)).toBe(false);
  expect(nativeCommandMatches({...extended,original:{...view.original,name:'another'}},source)).toBe(false);expect(nativeCommandMatches(extended,{...source,protectedCommandLists:[2]})).toBe(false);expect(source.commandSource.lists[0]).toEqual(view.original);
 });
+
+it('player start handles pin their native index, facing and source without becoming an AI squad',()=>{
+ const source={...context(),scenarioPlayerStarts:[{index:2,position:[1,2,3] as [number,number,number],facingRadians:.25}],playerStartEditIssue:null};const view:NativeAiStartView={...draft(),kind:'player',encounter:-1,squad:-1,start:2,encounterName:'Player starts',squadName:'Native starting locations',originalFacingRadians:.25,facingDegrees:'14.323945'};
+ expect(nativeAiStartMatches(view,source)).toBe(true);for(const patch of [{playerStartEditIssue:'recipe-owned'},{tagSha256:'b'.repeat(64)},{scenarioPlayerStarts:[{index:2,position:[4,2,3] as [number,number,number],facingRadians:.25}]}])expect(nativeAiStartMatches(view,{...source,...patch})).toBe(false);expect(nativeAiStartMatches({...view,commandList:0},source)).toBe(false);expect(nativeAiStartMatches({...view,kind:undefined},source)).toBe(false);expect(nativeAiStartDragValues(view,view,[7,8,9],true)).toEqual(['7','8','9']);
+});

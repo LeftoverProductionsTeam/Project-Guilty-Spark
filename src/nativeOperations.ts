@@ -88,6 +88,7 @@ export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_sp
 export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];profile:import('./firefight').NativePlayerProfile}
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
 export type NativeOperation =
+  | {kind:'playerStartPosition';index:number;position:[number,number,number];facingRadians:number;sourceSha256:string}
   | {kind:'squadTerminals';terminals:NativeSquadTerminal[];sourceSha256:string}
   | {kind:'factionKits';kits:NativeFactionKit[];sourceSha256:string} | {kind:'vehicleFlight';tuning:NativeVehicleFlight;sourceSha256:string} | {kind:'appendTransport';transport:NativeTransportAppend;sourceSha256:string} | {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string}|{kind:'cutsceneFlag';point:NativeCutsceneFlag;sourceSha256:string;append?:boolean}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string;append?:boolean}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
@@ -116,6 +117,8 @@ export interface NativeTagContext {
   canAppendFactionKits?:boolean;controlSources?:string[];weaponSources?:string[];
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
+  scenarioPlayerStarts?:{index:number;position:[number,number,number];facingRadians?:number|null}[];
+  playerStartEditIssue?:string|null;
   scenarioDevices?:NativeDevicePlacement[];
   deviceEditIssue?:string|null;
   scenarioVolumes?:NativeTriggerVolume[];

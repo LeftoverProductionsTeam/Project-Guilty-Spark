@@ -3,7 +3,7 @@ import type {Vec3} from './types';
 export const NATIVE_AI_START_VIEW='world.ai-start';
 /** Window-local, unsaved coordinate proposal. Never a project object or game actor. */
 export interface NativeAiStartView {
-  kind?:'firing'|'patrol';patrol?:{source:NativeSourcePatrolRoute;route:NativeSourcePatrolRoute};originalGroup?:string;group?:string;
+  kind?:'firing'|'patrol'|'player';patrol?:{source:NativeSourcePatrolRoute;route:NativeSourcePatrolRoute};originalGroup?:string;group?:string;
   key:string;projectId:string;buildId:string;tag:string;sourceSha256:string;
   encounter:number;squad:number;start:number;encounterName:string;squadName:string;
   originalCommandList?:number;commandList?:number;original:Vec3;values:[string,string,string];originalFacingRadians?:number|null;facingDegrees?:string;mode?:'translate'|'rotate';active:boolean;focus:number;locked:boolean;reviewRequest?:number;
@@ -15,12 +15,13 @@ export function nativeAiStartPosition(values:unknown):Vec3|null {
 // A native tag's separator spelling differs between default scenario and
 // explicit tag selection. Normalize separators only, never case or segments.
 const tagPath=(tag:string)=>tag.replaceAll('\\','/');
-export function nativeAiStartKey(context:NativeTagContext,encounter?:number,squad?:number,start?:number,kind?:'firing'|'patrol'):string {
+export function nativeAiStartKey(context:NativeTagContext,encounter?:number,squad?:number,start?:number,kind?:'firing'|'patrol'|'player'):string {
   return JSON.stringify([context.projectId,context.buildId,tagPath(context.tag),context.tagSha256,encounter,squad,start,...(kind?[kind]:[])]);
 }
 export function nativeAiStartMatches(view:NativeAiStartView,context:NativeTagContext):boolean {
-  if(context.class!=='scnr'||(view.kind?context.combatEditIssue:context.startEditIssue)||view.projectId!==context.projectId||view.buildId!==context.buildId||
+  if(context.class!=='scnr'||(view.kind==='player'?context.playerStartEditIssue:view.kind?context.combatEditIssue:context.startEditIssue)||view.projectId!==context.projectId||view.buildId!==context.buildId||
     tagPath(view.tag)!==tagPath(context.tag)||view.sourceSha256!==context.tagSha256)return false;
+  if(view.kind==='player'){const point=context.scenarioPlayerStarts?.find(p=>p.index===view.start);return view.encounter===-1&&view.squad===-1&&view.encounterName==='Player starts'&&view.squadName==='Native starting locations'&&!!point&&Array.isArray(view.original)&&point.position.every((v,i)=>v===view.original[i])&&Number.isFinite(point.facingRadians)&&Number.isFinite(view.originalFacingRadians)&&nativeAiFacingClose(point.facingRadians!,view.originalFacingRadians!)&&view.originalCommandList===undefined&&view.commandList===undefined;}
   if(view.kind==='firing'){const row=context.scenarioCombat?.find(r=>r.encounter===view.encounter),point=row?.points.find(p=>p.index===view.start);return !!row&&!!point&&row.name===view.encounterName&&point.group===view.originalGroup&&view.originalFacingRadians==null&&view.facingDegrees===undefined&&!context.protectedSquadEncounters?.includes(row.name.replace(/[A-Z]/g,c=>c.toLowerCase()))&&Array.isArray(view.original)&&point.position.every((v,i)=>v===view.original[i]);}
   if(view.kind==='patrol'){
     const row=context.scenarioCombat?.find(r=>r.encounter===view.encounter),squad=row?.squads.find(s=>s.index===view.squad&&s.name===view.squadName);
