@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — native Save37944 / Black Echo handoff after seam repair
-Status: automated acceptance incomplete
+Task: Operation110 — expanded Black Echo native handoff after scoped P0/seam acceptance
+Status: implementation incomplete
 Starting revision: 54c1984cb743e80fb4a4d2d33496f958570bf1b0, canonical master.
-Latest verified revision: parent54c1984 plus scoped source;83BSP/CE609 arch+terrain compile/readback/Windows previews PASS. Actual no-SDK42-edit Save/full restart/history/7.7ms paint PASS. Recovered37944/gameplay remain OPEN. Exact hashes in existing seam/runtime evidence.
-Next action: Use existing CE mission/HUD native workflow on hash-verified read-only Forerunner be_native08389ed4; stage only its matching tags in current owned output, verify recovered42-edit Save/restart and native HUD rebuild/readback. No engine launch or Forerunner writes.
+Latest verified revision: a2af8c9 plus current scoped source: recovered CE42-edit/HUD/Save/3restarts/native readback PASS; paint9.4ms/replies10,2,2ms. Build badge browser/native PASS; core all-targets PASS. Exact source/app/map hashes in RUNTIME_INTEGRATION_20261107/c40 fixture. No gameplay acceptance.
+Next action: Resume existing combined Black Echo Pelican/Spirit/native transport recipe and reviewed source handoff in RUNTIME_INTEGRATION_20261107. Reuse native writers/SDK selectors; verify current Forerunner admission read-only and stage the expanded candidate. Broad37944, hosted CI, traversal/game/peers/platform gates stay OPEN.
 
 ## Acceptance
 
@@ -40,7 +40,7 @@ Prior recovered7-beat/native collection authoring (74c16ac) and mission source�
 
 Native flight/route milestones78c01b2/e2879a6 retain exact scoped hashes/tests/clearance limits in RUNTIME_INTEGRATION_20261107 and Git. Gameplay remains OPEN.
 
-Prior CI/setup and P0 source fixes fbcdc8d/e3f0e2d retain exact scoped evidence in RUNTIME_INTEGRATION_20261107 and Git. Hosted CI, actual Windows42-edit/full restart/Save37944 remain OPEN.
+Prior CI/setup and P0 fixes fbcdc8d/e3f0e2d retain root-cause/worker/ordering evidence in RUNTIME_INTEGRATION_20261107.17Nov current recovered Windows42-edit/Save/restart/HUD/native readback passes; broader37944 and hosted CI remain OPEN.
 
 16Nov native cinematic area: saved existing-volume activation/history/Save/restart, startup-source generation, CE compile/independent enabled+disabled readback pass in one fresh Windows run,5normal closes/0page errors. Drawer Save only staged: fixed App binding to persistent Save; browser checks all3Save entrypoints. Frontend36/core18/creative16+1skip/browser6/TypeScript/Vite/Windows pass. QA68860/run-vGibcv CLOSED:3455554819 logicalB disposed; physical reclamation unavailable. Exact failures/hashes: RUNTIME_INTEGRATION_20261107.475IDs/legacy/originals unchanged; no game/37944/full-suite claim.
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current seam/native and actual42-edit no-SDK Save/paint/restart sources/evidence: MEGAWORLD_SEAM_ROUTES_20261108,RUNTIME_INTEGRATION_20261107,existing fixtures. Shared native geometry repaired; harness handles failed startup/refusal and reuses existing mission stress routine. No new writer/manager.
+Current source: native arch geometry repair; existing native mission driver selects a distinct actual source start and reuses42-edit/paint/history checks. Build.tsx reports pending/blocked/unavailable/ready truthfully; focused browser and actual native saved-project navigation pass. Evidence: seam/runtime records and existing fixtures.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -125,7 +125,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-Current: arch/terrain compile and open in actual Windows; arch warnings remain. Terrain game start refuses installed Chupathingyc16096a8 versus reviewedfa999752; no session, guard intact. Actual edge-pick/close entrances/human travel OPEN. No-SDK42-edit/history/restart passes; recovered Save37944/hosted CI still OPEN.
+Current: named recovered42-edit/native HUD workflow PASS, broader37944 remains OPEN. Chupathingy game gate refuses installedc16096a8 versus reviewedfa999752; no bypass. Arch structural warnings and actual edge-pick/close entrances/player/Warthog/game acceptance OPEN. Expanded dropship/Forerunner gameplay, hosted CI and full product remain unaccepted.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
@@ -151,7 +151,7 @@ Current: arch/terrain compile and open in actual Windows; arch warnings remain. 
 
 ## Operations and safe checkpoint
 
-Current parent54c1984: live QA Node26367/run-aVu7Oz owns12GiB-bounded external output. All current tests terminal: terrain UI4cases/native compile pass, game gate FAILS pin; compiled-preview3PASS; no-SDK Save and paint runsPASS. Reuse this owner/prepared tags/app for recovered CE mission; clean only after all writers exit. Forerunner input08389ed4 is read-only.
+Current a2af8c9 + scoped delta: QA Node26367/run-aVu7Oz CLOSED. All writers exited;5,277,334,844logical bytes disposed,peak5,321,689,666,last allocation5,032,051,032; exact disposal allocation unavailable. Root absent,runs[]/issues[]. Raw2353tags,Forerunner08389ed4,5Halo inputs,475CSV,legacy checkpoint/stashes unchanged. Source/app/output hashes and limits in existing runtime/seam fixtures. No game/push.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

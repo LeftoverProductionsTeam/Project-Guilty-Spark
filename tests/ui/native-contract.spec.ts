@@ -5205,3 +5205,23 @@ test('native ground repair rejects invalid heights and late replies after switch
  await page.evaluate(()=>{const m=(window as any).__sparkMock;m.geometryWrongGround=false;m.geometryDeferred=true;});await check.click();await expect.poll(()=>page.evaluate(()=>typeof (window as any).__sparkMock.finishGeometry)).toBe('function');const route=form.getByRole('combobox',{name:'Native command source list',exact:true});await revealPagedControl(route);await route.selectOption('1');await page.evaluate(()=>(window as any).__sparkMock.finishGeometry());await expect(check).toBeEnabled();await expect(results).toHaveCount(0);await expect(form.getByRole('spinbutton',{name:'Command point Z',exact:true})).toHaveValue('1');
  await revealPagedControl(check);await check.click();const ground=form.getByRole('button',{name:'Use ground for point 0 · BSP 0 · Z 0',exact:true});await revealPagedControl(ground);await ground.click();const preview=form.getByRole('button',{name:'Preview command list',exact:true});await revealPagedControl(preview);await preview.click();expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1))).toMatchObject({list:{index:1,name:'pilot_return',points:[[0,0,0],[4,0,2]]}});expect(await page.evaluate(()=>(window as any).__sparkMock.commandLists[0].points)).toEqual([[0,0,1],[4,0,2]]);
 });
+
+
+test('build badge distinguishes pending, blocked and unavailable checks',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,state=w.__buildBadge={mode:'held',release:null};
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command!=='compatibility')return invoke(command,args);
+   if(state.mode==='unavailable')throw Error('Synthetic build check unavailable');
+   const report={target:'Synthetic MCC',pipeline:'Synthetic source check',ready:state.mode!=='blocked',blockers:state.mode==='blocked'?['Synthetic missing source dependency']:[],warnings:[],bitmapDependencies:null};
+   if(state.mode==='held')return new Promise(resolve=>state.release=()=>resolve(report));
+   return report;
+  };
+ });
+ await openFixture(page);await chooseTool(page,'Build & playtest');const target=page.locator('.build-target');const build=page.getByRole('button',{name:'Convert map to MCC',exact:true});
+ await expect(target).toContainText('Checking build inputs…');await expect(target).not.toContainText('Dependencies required');await expect(build).toBeDisabled();
+ await expect.poll(()=>page.evaluate(()=>!!(window as any).__buildBadge.release)).toBe(true);await page.evaluate(()=>{const s=(window as any).__buildBadge;s.mode='ready';s.release();});await expect(target).toContainText('Ready to build');await expect(build).toBeEnabled();
+ await page.evaluate(()=>(window as any).__buildBadge.mode='blocked');await page.getByRole('button',{name:'Refresh checks',exact:true}).click();await expect(target).toContainText('Build blocked');await expect(page.locator('.compatibility')).toContainText('Synthetic missing source dependency');await expect(build).toBeDisabled();
+ await page.evaluate(()=>(window as any).__buildBadge.mode='unavailable');await page.getByRole('button',{name:'Refresh checks',exact:true}).click();await expect(target).toContainText('Build checks unavailable');await expect(page.locator('.build-page')).toContainText('Synthetic build check unavailable');await expect(build).toBeDisabled();
+ await page.evaluate(()=>(window as any).__buildBadge.mode='ready');await page.getByRole('button',{name:'Refresh checks',exact:true}).click();await expect(target).toContainText('Ready to build');await expect(build).toBeEnabled();
+});

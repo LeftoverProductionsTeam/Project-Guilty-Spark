@@ -751,7 +751,8 @@
     "humanTraversal": false,
     "realPeers": false,
     "streaming": false,
-    "sourceTransformsUnchangedFromPriorAuthoredFixture": true
+    "sourceTransformsUnchangedFromPriorAuthoredFixture": true,
+    "qaDisposalRef": "c40-native-save-integrity.json#qaDisposal20261117"
   },
   "terrainRegression20261117": {
     "parentRevision": "54c1984cb743e80fb4a4d2d33496f958570bf1b0",
@@ -854,6 +855,7 @@
       "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041"
     },
     "gameplayAccepted": false,
-    "fullRestartAccepted": false
+    "fullRestartAccepted": false,
+    "qaDisposalRef": "c40-native-save-integrity.json#qaDisposal20261117"
   }
 }

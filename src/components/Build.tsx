@@ -187,8 +187,8 @@ export default function Build({
                 <h2>{ceTarget?`Halo 1 · ${targetName}`:"Halo 1 · The Master Chief Collection"}</h2>
                 <p>Cache version {ceTarget?609:13} · {report?.pipeline??'Verified extraction and target compilation'}</p>
               </div>
-              <Pill tone={report?.ready ? 'green' : 'amber'}>
-                {report?.ready ? 'Ready to build' : 'Dependencies required'}
+              <Pill tone={checking ? '' : report?.ready ? 'green' : 'amber'}>
+                {checking ? 'Checking build inputs…' : report?.ready ? 'Ready to build' : report ? 'Build blocked' : 'Build checks unavailable'}
               </Pill>
             </div>
             <div className="build-steps">

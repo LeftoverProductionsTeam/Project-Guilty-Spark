@@ -177,5 +177,240 @@
     "recoveredNativeMissionAcceptance": false,
     "save37944RootCauseAccepted": false,
     "harnessSha256": "464dbdaef02227caccc0e4dcec18670119db3182be95a4e6e05f804f2f3ff84e"
+  },
+  "recoveredMission20261117": {
+    "parentRevision": "a2af8c966261c3a8dd17f5db224391ac6e9e2807",
+    "complete": true,
+    "mockedIpc": false,
+    "errors": [],
+    "normalCloses": 3,
+    "appSha256": "a084779c28372f9ad0832ff90818d723e5bbc21c4b1f4992a6d33bd5e8a4da7a",
+    "inputMapSha256": "08389ed43814960ddfdfcb401746f277f6a038e2e413e2a26ac8339703cec514",
+    "matchingTagCount": 2353,
+    "matchingTagsRehashedUnchanged": 2353,
+    "extractWarnings": "2 reported singleplayer Pistol weapon/damage reconstruction warnings; original cache unchanged",
+    "baselineSha256": "f0a1d4fd9e8cc25b4d9db7ddce8b882760179f52dc98b33ada8e04ed255259ed",
+    "initialFixtureFailure": {
+      "stage": "select CE source target",
+      "reason": "Old Covenant destination already equals Flood start; strict no-op assertion refused before editing",
+      "originalFailurePreserved": true
+    },
+    "nativeAi": {
+      "before": [
+        58.84561,
+        -89.47212,
+        0.078429
+      ],
+      "proposed": [
+        59.84561,
+        -85.47212,
+        0.078429
+      ],
+      "actualSourceBinding": {
+        "encounter": 3,
+        "squad": 0,
+        "encounterName": "be_defense",
+        "start": 0
+      },
+      "acceptedTagSha256": "9da7ffa156bcfd5d44b55d6363a986302095c74d743b07e56947f10073842c92",
+      "compiledPosition": [
+        59.845612,
+        -85.472122,
+        0.078429
+      ]
+    },
+    "hud": {
+      "messages": [
+        {
+          "name": "gs_mission_obj_1",
+          "text": "Use the deployment terminal to begin Operation Black Echo."
+        },
+        {
+          "name": "gs_mission_obj_2",
+          "text": "Reach the Marines and eliminate the facility defenders."
+        },
+        {
+          "name": "gs_mission_obj_3",
+          "text": "Recover the classified technology. Keep the Marines alive."
+        },
+        {
+          "name": "gs_mission_obj_4",
+          "text": "Contain the Flood outbreak before evacuation."
+        },
+        {
+          "name": "gs_mission_obj_5",
+          "text": "Defend the extraction point."
+        },
+        {
+          "name": "gs_mission_obj_6",
+          "text": "Activate extraction and return all survivors to the hub."
+        },
+        {
+          "name": "gs_mission_obj_7",
+          "text": "Equipment banked. Survivors extracted. Redeployment is available."
+        }
+      ],
+      "objectiveUndoRedo": true,
+      "rapidFieldEdits": 42,
+      "compactBeatList": [
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        },
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        },
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        },
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        },
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        },
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        },
+        {
+          "height": 36,
+          "width": 1423,
+          "scrollWidth": 1423
+        }
+      ],
+      "nativeCommandLatencyMs": [
+        10,
+        2,
+        2
+      ],
+      "saveSettled": "fulfilled",
+      "recoverySave": true,
+      "nativePaint": {
+        "ran": true,
+        "milliseconds": 9.400000005960464
+      },
+      "compactPanel": {
+        "height": 129,
+        "width": 1405,
+        "clientWidth": 1405,
+        "scrollWidth": 1405,
+        "checkboxes": 3
+      },
+      "objectiveSaveRestart": true,
+      "compactExpansionRestart": true,
+      "reviewedNativeUi": true,
+      "nativeTagSha256": "692b50ec2367447847b2cf621ea61907dc0dffde41c1f2f7b90a8553f5cc43d2",
+      "compiledIndependentReadback": true,
+      "compiledSaveRestart": true
+    },
+    "scriptDraftSha256": "9ea6080e04dca3d46fb7f49539e39e859638ed0609f78c8aa78dbd45c910f76d",
+    "compiledMap": {
+      "sha256": "49ff017d702b2e37522d4a8e8d4b680396d2c6a3055f081f6609684dcc6e6da5",
+      "bytes": 106369592,
+      "scenarioSha256": "a9f7cf5445eb7d260ea348bccd00d665905a8e5bca6750696cc15a85ba2de70c",
+      "recoveredHscSha256": "efbc3b12674dc8471a79e62bc3a3fc93c2a7a138978620184819871bafedca8e",
+      "target": "gbx-custom",
+      "cacheVersion": 609,
+      "scenarioType": "singleplayer"
+    },
+    "readinessWindowDispatch": {
+      "calls": 73,
+      "totalMs": 0,
+      "scope": "Dispatch only; worker cost is not zero"
+    },
+    "warnings": [
+      "WARNING: Bitmap 'effects\\particles\\solid\\bitmaps\\wood chips.bitmap' uses",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING (minor): Part #0 of event #0 contains a null sound tag reference. The",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING: Model with LoDs does not have any LoD cutoffs set",
+      "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+      "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+      "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+      "WARNING: HUDGlobals::anniversary_hud_remaps exceeds the legacy stock limit of 0",
+      "Built successfully with 14 warnings"
+    ],
+    "sourceAndPreviousGoodUnchanged": true,
+    "named42EditFreezeRegressionAccepted": true,
+    "broaderSave37944Accepted": false,
+    "gameplayVerified": false,
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-hud-20261117.png",
+        "bytes": 141392,
+        "sha256": "94c7a9b99ab9575bcd662f1f3dac551bd39b823fced7cffd94b62ddda955a94d"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-build-before-20261117.png",
+        "bytes": 203416,
+        "sha256": "06ad0692e526b1faca8c6ff593e7e2c6e76ff5e732d1a7c294886d817c71b846"
+      }
+    ],
+    "logHashes": {
+      "ce-mission-extract.log": "645484f146806afb269d90f811b00cc4b82e126b81c2e1cdf6968d1611cc34be",
+      "ce-hud-native/acceptance.json": "e012ca2fb17df1659366378a5f5017122c4060e9218b67c2af2b8d0b99ac76b5",
+      "ce-hud-distinct/acceptance.json": "6e47a02ecc51a1dbf9168ac69354dd3feea03c0f639bdc4f0da122665fbae645",
+      "build-badge-browser.log": "9dfbb442357a16bc290a292c9873c8b2d59a0b3700112d02ff615bcae18468b0",
+      "build-badge-browser-fixed.log": "ac3ee8e31d0d8e1e84340d91edf9bbcce0726ba7ee8d22c5552203b7f056a59c",
+      "build-badge-native-app.log": "5d7805989eb2ebcf44e4c69f3e190c3fb4af6033769320a869a9dcd660bb68d6",
+      "native-build-status/acceptance.json": "c153d258338e7f377c823141e21ee40b3271994b60ba64f3f0d3bab7baaa0fce",
+      "ce-hud-distinct/native-ipc-0.log": "25c2ceef773fae8dcb6a8a6bcf06517f7d1faa3608304bd0a77841a7219a344c",
+      "ce-hud-distinct/native-ipc-1.log": "1452a18af69227e29ba0145bc78033a79a438279e22de308822a8ecfc57f177a",
+      "ce-hud-distinct/native-ipc-2.log": "4ad65c6ebfdc7ab50f53c09a02a83d2db0077e7d07e6fde0003b8639db23eb14"
+    },
+    "currentHarnessSha256": "189d2b2b6ac44ea84c97d75a30a9ba9e3d812affaa4af2becdb80f8a60f18d04",
+    "coreAllTargets": {
+      "command": "cargo check --offline -p spark-core --all-targets",
+      "exitCode": 0,
+      "logSha256": "45039d02c51e03d6c622df39c1f7da290e0afdc56f340b28a39529fc0e4e0111"
+    }
+  },
+  "buildBadge20261117": {
+    "complete": true,
+    "mockedIpc": false,
+    "errors": [],
+    "appSha256": "0d390a68e2ded8d19d387768c5f1eb329756f037219853789855848c882f0792",
+    "initialTarget": "BUILD TARGET\nHalo 1 · Chupathingy\n\nCache version 609 · Verified extraction and target compilation\n\nChecking build inputs…\n1\nInspect source\n2\nExtract tags\n3\nBuild Chupathingy cache\n4\nValidate output",
+    "readyTarget": "BUILD TARGET\nHalo 1 · Chupathingy\n\nCache version 609 · Reviewed matching CE tags → isolated source/module staging → Invader CE build → independent cache/CRC/signature readback\n\nReady to build\n1\nInspect source\n2\nExtract tags\n3\nBuild Chupathingy cache\n4\nValidate output",
+    "savedSourceAndBuildsUnchanged": true,
+    "gracefulAppClose": true,
+    "appBytes": 67671552,
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-black-echo-build-ready-20261117.png",
+        "bytes": 242760,
+        "sha256": "97829b2dffe5b3905466fa3168df2a3c714910fb8ba78d4432da1b6f1afb0a26"
+      }
+    ],
+    "browser": "Pending/ready/blocked/unavailable/recovery and enabled/disabled states PASS; first missing synthetic compatibility fixture failed then corrected without changing assertions",
+    "nativeScope": "Actual saved CE mission navigation, pending status, backend ready status, enabled Build button and unchanged source/draft/builds; normal close. No native rebuild repeated."
+  },
+  "qaDisposal20261117": {
+    "workflow": "arch-native-geometry-repair",
+    "temporaryOutputDisposed": true,
+    "disposedLogicalBytes": 5277334844,
+    "disposedAllocatedFileBytes": null,
+    "peakLogicalBytes": 5321689666,
+    "lastAllocatedBytes": 5032051032,
+    "runRemoved": true,
+    "runs": [],
+    "issues": [],
+    "scope": "Shared bounded owner for arch, terrain, Windows preview, recovered CE mission and build-status checks; no exact physical-reclamation claim"
   }
 }
