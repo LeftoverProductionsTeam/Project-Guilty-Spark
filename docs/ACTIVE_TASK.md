@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — recovered mission radio reconnect/native rebuild
+Task: Operation110 — native mission route/AI ground repair
 Status: implementation incomplete
-Starting revision: 0b57e8caf3060d8ef9334a2584f5e9df96ddcd92, canonical master.
-Latest verified revision: parent0b57e8caf3060d8ef9334a2584f5e9df96ddcd92; radio source/browser/production CE609 compile/readback verified in this checkpoint commit. Windows/game gates OPEN.
-Next action: integrate recovered radio into the complete Pelican/Spirit Black Echo candidate handoff; inspect native route/landing/seat readiness and repair actionable source diagnostics. Desktop/game/37944 remain OPEN; advance independent creator work when blocked.
+Starting revision: 4339020e816691f3102b82dd359a83bc0af68b13, canonical master.
+Latest verified revision: parent4339020e816691f3102b82dd359a83bc0af68b13; ground repair source/browser/Windows compilation/CE609 readback verified in this checkpoint commit. Game gates OPEN.
+Next action: assemble the complete Pelican/Spirit Black Echo handoff with recovered radio and collision-derived routes; close remaining native dependency/source diagnostics. Actual Windows/game/37944 remains OPEN; advance independent creator work if blocked.
 
 ## Acceptance
 
@@ -16,9 +16,9 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov radio (parent0b57e8c): exact recovered snd! reconnect → retained timing/caption → pending Save/history/reopen → reviewed native revision → production CE609 rebuild/sample readback PASS. Frontend72/browser3/types-Vite/core/native1 PASS;5sample hashes retained, conflicting edit refuses. Exact failures/hashes/QA disposal: RUNTIME_INTEGRATION_20261107. Windows/audio/game acceptance OPEN.
+17Nov ground repair (parent4339020): bounded compiled-BSP ground → route/AI draft → review/Restore/Save/reopen → CE609 compile/readback PASS. Frontend21/core10/browser5distinct/final ground2/types-Vite/Windows check/native1 PASS. Actual sloped floor0.046889074 replaces assumed source height;5radio hashes retained. Exact hashes/failures/QA disposal: RUNTIME_INTEGRATION_20261107. Windows/game acceptance OPEN.
 
-17Nov recovered0b57e8c/attachedaa7c7f3 retain full review/adoption/history/source/native proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
+17Nov radio4339020/recovered0b57e8c/attachedaa7c7f3 retain scoped source/browser/native proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
 
 17Nov first insertion (parent234b6bb): UI/history/Save/reopen → exact generated transport ownership → shared escort without duplicate spawn → Pelican/Spirit CE609 compile/independent extracted scenario/actor/seat/latch readback PASS. Frontend72/guide4/creative23+1skip/transport5/browser12distinct+final8/web/Windows all-target PASS. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 

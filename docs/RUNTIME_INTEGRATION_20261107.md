@@ -1970,3 +1970,94 @@ Exact SHA-256 evidence:
 
 QA71874/run-ZBJtig CLOSED: {"workflow":"recovered-radio-reconnect","temporaryOutputDisposed":true,"disposedLogicalBytes":527619490,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1203321648,"allocatedBytes":492495096,"monitoringSamples":95,"monitoringMs":27694.76960000009,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62102800,"peakLogicalBytes":62102800,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
 Owned root absent, all writers exited, development runs[]/issues[]. Disposal allocation was unavailable; logical/last-measured/peak values above are distinct and do not establish physical reclamation. No retained compiler cache, map candidate or SDK duplicate.
+
+
+## 17 November — native route and AI ground repair (parent4339020)
+
+The existing compiled-BSP checker now optionally finds the closest upward-facing ground below each source point, with an explicit0.5–64world-unit bound. The same BVH/triangle floor calculation is reused; its original standing-capsule limits are unchanged. Existing nearby-surface ±0.5 and collision-space membership remain separate. No new physics, source writer, manager or asset pipeline. Native RPC retains selected build/scenario/output hashes, source lock/idle checks and final source/project revalidation. UI rejects invalid/above/out-of-range results and pins route/AI identity, coordinates, manual BSP and range; even equal-coordinate route switches invalidate delayed results.
+
+Existing AI command lists and AI starting/firing positions expose Find ground below points, Maximum ground search drop and explicit Use ground for point/BSP/Z candidates. Selection changes only draft Z, preserving X/Y, command data, indices and BSP assignment. Preview/Accept/Native Restore/Save/build remain the source writer/history route. Recipe-owned source remains protected; unaccepted drafts stay transient. The How To route was corrected from nonexistent Native source controls to the actual AI & scenario/Invader/Map scenario controls.
+
+Focused frontend21PASS, final catalog4PASS (repeat subset, not25distinct), core geometry10PASS, TypeScript/Vite and actual Windows application-source cargo check --bin GuiltySpark PASS49.26s. Browser4distinct geometry/AI/ground journeys PASS; final2ground rerun PASS, recovered-radio producer1PASS. Minimum800x600 ground controls client728/scroll728. Mouse/keyboard ground selection, bounded no-ground result, retained original source until review, Accept/Restore/reaccept, Save/reopen, AI proposal, invalid-height refusal and delayed equal-coordinate selection ownership all pass in synthetic IPC. This is not native Windows process restart or gameplay.
+
+Installed native integration1PASS120.26s: real protected CE609 BSP query → exact source-coordinate repair using existing native operations → compile → independent scenario/route/surface/actor/script/HUD readback → production recovered radio rebuild. Original actor/index/source data is preserved except the explicitly reviewed Flood start and appended authoring data; five radio permutation hashes remain exact and conflicting edited tags still refuse while keeping the prior-good output. Both aircraft remain present; static geometry/source checks do not prove physical flight/boarding. The source firing point atZ0.078429 was a nearby anchor, not the exact floor; the actual collision floor isZ0.046889074. Both the bounded downward query and the existing nearby-surface query independently agree, and compiled coordinates verify the chosen value.
+
+Initial failures: the first UI assertion expected old sourceSHAa after reaccept, while source correctly advanced toSHAb; corrected the fixture expectation and retained exact identity checks. The first Windows command incorrectly requested a nonexistent lib target; corrected to the actual GuiltySpark binary target, with no source/validation change. Native initial/diagnostic runs captured the false exact-height assumption about the floating authored anchor; the fixture now asserts the measured golden floor plus agreement with the existing surface query, writes that actual height and independently verifies native output. No compiler/ownership/geometry check was relaxed. Existing SDK texture/compression/LoD/sound/effect/HUD warnings remain visible.
+
+Full native Windows42-edit/37944/Save/full restart, rendered actor origin/clearance, actual route navigation/landing/flight, expanded Forerunner mission and peers remain OPEN under the recorded Computer Use initialization failure. No unchanged control retry, engine launch, Forerunner write, dependency download, new app executable/release, archive, push or publication. testExe below is the Rust test harness only.
+
+Exact SHA-256/coordinate evidence:
+```json
+{
+  "parentRevision": "4339020e816691f3102b82dd359a83bc0af68b13",
+  "initialCache": "ab354d88ea93bbd135c086d43d175aee578b581e298521cc2062c76d834e5a6c",
+  "productionParent": "4485e93d7700cd60bfcad05d52b11edd0ec541754665c72de987612607c21017",
+  "productionRevised": "ae0d59b924ffb69d5c84a4637b7f3e22072d73197e325cfff4410fda7bac7bf6",
+  "missionSource": "de4a242edbaa9ca2825b1ecdc85bb6ada72c0981cca29fed08ddb13cf37d60a2",
+  "revisedScenario": "a1563d989ac5e361110d3c65bbef4fa48bde7f27f78bc5e7204cdade2dbe3667",
+  "retainedRadioPermutations": 5,
+  "ground": [
+    {
+      "point": [
+        58.84561,
+        -89.47212,
+        1
+      ],
+      "bsps": [
+        0
+      ],
+      "nearPartition": false,
+      "supports": [],
+      "ground": [
+        {
+          "bsp": 0,
+          "z": 0.046889074
+        }
+      ]
+    },
+    {
+      "point": [
+        58.84561,
+        -89.47212,
+        8.078429
+      ],
+      "bsps": [
+        0
+      ],
+      "nearPartition": false,
+      "supports": [],
+      "ground": [
+        {
+          "bsp": 0,
+          "z": 0.046889074
+        }
+      ]
+    }
+  ],
+  "browserLayout": {
+    "client": 728,
+    "scroll": 728
+  },
+  "testExe": "025eeb3298b1b3a3a192673b976fbc761c8443a2ba29409ae2b86ae0d0feb314",
+  "logs": {
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "units.log": "17e1d78f03c815868e5ccf7408fc4a14f957a6d73d9826139976a14ac048f656",
+    "browser.log": "c129c22e71ed18434c43a46d7a74b637650c304670862030e62a44e0213ec7b4",
+    "browser2.log": "327a244e9e0e22c054c42ef8c0f13b53f2c670799905e21d0e239cf709a91131",
+    "browser-final.log": "7e4c7bccf0152b92eeeb6c3bf8f627d10593cb85b3e17d8f84e1aa34986af223",
+    "core.log": "0279f0d9afccec42c2e1f1ed11bfcc7d9b369d1e887f46d86949eb101df1a51e",
+    "windows-check.log": "cf3afa58e2f98f7a7e6e87bd2fb6922bd7c0b88953a2aa80218ba9e865fe0284",
+    "windows2.log": "e45b4184178fb1aa03e949e026c3f2b78eb4fdfbe55138c41f8e3916d1885ac2",
+    "mission-ui.log": "649047c07facd9659b87f99373fb28472c730b631f9ab91ba0e1d0ec6626237d",
+    "native.log": "1b0155931b39f7d4d590b64ed2a07883a146de92d8923f8b68aa15d103cb7849",
+    "native-diagnostic.log": "b07e32d3e77a84a69f763bc43153dc8c95a0a61eba846446b1b3b99f11be1f6e",
+    "native2.log": "e4b420d851a1daa72c8e62c4d8ab520b576276b4b2e5b53411854f940dacdf13",
+    "guides.log": "e040c08034ece8da6e409eed577b0c47884fddc5450cb30ad0d3da816c067c93",
+    "types-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "web.log": "5fb7089cbd27e283ebf063310732c42da871f7fd32faf168a28dfd5cccc78a01"
+  }
+}
+```
+
+QA76192/run-B4X974 CLOSED: {"workflow":"native-ground-authoring","temporaryOutputDisposed":true,"disposedLogicalBytes":1514176509,"disposedAllocatedFileBytes":null,"peakLogicalBytes":2189878558,"allocatedBytes":1385880424,"monitoringSamples":90,"monitoringMs":32388.945500000133,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62129542,"peakLogicalBytes":62129542,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Owned root absent, all writers exited, development runs[]/issues[]. Disposal allocation is reported only where measured; no physical-reclamation claim, retained map/SDK/compiler cache or archive. Protected475CSV/legacy checkpoint/original map/scenario hashes and stashes remain unchanged.

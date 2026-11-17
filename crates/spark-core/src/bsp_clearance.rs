@@ -114,10 +114,13 @@ impl Index {
         Ok(Self { triangles, planes, root })
     }
     fn floor(&self, at: V, scratch: &mut Vec<usize>) -> Option<f64> {
+        self.floor_in_range(at,scratch,2.,0.12)
+    }
+    fn floor_in_range(&self,at:V,scratch:&mut Vec<usize>,drop:f64,rise:f64)->Option<f64>{
         scratch.clear();
         self.root.query(
-            [at[0] - 1e-5, at[1] - 1e-5, at[2] - 2.],
-            [at[0] + 1e-5, at[1] + 1e-5, at[2] + 0.12],
+            [at[0] - 1e-5, at[1] - 1e-5, at[2] - drop],
+            [at[0] + 1e-5, at[1] + 1e-5, at[2] + rise],
             scratch,
         );
         let mut best: Option<f64> = None;
@@ -129,7 +132,7 @@ impl Index {
                 continue;
             }
             let z = p[0][2] - (n[0] * (at[0] - p[0][0]) + n[1] * (at[1] - p[0][1])) / n[2];
-            if z > at[2] + 0.12 || z < at[2] - 2. {
+            if z > at[2] + rise || z < at[2] - drop {
                 continue;
             }
             let test = [at[0], at[1], z];
@@ -258,6 +261,12 @@ impl RouteChecker {
     /// Independent triangle projection for native ground-bound waypoint review.
     /// The compiler remains authoritative for collision-surface/cluster binding.
     pub(crate) fn native_surface_z(&self,point:[f32;3])->Option<f32>{self.index.nearby_surface(point.map(f64::from),0.5).map(|z|z as f32)}
+    /// Closest upward-facing ground below the requested point, never an upward
+    /// teleport or an assertion of native navigation/vehicle clearance.
+    pub(crate) fn native_ground_z(&self,point:[f32;3],drop:f32)->Option<f32>{
+        if !drop.is_finite()||!(0.5..=64.).contains(&drop)||point.iter().any(|v|!v.is_finite()||v.abs()>1e6){return None;}
+        self.index.floor_in_range(point.map(f64::from),&mut vec![],f64::from(drop),0.).map(|z|z as f32)
+    }
     /// Static standing-capsule check, not a native movement/scenery test.
     pub(crate) fn verify_start(&self, position: V) -> Result<f64> {
         if position.iter().any(|v| !v.is_finite() || v.abs() > 4096.) {
@@ -444,6 +453,21 @@ mod tests {
         for z in [-0.25f32,0.,0.25,0.5]{assert_eq!(checker.native_surface_z([5.,0.,z]),Some(0.));}
         assert_eq!(checker.native_surface_z([5.,0.,0.5001]),None);assert_eq!(checker.native_surface_z([11.,0.,0.]),None);
         assert!(checker.verify_start([5.,0.,0.5]).is_err());
+    }
+    #[test]
+    fn ground_projection_is_bounded_downward_up_facing_and_selects_the_nearest_floor(){
+        let mut mesh=corridor(2.,10.);
+        let checker=RouteChecker::new(&mesh).unwrap();
+        assert_eq!(checker.native_ground_z([5.,0.,8.],16.),Some(0.));
+        assert_eq!(checker.native_ground_z([5.,0.,8.],7.),None);
+        assert_eq!(checker.native_ground_z([5.,0.,-0.01],16.),None);
+        assert_eq!(checker.native_ground_z([11.,0.,8.],16.),None);
+        for drop in [0.,0.49,64.01,f32::NAN,f32::INFINITY]{assert_eq!(checker.native_ground_z([5.,0.,8.],drop),None);}
+        quad(&mut mesh,[[0.,-1.,4.],[10.,-1.,4.],[10.,1.,4.],[0.,1.,4.]]);
+        let checker=RouteChecker::new(&mesh).unwrap();
+        assert_eq!(checker.native_ground_z([5.,0.,8.],16.),Some(4.));
+        assert_eq!(checker.native_ground_z([5.,0.,3.],16.),Some(0.));
+        assert_eq!(checker.native_ground_z([5.,0.,4.],0.5),Some(4.));
     }
     #[test]
     fn starting_capsules_require_close_floor_and_clear_body_not_just_a_valid_coordinate() {

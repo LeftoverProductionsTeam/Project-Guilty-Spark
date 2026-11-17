@@ -1723,7 +1723,7 @@ fn source_active_surfaces(r:&Reader,space:&Space,root:usize,surfaces:usize)->Res
 /// ground contact, pathfinding or gameplay. Standard format: c20 sbsp BSP3D fields.
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct BspPointLocation {pub point:[f32;3],pub bsps:Vec<u16>,pub near_partition:bool,pub supports:Vec<BspPointSupport>}
+pub struct BspPointLocation {pub point:[f32;3],pub bsps:Vec<u16>,pub near_partition:bool,pub supports:Vec<BspPointSupport>,pub ground:Vec<BspPointSupport>}
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct BspPointSupport {pub bsp:u16,pub z:f32}
@@ -1745,14 +1745,15 @@ fn collision_leaf_at(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&mut
  }
  invalid("Compiled BSP tree is cyclic or exceeds the supported traversal depth")
 }
-pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]])->Result<Vec<BspPointLocation>>{
+pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]],ground_drop:Option<f32>)->Result<Vec<BspPointLocation>>{
+ if ground_drop.is_some_and(|value|!value.is_finite()||!(0.5..=64.).contains(&value)){return invalid("Ground search needs a finite downward distance from0.5to64 world units");}
  if points.is_empty()||points.len()>1024||points.iter().flatten().any(|v|!v.is_finite()||v.abs()>1e6){return invalid("Review needs1–1024 finite native BSP points within supported bounds");}
  let(header,bytes,hash)=read_cache_snapshot_shared(path)?;if hash!=inspection.sha256{return invalid("Compiled map changed after BSP inspection");}
  let r=Reader(&bytes);let space=cache_tag_space(&r,&header)?;
  let scenarios=inspection.tags.iter().filter(|tag|tag.class=="scnr"&&tag.path==inspection.scenario_path).collect::<Vec<_>>();
  if scenarios.len()!=1{return invalid("Compiled scenario is missing or ambiguous");}let sc=scenarios[0].data_offset.ok_or_else(||SparkError::Invalid("Compiled scenario data is unavailable".into()))? as usize;
  let(table,count)=space.block(&r,sc+0x5a4,32,16)?;if count==0{return invalid("Compiled scenario has no structure BSP");}
- let mut rows=points.iter().map(|point|BspPointLocation{point:*point,bsps:vec![],near_partition:false,supports:vec![]}).collect::<Vec<_>>();let mut budget=1_000_000usize;
+ let mut rows=points.iter().map(|point|BspPointLocation{point:*point,bsps:vec![],near_partition:false,supports:vec![],ground:vec![]}).collect::<Vec<_>>();let mut budget=1_000_000usize;
  let(mesh,_)=collision_snapshot(&header,&bytes,inspection)?;
  for index in 0..count{
   let entry=table+index*32;let begin=r.u32(entry)? as usize;let size=r.u32(entry+4)? as usize;r.bytes(begin,size)?;
@@ -1760,7 +1761,10 @@ pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]
   let(blocks,n)=bsp_space.block(&r,bsp+0xb0,96,16)?;if n!=1{return invalid("Point membership requires one standard collision tree per native BSP");}
   let part=mesh.parts.get(index).ok_or_else(||SparkError::Invalid("Compiled BSP collision part is unavailable".into()))?;
   let selected=MeshData{positions:mesh.positions.clone(),indices:mesh.indices[part.index_start..part.index_start+part.index_count].to_vec(),..Default::default()};let checker=crate::bsp_clearance::RouteChecker::new(&selected)?;
-  for row in &mut rows{if let Some(z)=checker.native_surface_z(row.point){row.supports.push(BspPointSupport{bsp:index as u16,z});}}
+  for row in &mut rows{
+   if let Some(z)=checker.native_surface_z(row.point){row.supports.push(BspPointSupport{bsp:index as u16,z});}
+   if let Some(z)=ground_drop.and_then(|drop|checker.native_ground_z(row.point,drop)){row.ground.push(BspPointSupport{bsp:index as u16,z});}
+  }
   for row in &mut rows{let(inside,near)=collision_leaf_at(&r,&bsp_space,blocks,row.point,&mut budget)?;if inside{row.bsps.push(index as u16);}row.near_partition|=near;}
  }
  Ok(rows)
