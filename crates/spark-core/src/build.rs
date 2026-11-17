@@ -843,7 +843,10 @@ fn ce_source_preflight(project:&Project,inspection:&MapInspection,tools:&Toolcha
 fn run_ce_source_build(project:&Project,inspection:&MapInspection,tools:&Toolchain,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{
     ce_source_preflight(project,inspection,tools)?;
     let source=project.source.as_ref().unwrap();if maps::hash_file(&source.preserved_path)?!=source.sha256{return invalid("Preserved CE source changed before compilation");}
-    let base=tools.base_tags_directory.as_ref().unwrap();let all=crate::native_staging::inventory(base,&cancel)?;
+    // Preserve Windows' canonical verbatim spelling for Invader. Ordinary paths
+    // can make existing nested imported tags appear BROKEN beyond MAX_PATH.
+    let canonical_base=fs::canonicalize(tools.base_tags_directory.as_ref().unwrap())?;
+    let base=&canonical_base;let all=crate::native_staging::inventory(base,&cancel)?;
     let runner=Runner{id,project:&project.id,cancel:&cancel,event:&event};
     let dependency=tool_path(tools,"invader-dependency").unwrap();let dependency_sha256=maps::hash_file(&dependency)?;
     let mut roots=std::collections::BTreeSet::from([format!("{}.scenario",inspection.scenario_path).replace('\\',"/"),"globals/globals.globals".into()]);
@@ -859,8 +862,9 @@ fn run_ce_source_build(project:&Project,inspection:&MapInspection,tools:&Toolcha
     let recheck=||->Result<()>{for (_, (file,hash)) in &executables {if maps::hash_file(file)?!=*hash{return invalid("Native CE tool changed during build");}}Ok(())};
     let result=(||->Result<(PathBuf,String)>{
         let tags=dir.join("tags");let hashes=crate::native_staging::copy(base,&tags,&inventory,&cancel,|done,total,_,_|{if done==total{runner.emit("stage",format!("Prepared {total} matching native CE tags; originals unchanged"),20,"info");}})?;
+        let tags=fs::canonicalize(&tags)?;
         project::atomic_write(&dir.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
-        let data=dir.join("data");fs::create_dir(&data)?;
+        let data=dir.join("data");fs::create_dir(&data)?;let data=fs::canonicalize(data)?;
         let scenario=format!("{}.scenario",inspection.scenario_path);
         recheck()?;
         let kind=runner.run(&executables["invader-edit"].0,&["-t".into(),tags.to_string_lossy().into(),"-G".into(),"type".into(),scenario.clone()],&dir,"recovery-readback",22)?;
@@ -876,7 +880,7 @@ fn run_ce_source_build(project:&Project,inspection:&MapInspection,tools:&Toolcha
             let files=crate::working_tags::script_source_inventory(Some(&data),&cancel)?.0;
             if files.len()!=modules{return invalid("Recovered HaloScript modules are incomplete; no native source build was accepted");}
         }
-        let output_dir=dir.join("output");fs::create_dir(&output_dir)?;recheck()?;
+        let output_dir=dir.join("output");fs::create_dir(&output_dir)?;let output_dir=fs::canonicalize(output_dir)?;recheck()?;
         runner.run(&executables["invader-build"].0,&["-g".into(),"gbx-custom".into(),"-t".into(),tags.to_string_lossy().into(),"-m".into(),output_dir.to_string_lossy().into(),"--resource-usage".into(),"none".into(),inspection.scenario_path.clone()],&dir,"compile-ce",55)?;
         let stem=inspection.scenario_path.rsplit(['\\','/']).next().ok_or_else(||SparkError::Invalid("Missing native CE scenario name".into()))?;
         let output=output_dir.join(format!("{stem}.map"));let compiled=maps::inspect_map(&output,None)?;

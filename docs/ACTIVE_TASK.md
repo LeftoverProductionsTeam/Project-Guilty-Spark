@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — reviewed Forerunner admission and final Black Echo handoff
+Task: Operation110 - native Black Echo root-scenario authoring workflow
 Status: implementation incomplete
-Starting revision: 40d115eca45ee9830057705b429cb701289057ce, canonical master.
-Latest verified revision: 40d115e plus scoped handoff source; CE609 31505afb native compile/readback, Windows validation/export/File Save/reopen, two admitted private Forerunner Start/Stop PASS. Final appc370fbaa. Gameplay unconfirmed. Exact hashes/tests/limits: RUNTIME_INTEGRATION_20261107 and c40 fixture.
-Next action: Reuse the retained Pelican review map and existing CE driver; remove its hardcoded levels/forerunner prefix using the imported scenario identity, then prove complete native authoring controls. Physical flight/combat/settlement awaits working Windows control. Advance independent creator work; no SDK duplication, Forerunner writes or push.
+Starting revision: 8fdfe9141f7124db4c15ae2cd14375c0c3977e13, canonical master.
+Latest verified revision: 8fdfe91 plus canonical CE path/source-driver fix: actual root be_native AI Preview/Accept, script Undo/Redo, Save/3restarts/native compile/independent readback PASS. App3dd1b0e6/test map5e4f6556. Staging11PASS+1explicit skip; safe-path5PASS. Exact evidence: RUNTIME/c40 rootMission20261117.
+Next action: Complete structured dropship pilot/crew/route authoring through native UI against retained31505afb mission, reusing the corrected root-scenario workflow. Physical Forerunner flight/combat/settlement and full475IDs/M1-M6 remain pending; no repeat unchanged Windows-control failure, SDK duplication, Forerunner write or push.
 
 ## Acceptance
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current source: final-production native mission export, unchanged CE609/MCC13 validation through existing Build controls, actual-format readiness and guarded ce-existing private startup. Current/previous exact Forerunner identities retained. Source/native/UI checks pass; full creator/gameplay remains open.
+Current source: prior8fdfe91 native handoff/export/readiness preserved. Canonical CE source/tags/data/output paths fix false missing deep imports; native driver uses actual scenario identity/recovery paths and reports preflight failures without waiting for a nonexistent BuildRecord. Full root-source native UI workflow passes.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -151,7 +151,7 @@ Current: retained Pelican review map compiles/reads back/exports/reopens and pri
 
 ## Operations and safe checkpoint
 
-Current40d115e: QA39356/run-yI2DHp CLOSED; all writers exited/root absent/runs[]/issues[]. Disposed4021201188logicalB, last allocation3766279976B, disposal allocation unavailable. One review map retained: releases/black-echo-review-20261117 (110036926logicalB/110039880allocated-fileB). Evidence complete; verify manifest pair/protected475IDs and commit locally.
+Current8fdfe91: QA47848/run-KaV6E4 CLOSED; all writers exited/root absent/runs[]/issues[]. Disposed3128987209logicalB; last allocation2899864672B, disposal allocation unavailable. Source2461tag hashes and31505afb review map unchanged. Exact native hashes/screenshots/failure/limits in RUNTIME/c40. Verify manifests and commit scoped fix locally.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

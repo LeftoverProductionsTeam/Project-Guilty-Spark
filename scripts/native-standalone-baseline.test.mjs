@@ -4,6 +4,7 @@ import {nativeTagPath,nextNativeDependencies,verifyPreparedSdk} from './native-s
 test('native SDK baseline admits only archive-backed tag paths and rejects traversal/streams',()=>{
  for(const value of ['../globals.globals','levels/../a.scenario','C:/x.scenario','/x.scenario','a:stream.bitmap','x\n.scenario','a//b.sound','x'])assert.throws(()=>nativeTagPath(value));
  assert.equal(nativeTagPath('levels\\test\\bloodgulch\\bloodgulch.scenario'),'levels/test/bloodgulch/bloodgulch.scenario');
+ assert.equal(nativeTagPath('be_native.scenario'),'be_native.scenario');
 });
 test('dependency waves preserve exact publisher archive spelling and never restage a visited cycle',()=>{
  const index=new Map([['tags/a.scenario','tags/A.scenario'],['tags/b.bitmap','tags/B.bitmap']]);

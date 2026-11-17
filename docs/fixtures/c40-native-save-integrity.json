@@ -617,5 +617,203 @@
       "issues": [],
       "scope": "All owned compiler/browser/app/game scratch disposed; one explicit review map outside scratch retained. Stdout receipt observed; temporary console-capture observer failed after successful disposal, independently checked root absent and registry empty."
     }
+  },
+  "rootMission20261117": {
+    "parent": "8fdfe9141f7124db4c15ae2cd14375c0c3977e13",
+    "scope": "Real Windows root-scenario AI/source editing, Save/restart, native CE rebuild and independent readback; not gameplay",
+    "nativeDesktop": true,
+    "mockedIpc": false,
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "sourceMapSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+    "preparedTags": 2461,
+    "preparedTagsUnchanged": 2461,
+    "preparedInventorySha256": "def6d406113c686553e2c439051b0eb32588ff1b9f1d13b2b3395142bd3fb7dd",
+    "sdkCopied": false,
+    "acceptance": {
+      "scope": "native-solo-creator",
+      "schemaVersion": 1,
+      "complete": true,
+      "mockedIpc": false,
+      "gameplayVerified": false,
+      "appSha256": "3dd1b0e6b131d36def87fe6fcc6b6b349e2bf47f12c1f5dba4c4bbb5903dd371",
+      "sourcePreparation": {
+        "scope": "Reuse prepared matching CE tags; no SDK copy/extraction, no game launch",
+        "scenarioPath": "be_native"
+      },
+      "errors": [],
+      "normalRestarts": 3,
+      "ceMission": {
+        "projectId": "c3d2a573-7922-4a50-b8a6-9b12d0df2478",
+        "originalSha": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+        "scenarioPath": "be_native",
+        "stage": "passed",
+        "gameplayVerified": false,
+        "parent": {
+          "id": "7b82c332-a7e3-4bae-b791-172af53fb56f",
+          "timestamp": "2026-11-17T14:21:35.385421800+00:00",
+          "status": "validated",
+          "target": "gbx-custom",
+          "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-KaV6E4\\output\\native-ui-fixed\\library\\jobs\\7b82c332-a7e3-4bae-b791-172af53fb56f\\output\\be_native.map",
+          "sha256": "6e54ec61d6c7d931e9bc50028b11c3c513d6f2e1d44770080c1e7e68ff25ff57",
+          "message": "Selected native CE tags compiled, recovered scripts and independent cache/type/CRC/source checks passed. Native source changes and gameplay require review; this is not an automatic format conversion.",
+          "projectFingerprint": "cee07ef75eea2c6ff3b0cb0a3c42b7bf1f7b32296e3d5fa309042f8054ca3e50"
+        },
+        "beforeFlood": [
+          58.84561,
+          -89.47212,
+          0.046889
+        ],
+        "safeSourcePoint": [
+          58.84561,
+          -89.47212,
+          0.078429
+        ],
+        "safeSourceBinding": {
+          "encounter": 1,
+          "squad": 0,
+          "encounterName": "be_covenant",
+          "start": 0
+        },
+        "acceptedSourceSha256": "14c94a020f8bac1eeeb0a760786ab22d441c1fd60170ebefac72a9b0209b8525",
+        "projectDraftSha256": "41189eeb78dc572925865535cf777669474ca07f5cf254dfc08206adc0718ccd",
+        "saveRestart": true,
+        "build": {
+          "id": "98f24c2a-95df-4f67-982e-6029fe4745af",
+          "timestamp": "2026-11-17T14:23:55.735159800+00:00",
+          "status": "validated",
+          "target": "gbx-custom",
+          "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-KaV6E4\\output\\native-ui-fixed\\library\\jobs\\98f24c2a-95df-4f67-982e-6029fe4745af\\output\\be_native.map",
+          "sha256": "5e4f65564ce14cc4cd794fac4b676916851bc3b2fc019ef2a6dcdf1bb926a8a9",
+          "message": "Revised exact reviewed reviewed module extracted.hsc (SHA256 41189eeb78dc572925865535cf777669474ca07f5cf254dfc08206adc0718ccd) in separate native source; parent source, other modules and original script signatures retained. Native compilation/readback passed, gameplay remains untested.",
+          "projectFingerprint": "cee07ef75eea2c6ff3b0cb0a3c42b7bf1f7b32296e3d5fa309042f8054ca3e50"
+        },
+        "compiledBuildRestart": true,
+        "compiledFloodPosition": [
+          58.845612,
+          -89.472122,
+          0.078429
+        ],
+        "outputSha256": "5e4f65564ce14cc4cd794fac4b676916851bc3b2fc019ef2a6dcdf1bb926a8a9",
+        "independentScenarioSha256": "e8106dc77af3a28d7c73a6baec65e59c749e4450eefea1ebf7ac5874f22bbf88",
+        "independentSourceSha256": "0c8d0a0befc5ec4918e2082a2a818f7ed7931abb88d7679c64de7b4dcfa47c39",
+        "nativeWarnings": [
+          "WARNING: Bitmap 'effects\\particles\\solid\\bitmaps\\wood chips.bitmap' uses",
+          "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+          "WARNING: Model with LoDs does not have any LoD cutoffs set",
+          "WARNING (minor): Function scale is set to 20626.480625° (360 radians). This is",
+          "WARNING (minor): Part #0 of event #0 contains a null sound tag reference. The",
+          "WARNING: Model with LoDs does not have any LoD cutoffs set",
+          "WARNING: Model with LoDs does not have any LoD cutoffs set",
+          "WARNING: Model with LoDs does not have any LoD cutoffs set",
+          "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+          "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+          "WARNING: Bitmap data #0 uses height map compression which is not supported by",
+          "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+          "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+          "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+          "WARNING: Bitmap data #0 is monochrome format A8 or AY8 which is not supported",
+          "WARNING: HUDGlobals::anniversary_hud_remaps exceeds the legacy stock limit of 0",
+          "Built successfully with 16 warnings"
+        ],
+        "complete": true,
+        "realUi": true,
+        "sourceUnchangedUntilAccept": true,
+        "scriptUndoRedo": true,
+        "originalAndPreviousGoodUnchanged": true
+      },
+      "failedNativeJobId": "98f24c2a-95df-4f67-982e-6029fe4745af"
+    },
+    "initialFailure": {
+      "error": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: \"validated\"\nReceived: undefined\n\nCall Log:\n- Timeout 300000ms exceeded while waiting on the predicate",
+      "stage": "select CE source target",
+      "diagnosticFile": "native-ui/library/logs/93c59347-7aec-45d2-93b4-8db19ce08ee3.jsonl",
+      "missingDependency": "gs_assets_30000000000040008000000000000042/gs_assets_10000000000040008000000000000042/sound/dialog/marines/bisenti/conditional/combat2/groupcomm/advance.sound",
+      "sourceFilePresent": true,
+      "ordinaryExtraction": {
+        "extracted": 2460,
+        "matched": 2461,
+        "exit": 0,
+        "errors": 1,
+        "warnings": 2
+      },
+      "canonicalExtraction": {
+        "extracted": 1,
+        "matched": 1,
+        "exit": 0
+      },
+      "canonicalDependencyProbe": {
+        "exit": 0,
+        "lines": 1752,
+        "broken": [],
+        "errors": []
+      },
+      "noSourceTreeCopied": true
+    },
+    "repairs": [
+      "Native mission scenario identity comes from Invader and is cross-checked against imported inspection; root and nested recovery paths share the existing safe path helper.",
+      "Native CE source/dependency/compiler/data/output arguments retain canonical Windows path spellings. Missing-tag refusal and tool/source hash checks remain mandatory.",
+      "The existing driver surfaces the latest project preflight failure even when no BuildRecord was created."
+    ],
+    "tests": {
+      "nativeUi": 1,
+      "normalRestarts": 3,
+      "pageErrors": 0,
+      "nativeStaging": 11,
+      "explicitInstalledXboxSkip": 1,
+      "safePathAndPreparedInput": 5,
+      "syntax": true,
+      "embeddedWindowsBuild": true
+    },
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-ce-long-path-refusal-20261117.png",
+        "sha256": "eaebbca260790a1350b169d84f0168b8ff4d7b833b7a6a381c81efbdf8ffa259"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-ce-root-source-rebuilt-20261117.png",
+        "sha256": "6a5d5b0e676164575a8de0655908e2e6d828db6b25a2a3dfd16ed29dda21f008"
+      }
+    ],
+    "sourceHashes": {
+      "crates/spark-core/src/build.rs": "c7353f197d440c306524fdb85c18d77c249fc171207e0f0611c9300f325851a2",
+      "scripts/test-firefight-native.mjs": "3336452dd8f1a16e1814e5de17757c3da144b1f7d5619c68296c35526052fdf8",
+      "scripts/native-standalone-baseline.test.mjs": "6c41a35793a380735e01d0e6d278e7e8987383b1ff58edd93da69251ea3917b3"
+    },
+    "qaDisposal": {
+      "workflow": "black-echo-root-native-authoring",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 3128987209,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 3128992743,
+      "allocatedBytes": 2899864672,
+      "monitoringSamples": 193,
+      "monitoringMs": 106021.99940000122,
+      "sourceMonitoring": {
+        "scope": "Source and new top-level output; protected games/Git/dependencies are not traversed",
+        "currentLogicalBytes": 67412663,
+        "peakLogicalBytes": 67412663,
+        "excludedTopLevel": [
+          ".git",
+          ".toolchain",
+          "node_modules",
+          "tools",
+          ".research",
+          "preserved",
+          "releases",
+          "halo custom edition",
+          "opencehalo-windows-release",
+          "runtimes",
+          "chupathingyce-windows64-release",
+          "pyros zombie apocolypse mod versions",
+          "sample code",
+          "halo - combat evolved (usa).xiso.iso"
+        ],
+        "error": null
+      },
+      "rootRemoved": true,
+      "runs": [],
+      "issues": []
+    }
   }
 }
