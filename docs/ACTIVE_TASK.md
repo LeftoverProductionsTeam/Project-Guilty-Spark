@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 0f6144220d88973311fef44c7e8180e9e88b44fd, canonical local master.
-Latest verified revision: 0f6144220d88973311fef44c7e8180e9e88b44fd plus current scoped native-feature/handoff changes; exact new revision follows in local Git/manifests. Native/game acceptance remains separate.
-Next action: complete native squad-terminal/readiness and scoped objective authoring through existing mission/native controls. Current7-beat Pelican compiles/reads back/stages safely for exact Forerunner30a989…; actual gameplay/Windows42-edit/37944 remain OPEN behind the documented desktop/profile gate.
+Starting revision: c2e679793ba4c1eb6c2240e6ac984934f6e28c0c, canonical local master.
+Latest verified revision: c2e679793ba4c1eb6c2240e6ac984934f6e28c0c plus current native squad hub authoring scope; exact new revision follows in canonical Git/source manifests. Native Windows/game acceptance remains separate.
+Next action: implement scoped squad objective/HSC preparation in the existing mission/source workflow, using the authored terminal/readiness groups and Forerunner contract. Terminal/gate UI/native compile/readback pass in scope. Actual Windows Save/restart/37944/42-edit and gameplay remain OPEN.
 
 ## Acceptance
 
@@ -16,17 +16,15 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
+16Nov squad hub (parent c2e6797): native terminal/gate controls reuse Source Guardian, shared writer/readback and Save/build metadata. Source5/browser2/mission producers4/working17+1skip/guide10/frontend/all-target/native1 PASS. Both gated/ungated controls preserve originals and indices. Scope/hashes and unrun Windows/job/game acceptance: RUNTIME_INTEGRATION_20261107.
+
 16Nov current Forerunner: actual help/capabilities, exact build admission, compiled requirements and full7-beat Pelican→CE609 compile/readback→real private staging/3CEbanks/command/refusal/disposal pass in scope. Core20+1skip/browser3+4/guide10/frontend/all-target compilation pass. Exact hashes/errors: RUNTIME_INTEGRATION_20261107. Actual Windows/gameplay OPEN.
 
 16Nov retained HUD (parent c911f04): production CE parent→working-tags radio revision now passes with actual staged custom-HUD reference/table and no generated ownership or overwrite. Five sound hashes and original input identities preserved; conflicting edited tag refuses and keeps prior-good map. Native1/core17+1explicit skip/core all-target/browser1/guide4 pass. Exact hashes/setup corrections in RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
 16Nov recovered radio (parent bbbfe21): existing solo CE609/MCC13 UI/import/history/source build staging now includes immutable sound without replacing edited tags. Native typed sound path crash fixed; exact prior generated drafts upgrade safely. Frontend51/core17+imports4/browser1 and companion4/guide4/Windows all-target/TypeScript-Vite pass; actual Pelican+Spirit CE609 compile/readback preserves5original sample hashes. Exact source/cache/scenario/test-exe hashes, initial failures and boundaries: RUNTIME_INTEGRATION_20261107. Complete Windows working-tag job/restart/audible playback/game remain OPEN.
 
-16Nov cameras bbbfe21: append/pose/lens and relative aircraft shots retain source, review/Restore/history. Scoped source/browser/native Pelican+Spirit compilation/readback pass; exact tests/hashes in RUNTIME_INTEGRATION_20261107 and Git. Native Windows/framing/input/game acceptance OPEN.
-
-16Nov faction kits b24bac4: both native controls/profiles +7-beat mission and transports compile/read back; exact hashes/negative cases in RUNTIME_INTEGRATION_20261107. Gear/flight/native Windows/game acceptance OPEN.
-
-16Nov pilot/Spirit defc08c: actual source actor/biped/graph/seat admission and both generated controllers compile/read back. Exact hashes/tests/errors in RUNTIME_INTEGRATION_20261107 and Git; game/faction acceptance OPEN.
+Cameras bbbfe21, faction kits b24bac4 and pilot/Spirit defc08c retain their scoped source/browser/CE609 compile/readback proofs, exact hashes, controls and negative cases in RUNTIME_INTEGRATION_20261107 and Git. Actual Windows/full restart/gameplay remain OPEN.
 
 Deferred pilot/named technology/deployment milestones027c8c0/08500da retain exact scoped tests, hashes and native evidence in RUNTIME_INTEGRATION_20261107 and Git. They remain accepted in scope, not gameplay.
 
@@ -53,7 +51,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current Forerunner admission/optional native-feature gating, compiled requirements, runtime details and full Black Echo native resource staging are implemented in existing systems. Focused tests/native compilation/readback/staging/refusal pass in scope; exact hashes/failures in RUNTIME_INTEGRATION_20261107. Existing camera/radio/HUD/pilot/faction proofs remain above and in Git. No discarded WIP, new launcher/writer or Forerunner modification. Native Windows/gameplay OPEN.
+Current native squad terminals/readiness: UI→protected native append/Accept/Restore→saved source metadata→native build/readback is implemented in existing systems. Source/browser/native compile and independent control/group checks pass; actual Windows source-job/full restart/game gates remain OPEN. Group reference checks now parse each device inventory once. No new writer/manager, discarded WIP, engine edit or push. Full scoped quest/controller generation is next. Existing camera/radio/HUD/pilot/faction/current-runtime proofs remain above, in Git and RUNTIME_INTEGRATION_20261107.
 
 Native flight tuning78c01b2 remains verified in scope. Current route workflow: existing command/volume readers check physical movement, final-stop/facing references and final craft-origin containment by readable selected pads; unread/unsupported/bad-pad programs refuse generated preparation, manual source remains available. Existing route editor exposes Stop/Keep moving while preserving unknown values; viewport/Preview/Accept/Restore/Save/reopen continue. Only two selected route reviews render. Core28/browser3distinct/guide4/TypeScript/Vite/Windows and installed CE609 route/volume/aircraft/tuning readback1 pass. Native Windows/full restart/flight/gameplay remain unrun. Exact hashes/warnings in RUNTIME_INTEGRATION_20261107. No push.
 
@@ -145,7 +143,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-Current QA38892/run-hbw43J CLOSED:2534946191logicalB disposed; peak2534953300logicalB,last file allocation2407900008B. Disposal allocation unavailable; no physical reclamation claim. Root absent,runs[]/issues[]; all jobs stopped normally except the explicitly cancelled accidental broad browser tree. Exact native/log/test-exe hashes in RUNTIME_INTEGRATION_20261107. Originals/475IDs/legacy/stashes unchanged; no retained QA maps/SDK/runtime/cache/archive and no game/push.
+Current QA91948/run-YThRQQ CLOSED:1739051094logicalB disposed; peak1851826052logicalB,last file allocation1610933880B; disposal allocation unavailable, no physical-reclamation claim. Root absent,runs[]/issues[], owner exiting. Exact hashes/results and cleanup in RUNTIME_INTEGRATION_20261107.
 
 Prior QA31684/run-l1Q8hx CLOSED:1589724440 logicalB disposed, peak1701962732 logicalB, last allocation1461488488B; disposed allocation unavailable. Root absent; runs[]/issues[], owner exited. No retained maps/SDK/caches/archive. No game launched. Exact evidence in RUNTIME_INTEGRATION_20261107.
 

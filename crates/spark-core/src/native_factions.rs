@@ -1,6 +1,28 @@
 //! Forerunner's documented native faction controls/equipment profiles.
 //! Uses the existing reviewed source writer; never grants inventory or edits originals.
 use super::*;
+// Parse each device's group references once, shared by faction and squad checks.
+fn device_group_bindings(fields: &str) -> Result<Vec<(&'static str, u16, [i16; 2])>> {
+    let mut result = vec![];
+    for (array, class) in [("controls", "ctrl"), ("machines", "mach")] {
+        let table = array_listing(fields, array)?;
+        for (index, item) in array_items(&table, array)?.into_iter().enumerate() {
+            let row = direct_struct_fields(item)?;
+            result.push((
+                class,
+                u16::try_from(index).map_err(|_| {
+                    crate::SparkError::Invalid("Native device index exceeds its field".into())
+                })?,
+                [
+                    native_index(&row, "power_group")?,
+                    native_index(&row, "position_group")?,
+                ],
+            ));
+        }
+    }
+    Ok(result)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NativeFactionKit {
@@ -15,25 +37,10 @@ impl NativeFactionKit {
         format!("extraction_{}", self.faction)
     }
     pub fn validate(&self) -> Result<()> {
-        if !["unsc", "covenant"].contains(&self.faction.as_str())
-            || self.control_tag_path.is_empty()
-            || self.control_tag_path.len() > 230
-            || self.control_tag_path.starts_with('-')
-            || self.control_tag_path.ends_with(".device_control")
-            || self
-                .position
-                .iter()
-                .any(|v| !v.is_finite() || v.abs() > 2048.)
-            || self
-                .rotation_radians
-                .iter()
-                .any(|v| !v.is_finite() || v.abs() > std::f32::consts::TAU)
-        {
-            return invalid(
-                "Choose a native faction, existing touched control and finite hub pose",
-            );
+        if !["unsc", "covenant"].contains(&self.faction.as_str()) {
+            return invalid("Choose a native UNSC or Covenant faction");
         }
-        safe_relative(&self.control_tag_path)?;
+        validate_hub_pose(&self.control_tag_path, self.position, self.rotation_radians)?;
         crate::firefight::native_equipment_profile_arguments(&self.profile, 0, &self.name())?;
         Ok(())
     }
@@ -71,11 +78,30 @@ pub(super) fn validate_batch(kits: &[NativeFactionKit]) -> Result<()> {
     }
     Ok(())
 }
-fn layout(
+#[derive(Clone)]
+struct HubControl {
+    name: String,
+    control_tag_path: String,
+    position: [f32; 3],
+    rotation_radians: [f32; 3],
+    readiness: bool,
+}
+impl From<&NativeFactionKit> for HubControl {
+    fn from(kit: &NativeFactionKit) -> Self {
+        Self {
+            name: kit.name(),
+            control_tag_path: kit.control_tag_path.clone(),
+            position: kit.position,
+            rotation_radians: kit.rotation_radians,
+            readiness: false,
+        }
+    }
+}
+fn control_layout(
     fields: &str,
-    kits: &[NativeFactionKit],
+    kits: &[HubControl],
+    added_profiles: usize,
 ) -> Result<(usize, usize, usize, usize, Vec<String>)> {
-    validate_batch(kits)?;
     let names = named(fields, "object_names")?;
     let controls = array_listing(fields, "controls")?;
     let palette = named(fields, "control_palette")?;
@@ -84,13 +110,18 @@ fn layout(
     if names.len() + kits.len() > 512
         || controls.count + kits.len() > 100
         || palette.len() > 100
-        || group.len() + 2 * kits.len() > 128
-        || profiles.len() + kits.len() > 256
+        || group.len()
+            + kits
+                .iter()
+                .map(|kit| 2 + usize::from(kit.readiness))
+                .sum::<usize>()
+            > 128
+        || profiles.len() + added_profiles > 256
     {
-        return invalid("Native faction append exceeds the reviewed classic scenario capacity");
+        return invalid("Native hub append exceeds the reviewed classic scenario capacity");
     }
     for kit in kits {
-        let name = kit.name();
+        let name = kit.name.clone();
         if names
             .iter()
             .chain(&profiles)
@@ -98,6 +129,7 @@ fn layout(
             || group.iter().any(|(old, _, _)| {
                 old.eq_ignore_ascii_case(&(name.clone() + "_power"))
                     || old.eq_ignore_ascii_case(&(name.clone() + "_position"))
+                    || kit.readiness && old.eq_ignore_ascii_case(&(name.clone() + "_ready"))
             })
         {
             return invalid("A faction control/profile/group name already exists; preserve it and edit its source instead of appending duplicates");
@@ -122,7 +154,7 @@ fn layout(
             for key in ["power_group", "position_group"] {
                 let index = native_index(&root, key)?;
                 if index >= 0 && index as usize >= group.len() {
-                    return invalid("Resolve dangling original device-group references before appending faction groups");
+                    return invalid("Resolve dangling original device-group references before appending hub groups");
                 }
             }
         }
@@ -132,7 +164,7 @@ fn layout(
     let field = unique_volume(&volumes, "extraction_zone")?;
     for kit in kits {
         if !hub.contains(kit.position) || field.contains(kit.position) {
-            return invalid("Faction terminals must be inside the hub and outside activation");
+            return invalid("Hub terminals must be inside the hub and outside activation");
         }
     }
     Ok((
@@ -143,62 +175,72 @@ fn layout(
         palette,
     ))
 }
-pub fn arguments(
+fn layout(
+    fields: &str,
+    kits: &[NativeFactionKit],
+) -> Result<(usize, usize, usize, usize, Vec<String>)> {
+    validate_batch(kits)?;
+    control_layout(
+        fields,
+        &kits.iter().map(HubControl::from).collect::<Vec<_>>(),
+        kits.len(),
+    )
+}
+fn append_hub_controls(
     tags: &Path,
     tag: &str,
     before: &str,
-    kits: &[NativeFactionKit],
+    controls: &[HubControl],
+    added_profiles: usize,
 ) -> Result<Vec<String>> {
-    let (name, control, group, profile, palette) = layout(before, kits)?;
+    let (name, control, mut group, _, palette) = control_layout(before, controls, added_profiles)?;
     let old_palette = array_listing(before, "control_palette")?.count;
     let mut args = vec![
         "-t".into(),
         tags.to_string_lossy().into_owned(),
         "-n".into(),
     ];
-    let insert = |args: &mut Vec<String>, array: &str, count: usize| {
-        args.extend(["-I".into(), array.into(), count.to_string(), "end".into()])
+    let insert = |args: &mut Vec<String>, array: &str| {
+        args.extend(["-I".into(), array.into(), "1".into(), "end".into()])
     };
     let set =
         |args: &mut Vec<String>, key: String, value: String| args.extend(["-S".into(), key, value]);
     for (index, path) in palette.iter().enumerate().skip(old_palette) {
-        insert(&mut args, "control_palette", 1);
+        insert(&mut args, "control_palette");
         set(
             &mut args,
             format!("control_palette[{index}].name"),
             path.clone(),
         );
     }
-    for (index, kit) in kits.iter().enumerate() {
-        let native = kit.name();
-        insert(&mut args, "object_names", 1);
+    for (index, entry) in controls.iter().enumerate() {
+        insert(&mut args, "object_names");
         set(
             &mut args,
             format!("object_names[{}].name", name + index),
-            native.clone(),
+            entry.name.clone(),
         );
-        for (offset, suffix, value) in [(0, "power", "1"), (1, "position", "0")] {
-            let key = group + index * 2 + offset;
-            insert(&mut args, "device_groups", 1);
-            set(
-                &mut args,
-                format!("device_groups[{key}].name"),
-                format!("{native}_{suffix}"),
-            );
-            set(
-                &mut args,
-                format!("device_groups[{key}].initial_value"),
-                value.into(),
-            );
-            set(
-                &mut args,
-                format!("device_groups[{key}].flags.can_change_only_once"),
-                "0".into(),
-            );
+        for (offset, suffix, value) in [(0, "power", "1"), (1, "position", "0"), (2, "ready", "0")]
+        {
+            if offset == 2 && !entry.readiness {
+                continue;
+            }
+            let key = group + offset;
+            insert(&mut args, "device_groups");
+            for (field, value) in [
+                ("name", format!("{}_{suffix}", entry.name)),
+                ("initial_value", value.into()),
+                ("flags.can_change_only_once", "0".into()),
+            ] {
+                set(&mut args, format!("device_groups[{key}].{field}"), value);
+            }
         }
-        insert(&mut args, "controls", 1);
+        insert(&mut args, "controls");
         let key = format!("controls[{}]", control + index);
-        let reference = format!("{}.device_control", kit.control_tag_path.replace('\\', "/"));
+        let reference = format!(
+            "{}.device_control",
+            entry.control_tag_path.replace('\\', "/")
+        );
         let palette_index = palette
             .iter()
             .position(|p| p.replace('\\', "/").eq_ignore_ascii_case(&reference))
@@ -206,21 +248,43 @@ pub fn arguments(
         for (field, value) in [
             ("type", palette_index.to_string()),
             ("name", (name + index).to_string()),
-            ("position", kit.position.map(|n| n.to_string()).join(",")),
+            ("position", entry.position.map(|n| n.to_string()).join(",")),
             (
                 "rotation",
-                kit.rotation_radians.map(|n| n.to_string()).join(","),
+                entry.rotation_radians.map(|n| n.to_string()).join(","),
             ),
-            ("power_group", (group + index * 2).to_string()),
-            ("position_group", (group + index * 2 + 1).to_string()),
+            ("power_group", group.to_string()),
+            ("position_group", (group + 1).to_string()),
             ("device_flags.initially_off", "0".into()),
         ] {
             set(&mut args, format!("{key}.{field}"), value);
         }
+        group += 2 + usize::from(entry.readiness);
+    }
+    args.push(tag.into());
+    Ok(args)
+}
+pub fn arguments(
+    tags: &Path,
+    tag: &str,
+    before: &str,
+    kits: &[NativeFactionKit],
+) -> Result<Vec<String>> {
+    validate_batch(kits)?;
+    let mut args = append_hub_controls(
+        tags,
+        tag,
+        before,
+        &kits.iter().map(HubControl::from).collect::<Vec<_>>(),
+        kits.len(),
+    )?;
+    args.pop();
+    let profile = array_listing(before, "player_starting_profile")?.count;
+    for (index, kit) in kits.iter().enumerate() {
         args.extend(crate::firefight::native_equipment_profile_arguments(
             &kit.profile,
             profile + index,
-            &native,
+            &kit.name(),
         )?);
     }
     args.push(tag.into());
@@ -268,6 +332,7 @@ pub fn snapshots(fields: &str) -> Result<Vec<NativeFactionSnapshot>> {
     let profile_items = array_items(&profiles, "player_starting_profile")?;
     let profile_names = profile_names(&profile_items)?;
     let devices = scenario_device_choices(fields)?;
+    let bindings = device_group_bindings(fields)?;
     let control_items = array_listing(fields, "controls")?;
     let control_items = array_items(&control_items, "controls")?;
     let groups = groups(fields)?;
@@ -316,27 +381,13 @@ pub fn snapshots(fields: &str) -> Result<Vec<NativeFactionSnapshot>> {
                 return invalid("Faction groups must start powered/inactive and remain repeatable");
             }
         }
-        for other in &devices {
-            if other.class == "ctrl" && other.index == row.index {
-                continue;
-            }
-            let array = if other.class == "ctrl" {
-                "controls"
-            } else {
-                "machines"
-            };
-            let items = array_listing(fields, array)?;
-            let items = array_items(&items, array)?;
-            let other_root =
-                direct_struct_fields(items.get(other.index as usize).ok_or_else(|| {
-                    crate::SparkError::Invalid("Device index is missing".into())
-                })?)?;
-            for key in ["power_group", "position_group"] {
-                let index = native_index(&other_root, key)?;
-                if index == power || index == position {
-                    return invalid("Faction groups must not be shared by another device");
-                }
-            }
+        if bindings.iter().any(|(class, index, groups)| {
+            !(*class == "ctrl" && *index == row.index)
+                && groups
+                    .iter()
+                    .any(|index| *index == power || *index == position)
+        }) {
+            return invalid("Faction groups must not be shared by another device");
         }
         let flat = root.lines().map(str::trim).collect::<Vec<_>>().join("\n");
         if number(&flat, "initially_off")? != 0. || power == position {
@@ -505,7 +556,7 @@ pub fn validate_control_source(fields: &str) -> Result<()> {
             vec!["destroyed", "enum", "value"],
         ]
     {
-        return invalid("Faction selection requires an actual touched-by-player control tag; source was not changed");
+        return invalid("Hub selection requires an actual touched-by-player control tag; source was not changed");
     }
     Ok(())
 }
@@ -568,6 +619,78 @@ mod tests {
             fields.push_str(&format!("    trigger_volumes[{index}] struct\n        type enum\n            fixed enum value\n            rotational (*) enum value\n        name ({name}) tagstring\n        rotation_vector_forward (1,0,0) vector3d\n        rotation_vector_up (0,0,1) vector3d\n        starting_corner ({x},0,0) point3d\n        ending_corner_offset (10,10,10) vector3d\n"));
         }
         fields
+    }
+    #[test]
+    fn squad_terminals_append_isolated_gates_without_profiles_and_refuse_unsafe_source() {
+        let first = NativeSquadTerminal {
+            number: 1,
+            control_tag_path: "devices/terminal".into(),
+            position: [1., 1., 1.],
+            rotation_radians: [0.; 3],
+            readiness: false,
+        };
+        let second = NativeSquadTerminal {
+            number: 2,
+            readiness: true,
+            ..first.clone()
+        };
+        let fields = before();
+        let args = squad_arguments(
+            Path::new("owned"),
+            "test.scenario",
+            &fields,
+            &[first.clone(), second.clone()],
+        )
+        .unwrap();
+        assert!(!args
+            .iter()
+            .any(|arg| arg.starts_with("player_starting_profile")));
+        for pair in [
+            ["object_names[1].name", "extraction_squad_01"],
+            ["object_names[2].name", "extraction_squad_02"],
+            ["device_groups[4].name", "extraction_squad_02_ready"],
+            ["device_groups[4].initial_value", "0"],
+            ["controls[1].power_group", "2"],
+            ["controls[1].position_group", "3"],
+        ] {
+            assert!(args.windows(2).any(|w| w == pair));
+        }
+        assert!(squad_arguments(
+            Path::new("owned"),
+            "test.scenario",
+            &fields,
+            &[first.clone(), first.clone()]
+        )
+        .is_err());
+        assert!(squad_arguments(
+            Path::new("owned"),
+            "test.scenario",
+            &fields.replace("name (original)", "name (Extraction_Squad_01)"),
+            &[first.clone()]
+        )
+        .is_err());
+        assert!(squad_arguments(
+            Path::new("owned"),
+            "test.scenario",
+            &fields.replace("controls[0] array", "controls[100] array"),
+            &[first.clone()]
+        )
+        .is_err());
+        for mut bad in [first.clone(), first.clone(), first.clone(), first.clone()]
+            .into_iter()
+            .enumerate()
+        {
+            match bad.0 {
+                0 => bad.1.number = 23,
+                1 => bad.1.position = [25., 1., 1.],
+                2 => bad.1.control_tag_path = "../original".into(),
+                _ => bad.1.rotation_radians[0] = f32::NAN,
+            };
+            assert!(
+                squad_arguments(Path::new("owned"), "test.scenario", &fields, &[bad.1]).is_err()
+            );
+        }
+        assert_eq!(fields, before(), "Review never mutates the caller's source");
     }
     #[test]
     fn actual_empty_native_dependencies_are_distinct_from_missing_or_duplicated_fields() {
@@ -671,4 +794,388 @@ mod tests {
         )
         .is_err());
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeSquadTerminal {
+    pub number: u8,
+    pub control_tag_path: String,
+    pub position: [f32; 3],
+    pub rotation_radians: [f32; 3],
+    #[serde(default)]
+    pub readiness: bool,
+}
+impl NativeSquadTerminal {
+    pub fn name(&self) -> String {
+        format!("extraction_squad_{:02}", self.number)
+    }
+    pub fn validate(&self) -> Result<()> {
+        if !(1..=22).contains(&self.number) {
+            return invalid(
+                "Choose native squad01–22; this interface range is not player-count acceptance",
+            );
+        }
+        validate_hub_pose(&self.control_tag_path, self.position, self.rotation_radians)
+    }
+}
+fn validate_hub_pose(tag: &str, position: [f32; 3], rotation: [f32; 3]) -> Result<()> {
+    if tag.is_empty()
+        || tag.len() > 230
+        || tag.starts_with('-')
+        || tag.ends_with(".device_control")
+        || position.iter().any(|v| !v.is_finite() || v.abs() > 2048.)
+        || rotation
+            .iter()
+            .any(|v| !v.is_finite() || v.abs() > std::f32::consts::TAU)
+    {
+        return invalid("Choose an existing native touched control and finite hub pose");
+    }
+    safe_relative(tag)?;
+    Ok(())
+}
+impl From<&NativeSquadTerminal> for HubControl {
+    fn from(row: &NativeSquadTerminal) -> Self {
+        Self {
+            name: row.name(),
+            control_tag_path: row.control_tag_path.clone(),
+            position: row.position,
+            rotation_radians: row.rotation_radians,
+            readiness: row.readiness,
+        }
+    }
+}
+pub fn validate_squad_batch(terminals: &[NativeSquadTerminal]) -> Result<()> {
+    if terminals.is_empty() || terminals.len() > 22 {
+        return invalid("Review1–22native squad terminals");
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for terminal in terminals {
+        terminal.validate()?;
+        if !seen.insert(terminal.number) {
+            return invalid("Each native squad terminal must have a unique number");
+        }
+    }
+    Ok(())
+}
+pub fn squad_arguments(
+    tags: &Path,
+    tag: &str,
+    before: &str,
+    terminals: &[NativeSquadTerminal],
+) -> Result<Vec<String>> {
+    validate_squad_batch(terminals)?;
+    append_hub_controls(
+        tags,
+        tag,
+        before,
+        &terminals.iter().map(HubControl::from).collect::<Vec<_>>(),
+        0,
+    )
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeSquadTerminalSnapshot {
+    pub terminal: NativeSquadTerminal,
+    pub control_index: u16,
+    pub name_index: u16,
+    pub power_group: i16,
+    pub position_group: i16,
+    pub ready_group: Option<i16>,
+}
+
+pub fn squad_snapshots(fields: &str) -> Result<Vec<NativeSquadTerminalSnapshot>> {
+    let names = named(fields, "object_names")?;
+    let devices = scenario_device_choices(fields)?;
+    let bindings = device_group_bindings(fields)?;
+    let control_items = array_listing(fields, "controls")?;
+    let control_items = array_items(&control_items, "controls")?;
+    let group = groups(fields)?;
+    let volumes = scenario_volume_choices(fields)?;
+    let mut result = vec![];
+    let mut seen = std::collections::BTreeSet::new();
+    for name in &names {
+        let Some(digits) = name
+            .to_ascii_lowercase()
+            .strip_prefix("extraction_squad_")
+            .map(str::to_owned)
+        else {
+            continue;
+        };
+        let n = digits
+            .parse::<u8>()
+            .ok()
+            .filter(|n| (1..=22).contains(n))
+            .ok_or_else(|| {
+                crate::SparkError::Invalid(
+                    "Native squad control name needs exact01–22 suffix".into(),
+                )
+            })?;
+        if *name != format!("extraction_squad_{n:02}") || !seen.insert(n) {
+            return invalid("Native squad controls need unique exact two-digit names");
+        }
+        let rows = devices
+            .iter()
+            .filter(|d| d.class == "ctrl" && d.name == *name)
+            .collect::<Vec<_>>();
+        if rows.len() != 1 {
+            return invalid("Native squad name must bind exactly one live control");
+        }
+        let row = rows[0];
+        let root =
+            direct_struct_fields(control_items.get(row.index as usize).ok_or_else(|| {
+                crate::SparkError::Invalid("Squad control index is missing".into())
+            })?)?;
+        let power = native_index(&root, "power_group")?;
+        let position = native_index(&root, "position_group")?;
+        let ready = group
+            .iter()
+            .enumerate()
+            .filter(|(_, g)| g.0.eq_ignore_ascii_case(&format!("{name}_ready")))
+            .collect::<Vec<_>>();
+        if ready.len() > 1 {
+            return invalid("Native squad readiness group is ambiguous");
+        }
+        let ready = ready.first().map(|(index, _)| *index as i16);
+        checked_squad_groups(&bindings, &group, row, power, position, ready)?;
+        let flat = root.lines().map(str::trim).collect::<Vec<_>>().join("\n");
+        if number(&flat, "initially_off")? != 0. {
+            return invalid("Squad terminal must start live");
+        }
+        let terminal = NativeSquadTerminal {
+            number: n,
+            control_tag_path: row.tag_path.clone(),
+            position: row.position,
+            rotation_radians: row.rotation_radians,
+            readiness: ready.is_some(),
+        };
+        terminal.validate()?;
+        if !unique_volume(&volumes, "extraction_return")?.contains(row.position)
+            || unique_volume(&volumes, "extraction_zone")?.contains(row.position)
+        {
+            return invalid("Squad terminal must be inside the return hub and outside activation");
+        }
+        result.push(NativeSquadTerminalSnapshot {
+            terminal,
+            control_index: row.index,
+            name_index: row.name_index as u16,
+            power_group: power,
+            position_group: position,
+            ready_group: ready,
+        });
+    }
+    Ok(result)
+}
+
+fn checked_squad_groups(
+    bindings: &[(&str, u16, [i16; 2])],
+    groups: &[(String, f32, bool)],
+    row: &NativeDevicePlacement,
+    power: i16,
+    position: i16,
+    ready: Option<i16>,
+) -> Result<()> {
+    if power == position || ready == Some(power) || ready == Some(position) {
+        return invalid("Squad terminal groups must be independent");
+    }
+    for (index, suffix, value) in [
+        (Some(power), "power", 1.),
+        (Some(position), "position", 0.),
+        (ready, "ready", 0.),
+    ] {
+        if let Some(index) = index {
+            let actual = usize::try_from(index)
+                .ok()
+                .and_then(|i| groups.get(i))
+                .ok_or_else(|| {
+                    crate::SparkError::Invalid("Native squad group is missing".into())
+                })?;
+            if actual.0 != format!("{}_{suffix}", row.name) || actual.1 != value || actual.2 {
+                return invalid(
+                    "Squad groups need exact names, powered/inactive startup and repeatable flags",
+                );
+            }
+            if bindings.iter().any(|(class, other, groups)| {
+                !(*class == "ctrl" && *other == row.index) && groups.contains(&index)
+            }) {
+                return invalid("Squad groups cannot be shared by another native device");
+            }
+        }
+    }
+    Ok(())
+}
+pub fn reviewed_squads(
+    before: &str,
+    after: &str,
+    terminals: &[NativeSquadTerminal],
+) -> Result<Vec<FieldDifference>> {
+    validate_squad_batch(terminals)?;
+    let controls = terminals.iter().map(HubControl::from).collect::<Vec<_>>();
+    let (name, control, mut group, _, palette) = control_layout(before, &controls, 0)?;
+    transport::preserved_arrays(
+        before,
+        after,
+        &[
+            ("object_names", terminals.len()),
+            ("controls", terminals.len()),
+            (
+                "device_groups",
+                terminals.iter().map(|v| 2 + usize::from(v.readiness)).sum(),
+            ),
+            (
+                "control_palette",
+                palette.len() - array_listing(before, "control_palette")?.count,
+            ),
+        ],
+    )?;
+    let actual = squad_snapshots(after)?;
+    let mut differences = vec![];
+    for (index, terminal) in terminals.iter().enumerate() {
+        let row = actual
+            .iter()
+            .find(|row| row.terminal.number == terminal.number)
+            .ok_or_else(|| {
+                crate::SparkError::Invalid("Appended squad terminal is missing".into())
+            })?;
+        if row.control_index as usize != control + index
+            || row.name_index as usize != name + index
+            || row.power_group as usize != group
+            || row.position_group as usize != group + 1
+            || row.ready_group != terminal.readiness.then_some((group + 2) as i16)
+            || row.terminal.control_tag_path.replace('\\', "/")
+                != terminal.control_tag_path.replace('\\', "/")
+            || !positions_close(row.terminal.position, terminal.position)
+            || row
+                .terminal
+                .rotation_radians
+                .iter()
+                .zip(terminal.rotation_radians)
+                .any(|(a, b)| !facings_close(*a, b))
+        {
+            return invalid("Native squad output differs from the reviewed pose/control/groups");
+        }
+        differences.push(FieldDifference {
+            before: format!("No {} terminal", terminal.name()),
+            after: format!(
+                "Append {} at {:?}; readiness gate {}; native source and indices retained",
+                terminal.name(),
+                terminal.position,
+                terminal.readiness
+            ),
+        });
+        group += 2 + usize::from(terminal.readiness);
+    }
+    Ok(differences)
+}
+
+impl NativeSquadTerminalSnapshot {
+    pub fn validate(&self) -> Result<()> {
+        self.terminal.validate()?;
+        if self.control_index >= 100
+            || self.name_index >= 512
+            || !(0..128).contains(&self.power_group)
+            || !(0..128).contains(&self.position_group)
+            || self.power_group == self.position_group
+            || self.ready_group.is_some() != self.terminal.readiness
+            || self.ready_group.is_some_and(|g| {
+                !(0..128).contains(&g) || g == self.power_group || g == self.position_group
+            })
+        {
+            return invalid("Invalid native squad source snapshot");
+        }
+        Ok(())
+    }
+}
+pub fn verify_squad_cache(
+    expected: &[NativeSquadTerminalSnapshot],
+    cache: &Path,
+    map: &crate::maps::MapInspection,
+) -> Result<()> {
+    if expected.len() > 22
+        || map.header.scenario_type != 0
+        || map.header.version != 609
+        || map.header.extended
+    {
+        return invalid("Squad terminals require standard CE609 solo output");
+    }
+    let read = crate::maps::scenario_logic_readback(cache, map)?;
+    let mut seen = std::collections::BTreeSet::new();
+    for row in expected {
+        row.validate()?;
+        if !seen.insert(row.terminal.number) {
+            return invalid("Duplicate squad readback target");
+        }
+        let name = read
+            .names
+            .get(row.name_index as usize)
+            .ok_or_else(|| crate::SparkError::Invalid("Compiled squad name is absent".into()))?;
+        if name.name != row.terminal.name()
+            || name.object_type != 8
+            || name.object_index != row.control_index as i16
+        {
+            return invalid("Compiled squad name/type/index differs from source");
+        }
+        let devices = read
+            .devices
+            .iter()
+            .filter(|device| {
+                device.class == "ctrl"
+                    && device.index == row.control_index as usize
+                    && device.name_index == row.name_index as i16
+            })
+            .collect::<Vec<_>>();
+        if devices.len() != 1 {
+            return invalid("Compiled squad control binding is missing or ambiguous");
+        }
+        let device = devices[0];
+        if device.tag_path.replace('\\', "/") != row.terminal.control_tag_path.replace('\\', "/")
+            || !positions_close(device.position, row.terminal.position)
+            || device
+                .rotation_radians
+                .iter()
+                .zip(row.terminal.rotation_radians)
+                .any(|(a, b)| !facings_close(*a, b))
+            || device.power_group != Some(row.power_group)
+            || device.position_group != Some(row.position_group)
+        {
+            return invalid("Compiled squad pose/reference/groups differ from source");
+        }
+        for (index, suffix, value) in [
+            (Some(row.power_group), "power", 1.),
+            (Some(row.position_group), "position", 0.),
+            (row.ready_group, "ready", 0.),
+        ] {
+            if let Some(index) = index {
+                let group = read.groups.get(index as usize).ok_or_else(|| {
+                    crate::SparkError::Invalid("Compiled squad group is absent".into())
+                })?;
+                if group.name != format!("{}_{suffix}", row.terminal.name())
+                    || group.initial_value != value
+                    || group.flags != 0
+                    || read
+                        .groups
+                        .iter()
+                        .filter(|g| g.name.eq_ignore_ascii_case(&group.name))
+                        .count()
+                        != 1
+                {
+                    return invalid(
+                        "Compiled squad group identity/startup/flags differ from source",
+                    );
+                }
+                if read.devices.iter().any(|other| {
+                    !(other.class == "ctrl" && other.index == row.control_index as usize)
+                        && [other.power_group, other.position_group].contains(&Some(index))
+                }) {
+                    return invalid("Compiled squad group is shared by another device");
+                }
+            }
+        }
+        if !unique_volume(&read.volumes, "extraction_return")?.contains(device.position)
+            || unique_volume(&read.volumes, "extraction_zone")?.contains(device.position)
+        {
+            return invalid("Compiled squad terminal is outside its safe hub");
+        }
+    }
+    Ok(())
 }
