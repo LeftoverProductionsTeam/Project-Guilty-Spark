@@ -20,7 +20,7 @@ export function nativeCommandMatches(draft:NativeCommandDraft,context:NativeTagC
   /^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&draft.projectId===context.projectId&&draft.buildId===context.buildId&&
   draft.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&draft.sourceSha256===context.tagSha256&&
   draft.key===nativeCommandKey(context,original)&&JSON.stringify(draft.original)===JSON.stringify(original)&&
-  draft.list.index===original.index&&draft.list.name===original.name&&(draft.append||draft.list.commands.length===original.commands.length&&draft.list.points.length===original.points.length)&&!context.protectedCommandLists?.includes(original.index);
+  draft.list.index===original.index&&draft.list.name===original.name&&draft.list.commands.length>=original.commands.length&&draft.list.commands.length<=64&&draft.list.points.length>=original.points.length&&draft.list.points.length<=64&&!context.protectedCommandLists?.includes(original.index);
 }
 export function nativeRouteCommand(point:number):NativeCommand{return{atom:'go_to',modifier:0,parameters:[0,0],point1:point,point2:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1};}
 export function newNativeCommandRoute(context:NativeTagContext,name:string,position:[number,number,number]):NativeCommandDraft{

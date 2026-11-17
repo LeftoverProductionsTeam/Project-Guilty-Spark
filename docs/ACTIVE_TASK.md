@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - native Black Echo root-scenario authoring workflow
+Task: Operation110 - current Forerunner contract admission and Black Echo gameplay
 Status: implementation incomplete
-Starting revision: 8fdfe9141f7124db4c15ae2cd14375c0c3977e13, canonical master.
-Latest verified revision: 8fdfe91 plus canonical CE path/source-driver fix: actual root be_native AI Preview/Accept, script Undo/Redo, Save/3restarts/native compile/independent readback PASS. App3dd1b0e6/test map5e4f6556. Staging11PASS+1explicit skip; safe-path5PASS. Exact evidence: RUNTIME/c40 rootMission20261117.
-Next action: Complete structured dropship pilot/crew/route authoring through native UI against retained31505afb mission, reusing the corrected root-scenario workflow. Physical Forerunner flight/combat/settlement and full475IDs/M1-M6 remain pending; no repeat unchanged Windows-control failure, SDK duplication, Forerunner write or push.
+Starting revision: e531887070645e928fe2021d28104aa2db211add, canonical master.
+Latest verified revision: e531887 plus scoped route extension/CI/example fixes; TypeScript, frontend16, Rust command3/cache3/browser3, installed Invader1 and CE609/readback PASS. Exact evidence: RUNTIME/c40 nativeRouteExtension20261117. No game acceptance.
+Next action: Replace repeated Forerunner code pins with explicit persisted review of the existing versioned contract in runtime registration. Keep binary/DLL/profile hashes and stale guards. Current b428/8256a166 help+contract PASS, not launch-admitted. Then private31505afb Black Echo gameplay; desktop control now responds.
 
 ## Acceptance
 
@@ -151,7 +151,7 @@ Current: retained Pelican review map compiles/reads back/exports/reopens and pri
 
 ## Operations and safe checkpoint
 
-Current8fdfe91: QA47848/run-KaV6E4 CLOSED; all writers exited/root absent/runs[]/issues[]. Disposed3128987209logicalB; last allocation2899864672B, disposal allocation unavailable. Source2461tag hashes and31505afb review map unchanged. Exact native hashes/screenshots/failure/limits in RUNTIME/c40. Verify manifests and commit scoped fix locally.
+Current QA16649 CLOSED: route run665296380logicalB disposed (last allocated630461448; disposal unavailable); contract run39731641logical/39748128allocatedB disposed. Both roots absent/runs[]/issues[]; no game/app/hosted run. Original1ae5 scenario and31505 review map unchanged. Evidence:RUNTIME/c40.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

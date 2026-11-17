@@ -815,5 +815,269 @@
       "runs": [],
       "issues": []
     }
+  },
+  "nativeRouteExtension20261117": {
+    "baseRevision": "e531887070645e928fe2021d28104aa2db211add",
+    "scope": "Existing route tail additions through the current review/accept writer; not aircraft navigation or gameplay",
+    "sourceSha256": "0f5c99597d06d4875110549d5ab384d72ff5ff3e3eacb463bb15126ad4f554e9",
+    "originalScenarioSha256": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207",
+    "retainedReviewMapSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+    "invaderEditSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "invaderBuildSha256": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+    "native": [
+      {
+        "bytes": 106368484,
+        "cacheVersion": 609,
+        "commandLists": 2,
+        "gameplayVerified": false,
+        "scenarioType": 0,
+        "sha256": "a3e3219f133aa7208836c6bdcaecb74c2ede63df77a328402f02d9d6766c564f"
+      },
+      [
+        {
+          "extendedAcceptedRoute": true,
+          "index": 0,
+          "name": "pilot_route_0",
+          "points": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ],
+          "scenarioSha256": "c5c7c878984812a2b1073ee205371e38fdcff8bad143241e2c5b20ca4b7ea002",
+          "source": "fresh",
+          "unchangedPreviousLists": 0
+        },
+        {
+          "extendedAcceptedRoute": true,
+          "index": 1,
+          "name": "pilot_route_1",
+          "points": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ],
+          "scenarioSha256": "1a3d50cce68aa34f42aad2176b767501b401b09446bb8b831576a291df5efa9d",
+          "source": "fresh",
+          "unchangedPreviousLists": 1
+        },
+        {
+          "extendedAcceptedRoute": true,
+          "index": 0,
+          "name": "pilot_route_0",
+          "points": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ],
+          "scenarioSha256": "86debfcd1ea15e53a9805cca6445b40fc0e5a0065a6d9255925e905faad519ba",
+          "source": "owned_original",
+          "unchangedPreviousLists": 0
+        },
+        {
+          "extendedAcceptedRoute": true,
+          "index": 1,
+          "name": "pilot_route_1",
+          "points": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ],
+          "scenarioSha256": "483aab3e97ac7fcacc9793df4b61308bf7728ff35ebe94941cafaf3799b8bb84",
+          "source": "owned_original",
+          "unchangedPreviousLists": 1
+        }
+      ]
+    ],
+    "checks": {
+      "qaValidateExample": "cargo check -p spark-core --example qa_validate --locked --offline PASS",
+      "typescript": "PASS",
+      "frontend": "16 PASS",
+      "rustRoutes": "3 PASS, 2 installed tests explicitly ignored in ordinary run",
+      "installedRoute": "1 PASS including CE609 compile and all command/point readback",
+      "browser": "3 PASS synthetic IPC; no native Windows UI acceptance",
+      "cacheGuards": "3 PASS, 1 installed test explicitly ignored"
+    },
+    "initialFailures": [
+      "Browser and Rust filters initially selected zero tests; not counted; corrected from actual discovered names",
+      "Browser Restore fixture incorrectly restored its initial empty inventory instead of the immediate reviewed baseline; fixed per-preview snapshot and exact pre/post hash",
+      "Native fixture used project::JobEvent instead of build::JobEvent; compilation failed and was repaired"
+    ],
+    "disposal": {
+      "workflow": "native-route-extend",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 665296380,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 692299568,
+      "allocatedBytes": 630461448,
+      "monitoringSamples": 59,
+      "monitoringMs": 9612.577799999803,
+      "sourceMonitoring": {
+        "scope": "Source and new top-level output; protected games/Git/dependencies are not traversed",
+        "currentLogicalBytes": 67426472,
+        "peakLogicalBytes": 67426474,
+        "excludedTopLevel": [
+          ".git",
+          ".toolchain",
+          "node_modules",
+          "tools",
+          ".research",
+          "preserved",
+          "releases",
+          "halo custom edition",
+          "opencehalo-windows-release",
+          "runtimes",
+          "chupathingyce-windows64-release",
+          "pyros zombie apocolypse mod versions",
+          "sample code",
+          "halo - combat evolved (usa).xiso.iso"
+        ],
+        "error": null
+      }
+    },
+    "rootRemoved": true,
+    "runs": [],
+    "issues": [],
+    "gameplayVerified": false
+  },
+  "forerunnerContract20261117": {
+    "executableSha256": "b428588dd363b066fe276798bda74a65dae0fae9c44ee9414909d969d187e1a9",
+    "sdlSha256": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0",
+    "capabilities": {
+      "schema": "spark-forerunner.runtime-capabilities",
+      "contract_version": 1,
+      "engine": "Forerunner",
+      "build": {
+        "upstream_version": "0.9.1-dev",
+        "commit": "8256a166",
+        "platform": "Windows",
+        "architecture": "x64"
+      },
+      "simulation_hz": 30,
+      "network": {
+        "advertised_version": 45,
+        "native_layout_version": 44
+      },
+      "operations": [
+        "runtime.discover"
+      ],
+      "process_entrypoints": [
+        "--version",
+        "--help",
+        "--config",
+        "--server",
+        "--probe"
+      ],
+      "native_features": [
+        "extraction.squad_objectives.v1",
+        "extraction.squad_notices.v1",
+        "extraction.squad_radio.v1"
+      ],
+      "startup_map": {
+        "setting": "game.start_map",
+        "environment": "HALO_START_MAP",
+        "selector": "basename@ce",
+        "cache_version": 609,
+        "scenario_type": "solo",
+        "profile": "native-menu-create-or-existing",
+        "fresh_start": true,
+        "network_host": false
+      },
+      "upstream_projects": [
+        "OpenCE",
+        "ChupathingyCE",
+        "FractumSeraph/OpenCE"
+      ]
+    },
+    "capabilitiesStdoutSha256": "35d1f1e588aa7e48722559033ad6057d199e6ace03ac2dc9a1ab19dc7774b3473",
+    "helpExitCode": 0,
+    "capabilitiesExitCode": 0,
+    "stderr": "Power-throttling diagnostic; stdout is valid contract JSON. Initial merged-stream parse failed; separated streams passed, matching existing production query.",
+    "originalsUnchanged": true,
+    "gameLaunched": false,
+    "desktopControl": "sky.list_windows now available; no application input performed",
+    "admission": "Current b428 build remains outside static launch pins. No new SHA allowlist entry or launch bypass. Extend existing registration with explicit contract review and frozen executable/dependency integrity before staging.",
+    "disposal": {
+      "workflow": "forerunner-contract-inspection",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 39731641,
+      "disposedAllocatedFileBytes": 39748128,
+      "peakLogicalBytes": 39736444,
+      "allocatedBytes": 39756320,
+      "monitoringSamples": 7,
+      "monitoringMs": 366.0661000000546,
+      "sourceMonitoring": {
+        "scope": "Source and new top-level output; protected games/Git/dependencies are not traversed",
+        "currentLogicalBytes": 67426472,
+        "peakLogicalBytes": 67426472,
+        "excludedTopLevel": [
+          ".git",
+          ".toolchain",
+          "node_modules",
+          "tools",
+          ".research",
+          "preserved",
+          "releases",
+          "halo custom edition",
+          "opencehalo-windows-release",
+          "runtimes",
+          "chupathingyce-windows64-release",
+          "pyros zombie apocolypse mod versions",
+          "sample code",
+          "halo - combat evolved (usa).xiso.iso"
+        ],
+        "error": null
+      }
+    },
+    "rootRemoved": true,
+    "runs": [],
+    "issues": []
   }
 }

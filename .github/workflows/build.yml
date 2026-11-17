@@ -1,7 +1,6 @@
 name: CI
 on:
-  push:
-  pull_request:
+  # Owner starts hosted validation explicitly; local checks remain available.
   workflow_dispatch:
 permissions:
   contents: read

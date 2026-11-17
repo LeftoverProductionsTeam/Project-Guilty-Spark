@@ -6,7 +6,7 @@ use std::path::Path;
 fn main() -> spark_core::Result<()> {
     let a: Vec<String> = std::env::args().collect();
     if a.len() != 4 {
-        eprintln!("Usage: qa_validate <isolated data dir> <owned MCC map> <Invader dir>");
+        eprintln!("Usage: qa_validate <isolated data dir> <owned MCC or CE map> <Invader dir>");
         std::process::exit(2)
     }
     std::fs::create_dir_all(&a[1])?;
@@ -19,7 +19,7 @@ fn main() -> spark_core::Result<()> {
         ..Default::default()
     };
     let id = uuid::Uuid::new_v4().to_string();
-    let record = build::validate_existing_mcc(
+    let record = build::validate_existing_cache(
         &p,
         &i,
         &tools,

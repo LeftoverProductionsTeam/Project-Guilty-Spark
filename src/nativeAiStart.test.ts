@@ -142,3 +142,10 @@ it('new native routes share source-checked viewport drafts without accepting sta
  expect(nativeCommandMatches({...expanded,list:{...expanded.list,points:[]}},source)).toBe(false);expect(source.commandSource.lists).toHaveLength(1);
  const empty={...source,commandSource:{...source.commandSource,lists:[]}};expect(nativeCommandMatches(newNativeCommandRoute(empty,'pilot_insertion',[1,2,3]),empty)).toBe(true);
 });
+
+it('retains existing route drafts when extending tails, while rejecting removals, stale originals and capacity overflow',()=>{
+ const {source,view}=commandFixture();const extended={...view,list:{...view.list,points:[...view.list.points,[7,8,9] as [number,number,number]],commands:[...view.list.commands,nativeRouteCommand(2)]},point:2};
+ expect(nativeCommandMatches(extended,source)).toBe(true);expect(nativeCommandDrag(extended,extended,[8,9,10],true)?.list.points[2]).toEqual([8,9,10]);
+ for(const list of [{...extended.list,points:[]},{...extended.list,commands:[]},{...extended.list,points:Array.from({length:65},()=>[1,2,3] as [number,number,number])},{...extended.list,commands:Array.from({length:65},()=>nativeRouteCommand(0))}])expect(nativeCommandMatches({...extended,list},source)).toBe(false);
+ expect(nativeCommandMatches({...extended,original:{...view.original,name:'another'}},source)).toBe(false);expect(nativeCommandMatches(extended,{...source,protectedCommandLists:[2]})).toBe(false);expect(source.commandSource.lists[0]).toEqual(view.original);
+});

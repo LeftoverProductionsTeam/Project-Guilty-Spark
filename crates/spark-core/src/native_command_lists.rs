@@ -43,13 +43,15 @@ fn inventory(fields:&str)->Result<Vec<(NativeCommandList,Vec<usize>)>>{
 }
 pub fn arguments(tags:&Path,tag:&str,before:&str,list:&NativeCommandList)->Result<Vec<String>>{
  list.validate()?;let current=source(before)?;let old=current.lists.get(list.index as usize).ok_or_else(||crate::SparkError::Invalid("Native command-list index missing".into()))?;
- if old.name!=list.name||old.commands.len()!=list.commands.len()||old.points.len()!=list.points.len(){return invalid("Preserve command-list name and existing command/point indices; structural changes need a separate review");}if old.close(list){return invalid("Native command list already matches");}
+ if old.name!=list.name||old.commands.len()>list.commands.len()||old.points.len()>list.points.len(){return invalid("Preserve command-list name and every existing command/point index; only tail additions are supported");}if old.close(list){return invalid("Native command list already matches");}
  for c in &list.commands{for(v,n)in [c.animation,c.script,c.recording,c.object_name].into_iter().zip(current.reference_counts){if v>=0&&v as usize>=n{return invalid("Native command references a missing scenario binding");}}}
  if list.flags[5]&&(list.bsp<0||list.bsp as usize>=current.reference_counts[4]){return invalid("Manual command BSP needs an existing scenario BSP");}
- let prefix=format!("command_lists[{}]",list.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];let mut set=|key:String,value:String|args.extend(["-S".into(),key,value]);
+ let prefix=format!("command_lists[{}]",list.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+ for (name,old_count,new_count) in [("commands",old.commands.len(),list.commands.len()),("points",old.points.len(),list.points.len())] {if new_count>old_count {args.extend(["-I".into(),format!("{prefix}.{name}"),(new_count-old_count).to_string(),"end".into()]);}}
+ let mut set=|key:String,value:String|args.extend(["-S".into(),key,value]);
  for(i,key)in FLAGS.iter().enumerate(){if old.flags[i]!=list.flags[i]{set(format!("{prefix}.flags.{key}"),u8::from(list.flags[i]).to_string());}}if old.bsp!=list.bsp{set(format!("{prefix}.manual_bsp_index"),list.bsp.to_string());}
- for(i,(old,new))in old.commands.iter().zip(&list.commands).enumerate(){let fields=|c:&NativeCommand|[c.atom.clone(),c.modifier.to_string(),c.parameters[0].to_string(),c.parameters[1].to_string(),c.point1.to_string(),c.point2.to_string(),c.animation.to_string(),c.script.to_string(),c.recording.to_string(),c.command.to_string(),c.object_name.to_string()];for((a,b),key)in fields(old).into_iter().zip(fields(new)).zip(["atom_type","atom_modifier","parameter1","parameter2","point_1","point_2","animation","script","recording","command","object_name"]){if a!=b{set(format!("{prefix}.commands[{i}].{key}"),b);}}}
- for(i,(a,b))in old.points.iter().zip(&list.points).enumerate(){if !positions_close(*a,*b){set(format!("{prefix}.points[{i}].position"),b.map(|n|n.to_string()).join(","));}}args.push(tag.into());Ok(args)
+ for(i,new)in list.commands.iter().enumerate(){let old=old.commands.get(i);let fields=|c:&NativeCommand|[c.atom.clone(),c.modifier.to_string(),c.parameters[0].to_string(),c.parameters[1].to_string(),c.point1.to_string(),c.point2.to_string(),c.animation.to_string(),c.script.to_string(),c.recording.to_string(),c.command.to_string(),c.object_name.to_string()];for((a,b),key)in old.map(fields).map(|values|values.map(Some)).unwrap_or_else(||std::array::from_fn(|_|None)).into_iter().zip(fields(new)).zip(["atom_type","atom_modifier","parameter1","parameter2","point_1","point_2","animation","script","recording","command","object_name"]){if a.as_ref()!=Some(&b){set(format!("{prefix}.commands[{i}].{key}"),b);}}}
+ for(i,b)in list.points.iter().enumerate(){if !old.points.get(i).is_some_and(|a|positions_close(*a,*b)){set(format!("{prefix}.points[{i}].position"),b.map(|n|n.to_string()).join(","));}}args.push(tag.into());Ok(args)
 }
 
 /// Append one explicitly reviewed route. Existing indices and source bodies stay stable.
@@ -75,7 +77,38 @@ pub fn reviewed_append(before:&str,after:&str,list:&NativeCommandList)->Result<V
  let actual=source(after)?;if !actual.lists.last().is_some_and(|row|row.close(list)){return invalid("New native route differs from the reviewed commands/points/references");}
  Ok(vec![FieldDifference{before:format!("{} native command lists; no list at index{}",old.count,list.index),after:format!("New route {} at index{}: {} commands, {} points; existing lists/AI bindings preserved",list.name,list.index,list.commands.len(),list.points.len())}])
 }
+/// Compare the original layout after removing only explicitly admitted tails.
+/// Normalize Invader tree branches; unknown fields and all existing indices stay.
+fn retained_layout(fields:&str,index:usize,commands:usize,points:usize)->Result<String>{
+ let block=array_listing(fields,"command_lists")?;
+ let mut items=array_items(&block,"command_lists")?.into_iter().map(|item|item.to_vec()).collect::<Vec<_>>();
+ let selected=items.get(index).ok_or_else(||crate::SparkError::Invalid("Command route missing during preservation review".into()))?;
+ let mut root=direct_struct_fields(selected)?;
+ for (name,count) in [("commands",commands),("points",points)] {
+  let array=array_listing(&root,name)?;
+  if array.count<count{return invalid("Command review removed existing indices");}
+  let entries=array_items(&array,name)?;
+  let replacement=std::iter::once(format!("{name}[{count}] array")).chain(entries.iter().take(count).flat_map(|entry|entry.iter().cloned())).collect::<Vec<_>>();
+  let mut lines=root.lines().map(str::to_owned).collect::<Vec<_>>();lines.splice(array.start..array.end,replacement);root=lines.join("\n");
+ }
+ items[index]=std::iter::once(format!("    command_lists[{index}] struct")).chain(root.lines().map(|line|format!("        {line}"))).collect();
+ let mut lines=fields.lines().map(str::to_owned).collect::<Vec<_>>();
+ lines.splice(block.start..block.end,std::iter::once(format!("command_lists[{}] array",block.count)).chain(items.into_iter().flatten()));
+ Ok(lines.join("\n"))
+}
 pub fn reviewed(before:&str,after:&str,list:&NativeCommandList)->Result<Vec<FieldDifference>>{
+ arguments(Path::new("tags"),"review.scenario",before,list)?;
+ let original=source(before)?.lists.get(list.index as usize).cloned().ok_or_else(||crate::SparkError::Invalid("Command list missing".into()))?;
+ if original.commands.len()!=list.commands.len()||original.points.len()!=list.points.len(){
+  let actual=source(after)?;if !actual.lists.get(list.index as usize).is_some_and(|value|value.close(list)){return invalid("Extended native route differs from reviewed commands/points/references");}
+  let retained_before=retained_layout(before,list.index as usize,original.commands.len(),original.points.len())?;
+  let retained_after=retained_layout(after,list.index as usize,original.commands.len(),original.points.len())?;
+  let old=inventory(&retained_before)?;let allowed=&old[list.index as usize].1;
+  let a=retained_before.lines().collect::<Vec<_>>();let b=retained_after.lines().collect::<Vec<_>>();
+  if a.len()!=b.len()||a.iter().zip(&b).enumerate().any(|(i,(a,b))|a!=b&&!allowed.contains(&i)){return invalid("Route extension changed unrelated fields or existing native structure");}
+  let mut differences=a.iter().zip(&b).filter(|(a,b)|a!=b).map(|(a,b)|FieldDifference{before:(*a).into(),after:(*b).into()}).collect::<Vec<_>>();
+  differences.push(FieldDifference{before:format!("{} commands / {} points",original.commands.len(),original.points.len()),after:format!("{} commands / {} points; existing indices preserved",list.commands.len(),list.points.len())});return Ok(differences);
+ }
  let old=inventory(before)?;let new=inventory(after)?;let(a,allowed)=old.get(list.index as usize).ok_or_else(||crate::SparkError::Invalid("Command list missing".into()))?;let(b,new_allowed)=new.get(list.index as usize).ok_or_else(||crate::SparkError::Invalid("Revised command list missing".into()))?;
  if old.len()!=new.len()||a.name!=list.name||!b.close(list)||allowed!=new_allowed{return invalid("Command-list source identity/structure or requested values changed");}let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();if a.len()!=b.len(){return invalid("Command edit changed native structure");}let mut differences=vec![];for(i,(a,b))in a.iter().zip(b).enumerate(){if *a!=b{if !allowed.contains(&i){return invalid("Command edit changed unrelated scenario fields");}differences.push(FieldDifference{before:(*a).into(),after:b.into()});}}if differences.is_empty(){return invalid("Command edit changed no fields");}Ok(differences)
 }
@@ -87,6 +120,19 @@ mod tests{
   let mut text=String::from("command_lists[1] array\n    command_lists[0] struct\n        name (route) string\n        flags bitmask\n");for f in FLAGS{text+=&format!("            {f} (0) bitfield\n");}text+="        manual_bsp_index (65535) index\n        commands[1] array\n            commands[0] struct\n                atom_type enum\n";for(i,a)in COMMAND_ATOMS.iter().enumerate(){text+=&format!("                    {a}{} enum value\n",if i==0{" (*)"}else{""});}for(k,v)in [("atom_modifier","0"),("parameter1","0"),("parameter2","0"),("point_1","65535"),("point_2","65535"),("animation","65535"),("script","65535"),("recording","65535"),("command","65535"),("object_name","65535")]{text+=&format!("                {k} ({v}) number\n");}text+="        points[1] array\n            points[0] struct\n                position (1,2,3) point3d\nai_animation_references[0] array\nai_script_references[0] array\nai_recording_references[0] array\nobject_names[0] array\nstructure_bsps[0] array\n";text
  }
  #[test]fn existing_commands_preserve_structure_and_reject_missing_references_or_unrelated_edits(){let before=fixture();let original=source(&before).unwrap().lists[0].clone();let mut list=original.clone();list.commands[0].parameters[0]=1.25;list.points[0]=[4.,5.,6.];let args=arguments(Path::new("tags"),"level.scenario",&before,&list).unwrap();assert_eq!(args.iter().filter(|a|a.as_str()=="-S").count(),2);let after=before.replace("parameter1 (0)","parameter1 (1.25)").replace("position (1,2,3)","position (4,5,6)");assert_eq!(reviewed(&before,&after,&list).unwrap().len(),2);assert!(reviewed(&before,&after.replace("name (route)","name (other)"),&list).is_err());let mut bad=list.clone();bad.commands[0].script=0;assert!(arguments(Path::new("tags"),"level.scenario",&before,&bad).is_err());bad=list.clone();bad.commands[0].point1=1;assert!(bad.validate().is_err());bad=list.clone();bad.commands.clear();assert!(arguments(Path::new("tags"),"level.scenario",&before,&bad).is_err());bad=list;bad.points[0][0]=f32::NAN;assert!(bad.validate().is_err());assert!(arguments(Path::new("tags"),"level.scenario",&before,&original).is_err());}
+
+ #[test]fn route_extensions_keep_old_indices_and_reject_unrelated_or_unknown_field_changes(){
+  let before=fixture().replace("                position (1,2,3) point3d","                position (1,2,3) point3d\n                surface_index (65535) index");
+  let old=source(&before).unwrap().lists[0].clone();let mut list=old.clone();list.commands.push(NativeCommand{atom:"go_to".into(),modifier:1,parameters:[0.,0.],point1:1,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1});list.points.push([4.,5.,6.]);
+  let args=arguments(Path::new("tags"),"level.scenario",&before,&list).unwrap();assert_eq!(args.iter().filter(|a|a.as_str()=="-I").count(),2);
+  let command_start=before.find("            commands[0] struct").unwrap();let command_end=before.find("        points[1] array").unwrap();
+  let added=before[command_start..command_end].replace("commands[0]","commands[1]").replace("pause (*)","pause").replace("go_to enum","go_to (*) enum").replace("atom_modifier (0)","atom_modifier (1)").replace("point_1 (65535)","point_1 (1)");
+  let after=before.replace("commands[1] array","commands[2] array").replace("        points[1] array",&format!("{added}        points[2] array")).replace("ai_animation_references[0] array","            points[1] struct\n                position (4,5,6) point3d\n                surface_index (65535) index\nai_animation_references[0] array");
+  assert!(source(&after).unwrap().lists[0].close(&list));assert_eq!(reviewed(&before,&after,&list).unwrap().len(),1);
+  for changed in [after.replacen("surface_index (65535)","surface_index (1)",1),after.replace("name (route)","name (other)"),after.replace("ai_script_references[0]","ai_script_references[1]"),after.replace("parameter1 (0)","parameter1 (1)")]{assert!(reviewed(&before,&changed,&list).is_err());}
+  list.commands[0].command=1;let chained=after.replacen("command (65535)","command (1)",1);assert!(reviewed(&before,&chained,&list).is_ok());
+  let mut bad=list.clone();bad.points.remove(0);assert!(arguments(Path::new("tags"),"level.scenario",&before,&bad).is_err());bad=list.clone();bad.commands[0].script=0;assert!(arguments(Path::new("tags"),"level.scenario",&before,&bad).is_err());
+ }
 
  #[test]fn appended_routes_preserve_original_inventory_and_legacy_operation_shape(){
   let before=fixture();let old=source(&before).unwrap().lists[0].clone();let mut list=old.clone();list.index=1;list.name="pelican_approach".into();list.points[0]=[4.,5.,6.];
@@ -111,8 +157,22 @@ mod tests{
    for phase in 0..2 {let before=run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()]);let current=source(&before).unwrap();let new=NativeCommandList{index:current.lists.len() as u16,name:format!("pilot_route_{phase}"),flags:[false,false,false,false,false,supplied],bsp:if supplied{0}else{-1},points:vec![[1.,2.,3.],[4.,5.,6.]],commands:vec![NativeCommand{atom:"go_to".into(),modifier:0,parameters:[0.,0.],point1:0,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1},NativeCommand{atom:"go_to".into(),modifier:0,parameters:[0.,0.],point1:1,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1}]};
     let operation=Operation::CommandList{list:new.clone(),append:true,source_sha256:crate::maps::hash_file(&file).unwrap()};let args=operation.arguments_with_fields(&tags,"scnr",&tag,&before).unwrap();for batch in operation.argument_batches(args,false).unwrap(){run(batch);}
     let after=run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()]);reviewed_difference(&before,&after,&operation).unwrap();let actual=source(&after).unwrap();assert_eq!(actual.lists.len(),current.lists.len()+1);assert!(actual.lists[..current.lists.len()].iter().zip(&current.lists).all(|(a,b)|a.close(b)));assert!(actual.lists.last().unwrap().close(&new));let mut read=String::new();for batch in operation.argument_batches(operation.readback_arguments(&tags,"scnr",&tag,&before).unwrap().unwrap(),true).unwrap(){read+=&run(batch);}operation.verify_readback(&tags,"scnr",&tag,&before,&read).unwrap();
-    evidence.push(serde_json::json!({"source":name,"index":new.index,"name":new.name,"points":new.points,"scenarioSha256":crate::maps::hash_file(&file).unwrap(),"unchangedPreviousLists":current.lists.len()}));
+    let mut extended=new.clone();extended.points.push([7.,8.,9.]);let mut command=extended.commands.last().unwrap().clone();command.point1=2;extended.commands.push(command);extended.commands[0].modifier=1;
+    let edit=Operation::CommandList{list:extended.clone(),append:false,source_sha256:crate::maps::hash_file(&file).unwrap()};for batch in edit.argument_batches(edit.arguments_with_fields(&tags,"scnr",&tag,&after).unwrap(),false).unwrap(){run(batch);}
+    let updated=run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()]);reviewed_difference(&after,&updated,&edit).unwrap();let mut read=String::new();for batch in edit.argument_batches(edit.readback_arguments(&tags,"scnr",&tag,&after).unwrap().unwrap(),true).unwrap(){read+=&run(batch);}edit.verify_readback(&tags,"scnr",&tag,&after,&read).unwrap();
+    let actual=source(&updated).unwrap();assert!(actual.lists.last().unwrap().close(&extended));assert!(actual.lists[..current.lists.len()].iter().zip(&current.lists).all(|(a,b)|a.close(b)));
+    evidence.push(serde_json::json!({"source":name,"index":extended.index,"name":extended.name,"points":extended.points,"scenarioSha256":crate::maps::hash_file(&file).unwrap(),"unchangedPreviousLists":current.lists.len(),"extendedAcceptedRoute":true}));
    }
+   if supplied {if let Some(shared)=std::env::var_os("SPARK_NATIVE_ROUTE_SHARED_TAGS"){
+    let shared=std::path::PathBuf::from(shared).canonicalize().unwrap();assert!(!shared.starts_with(&root));crate::reject_links(&shared).unwrap();
+    let builder=tool.parent().unwrap().join("invader-build.exe");let builder_sha=crate::maps::hash_file(&builder).unwrap();let maps=temp.path().join("maps");fs::create_dir(&maps).unwrap();
+    let cancel=std::sync::atomic::AtomicBool::new(false);let on_event=|event:crate::build::JobEvent|{if event.severity=="warning"||event.severity=="error"{eprintln!("{}: {}",event.phase,event.message);}};
+    let runner=crate::build::Runner{id:"route-extension",project:"owned-route-fixture",cancel:&cancel,event:&on_event};
+    runner.run(&builder,&["-t".into(),tags.to_string_lossy().into_owned(),"-t".into(),shared.to_string_lossy().into_owned(),"-m".into(),maps.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),name.into()],temp.path(),"compile-ce",90).unwrap();
+    let cache=maps.join(format!("{name}.map"));let map=crate::maps::inspect_map(&cache,None).unwrap();assert_eq!(map.header.version,609);assert_eq!(map.header.scenario_type,0);
+    let expected=source(&run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()])).unwrap().lists;let readback=crate::maps::scenario_command_readback(&cache,&map).unwrap();assert_eq!(expected.len(),readback.len());assert!(expected.iter().zip(&readback).all(|(a,b)|a.close(b)));
+    assert_eq!(builder_sha,crate::maps::hash_file(&builder).unwrap());println!("NATIVE_ROUTE_CACHE {}",serde_json::json!({"sha256":map.sha256,"bytes":fs::metadata(&cache).unwrap().len(),"cacheVersion":609,"scenarioType":0,"commandLists":readback.len(),"gameplayVerified":false}));
+   }}
    if !supplied{let data=temp.path().join("data/scripts");fs::create_dir_all(&data).unwrap();fs::write(data.join("pilot.hsc"),"(script static void pilot_launch (ai_command_list pilot pilot_route_0))\n").unwrap();let compiler=tool.parent().unwrap().join("invader-script.exe");let result=Command::new(compiler).args(["-t"]).arg(&tags).arg("-d").arg(temp.path().join("data")).args(["-g","gbx-custom","-E",name]).current_dir(temp.path()).output().unwrap();assert!(result.status.success(),"Native route HSC: {}",String::from_utf8_lossy(&result.stderr));assert!(run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),tag.clone()]).contains("pilot_launch"));}
    fs::write(&file,&initial_bytes).unwrap();assert_eq!(initial_sha,crate::maps::hash_file(&file).unwrap());
   }
