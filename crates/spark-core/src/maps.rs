@@ -229,6 +229,8 @@ pub struct ShaderSelfIllumination {pub source:u16,pub function:u16,pub period:f3
 #[serde(rename_all="camelCase")]
 pub struct ShaderReflection {
     pub bitmap_tag_id:u32,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub native_type:Option<u16>,
     pub perpendicular_brightness:f32,
     pub parallel_brightness:f32,
     pub perpendicular_tint:[f32;3],
@@ -1324,7 +1326,7 @@ fn shader_bitmap_references(
         let perp=if model{tint(0x148)}else if glass{tint(0x90)}else{tint(0x2a8)};let para=if model{tint(0x158)}else if glass{tint(0xa0)}else{tint(0x2b4)};
         let falloff=if model{r.f32(at+0x13c)?}else{0.};let cutoff=if model{r.f32(at+0x140)?}else{0.};
         if [perpendicular,parallel].iter().all(|v|v.is_finite()&&(0.0..=1.0).contains(v))&&perp.iter().chain(&para).all(|v|v.is_finite()&&(0.0..=1.0).contains(v))&&[falloff,cutoff].iter().all(|v|v.is_finite()&&(0.0..=1e6).contains(v)){
-            Some(ShaderReflection{bitmap_tag_id:reference.target_id,perpendicular_brightness:perpendicular,parallel_brightness:parallel,perpendicular_tint:perp,parallel_tint:para,falloff,cutoff})
+            Some(ShaderReflection{bitmap_tag_id:reference.target_id,native_type:if tag.class=="senv"{Some(r.u16(at+0x2d2)?).filter(|mode|*mode<=2)}else{None},perpendicular_brightness:perpendicular,parallel_brightness:parallel,perpendicular_tint:perp,parallel_tint:para,falloff,cutoff})
         }else{None}
     }else{None};
     let glass=tag.class=="sgla";
@@ -2060,6 +2062,10 @@ mod shader_dependency_tests {
         install_ref(&mut bytes,at+0x88,88,b"mtib");bytes[at+40..at+42].copy_from_slice(&1u16.to_le_bytes());
         let mut environment=shader_fixture("senv");shader_bitmap_references(&Reader(&bytes),&region,&mut environment,&ids,at).unwrap();
         let preview=environment.shader_preview.unwrap();assert!(preview.alpha_test);assert!(!preview.detail_after_reflection);
+    }
+    #[test]fn environment_reflection_mode_survives_source_inspection_without_editing_bytes(){
+        let mut bytes=vec![0u8;1200];let at=64;install_ref(&mut bytes,at+0x88,17,b"mtib");install_ref(&mut bytes,at+0x324,18,b"mtib");let ids=std::collections::HashMap::from([(17,"bitm".into()),(18,"bitm".into())]);let region=Space{begin:0,end:bytes.len(),address:0};
+        for mode in [0u16,1,2,3,u16::MAX]{bytes[at+0x2d2..at+0x2d4].copy_from_slice(&mode.to_le_bytes());let before=bytes.clone();let mut tag=shader_fixture("senv");shader_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,at).unwrap();let reflection=tag.shader_preview.unwrap().reflection.unwrap();assert_eq!(reflection.native_type,Some(mode).filter(|v|*v<=2));assert_eq!(bytes,before);let mut old=serde_json::to_value(&reflection).unwrap();old.as_object_mut().unwrap().remove("nativeType");assert_eq!(serde_json::from_value::<ShaderReflection>(old).unwrap().native_type,None);}
     }
     #[test]
     fn native_model_decals_disable_cutout_without_changing_opaque_or_environment_flags(){

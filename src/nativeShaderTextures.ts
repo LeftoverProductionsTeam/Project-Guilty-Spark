@@ -2,6 +2,8 @@ import type {MeshData,ShaderPreview} from './types';
 /** Only an explicitly null native glass diffuse map permits texture-free
  * diffuse contribution. Missing/corrupt required images remain failures. */
 export const glassWithoutDiffuse=(shader:ShaderPreview|undefined|null)=>shader?.kind==='glass'&&shader.glassDiffuseAbsent===true;
+/** Native bumped cube reflection is source behavior, independent of optional enhancements. */
+export const nativeBumpedReflection=(shader:ShaderPreview|undefined|null)=>shader?.kind==='environment'&&shader.reflection?.nativeType===0;
 /** Labels emitted by the bounded native shader readers. Keep the preview and
  * world paths in agreement; generic transparent stages are not Chicago tags. */
 export function nativeShaderTextureRole(label: string): string | undefined {

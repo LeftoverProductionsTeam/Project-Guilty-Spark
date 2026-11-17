@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - current Forerunner contract admission and Black Echo gameplay
+Task: Operation110 - reviewed Forerunner handoff and viewport corrections
 Status: implementation incomplete
-Starting revision: e531887070645e928fe2021d28104aa2db211add, canonical master.
-Latest verified revision: e531887 plus scoped route extension/CI/example fixes; TypeScript, frontend16, Rust command3/cache3/browser3, installed Invader1 and CE609/readback PASS. Exact evidence: RUNTIME/c40 nativeRouteExtension20261117. No game acceptance.
-Next action: Replace repeated Forerunner code pins with explicit persisted review of the existing versioned contract in runtime registration. Keep binary/DLL/profile hashes and stale guards. Current b428/8256a166 help+contract PASS, not launch-admitted. Then private31505afb Black Echo gameplay; desktop control now responds.
+Starting revision: b2d8e4c6d0cf4945c9fdcd877894374376091df9, canonical master.
+Latest verified revision: b2d8e4c6d0cf4945c9fdcd877894374376091df9 plus scoped changes in this checkpoint commit: reviewed profiles/native persistence, drawer sizing, source reflection. Focused checks/Windows build pass; gameplay and exact base appearance OPEN.
+Next action: Identify the visible base shader and reproduce the reported reflection motion; preserve source shading. Then obtain the full DeLa/schi offending datum before fixing/retrying Black Echo. Existing runtime review is verified; Forerunner read-only. No active QA; no push/hosted jobs.
 
 ## Acceptance
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current source: prior8fdfe91 native handoff/export/readiness preserved. Canonical CE source/tags/data/output paths fix false missing deep imports; native driver uses actual scenario identity/recovery paths and reports preflight failures without waiting for a nonexistent BuildRecord. Full root-source native UI workflow passes.
+Current source: existing registration retains explicit Forerunner contract/EXE/SDL review; canonical-path Save defect repaired and native restart persisted. Source environment reflection mode/default bump loading and drawer flex restored. Focused core6+1skip/desktop3/parser1/browser9/frontend21, TypeScript and Windows build PASS. Native0page errors/5normal closes. Exact hashes, failures and screenshots: RUNTIME/c40 reviewedForerunnerAndRendering20261117. Prior root-source/CI/route proofs retained.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -108,10 +108,6 @@ Historical239373f/f5082e09 original AI proposal/source-control details remain in
 
 Historical Source472b10b: evidence remains in Git1f28be0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no prior native/game/peer acceptance is upgraded.
 
-Historical Current source f5082e09 evidence remains in Git1f28be0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no prior native/game/peer acceptance is upgraded.
-
-Historical Focused validation: frontend Vite evidence remains in Git1f28be0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107; no prior native/game/peer acceptance is upgraded.
-
 Earlier source details are preserved in Gitfec34a0:docs/ACTIVE_TASK.md and RUNTIME_INTEGRATION_20261107.md, not removed from history: mission HUD/checkpoint/endingb0b5336, mission reconciliationd6f7ce7, native mission attachment e2c3ff0, original script drafts129ecbe/module selection5a06bf0, independent campaign/loadout, native ctrl marker workflows9f99f29 and GPU direct-light draft63f1fed. They remain implementation/partial automation, not native/UI/gameplay acceptance. Full visual HUD/arrays, original Zombie recovery/controller/source-preservation, Forerunner staging, source recipe history and their exact earlier hashes remain in those existing records. No old code, requirement or unique evidence was discarded by this bounded checkpoint compaction.
 
 Owner priorities/addenda remain active:
@@ -125,7 +121,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-Current: retained Pelican review map compiles/reads back/exports/reopens and privately starts Forerunner; game revision null. Physical boarding/flight/combat/collection/settlement needs real control. Broader37944, Chupathingy c16096a8 refusal, seam gameplay, full CI/platform/peer/release gates remain OPEN.
+Current: private b428/build8256a166 requested retained31505 CE map with3real banks; owner reported DeLa/schi halt #298, full datum clipped/log disposed. Game revision null; no mission/gameplay acceptance. Engine fetched map-index metadata despite private settings: not offline. Base reflection still needs exact surface/game comparison. Later Windows Security blocked a click; no input/dismissal. Broader37944, seam/CI/platform/peer/release gates OPEN.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
@@ -151,7 +147,7 @@ Current: retained Pelican review map compiles/reads back/exports/reopens and pri
 
 ## Operations and safe checkpoint
 
-Current QA16649 CLOSED: route run665296380logicalB disposed (last allocated630461448; disposal unavailable); contract run39731641logical/39748128allocatedB disposed. Both roots absent/runs[]/issues[]; no game/app/hosted run. Original1ae5 scenario and31505 review map unchanged. Evidence:RUNTIME/c40.
+Current QA99184/run-sUIJX0 CLOSED:2576641187logicalB disposed; peak3961699290,last allocated2321803168,disposal allocation unavailable. Root absent/runs[]/issues[]; app/game closed. Trial EXE11bcb4fb; original1ae5 scenario/31505map unchanged. No retained QA cache/SDK copy/Forerunner write/push/hosted job. Exact evidence:RUNTIME/c40. Prior QA16649 receipts remain there/Git.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

@@ -2433,9 +2433,12 @@ async fn register_runtime(
     tauri::async_runtime::spawn_blocking(move || {
         runtime::inspect_registration(&registration).map_err(error)?;
         let state = app.state::<AppState>();
+        let before:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        if let Some(review)=&registration.reviewed_companion{runtime_connections::verify_companion_review(&registration.executable,review)?;}
         let lib = lock(&state.library)?;
         let mut registrations: Vec<runtime::RuntimeRegistration> =
             lib.setting("runtimeRegistrations").map_err(error)?;
+        if registration.reviewed_companion.is_some()&&serde_json::to_value(&registrations).map_err(error)?!=serde_json::to_value(&before).map_err(error)?{return Err("Runtime profiles changed during review; no registration was overwritten. Inspect the selected profile again.".into());}
         runtime::remember_registration(&mut registrations, registration).map_err(error)?;
         lib.set_setting("runtimeRegistrations", &registrations)
             .map_err(error)?;
@@ -2525,7 +2528,8 @@ fn registered_runtime_command_at(state:&AppState,registration:&runtime::RuntimeR
     if plan.runtime_id != registration.runtime_id || maps::hash_file(&executable).map_err(error)? != plan.executable_sha256 {
         return Err("Runtime executable changed after inspection; prepare the launch again".into());
     }
-    let forerunner = runtime::shared_content_interface(plan.runtime_id, &plan.executable_sha256) == Some("forerunner");
+    let forerunner = plan.profile_interface.as_deref()==Some("forerunner");
+    if let Some(review)=&registration.reviewed_companion{runtime_connections::verify_companion_review(&executable,review)?;}
     let mut command=steam::command(executable.to_string_lossy().as_ref());
     if forerunner {
         // Only this exact reviewed engine implements the private config/path contract.

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createHaloMaterial,createHaloMaterialPasses } from '../../../src/haloMaterial';
+import { createHaloMaterial,createHaloMaterialPasses,updateHaloMaterial } from '../../../src/haloMaterial';
 import { renderIndices } from '../../../src/haloGeometry';
 import type { ShaderPreview, ShaderStage } from '../../../src/types';
 
@@ -28,10 +28,11 @@ export function renderMaterialChecks() {
   const scene = new THREE.Scene();
   renderer.setRenderTarget(target);
   renderer.setClearColor(new THREE.Color(0.1, 0.2, 0.3), 1);
-  const sample = (material: THREE.Material|THREE.Material[], geo = geometry) => {
+  const sample = (material: THREE.Material|THREE.Material[], geo = geometry, updateSource=false) => {
     const grouped=Array.isArray(material)?geo.clone():geo;
     if(Array.isArray(material)){grouped.clearGroups();material.forEach((_,slot)=>grouped.addGroup(0,grouped.index?.count??grouped.getAttribute('position').count,slot));}
     const mesh = new THREE.Mesh(grouped, material);
+    if(updateSource)mesh.onBeforeRender=(_gl,scene,camera,_geometry,material)=>updateHaloMaterial(material,scene,camera);
     scene.add(mesh);
     renderer.clear();
     renderer.render(scene, camera);
@@ -153,6 +154,13 @@ export function renderMaterialChecks() {
   const directionalCube=new THREE.CubeTexture(directionalFaces);directionalCube.colorSpace=THREE.NoColorSpace;directionalCube.magFilter=THREE.NearestFilter;directionalCube.minFilter=THREE.NearestFilter;directionalCube.generateMipmaps=false;directionalCube.needsUpdate=true;
   panel.setAttribute('normal',new THREE.Float32BufferAttribute([0,0,1,0,0,1,0,1,0],3));
   const vertexDirection=sample(createHaloMaterial(black,null,{...metadata,kind:'model',reflection},{reflectionCube:directionalCube}),panel);
+  const nativeBump=texture([218,128,218,255]);
+  scene.userData.gsRenderFeatures={enabled:false,normalMaps:false,normalStrength:0};
+  const environmentReflection=(nativeType:number|undefined)=>createHaloMaterial(black,null,{...metadata,kind:'environment',reflection:{...reflection,nativeType}},{normalMap:nativeBump,reflectionCube:directionalCube});
+  const nativeBumped=[0,1,undefined].map(mode=>sample(environmentReflection(mode),geometry,true));
+  camera.rotation.z=Math.PI/2;const nativeBumpedRolled=sample(environmentReflection(0),geometry,true);camera.rotation.z=0;
+  const nativeNoReflection=sample(createHaloMaterial(green,null,{...metadata,kind:'environment',reflection:{...reflection,nativeType:0,perpendicularBrightness:0,parallelBrightness:0}},{normalMap:nativeBump,reflectionCube:directionalCube}),geometry,true);
+  nativeBump.dispose();delete scene.userData.gsRenderFeatures;
   panel.dispose();directionalCube.dispose();
   angularCube.dispose();
   for(const t of[pcMasks,xboxMasks])t.dispose();
@@ -176,7 +184,7 @@ export function renderMaterialChecks() {
   for (const t of [black, green, red, half,emissiveMask,noEmissionMask,grey]) t.dispose();
   target.dispose();
   const reflectionGlError=renderer.getContext().getError();renderer.dispose();
-  return { meters,meterCases, neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack,vertexTint,vertexTintExpected,vertexBack,vertexSaturated,vertexSaturatedExpected,vertexDirection,reflectionGlError, errors };
+  return { nativeBumped,nativeBumpedRolled,nativeNoReflection,meters,meterCases, neutral, added, alphaAdded, combined, model, decal, cutout, back,nativeGlow,advancedGlow,unmasked,blackGlow, detailOrder,noReflectionDetail,maskedDetailOrder,glassAlpha,glassTintSamples,glassNoDiffuse,glassNativeAngular,glassNativeBack,vertexTint,vertexTintExpected,vertexBack,vertexSaturated,vertexSaturatedExpected,vertexDirection,reflectionGlError, errors };
 }
 
 /** Real shared React/Three components, not a second shader implementation. */

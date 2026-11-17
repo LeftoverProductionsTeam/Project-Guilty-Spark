@@ -250,12 +250,12 @@ export function relocateRuntimeRegistration(registration:RuntimeRegistration,roo
 
 /** Read-only version-1 response; operation names never authorize arbitrary calls. */
 export interface CompanionRuntimeDiscovery {
- registrationId:string; executableSha256:string;
+ registrationId:string; executableSha256:string; capabilitiesSha256?:string;dependencySha256?:string|null;reviewIssue?:string|null;
  capabilities:{schema:'spark-forerunner.runtime-capabilities';contract_version:1;engine:'Forerunner';
  build:{upstream_version:string;commit:string;platform:string;architecture:string};simulation_hz:number;
  network:{advertised_version:number;native_layout_version:number};operations:string[];process_entrypoints:string[];
  native_features?:string[];
- /** Inspection only; does not admit an executable or enable automatic map startup. */
+ /** Advertising alone grants nothing; explicit profile review pins the supported startup contract. */
  startup_map?:{setting:string;environment:string;selector:string;cache_version:number;scenario_type:string;
  profile:string;fresh_start:boolean;network_host:boolean};upstream_projects:string[]};
 }

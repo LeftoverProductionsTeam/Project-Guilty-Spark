@@ -688,7 +688,7 @@ mod tests {
     fn inventory_fixture() -> (RuntimeRegistration, RuntimeInstallation, RuntimeInventory) {
         let root = std::path::PathBuf::from("fixture-runtime");
         let executable = root.join("halo.exe");
-        let registration = RuntimeRegistration {
+        let registration = RuntimeRegistration {reviewed_companion:None,
             id: "fixture-runtime".into(),
             runtime_id: RuntimeId::ChupathingyCe,
             root: root.clone(),

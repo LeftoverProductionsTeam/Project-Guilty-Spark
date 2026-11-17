@@ -788,9 +788,8 @@ html[data-gs-fullscreen='true'] .gs-workspace-shell { --gs-tools-height: 30px; }
 .gs-window-actions .gs-window-button:hover { background:color-mix(in srgb,var(--accent) 14%,transparent) !important;box-shadow:none; }
 .gs-window-actions .gs-window-close:hover { background:#ad486555 !important; }
 html[data-gs-fullscreen='true'] .gs-window-actions .gs-window-button { height:26px;min-height:26px; }
-/* Short tag forms size to their contents; long forms retain their own scroll. */
-.gs-workspace-panel[data-panel-id='object-tags']:is([data-dock='right'],[data-dock='left']) { bottom:auto;min-height:0; }
-.gs-workspace-panel[data-panel-id='object-tags'] .gs-panel-content { flex:0 1 auto;padding:8px 10px; }
+/* The saved drawer height belongs to its source form, not an empty shell. */
+.gs-workspace-panel[data-panel-id='object-tags'] .gs-panel-content { padding:8px 10px; }
 .viewport-tags .property-row { padding:7px 0;min-height:0;gap:8px;grid-template-columns:minmax(0,1fr) 128px; }
 .viewport-tags .property-row label { font-size:11px; }.viewport-tags .property-row small { font-size:9px;margin-top:2px; }
 .viewport-tags .property-value :is(input[type='number'],select) { min-height:27px;padding:4px 6px;font-size:11px;width:100%; }

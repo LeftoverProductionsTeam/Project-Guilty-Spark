@@ -338,7 +338,7 @@ pub(super) fn require_startup(root: &Path) -> Reply<()> {
     }
 }
 fn registration(root: &Path) -> runtime::RuntimeRegistration {
-    runtime::RuntimeRegistration {
+    runtime::RuntimeRegistration {reviewed_companion:None,
         id: uuid::Uuid::new_v4().to_string(),
         runtime_id: runtime::RuntimeId::HaloCustomEdition,
         root: root.into(),

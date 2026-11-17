@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if out.exists() {
         return Err("Report already exists; refuse overwrite".into());
     }
-    let registration = RuntimeRegistration {
+    let registration = RuntimeRegistration {reviewed_companion:None,
         id: "owner-ce-inspection".into(),
         runtime_id: RuntimeId::HaloCustomEdition,
         root: root.clone(),

@@ -91,7 +91,7 @@ fn profile(root: &Path, id: &str, exe: &str) -> RuntimeRegistration {
         b"\x7fELFsynthetic-test"
     };
     fs::write(&path, signature).unwrap();
-    RuntimeRegistration {
+    RuntimeRegistration {reviewed_companion:None,
         id: id.into(),
         runtime_id: RuntimeId::OpenCe,
         root: root.into(),

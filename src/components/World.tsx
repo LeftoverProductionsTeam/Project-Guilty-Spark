@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview,RuntimeId } from '../types';
 import { extraTextureKey } from '../haloMaterial';
+import {nativeBumpedReflection} from '../nativeShaderTextures';
 import {nativeEdgePick,donorPoint} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import {configureSourceTexture} from '../sourceTexture';
@@ -140,7 +141,7 @@ function planWorldMaterialPreviews(inspection:MapInspection,models:readonly Mesh
   for(const tag of inspection.tags.filter(t=>ids.has(t.id)&&t.shaderPreview)){
     const roles:Record<string,string>={'Primary detail map':'primaryDetail','Detail map':'primaryDetail','Secondary detail map':'secondaryDetail','Micro detail map':'microDetail'};
     const enhanced=renderFeatures(features);
-    if(['senv','sgla'].includes(tag.class)&&(tag.shaderPreview?.alphaTest||tag.shaderPreview?.bumpIsSpecular||(enhanced.enabled&&enhanced.normalMaps)))roles['Bump map']='normalMap';
+    if(['senv','sgla'].includes(tag.class)&&(tag.shaderPreview?.alphaTest||tag.shaderPreview?.bumpIsSpecular||nativeBumpedReflection(tag.shaderPreview)||(enhanced.enabled&&enhanced.normalMaps)))roles['Bump map']='normalMap';
     if(tag.class==='soso')roles['Multipurpose map']='multipurpose';
     for(const ref of tag.references){const role=roles[ref.label]??(/^(?:Chicago|Transparent) layer [1-3]$/.test(ref.label)?`layer${ref.label.at(-1)}`:null);if(!role)continue;
       const key=extraTextureKey(tag.id,role),bitmap=inspection.tags.find(t=>t.id===ref.targetId);

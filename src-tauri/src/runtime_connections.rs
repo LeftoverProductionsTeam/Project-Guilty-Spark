@@ -175,7 +175,7 @@ pub(super) async fn connect_detected_halo(app: tauri::AppHandle, runtime_id: run
         let state = app.state::<AppState>();
         let selected = discover(&state)?.into_iter().find(|item| item.runtime_id == runtime_id && item.executable_sha256 == executable_sha256).ok_or("Detected runtime changed or is unavailable. Recheck connections before connecting.")?;
         if !selected.content_ready { return Err(selected.detail); }
-        let registration = runtime::RuntimeRegistration { id: uuid::Uuid::new_v4().to_string(), runtime_id, root: selected.root,
+        let registration = runtime::RuntimeRegistration {reviewed_companion:None, id: uuid::Uuid::new_v4().to_string(), runtime_id, root: selected.root,
             executable: selected.executable, data_root: Some(selected.data_root), version: selected.version, network_version: None };
         let checked = runtime::inspect_registration(&registration).map_err(error)?;
         if checked.executable_sha256.as_deref() != Some(executable_sha256.as_str()) { return Err("Runtime changed during connection; no registration was saved".into()); }
@@ -254,7 +254,7 @@ fn engine_content_binding(state:&AppState,id:Option<&str>,dynamic:Option<&Path>)
   let profiles:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
   let profile=profiles.iter().find(|p|p.id==id).ok_or("Content library profile is no longer connected")?;
   let installed=runtime::inspect_registration(profile).map_err(error)?;
-  if installed.validation!=runtime::TestStatus::Pass||runtime::shared_content_interface(profile.runtime_id,installed.executable_sha256.as_deref().unwrap_or("")).is_none(){return Err("This engine has no verified shared-content interface. Keep MCC and stock CE in their native layouts.".into());}
+  if installed.validation!=runtime::TestStatus::Pass||runtime::registration_content_interface(&profile,installed.executable_sha256.as_deref().unwrap_or("")).map_err(error)?.is_none(){return Err("This engine has no verified shared-content interface. Keep MCC and stock CE in their native layouts.".into());}
   Ok((installed.data_root,installed.executable_sha256,None))
  }else{let plan=core::runtime_packages::dynamic_layout(dynamic.unwrap_or(&state.root.join("DynamicRuntime"))).map_err(error)?;Ok((plan.root.clone(),None,Some(plan.root)))}
 }
@@ -304,7 +304,7 @@ pub(super) async fn install_runtime_engine_download(app:tauri::AppHandle,id:Stri
    let engines=if let Some(root)=&binding.dynamic_root{core::runtime_packages::prepare_dynamic_layout(root).map_err(error)?.engines}else{state.root.join("Runtimes/engines")};
    let installed=core::runtime_packages::install(&download.path,&binding.package_id,&engines).map_err(error)?;
    core::reject_links(&binding.data_root).map_err(error)?;fs::create_dir_all(&binding.data_root).map_err(error)?;
-   let registration=runtime::RuntimeRegistration{id:profile_id,runtime_id:package.runtime_id,root:installed.root.clone(),executable:installed.executable.clone(),data_root:Some(binding.data_root),version:Some(package.version.into()),network_version:None};
+   let registration=runtime::RuntimeRegistration{reviewed_companion:None,id:profile_id,runtime_id:package.runtime_id,root:installed.root.clone(),executable:installed.executable.clone(),data_root:Some(binding.data_root),version:Some(package.version.into()),network_version:None};
    let lib=lock(&state.library)?;let mut profiles:Vec<runtime::RuntimeRegistration>=lib.setting("runtimeRegistrations").map_err(error)?;
    runtime::remember_registration(&mut profiles,registration.clone()).map_err(error)?;lib.set_setting("runtimeRegistrations",&profiles).map_err(error)?;
    let mut player_mods_linked=false;if let Some(root)=&binding.dynamic_root{let player_mods=root.join("player_mods");let mut linked:Vec<PathBuf>=lib.setting("assetSourceFolders").map_err(error)?;if linked.contains(&player_mods){player_mods_linked=true;}else if linked.len()<16{linked.push(player_mods);lib.set_setting("assetSourceFolders",&linked).map_err(error)?;player_mods_linked=true;}}drop(lib);
@@ -320,45 +320,16 @@ pub(super) async fn install_runtime_engine_download(app:tauri::AppHandle,id:Stri
 // Version 1 of Forerunner's existing SPARK_INTEGRATION_CONTRACT.md.
 // This opt-in discovery query is separate from passive file inspection and
 // never grants live-write, encounter-loading or multiplayer capabilities.
-#[derive(Serialize, Deserialize)]
-pub(super) struct CompanionCapabilities {
-    schema: String,
-    contract_version: u32,
-    engine: String,
-    build: CompanionBuild,
-    simulation_hz: u16,
-    network: CompanionNetwork,
-    operations: Vec<String>,
-    #[serde(default,skip_serializing_if="Vec::is_empty")]
-    native_features: Vec<String>,
-    process_entrypoints: Vec<String>,
-    #[serde(default, skip_serializing_if="Option::is_none")]
-    startup_map: Option<CompanionStartupMap>,
-    upstream_projects: Vec<String>,
-}
-// Advertised metadata is retained for inspection, never used as launch permission.
-// Old admitted binaries omit it; unknown additive JSON fields stay ignorable.
-#[derive(Serialize, Deserialize)]
-struct CompanionStartupMap {
-    setting: String,
-    environment: String,
-    selector: String,
-    cache_version: u32,
-    scenario_type: String,
-    profile: String,
-    fresh_start: bool,
-    network_host: bool,
-}
-#[derive(Serialize, Deserialize)]
-struct CompanionBuild { upstream_version: String, commit: String, platform: String, architecture: String }
-#[derive(Serialize, Deserialize)]
-struct CompanionNetwork { advertised_version: u32, native_layout_version: u32 }
+pub(super) type CompanionCapabilities=runtime::CompanionCapabilities;
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub(super) struct CompanionDiscovery {
     registration_id: String,
     executable_sha256: String,
     capabilities: CompanionCapabilities,
+    capabilities_sha256:String,
+    dependency_sha256:Option<String>,
+    review_issue:Option<String>,
 }
 fn companion_query(executable: &Path, arguments: &[&str]) -> Reply<Vec<u8>> {
     let mut command=steam::command(executable.to_string_lossy().as_ref());
@@ -403,36 +374,17 @@ pub(super) fn query_companion_capabilities(executable:&Path,expected_sha256:&str
         if !String::from_utf8(help).map_err(error)?.contains("--spark-capabilities") {return Err("This engine does not advertise the Spark companion contract; no capability flag was sent".into());}
         let bytes=companion_query(executable,&["--spark-capabilities","1"])?;
         let capabilities:CompanionCapabilities=serde_json::from_slice(&bytes).map_err(|_|"Runtime returned invalid companion discovery JSON".to_string())?;
-    capabilities.validate()?;
+    capabilities.validate().map_err(error)?;
     if maps::hash_file(executable).map_err(error)?!=expected_sha256{return Err("Runtime executable changed during capability discovery".into());}
     Ok(capabilities)
 }
-impl CompanionCapabilities {
-    fn validate(&self)->Reply<()>{
-        if self.schema!="spark-forerunner.runtime-capabilities" || self.contract_version!=1 || self.engine!="Forerunner" {
-            return Err("Unsupported companion schema or version; no downgrade or live operation was attempted".into());
-        }
-        let text=|value:&str|!value.is_empty()&&value.len()<=256&&!value.chars().any(char::is_control);
-        if !(1..=1000).contains(&self.simulation_hz) ||
-            [&self.build.upstream_version,&self.build.commit,&self.build.platform,&self.build.architecture].iter().any(|value|!text(value)) ||
-            self.operations.is_empty()||self.operations.len()>64||!self.operations.iter().any(|value|value=="runtime.discover")||
-            self.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
-            self.native_features.len()>64||self.native_features.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
-            self.native_features.iter().collect::<std::collections::BTreeSet<_>>().len()!=self.native_features.len()||
-            self.startup_map.as_ref().is_some_and(|startup|
-                startup.cache_version==0 ||
-                [&startup.setting,&startup.environment,&startup.selector,&startup.scenario_type,&startup.profile]
-                    .iter().any(|value|!text(value))) ||
-            self.process_entrypoints.len()>16||self.process_entrypoints.iter().any(|value|!text(value))||
-            self.upstream_projects.len()>16||self.upstream_projects.iter().any(|value|!text(value)) {
-            return Err("Companion discovery fields exceed the version-1 contract bounds".into());
-        }
-        Ok(())
-    }
-    pub(super) fn require_native_features(&self,required:&[String])->Reply<()>{
-        for feature in required{if !self.native_features.contains(feature){return Err(format!("This map requires native feature {feature}, which the selected Forerunner build does not advertise. Select a verified compatible build; no playtest was started"));}}
-        Ok(())
-    }
+/// An explicit profile save is the approval boundary, not capability advertising.
+pub(super) fn verify_companion_review(executable:&Path,review:&runtime::CompanionReview)->Reply<()>{
+    review.validate(&maps::hash_file(executable).map_err(error)?).map_err(error)?;
+    if runtime::companion_dependency_sha256(executable,&review.capabilities).map_err(error)?!=review.dependency_sha256{return Err("Forerunner library changed before contract review".into());}
+    let actual=query_companion_capabilities(executable,&review.executable_sha256)?;
+    if actual!=review.capabilities||runtime::companion_dependency_sha256(executable,&actual).map_err(error)?!=review.dependency_sha256{return Err("Forerunner contract or dependency changed during review; inspect and review this build again".into());}
+    Ok(())
 }
 #[tauri::command]
 pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_id:String,expected_executable_sha256:String)->Reply<CompanionDiscovery>{
@@ -457,7 +409,10 @@ pub(super) async fn inspect_companion_runtime(app:tauri::AppHandle,registration_
         }
         let current=runtime::inspect_registration(current_registration).map_err(error)?;
         if current.executable_sha256!=installation.executable_sha256 {return Err("Runtime executable changed during capability discovery; response discarded".into());}
-        Ok(CompanionDiscovery{registration_id,executable_sha256:expected_executable_sha256,capabilities})
+        let capabilities_sha256=capabilities.identity_sha256().map_err(error)?;
+        let (dependency_sha256,review_issue)=match runtime::companion_dependency_sha256(executable,&capabilities){Ok(sha)=>(Some(sha),None),Err(issue)=>(None,Some(error(issue)))};
+        if maps::hash_file(executable).map_err(error)?!=expected_executable_sha256{return Err("Forerunner executable changed during dependency inspection; response discarded".into());}
+        Ok(CompanionDiscovery{registration_id,executable_sha256:expected_executable_sha256,capabilities,capabilities_sha256,dependency_sha256,review_issue})
     }).await.map_err(error)?
 }
 
@@ -466,7 +421,7 @@ mod companion_contract_tests {
  use super::*;
  fn capabilities()->CompanionCapabilities{serde_json::from_value(serde_json::json!({"schema":"spark-forerunner.runtime-capabilities","contract_version":1,"engine":"Forerunner","build":{"upstream_version":"0.9.1-dev","commit":"native-contract-fixture","platform":"Windows","architecture":"x64"},"simulation_hz":30,"network":{"advertised_version":45,"native_layout_version":44},"operations":["runtime.discover"],"process_entrypoints":["--help"],"upstream_projects":["OpenCE"]})).unwrap()}
  #[test]fn optional_native_features_preserve_old_discovery_but_never_satisfy_new_map_requirements(){
-  let mut old=capabilities();old.validate().unwrap();old.require_native_features(&[]).unwrap();let required=vec![core::creative::SQUAD_OBJECTIVES_FEATURE.into()];assert!(old.require_native_features(&required).unwrap_err().contains("does not advertise"));
+  let mut old=capabilities();old.validate().unwrap();old.require_native_features(&[]).unwrap();let required=vec![core::creative::SQUAD_OBJECTIVES_FEATURE.into()];assert!(old.require_native_features(&required).unwrap_err().to_string().contains("does not advertise"));
   old.native_features=required.clone();old.validate().unwrap();old.require_native_features(&required).unwrap();old.native_features.push(required[0].clone());assert!(old.validate().is_err());
   for invalid in ["", "unsafe feature", "bad\nfield"]{old.native_features=vec![invalid.into()];assert!(old.validate().is_err());}
   old.native_features=required;old.contract_version=2;assert!(old.validate().is_err());

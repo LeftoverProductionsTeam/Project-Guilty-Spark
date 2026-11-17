@@ -1079,5 +1079,337 @@
     "rootRemoved": true,
     "runs": [],
     "issues": []
+  },
+  "reviewedForerunnerAndRendering20261117": {
+    "parentRevision": "b2d8e4c6d0cf4945c9fdcd877894374376091df9",
+    "sourceIdentity": "Scoped source and evidence in the commit containing this record; no remote writes",
+    "engineSha256": "b428588dd363b066fe276798bda74a65dae0fae9c44ee9414909d969d187e1a9",
+    "sdlSha256": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0",
+    "capabilitiesIdentitySha256": "bf565117f673112efcb88b2e702b6c3e5b07b2a32f2935c082fccd9baae4aa8bb",
+    "build": "8256a166",
+    "nativeAppSha256": "11bcb4fb393466d517567864cad23f636eb039534c562bb59c24f4c154f73030",
+    "mapSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+    "originalScenarioSha256": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207",
+    "tests": [
+      {
+        "name": "coreAllTargets",
+        "logSha256": "e10dcfcd556b99c55fda68b23314e1466e8ea1be4bdc9b7bcb3b69e17d5e858a",
+        "result": [
+          "    Finished `dev` profile [unoptimized] target(s) in 24.27s"
+        ]
+      },
+      {
+        "name": "reviewedProfiles",
+        "logSha256": "c5605f02704c62b268777a45c9a3a473340cffcf2fd0b089d343e1bd118c835d",
+        "result": [
+          "test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 606 filtered out; finished in 0.03s"
+        ]
+      },
+      {
+        "name": "desktopCapabilityValidator",
+        "logSha256": "5a9e18e5c2fa8a537815029188ece899dd26a2de6d145e149efd05a137fb3886",
+        "result": [
+          "    Finished `test` profile [unoptimized] target(s) in 11.92s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 164 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "name": "canonicalPathBrowser",
+        "logSha256": "eac82cdb63749a65b24839a2ede286e087e1d2076ce7338f5eafa5d5345edf94",
+        "result": [
+          "  1 passed (6.1s)"
+        ]
+      },
+      {
+        "name": "startupNoGameAcknowledgement",
+        "logSha256": "587a8875a7b00f48555a1c4f016928cb993a453a53d3b6c489a2b49a350cd7e0",
+        "result": [
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 164 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "name": "installedForerunnerStage",
+        "logSha256": "41d041959d84116bbbf3cf80afa311eaaf922ad30164579421d65047d76b2657",
+        "result": [
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 164 filtered out; finished in 4.25s"
+        ]
+      },
+      {
+        "name": "objectTagsResponsiveBrowser",
+        "logSha256": "b2b1f84ca8f3c44e5efcca65d3badafd12169b04b91d954d6a11e0f178821ec1",
+        "result": [
+          "  1 passed (6.2s)"
+        ]
+      },
+      {
+        "name": "materialGPU",
+        "logSha256": "9ea2a4ef89dfed482bb22625a4bd002af94152592af54c4760e2cf4cdd4a72ed",
+        "result": [
+          "  7 passed (11.9s)"
+        ]
+      },
+      {
+        "name": "nativeReflectionParser",
+        "logSha256": "edc266276beda1c56aaafa3d3ab3831e93c8fc37e262ebf0cf9587775892abf7",
+        "result": [
+          "    Finished `test` profile [unoptimized] target(s) in 28.14s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 613 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "name": "materialFrontend",
+        "logSha256": "435a97ef96e0de96a9d1ca308bddbd6887818c894435981740622d418ade3ae7",
+        "result": [
+          " Test Files  2 passed (2)",
+          "      Tests  15 passed (15)"
+        ]
+      },
+      {
+        "name": "nativeShaderTextureUnit",
+        "logSha256": "f9dddbee1b4f1076d95d2eb8236345449925bfc44815750f4c54cf0155a198cd",
+        "result": [
+          " Test Files  1 passed (1)",
+          "      Tests  6 passed (6)"
+        ]
+      },
+      {
+        "name": "finalFrontend",
+        "logSha256": "742fbce3f704346832a764149513cd8d83264d8df60c7d9bf9eaf7aa9337388f",
+        "result": [
+          "✓ built in 699ms"
+        ]
+      },
+      {
+        "name": "finalWindowsBuild",
+        "logSha256": "c8cbe367c154c78f4c1170564dc0a5f21150b9d935bba59a1be4cbb770cb6e4b",
+        "result": [
+          "    Finished `dev` profile [unoptimized] target(s) in 19.31s"
+        ]
+      }
+    ],
+    "nativeRegistration": {
+      "actualWindowsUi": true,
+      "reviewSavedAndRestored": true,
+      "changedOwnedSdlRefused": true,
+      "restoredSdlAccepted": true,
+      "canonicalSavePathDefectReproducedAndFixed": true,
+      "normalCloses": 5,
+      "pageErrors": [],
+      "gameplayAcceptance": false
+    },
+    "privateGame": {
+      "startupRequested": "be_native@ce",
+      "ceBanks": {
+        "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+        "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+        "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+      },
+      "finalPhase": "stopped",
+      "gameBuildId": null,
+      "gameSha256": null,
+      "tail": "s 2 channels\r\nchupathingyce: sound: stereo\r\nchupathingyce: cache folder: %USERPROFILE%\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-sUIJX0\\output\\native-library\\runtime-playtests\\cd37db63-d803-44de-a28b-e1e33a346fa2\\profile\\cache\r\nchupathingyce: shaders: ui: making 23 keys (23 from the game's list, 0 from this machine's) at the loading screen\r\nchupathingyce: audio: the Xbox HRTF (audio.hrtf \"on\") off\r\nchupathingyce: audio: binaural 3D sound (audio.hrtf \"on\") on\r\nchupathingyce: shaders: ui: 23 keys, 23 programs made in parallel, 0 failed, in 0.2 s at the loading screen\r\nchupathingyce: gametypes folder: %USERPROFILE%\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-sUIJX0\\output\\native-library\\runtime-playtests\\cd37db63-d803-44de-a28b-e1e33a346fa2\\profile\\saves/gametypes\r\nchupathingyce: menus: 1155 strings from the Custom Edition's loc.map\r\nchupathingyce: menus: 1898 widgets, 484 string lists and 110 bitmaps added to the map's 983 tags\r\nchupathingyce: high-res hud: 84 of 250 bitmaps in this map, 1 for some of their sprites (128 not in it)\r\nchupathingyce: Custom Edition resource maps: bitmaps.map is Custom Edition's: %USERPROFILE%\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-sUIJX0\\output\\native-library\\runtime-playtests\\cd37db63-d803-44de-a28b-e1e33a346fa2\\data/maps_ce/bitmaps.map\r\nchupathingyce: Custom Edition resource maps: sounds.map is Custom Edition's: %USERPROFILE%\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-sUIJX0\\output\\native-library\\runtime-playtests\\cd37db63-d803-44de-a28b-e1e33a346fa2\\data/maps_ce/sounds.map\r\nchupathingyce: Custom Edition resource maps: loc.map is Custom Edition's: %USERPROFILE%\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-sUIJX0\\output\\native-library\\runtime-playtests\\cd37db63-d803-44de-a28b-e1e33a346fa2\\data/maps_ce/loc.map\r\nchupathingyce: map torrents: a newer approved map list from https://raw.githubusercontent.com/FractumSeraph/OpenCE/map-index/map_torrents.txt (serial 1793481173)\r\nchupathingyce: menus: startup map waiting for a player profile; create one in the native menus\r\nchupathingyce: model detail: stock\r\nchupathingyce: anisotropic filtering: 1x (the GPU's most 16x)\r\nchupathingyce: high-res text: ui\\small_ui (capitals 10 units) drawn with CyborgInterfaceGothic-Regular.ttf, 97% wide\r\nchupathingyce: map torrents: the approved map list from https://raw.githubusercontent.com/FractumSeraph/OpenCE/map-index/map_torrents.txt is in use: serial 1793481173, 5834 maps (was serial 0, 0 maps)\r\nchupathingyce: chupathingy maps: index from https://maps.chupathingy.org checked\r\nchupathingyce: DELTA: the main menu's note, 1 of 3\r\nchupathingyce: high-res text: ui\\large_ui (capitals 13 units) drawn with CyborgInterfaceGothic-Regular.ttf, 98% wide\r\nchupathingyce: lights: 0.0 dynamic lights a frame (0 the most), 0.0 of them the first-person weapon's; 0.0 let go by display.dynamic_light_limit (0), 0.0 more lit without their specular by display.specular_light_limit (0)\r\nchupathingyce: menus: starting authored CE solo map fresh: be_native@ce\r\nchupathingyce: lights: 0.0 dynamic lights a frame (0 the most), 0.0 of them the first-person weapon's; 0.0 let go by display.dynamic_light_limit (0), 0.0 more lit without their specular by display.specular_light_limit (0)\r\nchupathingyce: menus: the pause menu has SETTINGS CONTROLS DELTA\r\nchupathingyce: menus: 1898 widgets, 484 string lists and 110 bitmaps added to the map's 2461 tags\r\nchupathingyce: window closed\r\n",
+      "reportedFailure": "Owner screenshot: EXCEPTION halt at cache/cache_files.c #298, expected tag group 'DeLa' but got 'schi'; offending datum clipped. Full debug.txt was disposed with private stage; stdout tail does not contain the halt. Cause and actual mission gameplay remain OPEN.",
+      "unexpectedNetwork": "Engine fetched approved map-index metadata despite disabled public hosting, automatic map downloads and updater. No public server was started. Do not describe this run as offline.",
+      "stageDisposed": true
+    },
+    "terminals": {
+      "nativeReadback": true,
+      "controls": 5,
+      "roles": [
+        "extraction_deploy",
+        "extraction_activate",
+        "extraction_loadout",
+        "extraction_unsc",
+        "extraction_covenant"
+      ],
+      "duplicatesDeleted": false,
+      "acceptance": "Separate named native controls; placement and gameplay purposes still need acceptance. Original map untouched."
+    },
+    "objectTags": {
+      "before": [
+        {
+          "rect": {
+            "x": 1139,
+            "y": 83,
+            "w": 360,
+            "h": 775
+          },
+          "dock": "right",
+          "content": [
+            {
+              "class": "gs-panel-content",
+              "clientHeight": 196,
+              "scrollHeight": 196,
+              "style": {
+                "flex": "0 1 auto",
+                "height": "196px",
+                "maxHeight": "none",
+                "overflow": "clip"
+              }
+            },
+            {
+              "class": "gs-paged-surface ",
+              "surface": "object-tags",
+              "clientHeight": 180,
+              "scrollHeight": 180,
+              "style": {
+                "flex": "1 1 0%",
+                "height": "180px",
+                "maxHeight": "none",
+                "overflow": "visible"
+              }
+            }
+          ]
+        }
+      ],
+      "after": {
+        "panel": 774,
+        "content": 729,
+        "scroll": 713,
+        "body": 713,
+        "flex": "1 1 0%",
+        "horizontal": 0
+      },
+      "browserSizes": [
+        [
+          800,
+          600
+        ],
+        [
+          1500,
+          950
+        ],
+        [
+          3440,
+          1440
+        ]
+      ],
+      "nativeSize": [
+        1500,
+        950
+      ],
+      "acceptance": "Actual native drawer now fills saved height; source and Undo/Save behavior unchanged."
+    },
+    "reflection": {
+      "sourceMode": "bumped_cube_map (0), read independently from native tag and cache offset 0x2d2",
+      "sourceUnchanged": true,
+      "defaultLoaderIncludesDeclaredBump": true,
+      "webglTests": "Bumped vs flat/legacy cube directions, camera roll invariance, separate diffuse lighting; optional enhancements disabled",
+      "nativeProbe": {
+        "samples": [
+          {
+            "normal": false,
+            "reflection": true,
+            "enhanced": false
+          }
+        ],
+        "error": 0
+      },
+      "cameraBefore": {
+        "type": "PerspectiveCamera",
+        "position": [
+          28.839403,
+          -88.819107,
+          4.001278
+        ],
+        "quaternion": [
+          0.583609,
+          -0.192499,
+          -0.247113,
+          0.749186
+        ],
+        "zoom": 1,
+        "fov": 55,
+        "target": [
+          34.608105,
+          -81.025856,
+          1.554378
+        ]
+      },
+      "cameraAfter": {
+        "type": "PerspectiveCamera",
+        "position": [
+          26.040869,
+          -85.566248,
+          4.001278
+        ],
+        "quaternion": [
+          0.526546,
+          -0.316867,
+          -0.406766,
+          0.675934
+        ],
+        "zoom": 1,
+        "fov": 55,
+        "target": [
+          34.608105,
+          -81.025856,
+          1.554378
+        ]
+      },
+      "acceptance": "Implementation and focused GPU/source checks pass. Visible native surface probe still had no bound normal; one native reflected environment shader has a null bump reference. Exact visible-surface association and in-game parity are OPEN; do not claim the reported sliding reflection is fully repaired."
+    },
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-object-tags-filled-20261117.png",
+        "bytes": 1618047,
+        "sha256": "8c9a2ca0c546ed1f889743f43935b5f768a560fe420a02bc99cd0c47a2cc6469"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-source-bumped-reflection-20261117.png",
+        "bytes": 1612217,
+        "sha256": "e3a9ef96b1f6695560488239e131d6603a09029a473f2454c05d87d1afd6e9fe"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-source-bumped-reflection-orbit-20261117.png",
+        "bytes": 1592314,
+        "sha256": "32413ef8b7f44c03fe491d94a500f8ee6e6c433586a7b190ca2e068cbf920fb4"
+      }
+    ],
+    "initialFailures": [
+      "Rust test fixture declaration syntax corrected before real tests",
+      "Wrong Rust namespace selected zero tests; not counted as a pass",
+      "Browser fixture initially omitted sessionOnly=false and native canonical path normalization; assertions corrected without weakening product checks",
+      "Native Save retained typed rather than canonical paths; actual capability button became unreachable, repaired and replayed",
+      "One cached build invocation could not locate cargo; absolute existing toolchain path succeeded",
+      "Native click interrupted by unrelated Windows Security; no input delivered and no retry/dismissal"
+    ],
+    "fullRegression": false,
+    "gameplayAcceptance": false,
+    "disposal": {
+      "workflow": "forerunner-profile-review",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 2576641187,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 3961699290,
+      "allocatedBytes": 2321803168,
+      "monitoringSamples": 406,
+      "monitoringMs": 134609.58490000275,
+      "sourceMonitoring": {
+        "scope": "Source and new top-level output; protected games/Git/dependencies are not traversed",
+        "currentLogicalBytes": 72299791,
+        "peakLogicalBytes": 72299791,
+        "excludedTopLevel": [
+          ".git",
+          ".toolchain",
+          "node_modules",
+          "tools",
+          ".research",
+          "preserved",
+          "releases",
+          "halo custom edition",
+          "opencehalo-windows-release",
+          "runtimes",
+          "chupathingyce-windows64-release",
+          "pyros zombie apocolypse mod versions",
+          "sample code",
+          "halo - combat evolved (usa).xiso.iso"
+        ],
+        "error": null
+      },
+      "rootRemoved": true,
+      "runs": [],
+      "issues": []
+    }
   }
 }

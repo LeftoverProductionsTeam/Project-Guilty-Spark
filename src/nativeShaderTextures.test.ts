@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { nativeShaderTextureRole,unassignedNativeTriangles,nativeMeterInputs } from './nativeShaderTextures';
+import { nativeShaderTextureRole,unassignedNativeTriangles,nativeMeterInputs,nativeBumpedReflection } from './nativeShaderTextures';
 it('loads every decoded generic and Chicago layer without accepting fabricated stages',()=>{
   for(const prefix of ['Chicago','Transparent'])for(let index=1;index<=3;index++)
     expect(nativeShaderTextureRole(`${prefix} layer ${index}`)).toBe(`layer${index}`);
@@ -38,4 +38,13 @@ it('resolves native meter sources without inventing unavailable engine values',(
  for(const bad of[NaN,Infinity,-1,2])expect(nativeMeterInputs(shader,[0,0,bad,0])).toBeNull();
  expect(nativeMeterInputs({...shader,meter:{...shader.meter,sources:[0,0,5,0,0]}},undefined)).toBeNull();
  expect(nativeMeterInputs({...shader,kind:'model'},[0,0,0,0])).toBeNull();
+});
+
+it('keeps declared bumped environment reflection independent of optional enhancements',()=>{
+ const reflection={bitmapTagId:7,nativeType:0,perpendicularBrightness:1,parallelBrightness:1,perpendicularTint:[1,1,1] as [number,number,number],parallelTint:[1,1,1] as [number,number,number],falloff:0,cutoff:0};
+ const shader={kind:'environment',alphaTest:false,twoSided:false,uvScale:[1,1] as [number,number],reflection};
+ expect(nativeBumpedReflection(shader)).toBe(true);
+ for(const nativeType of [undefined,1,2,99])expect(nativeBumpedReflection({...shader,reflection:{...reflection,nativeType}})).toBe(false);
+ for(const kind of ['model','glass','chicago'])expect(nativeBumpedReflection({...shader,kind})).toBe(false);
+ expect(nativeBumpedReflection(null)).toBe(false);
 });

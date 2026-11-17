@@ -56,7 +56,7 @@ fn registration(root: &std::path::Path) -> RuntimeRegistration {
         b"\x7fELFunit-test-not-a-game"
     };
     fs::write(&executable, signature).unwrap();
-    RuntimeRegistration {
+    RuntimeRegistration {reviewed_companion:None,
         id: "test-registration".into(),
         runtime_id: RuntimeId::ChupathingyCe,
         root: root.into(),

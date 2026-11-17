@@ -30,7 +30,7 @@ export default function Registration({
     if (native)
       void call<RuntimeRegistration[]>('list_runtime_registrations')
         .then((items) => {
-          if (current) setProfiles(items);
+          if (current) {setProfiles(items);const stored=items.find(item=>item.id===installation?.registrationId);if(stored)setDraft(value=>['id','runtimeId','root','executable','dataRoot','version','networkVersion'].every(key=>value[key as keyof RuntimeRegistration]===stored[key as keyof RuntimeRegistration])?stored:value);}
         })
         .catch((e) => {
           if (current) setError(String(e));
@@ -108,6 +108,22 @@ export default function Registration({
     catch(problem){if(current())setError(String(problem));}
     finally{if(companionRequest.current===request)setBusy(false);}
   }
+  async function reviewCompanion(){
+    const response=companion,selectedFingerprint=fingerprint;
+    if(busy||!response?.dependencySha256||response.reviewIssue||!response.capabilitiesSha256||inspected!==fingerprint||response.executableSha256!==inspection?.executableSha256||!profiles.some(profile=>profile.id===draft.id&&JSON.stringify(profile)===fingerprint))return;
+    const selected={...draft,reviewedCompanion:{executableSha256:response.executableSha256,dependencySha256:response.dependencySha256,capabilities:response.capabilities}};
+    const request=++companionRequest.current;setBusy(true);setError('');setMessage('');
+    try{
+      const reports=await call<RuntimeReport[]>('register_runtime',{registration:selected});
+      const saved=await call<RuntimeRegistration[]>('list_runtime_registrations');
+      if(companionRequest.current!==request||companionContext.current!==selectedFingerprint)return;
+      const retained=saved.find(profile=>profile.id===selected.id);if(!retained?.reviewedCompanion||JSON.stringify(retained.reviewedCompanion)!==JSON.stringify(selected.reviewedCompanion))throw Error('The reviewed runtime profile was not retained. Inspect this profile again.');
+      setProfiles(saved);setDraft(retained);setInspection(null);setInspected('');setCompanion(null);onRegistered(reports);
+      setMessage('This exact Forerunner build and its SDL library are saved. Inspect registration again to check readiness. Changes to either file require a new review; map loading and gameplay still need testing.');
+      window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
+    }catch(problem){if(companionRequest.current===request&&companionContext.current===selectedFingerprint)setError(String(problem));}
+    finally{if(companionRequest.current===request)setBusy(false);}
+  }
   async function browse(kind: 'executable' | 'root' | 'dataRoot') {
     try {
       const value = await call<string | null>('choose_runtime_path', { kind });
@@ -125,7 +141,7 @@ export default function Registration({
     setError('');
     try {
       setInspection(await call<RuntimeInstallation>('inspect_runtime_registration', { registration: draft }));
-      if (draft.dataRoot && draft.dataRoot !== draft.root) await call('inspect_runtime_launch',{registration:draft});
+      if (report.id!=='openCe'&&draft.dataRoot && draft.dataRoot !== draft.root) await call('inspect_runtime_launch',{registration:draft});
       setInspected(fingerprint);
     } catch (e) {
       setError(String(e));
@@ -137,9 +153,13 @@ export default function Registration({
     setBusy(true);
     setError('');
     try {
-      onRegistered(await call<RuntimeReport[]>('register_runtime', { registration: draft }));
+      const reports=await call<RuntimeReport[]>('register_runtime', { registration: draft });
+      const profiles=await call<RuntimeRegistration[]>('list_runtime_registrations');
+      const retained=profiles.find(profile=>profile.id===draft.id);
+      if(!retained)throw Error('The saved runtime profile is unavailable. Reopen runtime folders before continuing.');
+      const inspected=reports.find(report=>report.installation?.registrationId===retained.id)?.installation??null;
+      setProfiles(profiles);setDraft(retained);setInspection(inspected);setInspected(inspected?JSON.stringify(retained):'');onRegistered(reports);
       window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
-      setProfiles(await call<RuntimeRegistration[]>('list_runtime_registrations'));
       setMessage('Registration saved. Runtime files were not changed.');
     } catch (e) {
       setError(String(e));
@@ -320,6 +340,7 @@ export default function Registration({
         </>
       )}
       {report.id==='openCe'&&<section className="runtime-companion">
+        {draft.reviewedCompanion&&<><Pill>Reviewed build {draft.reviewedCompanion.capabilities.build.commit}</Pill><button disabled={busy} onClick={()=>{setDraft(current=>{const next={...current};delete next.reviewedCompanion;return next;});setInspection(null);setInspected('');setMessage('Build review removed from this draft. Inspect and save registration before reviewing a replacement. The installed runtime and saved profile remain unchanged until Save registration.');}}>Clear build review from draft</button></>}
         <button disabled={busy||!native||!inspection?.executableSha256||inspected!==fingerprint||!profiles.some(profile=>profile.id===draft.id&&JSON.stringify(profile)===fingerprint)} onClick={()=>void readCompanion()}>Read Forerunner capabilities</button>
         <p className="subtle">Save and inspect the installed profile first. This optional query runs the engine's help and advertised read-only version-1 contract; it does not start a map. Engine detection is separate from gameplay acceptance.</p>
         {companion&&<details open><summary>{companion.capabilities.engine} · contract {companion.capabilities.contract_version}</summary>
@@ -329,8 +350,13 @@ export default function Registration({
           <p>Network version {companion.capabilities.network.advertised_version} · native layout {companion.capabilities.network.native_layout_version}. These values do not prove peer compatibility.</p>
           {companion.capabilities.startup_map?<>
             <p>Advertised startup: {companion.capabilities.startup_map.selector} · cache {companion.capabilities.startup_map.cache_version} · {companion.capabilities.startup_map.scenario_type}. Profile: {companion.capabilities.startup_map.profile}.</p>
-            <p className="subtle">Fresh start: {companion.capabilities.startup_map.fresh_start?'yes':'no'} · hosts a network game: {companion.capabilities.startup_map.network_host?'yes':'no'}. This metadata does not enable automatic startup in Spark. The exact runtime build still needs separate validation.</p>
+            <p className="subtle">Fresh start: {companion.capabilities.startup_map.fresh_start?'yes':'no'} · hosts a network game: {companion.capabilities.startup_map.network_host?'yes':'no'}. Discovery alone does not enable startup. Review and save this exact build to use the supported private-session startup path.</p>
           </>:<p className="subtle">This build does not advertise authored-map startup. Use the native custom campaign chooser for an eligible staged solo test.</p>}
+          {companion.dependencySha256&&<p>SDL library SHA-256: <code className="wrap-code">{companion.dependencySha256}</code></p>}
+          {companion.capabilitiesSha256&&<p>Contract identity: <code className="wrap-code">{companion.capabilitiesSha256}</code></p>}
+          {companion.reviewIssue&&<Notice>{companion.reviewIssue}</Notice>}
+          <button disabled={busy||!companion.dependencySha256||!companion.capabilitiesSha256||!!companion.reviewIssue||inspected!==fingerprint} onClick={()=>void reviewCompanion()}>Review and save this Forerunner build</button>
+          <p className="subtle">Use only an installed build you trust. Saving checks its executable, matching SDL library and versioned contract again, then pins them in this profile. A changed build needs a fresh review. This is your local review, not an upstream signature.</p>
           <p className="subtle">Discovery does not confirm a loaded map, enable live editing or establish multiplayer support. To try a built CE solo project with an admitted Forerunner build, use Level editor → Game connection → Start staged solo test, then select the map in Forerunner. Native Windows interaction and gameplay acceptance remain separate.</p>
         </details>}
       </section>}

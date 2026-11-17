@@ -103,6 +103,8 @@ export interface ShaderPreview {
   glassTintScale?:number;
   reflection?: {
     bitmapTagId: number;
+    /** Native environment enum: 0 bumped cube, 1 flat cube, 2 bumped radiosity. */
+    nativeType?:number|null;
     perpendicularBrightness: number;
     parallelBrightness: number;
     perpendicularTint: Vec3;
@@ -481,6 +483,7 @@ export interface RuntimeRegistration {
   dataRoot: string | null;
   version: string | null;
   networkVersion: string | null;
+  reviewedCompanion?:{executableSha256:string;dependencySha256:string;capabilities:import('./runtimeWorkbench').CompanionRuntimeDiscovery['capabilities']};
 }
 export interface RuntimeInventory {
   runtimeId: RuntimeId;

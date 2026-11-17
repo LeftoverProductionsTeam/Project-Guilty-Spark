@@ -10,6 +10,8 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
   console.log('HALO_MATERIAL_PIXELS',JSON.stringify({detailOrder:result.detailOrder,noReflectionDetail:result.noReflectionDetail,maskedDetailOrder:result.maskedDetailOrder,glassAlpha:result.glassAlpha,glassTintSamples:result.glassTintSamples,glassNoDiffuse:result.glassNoDiffuse,glassNativeAngular:result.glassNativeAngular,glassNativeBack:result.glassNativeBack,decal:result.decal,cutout:result.cutout}));
   console.log('HALO_MODEL_VERTEX_REFLECTION',JSON.stringify({tint:result.vertexTint,expected:result.vertexTintExpected,direction:result.vertexDirection,back:result.vertexBack,saturated:result.vertexSaturated,saturatedExpected:result.vertexSaturatedExpected,glError:result.reflectionGlError}));
   expect(result.reflectionGlError).toBe(0);
+  console.log('HALO_ENVIRONMENT_NATIVE_BUMP',JSON.stringify({pixels:result.nativeBumped,rolled:result.nativeBumpedRolled,diffuse:result.nativeNoReflection}));
+  expect(result.nativeBumped[0]).toEqual([255,0,0,255]);expect(result.nativeBumped[1]).toEqual([0,0,255,255]);expect(result.nativeBumped[2]).toEqual(result.nativeBumped[1]);expect(result.nativeBumpedRolled).toEqual(result.nativeBumped[0]);expect(result.nativeNoReflection).toEqual([0,128,0,255]);
   for(const [channel,expected]of result.vertexTintExpected.entries())expect(Math.abs(result.vertexTint[channel]-expected)).toBeLessThanOrEqual(1);
   expect(result.vertexDirection).toEqual([240,16,32,255]);
   for(const [channel,expected]of result.vertexTintExpected.entries())expect(Math.abs(result.vertexBack[channel]-expected)).toBeLessThanOrEqual(1);

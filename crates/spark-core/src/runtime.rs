@@ -253,11 +253,32 @@ pub struct CapabilityEvidence {
         for bad in ["","../be_native","C:\\maps\\be_native","be_native@ce","be_native.map","map/name","with space"]{assert!(forerunner_solo_startup_selector(FORERUNNER_WINDOWS_X64_CURRENT_SHA256,bad).is_err());}
         assert!(forerunner_solo_startup_selector(&"0".repeat(64),"be_native").is_err());
     }
+    fn reviewed_capabilities()->CompanionCapabilities {serde_json::from_value(serde_json::json!({"schema":"spark-forerunner.runtime-capabilities","contract_version":1,"engine":"Forerunner","build":{"upstream_version":"local-dev","commit":"review-fixture","platform":"Windows","architecture":"x64"},"simulation_hz":30,"network":{"advertised_version":45,"native_layout_version":44},"operations":["runtime.discover"],"process_entrypoints":["--help"],"startup_map":{"setting":"game.start_map","environment":"HALO_START_MAP","selector":"basename@ce","cache_version":609,"scenario_type":"solo","profile":"native-menu-create-or-existing","fresh_start":true,"network_host":false},"upstream_projects":["OpenCE"]})).unwrap()}
+    #[test]fn reviewed_profiles_retain_exact_identity_without_expanding_builtin_pins(){
+        let mut registration:RuntimeRegistration=serde_json::from_value(serde_json::json!({"id":"local","runtimeId":"openCe","root":"owned","executable":"owned/halo.exe","dataRoot":null,"version":null,"networkVersion":null})).unwrap();
+        assert!(serde_json::to_value(&registration).unwrap().get("reviewedCompanion").is_none());let sha="a".repeat(64);assert_eq!(forerunner_windows_machine(&sha),None);
+        let review=CompanionReview{executable_sha256:sha.clone(),dependency_sha256:"b".repeat(64),capabilities:reviewed_capabilities()};registration.reviewed_companion=Some(review);
+        let restored:RuntimeRegistration=serde_json::from_slice(&serde_json::to_vec(&registration).unwrap()).unwrap();assert_eq!(restored.reviewed_companion,registration.reviewed_companion);
+        assert_eq!(forerunner_registration_machine(&restored,&sha).unwrap(),Some(0x8664));assert_eq!(registration_content_interface(&restored,&sha).unwrap(),Some("forerunner"));assert_eq!(forerunner_registration_startup_selector(&restored,&sha,"be_native").unwrap().as_deref(),Some("be_native@ce"));assert_eq!(forerunner_windows_machine(&sha),None);
+        assert!(forerunner_registration_machine(&restored,&"c".repeat(64)).is_err());assert!(forerunner_registration_startup_selector(&restored,&sha,"../map").is_err());registration.runtime_id=RuntimeId::ChupathingyCe;assert!(forerunner_registration_machine(&registration,&sha).is_err());
+    }
+    #[test]fn reviewed_profile_contract_refuses_unknown_startup_network_or_architecture(){
+        let good=reviewed_capabilities();good.profile_machine().unwrap();
+        for fault in 0..10{let mut bad=good.clone();match fault{0=>bad.contract_version=2,1=>bad.build.platform="Linux".into(),2=>bad.build.architecture="arm64".into(),3=>bad.simulation_hz=60,4=>bad.network.native_layout_version=45,5=>bad.startup_map.as_mut().unwrap().network_host=true,6=>bad.startup_map.as_mut().unwrap().fresh_start=false,7=>bad.startup_map.as_mut().unwrap().environment="ARBITRARY_ARGUMENT".into(),8=>bad.startup_map.as_mut().unwrap().cache_version=13,_=>bad.startup_map.as_mut().unwrap().selector="path".into()}assert!(bad.profile_machine().is_err(),"contract fault{fault}");}
+        let mut older=good;older.startup_map=None;older.profile_machine().unwrap();let mut invalid=CompanionReview{executable_sha256:"a".repeat(64),dependency_sha256:"b".repeat(64),capabilities:older};assert!(invalid.validate(&"a".repeat(64)).is_ok());invalid.dependency_sha256="not-a-hash".into();assert!(invalid.validate(&"a".repeat(64)).is_err());
+    }
+    #[test]fn reviewed_profile_checks_real_pe_roles_architecture_and_dependency_hash(){
+        let dir=tempfile::tempdir().unwrap();let exe=dir.path().join("halo.exe");let dll=dir.path().join("SDL3.dll");
+        let image=|machine:u16,is_dll:bool|{let mut bytes=vec![0u8;128];bytes[..2].copy_from_slice(b"MZ");bytes[60..64].copy_from_slice(&64u32.to_le_bytes());bytes[64..68].copy_from_slice(b"PE\0\0");bytes[68..70].copy_from_slice(&machine.to_le_bytes());bytes[86..88].copy_from_slice(&(if is_dll{0x2000u16}else{0u16}).to_le_bytes());bytes};
+        fs::write(&exe,image(0x8664,false)).unwrap();fs::write(&dll,image(0x8664,true)).unwrap();let capabilities=reviewed_capabilities();let sha=companion_dependency_sha256(&exe,&capabilities).unwrap();assert_eq!(sha,maps::hash_file(&dll).unwrap());
+        let registration=RuntimeRegistration{reviewed_companion:Some(CompanionReview{executable_sha256:maps::hash_file(&exe).unwrap(),dependency_sha256:sha,capabilities:capabilities.clone()}),id:"local".into(),runtime_id:RuntimeId::OpenCe,root:dir.path().into(),executable:exe.clone(),data_root:None,version:None,network_version:None};inspect_registration(&registration).unwrap();
+        let mut changed=image(0x8664,true);changed[127]=1;fs::write(&dll,&changed).unwrap();assert!(inspect_registration(&registration).unwrap_err().to_string().contains("SDL3.dll changed"));fs::write(&dll,image(0x014c,true)).unwrap();assert!(companion_dependency_sha256(&exe,&capabilities).is_err());fs::write(&dll,image(0x8664,false)).unwrap();assert!(companion_dependency_sha256(&exe,&capabilities).is_err());
+    }
     #[test]#[ignore="Requires the explicitly reviewed installed Forerunner and original Xbox UI library; read-only plan only"]
     fn installed_forerunner_profile_plan_preserves_originals(){
         let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_EXE").expect("explicit engine"));let data=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_DATA").expect("explicit data"));
         let original=maps::hash_file(&executable).unwrap();assert_eq!(original,FORERUNNER_WINDOWS_X64_CURRENT_SHA256);let ui=maps::hash_file(&data.join("maps/ui.map")).unwrap();
-        let registration=RuntimeRegistration{id:"native-read-only-forerunner".into(),runtime_id:RuntimeId::OpenCe,root:executable.parent().unwrap().into(),executable:executable.clone(),data_root:Some(data.clone()),version:None,network_version:None};
+        let registration=RuntimeRegistration{reviewed_companion:None,id:"native-read-only-forerunner".into(),runtime_id:RuntimeId::OpenCe,root:executable.parent().unwrap().into(),executable:executable.clone(),data_root:Some(data.clone()),version:None,network_version:None};
         let plan=prepare_launch(&registration).unwrap();assert_eq!(plan.profile_interface.as_deref(),Some("forerunner"));assert!(!plan.direct_map_launch);assert!(plan.args.is_empty());assert_eq!(plan.environment.get("HALO_DATA_ROOT"),Some(&process_path(&data).unwrap()));assert!(!plan.environment.contains_key("HALO_START_MAP"));
         assert_eq!(original,maps::hash_file(&executable).unwrap());assert_eq!(ui,maps::hash_file(&data.join("maps/ui.map")).unwrap());
     }
@@ -283,6 +304,109 @@ pub struct MapFamilyCapability {
     pub detail: String,
     pub sources: Vec<SourceReference>,
 }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompanionCapabilities {
+    pub schema: String,
+    pub contract_version: u32,
+    pub engine: String,
+    pub build: CompanionBuild,
+    pub simulation_hz: u16,
+    pub network: CompanionNetwork,
+    pub operations: Vec<String>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub native_features: Vec<String>,
+    pub process_entrypoints: Vec<String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub startup_map: Option<CompanionStartupMap>,
+    pub upstream_projects: Vec<String>,
+}
+// Advertised metadata is retained for inspection, never used as launch permission.
+// Old admitted binaries omit it; unknown additive JSON fields stay ignorable.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompanionStartupMap {
+    pub setting: String,
+    pub environment: String,
+    pub selector: String,
+    pub cache_version: u32,
+    pub scenario_type: String,
+    pub profile: String,
+    pub fresh_start: bool,
+    pub network_host: bool,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompanionBuild { pub upstream_version: String, pub commit: String, pub platform: String, pub architecture: String }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompanionNetwork { pub advertised_version: u32, pub native_layout_version: u32 }
+impl CompanionCapabilities {
+    pub fn validate(&self)->Result<()>{
+        if self.schema!="spark-forerunner.runtime-capabilities" || self.contract_version!=1 || self.engine!="Forerunner" {
+            return invalid("Unsupported companion schema or version; no downgrade or live operation was attempted");
+        }
+        let text=|value:&str|!value.is_empty()&&value.len()<=256&&!value.chars().any(char::is_control);
+        if !(1..=1000).contains(&self.simulation_hz) ||
+            [&self.build.upstream_version,&self.build.commit,&self.build.platform,&self.build.architecture].iter().any(|value|!text(value)) ||
+            self.operations.is_empty()||self.operations.len()>64||!self.operations.iter().any(|value|value=="runtime.discover")||
+            self.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
+            self.native_features.len()>64||self.native_features.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
+            self.native_features.iter().collect::<std::collections::BTreeSet<_>>().len()!=self.native_features.len()||
+            self.startup_map.as_ref().is_some_and(|startup|
+                startup.cache_version==0 ||
+                [&startup.setting,&startup.environment,&startup.selector,&startup.scenario_type,&startup.profile]
+                    .iter().any(|value|!text(value))) ||
+            self.process_entrypoints.len()>16||self.process_entrypoints.iter().any(|value|!text(value))||
+            self.upstream_projects.len()>16||self.upstream_projects.iter().any(|value|!text(value)) {
+            return invalid("Companion discovery fields exceed the version-1 contract bounds");
+        }
+        Ok(())
+    }
+    pub fn require_native_features(&self,required:&[String])->Result<()>{
+        for feature in required{if !self.native_features.contains(feature){return invalid(format!("This map requires native feature {feature}, which the selected Forerunner build does not advertise. Select a verified compatible build; no playtest was started"));}}
+        Ok(())
+    }
+}
+/// An explicit creator review of one local build, not a publisher signature or
+/// permission for advertised live/network operations. Stored in the same profile.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct CompanionReview {
+ pub executable_sha256:String,
+ pub dependency_sha256:String,
+ pub capabilities:CompanionCapabilities,
+}
+impl CompanionCapabilities {
+ pub fn profile_machine(&self)->Result<u16>{
+  self.validate()?;
+  if self.build.platform!="Windows"||self.simulation_hz!=30||self.network.advertised_version!=45||self.network.native_layout_version!=44{return invalid("This Forerunner contract has no reviewed Windows solo profile; its declared operations remain inspection-only");}
+  if self.startup_map.as_ref().is_some_and(|s|s.setting!="game.start_map"||s.environment!="HALO_START_MAP"||s.selector!="basename@ce"||s.cache_version!=609||s.scenario_type!="solo"||s.profile!="native-menu-create-or-existing"||!s.fresh_start||s.network_host){return invalid("Unsupported Forerunner startup contract; no startup or hosting permission was granted");}
+  match self.build.architecture.as_str(){"x64"=>Ok(0x8664),"x86"=>Ok(0x014c),_=>invalid("Forerunner profile architecture is not supported")}
+ }
+ pub fn identity_sha256(&self)->Result<String>{use sha2::Digest;Ok(crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(self)?)))}
+}
+impl CompanionReview {
+ pub fn validate(&self,sha256:&str)->Result<u16>{
+  let hash=|value:&str|value.len()==64&&value.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b));
+  if !hash(&self.executable_sha256)||!hash(&self.dependency_sha256)||self.executable_sha256!=sha256{return invalid("Reviewed Forerunner executable changed; inspect and explicitly review the new build before using it");}
+  self.capabilities.profile_machine()
+ }
+}
+fn windows_image_machine(path:&Path,dll:bool)->Result<u16>{
+ use std::io::{Seek,SeekFrom};crate::reject_links(path)?;
+ let size=fs::metadata(path)?.len();if !(64..=64*1024*1024).contains(&size){return invalid("Forerunner native member exceeds its inspected PE size bound");}
+ let mut file=fs::File::open(path)?;let mut dos=[0;64];file.read_exact(&mut dos)?;
+ if &dos[..2]!=b"MZ"{return invalid("Forerunner native member is not a PE image");}
+ let offset=u32::from_le_bytes(dos[60..64].try_into().unwrap()) as u64;
+ if offset<64||offset.checked_add(24).is_none_or(|end|end>size){return invalid("Forerunner PE header is outside its native member");}
+ file.seek(SeekFrom::Start(offset))?;let mut header=[0;24];file.read_exact(&mut header)?;
+ if &header[..4]!=b"PE\0\0"||(u16::from_le_bytes([header[22],header[23]])&0x2000!=0)!=dll{return invalid("Forerunner PE executable/library role is invalid");}
+ Ok(u16::from_le_bytes([header[4],header[5]]))
+}
+/// Read-only adjacent dependency review; never borrow another runtime's DLL.
+pub fn companion_dependency_sha256(executable:&Path,capabilities:&CompanionCapabilities)->Result<String>{
+ let machine=capabilities.profile_machine()?;let library=executable.parent().ok_or_else(||crate::SparkError::Invalid("Forerunner package folder is missing".into()))?.join("SDL3.dll");
+ if windows_image_machine(executable,false)?!=machine||windows_image_machine(&library,true)?!=machine{return invalid("Forerunner executable, contract and SDL3.dll architectures differ");}
+ maps::hash_file(&library)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeRegistration {
@@ -293,6 +417,8 @@ pub struct RuntimeRegistration {
     pub data_root: Option<PathBuf>,
     pub version: Option<String>,
     pub network_version: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub reviewed_companion:Option<CompanionReview>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -741,7 +867,13 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
         executable=fs::canonicalize(engine)?;executable_sha256=engine_hash;
         diagnostics.push("Reviewed Chupathingy launcher resolved to its exact installed game executable; no launcher configuration was changed.".into());
     }
-    if registration.runtime_id == RuntimeId::OpenCe && forerunner_windows_machine(&executable_sha256).is_some() {
+    if let Some(review)=&registration.reviewed_companion {
+        if registration.runtime_id!=RuntimeId::OpenCe{return invalid("A Forerunner review cannot authorize a different runtime family");}
+        review.validate(&executable_sha256)?;
+        if companion_dependency_sha256(&executable,&review.capabilities)?!=review.dependency_sha256{return invalid("Reviewed Forerunner SDL3.dll changed; inspect and review the exact package again");}
+        diagnostics.push("Explicit local Forerunner contract review retained with exact executable and SDL3 hashes. It is not an upstream signature or gameplay acceptance.".into());
+    }
+    if registration.runtime_id == RuntimeId::OpenCe && forerunner_registration_machine(registration,&executable_sha256)?.is_some() {
         diagnostics.push("Reviewed Forerunner identity: shared content uses separate Spark-managed settings, saves, logs and caches. Play opens menus; authored solo staging needs validated CE609 content and its own reviewed action. Automatic map revision readback and Live Rebuild remain unavailable; gameplay acceptance is separate.".into());
     }
     if binary_platform != platform() {
@@ -978,6 +1110,20 @@ pub const FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256:&str="2f94e8631f7a6c5278a
 pub const FORERUNNER_WINDOWS_X64_CURRENT_SHA256:&str="b68e4710e2a258f42ae69fa183aaa05aeaf0d637d36033b30b0503847bb579d2";
 pub fn forerunner_windows_machine(sha256:&str)->Option<u16>{match sha256{FORERUNNER_WINDOWS_X86_SHA256=>Some(0x014c),FORERUNNER_WINDOWS_X64_CURRENT_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_MESSAGES_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_SECONDARY_SHA256|FORERUNNER_WINDOWS_X64_SQUAD_PREVIOUS_SHA256|FORERUNNER_WINDOWS_X64_STARTUP_SHA256|FORERUNNER_WINDOWS_X64_SHA256|FORERUNNER_WINDOWS_X64_PREVIOUS_SHA256=>Some(0x8664),_=>None}}
 
+/// Persisted creator review and built-in release pins use the same guarded profile.
+pub fn forerunner_registration_machine(registration:&RuntimeRegistration,sha256:&str)->Result<Option<u16>>{
+ if registration.runtime_id!=RuntimeId::OpenCe {if registration.reviewed_companion.is_some(){return invalid("Forerunner review belongs only to its OpenCE-family profile");}return Ok(None);}
+ match &registration.reviewed_companion {Some(review)=>Ok(Some(review.validate(sha256)?)),None=>Ok(forerunner_windows_machine(sha256))}
+}
+pub fn registration_content_interface(registration:&RuntimeRegistration,sha256:&str)->Result<Option<&'static str>>{
+ if forerunner_registration_machine(registration,sha256)?.is_some(){return Ok(Some("forerunner"));}Ok(shared_content_interface(registration.runtime_id,sha256))
+}
+pub fn forerunner_registration_startup_selector(registration:&RuntimeRegistration,sha256:&str,map:&str)->Result<Option<String>>{
+ if !crate::ce_host::map_selector(map){return invalid("Forerunner startup needs a native map basename, not a path or family override");}
+ if forerunner_registration_machine(registration,sha256)?.is_none(){return invalid("Forerunner startup needs a reviewed executable identity");}
+ match &registration.reviewed_companion{Some(review)=>Ok(review.capabilities.startup_map.is_some().then(||format!("{map}@ce"))),None=>forerunner_solo_startup_selector(sha256,map)}
+}
+
 /// Only these exact reviewed binaries declare the admitted CE startup interface.
 /// The caller must still validate/stage the exact native solo cache and resources.
 /// A requested selector is never a loaded-map acknowledgement or live RPC.
@@ -1030,7 +1176,7 @@ pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> 
     let shared = installed.data_root != installed.root;
     let executable_sha256 = installed.executable_sha256
         .ok_or_else(|| crate::SparkError::Invalid("Missing inspected executable identity".into()))?;
-    let interface = shared_content_interface(registration.runtime_id, &executable_sha256);
+    let interface = registration_content_interface(registration, &executable_sha256)?;
     if shared && interface.is_none() {
         return invalid("This exact engine has no verified shared-folder interface. For modern Chupathingy select chupathingy.exe, not its small launcher. Stock Custom Edition and MCC keep their own native map layouts.");
     }

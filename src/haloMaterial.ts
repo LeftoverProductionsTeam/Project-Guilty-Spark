@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type {ShaderPreview} from './types';
 import {sunlightPosition} from './environment';
 import {applyHaloBlend,genericCombiner,haloWaveGlsl} from './haloTransparency';
-import {glassWithoutDiffuse,nativeMeterInputs} from './nativeShaderTextures';
+import {glassWithoutDiffuse,nativeMeterInputs,nativeBumpedReflection} from './nativeShaderTextures';
 import type {SourceObjectLighting} from './haloLightmap';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
 const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
@@ -41,7 +41,7 @@ varying vec3 haloReflectionDirection;varying vec4 haloReflectionFront,haloReflec
 #ifdef USE_COLOR
 varying vec3 haloVertexColor;
 #endif
-uniform samplerCube reflectionCube;uniform bool hasReflection;uniform mat3 viewToWorld;uniform vec2 reflectionBrightness,reflectionRange;uniform vec3 reflectionPerpTint,reflectionParallelTint;
+uniform samplerCube reflectionCube;uniform bool hasReflection,nativeBumpedReflection;uniform mat3 viewToWorld;uniform vec2 reflectionBrightness,reflectionRange;uniform vec3 reflectionPerpTint,reflectionParallelTint;
 uniform sampler2D baseMap,lightMap,primaryDetail,secondaryDetail,microDetail,alphaMask,layer1,layer2,layer3;
 uniform bool hasBase,hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
 uniform int kind,shaderType,detailFunction,microFunction,layerCount,detailMask;
@@ -83,6 +83,16 @@ vec4 combine(vec4 current,vec4 next,int c,int a){
   else if(a==9)alpha=mix(next.a,alpha,current.a);else if(a==10)alpha=mix(alpha,next.a,current.a);
   else if(a==11)alpha=mix(alpha,next.a,next.a);else if(a==12)alpha=mix(next.a,alpha,next.a);
   return clamp(vec4(rgb,alpha),0.0,1.0);
+}
+// Reuse the existing UV derivative basis for source reflection relief and
+// optional diffuse enhancement, with independent strengths and lighting scope.
+vec3 bumpNormal(vec3 n,float strength){
+  vec3 dp1=dFdx(haloView),dp2=dFdy(haloView);vec2 duv1=dFdx(haloUv),duv2=dFdy(haloUv);
+  vec3 a=cross(dp2,n),b=cross(n,dp1),t=a*duv1.x+b*duv2.x,bt=a*duv1.y+b*duv2.y;
+  float length2=max(dot(t,t),dot(bt,bt));if(length2<=.00000001)return n;
+  vec3 sampleN=texture2D(normalMap,haloUv*normalScale).rgb*2.0-1.0;sampleN.xy*=strength;
+  vec3 mapped=mat3(t*inversesqrt(length2),bt*inversesqrt(length2),n)*sampleN;
+  return dot(mapped,mapped)>.00000001?normalize(mapped):n;
 }
 void main(){
   if(kind==4&&glassTintPass){
@@ -134,12 +144,10 @@ void main(){
     vec3 surface=base.rgb;
     if(hasLight)base.rgb*=texture2D(lightMap,haloLightUv).rgb;
     vec3 n=normalize(haloNormal)*(gl_FrontFacing?1.0:-1.0);
-    if(hasNormal&&enhancedNormal){vec3 dp1=dFdx(haloView),dp2=dFdy(haloView);vec2 duv1=dFdx(haloUv),duv2=dFdy(haloUv);
-      vec3 a=cross(dp2,n),b=cross(n,dp1),t=a*duv1.x+b*duv2.x,bt=a*duv1.y+b*duv2.y;
-      float length2=max(dot(t,t),dot(bt,bt));if(length2>.00000001){float inv=inversesqrt(length2);vec3 sampleN=texture2D(normalMap,haloUv*normalScale).rgb*2.0-1.0;
-        sampleN.xy*=normalStrength;vec3 perturbed=normalize(mat3(t*inv,bt*inv,n)*sampleN);
-        float baseDiffuse=max(.25,dot(n,lightUnit(lightDirection))*.5+.5),relief=max(.25,dot(perturbed,lightUnit(lightDirection))*.5+.5);
-        base.rgb*=clamp(relief/baseDiffuse,.25,2.0);n=perturbed;}}
+    vec3 nativeReflectionNormal=hasReflection&&hasNormal&&nativeBumpedReflection?bumpNormal(n,1.0):n;
+    if(hasNormal&&enhancedNormal){vec3 perturbed=bumpNormal(n,normalStrength);
+      float baseDiffuse=max(.25,dot(n,lightUnit(lightDirection))*.5+.5),relief=max(.25,dot(perturbed,lightUnit(lightDirection))*.5+.5);
+      base.rgb*=clamp(relief/baseDiffuse,.25,2.0);n=perturbed;}
     if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);
       if(enhancedSpecular){float mask=multipurposeXbox?masks.r:masks.b;vec3 halfVector=normalize(lightUnit(lightDirection)+normalize(-haloView));base.rgb+=sunFill*mask*pow(max(0.0,dot(n,halfVector)),32.0)*specularStrength;}}
     if(overrideLighting||localObjectLighting){vec3 illumination=ambientFill+sunFill*max(0.0,dot(n,lightUnit(lightDirection)))+
@@ -158,7 +166,7 @@ void main(){
     // as an opaque additive mask. Tint is a separate source-controlled pass.
     float glassOpacity=kind==4?clamp(base.a,0.0,1.0):0.0;
     if(kind==4)base.rgb*=glassOpacity;
-    if(hasReflection){bool nativeModel=kind==1&&!(hasNormal&&enhancedNormal);vec3 reflected=viewToWorld*(nativeModel?haloReflectionDirection:reflect(normalize(haloView),n));float facing=kind==4?clamp(normalize(haloNormal).z,0.0,1.0):clamp(dot(normalize(-haloView),n),0.0,1.0);
+    if(hasReflection){bool nativeModel=kind==1&&!(hasNormal&&enhancedNormal);vec3 reflectionNormal=nativeBumpedReflection&&hasNormal?nativeReflectionNormal:n;vec3 reflected=viewToWorld*(nativeModel?haloReflectionDirection:reflect(normalize(haloView),reflectionNormal));float facing=kind==4?clamp(normalize(haloNormal).z,0.0,1.0):clamp(dot(normalize(-haloView),reflectionNormal),0.0,1.0);
       // Native glass uses the camera axis and squared facing. Its authored
       // reflection colour blends glossy and broad cube response; it is not
       // the multiplicative tint used by opaque model/environment shaders.
@@ -243,6 +251,7 @@ export function createHaloMaterial(
       meterNegative:{value:!!(meter&&meter.flags&4)},meterTintMode2:{value:mode2},
       reflectionCube: { value: extra.reflectionCube ?? null },
       hasReflection: { value: !!extra.reflectionCube && !!reflection },
+      nativeBumpedReflection:{value:nativeBumpedReflection(m)},
       viewToWorld: { value: new THREE.Matrix3() },
       reflectionBrightness: {
         value: new THREE.Vector2(

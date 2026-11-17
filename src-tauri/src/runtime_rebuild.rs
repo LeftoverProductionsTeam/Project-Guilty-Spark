@@ -63,6 +63,7 @@ struct Stage {
     executable_name: String,
     staged_sha256: std::collections::BTreeMap<String,String>,
     forerunner_extraction:bool,
+    forerunner_startup:Option<String>,
 }
 impl Drop for Stage {
     fn drop(&mut self) {
@@ -167,7 +168,7 @@ fn forerunner_registration(state:&AppState,expected:Option<&runtime::RuntimeRegi
 fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:BuildRecord)->Reply<Stage>{
     let installed=runtime::inspect_registration(reg).map_err(error)?;
     let executable_sha=installed.executable_sha256.as_deref().ok_or("Forerunner identity is missing")?;
-    let machine=runtime::forerunner_windows_machine(executable_sha).ok_or("Forerunner changed or has no reviewed Windows profile; inspect the build before staging")?;
+    let machine=runtime::forerunner_registration_machine(reg,executable_sha).map_err(error)?.ok_or("Forerunner changed or has no reviewed Windows profile; inspect the build before staging")?;
     let executable=installed.executable.as_deref().ok_or("Forerunner executable is missing")?;
     let package=executable.parent().ok_or("Forerunner package folder is missing")?;
     let library=package.join("SDL3.dll");core::reject_links(&library).map_err(error)?;
@@ -188,7 +189,7 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
     fs::create_dir_all(&root).map_err(error)?;lease.mark_owned().map_err(error)?;
     let budget=store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
     let name=executable.file_name().and_then(|n|n.to_str()).ok_or("Invalid Forerunner executable name")?.to_owned();
-    let mut result=Stage{forerunner_extraction:false,root,lease:Some(lease),budget,build:build.clone(),map:header.name.clone(),ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
+    let mut result=Stage{forerunner_startup:runtime::forerunner_registration_startup_selector(reg,executable_sha,&header.name).map_err(error)?,forerunner_extraction:false,root,lease:Some(lease),budget,build:build.clone(),map:header.name.clone(),ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
     prepare_runtime_roots(&result.root)?;let mut total=0;
     for(source,relative,sha)in[(executable.to_path_buf(),format!("engine/{name}"),executable_sha.to_owned()),(library,"engine/SDL3.dll".into(),library_sha)]{
         copy_pin(&source,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
@@ -209,8 +210,7 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
     for(name,sha)in &result.ce_resource_sha256{result.staged_sha256.insert(format!("data/maps_ce/{name}"),sha.clone());}
     result.budget.check().map_err(error)?;Ok(result)
 }
-fn apply_forerunner_startup(command:&mut Command,sha256:&str,map:&str)->Reply<Option<String>>{
-    let selector=runtime::forerunner_solo_startup_selector(sha256,map).map_err(error)?;
+fn apply_forerunner_startup(command:&mut Command,selector:Option<String>)->Reply<Option<String>>{
     command.env_remove("HALO_START_MAP");
     if let Some(selector)=&selector{command.env("HALO_START_MAP",selector);}
     Ok(selector)
@@ -229,11 +229,13 @@ fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&S
     // Native HaloScript owns these waves. A reviewed CE startup request uses
     // only this staged cache; no debug/test startup is inherited.
     for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
-    if stage.forerunner_extraction&&runtime::forerunner_windows_machine(&original.executable_sha256)!=Some(0x8664){return Err("This older Forerunner build is not reviewed for native Extraction settlement; select the current verified x64 profile".into());}
-    apply_forerunner_startup(&mut command,&original.executable_sha256,&stage.map)?;
+    if stage.forerunner_extraction&&runtime::forerunner_registration_machine(reg,&original.executable_sha256).map_err(error)?!=Some(0x8664){return Err("This older Forerunner build is not reviewed for native Extraction settlement; select the current verified x64 profile".into());}
+    let startup=runtime::forerunner_registration_startup_selector(reg,&original.executable_sha256,&stage.map).map_err(error)?;
+    if startup!=stage.forerunner_startup{return Err("Forerunner startup contract changed after staging; no process was launched".into());}
+    apply_forerunner_startup(&mut command,startup)?;
     command.env("HALO_EXTRACTION",if stage.forerunner_extraction{"true"}else{"false"});
     if stage.forerunner_extraction{command.env("HALO_NET_COOP_SCRIPT_ADAPTATIONS","false");}
-    if runtime::forerunner_windows_machine(&original.executable_sha256)==Some(0x014c){command.env("HALO_RENDERER","gl");}
+    if runtime::forerunner_registration_machine(reg,&original.executable_sha256).map_err(error)?==Some(0x014c){command.env("HALO_RENDERER","gl");}
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());Ok(command)
 }
 fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecord) -> Reply<Stage> {
@@ -247,7 +249,7 @@ fn stage(state: &AppState, reg: &runtime::RuntimeRegistration, build: BuildRecor
     fs::create_dir_all(&root).map_err(error)?;
     lease.mark_owned().map_err(error)?;
     let budget = store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
-    let mut result = Stage { forerunner_extraction:false, root, lease: Some(lease), budget, build: build.clone(), map: header.name.clone(), ce_resource_sha256: Default::default(), executable_name: String::new(), staged_sha256: Default::default() };
+    let mut result = Stage { forerunner_startup:None,forerunner_extraction:false, root, lease: Some(lease), budget, build: build.clone(), map: header.name.clone(), ce_resource_sha256: Default::default(), executable_name: String::new(), staged_sha256: Default::default() };
     prepare_runtime_roots(&result.root)?;
     let mut total = 0;
     let engine_source=installed.executable.as_deref().and_then(Path::parent).ok_or("Runtime executable has no package folder")?;
@@ -334,9 +336,9 @@ fn owned_session(workbench: &WorkbenchState, owner: &str, id: &str) -> Reply<Arc
 fn owned(state: &AppState, owner: &str, id: &str) -> Reply<Arc<Session>> {
     owned_session(&*lock(&state.runtime_workbench)?,owner,id)
 }
-fn publish_forerunner(view:&mut View,sha:&str,map:&str)->Reply<()>{
+fn publish_forerunner(view:&mut View,startup:Option<String>,map:&str)->Reply<()>{
         view.game_build_id=None;view.game_sha256=None;
-        view.startup_map=runtime::forerunner_solo_startup_selector(sha,map).map_err(error)?;
+        view.startup_map=startup;
         if let Some(selector)=view.startup_map.clone(){view.phase="awaitingMapStartup".into();view.detail=format!("Forerunner was asked to start the staged CE solo map {selector} fresh. Create a temporary player profile in its native menus if prompted. This request does not confirm a loaded map, revision or gameplay. Stop disposes this owned profile and scratch.");}
         else{view.phase="awaitingMapSelection".into();view.detail=format!("Forerunner opened with an isolated CE solo cache: {}. This reviewed build uses its native custom campaign chooser; create a temporary player profile if prompted. Spark cannot confirm the loaded map or restart it automatically. Stop disposes this owned profile and scratch.",map);}
     Ok(())
@@ -347,8 +349,7 @@ fn publish(session: &Session, run: &Running) -> Reply<()> {
     view.ce_resource_sha256=run.stage.ce_resource_sha256.clone();
     view.staged_map=run.stage.map.clone();view.engine_sha256=run.stage.staged_sha256.iter().filter(|(name,_)|name.starts_with("engine/")).map(|(name,sha)|(name.clone(),sha.clone())).collect();
     if view.runtime_id==runtime::RuntimeId::OpenCe{
-        let sha=run.stage.staged_sha256.get(&format!("engine/{}",run.stage.executable_name)).ok_or("Staged Forerunner identity missing")?;
-        return publish_forerunner(&mut view,sha,&run.stage.map);
+        return publish_forerunner(&mut view,run.stage.forerunner_startup.clone(),&run.stage.map);
     }
     view.game_build_id=None; view.game_sha256=None; view.phase="loading".into();
     view.detail="Private native playtest started; waiting for an actual engine gameplay tick. Rebuild restarts this round and does not replace live geometry.".into();
@@ -422,7 +423,7 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let (build,compiled_extraction,required_native_features)=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{(checked_build(&state,&project,None)?,false,vec![])};
         if !required_native_features.is_empty(){
             let sha=expected_executable_sha256.as_deref().ok_or("Inspect the required Forerunner build before starting")?;
-            runtime_connections::query_companion_capabilities(&reg.executable,sha)?.require_native_features(&required_native_features)?;
+            runtime_connections::query_companion_capabilities(&reg.executable,sha)?.require_native_features(&required_native_features).map_err(error)?;
         }
         if mission_extraction&&!compiled_extraction{return Err("The saved mission requires native settled Extraction, but this compiled revision has no admitted callback and hub layout. Rebuild the reviewed mission first".into());}
         // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
@@ -495,13 +496,13 @@ mod tests {
     #[test]
     fn forerunner_startup_is_pinned_scoped_and_not_a_game_acknowledgement(){
         let mut command=Command::new("unused-no-process-created");command.env("HALO_START_MAP","inherited_unrelated@ce");
-        assert_eq!(apply_forerunner_startup(&mut command,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap().as_deref(),Some("be_native@ce"));
+        assert_eq!(apply_forerunner_startup(&mut command,runtime::forerunner_solo_startup_selector(runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap()).unwrap().as_deref(),Some("be_native@ce"));
         let value=command.get_envs().find(|(key,_)|*key=="HALO_START_MAP").unwrap().1.unwrap();assert_eq!(value,"be_native@ce");assert_eq!(command.get_args().count(),0);
-        assert_eq!(apply_forerunner_startup(&mut command,runtime::FORERUNNER_WINDOWS_X64_SHA256,"be_native").unwrap(),None);assert!(command.get_envs().find(|(key,_)|*key=="HALO_START_MAP").unwrap().1.is_none());
-        assert!(apply_forerunner_startup(&mut command,&"0".repeat(64),"be_native").is_err());assert!(apply_forerunner_startup(&mut command,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"../other").is_err());
+        assert_eq!(apply_forerunner_startup(&mut command,runtime::forerunner_solo_startup_selector(runtime::FORERUNNER_WINDOWS_X64_SHA256,"be_native").unwrap()).unwrap(),None);assert!(command.get_envs().find(|(key,_)|*key=="HALO_START_MAP").unwrap().1.is_none());
+        assert!(runtime::forerunner_solo_startup_selector(&"0".repeat(64),"be_native").is_err());assert!(runtime::forerunner_solo_startup_selector(runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"../other").is_err());
         let session=session("owned","map");let mut view=lock(&session.view).unwrap();view.runtime_id=runtime::RuntimeId::OpenCe;
-        publish_forerunner(&mut view,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap();assert_eq!(view.startup_map.as_deref(),Some("be_native@ce"));assert_eq!(view.phase,"awaitingMapStartup");assert!(view.game_build_id.is_none()&&view.game_sha256.is_none());
-        publish_forerunner(&mut view,runtime::FORERUNNER_WINDOWS_X64_SHA256,"be_native").unwrap();assert_eq!(view.phase,"awaitingMapSelection");assert!(view.startup_map.is_none()&&view.game_build_id.is_none()&&view.game_sha256.is_none());
+        publish_forerunner(&mut view,runtime::forerunner_solo_startup_selector(runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256,"be_native").unwrap(),"be_native").unwrap();assert_eq!(view.startup_map.as_deref(),Some("be_native@ce"));assert_eq!(view.phase,"awaitingMapStartup");assert!(view.game_build_id.is_none()&&view.game_sha256.is_none());
+        publish_forerunner(&mut view,runtime::forerunner_solo_startup_selector(runtime::FORERUNNER_WINDOWS_X64_SHA256,"be_native").unwrap(),"be_native").unwrap();assert_eq!(view.phase,"awaitingMapSelection");assert!(view.startup_map.is_none()&&view.game_build_id.is_none()&&view.game_sha256.is_none());
     }
     #[test]
     fn fresh_playtest_roots_exist_before_windows_process_path_validation() {
@@ -552,9 +553,12 @@ mod tests {
         let data=PathBuf::from(std::env::var_os("SPARK_NATIVE_FORERUNNER_DATA").expect("Explicit Xbox UI data"));
         let ce=PathBuf::from(std::env::var_os("SPARK_NATIVE_CE_INSTALLATION").expect("Explicit owned CE installation"));
         let map=PathBuf::from(std::env::var_os("SPARK_NATIVE_SOLO_MAP").expect("Explicit independently compiled solo map"));
-        let registration=runtime::RuntimeRegistration{id:"native-forerunner-stage".into(),runtime_id:runtime::RuntimeId::OpenCe,root:executable.parent().unwrap().into(),executable:executable.clone(),data_root:Some(data.clone()),version:None,network_version:None};
-        let original=maps::hash_file(&executable).unwrap();assert_eq!(original,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256);
-        let ce_registration=runtime::RuntimeRegistration{id:"native-ce-source".into(),runtime_id:runtime::RuntimeId::HaloCustomEdition,root:ce.clone(),executable:ce.join("haloce.exe"),data_root:Some(ce.clone()),version:None,network_version:None};
+        let mut registration=runtime::RuntimeRegistration{reviewed_companion:None,id:"native-forerunner-stage".into(),runtime_id:runtime::RuntimeId::OpenCe,root:executable.parent().unwrap().into(),executable:executable.clone(),data_root:Some(data.clone()),version:None,network_version:None};
+        let original=maps::hash_file(&executable).unwrap();
+        if let Ok(expected)=std::env::var("SPARK_NATIVE_FORERUNNER_REVIEW_SHA256"){
+            assert_eq!(original,expected,"Explicit owner-selected snapshot identity");let capabilities=runtime_connections::query_companion_capabilities(&executable,&original).unwrap();let dependency_sha256=runtime::companion_dependency_sha256(&executable,&capabilities).unwrap();registration.reviewed_companion=Some(runtime::CompanionReview{executable_sha256:original.clone(),dependency_sha256,capabilities});runtime_connections::verify_companion_review(&executable,registration.reviewed_companion.as_ref().unwrap()).unwrap();
+        }else{assert_eq!(original,runtime::FORERUNNER_WINDOWS_X64_CURRENT_SHA256);}
+        let ce_registration=runtime::RuntimeRegistration{reviewed_companion:None,id:"native-ce-source".into(),runtime_id:runtime::RuntimeId::HaloCustomEdition,root:ce.clone(),executable:ce.join("haloce.exe"),data_root:Some(ce.clone()),version:None,network_version:None};
         lock(&state.library).unwrap().set_setting("runtimeRegistrations",&vec![ce_registration]).unwrap();
         let mut protected=vec![executable.clone(),executable.with_file_name("SDL3.dll"),data.join("maps/ui.map"),map.clone()];for name in ["bitmaps.map","sounds.map","loc.map","ui.map"]{protected.push(ce.join("maps").join(name));}
         let hashes=protected.iter().map(|file|maps::hash_file(file).unwrap()).collect::<Vec<_>>();
