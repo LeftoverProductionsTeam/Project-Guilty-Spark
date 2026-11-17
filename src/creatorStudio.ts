@@ -51,6 +51,9 @@ export function missionCameraUsers(studio:Pick<CreatorStudioDocument,'missions'>
   return studio.missions.filter(beat=>beat.cinematicCue?.firstShotId===shotId||beat.cinematicCue?.lastShotId===shotId);
 }
 export interface MissionBeat {
+  /** Absent: shared mission.01–22: native Forerunner operation membership. */
+  squadNumber?:number|null;
+  allowSharedPresentation?:boolean|null;
   id: string;
   title: string;
   objective: string;
@@ -238,14 +241,14 @@ export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:s
       const result=beat.conditionResult;
       if(!result||typeof result!=='object'||Array.isArray(result)||Object.keys(result).some(key=>!['beatId','failed'].includes(key))||typeof result.beatId!=='string'||typeof result.failed!=='boolean')throw Error('Invalid mission rescue result');
       const target=missions.findIndex(row=>row.id===result.beatId);
-      if(target<0||target>=index||missions[target].trigger!=='escort'||missions[target].escortFailure!=='continue')throw Error('Choose an earlier survivor escort configured to continue on failure');
+      if(target<0||target>=index||(missions[target].squadNumber??0)!==(beat.squadNumber??0)||missions[target].trigger!=='escort'||missions[target].escortFailure!=='continue')throw Error('Choose an earlier survivor escort configured to continue on failure');
     }
     if(beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')throw Error('Invalid mission branch outcome');
     if((beat.conditionGroup!=null||beat.conditionOutside!=null)&&beat.conditionVolume==null)throw Error('Mission branch decisions need an optional condition volume');
     if(beat.conditionGroup==null)continue;
     if(typeof beat.conditionGroup!=='string'||!recordId.test(beat.conditionGroup))throw Error('Invalid shared mission decision');
     const known=groups.get(beat.conditionGroup);
-    if(known&&known.volume!==beat.conditionVolume)throw Error('Shared mission decisions must use the same native volume');
+    if(known&&(known.volume!==beat.conditionVolume||(known.firstBeat.squadNumber??0)!==(beat.squadNumber??0)))throw Error('Shared mission decisions must use the same native volume and objective scope');
     if(!known)groups.set(beat.conditionGroup,{volume:beat.conditionVolume!,firstBeat:beat,index:groups.size+1});
   }
   return groups;
@@ -267,6 +270,8 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   for (const m of doc.missions) {
     try{missionCinematicShots(doc,m);}catch(error){failures.push(String(error));}
     if (!unique(m.id) || !safeText(m.title, 120) || !safeText(m.objective, 2048) || !safeText(m.encounterName, 128) || !triggerValues.has(m.trigger) ||
+      (m.squadNumber!=null&&(!Number.isInteger(m.squadNumber)||m.squadNumber<1||m.squadNumber>22)) ||
+      (m.allowSharedPresentation!=null&&typeof m.allowSharedPresentation!=='boolean') ||
       (m.triggerRef != null && m.triggerRef !== '' && !scriptIdent.test(m.triggerRef)) ||
       (m.conditionVolume != null && m.conditionVolume !== '' && (typeof m.conditionVolume!=='string'||!scriptIdent.test(m.conditionVolume))) ||
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||

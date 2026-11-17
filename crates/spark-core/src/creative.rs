@@ -53,6 +53,8 @@ impl MissionSoundCue {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MissionBeat {
+    #[serde(default,skip_serializing_if="Option::is_none")] pub squad_number:Option<u8>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub allow_shared_presentation:Option<bool>,
     pub id: String,
     pub title: String,
     pub objective: String,
@@ -209,6 +211,26 @@ pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
     }).collect()
 }
 /// Authoring metadata does not replace source/geometry or compiled-cache checks.
+fn mission_scope_last(missions:&[MissionBeat],index:usize)->bool{missions[index+1..].iter().all(|other|other.squad_number!=missions[index].squad_number)}
+fn validate_mission_scopes(missions:&[MissionBeat])->Result<()>{
+ if missions.iter().any(|beat|beat.squad_number.is_some_and(|number|!(1..=22).contains(&number))){return invalid("Squad numbers must be 1 through 22");}
+ if !missions.iter().any(|beat|beat.squad_number.is_some()){return Ok(());}
+ if missions.iter().any(|beat|beat.checkpoint==Some(true)||beat.complete_mission==Some(true)){return invalid("Independent squad operations cannot save or end the shared world; use a separate shared campaign");}
+ for(index,beat)in missions.iter().enumerate(){
+  if beat.squad_number.is_some(){
+   if beat.cinematic_cue.is_some(){return invalid("Squad camera isolation is unsupported; preserve the scene in shared campaign scope");}
+   if (beat.hud_objective==Some(true)||beat.sound_cue.is_some())&&beat.allow_shared_presentation!=Some(true){return invalid("Explicitly allow shared native HUD/radio presentation or keep the objective in shared scope");}
+   let same=missions.iter().filter(|other|other.squad_number==beat.squad_number).collect::<Vec<_>>();
+   if same.last().is_none_or(|last|last.trigger!="forerunnerExtractionSettled")||same.iter().filter(|other|other.trigger=="forerunnerExtractionSettled").count()!=1{return invalid("Every independent squad needs one final settled-extraction objective");}
+  }
+  for other in &missions[..index]{
+   if beat.squad_number==other.squad_number{continue;}
+   if matches!(beat.trigger.as_str(),"escort"|"encounterCleared")&&matches!(other.trigger.as_str(),"escort"|"encounterCleared")&&!beat.encounter_name.is_empty()&&(beat.encounter_name.eq_ignore_ascii_case(&other.encounter_name)||beat.encounter_name.to_ascii_lowercase().starts_with(&(other.encounter_name.to_ascii_lowercase()+"/"))||other.encounter_name.to_ascii_lowercase().starts_with(&(beat.encounter_name.to_ascii_lowercase()+"/"))){return invalid("Independent controllers cannot both own the same native encounter spawn");}
+   if beat.create_weapon_object.as_ref().zip(other.create_weapon_object.as_ref()).is_some_and(|(a,b)|a.eq_ignore_ascii_case(b)){return invalid("Independent controllers cannot both recreate the same named weapon");}
+  }
+ }Ok(())
+}
+
 pub(crate) fn validate_working_mission(project:&crate::project::Project,binding:&NativeMissionBinding)->Result<()> {
     if binding.schema_version!=1||!["manual","startup"].contains(&binding.activation.as_str())||binding.source_sha256.len()!=64||!binding.source_sha256.bytes().all(|value|value.is_ascii_hexdigit()){return invalid("Unsupported prepared mission binding or source hash");}
     let studio=project.studio.as_ref().ok_or_else(||crate::SparkError::Invalid("Prepared mission has no originating Creator Studio data".into()))?;
@@ -237,6 +259,7 @@ pub(crate) fn validate_working_mission(project:&crate::project::Project,binding:
             return invalid(format!("Mission '{}' needs its exact included native sound; choose the imported sound again before preparing",beat.title));
         }
     }
+    validate_mission_scopes(&binding.missions)?;
     let _=native_mission_hud(binding)?;
     Ok(())
 }
@@ -274,7 +297,7 @@ pub fn recovered_mission_binding_for_module(project:&crate::project::Project,sou
     validate_working_mission(project,&binding)?;
     if project.studio.as_ref().is_none_or(|studio|studio.shots!=config.shots){return invalid("Recovered mission camera references changed; prepare again");}
     for (index,beat) in binding.missions.iter().enumerate() {
-        if beat.trigger=="forerunnerExtractionSettled" && (!config.forerunner||index+1!=binding.missions.len()||beat.trigger_ref.as_deref()!=Some("extraction_activate")||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)) {
+        if beat.trigger=="forerunnerExtractionSettled" && (!config.forerunner||!mission_scope_last(&binding.missions,index)||beat.trigger_ref.as_deref()!=Some("extraction_activate")||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)) {
             return invalid("Forerunner settlement must be the final unconditional objective on a reviewed CE solo target");
         }
     }
@@ -302,10 +325,11 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Unsupported prepared mission binding or source hash");
     }
     validate_working_mission(project,&binding)?;
+    if binding.missions.iter().any(|beat|beat.squad_number.is_some()){return invalid("Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates; preserve mission data and use the recovered source workflow");}
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
     }
-    for beat in &binding.missions {
+    for (beat_index,beat) in binding.missions.iter().enumerate() {
         if let Some(name)=&beat.condition_volume {
             if !script_ident(name)||!doc.logic.as_ref().is_some_and(|logic|logic.triggers.iter().any(|trigger|crate::native_logic::trigger_name(trigger)==*name)) {
                 return invalid(format!("Mission '{}' references missing optional-condition volume '{}'",beat.title,name));
@@ -325,7 +349,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
                 if doc.starting_profile.as_ref().is_some_and(|p|p.primary_weapon==path||p.secondary_weapon.as_deref()==Some(path)){return invalid("Technology must be absent from authored starting equipment");}
             },
             "forerunnerExtractionSettled"=>{
-                if !matches!(doc.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe)||binding.missions.last().is_none_or(|last|last.id!=beat.id)||binding.missions.iter().filter(|b|b.trigger=="forerunnerExtractionSettled").count()!=1||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)||beat.trigger_ref.as_deref()!=Some("extraction_activate"){return invalid("Forerunner settlement must be the final unconditional objective on its CE campaign target");}
+                if !matches!(doc.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe)||!mission_scope_last(&binding.missions,beat_index)||binding.missions.iter().filter(|b|b.squad_number==beat.squad_number&&b.trigger=="forerunnerExtractionSettled").count()!=1||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)||beat.trigger_ref.as_deref()!=Some("extraction_activate"){return invalid("Forerunner settlement must be the final unconditional objective on its CE campaign target");}
                 crate::native_logic::validate_extraction_layout(doc,false)?;
 
             },
@@ -421,14 +445,31 @@ pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInsp
 pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path)->Result<()> {verify_native_mission_with_hud(binding,map,cache,None)}
 
 pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path,retained_hud:Option<(&str,&[crate::maps::NativeHudMessage])>)->Result<()> {
+    validate_mission_scopes(&binding.missions)?;
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
+    let scoped=binding.missions.iter().filter_map(|beat|beat.squad_number).collect::<std::collections::BTreeSet<_>>();
+    if !scoped.is_empty(){
+        if map.header.version!=609||map.header.extended{return invalid("Independent squad missions require standard CE609 Forerunner content");}
+        if binding.missions.iter().any(|beat|beat.squad_number.is_none()){expected.push(("gs_shared_mission".into(),1));}
+        let markers=crate::maps::scenario_logic_readback(cache,map)?;
+        crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
+        for number in &scoped{
+            expected.extend([(format!("gs_sq{number:02}_mission"),2),(format!("gs_sq{number:02}_guard"),2),(format!("forerunner_squad_{number:02}_players"),3)]);
+            let ready=format!("extraction_squad_{number:02}_ready");
+            let groups=markers.groups.iter().enumerate().filter(|(_,group)|group.name==ready).collect::<Vec<_>>();
+            if groups.len()!=1||groups[0].1.initial_value!=0.||groups[0].1.flags!=0||markers.devices.iter().any(|device|[device.power_group,device.position_group].contains(&Some(groups[0].0 as i16))){return invalid("Compiled squad mission needs one isolated zero-initialized readiness group");}
+            let controls=markers.names.iter().enumerate().filter(|(_,name)|name.name==format!("extraction_squad_{number:02}")).collect::<Vec<_>>();
+            if controls.len()!=1||controls[0].1.object_type!=8||!markers.devices.iter().any(|device|device.class=="ctrl"&&device.index==controls[0].1.object_index as usize&&device.name_index==controls[0].0 as i16){return invalid("Compiled squad mission needs its unique native selection control");}
+        }
+        let _=compiled_extraction_requirements(cache,map)?;
+    }
     if binding.cinematic.is_some()&&binding.cinematic_intro!=Some(false){expected.push(("gs_cinematic".into(),3));}
     if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
     for (index,beat) in binding.missions.iter().enumerate() {
         if beat.cinematic_cue.is_some(){expected.push((format!("gs_scene_{}",index+1),3));}
-        if beat.trigger=="forerunnerExtractionSettled"{if map.header.version!=609{return invalid("Forerunner Extraction requires native CE609 output; another cache format is not interchangeable");}expected.push(("forerunner_extraction_complete".into(),1));}
-        if beat.trigger=="manual"{expected.push((format!("gs_complete_{}",index+1),3));}
+        if beat.trigger=="forerunnerExtractionSettled"{if map.header.version!=609{return invalid("Forerunner Extraction requires native CE609 output; another cache format is not interchangeable");}expected.push((beat.squad_number.map(|number|format!("forerunner_squad_{number:02}_complete")).unwrap_or_else(||"forerunner_extraction_complete".into()),if beat.squad_number.is_some(){2}else{1}));}
+        if beat.trigger=="manual"{expected.push((beat.squad_number.map(|number|format!("gs_sq{number:02}_complete_{}",index+1)).unwrap_or_else(||format!("gs_complete_{}",index+1)),3));}
     }
     for (name,kind) in expected {
         let scripts=map.scripts.iter().filter(|script|script.name==name).collect::<Vec<_>>();
@@ -569,7 +610,7 @@ impl CreatorStudio {
                 || !m.blur.is_finite() || !(0.0..=1.0).contains(&m.blur)
             { return invalid("Invalid Machinima lens or playback settings"); }
         }
-        let mut branches:HashMap<&str,&str>=HashMap::new();
+        let mut branches:HashMap<&str,(&str,Option<u8>)>=HashMap::new();
         for (index,beat) in self.missions.iter().enumerate() {
             if let Some(cue)=&beat.cinematic_cue {
                 let first=self.shots.iter().position(|shot|shot.id==cue.first_shot_id);let last=self.shots.iter().position(|shot|shot.id==cue.last_shot_id);
@@ -578,6 +619,7 @@ impl CreatorStudio {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
+                || beat.squad_number.is_some_and(|n|!(1..=22).contains(&n))
                 || !["manual", "triggerVolume", "encounterCleared", "escort", "deviceActivated", "weaponOwned", "forerunnerExtractionSettled", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
@@ -590,13 +632,13 @@ impl CreatorStudio {
             { return invalid("Invalid Creator Studio mission beat"); }
             if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}
             if let Some(result)=&beat.condition_result {
-                if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}
+                if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.squad_number==beat.squad_number&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}
             }
             if (beat.condition_group.is_some()||beat.condition_outside.is_some())&&beat.condition_volume.is_none(){return invalid("Mission branch decisions need an optional condition volume");}
             if let Some(group)=&beat.condition_group {
                 if !valid_id(group){return invalid("Invalid shared mission decision");}
                 let volume=beat.condition_volume.as_deref().unwrap();
-                if branches.insert(group,volume).is_some_and(|previous|previous!=volume){return invalid("Shared mission decisions must use the same native volume");}
+                if branches.insert(group,(volume,beat.squad_number)).is_some_and(|previous|previous!=(volume,beat.squad_number)){return invalid("Shared mission decisions must use the same native volume and objective scope");}
             }
         }
         for shot in &self.shots {
@@ -973,6 +1015,21 @@ mod tests {
         for name in ["forerunner_squad_1_players","forerunner_squad_00_players","forerunner_squad_23_players","forerunner_squad_ab_players"]{assert!(squad_interface_number(name,"forerunner_squad_","_players").is_err());}
         assert_eq!(squad_interface_number("forerunner_extraction_complete","forerunner_squad_","_players").unwrap(),None);
         assert_eq!(squad_interface_number("extraction_squad_01_ready","extraction_squad_","_ready").unwrap(),Some(1));
+    }
+
+    #[test]
+    fn independent_squad_missions_require_real_settlement_and_isolated_spawn_owners(){
+        let beat=|id:&str,trigger:&str,scope:u8|serde_json::from_value::<MissionBeat>(serde_json::json!({"id":id,"title":id,"objective":id,"trigger":trigger,"triggerRef":"extraction_activate","encounterName":"","squadNumber":scope})).unwrap();
+        let mut missions=vec![beat("combat","encounterCleared",1),beat("end","forerunnerExtractionSettled",1),beat("manual","manual",2),beat("end2","forerunnerExtractionSettled",2)];
+        missions[0].encounter_name="guards".into();validate_mission_scopes(&missions).unwrap();
+        let saved=serde_json::to_value(&missions).unwrap();assert_eq!(saved[0]["squadNumber"],1);
+        let reopened:Vec<MissionBeat>=serde_json::from_value(saved).unwrap();assert_eq!(missions,reopened);
+        missions[2].trigger="encounterCleared".into();missions[2].encounter_name="GUARDS/patrol".into();assert!(validate_mission_scopes(&missions).unwrap_err().to_string().contains("encounter spawn"));
+        missions[2].trigger="manual".into();missions[0].hud_objective=Some(true);assert!(validate_mission_scopes(&missions).unwrap_err().to_string().contains("shared native HUD"));
+        missions[0].allow_shared_presentation=Some(true);validate_mission_scopes(&missions).unwrap();
+        missions[0].checkpoint=Some(true);assert!(validate_mission_scopes(&missions).is_err());missions[0].checkpoint=None;
+        missions[3].trigger="manual".into();assert!(validate_mission_scopes(&missions).unwrap_err().to_string().contains("final settled"));
+        missions[3].trigger="forerunnerExtractionSettled".into();missions[3].squad_number=Some(23);assert!(validate_mission_scopes(&missions).is_err());
     }
 
 }

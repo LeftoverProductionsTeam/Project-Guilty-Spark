@@ -316,3 +316,47 @@ it('authors and connects the complete recovered Black Echo blueprint without rep
  expect(()=>connectBlackEchoObjectives(draft,()=>'',{...source,sourceTarget:'mcc-cea'})).toThrow(/CE609/);
  let history=historyReducer({...initialHistory,current:project},{type:'edit',project:connected,description:'Author recovered Black Echo'});history=historyReducer(history,{type:'undo'});expect(history.current).toEqual(project);history=historyReducer(history,{type:'redo'});expect(JSON.parse(JSON.stringify(history.current)).studio.missions).toEqual(connected.studio!.missions);
 });
+
+it('authors independent native squad operations without rewriting literals or shared inventory',()=>{
+ const studio=emptyCreatorStudio();studio.missions=[
+ {id:'start',title:'Deploy',objective:'Deploy',trigger:'deviceActivated',triggerRef:'extraction_deploy',encounterName:'',squadNumber:1},
+ {id:'escort',title:'Rescue',objective:'Rescue',trigger:'escort',encounterName:'marines',triggerRef:'rally',escortFailure:'continue',squadNumber:1},
+ {id:'branch',title:'Return',objective:'Return',trigger:'triggerVolume',triggerRef:'rally',encounterName:'',conditionResult:{beatId:'escort',failed:false},conditionVolume:'rally',conditionGroup:'branch',squadNumber:1},
+ {id:'pickup',title:'Collect gs_mission',objective:'Collect',trigger:'weaponOwned',weaponPath:'weapons/gs_mission',encounterName:'',squadNumber:1},
+ {id:'end',title:'Extract',objective:'Extract',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',squadNumber:1},
+ {id:'other',title:'Wait',objective:'Wait',trigger:'manual',encounterName:'',squadNumber:2},
+ {id:'other-end',title:'Extract',objective:'Extract',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',squadNumber:2}];
+ expect(validateCreatorStudio(studio)).toEqual([]);
+ expect(()=>exportHaloCeMission(studio)).toThrow(/Forerunner/);
+ const script=exportHaloCeMission(studio,{forerunner:true});
+ expect(script.content).toContain('(script static object_list forerunner_squad_01_players (list_get (players) 32767))');
+ expect(script.content).toContain('(script continuous gs_sq01_mission');
+ expect(script.content).toContain('(script continuous forerunner_squad_02_complete');
+ expect(script.content).toContain('(script static void gs_sq02_complete_6');
+ expect(script.content).toContain('(set gs_sq01_result_2_done false)');
+ expect(script.content).toContain('(set gs_sq01_collected_4 false)');
+ expect(script.content).toContain('(and gs_sq01_result_2_done (not gs_sq01_result_2_failed))');
+ expect(script.content).toContain('(ai_follow_target_unit marines (unit (list_get (forerunner_squad_01_players) 0)))');
+ expect(script.content).toContain('"weapons\\gs_mission"');
+ expect(script.content).toContain('; 4: Collect gs_mission');
+ expect(script.content).toContain('(device_group_set extraction_squad_01_ready 1)');
+ expect(script.content).toContain('(device_group_set extraction_squad_02_ready 0)');
+ expect(script.content).toContain('(and gs_sq01_running (not gs_sq01_settled_5)');
+ expect(script.content).toContain('(if gs_sq01_settled_5 (sleep_until (or (= (list_count (forerunner_squad_01_players)) 0) (< (device_group_get extraction_squad_01_ready) 0.5)) 1))');
+ expect(sameMissionData([{...studio.missions[0],allowSharedPresentation:undefined}],[{...studio.missions[0],allowSharedPresentation:null}])).toBe(true);
+ expect(script.content).toContain('(if gs_sq01_aborted (sleep_until (= (list_count (forerunner_squad_01_players)) 0) 1))');
+ expect(script.content).not.toMatch(/device_set_power|ai_set_team|ai_allegiance|game_save|game_won/);
+ expect(script.dependencies).toEqual(expect.arrayContaining(['forerunner_squad:01','forerunner_squad:02','weapon:weapons/gs_mission']));
+ expect(script.warnings.join(' ')).not.toMatch(/not independent squad|No .*independent squad quest/);
+ const saved=JSON.parse(JSON.stringify(studio));expect(exportHaloCeMission(saved,{forerunner:true})).toEqual(script);
+});
+it('refuses unsafe squad mission ownership and preserves the authored source fields',()=>{
+ const studio=emptyCreatorStudio();studio.missions=[{id:'fight',title:'Fight',objective:'Fight',trigger:'encounterCleared',encounterName:'guards',squadNumber:1},{id:'end',title:'End',objective:'End',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',squadNumber:1}];
+ const generate=()=>exportHaloCeMission(studio,{forerunner:true});
+ studio.missions[0].hudObjective=true;studio.missions[0].hudText='Fight';expect(generate).toThrow(/Explicitly allow/);studio.missions[0].allowSharedPresentation=true;expect(generate().content).toContain('(hud_set_objective_text gs_mission_obj_1)');
+ studio.missions[0].checkpoint=true;expect(generate).toThrow(/shared world/);delete studio.missions[0].checkpoint;
+ studio.missions.push({...studio.missions[0],id:'collision',encounterName:'GUARDS/patrol',squadNumber:2},{...studio.missions[1],id:'end2',squadNumber:2});expect(generate).toThrow(/encounter spawn/);
+ studio.missions.splice(2);studio.missions[0].conditionResult={beatId:'end',failed:false};expect(generate).toThrow();delete studio.missions[0].conditionResult;
+ studio.missions[1].trigger='manual';expect(generate).toThrow(/final native settled/);
+ expect(studio.missions[0].hudText).toBe('Fight');
+});

@@ -29,17 +29,67 @@ const heading=(title:string):string[]=>[
   `; ${safeComment(title)}`,
   '',
 ];
+type MissionExportOptions={waitForLogic?:boolean;preparedCinematics?:boolean;forerunner?:boolean};
+function namespaceMission(source:string,scope:number,dependencies:string[]):string{
+ const rows=haloSourceDeclarations(source),owned=new Set(rows.filter(row=>row.name.startsWith('gs_')).map(row=>row.name)),edits:{start:number;end:number;value:string}[]=[];
+ for(const dependency of dependencies){const name=dependency.split(':')[1];if(owned.has(name)&&(scope||name==='gs_mission'))throw Error('Native source name '+name+' collides with generated controller state. Preserve it in shared scope or author an unambiguous native reference.');}
+ const prefix=scope?'gs_sq'+String(scope).padStart(2,'0')+'_':'gs_';
+ haloSourceDeclarations(source,(start,end,token)=>{
+  if(owned.has(token))edits.push({start,end,value:scope?prefix+token.slice(3):token==='gs_mission'?'gs_shared_mission':token});
+  else if(scope&&token==='players'&&source[start-1]==='(')edits.push({start,end,value:'forerunner_squad_'+String(scope).padStart(2,'0')+'_players'});
+ });
+ for(const edit of edits.reverse())source=source.slice(0,edit.start)+edit.value+source.slice(edit.end);
+ return source;
+}
+/** Same mission writer for shared and independent native squad operations. */
+export function exportHaloCeMission(studio:CreatorStudioDocument,options:MissionExportOptions={}):ScriptExport{
+ const errors=validateCreatorStudio(studio);if(errors.length)throw Error(errors.join('; '));
+ if(!studio.missions.some(beat=>beat.squadNumber!=null))return exportMissionFlow(studio,options);
+ if(!options.forerunner)throw Error('Independent squad objectives require the reviewed Forerunner native feature; legacy exports cannot execute these queries.');
+ const scopes=new Map<number,{beats:CreatorStudioDocument['missions'];indices:number[]}>();
+ studio.missions.forEach((beat,index)=>{const number=beat.squadNumber??0,part=scopes.get(number)??{beats:[],indices:[]};part.beats.push(beat);part.indices.push(index);scopes.set(number,part);});
+ for(const [index,beat]of studio.missions.entries()){
+  if(beat.squadNumber!=null){
+   if(beat.checkpoint||beat.completeMission)throw Error('Squad objectives cannot save or end the shared world. Keep checkpoints/level completion in the shared campaign.');
+   if(beat.cinematicCue)throw Error('Native squad camera isolation is not supported. Keep the saved scene and use shared mission scope or the shared intro; no camera fields were removed.');
+   if((beat.hudObjective||beat.soundCue)&&beat.allowSharedPresentation!==true)throw Error('Objective '+(index+1)+' uses shared native HUD/radio. Explicitly allow shared presentation or preserve those fields and use shared mission scope.');
+  }
+  for(const other of studio.missions.slice(0,index)){
+   if((beat.squadNumber??0)===(other.squadNumber??0))continue;
+   if(['escort','encounterCleared'].includes(beat.trigger)&&['escort','encounterCleared'].includes(other.trigger)&&[beat.encounterName,other.encounterName].every(Boolean)&&(beat.encounterName.toLowerCase()===other.encounterName.toLowerCase()||beat.encounterName.toLowerCase().startsWith(other.encounterName.toLowerCase()+'/')||other.encounterName.toLowerCase().startsWith(beat.encounterName.toLowerCase()+'/')))throw Error('Independent controllers cannot both own the same encounter spawn. Author separate native encounter groups.');
+   if(beat.createWeaponObject&&beat.createWeaponObject.toLowerCase()===other.createWeaponObject?.toLowerCase())throw Error('Independent controllers cannot both recreate the same named weapon. Use separately authored objects.');
+  }
+ }
+ if(studio.missions.some(beat=>beat.checkpoint||beat.completeMission))throw Error('Independent squad operations cannot save or end the shared world; use a separate shared campaign.');
+ const parts:ScriptExport[]=[],body:string[]=[],start:string[]=['(script dormant gs_mission'];
+ for(const [number,part]of scopes){
+  if(number&&part.beats.at(-1)?.trigger!=='forerunnerExtractionSettled')throw Error('Squad'+number+' needs a final native settled-extraction objective to rearm for another operation.');
+  const flow=exportMissionFlow({...studio,missions:part.beats},options,part.indices,number);
+  parts.push(flow);
+  if(number){
+   const digits=String(number).padStart(2,'0');
+   body.push('(script static object_list forerunner_squad_'+digits+'_players (list_get (players) 32767))',namespaceMission(flow.content,number,flow.dependencies));
+   start.push('  (set gs_sq'+digits+'_enabled true)');
+  }else{body.push(namespaceMission(flow.content,0,flow.dependencies));start.push('  (wake gs_shared_mission)');}
+ }
+ start.push(')');body.push(start.join('\n'));
+ return {filename:'gs_mission.hsc',content:body.join('\n\n'),dependencies:[...new Set(parts.flatMap(p=>p.dependencies))],activation:'(wake gs_mission)',warnings:[...new Set(parts.flatMap(p=>p.warnings)), 'Squad progress uses current native operation participants and isolated readiness; the engine owns inventory and durable settlement. Shared native presentation is explicitly opt-in. No mandatory raid timer or reward writer. Full native/peer/gameplay acceptance remains required.'],generatedOnly:true};
+}
+
 /** Ordered mission flow; manual beats are callable stubs, not automatically executed. */
-export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitForLogic?:boolean;preparedCinematics?:boolean;forerunner?:boolean}={}): ScriptExport {
+function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOptions={},indices?:number[],scope=0): ScriptExport {
   const errors=validateCreatorStudio(studio);if(errors.length)throw new Error(errors.join('; '));
   if(!studio.missions.length)throw new Error('Add at least one mission beat.');
   const extractionBeats=studio.missions.filter(beat=>beat.trigger==='forerunnerExtractionSettled');
   if(extractionBeats.length&&(!options.forerunner||extractionBeats.length!==1||studio.missions.at(-1)!==extractionBeats[0]||extractionBeats[0].conditionVolume!=null||extractionBeats[0].conditionResult!=null||extractionBeats[0].completeMission||extractionBeats[0].checkpoint))throw Error('Forerunner settled extraction must be the single final unconditional objective, without a checkpoint or level exit. Select its reviewed runtime; legacy engines cannot complete this callback.');
+  const empty="(= (list_count (players)) 0)";
+  const markAbort="  (if "+empty+" (set gs_aborted true))";
+  const wait=(condition:string,interval:number,timeout?:number,settlement=false):string[]=>scope?["  (sleep_until (or gs_aborted "+empty+" "+condition+") "+interval+(timeout==null?"":" "+timeout)+")",settlement?"  (if (and "+empty+" (not "+condition+")) (set gs_aborted true))":markAbort]:["  (sleep_until "+condition+" "+interval+(timeout==null?"":" "+timeout)+")"];
   const deps:string[]=[], lines=heading('Mission Director');
   const sceneSources:string[]=[];
   const sceneCall=(beat:CreatorStudioDocument['missions'][number],index:number,phase:'start'|'complete'):string[]=>
     beat.cinematicCue?.phase===phase?['  (sleep_until (> (list_count (players)) 0) 1)','  (gs_scene_'+(index+1)+')']:[];
-  studio.missions.forEach((beat,index)=>{
+  studio.missions.forEach((beat,local)=>{const index=indices?.[local]??local;
     const selected=missionCinematicShots(studio,beat);if(!selected.length)return;
     const shots=selected.map(shot=>({...shot,cameraMarker:cinematicMarker(shot,studio.shots.findIndex(row=>row.id===shot.id))}));
     const source=exportHaloCeCinematic({...emptyCreatorStudio(),shots},{prepared:options.preparedCinematics,scriptName:'gs_scene_'+(index+1)});
@@ -54,19 +104,25 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
     deps.push('sound:'+cue.soundPath);
     const nativePath=cue.soundPath.replaceAll('/','\\');
     const text:string[]=[];
-    if(cue.delayMs)text.push('  (sleep '+ticks(cue.delayMs)+')');
+    if(cue.delayMs){
+      if(scope){const counter='gs_cue_wait_'+(index+1)+'_'+phase;globals.push('(global short '+counter+' 0)');text.push('  (set '+counter+' 0)','  (sleep_until (begin','    (set '+counter+' (+ '+counter+' 1))','    (or gs_aborted '+empty+' (>= '+counter+' '+ticks(cue.delayMs)+'))','  ) 1)',markAbort);}
+      else text.push('  (sleep '+ticks(cue.delayMs)+')');
+    }
+    if(scope)text.push('  (if (not gs_aborted) (begin');
     if(cue.caption){deps.push('hud_message:gs_mission_cue_'+(index+1));text.push('  (hud_set_help_text gs_mission_cue_'+(index+1)+')','  (show_hud_help_text true)');}
     text.push('  (sound_impulse_start "'+nativePath+'" none '+cue.gain+')',
-      '  (sleep_until (<= (sound_impulse_time "'+nativePath+'") 0) 1 18000)');
+      ...wait('(<= (sound_impulse_time "'+nativePath+'") 0)',1,18000));
     if(cue.caption)text.push('  (show_hud_help_text false)');
+    if(scope)text.push('  ))');
     return text;
   };
-  studio.missions.forEach((beat,index)=>{if(beat.escortFailure==='continue')globals.push('(global boolean gs_result_'+(index+1)+'_done false)','(global boolean gs_result_'+(index+1)+'_failed false)');});
+  studio.missions.forEach((beat,local)=>{const index=indices?.[local]??local;if(beat.escortFailure==='continue')globals.push('(global boolean gs_result_'+(index+1)+'_done false)','(global boolean gs_result_'+(index+1)+'_failed false)');});
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
-  studio.missions.forEach((beat,i)=>{
+  studio.missions.forEach((beat,local)=>{const i=indices?.[local]??local;
+    if(scope)scripted.push(markAbort,"  (if (not gs_aborted) (begin");
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
     if(beat.conditionResult){
-      const index=studio.missions.findIndex(row=>row.id===beat.conditionResult!.beatId)+1,key='gs_result_'+index;
+      const target=studio.missions.findIndex(row=>row.id===beat.conditionResult!.beatId),index=(indices?.[target]??target)+1,key='gs_result_'+index;
       scripted.push('  (if (and '+key+'_done '+(beat.conditionResult.failed?key+'_failed':'(not '+key+'_failed)')+') (begin');
     }
     if(beat.conditionVolume!=null){
@@ -75,13 +131,13 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
       let condition='(volume_test_objects '+volume+' (players))';
       if(group){
         const key='gs_branch_'+group.index;
-        scripted.push('  (if (not '+key+'_ready) (begin','    (sleep_until (> (list_count (players)) 0) 1)','    (set '+key+'_inside '+condition+')','    (set '+key+'_ready true)','  ))');
+        scripted.push('  (if (not '+key+'_ready) (begin',...(scope?wait('(> (list_count (players)) 0)',1):['    (sleep_until (> (list_count (players)) 0) 1)']),'    (set '+key+'_inside '+condition+')','    (set '+key+'_ready true)','  ))');
         condition=key+'_inside';
       }
       if(beat.conditionOutside===true)condition='(not '+condition+')';
       scripted.push('  (if '+condition+' (begin');
     }
-    if(beat.completeMission===true&&(i+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null))
+    if(beat.completeMission===true&&(local+1!==studio.missions.length||beat.checkpoint===true||beat.conditionVolume!=null||beat.conditionResult!=null))
       throw Error('Native level completion must be the final beat, without a checkpoint or optional condition on the same beat.');
     scripted.push(...sceneCall(beat,i,'start'));
     if(beat.hudObjective===true) {
@@ -92,13 +148,14 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
       scripted.push(`  (hud_set_objective_text ${name})`);
     }
     scripted.push(...cueLines(beat,i,'start'));
+    if(scope)scripted.push('  (if (not gs_aborted) (begin');
     switch(beat.trigger){
       case 'manual':
         const key=`gs_manual_${i+1}_done`;
         globals.push(`(global boolean ${key} false)`);
         manualSetters.push(`(script static void gs_complete_${i+1}`, `  (set ${key} true)`, ')', '');
         scripted.push(`  ; Another HaloScript trigger must call (gs_complete_${i+1}).`);
-        scripted.push(`  (sleep_until ${key} 15)`);
+        scripted.push(...wait(key,15));
         break;
       case 'weaponOwned': {
         const path=beat.weaponPath??'';if(!validMissionWeaponPath(path))throw Error('Choose an included native technology weapon for objective '+(i+1)+'.');
@@ -108,40 +165,56 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         scripted.push('  (sleep_until (begin',
           '    (if (>= '+cursor+' (list_count (players))) (set '+cursor+' 0))',
           '    (if (and (< '+cursor+' (list_count (players))) (unit_has_weapon (unit (list_get (players) '+cursor+')) "'+path.replaceAll('/','\\')+'")) (set '+found+' true))',
-          '    (set '+cursor+' (+ '+cursor+' 1))', '    '+found, '  ) 1)');break;
+          '    (set '+cursor+' (+ '+cursor+' 1))', scope?'    (or gs_aborted '+empty+' '+found+')':'    '+found, '  ) 1)');if(scope)scripted.push(markAbort);break;
       }
       case 'forerunnerExtractionSettled': {
         const control=ensureName(beat.triggerRef??undefined,'Forerunner extraction control');
         if(control!=='extraction_activate')throw Error('Forerunner contract 1 requires the native extraction_activate control.');
         deps.push('forerunner_extraction:'+control);const settled='gs_settled_'+(i+1),armed='gs_extraction_armed';
         globals.push('(global boolean '+armed+' false)','(global boolean '+settled+' false)');
-        manualSetters.push('(script dormant forerunner_extraction_complete','  (if '+armed+' (set '+settled+' true))',')','');
-        // Disable escape before earlier objectives can run. The callback is not
-        // a loot writer: the engine wakes it only after authoritative settlement.
-        scripted.splice(2,0,'  (device_set_power '+control+' 0)');
-        scripted.push('  (set '+armed+' true)','  (device_set_power '+control+' 1)','  (sleep_until '+settled+' 1)');break;
+        if(scope){
+          manualSetters.push('(script continuous forerunner_squad_'+String(scope).padStart(2,'0')+'_complete','  (sleep -1)','  (if (and '+armed+' (not gs_aborted)) (set '+settled+' true))',')','');
+          scripted.push('  (set '+armed+' true)','  (device_group_set extraction_squad_'+String(scope).padStart(2,'0')+'_ready 1)',...wait(settled,1,undefined,true),'  (set '+armed+' false)');
+        }else{
+          manualSetters.push('(script dormant forerunner_extraction_complete','  (if '+armed+' (set '+settled+' true))',')','');
+          scripted.splice(2,0,'  (device_set_power '+control+' 0)');
+          scripted.push('  (set '+armed+' true)','  (device_set_power '+control+' 1)','  (sleep_until '+settled+' 1)');
+        }break;
       }
       case 'timer':
         if(!Number.isInteger(beat.timerSeconds) || beat.timerSeconds! < 1 || beat.timerSeconds! > 600)
           throw new Error(`Beat ${i+1} needs timerSeconds between 1 and 600.`);
-        scripted.push(`  (sleep ${ticks(beat.timerSeconds!*1000)})`);break;
+        if(scope){const counter='gs_delay_'+(i+1);globals.push('(global short '+counter+' 0)');scripted.push('  (sleep_until (begin','    (set '+counter+' (+ '+counter+' 1))','    (or gs_aborted '+empty+' (>= '+counter+' '+ticks(beat.timerSeconds!*1000)+'))','  ) 1)',markAbort);}
+        else scripted.push('  (sleep '+ticks(beat.timerSeconds!*1000)+')');break;
       case 'triggerVolume':{
         const ref=ensureName(beat.triggerRef??undefined,`Beat ${i+1} trigger volume`);
         deps.push(`trigger_volume:${ref}`);
-        scripted.push(`  (sleep_until (volume_test_objects ${ref} (players)) 15)`);break;
+        scripted.push(...wait(scope?'(and (> (list_count (players)) 0) (volume_test_objects '+ref+' (players)))':'(volume_test_objects '+ref+' (players))',15));break;
       }
       case 'deviceActivated':{
         const ref=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' native control');
         deps.push('device_control:'+ref);
         // Arm below the threshold first. An already-active terminal cannot
         // silently satisfy a later objective; do not reset the player's device.
-        scripted.push('  (sleep_until (< (device_get_position '+ref+') 0.5) 1)',
-          '  (sleep_until (>= (device_get_position '+ref+') 0.5) 1)');break;
+        if(scope&&ref==='extraction_deploy')scripted.push(...wait('(> (list_count (players)) 0)',1));
+        else scripted.push(...wait('(< (device_get_position '+ref+') 0.5)',1),...wait('(>= (device_get_position '+ref+') 0.5)',1));break;
       }
       case 'escort':{
         const ref=ensureName(beat.encounterName,'Beat '+(i+1)+' survivor encounter',true),destination=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' survivor destination');
         const minimum=beat.minimumSurvivors??1;
         deps.push('ai_encounter:'+ref,'trigger_volume:'+destination,'hud_message:gs_mission_fail_'+(i+1));
+        if(scope){
+          scripted.push('  (ai_place '+ref+')',...wait('(> (ai_living_count '+ref+') 0)',15,300),'  (if (not gs_aborted) (begin',
+            '  (sleep_until (begin','    (if (> (list_count (players)) 0) (ai_follow_target_unit '+ref+' (unit (list_get (players) 0))))',
+            '    (or gs_aborted '+empty+' (< (ai_living_count '+ref+') '+minimum+') (and (> (ai_living_count '+ref+') 0) (volume_test_objects_all '+destination+' (ai_actors '+ref+'))))','  ) 15)',markAbort,
+            '  (if (and (not gs_aborted) (< (ai_living_count '+ref+') '+minimum+')) (begin');
+          if(beat.allowSharedPresentation)scripted.push('    (hud_set_objective_text gs_mission_fail_'+(i+1)+')');
+          scripted.push('    (print "gs survivor objective failed")',beat.escortFailure==='continue'?'    (set gs_result_'+(i+1)+'_failed true)':'    (set gs_aborted true)','  ))');
+          if(beat.escortFailure==='continue')scripted.push('  (if (not gs_aborted) (set gs_result_'+(i+1)+'_done true))');
+          scripted.push('  ))');
+          if(beat.escortFailure==='continue')scripted.push('  (if (not gs_result_'+(i+1)+'_failed) (begin');
+          break;
+        }
         scripted.push('  (ai_place '+ref+')','  (sleep_until (> (ai_living_count '+ref+') 0) 15 300)',
           '  (ai_allegiance player human)','  (ai_set_team '+ref+' human)','  (ai_follow_target_players '+ref+')',
           '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') (volume_test_objects_all '+destination+' (ai_actors '+ref+'))) 15)',
@@ -158,28 +231,43 @@ export function exportHaloCeMission(studio:CreatorStudioDocument,options:{waitFo
         deps.push(`ai_encounter:${ref}`);
         scripted.push(`  (ai_place ${ref})`);
         // Guard: never count an unspawned/empty squad as a successfully cleared wave.
-        scripted.push(`  (sleep_until (> (ai_living_count ${ref}) 0) 15)`);
-        scripted.push(`  (sleep_until (= (ai_living_count ${ref}) 0) 15)`);break;
+        scripted.push(...wait('(> (ai_living_count '+ref+') 0)',15));
+        scripted.push(...wait('(= (ai_living_count '+ref+') 0)',15));break;
       }
     }
+    if(scope)scripted.push('  (if (not gs_aborted) (begin');
     scripted.push(...cueLines(beat,i,'complete'),...sceneCall(beat,i,'complete'));
     scripted.push('  (print "gs objective complete")');
     if(beat.checkpoint===true)scripted.push('  (game_save)');
     if(beat.completeMission===true)scripted.push('  (game_won)');
+    if(scope)scripted.push('  ))');
     if(beat.escortFailure==='continue')scripted.push('  ))');
+    if(scope)scripted.push('  ))');
     if(beat.conditionVolume!=null)scripted.push('  ))');
     if(beat.conditionResult!=null)scripted.push('  ))');
+    if(scope)scripted.push('  ))');
   });
+  if(scope){
+    const ready='extraction_squad_'+String(scope).padStart(2,'0')+'_ready';
+    deps.push('forerunner_squad:'+String(scope).padStart(2,'0'),'device_control:extraction_squad_'+String(scope).padStart(2,'0'));
+    globals.unshift('(global boolean gs_enabled false)','(global boolean gs_running false)','(global boolean gs_aborted false)');
+    const reset=globals.flatMap(line=>{const found=line.match(/^\(global (?:boolean|short) ([A-Za-z_0-9]+) ([A-Za-z_0-9-]+)\)$/);return found&&found[1]!=='gs_enabled'?['  (set '+found[1]+' '+found[2]+')']:[];});
+    scripted[0]='(script continuous gs_mission';
+    scripted.splice(1,0,'  (sleep_until gs_enabled 1)',...reset,'  (device_group_set '+ready+' 0)','  (sleep_until (> (list_count (players)) 0) 1)','  (set gs_running true)');
+    const settled='gs_settled_'+((indices?.[studio.missions.length-1]??studio.missions.length-1)+1);
+    scripted.push('  (set gs_running false)','  (set gs_extraction_armed false)','  (if '+settled+' (sleep_until (or '+empty+' (< (device_group_get '+ready+') 0.5)) 1))','  (device_group_set '+ready+' 0)','  (if gs_aborted (sleep_until '+empty+' 1))','  (sleep 1)');
+    manualSetters.push('(script continuous gs_guard','  (if (and gs_running (not '+settled+') (= (list_count (players)) 0)) (set gs_aborted true))','  (sleep 1)',')','');
+  }
   scripted.push(')', '');
   lines.push(...sceneSources,...globals, '', ...manualSetters, ...scripted);
   return {filename:'gs_mission.hsc',content:lines.join('\r\n'),dependencies:deps,activation:'(wake gs_mission)',warnings:[
     'Mission is a dormant script. Explicitly call (wake gs_mission) from a reviewed scenario startup script.',
-    'Optional volume conditions run when their step starts. Shared decisions sample once at their first eligible member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
-    'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
-    ...(studio.missions.some(beat=>beat.trigger==='weaponOwned')?['Collection scans one actual native player inventory per tick, including later players. Any matching owned weapon satisfies this shared objective; use a unique technology tag absent from starting loadouts if only one pickup should qualify. No pickup, duplication, bank award or per-squad quest is fabricated.']:[]),
-    ...(extractionBeats.length?['Forerunner-only: enable its native Extraction mode and supply powered deployment control, initially unpowered extraction_activate, extraction_zone/extraction_return volumes and safe hub starts. Earlier objectives gate extraction power; the native one-shot callback arrives only after actual survivor/gear settlement. No timer, reward writer, teleport or independent squad quest is added. Legacy runtime exports are refused.']:[]),
-    ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?['Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
-    ...(studio.missions.some(beat=>beat.trigger==='escort')?['Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
+    scope?"Optional conditions and rescue results stay within this squad. Decisions reset each operation and sample current native participants; skipped steps run no AI, HUD or cue.":'Optional volume conditions run when their step starts. Shared decisions sample once at their first eligible member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
+    scope?"Manual beats wait for their namespaced gs_sqNN_complete_N function. State resets per operation; stale external calls and real native replay still require gameplay acceptance.":'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
+    ...(studio.missions.some(beat=>beat.trigger==='weaponOwned')?[scope?"Collection scans current issued squad participants, requerying each tick. Use a technology tag absent from starting loadouts. This does not bank or award inventory.":'Collection scans one actual native player inventory per tick, including later players. Any matching owned weapon satisfies this shared objective; use a unique technology tag absent from starting loadouts if only one pickup should qualify. No pickup, duplication, bank award or per-squad quest is fabricated.']:[]),
+    ...(extractionBeats.length?[scope?"Forerunner-only squad operation: author the matching numbered terminal and unique readiness group, deployment/extraction volumes and hub starts. Readiness arms only after this squad finishes its objectives; the native callback confirms settlement. No global extraction control, reward writer, raid timer or teleport is added.":'Forerunner-only: enable its native Extraction mode and supply powered deployment control, initially unpowered extraction_activate, extraction_zone/extraction_return volumes and safe hub starts. Earlier objectives gate extraction power; the native one-shot callback arrives only after actual survivor/gear settlement. No timer, reward writer, teleport or independent squad quest is added. Legacy runtime exports are refused.']:[]),
+    ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?[scope?"Numbered squad deployment is detected through the native issued-participant query. Other terminal objectives observe shared control transitions; use independent controls when interaction must be isolated. Scripts may also activate controls; no terminal reset or inventory grant is added.":'Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
+    ...(studio.missions.some(beat=>beat.trigger==='escort')?[scope?"Scoped rescue preserves source AI teams and follows a current squad participant. All surviving actors must reach the destination with the required minimum alive. Failure stops this operation or follows the authored rescue-result path. AI allegiance, navigation and multiplayer behavior require gameplay testing.":'Survivor escort places its source group, assigns native human team and follows the closest players. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
@@ -196,7 +284,7 @@ function retainedMissionSource(content:string):string{const start=content.indexO
 export interface RecoveredMissionComposition {filename:string;sourceSha256:string;retainedSha256?:string;retiredStartups:string[];replaceExtractionCallback:boolean}
 export interface HaloSourceDeclaration {kind:'script'|'global';type:string;name:string;start:number;end:number;headerEnd:number}
 /** Bounded lossless source spans, not a replacement HaloScript compiler. */
-export function haloSourceDeclarations(source:string):HaloSourceDeclaration[]{
+export function haloSourceDeclarations(source:string,visitToken?:(start:number,end:number,token:string)=>void):HaloSourceDeclaration[]{
  if(new TextEncoder().encode(source).length>256*1024)throw Error('Mission composition supports at most256KiB of original source. Use the manual source editor.');
  const rows:HaloSourceDeclaration[]=[];let depth=0,start=0,at=0,header:{text:string;end:number;quoted?:boolean}[]=[];
  while(at<source.length){
@@ -213,7 +301,7 @@ export function haloSourceDeclarations(source:string):HaloSourceDeclaration[]{
    rows.push({kind:kind as 'script'|'global',type,name:name.text,start,end:at,headerEnd:name.end});if(rows.length>2048)throw Error('Native source declaration limit exceeded.');continue;
   }
   if(c==='"'){const begin=at++;let closed=false;while(at<source.length){if(source[at]==='\\'){at+=2;continue;}if(source[at++]==='"'){closed=true;break;}}if(!closed)throw Error('Unclosed native source string.');if(!depth)throw Error('Unexpected text outside native source declarations.');if(depth===1&&header.length<4)header.push({text:source.slice(begin,at),end:at,quoted:true});continue;}
-  const begin=at;while(at<source.length&&!/[\s();"\uFEFF]/.test(source[at]))at++;if(at===begin)throw Error('Unsupported native source text.');if(!depth)throw Error('Unexpected text outside native source declarations.');if(depth===1&&header.length<4)header.push({text:source.slice(begin,at),end:at});
+  const begin=at;while(at<source.length&&!/[\s();"\uFEFF]/.test(source[at]))at++;if(at===begin)throw Error('Unsupported native source text.');if(!depth)throw Error('Unexpected text outside native source declarations.');visitToken?.(begin,at,source.slice(begin,at));if(depth===1&&header.length<4)header.push({text:source.slice(begin,at),end:at});
  }
  if(depth)throw Error('Unbalanced native source parentheses.');return rows;
 }
@@ -311,7 +399,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     binding.schemaVersion!==1||!['manual','startup'].includes(binding.activation)||!Array.isArray(binding.missions)||
     !binding.missions.length||binding.missions.length>128||typeof binding.sourceSha256!=='string'||!/^[a-f0-9]{64}$/i.test(binding.sourceSha256))
     throw Error('Attached mission uses unsupported metadata. No local mission data was replaced.');
-  const beatFields=['id','title','objective','trigger','encounterName','triggerRef','weaponPath','createWeaponObject','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
+  const beatFields=['squadNumber','allowSharedPresentation','id','title','objective','trigger','encounterName','triggerRef','weaponPath','createWeaponObject','timerSeconds','hudObjective','hudText','checkpoint','completeMission','conditionVolume','conditionGroup','conditionOutside','soundCue','minimumSurvivors','escortFailure','conditionResult','cinematicCue'];
   if(binding.missions.some(beat=>!beat||typeof beat!=='object'||Array.isArray(beat)||
     Object.keys(beat).some(key=>!beatFields.includes(key))||
     (['id','title','objective','trigger','encounterName'] as const).some(field=>typeof beat[field]!=='string')||
@@ -344,6 +432,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
+    squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,
     triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
@@ -432,6 +521,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   if(doc.logic?.manualSource!=null)throw Error('Generated startup logic is overridden. Preserve handwritten source before returning Native HaloScript to generated logic.');
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
+  if(missions.some(beat=>beat.squadNumber!=null))throw Error('Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates. Build a base map, open its compiled source and use Prepare recovered mission source. The saved mission fields are preserved.');
   const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
   const shots=project.studio?.shots??[];
   const forerunner=missions.some(beat=>beat.trigger==='forerunnerExtractionSettled');
