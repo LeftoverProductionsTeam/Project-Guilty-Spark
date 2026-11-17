@@ -452,8 +452,14 @@ mod installed {
    let baseline=crate::build::run_build(&parent,&map,&toolchain,&jobs,&uuid::Uuid::new_v4().to_string(),cancel.clone(),|e|{if e.severity=="error"{eprintln!("{}: {}",e.phase,e.message);}}).unwrap();assert_eq!(baseline.status,"validated","{}",baseline.message);parent.builds.push(baseline.clone());
    let mut current=parent.clone();current.studio=Some(serde_json::from_value(revision["studio"].clone()).unwrap());
    let cue=current.studio.as_ref().unwrap().missions.iter().find_map(|beat|beat.sound_cue.as_ref()).unwrap().clone();
-   let source_inspection=crate::maps::inspect_map(source,None).unwrap();let mut origin=crate::project::Project::new("Preserved original mission radio source");origin.source=radio.source.clone();
-   let selected=source_inspection.tags.iter().find(|tag|tag.class=="snd!"&&tag.id==radio.native_asset_imports[0].tag_id).expect("Exact original native sound ID");assert_eq!(selected.path,radio.native_asset_imports[0].tag_path);
+   // Recovered cues must re-include the exact tag from the compiled campaign,
+   // not guess a similarly named original or reuse an absent import receipt.
+   let recovered_path=revision["recoveredRadioPath"].as_str();
+   let audio_source=if recovered_path.is_some(){&cache}else{source};
+   let source_inspection=crate::maps::inspect_map(audio_source,None).unwrap();let mut origin=crate::project::Project::new("Preserved original mission radio source");origin.source=if recovered_path.is_some(){current.source.clone()}else{radio.source.clone()};
+   let candidates=source_inspection.tags.iter().filter(|tag|tag.class=="snd!"&&match recovered_path{Some(path)=>tag.path.replace('\\',"/")==path,None=>tag.id==radio.native_asset_imports[0].tag_id}).collect::<Vec<_>>();assert_eq!(candidates.len(),1,"Exact unique recovered radio source");let selected=candidates[0];
+   assert_eq!(selected.path.replace('\\',"/"),recovered_path.unwrap_or(&radio.native_asset_imports[0].tag_path).replace('\\',"/"));
+   if let Some(path)=recovered_path{assert_eq!(path,radio.native_asset_imports[0].native_path);eprintln!("Recovered radio exact compiled-source re-inclusion: {} tag {} source {}",path,selected.id,source_inspection.sha256);}
    let extracted=crate::tag_exchange::extract_selected_tag(&origin,&source_inspection,&toolchain,managed,&uuid::Uuid::new_v4().to_string(),selected.id,cancel.clone(),|_|{}).unwrap();
    let binding=crate::native_asset_imports::prepare(&current,&origin,&source_inspection,&extracted,&toolchain,managed,&cue.import_id,selected.id,&cancel,|_|{}).unwrap();assert_eq!(binding.native_path,cue.sound_path);current.native_asset_imports.push(binding.clone());
    let filename=revision["filename"].as_str().unwrap();let content=revision["content"].as_str().unwrap();let parent_job=jobs.join(&baseline.id);let parent_tags=parent_job.join("tags");

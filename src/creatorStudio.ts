@@ -26,14 +26,18 @@ export function validMissionSoundCue(cue:MissionSoundCue):boolean {
     Number.isInteger(cue.delayMs)&&cue.delayMs>=0&&cue.delayMs<=60000&&
     typeof cue.caption==='string'&&cue.caption.length<=254&&!/[%\x00-\x1f\x7f]/.test(cue.caption);
 }
+/** A saved cue must resolve to its exact receipt, class and native path. */
+export function missionSoundImport(project:Project,cue:MissionSoundCue) {
+  const found=project.nativeAssetImports?.filter(binding=>binding.id===cue.importId)??[];
+  return found.length===1&&found[0].tagClass==='snd!'&&found[0].nativePath.replaceAll('\\','/')===cue.soundPath?found[0]:undefined;
+}
 /** Verify selected closures before preparation; the existing importer rechecks
  * their receipts, bytes and origins during native staging. */
 export function missionSoundProblems(project:Project):string[] {
   return (project.studio?.missions??[]).flatMap(beat=>{
     const cue=beat.soundCue;if(!cue)return [];
     if(!validMissionSoundCue(cue))return ['Invalid radio cue on '+beat.title];
-    const found=project.nativeAssetImports?.filter(binding=>binding.id===cue.importId)??[];
-    return found.length===1&&found[0].tagClass==='snd!'&&found[0].nativePath.replaceAll('\\','/')===cue.soundPath?[]:
+    return missionSoundImport(project,cue)?[]:
       ['Mission '+beat.title+' needs its exact included native sound. Choose the imported sound again; no missing audio is replaced.'];
   });
 }

@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — recovered Black Echo mission review/adoption/native revision
+Task: Operation110 — recovered mission radio reconnect/native rebuild
 Status: implementation incomplete
-Starting revision: aa7c7f37f7ab89b5860ddb508d708c31dd55a0ba, canonical master.
-Latest verified revision: parentaa7c7f37f7ab89b5860ddb508d708c31dd55a0ba; recovered mission source/browser/CE609 compile/readback verified in this checkpoint commit. Native Windows/game gates OPEN.
-Next action: complete recovered mission radio-asset re-inclusion and native handoff through the existing importer/build path; retain source/history/Save protections. Native Windows/game/37944 remain OPEN.
+Starting revision: 0b57e8caf3060d8ef9334a2584f5e9df96ddcd92, canonical master.
+Latest verified revision: parent0b57e8caf3060d8ef9334a2584f5e9df96ddcd92; radio source/browser/production CE609 compile/readback verified in this checkpoint commit. Windows/game gates OPEN.
+Next action: integrate recovered radio into the complete Pelican/Spirit Black Echo candidate handoff; inspect native route/landing/seat readiness and repair actionable source diagnostics. Desktop/game/37944 remain OPEN; advance independent creator work when blocked.
 
 ## Acceptance
 
@@ -16,9 +16,9 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov recovered review (parentaa7c7f3): pinned source → consent → queued Save/history/reopen → real team edit/revision request → native previous-source recovery/CE609 compile/readback PASS. Frontend79/guide4/shared browser flows/types/Vite/native1 PASS.6scripts/original4prefix,9HUD/original1; exact hashes/receipts: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
+17Nov radio (parent0b57e8c): exact recovered snd! reconnect → retained timing/caption → pending Save/history/reopen → reviewed native revision → production CE609 rebuild/sample readback PASS. Frontend72/browser3/types-Vite/core/native1 PASS;5sample hashes retained, conflicting edit refuses. Exact failures/hashes/QA disposal: RUNTIME_INTEGRATION_20261107. Windows/audio/game acceptance OPEN.
 
-17Nov attached review (parent2a5839c): reproduced self-generated team rejection; strict typed reader → complete gameplay comparison → consent/history/Save/reopen/re-prepare PASS. Frontend77/browser final4+camera2+measured2/TypeScript-Vite PASS;800/1920 comparison scroll widths725/1845 equal clients. Native writer6-team output unchanged; no native rerun. Exact proof: RUNTIME_INTEGRATION_20261107.
+17Nov recovered0b57e8c/attachedaa7c7f3 retain full review/adoption/history/source/native proof, hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
 
 17Nov first insertion (parent234b6bb): UI/history/Save/reopen → exact generated transport ownership → shared escort without duplicate spawn → Pelican/Spirit CE609 compile/independent extracted scenario/actor/seat/latch readback PASS. Frontend72/guide4/creative23+1skip/transport5/browser12distinct+final8/web/Windows all-target PASS. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 

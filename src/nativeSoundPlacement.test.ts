@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createEmitter, emptySoundScene } from './spatialAudio';
-import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound, prepareMissionSound,missionSoundUnavailable } from './nativeSoundPlacement';
+import { includePreparedSound, nativeSoundUnavailable, prepareNativeSound, prepareMissionSound,missionSoundUnavailable,missionSoundCueForImport } from './nativeSoundPlacement';
 import {prepareCampaignActor} from './nativeAssetImport';
+import {missionSoundImport,missionSoundProblems,emptyCreatorStudio} from './creatorStudio';
 import { editRevisionKey, changedEditInputs } from './smartEdit';
 import { historyReducer, initialHistory } from './editor';
 import type { NativeAssetImport, Project } from './types';
@@ -208,4 +209,41 @@ it('includes recovered solo mission audio without QuickForge and refuses stale o
  const before=JSON.stringify(project);expect(missionSoundUnavailable(project,inspection)).toBeNull();expect(await prepareMissionSound(project,radio,inspection)).toEqual(sound);expect(JSON.stringify(project)).toBe(before);
  for(const next of [{...inspection,sha256:'c'.repeat(64)},{...inspection,header:{...inspection.header,scenarioType:1}},{...inspection,header:{...inspection.header,version:5}}])await expect(prepareMissionSound(project,radio,next)).rejects.toThrow(/matching CE609 or MCC13 solo/);
  await expect(prepareMissionSound(project,radio)).rejects.toThrow(/matching CE609/);
+});
+
+
+it('reconnects an exact recovered native cue through verified import without resetting authored settings',async()=>{
+ const {project}=fixture();project.quickForge=null;project.source={sha256:hash,cacheVersion:609} as Project['source'];
+ const cue={importId:'lost-receipt',soundPath:'gs_assets_previous/sound/radio',phase:'complete' as const,gain:.35,delayMs:275,caption:'Return to the pad.'};
+ const inspection={sha256:hash,header:{version:609,scenarioType:0},tags:[{id:17,class:'snd!',path:cue.soundPath.replaceAll('/','\\')},{id:18,class:'snd!',path:'other/sound/radio'}]} as import('./types').MapInspection;
+ const sound={...binding,sourceProjectId:project.id,tagClass:'snd!',tagId:17,tagPath:inspection.tags[0].path,nativePath:'gs_assets_new/'+cue.soundPath};
+ api.call.mockImplementation(async(command:string)=>{if(command==='open_project')return{project,inspection};if(command==='prepare_native_asset_import')return sound;throw Error(command);});
+ const before=JSON.stringify(project),prepared=await prepareMissionSound(project,cue,inspection);expect(JSON.stringify(project)).toBe(before);
+ expect(api.call).toHaveBeenLastCalledWith('prepare_native_asset_import',{projectId:project.id,sourceProjectId:project.id,sourceSha256:hash,tagId:17,existing:null});
+ expect(missionSoundCueForImport(prepared,cue,.8)).toEqual({...cue,importId:sound.id,soundPath:sound.nativePath});
+ project.nativeAssetImports=[sound];await prepareMissionSound(project,cue,inspection);
+ expect(api.call).toHaveBeenLastCalledWith('prepare_native_asset_import',{projectId:project.id,sourceProjectId:project.id,sourceSha256:hash,tagId:17,existing:sound});
+ const studio=emptyCreatorStudio();studio.missions=[{id:'radio',title:'Arrival',objective:'Return',trigger:'manual',encounterName:'',soundCue:missionSoundCueForImport(prepared,cue)}];project.studio=studio;
+ expect(missionSoundProblems(project)).toEqual([]);expect(missionSoundImport(project,studio.missions[0].soundCue!)).toEqual(sound);
+ project.nativeAssetImports=[{...sound,nativePath:'other/sound/radio'}];expect(missionSoundProblems(project)).toHaveLength(1);expect(missionSoundImport(project,studio.missions[0].soundCue!)).toBeUndefined();
+ project.nativeAssetImports=[sound,sound];expect(missionSoundProblems(project)).toHaveLength(1);
+});
+
+it('refuses missing ambiguous stale or invalid recovered radio without guessing a basename or importing a substitute',async()=>{
+ const {project}=fixture();project.quickForge=null;project.source={sha256:hash,cacheVersion:609} as Project['source'];
+ const cue={importId:'lost',soundPath:'gs_assets_previous/sound/radio',phase:'start' as const,gain:.5,delayMs:0,caption:''};
+ const inspection={sha256:hash,header:{version:609,scenarioType:0},tags:[{id:17,class:'snd!',path:'other/sound/radio'}]} as import('./types').MapInspection;
+ api.call.mockImplementation(async(command:string)=>{if(command==='open_project')return{project,inspection};throw Error('Unexpected importer');});
+ await expect(prepareMissionSound(project,cue,inspection)).rejects.toThrow(/missing or ambiguous/);
+ inspection.tags=[{...inspection.tags[0],id:17,path:cue.soundPath},{...inspection.tags[0],id:18,path:cue.soundPath}];await expect(prepareMissionSound(project,cue,inspection)).rejects.toThrow(/missing or ambiguous/);
+ inspection.tags.length=1;api.call.mockResolvedValue({project,inspection:{...inspection,sha256:'c'.repeat(64)}});await expect(prepareMissionSound(project,cue,inspection)).rejects.toThrow(/source changed/);
+ await expect(prepareMissionSound(project,{...cue,soundPath:'../radio'},inspection)).rejects.toThrow(/valid saved radio/);
+ expect(api.call.mock.calls.every(row=>row[0]==='open_project')).toBe(true);
+});
+
+it('replacing a mission sound keeps completion timing gain delay and caption while a new cue uses its selected gain',()=>{
+ const sound={...binding,tagClass:'snd!'},cue={importId:'old',soundPath:'sound/old',phase:'complete' as const,gain:.4,delayMs:1500,caption:'Keep this transmission.'};
+ expect(missionSoundCueForImport(sound,cue,.9)).toEqual({...cue,importId:sound.id,soundPath:sound.nativePath});
+ expect(missionSoundCueForImport(sound,undefined,.75)).toEqual({importId:sound.id,soundPath:sound.nativePath,phase:'start',gain:.75,delayMs:0,caption:''});
+ expect(()=>missionSoundCueForImport(binding,cue)).toThrow(/one-shot/);
 });

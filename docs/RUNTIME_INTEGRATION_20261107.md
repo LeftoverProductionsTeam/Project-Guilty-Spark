@@ -1896,3 +1896,77 @@ Final TypeScript check PASS; protected475CSV/legacy checkpoint/original scenario
 Native QA28750/run-ftk6Wy CLOSED: {"workflow":"native-recovered-mission-adoption","temporaryOutputDisposed":true,"disposedLogicalBytes":499041826,"disposedAllocatedFileBytes":null,"peakLogicalBytes":499067352,"allocatedBytes":463677136,"monitoringSamples":62,"monitoringMs":6081.648000000394,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62072170,"peakLogicalBytes":62072170,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
 Frontend QA28750/run-isvZ4C CLOSED: {"workflow":"frontend-recovered-mission-review","temporaryOutputDisposed":true,"disposedLogicalBytes":28907163,"disposedAllocatedFileBytes":29153432,"peakLogicalBytes":28990363,"allocatedBytes":29161624,"monitoringSamples":115,"monitoringMs":6730.14150000002,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62072938,"peakLogicalBytes":62072938,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
 Both roots absent, all writers exited, development runs[]/issues[]. Disposal allocation is reported only where measured; native disposal allocation is unavailable, so no combined physical-reclamation claim. No retained candidates, compiler/browser caches, SDK duplicates or replacement archives.
+
+
+## 17 November — recovered campaign radio re-inclusion (parent0b57e8c)
+
+Creator Studio now reconnects a saved cue through the current campaign’s exact unique native snd! path. The existing importer reopens/pins the source and verifies/reuses immutable receipts; no basename matching, fabricated tags/samples, source overwrite or new pipeline. Included native sound, Include and Reconnect preserve phase/gain/delay/caption. Missing/ambiguous/stale source refuses. Summary and audition resolve the same unique binding/class/path as native preparation; long paths wrap in compact controls. Existing project history/mutation lease protects Undo/Redo, queued Save and stale-draft refusal. Recovered review and How To point to the actual action.
+
+Final focused source72/72 (five files), browser3/3, TypeScript/Vite and core test compilation PASS. Browser proves missing/stale refusal before importer, keyboard reconnect with pending Save, retained completion/.4 gain/750ms/caption, Undo/Redo, Save/reopen, ordinary Map sounds re-inclusion with existing receipt revalidation, explicit controller ownership and changed-source compile request. At800x600 the saved-path control has no horizontal overflow. The two existing plain/composed recovery journeys also pass. Synthetic IPC/reopen is not native Windows interaction or process restart.
+
+Installed Invader integration1/1 PASS (123.14s): real native sound inclusion → CE609 cache → exact sound re-import from that compiled campaign into a new immutable namespace → production parent/working-tag rebuild → independent native sound/sample readback. All5 original permutation hashes remain exact. Deliberately conflicting edited loose sound refuses; edited bytes, source inventory and previous-good output hashes remain intact. Original script/global/HUD/actor indices and map/source hashes are checked by the existing fixture. The exact final UI fixture equals the native test input; no engine process or audible playback is inferred. The exported cache below is the initial fixture cache, distinct from the production revised cache.
+
+Initial failures retained: TypeScript rejected nullable prior cues and incomplete typed test tags; fixed types/fixtures without weakening checks. First browser exposed unchanged misleading included summary; repaired actual source resolution and kept assertion. Native attempt1 omitted the required precreated owned test root (no compilation); attempt2 completed compilation/readback/rollback assertions but export ownership correctly refused a sibling output path. Attempt3 uses an export inside the owned native test root and fully passes. No guard relaxed. Existing SDK A8/AY8/compression/LoD/minor sound/effect/HUD warnings remain visible.
+
+Full native Windows42-edit/restart/Save37944, audible timing/class/gain/caption, dropship mission/Forerunner gameplay and real peers remain OPEN behind the recorded Computer Use initialization failure. No new native desktop app/package was built; testExe below is only the Rust test harness. No Forerunner writes, downloads, source archive, push or publication. All475 CSV IDs, legacy checkpoint, protected original scenario/cache and stashes remain unchanged.
+
+Exact SHA-256 evidence:
+```json
+{
+  "parentRevision": "0b57e8caf3060d8ef9334a2584f5e9df96ddcd92",
+  "initialCache": "35e007b451a9331fa3cf92deb16919e263b0f29b6040e0981a6f51e3aaa11878",
+  "productionParent": "2610fee3d0eda7083b338a870ac5cf802309f77f01f8dc7baf15c1f9554d4130",
+  "productionRevised": "7a5131f46f51b40decc852bfca68430bf42b5f095e22199f6e40457309d48c82",
+  "revisedMissionSource": "de4a242edbaa9ca2825b1ecdc85bb6ada72c0981cca29fed08ddb13cf37d60a2",
+  "originalMissionSource": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+  "initialMissionSource": "be62d9ee92c2e693cc99dd748a4f6196a097327fb61f961e1c22bd91e28b650d",
+  "uiFixture": "3407ab2ce2a2a148c7740dbcecdb960aec796053cece077b1e00abe2d32a2230",
+  "nativeFixtureMatchesFinalUI": true,
+  "samples": [
+    {
+      "permutation": 0,
+      "byteLength": 6022,
+      "sha256": "cc6962da251ad81938abe11f95860d0fe70fbfe108657d7a4b8cf08a8dd80e22"
+    },
+    {
+      "permutation": 1,
+      "byteLength": 7060,
+      "sha256": "36858ccd30ca1f2b5477a777dd1773149494582da57c33269c0ddfbd7951d4b2"
+    },
+    {
+      "permutation": 2,
+      "byteLength": 4659,
+      "sha256": "d7936242838a7c4489eacdade395e75fca2a1784720184445e2651044cd0852a"
+    },
+    {
+      "permutation": 3,
+      "byteLength": 6587,
+      "sha256": "4116f8f13572668fc3441fca3f9651aaac7ab040caac584015a4166c10951656"
+    },
+    {
+      "permutation": 4,
+      "byteLength": 5728,
+      "sha256": "85161b9a86beb378a37c36b37d14144193061506f75501a06aad0c69d892c501"
+    }
+  ],
+  "testExe": "0cae378858c96b0766098f8e0814391ea231ea0d3a35076d37b7a1065ca2d4d2",
+  "logs": {
+    "unit.log": "92f5960b0180f614f31c887e56cf33d190c179ffae3fad472f0e13c3ed4be394",
+    "types.log": "737301431dc7383832e796df5fe10987f3c640420866d57a9082e3c06f2d6f73",
+    "browser.log": "dfdb23717a94c5b49974b35987a95a3b87725ffcac9dd4ba62867f418c00cc97",
+    "browser2.log": "e6ee8718f0cb35774766a7131ecee30af4827ba2e00d4748f8cd93e59b111daa",
+    "browser3.log": "180495e60e425fa5bc9fdc1939716dd4efa6d40b997872851c3a948460d8c6ca",
+    "core-compile.log": "10eb7c99210bbfd86c85feed91331596e441b6866318287feb4084616bed9ac3",
+    "native.log": "ab0c0de9da9eee0107f87235a197d831f46f7684b38324a7aa1596fa9632a858",
+    "native2.log": "6c93e6aeb8fbbdc099bd098e372bed17d83d867426f12a2341c5b4c4f88c5164",
+    "native3.log": "430bd0d9b05c99ef218e6e8497dbda6e2cc7804d57ab18606498e381d0be2e19",
+    "source-final.log": "f129cc373dfd2ee993d52525823e74eb07120f984bceebc45a100b8c025ed81b",
+    "browser4.log": "0992122c8b798a8852231956b680d909a9a710613d7ff60c2771d52e94bc32bc",
+    "types-complete.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "web-complete.log": "338e8ce121e7d3482daac62f93c8358087bb5d4a8fd06ee2bebfb733f55e495c"
+  }
+}
+```
+
+QA71874/run-ZBJtig CLOSED: {"workflow":"recovered-radio-reconnect","temporaryOutputDisposed":true,"disposedLogicalBytes":527619490,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1203321648,"allocatedBytes":492495096,"monitoringSamples":95,"monitoringMs":27694.76960000009,"sourceMonitoring":{"scope":"Source and new top-level output; protected games/Git/dependencies are not traversed","currentLogicalBytes":62102800,"peakLogicalBytes":62102800,"excludedTopLevel":[".git",".toolchain","node_modules","tools",".research","preserved","releases","halo custom edition","opencehalo-windows-release","runtimes","chupathingyce-windows64-release","pyros zombie apocolypse mod versions","sample code","halo - combat evolved (usa).xiso.iso"],"error":null}}
+Owned root absent, all writers exited, development runs[]/issues[]. Disposal allocation was unavailable; logical/last-measured/peak values above are distinct and do not establish physical reclamation. No retained compiler cache, map candidate or SDK duplicate.
