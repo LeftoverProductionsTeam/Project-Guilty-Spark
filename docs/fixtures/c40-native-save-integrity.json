@@ -1628,9 +1628,301 @@
     "operation": {
       "nodeSession": 30370,
       "ownedRoot": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-4d3zQz",
-      "active": true,
+      "active": false,
       "nativeAppClosed": true,
-      "next": "Reuse prepared target/library for reviewed native aircraft/control placement workflow; dispose after all owned writers settle"
+      "next": "Closed; continue coherent Black Echo source layout from nativeAircraftPlacement20261117, with a new bounded owner when needed.",
+      "finalStatus": "Closed after native aircraft placement milestone; see nativeAircraftPlacement20261117.disposal"
+    }
+  },
+  "nativeAircraftPlacement20261117": {
+    "scope": "Isolated native vehicle pose workflow, not mission/gameplay acceptance",
+    "baseRevision": "24e69f4b3423d3d24c588d19ab0901dc6a4eed8f",
+    "projectId": "9f1cdb4e-55d9-4c8c-a57a-4d5dd382b7ca",
+    "originalMapSha": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+    "baselineBuild": {
+      "id": "1bca2d98-0271-4157-9316-43eeb60640dd",
+      "timestamp": "2026-11-17T17:45:38.943272500+00:00",
+      "status": "validated",
+      "target": "gbx-custom",
+      "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-4d3zQz\\output\\native-library\\jobs\\1bca2d98-0271-4157-9316-43eeb60640dd\\output\\be_native.map",
+      "sha256": "6e54ec61d6c7d931e9bc50028b11c3c513d6f2e1d44770080c1e7e68ff25ff57",
+      "message": "Selected native CE tags compiled, recovered scripts and independent cache/type/CRC/source checks passed. Native source changes and gameplay require review; this is not an automatic format conversion.",
+      "projectFingerprint": "6f1071a826824610b55014b4725a29afccde0478699e7476c386176b628f4c10"
+    },
+    "reviewedSourceSha": "649a2118f085893d3d7395431710f205b6c261732a4c1119819d499d5129e143",
+    "proposal": {
+      "class": "vehi",
+      "index": 0,
+      "name": "extraction_pelican",
+      "position": [
+        49,
+        -80,
+        0.35
+      ],
+      "rotationRadians": [
+        0.25,
+        0,
+        0
+      ]
+    },
+    "nativeMouseDraggedX": 49.45710003428431,
+    "restoredBeforeSha": "d97241fc9f642ba94e3d9b80b75aa169ae021ce491c958e193588367969d46f5",
+    "restoredThenReaccepted": true,
+    "nativeNormalRestart": true,
+    "build": {
+      "id": "576ccf12-d2e1-49d4-8c0c-cc16c374f950",
+      "timestamp": "2026-11-17T17:57:13.971036200+00:00",
+      "status": "validated",
+      "target": "gbx-custom",
+      "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-4d3zQz\\output\\native-library\\jobs\\576ccf12-d2e1-49d4-8c0c-cc16c374f950\\output\\be_native.map",
+      "sha256": "92b0b4ae9df5b1202575b2984a5acb9961f042b1167802e144b6f0a013a2f9d5",
+      "message": "Current working tags compiled without re-extraction; source identities and native cache checks passed. Existing compiled scripts are retained; edited .hsc files require Compile scripts & build. Gameplay and peers remain untested.",
+      "projectFingerprint": "6f1071a826824610b55014b4725a29afccde0478699e7476c386176b628f4c10"
+    },
+    "independentReadback": {
+      "scenarioSha256": "649a2118f085893d3d7395431710f205b6c261732a4c1119819d499d5129e143",
+      "scalars": "49.000000,-80.000000,0.350000\r\n14.323945,0.000000,0.000000\r\n4\r\nextraction_deploy\r\nextraction_activate\r\nextraction_loadout\r\nbe_technology\r\nextraction_pelican\r\nextraction_spirit\r\nextraction_unsc\r\nextraction_covenant",
+      "compiledCacheSha256": "92b0b4ae9df5b1202575b2984a5acb9961f042b1167802e144b6f0a013a2f9d5",
+      "receiptDevices": [
+        {
+          "class": "ctrl",
+          "index": 0,
+          "nameIndex": 0,
+          "name": "extraction_deploy",
+          "tagPath": "levels/b40/devices/holo control/b40_holo control",
+          "position": [
+            49.695614,
+            -87.47212,
+            0.678429
+          ],
+          "rotationRadians": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "class": "ctrl",
+          "index": 1,
+          "nameIndex": 1,
+          "name": "extraction_activate",
+          "tagPath": "levels/b40/devices/holo control/b40_holo control",
+          "position": [
+            60.84561,
+            -87.47212,
+            0.678429
+          ],
+          "rotationRadians": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "class": "ctrl",
+          "index": 2,
+          "nameIndex": 2,
+          "name": "extraction_loadout",
+          "tagPath": "levels/b40/devices/holo control/b40_holo control",
+          "position": [
+            48.84561,
+            -88.12212,
+            0.678429
+          ],
+          "rotationRadians": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "class": "ctrl",
+          "index": 3,
+          "nameIndex": 6,
+          "name": "extraction_unsc",
+          "tagPath": "levels/b40/devices/holo control/b40_holo control",
+          "position": [
+            49,
+            -87.472,
+            0.1
+          ],
+          "rotationRadians": [
+            1.5707964,
+            0,
+            0
+          ]
+        },
+        {
+          "class": "ctrl",
+          "index": 4,
+          "nameIndex": 7,
+          "name": "extraction_covenant",
+          "tagPath": "levels/b40/devices/holo control/b40_holo control",
+          "position": [
+            50,
+            -87.472,
+            0.1
+          ],
+          "rotationRadians": [
+            1.5707964,
+            0,
+            0
+          ]
+        },
+        {
+          "class": "vehi",
+          "index": 0,
+          "nameIndex": 4,
+          "name": "extraction_pelican",
+          "tagPath": "forerunner/transport/pelican",
+          "position": [
+            49,
+            -80,
+            0.35
+          ],
+          "rotationRadians": [
+            0.25,
+            0,
+            0
+          ]
+        },
+        {
+          "class": "vehi",
+          "index": 1,
+          "nameIndex": 5,
+          "name": "extraction_spirit",
+          "tagPath": "forerunner/transport/spirit",
+          "position": [
+            65,
+            -87.472,
+            0.078429
+          ],
+          "rotationRadians": [
+            0.25,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "previousGoodUnchanged": true,
+    "mechanicsAppSha256": "8ae414d1555b52cad41ae32d228319f860eda9ec9e858eee8c1f5db95725b897",
+    "tests": {
+      "corePlacements": 3,
+      "coreReadback": 7,
+      "coreReadbackInstalledSkip": 1,
+      "installedSourceInventory": 1,
+      "frontend": 7,
+      "browser": 4,
+      "notes": [
+        "check12 omitted --lib and invoked zero-filtered integration executables; only its3 actual placement tests counted",
+        "check26 selected zero tests; check27 selected the installed read-only test and passed",
+        "first browser runs failed an obsolete Trigger label; corrected to actual Mission trigger N, no relaxed assertions"
+      ]
+    },
+    "finalAppSha256": "3c895cb9bbc1da30e56f0c6c2248929a5fc20979a30661327e6c36a00144fed8",
+    "openCompiledFromUi": {
+      "projectId": "5bc6a8aa-8f84-4ef6-bb97-609082246718",
+      "sourceSha256": "92b0b4ae9df5b1202575b2984a5acb9961f042b1167802e144b6f0a013a2f9d5",
+      "vehicle0": {
+        "id": "Vehicle-0",
+        "name": "pelican · 1",
+        "kind": "Vehicle",
+        "tagId": 3800236303,
+        "position": [
+          49,
+          -80,
+          0.35
+        ],
+        "rotation": [
+          0.25,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "visible": true,
+        "sourceOffset": 103847992,
+        "rotationOffset": 103848004,
+        "assetId": null
+      },
+      "controlCount": 5
+    },
+    "finalNativeStartup": true,
+    "finalPageErrors": [],
+    "status": "Native source-placement workflow verified; complete Black Echo mission correction remains incomplete",
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "sourceIntegrity": {
+      "retainedCandidateSha256": "31505afb15da14ff32af694afecc28362ff911bd6df6b79778195493c6c3ebab",
+      "previousGoodNativeBuildUnchanged": true,
+      "forerunnerReadOnly": true,
+      "originalAssetsModified": false,
+      "forerunnerScenarioSha256": "1ae5f61998b650b56aba94e786f7edb1b148dc6aa8ba75a3d986f355833b5207"
+    },
+    "roles": {
+      "extraction_deploy": "Reserve/grant gear and signal deployment",
+      "extraction_activate": "Activate cancellable evacuation, not settled reward",
+      "extraction_loadout": "Preview/cycle compatible stored loadout",
+      "extraction_unsc": "Choose native UNSC allegiance and profile",
+      "extraction_covenant": "Choose native Covenant allegiance and profile"
+    },
+    "boundary": "Vehicle-only pose trial [49,-80,.35] is outside original extraction_return Y[-90.47212,-83.47212]. Do not export as repaired mission; coordinate starts, all controls, pilot/route and hub/LZ volumes first. Native landing up>=.95, real terminal use, flight, objectives and settlement remain open.",
+    "preparation": {
+      "source": "Exact retained31505 cache, no SDK extraction or Forerunner writes",
+      "extraction": "Invader initially2456/2461 with5 Windows path errors despite exit0; namespaced output recovered only5missing files, no overwrite. Completed2461tags. Two singleplayer weapon extraction warnings retained; no suppression.",
+      "scope": "Prepared108MiB native closure reused; no permanent warehouse",
+      "nativeInventoryLog": "check-27.log",
+      "independentExtractLog": "check-30.log",
+      "independentPoseLog": "check-31.log"
+    },
+    "initialFailures": [
+      "Two early native app preparation builds omitted tauri/custom-protocol and opened a development URL; closed normally. Embedded rebuild and final app startup passed.",
+      "UI automation initially requested obsolete exact Trigger and Move (W) labels; actual Mission trigger N and Translate (W) used. No product controls hidden or assertions relaxed.",
+      "Attempted setup-only save_project without native history acknowledgement was correctly refused; target was instead authored and saved through actual UI. This refusal is not Save37944."
+    ],
+    "nativeScreenshot": {
+      "path": "docs/screenshots/workspaces/native-aircraft-source-preview-20261117.png",
+      "sha256": "aafc59eb6236be03571b618c925c78cb6f98cd7620f8aea01375aeea6e6d838a",
+      "scope": "Actual embedded Windows source pose preview and filled Object Tags drawer; not gameplay."
+    },
+    "disposal": {
+      "workflow": "private-runtime-diagnostics",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 4491428948,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 4491437377,
+      "allocatedBytes": 4260461952,
+      "monitoringSamples": 423,
+      "monitoringMs": 219012.3605000041,
+      "sourceMonitoring": {
+        "scope": "Source and new top-level output; protected games/Git/dependencies are not traversed",
+        "currentLogicalBytes": 73978048,
+        "peakLogicalBytes": 73978048,
+        "excludedTopLevel": [
+          ".git",
+          ".toolchain",
+          "node_modules",
+          "tools",
+          ".research",
+          "preserved",
+          "releases",
+          "halo custom edition",
+          "opencehalo-windows-release",
+          "runtimes",
+          "chupathingyce-windows64-release",
+          "pyros zombie apocolypse mod versions",
+          "sample code",
+          "halo - combat evolved (usa).xiso.iso"
+        ],
+        "error": null
+      },
+      "rootGone": true,
+      "remainingRuns": [],
+      "issues": []
     }
   }
 }

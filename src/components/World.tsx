@@ -1,4 +1,4 @@
-import {NATIVE_DEVICE_VIEW,deviceMatches,deviceIdentity,deviceScope,deviceTransform,deviceSceneObject,deviceObjectId} from '../nativeDevicePlacement';
+import {NATIVE_DEVICE_VIEW,deviceMatches,deviceIdentity,deviceScope,deviceTransform,deviceSceneObject,deviceObjectId,deviceDraft} from '../nativeDevicePlacement';
 import type {NativeDeviceView} from '../nativeDevicePlacement';
 import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
 import type {NativeTagContext,NativeCommandDraft} from '../nativeOperations';
@@ -605,6 +605,7 @@ export default function World({
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
   const [nativeDevice,setNativeDevice]=useMapState<NativeDeviceView|null>(project.id,NATIVE_DEVICE_VIEW,()=>null);
+  const [openingPlacement,setOpeningPlacement]=useState(false);
   const [verifiedDevice,setVerifiedDevice]=useState('');const nativeDeviceLatest=useRef(nativeDevice);nativeDeviceLatest.current=nativeDevice;
   const nativeDeviceIdentity=!cinematic&&nativeDevice?.active?deviceIdentity(nativeDevice):'';
   const nativeDeviceReady=!!nativeDeviceIdentity&&nativeDeviceIdentity===verifiedDevice&&project.builds.some(build=>build.id===nativeDevice?.buildId&&build.status==='validated');
@@ -1143,6 +1144,21 @@ export default function World({
   const currentTextureScopeRef=useRef(textureScope);
   currentTextureScopeRef.current=textureScope;
   const chosen = renderProject.scene.find((o) => o.id === selected);
+  async function reviewObjectPlacement(object:SceneObject){
+    if(!native||openingPlacement||!onReviewDevice)return;
+    setOpeningPlacement(true);
+    try{
+      const context=await call<NativeTagContext>('native_tag_context',{projectId:project.id});
+      if(context.deviceEditIssue)throw Error(context.deviceEditIssue);
+      const original=context.scenarioDevices?.find(row=>deviceObjectId(row)===object.id);
+      if(!original||!context.tagSha256||!project.builds.some(build=>build.id===context.buildId&&build.status==='validated'))throw Error('Build this map with matching source first, then reopen its validated native placements.');
+      const view:NativeDeviceView={projectId:project.id,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,original,...deviceDraft(original),active:false,focus:0};
+      if(!deviceMatches(view,context)||!deviceSceneObject(view,project,inspection))throw Error('This object does not match the reviewed native placement. Rebuild and reopen the current compiled map.');
+      const retained=nativeDeviceLatest.current;writeMapSession(project.id,NATIVE_DEVICE_VIEW,retained&&deviceMatches(retained,context)&&deviceObjectId(retained.original)===object.id?{...retained,active:false}:view);onReviewDevice();
+    }catch(error){notify('Placement source unavailable: '+String(error)+' Use Build & playtest to connect matching source and complete a native build.');}
+    finally{setOpeningPlacement(false);}
+  }
+
   const renderAvailable = hasRenderGeometry(inspection);
   useEffect(()=>{
     setViewMode(renderAvailable ? 'render' : 'smooth');
@@ -1629,7 +1645,7 @@ export default function World({
               </Canvas>}
             </Suspense>
           </ViewportBoundary>
-          {!cinematic&&nativeDevice?.active&&<div className="viewport-object-actions native-device-actions" role="status"><strong>Native device · {nativeDevice.original.name||nativeDevice.original.tagPath}</strong><span>Source model pose proposal · Move (W) / Rotate (E), then review</span>{chosen?.tagId!=null&&<button onClick={()=>openObjectTag(chosen.tagId!)}>Object tags</button>}<button onClick={()=>revealPanel('inspector')}>Transform</button><button disabled={!nativeDeviceReady||fly||cameraLocked||!!externalCameraAuthority} onClick={()=>{setPlayerView(false);setFrame(n=>n+1);}}>Frame native device</button>{onReviewDevice&&<button onClick={onReviewDevice}>Review device source</button>}<button onClick={()=>setNativeDevice({...nativeDevice,locked:!nativeDevice.locked})}>{nativeDevice.locked?'Unlock device handles':'Lock device handles'}</button><button onClick={()=>{setNativeDevice({...nativeDevice,active:false});setLocalSelected(null);}}>Hide device handles</button></div>}
+          {!cinematic&&nativeDevice?.active&&<div className="viewport-object-actions native-device-actions" role="status"><strong>Native {nativeDevice.original.class==='vehi'?'vehicle':'device'} · {nativeDevice.original.name||nativeDevice.original.tagPath}</strong><span>Source model pose proposal · Move (W) / Rotate (E), then review</span>{chosen?.tagId!=null&&<button onClick={()=>openObjectTag(chosen.tagId!)}>Object tags</button>}<button onClick={()=>revealPanel('inspector')}>Transform</button><button disabled={!nativeDeviceReady||fly||cameraLocked||!!externalCameraAuthority} onClick={()=>{setPlayerView(false);setFrame(n=>n+1);}}>{nativeDevice.original.class==='vehi'?'Frame native vehicle':'Frame native device'}</button>{onReviewDevice&&<button onClick={onReviewDevice}>{nativeDevice.original.class==='vehi'?'Review vehicle source':'Review device source'}</button>}<button onClick={()=>setNativeDevice({...nativeDevice,locked:!nativeDevice.locked})}>{nativeDevice.locked?'Unlock device handles':'Lock device handles'}</button><button onClick={()=>{setNativeDevice({...nativeDevice,active:false});setLocalSelected(null);}}>Hide device handles</button></div>}
           {!cinematic&&nativeVolume?.active&&<div className="viewport-object-actions" role="status"><strong>Trigger area · {nativeVolume.original.name}</strong><span>Source box proposal · Move (W), Rotate (E), Size (R); F frames</span><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeVolume({...nativeVolume,focus:Date.now()})}>Frame trigger area</button>{onReviewTrigger&&<button onClick={onReviewTrigger}>Review trigger source</button>}<button onClick={()=>setNativeVolume({...nativeVolume,locked:!nativeVolume.locked})}>{nativeVolume.locked?"Unlock trigger handles":"Lock trigger handles"}</button><button onClick={()=>setNativeVolume({...nativeVolume,active:false})}>Hide trigger handles</button></div>}
           {!cinematic&&nativeCamera?.active&&<div className="viewport-object-actions"><strong>Cutscene camera · {nativeCamera.original.name||nativeCamera.original.index}</strong><span>Editor preview · fly/orbit, then return and capture the viewport pose</span>{onReviewCamera&&<button onClick={onReviewCamera}>Review cutscene camera source</button>}<button onClick={()=>setNativeCamera({...nativeCamera,active:false})}>Leave camera preview</button></div>}
           {!cinematic&&nativeCommand?.active&&<div className="viewport-object-actions native-command-actions" role="status"><strong>Command route · {nativeCommand.list.name||nativeCommand.list.index} / Point {nativeCommand.point}</strong><span>Unsaved source waypoint · Move (W), F frames; not a pilot flight simulation</span><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeCommand({...nativeCommand,focus:Date.now(),frameRoute:false})}>Frame command point</button><button disabled={fly||cameraLocked||!!externalCameraAuthority} onClick={()=>setNativeCommand({...nativeCommand,focus:Date.now(),frameRoute:true})}>Frame command route</button>{onReviewCommand&&<button onClick={onReviewCommand}>Review command source</button>}<button onClick={()=>setNativeCommand({...nativeCommand,locked:!nativeCommand.locked})}>{nativeCommand.locked?'Unlock command handles':'Lock command handles'}</button><button onClick={()=>setNativeCommand({...nativeCommand,active:false})}>Hide command handles</button></div>}
@@ -1759,6 +1775,7 @@ export default function World({
                 requestedTagId={tagRequest}
                 requestRevision={tagRevision}
                 onSelectMap={onSelectMap}
+                instance={tagContext.project.id===project.id&&chosen&&!chosen.sourceModel&&chosen.tagId===tagRequest&&['Control','Machine','Vehicle'].includes(chosen.kind)&&onReviewDevice?{id:chosen.id,name:chosen.name,busy:openingPlacement,onEdit:()=>void reviewObjectPlacement(chosen)}:undefined}
                 edit={edit}
                 notify={notify}
                 onFullEditor={(id) => onOpenTag?.(id, tagContext.project.id)}

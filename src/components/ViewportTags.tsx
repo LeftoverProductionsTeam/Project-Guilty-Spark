@@ -21,7 +21,9 @@ export default function ViewportTags({
   onFullEditor,
   onSave,
   onSelectMap,
+  instance,
 }: {
+  instance?:{id:string;name:string;busy:boolean;onEdit:()=>void};
   project: Project;
   inspection: MapInspection;
   requestedTagId: number | null;
@@ -66,6 +68,7 @@ export default function ViewportTags({
         <Pill>{classNames[tag.class] ?? tag.class}</Pill>
       </div>
       <code className="viewport-tag-path">{renamedTagPath(project,tag)}</code>
+      {instance&&selected===requestedTagId&&<section aria-label="Selected native instance"><strong>{instance.id} · {instance.name}</strong><p className="subtle">This placement has its own position and scenario binding. Shared tag fields below affect every copy; they do not assign mission objectives or terminal roles.</p><button disabled={instance.busy} onClick={instance.onEdit}>{instance.busy?'Reading placement source…':'Edit this native placement'}</button><p className="subtle">Review the source name, position and rotation in AI &amp; scenario. Terminal objective bindings use Creator Studio → Recovered scenario areas &amp; controls.</p></section>}
       <TagRenamePanel key={tag.id} project={project} inspection={inspection} tag={tag} edit={edit}/>
       {(tag.class!=='bitm'||tag.fields.length>0)&&<><p className="subtle">
         Tag changes affect every object using this tag. Review the save plan to create a validated game map.

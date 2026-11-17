@@ -37,6 +37,11 @@ pub struct ScenarioLogicGroup {pub name:String,pub initial_value:f32,pub flags:u
 pub fn scenario_logic_readback(path:&Path,inspection:&MapInspection)->Result<ScenarioLogicReadback> {
     with_scenario(path,inspection,|r,space,at|parse(r,space,at,&inspection.tags))
 }
+/// Full placement checks additionally need unnamed vehicles. This shares the
+/// same decoder while retaining the existing named-marker reader's scope.
+pub fn scenario_placement_readback(path:&Path,inspection:&MapInspection)->Result<ScenarioLogicReadback>{
+    with_scenario(path,inspection,|r,space,at|parse_placements(r,space,at,&inspection.tags,true))
+}
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct NativeCameraPoint {pub index:u16,pub name:String,pub position:[f32;3],pub orientation_radians:[f32;3],pub fov_radians:f32}
@@ -140,6 +145,9 @@ pub fn scenario_weapon_readback(path:&Path,map:&MapInspection)->Result<(Vec<Scen
     })
 }
 fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadback>{
+    parse_placements(r,space,sc,tags,false)
+}
+fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:bool)->Result<ScenarioLogicReadback>{
     let names=parse_names(r,space,sc)?;
     let volumes=parse_volumes(r,space,sc)?;
     let(at,count)=space.block(r,sc+0x288,52,128)?;let mut groups=vec![];
@@ -151,7 +159,7 @@ fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadb
     let mut blocks=vec![(0x294,0x2a0,64,"mach","Machine"),(0x2ac,0x2b8,64,"ctrl","Control")];
     // Vehicle1 is a standard native object type. Keep unrelated unnamed vehicle
     // inventories outside this optional marker readback; reuse the same decoder.
-    if names.iter().any(|name|name.object_type==1){blocks.push((0x240,0x24c,120,"vehi","Vehicle"));}
+    if all_vehicles||names.iter().any(|name|name.object_type==1){blocks.push((0x240,0x24c,120,"vehi","Vehicle"));}
     for (offset,palette,stride,class,kind) in blocks {
         // Reuse the editor's native placement decoder; only the reverse name
         // binding is additional metadata absent from SceneObject.
@@ -214,6 +222,15 @@ mod tests {
         let mut tag=tags[0].clone();tag.id=13;tag.class="vehi".into();tag.path="vehicles/pelican/pelican".into();tags.push(tag);
         let space=Space{begin:0,end:bytes.len(),address:0};let read=parse(&Reader(&bytes),&space,0,&tags).unwrap();assert_eq!(read.devices.len(),1);assert_eq!(read.vehicles.len(),1);assert_eq!(read.vehicles[0].name_index,1);assert_eq!(read.vehicles[0].tag_path,"vehicles/pelican/pelican");assert_eq!(read.vehicles[0].position,[4.,0.,0.]);assert_eq!(read.names[1].object_type,1);
         bytes[0xc00..0xc02].copy_from_slice(&1u16.to_le_bytes());assert!(parse(&Reader(&bytes),&space,0,&tags).is_err());
+    }
+    #[test]
+    fn full_placement_readback_includes_unnamed_vehicles_without_broadening_marker_checks(){
+        let(mut bytes,mut tags)=fixture();for(at,pointer)in[(0x240,0xc00u32),(0x24c,0xd00u32)]{bytes[at..at+4].copy_from_slice(&1u32.to_le_bytes());bytes[at+4..at+8].copy_from_slice(&pointer.to_le_bytes());}
+        bytes[0xc02..0xc04].copy_from_slice(&u16::MAX.to_le_bytes());bytes[0xc08..0xc0c].copy_from_slice(&4f32.to_le_bytes());bytes[0xd00..0xd04].copy_from_slice(b"ihev");bytes[0xd0c..0xd10].copy_from_slice(&13u32.to_le_bytes());
+        let mut tag=tags[0].clone();tag.id=13;tag.class="vehi".into();tag.path="vehicles/pelican/pelican".into();tags.push(tag);
+        let space=Space{begin:0,end:bytes.len(),address:0};assert!(parse(&Reader(&bytes),&space,0,&tags).unwrap().vehicles.is_empty());
+        let read=parse_placements(&Reader(&bytes),&space,0,&tags,true).unwrap();assert_eq!(read.vehicles.len(),1);assert_eq!(read.vehicles[0].name_index,-1);assert_eq!(read.vehicles[0].position,[4.,0.,0.]);
+        bytes[0xc00..0xc02].copy_from_slice(&1u16.to_le_bytes());assert!(parse_placements(&Reader(&bytes),&space,0,&tags,true).is_err());
     }
     #[test]
     fn native_device_groups_read_real_initial_values_and_device_aliases(){
