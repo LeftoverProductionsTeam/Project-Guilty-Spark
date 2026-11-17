@@ -52,7 +52,12 @@ impl MissionSoundCue {
 }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct MissionGuidance {pub flag:String,pub height:f32}
+pub struct MissionGuidance {
+ #[serde(default,skip_serializing_if="Option::is_none")] pub flag:Option<String>,
+ #[serde(default,skip_serializing_if="Option::is_none")] pub object:Option<String>,
+ pub height:f32
+}
+impl MissionGuidance {fn target(&self)->Option<&str>{match(&self.flag,&self.object){(Some(name),None)|(None,Some(name))=>Some(name),_=>None}}}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MissionBeat {
@@ -217,7 +222,7 @@ pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
 /// Authoring metadata does not replace source/geometry or compiled-cache checks.
 fn mission_scope_last(missions:&[MissionBeat],index:usize)->bool{missions[index+1..].iter().all(|other|other.squad_number!=missions[index].squad_number)}
 fn validate_mission_scopes(missions:&[MissionBeat])->Result<()>{
- if missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|beat.squad_number.is_none()||!script_ident(&g.flag)||!g.height.is_finite()||g.height.abs()>100.)){return invalid("Personal guidance needs a native location flag, finite height and Forerunner squad scope");}
+ if missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|beat.squad_number.is_none()||g.target().is_none_or(|name|!script_ident(name))||!g.height.is_finite()||g.height.abs()>100.)){return invalid("Personal guidance needs one native flag or object, finite height and Forerunner squad scope");}
  if missions.iter().any(|beat|beat.squad_number.is_some_and(|number|!(1..=22).contains(&number))){return invalid("Squad numbers must be 1 through 22");}
  if !missions.iter().any(|beat|beat.squad_number.is_some()){return Ok(());}
  if missions.iter().any(|beat|beat.checkpoint==Some(true)||beat.complete_mission==Some(true)){return invalid("Independent squad operations cannot save or end the shared world; use a separate shared campaign");}
@@ -460,7 +465,11 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
         let markers=crate::maps::scenario_logic_readback(cache,map)?;
         crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
         let flags=crate::maps::scenario_flag_readback(cache,map)?;
-        for guide in binding.missions.iter().filter_map(|beat|beat.guidance.as_ref()){if flags.iter().filter(|flag|flag.name.eq_ignore_ascii_case(&guide.flag)).count()!=1{return invalid("Compiled objective waypoint flag is missing or ambiguous");}}
+        let objects=if binding.missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|g.object.is_some())){crate::maps::scenario_named_object_readback(cache,map)?}else{vec![]};
+        for guide in binding.missions.iter().filter_map(|beat|beat.guidance.as_ref()){
+            if let Some(name)=&guide.flag{if flags.iter().filter(|flag|flag.name.eq_ignore_ascii_case(name)).count()!=1{return invalid("Compiled objective waypoint flag is missing or ambiguous");}}
+            if let Some(name)=&guide.object{if objects.iter().filter(|object|object.name.eq_ignore_ascii_case(name)).count()!=1{return invalid("Compiled objective waypoint object is missing or ambiguous");}}
+        }
         for number in &scoped{
             expected.extend([(format!("gs_sq{number:02}_mission"),2),(format!("gs_sq{number:02}_guard"),2),(format!("forerunner_squad_{number:02}_players"),3)]);
             if binding.missions.iter().any(|beat|beat.squad_number==Some(*number)&&beat.guidance.is_some()){expected.extend(["hide","show","update"].map(|name|(format!("gs_sq{number:02}_nav_{name}"),3)));}
@@ -628,7 +637,7 @@ impl CreatorStudio {
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
                 || !bounded(&beat.encounter_name, 128)
                 || beat.squad_number.is_some_and(|n|!(1..=22).contains(&n))
-                || beat.guidance.as_ref().is_some_and(|g|!g.flag.is_empty()&&!script_ident(&g.flag)||!g.height.is_finite()||g.height.abs()>100.)
+                || beat.guidance.as_ref().is_some_and(|g|g.target().is_none_or(|name|!name.is_empty()&&!script_ident(name))||!g.height.is_finite()||g.height.abs()>100.)
                 || !["manual", "triggerVolume", "encounterCleared", "escort", "deviceActivated", "weaponOwned", "forerunnerExtractionSettled", "timer"].contains(&beat.trigger.as_str())
                 || beat.trigger_ref.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
                 || beat.condition_volume.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))

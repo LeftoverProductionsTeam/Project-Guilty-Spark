@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 1ce17fecad733af4156c448318eaee308ecda835, canonical master.
-Latest verified revision: 1ce17fecad733af4156c448318eaee308ecda835; flag/guidance increment passes source/browser/native checks in the local commit containing this checkpoint. Native Windows/game gates remain OPEN.
-Next action: complete moving-target guidance and remaining faction-specific Black Echo authoring through existing native object/actor bindings. Keep current runtime guidance-budget/admission, Windows37944/42-edit/flight/peer/game gates OPEN; no unchanged desktop retry.
+Starting revision: 70e83669e8450eedfb7a88b54b21b7e2d2fe3f90, canonical master.
+Latest verified revision: 70e83669e8450eedfb7a88b54b21b7e2d2fe3f90; moving-object increment passes source/browser/native checks in the local commit containing this checkpoint. Windows/game gates remain OPEN.
+Next action: finish remaining faction-specific Black Echo authoring and runtime handoff through existing native bindings. Keep Windows37944/42-edit, actual guidance-budget/marker/flight/combat/settlement/peer/game gates OPEN; no unchanged desktop retry.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+17Nov moving targets (parent70e8366): existing Objective waypoint → named objects → Undo/Redo/Save/reopen → reviewed source → CE609 compile/readback passes. Frontend71/native21+1skip/creative21+1skip/working17+1skip/browser7distinct+negative1/guide4/web/Windows all-target PASS; flag-only source byte-identical. Ten named bindings and deliberate drift/missing refusals pass. Exact hashes/limits: RUNTIME_INTEGRATION_20261107. Native Windows/game gates OPEN.
 
 17Nov native flag/guidance (parent1ce17fe): protected append/pose/Restore/Save and scoped marker authoring→standard parameterless HSC→CE609 compile/readback pass. Frontend70/native20+1skip/creative21+1skip/working17+1skip/browser6distinct/latest2/TypeScript-Vite/Windows all-target PASS. Exact cache/source/test-exe hashes, compiler/initialization fixes and limits: RUNTIME_INTEGRATION_20261107. Actual marker/mission/gameplay remains OPEN.
 
@@ -147,9 +149,7 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA15708/run-x3PzLH CLOSED:1535916810logicalB disposed, peak1550109358logicalB; last allocation1404717640B, disposal allocation unavailable. Root absent, runs[]/issues[], writers finished. No retained maps/tags/SDK/browser/compiler/cache/archive or game/engine writes. Evidence: RUNTIME_INTEGRATION_20261107.
-
-QA45018/run-9nImdg CLOSED:1645345393logicalB disposed, peak1758189218logicalB, last allocation1514157896B; disposal allocation unavailable. Root absent; runs[]/issues[]. No retained maps/tags/SDK/browser/compiler/cache/archive or game/Forerunner writes. Exact cleanup/hashes: RUNTIME_INTEGRATION_20261107.
+QA39694/run-60rgEl CLOSED: 1536195660logicalB disposed, peak1538090194logicalB; last allocation1404992144B, disposal allocation unavailable. Root absent, runs[]/issues[], all writers finished. No retained outputs or engine/game writes. Exact hashes/protected checks/limits: RUNTIME_INTEGRATION_20261107.
 
 Earlier owned QA roots remain closed; exact receipts survive in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git. No old jobs revived or checkpoint duplicated.
 

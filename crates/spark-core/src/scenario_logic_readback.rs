@@ -88,6 +88,40 @@ fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolum
 }
 #[derive(Clone,Debug)]
 pub struct ScenarioLogicWeapon {pub index:usize,pub name_index:i16,pub tag_path:String,pub not_placed:u16}
+/// Native placement blocks shared by source selection and independent cache bindings.
+pub(crate) const NAMED_OBJECT_BLOCKS:&[(&str,&str,&str,&str,i16,usize,usize,usize,&str)]=&[
+ ("scenery","scenery_palette","scen","scenery",6,0x210,0x21c,72,"Scenery"),
+ ("bipeds","biped_palette","bipd","biped",0,0x228,0x234,120,"Biped"),
+ ("vehicles","vehicle_palette","vehi","vehicle",1,0x240,0x24c,120,"Vehicle"),
+ ("equipment","equipment_palette","eqip","equipment",3,0x258,0x264,40,"Equipment"),
+ ("weapons","weapon_palette","weap","weapon",2,0x270,0x27c,92,"Weapon"),
+ ("machines","machine_palette","mach","device_machine",7,0x294,0x2a0,64,"Machine"),
+ ("controls","control_palette","ctrl","device_control",8,0x2ac,0x2b8,64,"Control"),
+ ("light_fixtures","light_fixture_palette","lifi","device_light_fixture",9,0x2c4,0x2d0,88,"Light fixture"),
+ ("sound_scenery","sound_scenery_palette","ssce","sound_scenery",11,0x2dc,0x2e8,40,"Sound scenery"),
+];
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct NativeNamedObject {pub name:String,pub class:String,pub index:u16,pub name_index:u16,pub tag_path:String,pub position:[f32;3]}
+pub fn scenario_named_object_readback(path:&Path,map:&MapInspection)->Result<Vec<NativeNamedObject>>{
+ with_scenario(path,map,|r,space,sc|{
+  let names=parse_names(r,space,sc)?;let mut result=vec![];
+  for &(_,_,class,_,object_type,offset,palette,stride,kind)in NAMED_OBJECT_BLOCKS{
+   if !names.iter().any(|n|n.object_type==object_type){continue;}
+   let mut diagnostics=vec![];let objects=placements(r,space,sc,(offset,palette,stride,kind),&map.tags,&mut diagnostics)?;
+   if !diagnostics.is_empty(){return invalid("Named waypoint object placement/palette is invalid");}
+   let(at,_)=space.block(r,sc+offset,stride,4096)?;
+   for(name_index,name)in names.iter().enumerate().filter(|(_,n)|n.object_type==object_type){
+    let index=usize::try_from(name.object_index).map_err(|_|SparkError::Invalid("Named object has no compiled placement".into()))?;
+    let object=objects.get(index).ok_or_else(||SparkError::Invalid("Named object placement is missing".into()))?;
+    if r.u16(at+index*stride+2)? as usize!=name_index||object.position.iter().any(|v|!v.is_finite()){return invalid("Compiled object reverse name or pose is invalid");}
+    let tags=map.tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class==class).collect::<Vec<_>>();
+    if tags.len()!=1{return invalid("Named object tag/class is missing or ambiguous");}
+    result.push(NativeNamedObject{name:name.name.clone(),class:class.into(),index:index as u16,name_index:name_index as u16,tag_path:tags[0].path.clone(),position:object.position});
+   }
+  }Ok(result)
+ })
+}
 fn parse_names(r:&Reader,space:&Space,sc:usize)->Result<Vec<ScenarioLogicName>>{
     let(at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
     for index in 0..count{let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}Ok(names)

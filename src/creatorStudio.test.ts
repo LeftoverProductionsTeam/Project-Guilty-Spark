@@ -379,3 +379,19 @@ it('authors personal native flag guidance with body-change and settlement cleanu
  studio.missions.forEach(beat=>delete beat.squadNumber);expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow(/squad scope/);
  studio.missions[0].guidance!.flag='bad ) (quit';expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow();
 });
+
+it('authors object guidance that waits for targets and removes the previous binding before replacement',()=>{
+ const studio=emptyCreatorStudio();studio.missions=[{id:'pickup',title:'Collect',objective:'Collect',trigger:'weaponOwned',encounterName:'',weaponPath:'weapons/technology',squadNumber:1,guidance:{object:'technology',height:1}},{id:'end',title:'Return',objective:'Return',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',squadNumber:1,guidance:{object:'extraction_pelican',height:3}}];
+ const output=exportHaloCeMission(studio,{forerunner:true});expect(output.dependencies).toEqual(expect.arrayContaining(['waypoint_object:technology','waypoint_object:extraction_pelican']));
+ expect(output.content).toContain('(global object gs_sq01_nav_previous none)');
+ expect(output.content).toContain('(set gs_sq01_nav_target extraction_pelican)');
+ expect(output.content).toContain('(!= gs_sq01_nav_target gs_sq01_nav_previous)');
+ expect(output.content).toContain('(deactivate_nav_point_object gs_sq01_nav_viewer gs_sq01_nav_previous)');
+ expect(output.content).toContain('(and (= gs_sq01_nav_stage 1) (!= gs_sq01_nav_target none))');
+ expect(output.content).toContain('(activate_nav_point_object default gs_sq01_nav_viewer gs_sq01_nav_target 3)');
+ const update=output.content.slice(output.content.indexOf('(script static void gs_sq01_nav_update'));expect(update.indexOf('(gs_sq01_nav_hide)')).toBeLessThan(update.indexOf('(set gs_sq01_nav_previous gs_sq01_nav_target)'));expect(update.indexOf('(set gs_sq01_nav_previous gs_sq01_nav_target)')).toBeLessThan(update.indexOf('(gs_sq01_nav_show)'));
+ expect(output.content).not.toContain('(object_create technology)');
+ expect(exportHaloCeMission(JSON.parse(JSON.stringify(studio)),{forerunner:true})).toEqual(output);
+ const invalid=structuredClone(studio);invalid.missions[0].guidance={flag:'both',object:'technology',height:1};expect(()=>exportHaloCeMission(invalid,{forerunner:true})).toThrow();
+ expect(sameMissionData([{...studio.missions[0],guidance:{flag:null,object:'technology',height:1}}],[studio.missions[0]])).toBe(true);
+});

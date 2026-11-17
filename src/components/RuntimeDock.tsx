@@ -583,10 +583,13 @@ export default function RuntimeDock({
         const matches=refs.extractionSquads?.filter(row=>row.terminal.number===number);
         if(matches?.length!==1||!matches[0].terminal.readiness)throw Error('Squad'+number+' needs its reviewed native selection terminal and readiness gate. Author them in AI & scenario, accept/build, then read mission source again.');
       }
-      for(const beat of studio.missions){if(beat.guidance&&refs.flags?.filter(flag=>flag.name.toLowerCase()===beat.guidance!.flag.toLowerCase()).length!==1)throw Error('Objective waypoint flag is missing or ambiguous. Author it in AI & scenario, accept/build, then read source again.');}
+      for(const beat of studio.missions){const guide=beat.guidance;if(!guide)continue;
+        if(guide.object!=null){if(refs.objectIssue)throw Error(refs.objectIssue);if(refs.objects?.filter(object=>object.name.toLowerCase()===guide.object!.toLowerCase()).length!==1)throw Error('Objective waypoint object is missing or ambiguous. Bind a unique native object in the source, accept/build and read source again.');}
+        else if(refs.flags?.filter(flag=>flag.name.toLowerCase()===guide.flag?.toLowerCase()).length!==1)throw Error('Objective waypoint flag is missing or ambiguous. Author it in AI & scenario, accept/build, then read source again.');
+      }
       const bindings=inspectScenarioBindings([generated],null,null,[],review.triggerVolumes.map(name=>({name})),refs.devices,refs.squads,refs.weapons);
       for(const row of bindings){
-        if(['hud_message:','sound:','weapon:','forerunner_extraction:','forerunner_squad:','cutscene_flag:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
+        if(['hud_message:','sound:','weapon:','forerunner_extraction:','forerunner_squad:','cutscene_flag:','waypoint_object:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
         if(row.dependency.startsWith('cutscene_camera_point:')){if(review.cameras.filter(camera=>camera.name===row.dependency.slice('cutscene_camera_point:'.length)).length!==1)throw Error('Native camera reference is missing or ambiguous: '+row.dependency);continue;}
         if(row.status!=='presentInNativeSource')throw Error('Native mission reference is missing or ambiguous: '+row.dependency);
       }

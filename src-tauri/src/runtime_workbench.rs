@@ -360,7 +360,7 @@ pub(super) struct WorkingScriptSources {
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-pub(super) struct WorkingMissionReview {flags:Vec<core::maps::NativeCutsceneFlag>,extraction_squads:Vec<core::native_operations::NativeSquadTerminalSnapshot>,weapons:Vec<core::native_operations::NativeMissionWeapon>,encounters:Vec<core::native_operations::NativeMissionEncounter>,squads:Vec<core::native_operations::ScenarioSquadChoice>,devices:Vec<core::native_operations::NativeDevicePlacement>,protected_encounters:Vec<String>}
+pub(super) struct WorkingMissionReview {objects:Option<Vec<core::maps::NativeNamedObject>>,object_issue:Option<String>,flags:Vec<core::maps::NativeCutsceneFlag>,extraction_squads:Vec<core::native_operations::NativeSquadTerminalSnapshot>,weapons:Vec<core::native_operations::NativeMissionWeapon>,encounters:Vec<core::native_operations::NativeMissionEncounter>,squads:Vec<core::native_operations::ScenarioSquadChoice>,devices:Vec<core::native_operations::NativeDevicePlacement>,protected_encounters:Vec<String>}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub(super) struct WorkingCameraReview {tag_identity:String,cameras:Vec<maps::NativeCameraPoint>,script_names:Vec<String>,trigger_volumes:Vec<String>,scenario_type:u16}
@@ -412,7 +412,8 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
             let trigger_volumes=core::native_operations::scenario_trigger_volume_names(&values).map_err(error)?;let scenario_type=source_scenario_type(&state,&project)?;
             if include_mission==Some(true){
                 let mission=core::native_operations::native_mission_source(&values).map_err(error)?;
-                view.mission_review=Some(WorkingMissionReview{flags:core::native_operations::scenario_flag_choices(&values).map_err(error)?,extraction_squads:if context.build.target=="gbx-custom"{core::native_operations::native_squad_terminal_snapshots(&values).map_err(error)?}else{vec![]},weapons:mission.weapons,encounters:mission.encounters,squads:core::native_operations::scenario_squad_choices(&values).map_err(error)?,devices:core::native_operations::scenario_device_choices(&values).map_err(error)?,protected_encounters:native_operations_native::protected_mission_encounters(&state,&project,&context.build)?.into_iter().collect()});
+                let(objects,object_issue)=match core::native_operations::native_guidance_objects(&values){Ok(rows)=>(Some(rows),None),Err(issue)=>(None,Some(error(issue)))};
+                view.mission_review=Some(WorkingMissionReview{objects,object_issue,flags:core::native_operations::scenario_flag_choices(&values).map_err(error)?,extraction_squads:if context.build.target=="gbx-custom"{core::native_operations::native_squad_terminal_snapshots(&values).map_err(error)?}else{vec![]},weapons:mission.weapons,encounters:mission.encounters,squads:core::native_operations::scenario_squad_choices(&values).map_err(error)?,devices:core::native_operations::scenario_device_choices(&values).map_err(error)?,protected_encounters:native_operations_native::protected_mission_encounters(&state,&project,&context.build)?.into_iter().collect()});
             }
             if include_transport==Some(true){
                 let mut choices=core::native_operations::scenario_transport_choices(&values).map_err(error)?;

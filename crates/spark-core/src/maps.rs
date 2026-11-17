@@ -2,7 +2,8 @@
 //! Known field offsets are deliberately a small audited subset, never guessed from tag names.
 #[path = "scenario_logic_readback.rs"]
 mod scenario_logic_readback;
-pub use scenario_logic_readback::{scenario_weapon_readback,ScenarioLogicWeapon,scenario_command_readback,scenario_volume_readback,scenario_camera_readback,NativeCameraPoint,scenario_flag_readback,NativeCutsceneFlag,scenario_logic_readback,ScenarioLogicReadback,ScenarioLogicName,ScenarioLogicDevice,ScenarioLogicGroup,ScenarioLogicVolume,ScenarioLogicVolumeGeometry};
+pub(crate) use scenario_logic_readback::NAMED_OBJECT_BLOCKS;
+pub use scenario_logic_readback::{scenario_weapon_readback,ScenarioLogicWeapon,scenario_command_readback,scenario_volume_readback,scenario_camera_readback,NativeCameraPoint,scenario_flag_readback,NativeCutsceneFlag,scenario_named_object_readback,NativeNamedObject,scenario_logic_readback,ScenarioLogicReadback,ScenarioLogicName,ScenarioLogicDevice,ScenarioLogicGroup,ScenarioLogicVolume,ScenarioLogicVolumeGeometry};
 use crate::{binary::Reader, invalid, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1676,6 +1677,7 @@ fn placements(
             "Machine" => "mach",
             "Control" => "ctrl",
             "Sound scenery" => "ssce",
+            "Light fixture" => "lifi",
             _ => "",
         };
         if let Some(target) = tid.and_then(|id| tags.iter().find(|t| t.id == id)) {

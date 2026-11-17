@@ -1551,6 +1551,7 @@ fn run_with(
             let include_starts=prepared.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
             let squads=if include_starts{crate::native_operations::scenario_squad_start_choices(&fields)?}else{crate::native_operations::scenario_squad_choices(&fields)?};
             let combat=crate::native_operations::current_combat_targets(&fields,&source_sha256,&prepared.scenario_squad_readback.as_ref().unwrap().combat)?;
+            let named_objects=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.named_objects.is_some()){Some(crate::native_operations::native_guidance_objects(&fields)?)}else{None};
             let cutscene_flags=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cutscene_flags.is_some()){Some(crate::native_operations::scenario_flag_choices(&fields)?)}else{None};
             let cameras=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cameras.is_some()){Some(crate::native_operations::scenario_camera_choices(&fields)?)}else{None};
             let volumes=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.volumes.is_some()){Some(crate::native_operations::scenario_volume_choices(&fields)?)}else{None};
@@ -1564,7 +1565,7 @@ fn run_with(
                 let actual=crate::native_operations::native_faction_snapshots(&fields)?;
                 if serde_json::to_value(expected)?!=serde_json::to_value(&actual)?{return invalid("Staged faction controls/profiles changed after source review; no compiler ran");}Some(actual)
             }else{None};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{cutscene_flags,extraction_squads,faction_kits,transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{named_objects,cutscene_flags,extraction_squads,faction_kits,transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }

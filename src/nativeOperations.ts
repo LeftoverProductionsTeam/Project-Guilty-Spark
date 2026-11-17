@@ -77,6 +77,7 @@ export function nativePatrolEqual(a:NativeSourcePatrolRoute,b:NativeSourcePatrol
  return a.points.length===b.points.length&&a.points.every((p,i)=>{const q=b.points[i];return p.sourceIndex===q.sourceIndex&&p.animation===q.animation&&p.sequenceId===q.sequenceId&&p.position.every((v,j)=>close(v,q.position[j]))&&close(p.weight,q.weight)&&p.waitSeconds.every((v,j)=>close(v,q.waitSeconds[j]))&&Number.isFinite(p.facingRadians)&&Number.isFinite(q.facingRadians)&&Math.abs(Math.atan2(Math.sin(p.facingRadians-q.facingRadians),Math.cos(p.facingRadians-q.facingRadians)))<=.000002;});
 }
 export interface NativeScenarioCombat {encounter:number;name:string;points:{index:number;position:[number,number,number];group:string}[];squads:{index:number;name:string;groups:NativeCombatSource['groups'];behavior?:NativeSquadBehavior|null;behaviorIssue?:string|null;patrol?:NativeSourcePatrolRoute|null;patrolIssue?:string|null}[]}
+export interface NativeNamedObject {name:string;class:string;index:number;nameIndex:number;tagPath:string;position:[number,number,number]}
 export interface NativeCutsceneFlag {index:number;name:string;position:[number,number,number];facingRadians:[number,number]}
 export interface NativeCameraPoint {index:number;name:string;position:[number,number,number];orientationRadians:[number,number,number];fovRadians:number}
 export interface NativeVolumeGeometry {forward:[number,number,number];up:[number,number,number];corner:[number,number,number];dimensions:[number,number,number]}
@@ -119,6 +120,7 @@ export interface NativeTagContext {
   deviceEditIssue?:string|null;
   scenarioVolumes?:NativeTriggerVolume[];
   triggerEditIssue?:string|null;
+  guidanceObjects?:NativeNamedObject[]|null;guidanceObjectIssue?:string|null;
   scenarioFlags?:NativeCutsceneFlag[];flagEditIssue?:string|null;
   scenarioCameras?:NativeCameraPoint[];
   cameraEditIssue?:string|null;

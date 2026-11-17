@@ -1449,3 +1449,154 @@ Failures resolved: flag draft passed null instead of a lazy object-state initial
 Native Windows/full restart/42-edit/37944, actual marker visibility/body replacement/reorder/death/reconnect/settlement/peers, aircraft flight/boarding and complete mission gameplay remain OPEN behind the recorded desktop initialization failure. No game, Forerunner writes, download or remote action. Current scope is authoring/compiler/readback evidence, not final gameplay/platform/release acceptance; all475/M1–M6/Operation110 remain active.
 
 QA15708/run-x3PzLH CLOSED: {"disposedLogicalBytes":1535916810,"peakLogicalBytes":1550109358,"lastAllocatedFileBytes":1404717640,"disposedAllocatedFileBytes":null}. Owned root absent; runs[]/issues[]. All writers finished before disposal. Disposal allocation unavailable: no physical-space reclaimed claim. Original SCNR/cache,475CSV, legacy checkpoint and both stashes rechecked unchanged. No retained generated maps/tags/SDK/browser/compiler/cache/archive or engine/runtime writes.
+
+
+### 17 November — moving-object squad objectives (parent70e8366)
+
+Creator Studio Objective waypoint now selects stable flags or real named native objects from accepted working source, retaining target kind/name/height through the existing project Undo/Redo, Save/reopen and recovered mission writer. Missing or case-ambiguous source objects refuse preparation; no object is manufactured, spawned or granted by guidance. The shared native placement registry covers scenery, bipeds, vehicles, equipment, weapons, machines, controls, light fixtures and sound scenery; source/cache reverse name and real palette bindings are checked. Existing scenario readback receipts optionally snapshot named objects and refresh from final staged source, then independently compare name, class, placement/name indices, asset and coordinates. Old receipts remain readable. Parameterless native squad helpers clear all old participant/target bindings before replacements, query live object identity and wait while absent. Rendering/replacement/disappearance behavior remains game-unverified.
+
+Focused proof: frontend71PASS; creative21PASS/1explicit installed skip; native operations21PASS/1explicit installed skip (including final receipt rerun); working-tags17PASS/1explicit installed skip; seven distinct connected browser cases PASS, followed by the moving-target case including missing/case-ambiguous refusal1PASS; guide4PASS; TypeScript/Vite and Windows Rust workspace/all-target PASS (including final receipt rerun). One guide invocation used unsupported runner mode/run and wrong filename; exited1 before tests, corrected to unit/src/featureWorkflow.test.ts then4PASS. No assertions relaxed. Legacy flag-only recovered composition is byte-identical to70e8366.
+
+The actual saved UI nine-beat/two-squad mission, Pelican controller, cameras/flags, faction kits and both readiness controls were compiled using the existing installed native transport fixture:1PASS in14.44s. CE609 singleplayer,23scripts, original4script/global prefixes retained,10HUD messages including original1, five unchanged real radio samples, both aircraft and real pilot dependencies retained. Selected moving targets: Pelican vehicle0/name4, Spirit vehicle1/name5 and technology weapon0/name3; ten total named source/cache placements matched. Five deliberate source-snapshot changes (pose, asset, placement index, name index, name) and a missing mission target refuse independent verification; existing named-weapon negative cases also pass and previous-good map hash remains unchanged. Reuses prepared read-only SDK inputs; no complete SDK copy/archive or engine writes.
+
+Exact native evidence (test executable is NOT an app/release build):
+
+```json
+{
+  "map": {
+    "sha256": "57250f0c847695050c2be629fa2b03e78f52fbedc461b72d079dc5d90df1dd32",
+    "bytes": 110039056
+  },
+  "scenarioSha256": "0d23a9e7a5b08f0c0a2e857009e462574d04496f26bac37e2f8a9c405be5f6bd",
+  "missionSha256": "da6f9b2c60c11c153ce36e1c85d1e9b8a6b9ddad2a55ce6e911960b6246d33c1",
+  "originalMissionSha256": "9be5f421f3d67bb6bd5676ae2792e5cf3b4927e3cb314260fdac520ba51c17d0",
+  "testExecutableSha256": "9f651d7b5b0d692e5c7c7e057a2ab45ff2404044e4d99fbf6039c743690f7033",
+  "logSha256": "5bc431142981cab8e5ce68c3b884f8b16d48fa7996bfaf37df1bae91b9683b9d",
+  "objects": [
+    {
+      "name": "extraction_pelican",
+      "class": "vehi",
+      "index": 0,
+      "nameIndex": 4,
+      "tagPath": "forerunner/transport/pelican",
+      "position": [
+        49,
+        -87.472,
+        0.078429
+      ]
+    },
+    {
+      "name": "extraction_spirit",
+      "class": "vehi",
+      "index": 1,
+      "nameIndex": 5,
+      "tagPath": "forerunner/transport/spirit",
+      "position": [
+        65,
+        -87.472,
+        0.078429
+      ]
+    },
+    {
+      "name": "be_technology",
+      "class": "weap",
+      "index": 0,
+      "nameIndex": 3,
+      "tagPath": "forerunner/be_native/technology",
+      "position": [
+        55.84561,
+        -86.47212,
+        0.078429
+      ]
+    },
+    {
+      "name": "extraction_deploy",
+      "class": "ctrl",
+      "index": 0,
+      "nameIndex": 0,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        49.695614,
+        -87.47212,
+        0.678429
+      ]
+    },
+    {
+      "name": "extraction_activate",
+      "class": "ctrl",
+      "index": 1,
+      "nameIndex": 1,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        60.84561,
+        -87.47212,
+        0.678429
+      ]
+    },
+    {
+      "name": "extraction_loadout",
+      "class": "ctrl",
+      "index": 2,
+      "nameIndex": 2,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        48.84561,
+        -88.12212,
+        0.678429
+      ]
+    },
+    {
+      "name": "extraction_unsc",
+      "class": "ctrl",
+      "index": 3,
+      "nameIndex": 6,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        49,
+        -87.472,
+        0.1
+      ]
+    },
+    {
+      "name": "extraction_covenant",
+      "class": "ctrl",
+      "index": 4,
+      "nameIndex": 7,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        50,
+        -87.472,
+        0.1
+      ]
+    },
+    {
+      "name": "extraction_squad_01",
+      "class": "ctrl",
+      "index": 5,
+      "nameIndex": 8,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        49,
+        -87.472,
+        0.1
+      ]
+    },
+    {
+      "name": "extraction_squad_02",
+      "class": "ctrl",
+      "index": 6,
+      "nameIndex": 9,
+      "tagPath": "levels/b40/devices/holo control/b40_holo control",
+      "position": [
+        50,
+        -87.472,
+        0.1
+      ]
+    }
+  ]
+}
+```
+
+Native Windows42-edit/seven-objective Save/restart, Save37944 root acceptance, real HUD marker rendering/lifecycle/relay budget, dropship flight/boarding, combat, settlement/persistence, peers and complete Black Echo gameplay remain OPEN. Existing desktop-control initialization failure was not retried or bypassed; no game/Forerunner launch or remote write. Full Operation110/M1–M6/475IDs remain incomplete.
+
+QA39694/run-60rgEl CLOSED after all writers completed. Root absent; storage runs[]/issues[]. Receipt: {"disposedLogicalBytes":1536195660,"disposedAllocatedFileBytes":null,"peakLogicalBytes":1538090194,"lastAllocatedFileBytes":1404992144}. No physical reclamation claim when disposal allocation is unavailable. Protected475 CSV, legacy checkpoint, original scenario/cache hashes and both stashes unchanged. No retained candidate/dependency/browser/compiler caches or archives.

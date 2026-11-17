@@ -153,7 +153,8 @@ pub(super) fn protected_mission_encounters(state:&AppState,project:&Project,buil
 pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&BuildRecord,tags:&Path,force_cameras:bool)->Reply<Option<recipes::ScenarioSquadReadback>> {
     let (required,include_starts,combat,_,include_cameras,include_volumes,include_devices,include_commands,include_transports,flight_tags)=encounter_review_metadata(state,project,build)?;
     let include_cameras=include_cameras||force_cameras;
-    if !required&&!include_cameras&&!include_volumes&&!include_devices&&!include_commands&&!include_transports{return Ok(None);}
+    let include_objects=project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|g.object.is_some())));
+    if !required&&!include_cameras&&!include_volumes&&!include_devices&&!include_commands&&!include_transports&&!include_objects{return Ok(None);}
     let tag=format!("{}.scenario",project.scenario_path().map_err(error)?);
     let file=tags.join(core::safe_relative(&tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
     let source_sha256=maps::hash_file(&file).map_err(error)?;
@@ -161,6 +162,7 @@ pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&Bui
     if maps::hash_file(&file).map_err(error)?!=source_sha256{return Err("Native scenario changed during squad review; rebuild was not started".into());}
     let squads=if include_starts{recipes::scenario_squad_start_choices(&listing)}else{recipes::scenario_squad_choices(&listing)}.map_err(error)?;
     let combat=if combat.is_empty(){vec![]}else{recipes::current_combat_targets(&listing,&source_sha256,&combat).map_err(error)?};
+    let named_objects=if include_objects{Some(recipes::native_guidance_objects(&listing).map_err(error)?)}else{None};
     let cutscene_flags=if include_cameras{Some(recipes::scenario_flag_choices(&listing).map_err(error)?)}else{None};
     let cameras=if include_cameras{Some(recipes::scenario_camera_choices(&listing).map_err(error)?)}else{None};
     let volumes=if include_volumes{Some(recipes::scenario_volume_choices(&listing).map_err(error)?)}else{None};
@@ -175,7 +177,7 @@ pub(super) fn squad_readback_targets(state:&AppState,project:&Project,build:&Bui
     }else{None};
     let extraction_squads=recipes::native_squad_terminal_snapshots(&listing).map_err(error)?;
     let faction_kits=recipes::native_faction_snapshots(&listing).map_err(error)?;
-    let snapshot=recipes::ScenarioSquadReadback{cutscene_flags,extraction_squads:if extraction_squads.is_empty(){None}else{Some(extraction_squads)},faction_kits:if faction_kits.is_empty(){None}else{Some(faction_kits)},transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
+    let snapshot=recipes::ScenarioSquadReadback{named_objects,cutscene_flags,extraction_squads:if extraction_squads.is_empty(){None}else{Some(extraction_squads)},faction_kits:if faction_kits.is_empty(){None}else{Some(faction_kits)},transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
     snapshot.validate().map_err(error)?;
     Ok(Some(snapshot))
 }
@@ -200,6 +202,7 @@ pub(super) struct Context {
     can_append_faction_kits:bool,control_sources:Vec<String>,weapon_sources:Vec<String>,
     scenario_squads:Vec<recipes::ScenarioSquadChoice>,
     scenario_start_squads:Vec<recipes::ScenarioSquadChoice>,
+    guidance_objects:Option<Vec<maps::NativeNamedObject>>,guidance_object_issue:Option<String>,
     mission_source:Option<recipes::NativeMissionSource>,mission_source_issue:Option<String>,
     scenario_devices:Vec<recipes::NativeDevicePlacement>,
     device_edit_issue:Option<String>,
@@ -612,6 +615,7 @@ pub(super) async fn native_tag_context(
         let (scenario_start_squads,mut start_edit_issue)=if source.class=="scnr"{
             match recipes::scenario_squad_start_choices(&values){Ok(rows)=>(rows,None),Err(issue)=>(vec![],Some(error(issue)))}
         }else{(vec![],None)};
+        let(guidance_objects,guidance_object_issue)=if source.class=="scnr"{match recipes::native_guidance_objects(&values){Ok(rows)=>(Some(rows),None),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
         let(mission_source,mission_source_issue)=if source.class=="scnr"{match recipes::native_mission_source(&values){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
         let(scenario_devices,device_edit_issue)=if source.class=="scnr"{match recipes::scenario_device_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_volumes,trigger_edit_issue)=if source.class=="scnr"{match recipes::scenario_volume_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
@@ -662,7 +666,7 @@ pub(super) async fn native_tag_context(
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
         Ok(Context {
-            mission_source,mission_source_issue,vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,command_source,command_source_issue,protected_command_lists,scenario_devices,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_flags,flag_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
+            guidance_objects,guidance_object_issue,mission_source,mission_source_issue,vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,command_source,command_source_issue,protected_command_lists,scenario_devices,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_flags,flag_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,
