@@ -58,14 +58,15 @@ pub struct NativePlayerProfile {
     pub fragmentation_grenades: u8,
     pub plasma_grenades: u8,
 }
-fn validate_native_profile(profile:&NativePlayerProfile)->Result<()> {
+fn validate_native_profile(profile:&NativePlayerProfile)->Result<()> {validate_profile_fields(profile,false)}
+fn validate_profile_fields(profile:&NativePlayerProfile,equipment_only:bool)->Result<()> {
     for path in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
         crate::safe_relative(path)?;
         if path.is_empty()||path.len()>240||!path.is_ascii()||path.chars().any(char::is_control)||path.to_ascii_lowercase().ends_with(".weapon") {
             return invalid("Choose a native player weapon tag path without its extension (1–240 ASCII characters)");
         }
     }
-    if !profile.health.is_finite()||!(0.01..=1.0).contains(&profile.health)||!profile.shields.is_finite()||!(0.0..=3.0).contains(&profile.shields)
+    if !profile.health.is_finite()||!profile.shields.is_finite()||(if equipment_only{profile.health!=0.||profile.shields!=0.}else{!(0.01..=1.0).contains(&profile.health)||!(0.0..=3.0).contains(&profile.shields)})
         ||profile.fragmentation_grenades>4||profile.plasma_grenades>4
         ||[profile.primary_loaded,profile.primary_reserved,profile.secondary_loaded,profile.secondary_reserved].iter().any(|value|*value>32767) {
         return invalid("Native player profile exceeds Halo health, shield, grenade or ammunition limits");
@@ -1405,8 +1406,10 @@ pub fn validate_native_round_rules(config:&FirefightConfig)->Result<()> {
 }
 
 /// Standard scenario profile arguments shared by fresh and recovered source.
-pub fn native_player_profile_arguments(profile:&NativePlayerProfile,index:usize,name:&str)->Result<Vec<String>> {
-    validate_native_profile(profile)?;
+pub fn native_player_profile_arguments(profile:&NativePlayerProfile,index:usize,name:&str)->Result<Vec<String>> {profile_arguments(profile,index,name,false)}
+pub fn native_equipment_profile_arguments(profile:&NativePlayerProfile,index:usize,name:&str)->Result<Vec<String>> {profile_arguments(profile,index,name,true)}
+fn profile_arguments(profile:&NativePlayerProfile,index:usize,name:&str,equipment_only:bool)->Result<Vec<String>> {
+    validate_profile_fields(profile,equipment_only)?;
     if index>=256||name.is_empty()||name.len()>31||!name.bytes().next().is_some_and(|c|c.is_ascii_alphabetic()||c==b'_')||!name.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_') {
         return invalid("Native player profile needs a safe unique name and an index below 256");
     }
@@ -1426,8 +1429,10 @@ pub fn native_player_profile_arguments(profile:&NativePlayerProfile,index:usize,
     Ok(args)
 }
 /// Resolve weapon identities in independently decoded output, never by datum reuse.
-pub fn verify_native_player_profile(expected:&NativePlayerProfile,name:&str,index:usize,map:&MapInspection)->Result<()> {
-    validate_native_profile(expected)?;
+pub fn verify_native_player_profile(expected:&NativePlayerProfile,name:&str,index:usize,map:&MapInspection)->Result<()> {verify_profile_fields(expected,name,index,map,false)}
+pub fn verify_native_equipment_profile(expected:&NativePlayerProfile,name:&str,index:usize,map:&MapInspection)->Result<()> {verify_profile_fields(expected,name,index,map,true)}
+fn verify_profile_fields(expected:&NativePlayerProfile,name:&str,index:usize,map:&MapInspection,equipment_only:bool)->Result<()> {
+    validate_profile_fields(expected,equipment_only)?;
     let profiles=map.player_starting_profiles.as_ref().ok_or_else(||SparkError::Invalid("Compiled player profiles could not be decoded".into()))?;
     let actual=profiles.get(index).filter(|profile|profile.name==name).ok_or_else(||SparkError::Invalid("Compiled player profile name/index differs from reviewed source".into()))?;
     if profiles.iter().filter(|profile|profile.name.eq_ignore_ascii_case(name)).count()!=1{return invalid("Compiled player profile name is ambiguous");}

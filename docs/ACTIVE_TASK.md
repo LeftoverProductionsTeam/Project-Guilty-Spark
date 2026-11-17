@@ -2,9 +2,9 @@
 
 Task: Operation110 — P1 native dropship mission; P0 Windows acceptance pending
 Status: implementation incomplete
-Starting revision: 027c8c0466bceb0acb0789d70a50bfbc299a70ca, canonical local master.
-Latest verified revision: this pilot-animation/Spirit integration checkpoint (parent027c8c0466bceb0acb0789d70a50bfbc299a70ca); final source manifests/Git identify its exact commit.
-Next action: finish faction-specific mission objectives/actor alignment/loadouts and native resource/camera/audio handoff using existing writers. Both transport variants now compile/read back with exact pilot graph labels; no complete Covenant mission/gameplay claim. Actual Windows42-edit/37944/restart and approved Forerunner flight/boarding/collection/settlement remain OPEN under unchanged desktop control failure; continue independent source work, no bypass retry.
+Starting revision: defc08c7d815023a6f88368f0cc954e8737ee51f, canonical local master.
+Latest verified revision: this native faction-kit checkpoint, parent defc08c7d815023a6f88368f0cc954e8737ee51f; manifests/Git identify exact source.
+Next action: continue native Black Echo relative-craft cameras/radio and faction mission/actor alignment using existing writers; faction kit source/browser/native compile/readback now pass separately. Actual Windows42-edit/37944/restart, complete handoff and approved Forerunner gameplay remain OPEN under unchanged desktop failure. No bypass retry.
 
 ## Acceptance
 
@@ -14,11 +14,11 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
+16Nov faction kits (parent defc08c): both authored native controls/equipment profiles compile with7-beat mission and transport. Pelican cachef4a0c82c15f7e60d1d21d0d7396655ac5e4b8868dc74e38b63bcd2d1fa555d65; Spiritcb475b1430e227327d1234bb0419ba3e3fb3fa1c6db88602e3f095a0b58201af. Exact negative cases/source/cache/test-exe hashes and current contract reference in RUNTIME_INTEGRATION_20261107. Actual gear/flight/complete faction mission and native UI/Save37944 remain OPEN.
+
 16Nov pilot animation/Spirit (parent027c8c0): actual base/start actor → biped → exact graph driver-label review, bounded native count/label reads and saved-draft refusal. Both actual UI controller payloads +7-objective mission compile CE609 and independently read back pilot/graph/routes/original slots. Pelicancachee122b840495e9ec8ad6288f3bbc1a500963d93d77a6612f144bab95224f42b9c; Spirit985df7845e18d27194984ec52029bd80d1a757a6fef0eda3621c4de230287d8f. Core5+2/browser3/native2/Windows reader3/all-target/TypeScript-Vite/guide20contexts PASS. Exact hashes/errors/limits: RUNTIME_INTEGRATION_20261107. No game/faction-mission acceptance.
 
-16Nov deferred pilot (parent08500da): actual native flags/starts → explicit source ownership → UI/history/Save/reload → guarded ai_place → real compiled pilot/two routes and saved transport controller with7objectives. CE609cacheff8e24c9aa02d554159f0a61637e01f340b9f7845f5eb1b5b0e0a661204ef765, exact SCNR/HSC/source/test-exe hashes in RUNTIME_INTEGRATION_20261107. Frontend41/core4/native1/browser1/TypeScript/Vite/Windows all-target/guide20contexts PASS; originals/original indices retained. UNSC/Pelican source proof, not complete dropship/faction/flight/gameplay acceptance.
-
-16Nov named technology/deployment (parent4249bb5): source inventory, creation choice, history/Save/reopen and current reviewed-module writer connected; original slots preserved. Actual browser-saved7-beat mission compiles CE609; named class/index/tag/flag readback and invalid-candidate previous-good preservation PASS. Cache0c82c0e86ae5288aa46c9c190bf7041cd2c782a48516b4bb144c63306bd9ab80. Frontend40/core2+19+16 (2opt-in skips)/native1/browser3distinct/TypeScript/Vite/Windows all-target/guide20contexts PASS. Exact hashes, failures and pending Windows/game acceptance: RUNTIME_INTEGRATION_20261107. No complete dropship mission claim.
+Deferred pilot/named technology/deployment milestones027c8c0/08500da retain exact scoped tests, hashes and native evidence in RUNTIME_INTEGRATION_20261107 and Git. They remain accepted in scope, not gameplay.
 
 4249bb5 recovered composition/native slots/HUD preservation is accepted in scope; exact tests/source/native hashes and guard corrections remain in RUNTIME_INTEGRATION_20261107 and Git. Native Windows/gameplay remain OPEN.
 
@@ -46,6 +46,8 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Current native faction kits since defc08c: UI → protected append/review → source revision → compiled profile/control/groups/interaction verification implemented. Native dependency-null parser and staged snapshot retention repaired. Source tests33/working16/profile1, browser4, installed CE609 Pelican+Spirit2, TypeScript/Vite/Windows/guide20 pass separately. No actual desktop/restart/gameplay claim. QA31684/run-l1Q8hx remains live for next connected work; dispose via owner only.
 
 Current checkpoint: pilot graph/seat source review, bounded shared native reader, RuntimeDock preparation/build refusal and both faction native mission integration; existing tests/guides updated. Scoped checks pass; no discarded WIP. No duplicate writer, engine edit or new requirement tracker.
 
@@ -139,7 +141,9 @@ Owner priorities/addenda remain active:
 
 ## Operations and safe checkpoint
 
-QA52570/run-ttbH55 CLOSED:2248427795logicalB disposed; allocation disposal unavailable. Root absent, owner exited, storage runs[]/issues[]. No retained test binaries/maps/SDK/archive or original/runtime/Forerunner writes. Exact native/checkpoint evidence: RUNTIME_INTEGRATION_20261107. Resume from local commit, not retired scratch.
+Current QA31684/run-l1Q8hx ACTIVE, bounded external output under existing owner; focused jobs finished. Reuse for connected work, collect receipts then finish owner and verify cleanup. No game launched.
+
+Prior QA52570/run-ttbH55 CLOSED:2248427795logicalB disposed; allocation disposal unavailable. Root absent, owner exited, storage runs[]/issues[]. No retained test binaries/maps/SDK/archive or original/runtime/Forerunner writes. Exact native/checkpoint evidence: RUNTIME_INTEGRATION_20261107. Resume from local commit, not retired scratch.
 
 Prior QA59805/run-n5CPtL closed1398599599logicalB; QA98579/run-yCym7t closed1399116590logicalB; earlier native UI/Save/restart/geometry/actor/source evidence, exact hashes and cleanup remain in existing RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT and Git74c16ac/bb8e906/a2d0aa0/78c01b2/e2879a6/351dd043/057a9839/50f2f77. Git preserves checkpoint detail; never copy it into ACTIVE_TASK.previous. No old jobs revived. Save37944 and complete mission/flight/human/peer/platform acceptance stay OPEN.
 

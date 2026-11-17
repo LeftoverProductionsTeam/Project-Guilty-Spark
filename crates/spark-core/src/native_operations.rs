@@ -6,6 +6,12 @@ use sha2::{Digest,Sha256};
 use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
+#[path="native_factions.rs"] mod factions;
+pub use factions::{NativeFactionKit,NativeFactionSnapshot};
+pub fn validate_faction_control_source(fields:&str)->Result<()>{factions::validate_control_source(fields)}
+pub fn native_faction_snapshots(fields:&str)->Result<Vec<NativeFactionSnapshot>>{factions::snapshots(fields)}
+pub fn verify_native_faction_control_values(trigger:&str,initially_off:&str)->Result<()>{factions::verify_control_values(trigger,initially_off)}
+pub fn verify_native_faction_kits(expected:&[NativeFactionSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_cache(expected,cache,map)}
 pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,TransportFlightRoute,NativeTransportPilotBinding};
 pub fn native_transport_pilot_bindings(fields:&str,choices:&NativeTransportChoices,read:impl FnMut(&str)->Result<String>,graph:impl FnMut(&str)->Result<Vec<String>>)->Result<Vec<NativeTransportPilotBinding>>{transport::pilot_bindings(fields,choices,read,graph)}
 pub fn native_transport_routes(fields:&str)->Result<Vec<TransportFlightRoute>>{let routes=native_command_source(fields)?;let volumes=scenario_volume_choices(fields)?;Ok(routes.lists.iter().map(|route|transport::flight_route(route,&volumes)).collect())}
@@ -40,6 +46,7 @@ pub fn native_vehicle_pilot_seats(fields:&str)->Result<Vec<String>>{
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Operation {
     VehicleFlight {tuning:VehicleFlightTuning,#[serde(rename="sourceSha256")] source_sha256:String},
+    FactionKits {kits:Vec<NativeFactionKit>,#[serde(rename="sourceSha256")] source_sha256:String},
     AppendTransport {transport:TransportAppend,#[serde(rename="sourceSha256")] source_sha256:String},
     CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     Dependencies,
@@ -169,10 +176,11 @@ fn actor_spacing()->f32{0.75}
 impl Operation {
     /// One exhaustive source binding for preview, retained reviews and readback.
     pub fn expected_source_sha256(&self)->Option<&str>{match self{
-        Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
+        Self::FactionKits{source_sha256,..}|Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
         Self::Dependencies|Self::AppendEncounter{..}|Self::AppendEncounters{..}|Self::BoundingRadius{..}|Self::LensFlareScaleRepair=>None,
     }}
     pub fn is_vehicle_flight(&self)->bool{matches!(self,Self::VehicleFlight{..})}
+    pub fn is_faction_edit(&self)->bool{matches!(self,Self::FactionKits{..})}
     pub fn is_transport_append(&self)->bool{matches!(self,Self::AppendTransport{..})}
     pub fn is_command_edit(&self)->bool{matches!(self,Self::CommandList{..})}
     pub fn is_device_edit(&self)->bool{matches!(self,Self::DevicePlacement{..})}
@@ -208,20 +216,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::FactionKits { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::FactionKits { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::FactionKits { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -233,6 +241,7 @@ impl Operation {
         }
         match self {
             Self::VehicleFlight{tuning,source_sha256}=>{if class!="vehi"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Vehicle flight editing needs an exact native vehicle source hash");}tuning.validate()?;}
+            Self::FactionKits{kits,source_sha256}=>{if class!="scnr"||kits.is_empty()||kits.len()>2||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction kits require a reviewed scenario source hash and one or two kits");}factions::validate_batch(kits)?;},
             Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source and finite position/rotation");}}
@@ -325,7 +334,7 @@ impl Operation {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         match self {
             Self::Dependencies => args.push("-r".into()),
-            Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
+            Self::FactionKits{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("AI editing requires the original native encounter inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -462,6 +471,7 @@ impl Operation {
     pub fn arguments_with_fields(&self,tags:&Path,class:&str,tag:&str,before:&str)->Result<Vec<String>> {
         self.validate(class,tag)?;
         if let Self::VehicleFlight{tuning,..}=self{return transport::flight_arguments(tags,tag,before,tuning);}
+        if let Self::FactionKits{kits,..}=self{return factions::arguments(tags,tag,before,kits);}
         if let Self::AppendTransport{transport,..}=self{return transport::arguments(tags,tag,before,transport);}
         if let Self::CommandList{list,append,..}=self{return if *append{command_lists::append_arguments(tags,tag,before,list)}else{command_lists::arguments(tags,tag,before,list)};}
         if let Self::DevicePlacement{device,..}=self{
@@ -774,6 +784,7 @@ pub fn reviewed_difference(
     operation: &Operation,
 ) -> Result<Vec<FieldDifference>> {
     if let Operation::VehicleFlight{tuning,..}=operation{return transport::reviewed_flight(before,after,tuning);}
+    if let Operation::FactionKits{kits,..}=operation{return factions::reviewed(before,after,kits);}
     if let Operation::AppendTransport{transport,..}=operation{return transport::reviewed(before,after,transport);}
     if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}
     if let Operation::DevicePlacement{device,..}=operation{return reviewed_device(before,after,device);}
@@ -902,6 +913,7 @@ fn array_items<'a>(listing:&'a ArrayListing,name:&str)->Result<Vec<&'a [String]>
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioSquadReadback {
     pub source_sha256:String,pub squads:Vec<ScenarioSquadChoice>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub faction_kits:Option<Vec<NativeFactionSnapshot>>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub transports:Option<Vec<TransportSnapshot>>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub command_lists:Option<Vec<NativeCommandList>>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub devices:Option<Vec<NativeDevicePlacement>>,
@@ -932,6 +944,7 @@ impl ScenarioSquadReadback {
             return invalid("Native squad readback needs an exact source SHA256 and bounded inventory");
         }
         if self.combat.len()>4096{return invalid("Native combat readback exceeds4096selected targets");}let mut targets=std::collections::BTreeSet::new();for op in &self.combat{let key=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unsupported combat readback operation".into()))?;if !targets.insert(key){return invalid("Duplicate native combat readback target");}op.validate("scnr","readback.scenario")?;let source=op.expected_source_sha256().ok_or_else(||crate::SparkError::Invalid("Unsupported native combat readback source binding".into()))?;if !source.eq_ignore_ascii_case(&self.source_sha256){return invalid("Combat readback source identity differs from its snapshot");}}
+        if let Some(kits)=&self.faction_kits{if kits.len()>2{return invalid("Faction snapshot exceeds two roles");}let mut seen=std::collections::BTreeSet::new();for row in kits{row.kit.validate()?;if !seen.insert(&row.kit.faction)||row.control_index>=100||row.name_index>=512||row.profile_index>=256||!(0..128).contains(&row.power_group)||!(0..128).contains(&row.position_group){return invalid("Invalid faction source snapshot");}}}
         if let Some(points)=&self.cameras{if points.len()>512||points.iter().enumerate().any(|(i,p)|usize::from(p.index)!=i||p.name.len()>32||p.name.chars().any(char::is_control)||p.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||p.orientation_radians.iter().any(|v|!v.is_finite()||v.abs()>20000.)||!p.fov_radians.is_finite()){return invalid("Invalid native camera snapshot inventory");}}
         if let Some(lists)=&self.command_lists{if lists.len()>256{return invalid("Command snapshot exceeds256lists");}for(i,list)in lists.iter().enumerate(){if list.index as usize!=i{return invalid("Command snapshot indices changed");}list.validate()?;}}
         if let Some(transports)=&self.transports{if transports.len()>2{return invalid("Transport snapshot exceeds two faction roles");}let mut names=std::collections::BTreeSet::new();for row in transports{row.validate()?;if !names.insert(&row.transport.name){return invalid("Duplicate transport snapshot role");}}}
@@ -957,7 +970,7 @@ impl ScenarioSquadReadback {
         Ok(())
     }
     pub fn verify_cache(&self,path:&Path,map:&crate::maps::MapInspection)->Result<()> {
-        self.verify_map(map)?;if let Some(expected)=&self.transports{transport::verify_cache(expected,path,map)?;}if let Some(expected)=&self.command_lists{let actual=crate::maps::scenario_command_readback(path,map)?;if expected.len()!=actual.len()||expected.iter().zip(&actual).any(|(a,b)|!a.close(b)){return invalid("Compiled command lists/actions/parameters/references/points differ from reviewed source");}}if let Some(expected)=&self.devices{verify_devices_cache(expected,path,map)?;}if let Some(expected)=&self.volumes{let actual=crate::maps::scenario_volume_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(actual).any(|(a,b)|a.name!=b.name||a.kind!=b.kind||match(&a.geometry,&b.geometry){(Some(a),Some(b))=>!volume_geometry_close(a,b),(None,None)=>false,_=>true}){return invalid("Compiled trigger inventory, identity or geometry differs from reviewed source");}}if let Some(expected)=&self.cameras{let actual=crate::maps::scenario_camera_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(&actual).any(|(a,b)|!camera_points_close(a,b)){return invalid("Compiled native camera inventory/name/pose/lens differs from reviewed source");}}Ok(())
+        self.verify_map(map)?;if let Some(expected)=&self.faction_kits{factions::verify_cache(expected,path,map)?;}if let Some(expected)=&self.transports{transport::verify_cache(expected,path,map)?;}if let Some(expected)=&self.command_lists{let actual=crate::maps::scenario_command_readback(path,map)?;if expected.len()!=actual.len()||expected.iter().zip(&actual).any(|(a,b)|!a.close(b)){return invalid("Compiled command lists/actions/parameters/references/points differ from reviewed source");}}if let Some(expected)=&self.devices{verify_devices_cache(expected,path,map)?;}if let Some(expected)=&self.volumes{let actual=crate::maps::scenario_volume_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(actual).any(|(a,b)|a.name!=b.name||a.kind!=b.kind||match(&a.geometry,&b.geometry){(Some(a),Some(b))=>!volume_geometry_close(a,b),(None,None)=>false,_=>true}){return invalid("Compiled trigger inventory, identity or geometry differs from reviewed source");}}if let Some(expected)=&self.cameras{let actual=crate::maps::scenario_camera_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(&actual).any(|(a,b)|!camera_points_close(a,b)){return invalid("Compiled native camera inventory/name/pose/lens differs from reviewed source");}}Ok(())
     }
     pub fn verify_map(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate()?;
@@ -1053,9 +1066,12 @@ pub struct NativeMissionSource {pub encounters:Vec<NativeMissionEncounter>,pub w
 /// palette alone. This is source selection, not a claim that an item spawns.
 /// One checked native reader reference shape, shared by weapons and pilot chains.
 fn native_dependency_path(root:&str,key:&str,extension:&str)->Result<Option<String>>{
- let prefix=format!("{key} (");let lines=root.lines().collect::<Vec<_>>();let rows=lines.iter().enumerate().filter_map(|(i,line)|line.strip_prefix(&prefix).map(|value|(i,value))).collect::<Vec<_>>();
+ let prefix=format!("{key} (");let lines=root.lines().collect::<Vec<_>>();
+ // Invader's actual listing prints an empty dependency without parentheses.
+ // Count both spellings together: a missing or duplicated field is not null.
+ let rows=lines.iter().enumerate().filter_map(|(i,line)|if let Some(value)=line.strip_prefix(&prefix){Some((i,Some(value)))}else if line.split_whitespace().collect::<Vec<_>>()==[key,"dependency"]{Some((i,None))}else{None}).collect::<Vec<_>>();
  if rows.len()!=1{return invalid(format!("Native {key} reference is missing or ambiguous"));}
- let (index,text)=rows[0];let(value,kind)=text.rsplit_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native tag reference".into()))?;
+ let (index,Some(text))=rows[0]else{return Ok(None);};let(value,kind)=text.rsplit_once(')').ok_or_else(||crate::SparkError::Invalid("Malformed native tag reference".into()))?;
  // Invader omits its type column on long values. The installed native reader
  // still validates the tag; require the known field's exact extension below.
  let kind=kind.trim();let kind=if kind.is_empty()&&lines.get(index+1).is_some_and(|line|line.trim()=="dependency"){"dependency"}else{kind};
@@ -1545,7 +1561,7 @@ mod tests {
         let readback=run(operation.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());
         assert_eq!(readback.trim().split(',').map(|value|value.trim().parse::<f32>().unwrap()).collect::<Vec<_>>(),[20.25,-8.5,4.125]);
         let after_sha=crate::maps::hash_file(&file).unwrap();assert_ne!(before_sha,after_sha);
-        ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,combat:vec![],source_sha256:after_sha.clone(),squads:scenario_squad_start_choices(&after).unwrap(),include_starts:true}.validate().unwrap();
+        ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,combat:vec![],source_sha256:after_sha.clone(),squads:scenario_squad_start_choices(&after).unwrap(),include_starts:true}.validate().unwrap();
         let restore=Operation::EncounterStartPosition{encounter:1,squad:1,start:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),
             position:[1.,1.,1.],source_sha256:after_sha.clone(),facing_radians:None,command_list:None};
         run(restore.arguments_with_fields(&tags,"scnr",tag,&after).unwrap());assert_eq!(before,fields());
@@ -1571,7 +1587,7 @@ mod tests {
         let mut moving=all.clone();if let Operation::EncounterSquadBehavior{behavior,..}=&mut moving{behavior.initial_state="moving_loop".into();}assert!(moving.arguments_with_fields(&tags,"scnr",tag,&before).is_err());let mut renumbered=all.clone();if let Operation::EncounterSquadBehavior{behavior,..}=&mut renumbered{behavior.starts[0].index=1;}assert!(renumbered.arguments_with_fields(&tags,"scnr",tag,&before).is_err());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let combat_inventory=scenario_combat_choices(&before).unwrap();assert_eq!(combat_inventory[1].points.len(),2);assert_eq!(combat_inventory[1].points[1].group,"z");
         let firing=Operation::EncounterFiringPosition{encounter:1,point:0,encounter_name:"original_1".into(),position:[7.,8.,9.],group:"b".into(),source_sha256:before_sha.clone()};run(firing.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let revised=fields();assert_eq!(reviewed_difference(&before,&revised,&firing).unwrap().len(),3);assert!(reviewed_difference(&before,&revised.replace("name (original_0)","name (changed)"),&firing).is_err());let read=run(firing.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());firing.verify_readback(&tags,"scnr",tag,&before,&read).unwrap();let firing_sha=crate::maps::hash_file(&file).unwrap();
-        let groups=FiringGroups{attacking:vec!["a".into(),"z".into()],attacking_search:vec!["b".into()],attacking_guard:vec!["z".into()],defending:vec!["a".into()],defending_search:vec![],defending_guard:vec!["b".into(),"z".into()]};let tactical=Operation::EncounterSquadFiringGroups{encounter:1,squad:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),groups,source_sha256:firing_sha.clone()};for batch in tactical.argument_batches(tactical.arguments_with_fields(&tags,"scnr",tag,&revised).unwrap(),false).unwrap(){run(batch);}let final_fields=fields();assert_eq!(reviewed_difference(&revised,&final_fields,&tactical).unwrap().len(),7);let read=run(tactical.readback_arguments(&tags,"scnr",tag,&revised).unwrap().unwrap());tactical.verify_readback(&tags,"scnr",tag,&revised,&read).unwrap();let hash=crate::maps::hash_file(&file).unwrap();let targets=current_combat_targets(&final_fields,&hash,&[firing.clone(),tactical.clone()]).unwrap();let snapshot=ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:hash.clone(),squads:scenario_squad_start_choices(&final_fields).unwrap(),include_starts:true,combat:targets};snapshot.validate().unwrap();let restored_targets=current_combat_targets(&before,&before_sha,&snapshot.combat).unwrap();assert!(matches!(&restored_targets[0],Operation::EncounterFiringPosition{position,group,..}if *position==[0.,0.,0.]&&group=="a"));assert!(matches!(&restored_targets[1],Operation::EncounterSquadFiringGroups{groups,..}if groups.masks().unwrap()==[0;6]));println!("Original native firing/tactics:pointSHA={firing_sha}; groupsSHA={hash}; scalarSHA={}; exact fields/restore scope verified",crate::hex_bytes(Sha256::digest(read.as_bytes())));fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        let groups=FiringGroups{attacking:vec!["a".into(),"z".into()],attacking_search:vec!["b".into()],attacking_guard:vec!["z".into()],defending:vec!["a".into()],defending_search:vec![],defending_guard:vec!["b".into(),"z".into()]};let tactical=Operation::EncounterSquadFiringGroups{encounter:1,squad:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),groups,source_sha256:firing_sha.clone()};for batch in tactical.argument_batches(tactical.arguments_with_fields(&tags,"scnr",tag,&revised).unwrap(),false).unwrap(){run(batch);}let final_fields=fields();assert_eq!(reviewed_difference(&revised,&final_fields,&tactical).unwrap().len(),7);let read=run(tactical.readback_arguments(&tags,"scnr",tag,&revised).unwrap().unwrap());tactical.verify_readback(&tags,"scnr",tag,&revised,&read).unwrap();let hash=crate::maps::hash_file(&file).unwrap();let targets=current_combat_targets(&final_fields,&hash,&[firing.clone(),tactical.clone()]).unwrap();let snapshot=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:hash.clone(),squads:scenario_squad_start_choices(&final_fields).unwrap(),include_starts:true,combat:targets};snapshot.validate().unwrap();let restored_targets=current_combat_targets(&before,&before_sha,&snapshot.combat).unwrap();assert!(matches!(&restored_targets[0],Operation::EncounterFiringPosition{position,group,..}if *position==[0.,0.,0.]&&group=="a"));assert!(matches!(&restored_targets[1],Operation::EncounterSquadFiringGroups{groups,..}if groups.masks().unwrap()==[0;6]));println!("Original native firing/tactics:pointSHA={firing_sha}; groupsSHA={hash}; scalarSHA={}; exact fields/restore scope verified",crate::hex_bytes(Sha256::digest(read.as_bytes())));fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         fs::create_dir_all(tags.join("actors")).unwrap();run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),"actors/behavior.actor_variant".into()]);
         let states=[CampaignAiState::Sleeping,CampaignAiState::Alert,CampaignAiState::Guarding,CampaignAiState::Searching,CampaignAiState::Fleeing];
         let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]}),patrol:None,combat:None}).collect();
@@ -1589,7 +1605,7 @@ mod tests {
         for batch in patrol_edit.argument_batches(patrol_edit.arguments_with_fields(&tags,"scnr",tag,&after).unwrap(),false).unwrap(){run(batch);}let route_after=fields();reviewed_difference(&after,&route_after,&patrol_edit).unwrap();assert!(reviewed_difference(&after,&route_after.replace("name (original_0)","name (bad)"),&patrol_edit).is_err());
         let mut scalar=vec![];for batch in patrol_edit.argument_batches(patrol_edit.readback_arguments(&tags,"scnr",tag,&after).unwrap().unwrap(),true).unwrap(){scalar.extend(run(batch).lines().map(str::to_owned));}let scalar=scalar.join("\n");patrol_edit.verify_readback(&tags,"scnr",tag,&after,&scalar).unwrap();
         let refreshed=current_combat_targets(&route_after,&crate::maps::hash_file(&file).unwrap(),std::slice::from_ref(&patrol_edit)).unwrap();if let Operation::EncounterSquadPatrol{route,..}=&refreshed[0]{assert_eq!(route.points.len(),4);assert!(route.points.iter().enumerate().all(|(i,p)|p.source_index==Some(i as u16)));}else{panic!("Wrong patrol readback scope");}
-        let binding=ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:crate::maps::hash_file(&file).unwrap(),squads:scenario_squad_start_choices(&route_after).unwrap(),include_starts:true,combat:refreshed};binding.validate().unwrap();let mut stale=binding.clone();stale.source_sha256="f".repeat(64);assert!(stale.validate().is_err());
+        let binding=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:crate::maps::hash_file(&file).unwrap(),squads:scenario_squad_start_choices(&route_after).unwrap(),include_starts:true,combat:refreshed};binding.validate().unwrap();let mut stale=binding.clone();stale.source_sha256="f".repeat(64);assert!(stale.validate().is_err());
         println!("Original patrol source: insert/copy/move/erase/pose/weight/waits; tagSHA={}; scalarSHA={}",crate::maps::hash_file(&file).unwrap(),crate::hex_bytes(Sha256::digest(scalar.as_bytes())));
         let mut invalid=patrol_edit.clone();if let Operation::EncounterSquadPatrol{route,..}=&mut invalid{route.points[0].animation=7;}assert!(invalid.arguments_with_fields(&tags,"scnr",tag,&after).is_err());
         if let Operation::EncounterSquadPatrol{route,..}=&mut invalid{*route=revised_route.clone();route.points.truncate(1);}assert!(invalid.arguments_with_fields(&tags,"scnr",tag,&after).is_err());
@@ -1665,7 +1681,7 @@ mod tests {
     #[test]
     fn original_patrol_snapshot_validates_its_source_binding_without_panicking(){
         let operation:Operation=serde_json::from_value(serde_json::json!({"kind":"encounterSquadPatrol","encounter":0,"squad":0,"encounterName":"original_0","squadName":"squad_0","route":{"points":[]},"sourceSha256":"a".repeat(64)})).unwrap();
-        let mut snapshot=ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![operation.clone()]};snapshot.validate().unwrap();
+        let mut snapshot=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![operation.clone()]};snapshot.validate().unwrap();
         snapshot.source_sha256="b".repeat(64);assert!(snapshot.validate().is_err());snapshot.source_sha256="a".repeat(64);snapshot.combat.push(operation);assert!(snapshot.validate().is_err());
     }
     #[test]
@@ -1695,15 +1711,15 @@ mod tests {
             mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![Encounter{name:"original".into(),squads:vec!["squad_a".into()],
                 team:0,details:Some(EncounterDetails{flags:0,manual_bsp_index:-1,squads:vec![squad],firing_positions:vec![]})}],
             scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"level".into()};
-        let snapshot=ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&ai_fields()).unwrap(),include_starts:true};
+        let snapshot=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&ai_fields()).unwrap(),include_starts:true};
         snapshot.verify_map(&map).unwrap();
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].facing=0.;assert!(snapshot.verify_map(&map).is_err());
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].facing=std::f32::consts::FRAC_PI_2;
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].position[0]=9.0;
         assert!(snapshot.verify_map(&map).is_err());
         map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].position=[1.,2.,3.];
-        let fields=ai_fields().replace("facing (90) angle","facing (90) angle\n                        command_list (1) index");let bound=ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&fields).unwrap(),include_starts:true,combat:vec![]};assert!(bound.verify_map(&map).is_err());map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=1;bound.verify_map(&map).unwrap();let mut binding=start_edit();if let Operation::EncounterStartPosition{position,facing_radians,command_list,..}=&mut binding{*position=[1.,2.,3.];*facing_radians=Some(std::f32::consts::FRAC_PI_2);*command_list=Some(1);}binding.verify_compiled_encounter(&map).unwrap();map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=-1;assert!(binding.verify_compiled_encounter(&map).is_err());
-        let legacy=ScenarioSquadReadback{transports:None,command_lists:None,devices:None,volumes:None,cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_choices(&ai_fields()).unwrap(),include_starts:false};
+        let fields=ai_fields().replace("facing (90) angle","facing (90) angle\n                        command_list (1) index");let bound=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:scenario_squad_start_choices(&fields).unwrap(),include_starts:true,combat:vec![]};assert!(bound.verify_map(&map).is_err());map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=1;bound.verify_map(&map).unwrap();let mut binding=start_edit();if let Operation::EncounterStartPosition{position,facing_radians,command_list,..}=&mut binding{*position=[1.,2.,3.];*facing_radians=Some(std::f32::consts::FRAC_PI_2);*command_list=Some(1);}binding.verify_compiled_encounter(&map).unwrap();map.encounters[0].details.as_mut().unwrap().squads[0].starting_locations[0].command_list=-1;assert!(binding.verify_compiled_encounter(&map).is_err());
+        let legacy=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,combat:vec![],source_sha256:"a".repeat(64),squads:scenario_squad_choices(&ai_fields()).unwrap(),include_starts:false};
         let encoded=serde_json::to_value(&legacy).unwrap();assert!(encoded.get("includeStarts").is_none());
         serde_json::from_value::<ScenarioSquadReadback>(encoded.clone()).unwrap().verify_map(&map).unwrap();
         assert!(encoded.get("combat").is_none());let firing=Operation::EncounterFiringPosition{encounter:0,point:0,encounter_name:"original".into(),position:[4.,5.,6.],group:"z".into(),source_sha256:"a".repeat(64)};map.encounters[0].details.as_mut().unwrap().firing_positions.push(AiFiringPosition{position:[4.,5.,6.],group_index:25,cluster_index:-1,surface_index:0});firing.verify_compiled_encounter(&map).unwrap();map.encounters[0].details.as_mut().unwrap().firing_positions[0].group_index=0;assert!(firing.verify_compiled_encounter(&map).is_err());map.encounters[0].details.as_mut().unwrap().firing_positions[0].group_index=25;
@@ -1914,7 +1930,7 @@ mod device_placement_tests {
   let after=before.replace("position (1,2,3)","position (2,3,4)").replace("rotation (0,0,0)","rotation (0,0,90)");assert_eq!(reviewed_difference(&before,&after,&op).unwrap().len(),2);op.verify_readback(Path::new("tags"),"scnr","level.scenario",&before,"2,3,4\n0,0,90\n").unwrap();assert!(op.verify_readback(Path::new("tags"),"scnr","level.scenario",&before,"2,3,4\n0,0,1.570796\n").is_err());
   for invalid in [after.replace("initially_off (0)","initially_off (1)"),after.replace("power_group (65535)","power_group (0)"),after.replace("name (terminal)","name (another)"),after.replace("name (devices/terminal.device_control)","name (devices/other.device_control)")]{assert!(reviewed_difference(&before,&invalid,&op).is_err());}
   let mut invalid=desired.clone();invalid.class="weap".into();assert!(!invalid.valid());invalid=desired.clone();invalid.position[0]=f32::NAN;assert!(!invalid.valid());invalid=desired.clone();invalid.name_index=-1;assert!(!invalid.valid());
-  let snapshot=ScenarioSquadReadback{transports:None,command_lists:None,devices:Some(vec![desired]),volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![]};snapshot.validate().unwrap();let mut bad=snapshot.clone();bad.devices.as_mut().unwrap().push(original);assert!(bad.validate().is_err());
+  let snapshot=ScenarioSquadReadback{faction_kits:None,transports:None,command_lists:None,devices:Some(vec![desired]),volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![]};snapshot.validate().unwrap();let mut bad=snapshot.clone();bad.devices.as_mut().unwrap().push(original);assert!(bad.validate().is_err());
  }
  #[test]
  fn native_machine_pose_uses_its_own_array_and_preserves_control_inventory(){
