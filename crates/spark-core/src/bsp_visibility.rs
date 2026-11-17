@@ -190,6 +190,15 @@ pub(crate) struct SourcePortal {
     pub points: Vec<Point>,
     pub triangles: Vec<[usize; 3]>,
 }
+fn native_contours(polygons: Vec<Vec<manifold_rust::linalg::Vec2>>, world_scale:f64)->Result<Vec<Vec<manifold_rust::linalg::Vec2>>> {
+    // Slice triangulation leaves redundant near-collinear vertices. Remove
+    // only detail below the source's f32 coordinate precision; retain real
+    // corners and holes instead of moving a creator's visibility plane.
+    let count=polygons.len();
+    let cleaned=manifold_rust::cross_section::CrossSection::new(polygons).simplify(world_scale.max(1.)*f64::from(f32::EPSILON)).to_polygons();
+    if cleaned.len()!=count || cleaned.iter().any(|ring|ring.len()<3) { return invalid("Native visibility precision would remove an opening or obstruction; move the cut away from this feature"); }
+    Ok(cleaned)
+}
 pub(crate) fn clipped_portal(space:&manifold_rust::manifold::Manifold, center:Point, direction:Point, probe_height:f64)->Result<SourcePortal>{
     use manifold_rust::linalg::{Vec2,Vec3};
     let length=direction[0].hypot(direction[1]);
@@ -204,6 +213,8 @@ pub(crate) fn clipped_portal(space:&manifold_rust::manifold::Manifold, center:Po
     let outer=polygons.iter().filter(|p|area(p)>0.&&contains(p,probe)).min_by(|a,b|area(a).total_cmp(&area(b))).ok_or_else(||crate::SparkError::Invalid("Visibility cut has no closed air section at the route; move the handle away from walls or junctions".into()))?;
     let mut selected=vec![outer.clone()];
     for hole in polygons.iter().filter(|p|area(p)<0.&&p.first().is_some_and(|point|contains(outer,*point))){if contains(hole,probe){return invalid("Visibility cut lies inside a structural obstruction");}selected.push(hole.clone());}
+    let world_scale=selected.iter().flatten().flat_map(|p|[center[0]+side[0]*p.y,center[1]+side[1]*p.y,center[2]+p.x]).map(f64::abs).fold(1.,f64::max);
+    let selected=native_contours(selected,world_scale)?;
     let flat:Vec<_>=selected.iter().flatten().copied().collect();
     let points:Vec<Point>=flat.iter().map(|p|[center[0]+side[0]*p.y,center[1]+side[1]*p.y,center[2]+p.x]).collect();
     if points.iter().flatten().any(|v|!v.is_finite()||v.abs()>2048.){return invalid("Native portal leaves the supported world bounds");}
@@ -224,6 +235,23 @@ mod tests {
             end,
         }
     }
+    #[test]
+    fn native_arch_contour_keeps_all_real_corners_without_sub_float_slice_vertices() {
+        use manifold_rust::linalg::Vec2;
+        // Actual native portal Y/Z outline. All nine true arch corners stay;
+        // the extra fourteen vertices are slicing/float interpolation noise.
+        let points=[[43.96125793,-18.03289795],[43.95098495,-18.07504272],[43.95098495,-18.15253067],[43.95098495,-20.98648453],[43.95098495,-21.07504272],[47.25692749,-21.07504272],[47.59071732,-21.07504272],[47.59071732,-21.0418911],[47.59071732,-21.00536919],[47.59071732,-18.2176609],[47.59071732,-18.07504272],[47.57353592,-18.00456619],[47.34690094,-17.07504272],[47.34563828,-17.07365036],[47.02045441,-16.7162838],[46.68078613,-16.34299278],[46.16997528,-16.19257355],[45.77085114,-16.07504272],[45.18622208,-16.24720001],[44.86091995,-16.34299278],[44.39152527,-16.85884666],[44.19544983,-17.07432747],[44.19480133,-17.07504272]];
+        let mut ring:Vec<_>=points.into_iter().map(|p|Vec2::new(p[0],p[1])).collect();
+        let area=ring.iter().zip(ring.iter().cycle().skip(1)).map(|(a,b)|a.x*b.y-a.y*b.x).sum::<f64>();if area<0.{ring.reverse();}
+        let cleaned=native_contours(vec![ring],120.).unwrap();assert_eq!(cleaned.len(),1);assert_eq!(cleaned[0].len(),9);
+        for p in [points[1],points[4],points[6],points[10],points[12],points[15],points[17],points[19],points[22]] {
+            assert!(cleaned[0].iter().any(|v|(v.x-p[0]).hypot(v.y-p[1])<2e-5),"True arch corner must survive native precision cleanup");
+        }
+        let outer=vec![Vec2::new(0.,0.),Vec2::new(4.,0.),Vec2::new(4.,4.),Vec2::new(0.,4.)];
+        let hole=vec![Vec2::new(1.,1.),Vec2::new(1.,1.+1e-8),Vec2::new(1.+1e-8,1.+1e-8),Vec2::new(1.+1e-8,1.)];
+        assert!(native_contours(vec![outer,hole],120.).is_err(),"Never silently drop a sub-resolution obstruction");
+    }
+
     #[test]
     fn authored_cuts_follow_slopes_and_span_the_tunnel_without_collision_geometry() {
         let points = [[0., 0., 0.], [10., 0., 2.]];

@@ -611,5 +611,249 @@
       "runs": [],
       "issues": []
     }
+  },
+  "archRepair20261117": {
+    "parentRevision": "54c1984cb743e80fb4a4d2d33496f958570bf1b0",
+    "status": "Native arch compile/readback and scoped Windows preview passed; gameplay and blended terrain acceptance remain separate",
+    "sourceHashes": {
+      "crates/spark-core/src/bsp_triangulate.rs": "875f0f98bc97d402354237008244ca6caae02ce506ff0e59eaf01aebf4d84f2d",
+      "crates/spark-core/src/bsp_assembly.rs": "359bde1bf8944fbba0105cee7a2450239c733ce4e88bcd2176326906e9d3bd6e",
+      "crates/spark-core/src/bsp_visibility.rs": "4f245457f894761ff875ab7e967b0cb4cb66bbbb8dee0ff38dc8b8614e1e4a93",
+      "crates/spark-core/examples/qa_megaworld_ce.rs": "16adbe735a17e197ea8922a643f10fc107b68cf3ca70132988b11a885945bace",
+      "scripts/test-workspace-lifecycle-native.mjs": "cb280d1154f89d2516007adcbb0a13ae748ce11c68e7d0d04b4641163d46a03a"
+    },
+    "sourceGeometry": {
+      "connectorTriangles": 194,
+      "donorScenery": 42,
+      "generatedUvFaces": 1428,
+      "inputTriangles": 18760,
+      "outputTriangles": 32460,
+      "portalCount": 8,
+      "routeClearance": [
+        {
+          "clearHeight": 1.600000023841858,
+          "label": "Primary connection",
+          "walkSamples": 423,
+          "width": 2
+        },
+        {
+          "clearHeight": 3,
+          "label": "Seam section 1",
+          "walkSamples": 446,
+          "width": 4
+        }
+      ],
+      "walkSamples": 869,
+      "warnings": [
+        "Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.",
+        "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.",
+        "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+        "A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances."
+      ]
+    },
+    "nativeCache": {
+      "sha256": "8534a9b1c271f05cb188de8c52ccf0535a3aff7d889473725bef16d82330ab78",
+      "bytes": 77745028,
+      "target": "gbx-custom",
+      "version": 609,
+      "crc32": "0xF2E8FD32",
+      "clusters": 8,
+      "clusterPortals": 8,
+      "lightmapGroups": 10,
+      "bspSha256": "48fa9dbab284303c3efb5ad3a9bfc361b69124001f9f233ccfd1e1fcbe1983e7",
+      "jmsSha256": "fdd2b4ed7e4b6f182fa82c752ebf72abe6a549d852b247a88a1b2c01d95e9233"
+    },
+    "compiledCollision": {
+      "triangles": 16342,
+      "forwardSamples": 869,
+      "returnSamples": 869,
+      "originalSpawnCapsules": 68,
+      "issues": [],
+      "humanTraversal": false
+    },
+    "remainingStructureWarnings": {
+      "solidLeaf": 1,
+      "nearlyCoplanar": 1,
+      "unearthedEdges": 62
+    },
+    "invaderBuildWarnings": 49,
+    "knownStockRecovery": {
+      "explicitOptIn": "recover-known-stock",
+      "existingProfile": true,
+      "nonLossless": true,
+      "changedTags": 3,
+      "changedFields": 7,
+      "rawInputsPreserved": true,
+      "originalsPreserved": true,
+      "donorSourceFiles": 69,
+      "donorSourceBytes": 18034422,
+      "baseSourceFiles": 2437,
+      "baseSourceBytes": 77572742
+    },
+    "tests": {
+      "bsp": {
+        "passed": 83,
+        "failed": 0,
+        "ignored": 2,
+        "reason": "Explicit installed MCC painted-detail fixtures not supplied"
+      },
+      "triangulation": {
+        "passed": 9
+      },
+      "ceProfile": {
+        "passed": 3
+      },
+      "nativeWindows": {
+        "mockedIpc": false,
+        "passed": [
+          "Owned native cache 609 opens in actual BSP viewport with source materials",
+          "Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged",
+          "Native Frame scene control changes the player view to the complete compiled BSP overview"
+        ],
+        "errors": [],
+        "gracefulAppClose": true,
+        "appSha256": "a084779c28372f9ad0832ff90818d723e5bbc21c4b1f4992a6d33bd5e8a4da7a",
+        "appBytes": 67667456,
+        "primaryShaders": 134,
+        "missingPrimaryShaders": [],
+        "boundLightmapPages": 9,
+        "initialBadBuild": "Omitted existing tauri/custom-protocol feature; failed devURL startup, corrected invocation without changing runtime architecture",
+        "startupNegative": "Expected primary timeout only; no secondary TypeError or normal-close error; all owned writers exited"
+      }
+    },
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-arch-spawn-20261117.png",
+        "sha256": "a616f9802f99fa9c940285137819a17ccd13d423ed31a26ab77a84ea00fee8f6",
+        "bytes": 1482091,
+        "scope": "Actual native player-start view; arch not visible from this camera"
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-arch-overview-20261117.png",
+        "sha256": "c0dafb56efecfa009d32124af580844cd4aabc4ca12303fd721ab8acfaaee7d91",
+        "bytes": 187054,
+        "scope": "Actual Frame scene control; spaced maps joined by tunnel and arch, not blended terrain acceptance"
+      }
+    ],
+    "logHashes": {
+      "roof-before.log": "199da6e45db913a29b8c0b2f7e6763ce1258d8b5bfb78f1db9c6525ce3d6bf05",
+      "triangulate-after.log": "bffb2b9ce557c1cacd3a7ca2b4c70c5302dfa50fecd8a78e47032a7f995d5840",
+      "bsp-contour-final.log": "aaac0630e4ac904d992da8644a3764651ab3821112f1fea2783eb7e5d8e48012",
+      "ce-profile-tests.log": "46e9a62d2c519711f0941918035146a1f58f9d01b34df4ee06d841d29cae0817",
+      "arch-native.log": "6efe3d4ef31448805456eb32b6342625d1fdc7d351bfc97ebd6c8b0b65cbe9fa",
+      "spawn-readback.log": "02121b2a839a9a82da78fa97f9c27896599257b92682a0ac80a9b864ba64aeb0",
+      "cache-bsp-fields-fixed.log": "836c124d35e115216c208ff7e01006b7bf570ba9ae1561f0eb03d28ae661432d",
+      "native-embedded-build.log": "a0ce8613d91b5761e71f5bf923899e0d96724ba9e61a6d07411abd8d2f76d20d",
+      "native-framed-preview.log": "8031c0cb7da8631d8d41504c9f107fa3cc4dc843870f5f4572b15d0021e995c4",
+      "startup-negative.log": "17bd9514e9c4eb84d35486c6304ffbfa8347d17ee78c1593cc4e174c3a5c25b5"
+    },
+    "gameLoaded": false,
+    "humanTraversal": false,
+    "realPeers": false,
+    "streaming": false,
+    "sourceTransformsUnchangedFromPriorAuthoredFixture": true
+  },
+  "terrainRegression20261117": {
+    "parentRevision": "54c1984cb743e80fb4a4d2d33496f958570bf1b0",
+    "overallPass": false,
+    "sourceUiCases": [
+      "File/New creates an independent native two-source world, then Save and reopen retain its plan",
+      "Original base and donor render together with source-specific native materials and lightmaps; moving and undoing retain the donor preview",
+      "Saved source-bound donor controls support edited width, Undo/Redo, immediate Save and actual joined-source rendering/clearance",
+      "Native combined Timberland–Sidewinder cache compiled and independently reopened; player traversal remains unverified"
+    ],
+    "sourceClearance": {
+      "accepted": true,
+      "scope": "Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance",
+      "summary": "Source clearance checked at 524 points · 32,154 triangles.",
+      "connectorBudget": "Connector: 287 triangles · full source: 32,154. Native compilation and gameplay remain separate.",
+      "viewport": {
+        "actualRenderer": true,
+        "triangles": 15862,
+        "nativeCompiled": false
+      }
+    },
+    "compiledRouteReadback": {
+      "cacheSha256": "f386173d01244c0f766bffaed01a3d7d5553646e51db1a56b6c543c2501b114f",
+      "collisionTriangles": 16230,
+      "routes": [
+        {
+          "donorTitle": "sidewinder",
+          "projectFileSha256": "a68dbac31cb5a20b85bfbc826acadf09013606b9f5789c25b7dad8cdea042959",
+          "projectTitle": "Timberland–Sidewinder authored connection",
+          "walkSamples": 524
+        }
+      ],
+      "scope": "BSP collision route sampling only; scenery and player physics need in-game testing",
+      "status": "PASS",
+      "gameplayAccepted": false,
+      "independentProcess": true
+    },
+    "nativeCompilation": {
+      "accepted": true,
+      "target": "gbx-custom",
+      "gameRuntime": "chupathingyCe",
+      "gameLoaded": false,
+      "mapSha256": "f386173d01244c0f766bffaed01a3d7d5553646e51db1a56b6c543c2501b114f",
+      "bytes": 77708800,
+      "milliseconds": 453834,
+      "collisionTriangles": 16230,
+      "independentBspReference": "levels\\spark\\assembly_ff0ada45\\connected.scenario_structure_bsp",
+      "crcMismatch": 0
+    },
+    "materials": [
+      {
+        "source": 0,
+        "shader": "gsbsp_66ffa57a_0\\materials\\gster069d53940x.shader_environment",
+        "baseMap": "gsbsp_66ffa57a_0\\levels\\test\\timberland\\bitmaps\\timberland_ground.bitmap"
+      },
+      {
+        "source": 1,
+        "shader": "gsbsp_66ffa57a_1\\materials\\gster169d53940x.shader_environment",
+        "baseMap": "gsbsp_66ffa57a_1\\levels\\test\\sidewinder\\bitmaps\\sidewinder_ground.bitmap"
+      }
+    ],
+    "nativeCompiledPreview": {
+      "complete": true,
+      "errors": [],
+      "cases": [
+        "Owned native cache 609 opens in actual BSP viewport with source materials",
+        "Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged",
+        "Native Frame scene control changes the player view to the complete compiled BSP overview"
+      ],
+      "mockedIpc": false,
+      "appSha256": "a084779c28372f9ad0832ff90818d723e5bbc21c4b1f4992a6d33bd5e8a4da7a",
+      "requiredPrimaryShaders": 136,
+      "lightmapPages": 7,
+      "gracefulAppClose": true
+    },
+    "gameLoadBlocked": {
+      "expectedExecutableSha256": "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b",
+      "installedExecutableSha256": "c16096a841422b2597a3c5f26d8b16be7dd6a2914f678c7ea4b36e31ec3a3050",
+      "diagnostic": "Live Rebuild requires the reviewed Chupathingy v0.9.0c executable; this build has no validated restart adapter",
+      "noSessionCreated": true,
+      "validationNotBypassed": true
+    },
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-terrain-source-20261117.png",
+        "sha256": "bdaf7ff52ef3e5406283b63df0223c25c88ab451b0a5266dd43f204771c4c605",
+        "bytes": 287729
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-terrain-compiled-20261117.png",
+        "sha256": "e7c568113fcca0d4b855ca96d59d25e80193634ea65e79218d05917196386d5c",
+        "bytes": 241831
+      }
+    ],
+    "originalHashes": {
+      "timberland.map": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+      "sidewinder.map": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+      "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2",
+      "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041"
+    },
+    "gameplayAccepted": false,
+    "fullRestartAccepted": false
   }
 }

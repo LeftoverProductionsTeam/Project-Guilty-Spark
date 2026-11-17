@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 — source-edge arch seam native acceptance
-Status: implementation incomplete
-Starting revision: 939cea8090ff5182161463ef68f32dcf10740b05, canonical master.
-Latest verified revision: parent939cea8090ff5182161463ef68f32dcf10740b05; scoped portal/keyboard/source/native diagnostics verified in this checkpoint commit. Exact source hashes in native-terrain fixture.
-Next action: reproduce the authored arch roof/junction needle from edgeSectionContinuation20261117 and repair native geometry without raising limits. Positive CE baseline also needs the existing explicitly reviewed stock-CE source correction. Preserve R157/H19 and all475.
+Task: Operation110 — native Save37944 / Black Echo handoff after seam repair
+Status: automated acceptance incomplete
+Starting revision: 54c1984cb743e80fb4a4d2d33496f958570bf1b0, canonical master.
+Latest verified revision: parent54c1984 plus scoped source;83BSP/CE609 arch+terrain compile/readback/Windows previews PASS. Actual no-SDK42-edit Save/full restart/history/7.7ms paint PASS. Recovered37944/gameplay remain OPEN. Exact hashes in existing seam/runtime evidence.
+Next action: Use existing CE mission/HUD native workflow on hash-verified read-only Forerunner be_native08389ed4; stage only its matching tags in current owned output, verify recovered42-edit Save/restart and native HUD rebuild/readback. No engine launch or Forerunner writes.
 
 ## Acceptance
 
@@ -16,7 +16,7 @@ Full Operation110, M1–M6 and all475 historical requirement IDs remain active. 
 
 ## Verified milestones
 
-17Nov seam (parent939cea8): overlapping arch portals use closed-air/shared cuts; keyboard width/height/facets preview → Apply/Save/Undo passes. Core79+2explicit installed-fixture skips/frontend7/browser1/types/examples PASS. Native baseline Tool structure/lightmaps PASS; CE fails exact known Scorpion flare index. Arch conditioning remains blocked. Exact source/QA/native hashes, coordinates and cleanup: MEGAWORLD_SEAM_ROUTES_20261108 + existing fixture.
+17Nov arch(parent54c1984): repaired generated roof refinement, f32 collision fins and redundant portal contours; unchanged quality/budget/source transforms.83BSP+2explicit skips,CEprofile3,native CE609/Invader readback/Windows3 actual controls PASS.194connector/32460total triangles;869samples each way/68spawns. Remaining Tool warnings/gameplay gates in MEGAWORLD_SEAM_ROUTES_20261108; R157 retained.
 
 17Nov Black Echo939cea8/ground5a7a53a/radio4339020/recovered0b57e8c/attachedaa7c7f3/insertion(parent234b6bb) retain scoped source/browser/production CE609 proof, full hashes and limits in RUNTIME_INTEGRATION_20261107 and Git; Windows/game gates OPEN.
 
@@ -55,7 +55,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Current seam scope: closed-air section portals, complete slider-key previews, matching guide/browser history checks, existing native example recovery/real-edge fixture and exact negative geometry/source evidence.
+Current seam/native and actual42-edit no-SDK Save/paint/restart sources/evidence: MEGAWORLD_SEAM_ROUTES_20261108,RUNTIME_INTEGRATION_20261107,existing fixtures. Shared native geometry repaired; harness handles failed startup/refusal and reuses existing mission stress routine. No new writer/manager.
 
 Current native flags and personal squad guidance reuse protected revisions, snapshots, Save/history and the same mission writer. Stable flags preserve original names/indices; per-unit markers clear old bindings before replacements, transitions/failure/settlement. Source/browser/native compile/readback pass; native Windows/marker/peer/game acceptance stays OPEN. How To and HUMAN_TEST_PLAN contain actual controls, limits and missing tests.
 
@@ -125,7 +125,7 @@ Owner priorities/addenda remain active:
 
 ## Failures and blockers
 
-Current: real arch roof/junction needle conditioning refuses at256 refinements; no limit relaxed. Raw CE baseline Tool structure/lightmaps pass, Invader refuses the exact known Scorpion bitmap index; use existing explicitly reviewed recovery. R157 remains accepted; H19/native Windows/game gates OPEN.
+Current: arch/terrain compile and open in actual Windows; arch warnings remain. Terrain game start refuses installed Chupathingyc16096a8 versus reviewedfa999752; no session, guard intact. Actual edge-pick/close entrances/human travel OPEN. No-SDK42-edit/history/restart passes; recovered Save37944/hosted CI still OPEN.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 
@@ -150,6 +150,8 @@ Current: real arch roof/junction needle conditioning refuses at256 refinements; 
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+Current parent54c1984: live QA Node26367/run-aVu7Oz owns12GiB-bounded external output. All current tests terminal: terrain UI4cases/native compile pass, game gate FAILS pin; compiled-preview3PASS; no-SDK Save and paint runsPASS. Reuse this owner/prepared tags/app for recovered CE mission; clean only after all writers exit. Forerunner input08389ed4 is read-only.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

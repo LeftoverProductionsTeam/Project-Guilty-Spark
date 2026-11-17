@@ -80,5 +80,102 @@
     "sha256": "2bff8dc95c934c3783e44f1862d3ff2fe0170c6f99d1d5cd628c77e3792fb2bd",
     "newHumanGuiSaveClaimed": false
   },
-  "publicPathRedaction": "Private executable location only; identities, observations and outcomes are unchanged."
+  "publicPathRedaction": "Private executable location only; identities, observations and outcomes are unchanged.",
+  "missionSave20261117": {
+    "parentRevision": "54c1984cb743e80fb4a4d2d33496f958570bf1b0",
+    "appSha256": "a084779c28372f9ad0832ff90818d723e5bbc21c4b1f4992a6d33bd5e8a4da7a",
+    "mockedIpc": false,
+    "actualControls": true,
+    "sourceFixture": "New owned QuickForge workshop;7objectives authored with Add beat and actual HUD controls; no SDK or game launch",
+    "rapidFieldEdits": 42,
+    "firstRun": {
+      "complete": true,
+      "errors": [],
+      "normalCloses": 2,
+      "nativeCommandLatencyMs": [
+        3431,
+        15,
+        4
+      ]
+    },
+    "paintRun": {
+      "complete": true,
+      "errors": [],
+      "normalCloses": 2,
+      "nativeCommandLatencyMs": [
+        10,
+        1,
+        2
+      ],
+      "nativePaint": {
+        "ran": true,
+        "milliseconds": 7.700000017881393
+      },
+      "savedStudioSha256": "fa1f06bdba32f465d9bd88e981aebc7c72d4c0e6f55fce1fb0040544ccd09ead",
+      "savedPast": 78,
+      "savedFuture": 1,
+      "savedDirty": false
+    },
+    "retainedUndoRedo": true,
+    "fullProcessRestart": true,
+    "compactRows": [
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      },
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      },
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      },
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      },
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      },
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      },
+      {
+        "height": 36,
+        "width": 1423,
+        "scrollWidth": 1423
+      }
+    ],
+    "compactObjective": {
+      "height": 129,
+      "width": 1405,
+      "clientWidth": 1405,
+      "scrollWidth": 1405,
+      "checkboxes": 3
+    },
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-seven-objective-list-20261117.png",
+        "sha256": "d8e02ab561b6966bceda60adda182bdd0ef0abe13efd7df4802577ab382b71c0",
+        "bytes": 191857
+      },
+      {
+        "path": "docs/screenshots/workspaces/native-objective-save-20261117.png",
+        "sha256": "5665460b39a27ee9b8d42cffe300e5abbc696194be132b13d61bfd5f90999a17",
+        "bytes": 149099
+      }
+    ],
+    "recoveredNativeMissionAcceptance": false,
+    "save37944RootCauseAccepted": false,
+    "harnessSha256": "464dbdaef02227caccc0e4dcec18670119db3182be95a4e6e05f804f2f3ff84e"
+  }
 }

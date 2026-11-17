@@ -99,7 +99,9 @@ if(aiFacingReview&&process.env.SPARK_NATIVE_AI_START_REVIEW!=='1')throw Error('N
 const expect=assertion.configure({timeout:60000});
 const hash=async file=>{const digest=crypto.createHash('sha256');for await(const b of createReadStream(file))digest.update(b);return digest.digest('hex');};
 await fs.mkdir(await assertQaOutputPath(output));
-const report={scope:saveOnly?'native-workshop-immediate-save-only':'native-solo-creator',schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
+const missionSaveStress=process.env.SPARK_NATIVE_MISSION_SAVE_STRESS==='1';
+if(missionSaveStress&&(!saveOnly||ceMissionReview))throw Error('Mission Save stress requires the isolated no-SDK Save workflow');
+const report={scope:missionSaveStress?'native-seven-objective-save-stress':saveOnly?'native-workshop-immediate-save-only':'native-solo-creator',schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
 let browser,page,child,call;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
  const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
@@ -134,7 +136,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    }
    const state=async id=>{const status=await call('read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(snapshot=>snapshot.key===status.history.head.current)?.project};};
    const save=async (id,afterRevision)=>{
-    await page.evaluate(()=>{window.__sparkSaveFrame={ran:false};requestAnimationFrame(()=>{window.__sparkSaveFrame.ran=true;});});
+    await page.evaluate(()=>{const began=performance.now();window.__sparkSaveFrame={ran:false};requestAnimationFrame(()=>{window.__sparkSaveFrame.ran=true;window.__sparkSaveFrame.milliseconds=performance.now()-began;});});
     try{await page.keyboard.press('Control+s');await expect.poll(async()=>{const head=(await state(id)).history?.head;return !!head&&!head.dirty&&(afterRevision===undefined||head.current!==afterRevision);}).toBe(true);}
     catch(error){
      const current=await state(id),stored=await call('open_project',{id});
@@ -142,6 +144,40 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
       controls:await page.evaluate(()=>({hasFocus:document.hasFocus(),visibility:document.visibilityState,animationFrame:window.__sparkSaveFrame,focus:document.activeElement?.outerHTML.slice(0,500),dialogs:[...document.querySelectorAll('[role="dialog"]')].map(e=>e.textContent?.slice(0,500))})),statuses:(await page.getByRole('status').allTextContents()).map(text=>text.slice(-700)).slice(-8)};
      console.log('NATIVE_SAVE_FAILURE',JSON.stringify(report.saveFailure));throw error;
     }
+   };
+   // Reuse the same42-edit native workflow without preparing an SDK when
+   // investigating Save/history responsiveness independently of compilation.
+   const exerciseMissionSave=async(fork,record)=>{
+     await chooseTool(page,'Creator Studio');await openMissionBeats(page);
+     // Reproduce the rapid multi-field load that exposed the original timeout,
+     // retaining each authored Undo snapshot and restoring every saved value.
+     for(const [i,step]of ceMissionHudSteps.entries()){
+      const item=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat '+(i+1),exact:true})});
+      for(const [name,value]of [['Title',step.title],['Objective / direction',step.text]]){const field=item.getByRole('textbox',{name,exact:true});await revealPagedControl(field);await field.fill(value+' review');await field.fill(value);}
+      const panel=item.locator('.studio-native-objective');if(await panel.getAttribute('open')===null){const summary=panel.locator('> summary');await revealPagedControl(summary);await summary.click();}const field=item.getByRole('textbox',{name:'HUD objective '+(i+1),exact:true});await revealPagedControl(field);await field.fill(step.text+' Review.');await field.fill(step.text);await field.blur();
+     }
+     record.hud.rapidFieldEdits=42;
+     const beatRows=page.locator('.studio-mission-record');
+     for(let i=0;i<await beatRows.count();i++){const item=beatRows.nth(i);if(await item.getAttribute('open')!==null){const summary=item.locator(':scope > summary');await revealPagedControl(summary);await summary.click();}}
+     await expect(page.locator('.studio-beat-body')).toHaveCount(0);
+     record.hud.compactBeatList=await beatRows.evaluateAll(rows=>rows.map(row=>({height:row.getBoundingClientRect().height,width:row.clientWidth,scrollWidth:row.scrollWidth})));
+     for(const row of record.hud.compactBeatList){expect(row.height).toBeLessThanOrEqual(40);expect(row.scrollWidth).toBeLessThanOrEqual(row.width+1);}
+     await page.screenshot({path:path.join(output,'campaign-beat-list.png')});
+     const seventh=beatRows.nth(6).locator(':scope > summary');await revealPagedControl(seventh);await seventh.focus();await page.keyboard.press('Enter');await expect(page.locator('.studio-beat-body')).toHaveCount(1);
+
+     const row=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat 7',exact:true})});const completion=row.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);if(await row.locator('.studio-native-objective').getAttribute('open')===null)await completion.click();
+     const text=row.getByRole('textbox',{name:'HUD objective 7',exact:true});await revealPagedControl(text);await text.fill(ceMissionHudSteps[6].text+' Ready.');await text.blur();await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);await page.keyboard.press('Control+y');await expect(text).toHaveValue(ceMissionHudSteps[6].text+' Ready.');await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);
+     const saving=save(fork.id),latency=[];
+     const responsiveness=(async()=>{for(let i=0;i<3;i++){const started=Date.now();await Promise.race([call('startup_status'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Windows command loop stopped responding during Save')),5000))]);latency.push(Date.now()-started);}})();
+     // Preserve a failed responsiveness gate, but collect the actual Save result
+     // before closing its app. Do not abandon a pending Save on a timer rejection.
+     const settled=await Promise.allSettled([saving,responsiveness]);
+     record.hud.nativeCommandLatencyMs=latency;record.hud.saveSettled=settled[0].status;
+     report.saveIpcTraceFile='native-ipc-'+report.normalRestarts+'.log';
+     for(const result of settled)if(result.status==='rejected')throw result.reason;
+     record.hud.objectiveUndoRedo=true;record.hud.recoverySave=true;record.hud.nativeCommandLatencyMs=latency;
+     record.hud.nativePaint=await page.evaluate(()=>window.__sparkSaveFrame);expect(record.hud.nativePaint.ran).toBe(true);expect(record.hud.nativePaint.milliseconds).toBeLessThan(5000);
+     const panel=row.locator('.studio-native-objective');record.hud.compactPanel=await panel.evaluate(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,checkboxes:[...el.querySelectorAll('input[type=checkbox]')].length}));expect(record.hud.compactPanel.checkboxes).toBe(3);expect(record.hud.compactPanel.height).toBeLessThan(210);expect(record.hud.compactPanel.scrollWidth).toBeLessThanOrEqual(record.hud.compactPanel.clientWidth+1);await panel.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'campaign-hud-compact.png')});
    };
    const open=async title=>{await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();};
    async function dragYawRing(canvas){
@@ -333,37 +369,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      expect(fork.studio.missions.map(beat=>beat.hudText)).toEqual(ceMissionHudSteps.map(step=>step.text));
      record.hud={messages:ceMissionHudSteps.map((step,i)=>({name:'gs_mission_obj_'+(i+1),text:step.text})),recoveredFromSaveTimeout:!!prior.saveFailure,continuedAfterSourcePanelTimeout:!prior.saveFailure};
     }
-    if(ceMissionHudReview&&!compileResume){
-     await chooseTool(page,'Creator Studio');await openMissionBeats(page);
-     // Reproduce the rapid multi-field load that exposed the original timeout,
-     // retaining each authored Undo snapshot and restoring every saved value.
-     for(const [i,step]of ceMissionHudSteps.entries()){
-      const item=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat '+(i+1),exact:true})});
-      for(const [name,value]of [['Title',step.title],['Objective / direction',step.text]]){const field=item.getByRole('textbox',{name,exact:true});await revealPagedControl(field);await field.fill(value+' review');await field.fill(value);}
-      const panel=item.locator('.studio-native-objective');if(await panel.getAttribute('open')===null){const summary=panel.locator('> summary');await revealPagedControl(summary);await summary.click();}const field=item.getByRole('textbox',{name:'HUD objective '+(i+1),exact:true});await revealPagedControl(field);await field.fill(step.text+' Review.');await field.fill(step.text);await field.blur();
-     }
-     record.hud.rapidFieldEdits=42;
-     const beatRows=page.locator('.studio-mission-record');
-     for(let i=0;i<await beatRows.count();i++){const item=beatRows.nth(i);if(await item.getAttribute('open')!==null){const summary=item.locator(':scope > summary');await revealPagedControl(summary);await summary.click();}}
-     await expect(page.locator('.studio-beat-body')).toHaveCount(0);
-     record.hud.compactBeatList=await beatRows.evaluateAll(rows=>rows.map(row=>({height:row.getBoundingClientRect().height,width:row.clientWidth,scrollWidth:row.scrollWidth})));
-     for(const row of record.hud.compactBeatList){expect(row.height).toBeLessThanOrEqual(40);expect(row.scrollWidth).toBeLessThanOrEqual(row.width+1);}
-     await page.screenshot({path:path.join(output,'campaign-beat-list.png')});
-     const seventh=beatRows.nth(6).locator(':scope > summary');await revealPagedControl(seventh);await seventh.focus();await page.keyboard.press('Enter');await expect(page.locator('.studio-beat-body')).toHaveCount(1);
-
-     const row=page.locator('.studio-record').filter({has:page.getByRole('button',{name:'Remove beat 7',exact:true})});const completion=row.getByText('Native objective & completion',{exact:true});await revealPagedControl(completion);if(await row.locator('.studio-native-objective').getAttribute('open')===null)await completion.click();
-     const text=row.getByRole('textbox',{name:'HUD objective 7',exact:true});await revealPagedControl(text);await text.fill(ceMissionHudSteps[6].text+' Ready.');await text.blur();await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);await page.keyboard.press('Control+y');await expect(text).toHaveValue(ceMissionHudSteps[6].text+' Ready.');await page.keyboard.press('Control+z');await expect(text).toHaveValue(ceMissionHudSteps[6].text);
-     const saving=save(fork.id),latency=[];
-     const responsiveness=(async()=>{for(let i=0;i<3;i++){const started=Date.now();await Promise.race([call('startup_status'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Windows command loop stopped responding during Save')),5000))]);latency.push(Date.now()-started);}})();
-     // Preserve a failed responsiveness gate, but collect the actual Save result
-     // before closing its app. Do not abandon a pending Save on a timer rejection.
-     const settled=await Promise.allSettled([saving,responsiveness]);
-     record.hud.nativeCommandLatencyMs=latency;record.hud.saveSettled=settled[0].status;
-     report.saveIpcTraceFile='native-ipc-'+report.normalRestarts+'.log';
-     for(const result of settled)if(result.status==='rejected')throw result.reason;
-     record.hud.objectiveUndoRedo=true;record.hud.recoverySave=true;record.hud.nativeCommandLatencyMs=latency;
-     const panel=row.locator('.studio-native-objective');record.hud.compactPanel=await panel.evaluate(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,checkboxes:[...el.querySelectorAll('input[type=checkbox]')].length}));expect(record.hud.compactPanel.checkboxes).toBe(3);expect(record.hud.compactPanel.height).toBeLessThan(210);expect(record.hud.compactPanel.scrollWidth).toBeLessThanOrEqual(record.hud.compactPanel.clientWidth+1);await panel.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'campaign-hud-compact.png')});
-    }
+    if(ceMissionHudReview&&!compileResume)await exerciseMissionSave(fork,record);
 
     if(compileResume){const draft=(await state(fork.id)).project.scenarioScriptDraft;expect(draft).toBeTruthy();expect(crypto.createHash('sha256').update(draft.content).digest('hex')).toBe(record.projectDraftSha256);}
     await openStudioMenu(page);const runtime=page.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(runtime);await runtime.selectOption('chupathingyCe');await page.keyboard.press('Escape');
@@ -441,7 +447,36 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const p=(await state(created.project.id)).project;
    expect(p.quickForge.workshop.brushes).toHaveLength(4);
    report.immediateWorkshopSave={realUi:true,brushes:p.quickForge.workshop.brushes.length,dirty:(await state(created.project.id)).history.head.dirty};
-   if(saveOnly){report.sourcePreparation={scope:'No SDK/tag staging or native compilation required for this Save reproduction'};await page.screenshot({path:path.join(output,'workshop-save.png')});await close();return;}
+   if(saveOnly){
+    report.sourcePreparation={scope:'No SDK/tag staging or native compilation required for this Save reproduction'};
+    if(missionSaveStress){
+     const record=report.missionSaveStress={hud:{},actualControls:true,gameplayVerified:false};
+     await chooseTool(page,'Creator Studio');
+     for(const [i,step]of ceMissionHudSteps.entries()){
+      const add=page.getByRole('button',{name:'Add beat',exact:true});await revealPagedControl(add);await add.click();
+      const row=page.locator('.studio-mission-record').nth(i);
+      for(const [name,value]of [['Title',step.title],['Objective / direction',step.text]]){const field=row.getByRole('textbox',{name,exact:true});await revealPagedControl(field);await field.fill(value);}
+      const summary=row.locator('.studio-native-objective > summary');await revealPagedControl(summary);await summary.click();
+      const show=row.getByRole('checkbox',{name:'Show native HUD objective while this beat is active',exact:true});await revealPagedControl(show);await show.check();
+      const text=row.getByRole('textbox',{name:'HUD objective '+(i+1),exact:true});await revealPagedControl(text);await text.fill(step.text);
+     }
+     await exerciseMissionSave(created.project,record);
+     const saved=await state(created.project.id);expect(saved.history.head.dirty).toBe(false);expect(saved.history.head.past.length).toBeGreaterThan(0);
+     const previous=saved.history.snapshots.find(row=>row.key===saved.history.head.past.at(-1)).project;
+     record.savedHead=saved.history.head;record.savedStudioSha256=crypto.createHash('sha256').update(JSON.stringify(saved.project.studio)).digest('hex');
+     await close();await start();await chooseTool(page,'Map library');await open(created.project.title);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
+     const resumed=await state(created.project.id);expect(resumed.history.head).toEqual(saved.history.head);expect(resumed.project.studio).toEqual(saved.project.studio);
+     for(const [i,step]of ceMissionHudSteps.entries()){
+      const row=page.locator('.studio-mission-record').nth(i);await expect(row.getByRole('textbox',{name:'Title',exact:true})).toHaveValue(step.title);await expect(row.getByRole('textbox',{name:'Objective / direction',exact:true})).toHaveValue(step.text);
+      const summary=row.locator('.studio-native-objective > summary');if(await row.locator('.studio-native-objective').getAttribute('open')===null){await revealPagedControl(summary);await summary.click();}await expect(row.getByRole('textbox',{name:'HUD objective '+(i+1),exact:true})).toHaveValue(step.text);
+     }
+     const tab=page.getByRole('tab',{name:'Mission director',exact:true});await tab.focus();await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(created.project.id)).project.studio).toEqual(previous.studio);
+     await tab.focus();await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(created.project.id)).project.studio).toEqual(saved.project.studio);await save(created.project.id);
+     record.fullProcessRestart=true;record.retainedUndoRedo=true;record.savedStateRestored=true;record.recoveredNativeMissionAcceptance=false;
+     await page.screenshot({path:path.join(output,'mission-save-restarted.png')});console.log('NATIVE_MISSION_SAVE_STRESS',JSON.stringify(record));
+    }
+    await page.screenshot({path:path.join(output,'workshop-save.png')});await close();return;
+   }
    p.title='Native solo Firefight acceptance';p.quickForge.name=p.title;p.quickForge.gameMode='firefight';
    p.quickForge.materials[0].shaderPath='levels/test/tutorial/shaders/example_tutorial_metal_floor';p.quickForge.skyPath='levels/test/bloodgulch/bloodgulch';
    p.quickForge.spawns=p.quickForge.spawns.slice(0,1);p.quickForge.spawns[0].position=[-5,-4,0.1];p.quickForge.placements=[];p.quickForge.objectives=[];

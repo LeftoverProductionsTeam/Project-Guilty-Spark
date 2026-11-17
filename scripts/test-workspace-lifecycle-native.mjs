@@ -1219,7 +1219,7 @@ try{
         await invoke(main,'register_runtime',{registration:{id:'native-seam-chupathingy',runtimeId:'chupathingyCe',root:runtime,executable:path.join(runtime,'chupathingy.exe'),dataRoot:runtime,version:'v0.9.0c'}});
         await chooseTool(main,'Level editor');await openStudioMenu(main);const choice=main.getByRole('combobox',{name:'Active Halo runtime',exact:true,includeHidden:true});await revealPagedControl(choice);await choice.selectOption('chupathingyCe');await main.keyboard.press('Escape');
         await openDrawer(main,'Game connection');const controls=main.getByRole('region',{name:'Chupathingy Live Rebuild',exact:true});const start=controls.getByRole('button',{name:'Start compiled playtest',exact:true,includeHidden:true});await revealPagedControl(start);await start.click();
-        await expect.poll(async()=>{const session=await invoke(main,'runtime_rebuild_status');if(session?.error||session?.phase==='failed')throw Error(session.error||session.detail);return session;},{timeout:180000,intervals:[1000,2000]}).toMatchObject({phase:'running',gameSha256:report.megaWorldCreation.nativeCompilation.mapSha256});
+        await expect.poll(async()=>{const refused=controls.locator('.notice.error');if(await refused.count())throw Error(await refused.innerText());const session=await invoke(main,'runtime_rebuild_status');if(session?.error||session?.phase==='failed')throw Error(session.error||session.detail);return session;},{timeout:180000,intervals:[1000,2000]}).toMatchObject({phase:'running',gameSha256:report.megaWorldCreation.nativeCompilation.mapSha256});
         report.megaWorldCreation.nativeGameLoad={session:await invoke(main,'runtime_rebuild_status'),actualControls:true,privateOwnedProcess:true,humanTraversalAccepted:false};report.megaWorldCreation.nativeCompilation.gameLoaded=true;
         await main.screenshot({path:path.join(root,'megaworld-chupathingy-loaded.png')});const stop=controls.getByRole('button',{name:'Stop playtest',exact:true,includeHidden:true});await revealPagedControl(stop);await stop.click();await expect.poll(()=>invoke(main,'runtime_rebuild_status'),{timeout:15000}).toMatchObject({phase:'stopped',processId:null});
         await main.getByRole('button',{name:'Close Game connection',exact:true}).click();await chooseTool(main,'Build & playtest');
@@ -1527,6 +1527,14 @@ try{
       expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
       report.sourcePreview={cacheVersion:expectedCacheVersion,engine:opened.inspection.header.engine,sourceSha256:originalHash,resources:actualSource.resourceSha256??{},requiredPrimaryShaders:required,missingPrimaryShaders:missing,requiredLightmapPages:lightmaps.size,spartanTagId:spartan?.id??null,spartanModelClass:expectedCacheVersion===5?'mode':'mod2',visibleObjects:opened.project.scene.filter(object=>object.visible).length,readOnly,gameplayAccepted:false};
       step('Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged');
+      if(previewOnly){
+        await main.getByRole('button',{name:'Frame scene (F)',exact:true}).click();
+        await expect(main.getByRole('combobox',{name:'View from player start',exact:true})).toHaveValue('');
+        await main.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        await main.screenshot({path:path.join(root,'owned-native-bsp-framed.png')});
+        report.sourcePreview.framedThroughActualControl=true;
+        step('Native Frame scene control changes the player view to the complete compiled BSP overview');
+      }
       if(vehiclePreview)await nativeVehiclePreview(opened,originalHash);
       if(contextOnly){
         if(!pistol)throw Error('Native asset-context acceptance requires the actual pistol');
@@ -1738,7 +1746,7 @@ try{
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser){
   report.failureWindows=await Promise.all(pages().map(async(page,i)=>{await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});return{url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label).catch(()=>null),workspace:await page.locator('.gs-workspace-shell').getAttribute('data-workspace').catch(()=>null),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,2500),tail:(await page.locator('body').innerText().catch(()=>'')).slice(-4000)};}));
 }
-  report.nativeFailureLogs=await Promise.race([invoke(main,'bootstrap').then(value=>value.logs.filter(row=>!report.megaWorldCreation?.projectId||row.projectId===report.megaWorldCreation.projectId).slice(-500)).catch(()=>[]),new Promise(resolve=>setTimeout(()=>resolve([]),3000))]);
+  report.nativeFailureLogs=main&&!main.isClosed()?await Promise.race([invoke(main,'bootstrap').then(value=>value.logs.filter(row=>!report.megaWorldCreation?.projectId||row.projectId===report.megaWorldCreation.projectId).slice(-500)).catch(()=>[]),new Promise(resolve=>setTimeout(()=>resolve([]),3000))]):[];
   if(report.megaWorldCreation){
     // Preserve bounded native error geometry before the owned failed job is
     // disposed. A compiler diagnostic must survive cleanup, not its SDK tree.
@@ -1783,7 +1791,10 @@ finally{
   // sealing its regenerable cache. Abrupt termination leaves WebView writers
   // flushing files after the parent exits; those files must never be deleted
   // against an unstable hash inventory.
-  if(browser){
+  // A browser connection can exist on chrome-error:// before any app page
+  // is admitted. That owned startup failure has no save/close UI; proceed to
+  // the existing bounded process stop instead of waiting for a nonexistent page.
+  if(browser&&main){
     try{for(const page of pages().reverse()){if(!page.isClosed()){console.log('NATIVE_CLOSE_REVIEW',JSON.stringify({scope:report.scope,url:page.url(),at:new Date().toISOString()}));await close(page,'save');}}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
     catch(error){
       report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;

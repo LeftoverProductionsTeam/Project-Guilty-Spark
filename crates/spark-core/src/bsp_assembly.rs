@@ -1294,6 +1294,32 @@ fn playable_anchor(
         .map(|(p, f, _)| (p, f))
         .unwrap_or(fallback))
 }
+// Simplification can leave two sides of a sub-float miter fin distinct in
+// f64 but coincident in the exported f32 mesh. Rebuild that rounded closed
+// volume, keeping material IDs, rather than deleting individual faces/edges.
+fn collision_precision_cleanup(mut output: MeshGL64) -> Result<MeshGL64> {
+    let problem = |mesh:&MeshGL64| {
+        let mut faces=std::collections::BTreeSet::new();
+        mesh.tri_verts.chunks_exact(3).enumerate().any(|(face,t)| {
+            let p:[V;3]=std::array::from_fn(|k|std::array::from_fn(|j|f64::from(mesh.vert_properties[t[k] as usize*3+j] as f32)));
+            let n=cross(sub(p[1],p[0]),sub(p[2],p[0]));
+            let mut key=p.map(|v|v.map(f64::to_bits));key.sort();
+            dot(n,n)==0. || !faces.insert((mesh.face_id[face],key))
+        })
+    };
+    for _ in 0..3 {
+        crate::bsp_triangulate::improve(&mut output);
+        if !problem(&output) { return Ok(output); }
+        for value in &mut output.vert_properties { *value=f64::from(*value as f32); }
+        output.merge();
+        let body=checked(Manifold::from_mesh_gl64_robust(&output),"Rounded collision import")?;
+        let body=checked(body.rebuild_solid(manifold_rust::types::WindingRule::Positive),"Rounded collision regularization")?;
+        output=body.get_mesh_gl64(-1);
+        if output.num_prop!=3 || output.face_id.len()!=output.num_tri() || output.num_tri()>MAX_OUTPUT_TRIANGLES { return invalid("Rounded collision lost native material identities or exceeded the BSP budget"); }
+    }
+    if problem(&output) { return invalid("Collision still has collapsed or coincident native faces after bounded precision repair; adjust the source connection"); }
+    Ok(output)
+}
 fn collision_layer(
     render: &MeshGL64,
     materials: &mut Vec<AssemblyMaterial>,
@@ -1347,11 +1373,11 @@ fn collision_layer(
         body.set_tolerance(0.001).simplify(0.001),
         "Collision precision cleanup",
     )?;
-    let mut output = body.get_mesh_gl64(-1);
+    let output = body.get_mesh_gl64(-1);
     if output.num_prop != 3 || output.face_id.len() != output.num_tri() {
         return invalid("Collision layer lost its material identity");
     }
-    crate::bsp_triangulate::improve(&mut output);
+    let output = collision_precision_cleanup(output)?;
     let mut mesh = MeshData {
         label: "Connected collision and render source".into(),
         source: "spark-bsp-assembly".into(),
@@ -1533,6 +1559,49 @@ mod tests {
             assert!(materials[slot].collision_only);volume+=dot(p[0],cross(p[1],p[2]))/6.;
         }
         assert!((volume.abs()-body.volume()).abs()<1e-4,"Cleanup must preserve the complete solid volume");
+    }
+
+    #[test]
+    fn native_collision_regularizes_the_actual_opposing_arch_cap_without_volume_loss() {
+        let a=[38.811767578125,34.44912338256836,-21.075042829581236];
+        let b=[65.13874816894531,46.44912338256836,-21.075042829581236];
+        let sides=tunnel_sides(&[a,b],4.).unwrap();
+        let body=seam_sections::arch_solid(a,b,sides[0],sides[1],4.,3.,6,0).unwrap();
+        let mut mesh=body.get_mesh_gl64(-1);
+        mesh.vert_properties=mesh.vert_properties.chunks_exact(5).flat_map(|p|p[..3].iter().copied()).collect();mesh.num_prop=3;
+        let first=mesh.num_vert() as u64;
+        // Exact native Tool red-edge cap, in world units. Opposing faces are
+        // a numerical fin, not two different material/physics surfaces.
+        for p in [[65.57305908,44.44912338,-18.07504272],[65.51486969,44.71707153,-17.07504272],[65.35590363,45.44912338,-16.34299278]] { mesh.vert_properties.extend(p); }
+        mesh.tri_verts.extend([first,first+1,first+2,first,first+2,first+1]);mesh.face_id.extend([0,0]);
+        let output=collision_precision_cleanup(mesh).unwrap();
+        let repaired=checked(Manifold::from_mesh_gl64_robust(&output),"Repaired cap readback").unwrap();
+        assert!((repaired.volume()-body.volume()).abs()<1e-3);
+        assert!(output.face_id.iter().all(|id|*id==0));
+        let mut faces=std::collections::BTreeSet::new();
+        for t in output.tri_verts.chunks_exact(3) {let mut key=t.iter().map(|id|std::array::from_fn::<_,3,_>(|k|(output.vert_properties[*id as usize*3+k] as f32).to_bits())).collect::<Vec<_>>();key.sort();assert!(faces.insert(key));}
+    }
+
+    #[test]
+    fn native_arch_miter_collision_has_no_opposing_float_faces() {
+        let points=[[38.811767578125,34.44912338256836,-21.075042829581236],[65.13874816894531,46.44912338256836,-21.075042829581236],[117.79270935058594,46.44912338256836,-21.075042829581236]];
+        let sides=tunnel_sides(&points,4.).unwrap();
+        let first=seam_sections::arch_solid(points[0],points[1],sides[0],sides[1],4.,3.,6,0).unwrap();
+        let second=seam_sections::arch_solid(points[1],points[2],sides[1],sides[2],4.,3.,6,0).unwrap();
+        for offset in [0.,1e-10,1e-8,1e-6] {
+        let shifted=second.translate(manifold_rust::linalg::Vec3::new(offset,0.,0.));
+        let body=checked(first.union(&shifted),"Arch miter fixture").unwrap();
+        let mut materials=vec![material()];let (mesh,slots)=collision_layer(&body.get_mesh_gl64(-1),&mut materials).unwrap();
+        let mut faces=std::collections::BTreeSet::new();let mut volume=0.;
+        for (t,slot) in mesh.indices.chunks_exact(3).zip(slots) {
+            let p:[V;3]=std::array::from_fn(|k|vertex(&mesh,t[k]));
+            let mut key=p.map(|v|v.map(f64::to_bits));key.sort();
+            assert!(faces.insert(key),"Native float narrowing must not leave opposing arch-cap faces");
+            let n=cross(sub(p[1],p[0]),sub(p[2],p[0]));assert!(dot(n,n)>0.);
+            assert!(materials[slot].collision_only);volume+=dot(p[0],cross(p[1],p[2]))/6.;
+        }
+        assert!((volume.abs()-body.volume()).abs()<1e-3);
+        }
     }
 
     #[test]

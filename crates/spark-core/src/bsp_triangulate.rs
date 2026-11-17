@@ -112,10 +112,10 @@ fn improve_material(m: &mut MeshGL64, selected:Option<u64>) -> usize {
     }
     flips
 }
-/// Condition generated tunnel fans for Halo's float lightmapper. An interior
-/// point near the short edge permits better coplanar diagonals; blindly bisecting
-/// long edges reproduces the acute fan. Original vertices, boundary edges, source
-/// materials and affine texture mapping remain unchanged.
+/// Condition generated tunnel fans without moving their surface or UV seams.
+/// A long boundary beside a nearby concave cut cannot be repaired by repeatedly
+/// adding interior points. Bisect its geometric edge on every adjacent face,
+/// including aliases with another material/UV, then improve coplanar diagonals.
 pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_material: u64) -> crate::Result<usize> {
     const QUALITY: f64 = 0.002;
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
@@ -125,30 +125,41 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
     loop {
         let selected = m.tri_verts.chunks_exact(3).enumerate().find_map(|(index,t)| {
             (m.face_id[index] == generated_material && face(m,[t[0],t[1],t[2]]).1 < QUALITY)
-                .then_some((index,[t[0],t[1],t[2]]))
+                .then_some([t[0],t[1],t[2]])
         });
-        let Some((index,t)) = selected else { return Ok(splits); };
-        if m.num_tri().saturating_add(2) > maximum || splits >= 256 {
-            return crate::invalid(format!("Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material {generated_material}, {} triangles, {splits} refinements, quality {:.8}, points {:?})",m.num_tri(),face(m,t).1,t.map(|id|at(m,id))));
-        }
-        let k = (0..3).min_by(|&a,&b| {
+        let Some(t) = selected else { return Ok(splits); };
+        let k = (0..3).max_by(|&a,&b| {
             let length = |k:usize| { let d=sub(at(m,t[k]),at(m,t[(k+1)%3]));dot(d,d) };
             length(a).total_cmp(&length(b))
         }).unwrap();
-        let [a,b,c] = [t[k],t[(k+1)%3],t[(k+2)%3]];
-        let edge = sub(at(m,b),at(m,a)); let short = dot(edge,edge).sqrt();
-        let n = cross(edge,sub(at(m,c),at(m,a))); let height = dot(n,n).sqrt()/short;
-        if !height.is_finite() || height <= 1e-12 || short <= 1e-12 {
+        let endpoints = [at(m,t[k]),at(m,t[(k+1)%3])];
+        let direction=sub(endpoints[1],endpoints[0]);
+        if dot(direction,direction)<=1e-24 || face(m,t).1<=1e-14 {
             return crate::invalid("Native source contains a degenerate triangle; repair the source surface");
         }
-        let weight = (short*0.5/height).min(0.25);
-        let midpoint = m.num_vert() as u64; let offset = m.num_prop as usize;
-        for k in 0..offset {
-            m.vert_properties.push((1.-weight)*(m.vert_properties[a as usize*offset+k]+m.vert_properties[b as usize*offset+k])*0.5+weight*m.vert_properties[c as usize*offset+k]);
+        let adjacent: Vec<_> = m.tri_verts.chunks_exact(3).enumerate().filter_map(|(i,t)| {
+            (0..3).find(|&k| {let a=at(m,t[k]);let b=at(m,t[(k+1)%3]);[a,b]==endpoints || [b,a]==endpoints}).map(|k|(i,[t[k],t[(k+1)%3],t[(k+2)%3]]))
+        }).collect();
+        if adjacent.is_empty() || adjacent.len()>2 { return crate::invalid("Native refinement found a non-manifold edge; repair the source surface"); }
+        if m.num_tri().saturating_add(adjacent.len()) > maximum || splits >= 256 {
+            return crate::invalid(format!("Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material {generated_material}, {} triangles, {splits} refinements, quality {:.8}, points {:?})",m.num_tri(),face(m,t).1,t.map(|id|at(m,id))));
         }
-        m.tri_verts[index*3..index*3+3].copy_from_slice(&[a,b,midpoint]);
-        m.tri_verts.extend([b,c,midpoint,c,a,midpoint]);m.face_id.extend([generated_material;2]);
-        splits += 1; improve_material(m,Some(generated_material));
+        // Identical geometric edges can have distinct UV vertex identities.
+        // Interpolate each identity separately and preserve every face's slot.
+        let mut midpoints = BTreeMap::new();
+        let offset = m.num_prop as usize;
+        for (index,[a,b,c]) in adjacent {
+            let midpoint = *midpoints.entry((a.min(b),a.max(b))).or_insert_with(|| {
+                let id=m.num_vert() as u64;
+                for k in 0..offset { m.vert_properties.push((m.vert_properties[a as usize*offset+k]+m.vert_properties[b as usize*offset+k])*0.5); }
+                id
+            });
+            let material=m.face_id[index];
+            m.tri_verts[index*3..index*3+3].copy_from_slice(&[a,midpoint,c]);
+            m.tri_verts.extend([midpoint,b,c]);m.face_id.push(material);
+        }
+        splits += 1;
+        improve_material(m,Some(generated_material));
     }
 }
 #[cfg(test)]
@@ -272,6 +283,54 @@ mod tests {
         assert!(refine_native_needles(&mut m,150_000,17).unwrap_err().to_string().contains("budget"));
         assert_eq!(&m.vert_properties[..original.len()],&original);assert!(m.num_tri()<=5+256*2);
     }
+    #[test]
+    fn native_arch_roof_sliver_preserves_its_surface_and_uv_seam() {
+        // Exact generated roof patch from the original Timberland/Sidewinder
+        // arch fixture: six planar faces, not a packaged original map/model.
+        let points = [
+            [121.59999084472656,46.61436483184136,-17.072433934279417],
+            [118.0098652756816,47.44912338256836,-16.34299202201236],
+            [121.59999084472656,45.81272202313707,-16.34299202201236],
+            [118.16883444601625,48.181174190137234,-17.075042829581236],
+            [144.8380639859736,36.0251750099245,-17.075042829581236],
+            [140.51961811026098,37.21344297283865,-16.365197732704097],
+            [140.9073561041133,37.01230595136674,-16.34299202201236],
+            [144.53444338941605,35.359057213879176,-16.34299202201236],
+        ];
+        let mut m=MeshGL64 { num_prop:5, tri_verts:vec![0,1,2,0,3,1,4,3,0,5,4,0,4,6,7,6,4,5], face_id:vec![17;6], ..Default::default() };
+        for p in points { m.vert_properties.extend(p);m.vert_properties.extend([p[0],p[1]]); }
+        // The long roof edge is also a boundary of another native material,
+        // with different UVs/vertex IDs. Refinement must remain conforming.
+        let adjacent=[points[3],points[4],[(points[3][0]+points[4][0])/2.,(points[3][1]+points[4][1])/2.,points[3][2]-1.]];
+        for p in adjacent { m.vert_properties.extend(p);m.vert_properties.extend([100.+p[0],200.+p[2]]); }
+        m.tri_verts.extend([8,9,10]);m.face_id.push(29);
+        let original=m.vert_properties.clone();
+        let area=|m:&MeshGL64,material:u64| m.tri_verts.chunks_exact(3).zip(&m.face_id).filter(|(_,id)|**id==material).map(|(t,_)| {let n=cross(sub(at(m,t[1]),at(m,t[0])),sub(at(m,t[2]),at(m,t[0])));dot(n,n).sqrt()*0.5}).sum::<f64>();
+        let before=[area(&m,17),area(&m,29)];
+        assert!(refine_native_needles(&mut m,150_000,17).unwrap()>0);
+        assert_eq!(&m.vert_properties[..original.len()],&original);
+        for (i,material) in [17,29].into_iter().enumerate(){assert!((area(&m,material)-before[i]).abs()<1e-7);}
+        assert!(m.tri_verts.chunks_exact(3).zip(&m.face_id).filter(|(_,id)|**id==17).all(|(t,_)|face(&m,[t[0],t[1],t[2]]).1>=0.002));
+        assert!(m.face_id.iter().filter(|id|**id==29).count()>1,"Shared native boundary must split on both sides");
+        for (t,material) in m.tri_verts.chunks_exact(3).zip(&m.face_id){for id in t {
+            let v=&m.vert_properties[*id as usize*5..*id as usize*5+5];
+            let expected=if *material==17 {[v[0],v[1]]}else{[100.+v[0],200.+v[2]]};
+            assert!((v[3]-expected[0]).abs()<1e-10&&(v[4]-expected[1]).abs()<1e-10);
+        }}
+        let segments = |material:u64| {
+            let direction=sub(points[4],points[3]);let length=dot(direction,direction);
+            let on_edge=|p:V| {let delta=sub(p,points[3]);let n=cross(delta,direction);dot(n,n)<1e-18 && (-1e-10..=1.+1e-10).contains(&(dot(delta,direction)/length))};
+            let mut edges=std::collections::BTreeSet::new();
+            for (t,_) in m.tri_verts.chunks_exact(3).zip(&m.face_id).filter(|(_,id)|**id==material) {
+                for k in 0..3 {let a=at(&m,t[k]);let b=at(&m,t[(k+1)%3]);if on_edge(a)&&on_edge(b) {let mut key=[a.map(f64::to_bits),b.map(f64::to_bits)];key.sort();edges.insert(key);}}
+            }
+            edges
+        };
+        assert!(segments(17).len()>1);
+        assert_eq!(segments(17),segments(29),"Distinct UV identities must share exactly the same subdivided geometric boundary");
+        assert!(m.num_tri()<=7+256*2);
+    }
+
     #[test]
     fn native_refinement_refuses_the_existing_budget_before_mutating_the_mesh() {
         let mut m = needle(); let positions = m.vert_properties.clone(); let indices = m.tri_verts.clone(); let materials = m.face_id.clone();
