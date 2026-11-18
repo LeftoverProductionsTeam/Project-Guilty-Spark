@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - verify detached workspace handoff without render frames
+Task: Operation110 - validate the retained Black Echo mission in approved Forerunner
 Status: implementation incomplete
-Starting revision: 7a9ff968b0458e727acac792d5bbd22fe94d4c73, canonical master.
-Latest verified revision: 7a9ff96 plus scoped snapshot restore repair. Native Windows verified backup preservation, persisted restore, restart and Undo/Redo. Projectile picker browser layout verified separately in 2831d76.
-Next action: Reproduce a workspace pop-out with animation frames withheld, then verify the focused edit and Undo history reach the receiving window through the existing native handoff. Black Echo gameplay and original Save37944 remain open.
+Starting revision: a981a9dfa276fe7729c1014b9d472f96c6c98852, canonical master.
+Latest verified revision: a981a9d plus native workspace handoff repair. Eight Windows window/history scenarios and seven focused browser checks pass.
+Next action: Match the current approved Forerunner binary and capability profile to the retained corrected Black Echo CE609 cache and verify native map acknowledgement and mission flight. If interactive input remains unavailable, continue independently with the read-only tab close path, which still attempts to stage through the writer-only Save queue. Original Save37944 remains open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov workspace transfer: reproduced missing Pop out IPC and Close prompt while render frames were held. Fixed both along with background writes in observers. Actual Windows Workshop moves and closes with the WebView render callbacks held. Selection, independent ownership, explicit Save, press/release drag, reopening and Undo/Redo pass. RUNTIME_INTEGRATION_20261107 has exact hashes and test evidence.
 
 18Nov project snapshots: reproduced restore leaving the pre-restore Undo head and descriptor. Windows fix durably restores the chosen checkpoint, backs up the current unsaved edit, refuses a stale revision and preserves Undo/Redo across restart. Frontend29 and Rust16 pass. Exact receipts and scope in RUNTIME_INTEGRATION_20261107.
 
@@ -104,6 +106,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+18Nov run-f7IUXC and run-94ldKr closed. Their owned test apps and scripts exited; temporary output disposed 2,081,487,353 and 2,168,372,640 logical bytes. Both roots absent with zero development runs or issues.
 
 18Nov run-qjZQox closed. All native test writers exited and owned scratch disposed 2,245,630,569 logical bytes. Physical allocation unmeasured. Run root absent with zero development runs or issues.
 

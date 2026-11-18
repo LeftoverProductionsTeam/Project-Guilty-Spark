@@ -459,10 +459,10 @@ export default function App() {
   useEffect(()=>{
     if(!native)return;
     const timer=window.setInterval(()=>{
-      const id=historyRef.current.current?.id;if(!id||closingDocuments.current.has(id))return;
+      const id=historyRef.current.current?.id;if(!id||windowWritersRef.current[id]!==true||closingDocuments.current.has(id))return;
       const project=historyRef.current.current;
       if(!project||(project.automaticBackupRetention??data.settings.snapshotRetention??0)===0)return;
-      void save().then(()=>call('create_project_snapshot',{projectId:id,reason:'periodic'}))
+      void save(false,id).then(()=>call('create_project_snapshot',{projectId:id,reason:'periodic'}))
         .catch(e=>notice(`Periodic snapshot could not be saved: ${String(e)}`,'error'));
     },Math.max(1,data.settings.snapshotIntervalMinutes??10)*60_000);
     return ()=>window.clearInterval(timer);
@@ -517,10 +517,13 @@ export default function App() {
       event.preventDefault();
       if (closingRef.current) return;
       closingRef.current = true;
-      // Commit a focused numeric draft before collecting the final project snapshot.
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       try {
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        // Closing an occluded WebView must not depend on its render frames.
+        flushSync(() => {
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        });
+        const editable=documentsRef.current.documents.filter(doc=>windowHistories.current.writable(doc.id));
+        await Promise.all(editable.map(doc=>afterProjectMutation(doc.id,()=>undefined)));
         const dirty=documentsRef.current.documents.filter(doc=>doc.history.dirty&&windowHistories.current.writable(doc.id));
         for(const doc of dirty)closingDocuments.current.add(doc.id);
         const choice=returnPanelRequested.current?'discard':await chooseClose(dirty.flatMap(doc=>doc.history.current?[doc.history.current]:[]));
@@ -756,12 +759,13 @@ export default function App() {
     };
   }, [notice, refresh]);
   useEffect(() => {
-    if (!native || !history.dirty || !current) return;
+    const id=current?.id;
+    if (!native || !history.dirty || !id || windowWriters[id]!==true) return;
     const timer = setTimeout(() => {
-      void save().catch(() => {});
+      if(windowWritersRef.current[id]===true)void save(false,id).catch(() => {});
     }, 1200);
     return () => clearTimeout(timer);
-  }, [current, history.dirty, save]);
+  }, [current, history.dirty, save, windowWriters]);
   useEffect(()=>{
     const needsFirstSave=data.entries.some(entry=>entry.id===current?.id&&entry.sessionOnly);
     if(!data.memoryFirst||!current||!history.dirty||(!needsFirstSave&&(current.automaticBackupRetention??data.settings.snapshotRetention??0)>0)||warnedUnsaved.current.has(current.id))return;
@@ -944,9 +948,12 @@ export default function App() {
     flushSync(()=>{dispatchDocument({type:'select',id});setWorkspace(targetWorkspace??rememberedWorkspace(map.history.current!,map.inspection));});
   }
   async function flushWindowHandoff(id:string){
-    if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-    await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id,true);
-    await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    // Commit the focused draft before Save captures it, even if the
+    // source window is occluded and its renderer has stopped painting.
+    flushSync(()=>{
+      if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+    });
+    await save(false,id,true);
     const latest=documentsRef.current.documents.find(d=>d.id===id);
     if(latest&&native&&windowHistories.current.writable(id))await windowHistories.current.persist(id,latest.history);
     await windowHistories.current.flush(id);window.dispatchEvent(new Event('gs:save-viewport-context'));
@@ -987,7 +994,6 @@ export default function App() {
     // Stop background journal writes before transferring the native writer
     // lease. Saving the focused edit below is the final acknowledged write.
     closingDocuments.current.add(id);
-    if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     setBusy(true);try{
       await flushWindowHandoff(id);
       const document=documentsRef.current.documents.find(doc=>doc.id===id);

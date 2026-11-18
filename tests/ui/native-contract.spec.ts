@@ -166,7 +166,7 @@ test('C63 immediate Undo then Save in one frame saves the undone revision',async
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='save_project')?.args.project.tagEdits)).toEqual([]);
 });
 
-test('Save waits for the in-flight Workshop example before capturing its source revision',async({page})=>{
+for(const close of [false,true])test((close?'Window close':'Save')+' waits for the in-flight Workshop example before capturing its source revision',async({page})=>{
  await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Pending geometry',template:'customBlank',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[{id:'metal',name:'Metal',color:'#777777',shaderPath:'levels/test/metal',uScale:1,vScale:1}],spawns:[],objectives:[],placements:[]})));
  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
  await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();
@@ -178,10 +178,13 @@ test('Save waits for the in-flight Workshop example before capturing its source 
  });
  await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).__geometryHeld)).toBe(true);
- await page.keyboard.press('Control+s');
+ const review=page.getByRole('dialog',{name:'Save changes before closing?',exact:true});
+ if(close)await page.evaluate(()=>{void (window as any).__sparkMock.emit('tauri://close-requested');});
+ else await page.keyboard.press('Control+s');
  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
- expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='save_project'))).toBe(false);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>['save_project','close_application'].includes(call.command)))).toBe(false);
  await page.evaluate(()=>(window as any).__releaseGeometry());
+ if(close)await review.getByRole('button',{name:'Save changes',exact:true}).click();
 
  try {
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop?.brushes?.length)).toBe(4);
@@ -193,6 +196,10 @@ test('Save waits for the in-flight Workshop example before capturing its source 
   console.log('PENDING_SAVE_FAILURE',JSON.stringify(diagnostic));throw error;
  }
 
+ if(close){
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='close_application'))).toBe(true);
+  return;
+ }
  await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).not.toHaveAttribute('aria-description','Unsaved changes');
  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop?.brushes?.length??0)).toBe(0);
@@ -893,13 +900,30 @@ test('the current workspace can be dragged into a native window with no map open
   }
 });
 
-test('popping out a map editor stages the focused edit without a disk Save before transferring its document',async({page})=>{
+async function holdWindowFrames(page:Page){
+ await page.evaluate(()=>{
+  const w=window as any,original=window.requestAnimationFrame;
+  w.__windowFrames={original,count:0};
+  window.requestAnimationFrame=()=>++w.__windowFrames.count;
+ });
+ return async()=>page.evaluate(()=>{
+  const w=window as any;
+  window.requestAnimationFrame=w.__windowFrames.original;
+  delete w.__windowFrames;
+ });
+}
+
+test('popping out a map editor stages the focused edit before transferring its document with paint suspended',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{(window as any).__sparkMock.enforceTransfer=true;});
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('28');
-  await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await openViewMenu(page);
+  const resume=await holdWindowFrames(page);
+  try{
+   await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.findIndex((call:any)=>call.command==='open_project_window')),{timeout:2500}).toBeGreaterThan(0);
+  }finally{await resume();}
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.tagEdits?.[0]?.value)).toBe(28);
-  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.findIndex((call:any)=>call.command==='open_project_window'))).toBeGreaterThan(0);
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
   const move=calls.findIndex((call:any)=>call.command==='open_project_window');expect(move).toBeGreaterThan(0);
   expect(calls.slice(0,move).some((call:any)=>call.command==='update_project')).toBe(true);
@@ -2563,15 +2587,19 @@ test('cancelled descriptor export has no success notice and all readiness failur
   await expect(page.getByText('Metadata template: Error: Synthetic template error')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Install local package', exact: true })).toBeDisabled();
 });
-test('close guard commits focused fields and stays open after a save failure', async ({ page }) => {
+test('close guard commits focused fields with paint suspended and stays open after a save failure', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
   await page.getByRole('spinbutton', { name: 'Velocity' }).fill('44');
-  await page.evaluate(() => {
-    (window as any).__sparkMock.failSave = true;
-    void (window as any).__sparkMock.emit('tauri://close-requested');
-  });
   const closeReview = page.getByRole('dialog', { name: 'Save changes before closing?', exact: true });
+  const resume=await holdWindowFrames(page);
+  try{
+    await page.evaluate(() => {
+      (window as any).__sparkMock.failSave = true;
+      void (window as any).__sparkMock.emit('tauri://close-requested');
+    });
+    await expect(closeReview).toBeVisible({timeout:2500});
+  }finally{await resume();}
   await closeReview.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('window remains open');
   expect(
