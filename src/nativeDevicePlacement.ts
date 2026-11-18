@@ -2,12 +2,21 @@ import type {NativeDevicePlacement,NativeTagContext} from './nativeOperations';
 import type {Project,MapInspection,SceneObject,Vec3} from './types';
 import {nativeAiStartPosition} from './nativeAiStart';
 export const NATIVE_DEVICE_VIEW='world.device-placement';
-export interface NativeDeviceView {projectId:string;buildId:string;tag:string;sourceSha256:string;original:NativeDevicePlacement;position:[string,string,string];angles:[string,string,string];active:boolean;focus:number;locked?:boolean;reviewRequest?:number}
+export interface NativeDeviceView {projectId:string;buildId:string;tag:string;sourceSha256:string;original:NativeDevicePlacement;position:[string,string,string];angles:[string,string,string];usableFromBothSides?:boolean;active:boolean;focus:number;locked?:boolean;reviewRequest?:number}
 const strings=(v:number[])=>v.map(String) as [string,string,string];
-export function deviceDraft(row:NativeDevicePlacement){return {position:strings(row.position),angles:strings(row.rotationRadians.map(n=>Number((n*180/Math.PI).toFixed(6))))};}
-export function devicePose(view:Pick<NativeDeviceView,'original'|'position'|'angles'>):NativeDevicePlacement|null{const position=nativeAiStartPosition(view.position),angles=view.angles.map(v=>v.trim()?Number(v):NaN);if(!position||angles.some(n=>!Number.isFinite(n)||Math.abs(n)>360))return null;const before=deviceDraft(view.original).angles;return {...view.original,position,rotationRadians:angles.every((n,i)=>n===Number(before[i]))?view.original.rotationRadians:angles.map(n=>n*Math.PI/180) as Vec3};}
+export function deviceDraft(row:NativeDevicePlacement){
+    return {position:strings(row.position),angles:strings(row.rotationRadians.map(n=>Number((n*180/Math.PI).toFixed(6)))),usableFromBothSides:row.usableFromBothSides};
+}
+export function devicePose(view:Pick<NativeDeviceView,'original'|'position'|'angles'|'usableFromBothSides'>):NativeDevicePlacement|null{
+    const position=nativeAiStartPosition(view.position),angles=view.angles.map(v=>v.trim()?Number(v):NaN);
+    if(!position||angles.some(n=>!Number.isFinite(n)||Math.abs(n)>360))return null;
+    const before=deviceDraft(view.original).angles;
+    const rotationRadians=angles.every((n,i)=>n===Number(before[i]))?view.original.rotationRadians:angles.map(n=>n*Math.PI/180) as Vec3;
+    const usableFromBothSides=view.original.usableFromBothSides===undefined?undefined:view.usableFromBothSides??view.original.usableFromBothSides;
+    return {...view.original,position,rotationRadians,usableFromBothSides};
+}
 export function deviceIdentity(view:NativeDeviceView){return JSON.stringify([view.projectId,view.buildId,view.tag,view.sourceSha256,view.original]);}
-export function deviceScope(view:NativeDeviceView){return JSON.stringify([deviceIdentity(view),view.position,view.angles]);}
+export function deviceScope(view:NativeDeviceView){return JSON.stringify([deviceIdentity(view),view.position,view.angles,view.usableFromBothSides]);}
 export function deviceMatches(view:NativeDeviceView,context:NativeTagContext){return !context.deviceEditIssue&&context.class==='scnr'&&view.projectId===context.projectId&&view.buildId===context.buildId&&view.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&view.sourceSha256===context.tagSha256&&JSON.stringify(context.scenarioDevices?.find(row=>row.class===view.original.class&&row.index===view.original.index))===JSON.stringify(view.original);}
 export function deviceObjectId(row:NativeDevicePlacement){return (row.class==='ctrl'?'Control-':row.class==='vehi'?'Vehicle-':'Machine-')+row.index;}
 export function deviceSceneObject(view:NativeDeviceView,project:Project,inspection:MapInspection|null):SceneObject|null{const pose=devicePose(view),object=project.scene.find(o=>o.id===deviceObjectId(view.original));const tag=inspection?.tags.find(t=>t.id===object?.tagId);return pose&&object&&tag?.class===pose.class&&tag.path.replaceAll('\\','/').toLowerCase()===pose.tagPath.replaceAll('\\','/').toLowerCase()?{...object,visible:true,position:pose.position,rotation:pose.rotationRadians}:null;}

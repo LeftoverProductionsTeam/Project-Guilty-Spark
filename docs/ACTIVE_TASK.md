@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - verify native Covenant terminal activation and paired Black Echo boarding
+Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: e8f6f8b. CE609 candidate 833f7081 compiled and independently read back. Paired 7074 confirmed one rider and outbound lift. The guest diverged below the unchanged BSP.
-Next action: Use the exact 833f7081 reviewed candidate to verify the Covenant use prompt and actual faction selection from the north side. In the paired Pelican branch verify both host and guest stay grounded approaching the moved pad and occupy distinct seats before lift. Track the companion position divergence at the recorded ticks, then technology collection and settlement. Original Save37944 stays open.
+Latest verified revision: 45266f2 plus verified native control-side authoring. Exact 833f7081: both UNSC players boarded, landed and disembarked. Both Covenant selections registered. The Covenant guest could not deploy, and UNSC stopped short of rescue.
+Next action: Inspect the separate deployment control at the recorded Covenant guest pose (40.392,-109.485,1.349), then verify both players deploy and board the Spirit. Inspect the grounded UNSC rescue approach near (53.390,-93.511,0.156) before changing the mission. Verify technology collection, extraction and settlement. Original Save37944 stays open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov native terminal interaction sides: the existing device placement editor reviews a per-control two-sided flag. Four device tests, 16 native Logic tests (four ignored), four browser checks, TypeScript and the offline core build pass. Invader CE609 compile and independent readback confirm the only edited field. The exact 833f7081 paired UNSC run clears boarding, flight, landing and disembarkation. Rescue approach and later gameplay remain open. See RUNTIME_INTEGRATION_20261107.
 
 18Nov Black Echo Covenant terminal 833f7081: native range and marker orientation explain the missed north-side use prompt on 0ec0. The corrected placement preserves the other controls, both aircraft, all scripts and the BSP. Native compile and both readbacks pass. The paired 7074 approach reached one physical boarding and outbound climb. Host and guest disagreed about the guest position below existing ground, blocking paired departure. Exact traces are in RUNTIME_INTEGRATION_20261107.
 
@@ -120,6 +122,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+18Nov control-side run-w9uCnP closed. Owned native output of 1,008,128,495 logical bytes was disposed and the root is absent. Existing game trials are tracked by their Forerunner receipts.
 
 18Nov run-LRDY8K closed. Spark stopped only owned Forerunner PID4580, retained its diagnostics through stop, and exited0. Disposed 3,023,142,765 logical bytes, root absent, runs/issues zero. Retained exactly the new map and its two source files (113,362,688 bytes).
 

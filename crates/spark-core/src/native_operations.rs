@@ -536,9 +536,26 @@ impl Operation {
         if let Self::AppendTransport{transport,..}=self{return transport::arguments(tags,tag,before,transport);}
         if let Self::CommandList{list,append,..}=self{return if *append{command_lists::append_arguments(tags,tag,before,list)}else{command_lists::arguments(tags,tag,before,list)};}
         if let Self::DevicePlacement{device,..}=self{
-            let rows=native_device_fields(before)?;let original=rows.iter().find(|(row,_)|row.class==device.class&&row.index==device.index).ok_or_else(||crate::SparkError::Invalid("Native device index missing".into()))?;
-            if !original.0.same_identity(device)||original.0.same_pose(device){return invalid("Device source identity changed or already matches");}
-            let prefix=format!("{}[{}]",device.array(),device.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];for(field,values)in [("position",device.position),("rotation",device.rotation_radians)]{args.extend(["-S".into(),format!("{prefix}.{field}"),values.map(|v|v.to_string()).join(",")]);}args.push(tag.into());return Ok(args);
+            let rows = native_device_fields(before)?;
+            let (original, _) = rows.iter().find(|(row, _)| row.class == device.class && row.index == device.index)
+                .ok_or_else(|| crate::SparkError::Invalid("Native device index missing".into()))?;
+            if !original.same_identity(device) || (device.usable_from_both_sides.is_some() && original.usable_from_both_sides.is_none()) {
+                return invalid("Native device identity or control-side setting is unavailable");
+            }
+            let prefix = format!("{}[{}]", device.array(), device.index);
+            let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+            if !positions_close(original.position, device.position) {
+                args.extend(["-S".into(), format!("{prefix}.position"), device.position.map(|v| v.to_string()).join(",")]);
+            }
+            if !original.same_rotation(device) {
+                args.extend(["-S".into(), format!("{prefix}.rotation"), device.rotation_radians.map(|v| v.to_string()).join(",")]);
+            }
+            if let Some(sides) = device.usable_from_both_sides.filter(|sides| Some(*sides) != original.usable_from_both_sides) {
+                args.extend(["-S".into(), format!("{prefix}.control_flags.usable_from_both_sides"), u8::from(sides).to_string()]);
+            }
+            if args.len() == 2 { return invalid("Native device placement already matches"); }
+            args.push(tag.into());
+            return Ok(args);
         }
         if let Self::TriggerVolume{index,name,geometry,append,..}=self{
             let rows=scenario_volume_choices(before)?;let prefix=format!("trigger_volumes[{index}]");let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
@@ -2168,29 +2185,81 @@ mod tests {
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct NativeDevicePlacement {pub class:String,pub index:u16,pub name_index:i16,pub name:String,pub tag_path:String,pub position:[f32;3],pub rotation_radians:[f32;3]}
+pub struct NativeDevicePlacement {
+    pub class: String,
+    pub index: u16,
+    pub name_index: i16,
+    pub name: String,
+    pub tag_path: String,
+    pub position: [f32; 3],
+    pub rotation_radians: [f32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usable_from_both_sides: Option<bool>,
+}
 impl NativeDevicePlacement {
     fn array(&self)->&str{match self.class.as_str(){"ctrl"=>"controls","vehi"=>"vehicles",_=>"machines"}}
-    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
+    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&(self.class=="ctrl"||self.usable_from_both_sides.is_none())&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
     fn same_identity(&self,b:&Self)->bool{self.class==b.class&&self.index==b.index&&self.name_index==b.name_index&&self.name==b.name&&self.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))}
-    fn same_pose(&self,b:&Self)->bool{positions_close(self.position,b.position)&&self.rotation_radians.iter().zip(b.rotation_radians).all(|(a,b)|facings_close(*a,b))}
+    fn same_rotation(&self, other: &Self) -> bool {
+        self.rotation_radians.iter().zip(other.rotation_radians).all(|(a, b)| facings_close(*a, b))
+    }
 }
 fn native_index(fields:&str,key:&str)->Result<i16>{let n=number(fields,key)?;if n.fract()!=0.||n< -1.||n>65535.{return invalid("Invalid native placement index");}if n==65535.{Ok(-1)}else{i16::try_from(n as i64).map_err(|_|crate::SparkError::Invalid("Native placement index exceeds signed short".into()))}}
 pub fn scenario_device_choices(fields:&str)->Result<Vec<NativeDevicePlacement>>{Ok(native_device_fields(fields)?.into_iter().map(|row|row.0).collect())}
-fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[usize;2])>>{
+fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;3])>>{
     let names=array_listing(fields,"object_names")?;if names.count>512{return invalid("Native object name table exceeds512entries");}let names=array_items(&names,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
     let mut result=vec![];
     for(array,palette,class,extension)in [("machines","machine_palette","mach","device_machine"),("controls","control_palette","ctrl","device_control"),("vehicles","vehicle_palette","vehi","vehicle")]{
         let inventory=array_listing(fields,array)?;let pal=array_listing(fields,palette)?;let refs=array_items(&pal,palette)?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;let mut line=inventory.start+1;
         for(index,item)in array_items(&inventory,array)?.into_iter().enumerate(){let root=direct_struct_fields(item)?;let palette_index=native_index(&root,"type")?;let name_index=native_index(&root,"name")?;let name=if name_index<0{String::new()}else{names.get(name_index as usize).cloned().ok_or_else(||crate::SparkError::Invalid("Native object name index missing".into()))?};
             let tag=usize::try_from(palette_index).ok().and_then(|i|refs.get(i)).and_then(|v|v.strip_suffix(&format!(".{extension}"))).ok_or_else(||crate::SparkError::Invalid("Native device palette reference is unavailable or has another class".into()))?;
-            let(position,p)=native_vector(&root,"position")?;let(rotation,r)=native_vector(&root,"rotation")?;let row=NativeDevicePlacement{class:class.into(),index:index as u16,name_index,name,tag_path:tag.replace('\\',"/"),position,rotation_radians:rotation.map(f32::to_radians)};if !row.valid(){return invalid("Native device identity/pose is invalid");}result.push((row,[line+1+p,line+1+r]));line+=item.len();
+            let (position, p) = native_vector(&root, "position")?;
+            let (rotation, r) = native_vector(&root, "rotation")?;
+            let (usable_from_both_sides, side_line) = if class == "ctrl" && root.lines().any(|row| row.split_whitespace().eq(["control_flags", "bitmask"])) {
+                let (_, flags) = native_children(&root, "control_flags", "bitmask", 1)?;
+                let (flag_line, field) = &flags[0];
+                let enabled = match field.split_whitespace().collect::<Vec<_>>().as_slice() {
+                    ["usable_from_both_sides", "(0)", "bitfield"] => false,
+                    ["usable_from_both_sides", "(1)", "bitfield"] => true,
+                    _ => return invalid("Native control-side flag is unavailable"),
+                };
+                (Some(enabled), Some(line + 1 + flag_line))
+            } else {
+                (None, None)
+            };
+            let row = NativeDevicePlacement { class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides };
+            if !row.valid() { return invalid("Native device identity/pose is invalid"); }
+            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line]));
+            line += item.len();
         }
     }Ok(result)
 }
 fn reviewed_device(before:&str,after:&str,desired:&NativeDevicePlacement)->Result<Vec<FieldDifference>>{
-    let old=native_device_fields(before)?;let new=native_device_fields(after)?;if old.len()!=new.len(){return invalid("Device edit changed native inventory");}let i=old.iter().position(|(d,_)|d.class==desired.class&&d.index==desired.index).ok_or_else(||crate::SparkError::Invalid("Native device missing".into()))?;let(a,lines)=&old[i];let(b,new_lines)=&new[i];if !a.same_identity(desired)||!b.same_identity(desired)||!b.same_pose(desired)||lines!=new_lines{return invalid("Device edit changed identity/references or differs from proposed pose");}
-    let a=before.lines().collect::<Vec<_>>();let b=after.lines().collect::<Vec<_>>();if a.len()!=b.len(){return invalid("Device edit changed field structure");}let mut differences=vec![];for(i,(a,b))in a.iter().zip(&b).enumerate(){if a!=b{if !lines.contains(&i){return invalid("Device edit changed unrelated fields, flags, scripts or indices");}differences.push(FieldDifference{before:(*a).into(),after:(*b).into()});}}if differences.is_empty(){return invalid("Device edit changed no fields");}Ok(differences)
+    let old = native_device_fields(before)?;
+    let new = native_device_fields(after)?;
+    if old.len() != new.len() { return invalid("Device edit changed native inventory"); }
+    let index = old.iter().position(|(row, _)| row.class == desired.class && row.index == desired.index)
+        .ok_or_else(|| crate::SparkError::Invalid("Native device missing".into()))?;
+    let (original, lines) = &old[index];
+    let (revised, new_lines) = &new[index];
+    if !original.same_identity(desired) || !revised.same_identity(desired)
+        || !positions_close(revised.position, desired.position) || !revised.same_rotation(desired)
+        || revised.usable_from_both_sides != desired.usable_from_both_sides.or(original.usable_from_both_sides)
+        || lines != new_lines {
+        return invalid("Device readback differs from the reviewed identity, pose or control sides");
+    }
+    let before = before.lines().collect::<Vec<_>>();
+    let after = after.lines().collect::<Vec<_>>();
+    if before.len() != after.len() { return invalid("Device edit changed field structure"); }
+    let mut differences = vec![];
+    for (index, (a, b)) in before.iter().zip(&after).enumerate() {
+        if a != b {
+            if !lines.contains(&Some(index)) { return invalid("Device edit changed unrelated fields, flags, scripts or indices"); }
+            differences.push(FieldDifference { before: (*a).into(), after: (*b).into() });
+        }
+    }
+    if differences.is_empty() { return invalid("Device edit changed no fields"); }
+    Ok(differences)
 }
 fn verify_devices_cache(expected:&[NativeDevicePlacement],path:&Path,map:&crate::maps::MapInspection)->Result<()> {
     // Old receipts cover devices only. New placement receipts also pin the
@@ -2199,7 +2268,7 @@ fn verify_devices_cache(expected:&[NativeDevicePlacement],path:&Path,map:&crate:
     let actual=if vehicles{crate::maps::scenario_placement_readback(path,map)?}else{crate::maps::scenario_logic_readback(path,map)?};
     let rows=actual.devices.iter().chain(actual.vehicles.iter().filter(|_|vehicles)).collect::<Vec<_>>();
     if rows.len()!=expected.len(){return invalid("Compiled native placement inventory differs from source");}
-    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b)){return invalid("Compiled device identity, reference or pose differs from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
+    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides){return invalid("Compiled device identity, reference, pose or control sides differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
     Ok(())
 }
 
@@ -2215,6 +2284,31 @@ mod device_placement_tests {
   let mut invalid=desired.clone();invalid.class="weap".into();assert!(!invalid.valid());invalid=desired.clone();invalid.position[0]=f32::NAN;assert!(!invalid.valid());invalid=desired.clone();invalid.name_index=-1;assert!(!invalid.valid());
   let snapshot=ScenarioSquadReadback{named_objects:None,cutscene_flags:None,extraction_squads:None,faction_kits:None,transports:None,command_lists:None,devices:Some(vec![desired]),volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![]};snapshot.validate().unwrap();let mut bad=snapshot.clone();bad.devices.as_mut().unwrap().push(original);assert!(bad.validate().is_err());
  }
+    #[test]
+    fn control_sides_use_only_the_selected_native_flag_and_preserve_legacy_pose_edits() {
+        let before = fields().replace("scripts[0] array", "        control_flags bitmask\n            usable_from_both_sides (0) bitfield\nscripts[0] array");
+        let mut device = scenario_device_choices(&before).unwrap().remove(0);
+        assert_eq!(device.usable_from_both_sides, Some(false));
+        device.usable_from_both_sides = Some(true);
+        let tags = Path::new("tags");
+        let op = Operation::DevicePlacement {device:device.clone(),source_sha256:"a".repeat(64)};
+        let args = op.arguments_with_fields(tags, "scnr", "level.scenario", &before).unwrap();
+        assert_eq!(&args[2..5], ["-S", "controls[0].control_flags.usable_from_both_sides", "1"]);
+        assert_eq!(args.len(), 6);
+        let after = before.replace("usable_from_both_sides (0)", "usable_from_both_sides (1)");
+        assert_eq!(reviewed_difference(&before, &after, &op).unwrap().len(), 1);
+        assert!(reviewed_difference(&before, &after.replace("initially_off (0)", "initially_off (1)"), &op).is_err());
+        op.verify_readback(tags, "scnr", "level.scenario", &before, "1\n").unwrap();
+        assert!(op.verify_readback(tags, "scnr", "level.scenario", &before, "0\n").is_err());
+        assert!(op.arguments_with_fields(tags, "scnr", "level.scenario", &fields()).is_err());
+
+        device.usable_from_both_sides = None;
+        device.position[0] = 4.;
+        let legacy = Operation::DevicePlacement {device,source_sha256:"a".repeat(64)};
+        let local_move = before.replace("position (1,2,3)", "position (4,2,3)");
+        assert_eq!(reviewed_difference(&before, &local_move, &legacy).unwrap().len(), 1);
+        assert!(reviewed_difference(&before, &local_move.replace("usable_from_both_sides (0)", "usable_from_both_sides (1)"), &legacy).is_err());
+    }
  #[test]
  fn native_vehicle_pose_reuses_the_existing_review_and_preserves_names_flags_and_other_placements(){
   let before=fields().replace("object_names[1] array","object_names[2] array").replace("vehicles[0] array\nvehicle_palette[0] array", "vehicles[1] array\n    vehicles[0] struct\n        type (0) index\n        name (1) index\n        position (7,8,9) point3d (float32)\n        rotation (0,0,0) euler3d (float)\n        body_vitality (1) float\n        team_index (0) enum\nvehicle_palette[1] array\n    vehicle_palette[0] struct\n        name (vehicles/pelican/pelican.vehicle) tagref").replace("vehicles[1] array","    object_names[1] struct\n        name (extraction_pelican) string\nvehicles[1] array");

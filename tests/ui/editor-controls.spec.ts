@@ -136,6 +136,34 @@ test('existing native device poses retain bindings and refuse dirty invalid or s
  await yaw.fill('361');await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeDisabled();await yaw.fill('90');await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(x).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();await expect(x).toHaveValue('1');await expect(yaw).toHaveValue('0');await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeDisabled();
 });
 
+test('native control sides change only the reviewed placement and reset on source change', async ({page}) => {
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-device');
+ const form=page.locator('.native-device-placements');
+ await form.locator(':scope > summary').click();
+ const sides=form.getByRole('checkbox',{name:'Allow use from both sides',exact:true});
+ const preview=form.getByRole('button',{name:'Preview device placement',exact:true});
+ const placement=form.getByRole('combobox',{name:'Native source placement',exact:true});
+ await expect(sides).not.toBeChecked();
+ await expect(preview).toBeDisabled();
+ await sides.focus();
+ await page.keyboard.press('Space');
+ await preview.click();
+ const op=JSON.parse((await page.getByTestId('device-operation').textContent())!);
+ expect(op).toMatchObject({kind:'devicePlacement',sourceSha256:'a'.repeat(64),device:{index:0,position:[1,2,3],rotationRadians:[0,0,0],usableFromBothSides:true}});
+ await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();
+ await expect(sides).toBeDisabled();
+ await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();
+ await placement.selectOption('ctrl:1');
+ await expect(sides).not.toBeChecked();
+ await expect(preview).toBeDisabled();
+ await sides.check();
+ await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();
+ await expect(sides).not.toBeChecked();
+ await expect(preview).toBeDisabled();
+ await placement.selectOption('vehi:0');
+ await expect(sides).toHaveCount(0);
+});
+
 test('existing native command actions and waypoints stay source-bound and reject invalid references',async({page})=>{
  await page.goto('/tests/ui/fixtures/editorControls.html?native-command-source');const form=page.locator('.native-command-lists');await form.locator(':scope > summary').click();const preview=form.getByRole('button',{name:'Preview command list',exact:true});await expect(preview).toBeDisabled();await form.getByRole('combobox',{name:'Native command action',exact:true}).selectOption('pause');await form.getByRole('spinbutton',{name:'Command Parameter 1',exact:true}).fill('1.25');await form.getByRole('spinbutton',{name:'Command point X',exact:true}).fill('7.5');await preview.click();let result=JSON.parse(await page.getByTestId('command-operation').textContent()??'null');expect(result).toMatchObject({kind:'commandList',sourceSha256:'a'.repeat(64),list:{index:0,name:'patrol',points:[[7.5,2,3],[4,5,6]]}});expect(result.list.commands[0]).toMatchObject({atom:'pause',parameters:[1.25,0]});expect(result.list.commands[1].command).toBe(0);
  await form.getByText('Native references',{exact:true}).click();await form.getByRole('spinbutton',{name:'Command Point 1',exact:true}).fill('2');await expect(preview).toBeDisabled();await form.getByRole('spinbutton',{name:'Command Point 1',exact:true}).fill('0');await form.getByRole('spinbutton',{name:'Command Parameter 1',exact:true}).fill('');await expect(preview).toBeDisabled();await form.getByRole('spinbutton',{name:'Command Parameter 1',exact:true}).fill('1.25');await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(preview).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await page.getByRole('button',{name:'Toggle shared source',exact:true}).click();await expect(preview).toBeDisabled();await page.getByRole('button',{name:'Toggle shared source',exact:true}).click();await page.getByRole('button',{name:'Toggle recipe-owned list',exact:true}).click();await expect(preview).toBeDisabled();await expect(form.getByRole('combobox',{name:'Native command source list',exact:true})).toBeEnabled();await form.getByRole('combobox',{name:'Native command source list',exact:true}).selectOption('1');await expect(form.getByRole('spinbutton',{name:'Command point X',exact:true})).toBeEnabled();await form.getByRole('combobox',{name:'Native command source list',exact:true}).selectOption('0');await page.getByRole('button',{name:'Toggle recipe-owned list',exact:true}).click();await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();await expect(preview).toBeDisabled();await expect(form.getByRole('spinbutton',{name:'Command point X',exact:true})).toHaveValue('1');

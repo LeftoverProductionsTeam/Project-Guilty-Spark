@@ -9,6 +9,7 @@ pub struct ScenarioLogicName {pub name:String,pub object_type:i16,pub object_ind
 pub struct ScenarioLogicDevice {
     #[serde(skip_serializing_if="Option::is_none")] pub power_group:Option<i16>,
     #[serde(skip_serializing_if="Option::is_none")] pub position_group:Option<i16>,
+    #[serde(skip_serializing_if="Option::is_none")] pub usable_from_both_sides:Option<bool>,
     pub class:String,pub index:usize,pub name_index:i16,pub tag_path:String,pub position:[f32;3],pub rotation_radians:[f32;3]}
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -170,7 +171,10 @@ fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:boo
         for (index,object) in placed.into_iter().enumerate(){
             let targets=tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class==class).collect::<Vec<_>>();
             if targets.len()!=1{return invalid("Compiled Logic device tag identity/class is missing or ambiguous");}
-            let placement=ScenarioLogicDevice{power_group:if class=="vehi"{None}else{Some(r.u16(at+index*stride+40)? as i16)},position_group:if class=="vehi"{None}else{Some(r.u16(at+index*stride+42)? as i16)},class:class.into(),index,name_index:r.u16(at+index*stride+2)? as i16,
+            let placement_at = at + index * stride;
+            // In the 64-byte control placement, control_flags follows the common device flags.
+            let usable_from_both_sides = if class == "ctrl" { Some(r.u32(placement_at + 48)? & 1 != 0) } else { None };
+            let placement=ScenarioLogicDevice{power_group:if class=="vehi"{None}else{Some(r.u16(placement_at+40)? as i16)},position_group:if class=="vehi"{None}else{Some(r.u16(placement_at+42)? as i16)},usable_from_both_sides,class:class.into(),index,name_index:r.u16(placement_at+2)? as i16,
                 tag_path:targets[0].path.clone(),position:object.position,rotation_radians:object.rotation};
             if class=="vehi"{vehicles.push(placement);}else{devices.push(placement);}
         }
