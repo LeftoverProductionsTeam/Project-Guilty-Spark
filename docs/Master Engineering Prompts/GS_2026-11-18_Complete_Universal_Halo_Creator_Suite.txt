@@ -1,0 +1,204 @@
+# PROJECT GUILTY SPARK — COMPLETE UNIVERSAL HALO CREATOR SUITE
+## ALL THE TOOLS, AND THEN SOME.
+### Permanent engineering directive — November 18, 2026
+
+**MISSION: Finish the entire Guilty Spark vision to Operation 110% quality, preserving all 475 historical requirements and milestones M1–M6.**
+
+Spark must become the singular, safe creator environment for Halo 1 across old and modern engines—not another incomplete editor, test harness or collection of duplicated Halo tools.
+
+This directive extends the existing permanent goal. No original requirement is canceled.
+
+## 1. Preserve the entire runtime vision
+
+Continue support and truthful compatibility work for:
+
+- Original Xbox Halo retail.
+- Gearbox Halo PC retail and Custom Edition.
+- HaloMD and legacy Mac Demo/Mac retail.
+- MCC Halo 1 Anniversary and its supported maps, tags and Workshop workflows.
+- OpenSauce where legitimately compatible.
+- OpenCE, Chupathingy, OpenH1, Forerunner and approved related community forks.
+- Compatible alternative engines, external HEK/Tool/OpenTool, Invader, Guerilla, Sapien and Baboon workflows.
+- Native Windows, Linux and macOS authoring and distribution, including Mac Legacy Edition.
+
+Review recent upstream changes to maps, tags, lighting, renderers, content formats, network-capability metadata, Workshop workflows and build tools at meaningful integration milestones.
+
+Never silently assume formats or tool behavior remain unchanged.
+
+**One authored source must remain portable whenever technically achievable.**
+
+For a selected target runtime, automatically propose and perform the necessary compatible conversion, removal or substitution of unsupported content in a reviewed, staged output—not the original source.
+
+Xbox exports must be specifically validated against Xbox-supported formats and constraints. Preserve the higher-fidelity authoring version and provide an explicit conversion report.
+
+Use native formats, compatible sidecars and existing toolchains. Do not invent proprietary tag extensions merely to bypass compatibility work.
+
+## 2. Correct the confirmed and suspected issues
+
+**Save37944 and project integrity**
+- Reproduce and identify the remaining Save37944 issue without assuming a previously repaired Save defect is its cause.
+- Close the final external-writer race identified in project publication.
+- Preserve strong file identities, exact source hashes, approved write ownership and durable recovery.
+- Verify actual Save, Undo, Redo, crash recovery, multiple windows, independent observers, source changes and restart.
+- Protect concurrent external edits. Refuse stale writes without overwriting another writer.
+- Check Windows, Linux and macOS behavior using appropriate filesystem semantics.
+- Preserve previous-good source and builds. No unsafe in-place repair of user assets.
+
+**Asset preview correctness**
+- Investigate reuse of cached meshes across changed asset/source revisions.
+- Bind asynchronous mesh results to the expected asset SHA-256 and relevant project revision.
+- Discard stale results safely instead of painting an older model over a newer asset.
+- Reuse existing metadata and the document reducer. No second cache architecture.
+
+**Viewport scalability**
+- Profile the repeated BSP triangle searches used for object incident-lighting probes.
+- Reuse cached spatial structures or existing spatial query utilities before introducing new geometry systems.
+- Check large BSPs, dense object scenes and repeated selection/drag operations.
+- Improve interactive frame pacing without compromising native lighting correctness.
+
+**Runtime identification**
+- Reconcile eight historical Forerunner executable hashes and hard-coded contract assumptions with reviewed, versioned runtime capabilities.
+- Preserve compatibility with already registered trusted builds.
+- Maintain executable/dependency verification and explicit trust/admission.
+- A new legitimate Forerunner build should not require endlessly growing hard-coded SHA tables.
+- Never turn dynamic capability discovery into blind trust of arbitrary executables.
+
+## 3. Finish Black Echo's complete playable handoff
+
+Use the latest current evidence, not historical blockers that have already been corrected.
+
+Complete source editing, script compilation, native CE609 cache generation and independent readback for both factions.
+
+Work with Forerunner to prove:
+
+- Correct squad/faction spawning and native equipment.
+- Pelican and Spirit seat assignments, pilots, initial placement, flight routes and safe disembarkation.
+- Physical rescue rallies, grounded ally movement, encounter triggers and combat.
+- Correct team allegiance, enemy position, spawn timing and scripted objective conditions.
+- Player-visible mission markers, terminal interaction, audio, HUD, checkpoints and cinematics.
+- Native rescue completion, collection, evacuation and banking.
+- Two real authenticated clients with valid positions, synced objectives, successful extraction and clean restart.
+- Robust recovery after death, cancellation, route obstruction or reconnect.
+
+The reported Covenant escort and Spirit return are useful verified progress. Later reports identified combat proximity, Pelican route and peer-position issues. Reconcile the newest tests before changing source.
+
+**Do not weaken aircraft landing, native animation, player seating, HaloScript or collision checks to manufacture success.**
+
+A complete authored mission working in Forerunner is the acceptance target.
+
+## 4. Fully integrated creation workflows
+
+Finish the original seamless authoring experience:
+
+**3D world and scenario editing**
+- Full in-viewport move, rotate, scale, select, clone, place, drag and inspect with native readback.
+- Editable native objects, tags, physics, dependencies, animation, sounds, scripts, weather, shaders, materials and scenery.
+- BSP creation and refinement, collision, portals, pathfinding, navigation, caves, canyon seams, tunnels, mountain paths and terrain sculpting.
+- Real AI squads, encounters, command lists, objectives, spawning and HaloScript authoring.
+- Finish previously missing object, tag and scene workflows; no inert controls or preview-only functionality disguised as editing.
+
+**Native build and tools**
+- Continue integrated Invader, Tool/OpenTool, Guerilla, Baboon and equivalent native tool workflows.
+- Offer secure acquisition of legally distributable tool versions and allow an explicitly selected existing installation.
+- Verify tool versions, dependencies, architecture and compatibility.
+- After a native tool changes owned staged output, detect and refresh affected tags, source state, dependencies and previews.
+- Keep native compiler errors and readbacks visible in Spark.
+- Do not silently overwrite or update third-party applications or source files.
+
+**Lighting**
+- Finish the real-time light placement and editing workflow.
+- Keep the working GPU direct-light draft.
+- Extend it toward full native Halo lightmap production through the existing source/native bake pipeline: validated UVs, chart padding, encoding, mipmaps, native tags, shaders and compiled-map readback.
+- Integrate a real Bake action and external Tool/OpenTool path where appropriate.
+- Fix remaining P8/bump/reflection and material parity issues.
+- Do not confuse a rendered lighting preview with a native game lightmap.
+
+**Live editing**
+- Finish SparkLink, Live Link and Live Rebuild as working editor-to-game workflows.
+- Support safe reviewed live asset/tag edits, visual changes, undo/redo, transactional rejection, reload and native proof.
+- Extend existing Forerunner capability discovery instead of creating another communication protocol.
+- Work toward compatible live editing with Chupathingy/OpenCE where supported by actual integration.
+- Preserve a known-good running game after failed rebuilds.
+
+## 5. Complete the creative game systems
+
+Finish authoring, content generation and real native verification for:
+
+- Classic campaign missions, cutscenes and co-op.
+- Firefight, enemy-wave/spawner controls and cooperative objectives.
+- Zombie Apocalypse/Infection with genuine Halo-based AI, behaviors, survival logic, encounters and encounters' native assets—not just explanatory stubs.
+- Marathon-style Extraction with independent squads, loot, technology, missions, risk/reward and PvPvE.
+- First Contact and other previously approved gameplay concepts.
+- Forge, machinima, cinematics, camera tracks and native animation/lighting integration.
+- Custom game modes, map voting, custom game browser/content discovery and compatible community map distribution.
+
+**MegaWorld remains a flagship, not a demo.**
+
+Deliver all 19 genuinely connected regions, editing and validating their adjacent edges, caves, canyons, tunnel routes, mountain paths and playable traversal.
+
+The current atlas and two-region compiler proof are not the final system.
+
+Complete reusable connected-world build rules, cross-region content placement, continuous or appropriately hidden native transitions, AI/nav connectivity, environment/lighting continuity, object persistence, performance budgets and validated Forerunner gameplay.
+
+Do not introduce unapproved proprietary map extensions to make it work.
+
+**VR authoring**
+Complete OpenXR-compatible spatial editing, flying through levels, manipulating objects, placing assets, editing native parameters and testing scenes in VR. Work with Forerunner's existing VR runtime and preserve conventional desktop editing.
+
+## 6. Product quality and UX
+
+The application must feel like one coherent editor.
+
+- Keep the existing navigation, workspace management, integrated asset library and established native workflow architecture.
+- Resolve confusing or duplicated controls, dead clicks, unreachable features, misplaced UI, clipped lists and misleading labels.
+- Preserve all normal/advanced workflows, keyboard shortcuts, pop-out windows, multimonitor editing and accessibility.
+- Keep user-selected runtime and source folders linked and protected.
+- Load assets on demand, cache by verified identity, and release unneeded CPU/GPU allocations.
+- No massive refactor merely to split large files.
+- Gradually separate `native_operations.rs`, QuickForge, App and the oversized browser test specification only where actual change boundaries justify it.
+- Preserve novice and expert journeys without introducing another parallel editor.
+
+## 7. Storage, repository and original-file safety
+
+**User files are sacred.**
+
+Original Halo maps, ISOs, tags, game installations, linked folders and any explicitly selected files remain untouchable without explicit permission—even if located inside the repository root or larger than repository size limits.
+
+- Use staged output, immutable source identities and independent native readback.
+- No destructive source cleanup, recursive directory deletion or unexpected writes.
+- Preserve original project histories, credits, previous-good builds and Undo/Redo recovery.
+- Retain historical project requirements and artifact provenance.
+- Review the approximately 45 MB tracked screenshot collection for safe source-tree slimming, but do not delete irreplaceable evidence.
+- Keep generated test artifacts and caches out of tracked source.
+- Preserve needed historical compatibility code and all intentionally retained old-platform functionality.
+- Never remove a module simply because it is old, small, unreferenced by direct imports or not used on Windows.
+- Respect licensing, including Spark's MIT boundary when considering GPL/AGPL upstream code. Avoid incompatible code copying.
+
+## 8. Completion and execution policy
+
+The preserved **475 historical requirements** and M1–M6 remain authoritative. Keep their existing identities and evidence. Do not duplicate records or count records as completed features.
+
+**Priority order:**
+
+1. Actual Save37944 root cause and verified source integrity.
+2. Complete Black Echo mission with real Forerunner clients.
+3. Finish viewport correctness, native editing, real build/readback and lighting.
+4. Complete Forge, campaign/co-op, Firefight, Zombies, Extraction, First Contact and machinima.
+5. Deliver MegaWorld, Live Link/Live Rebuild, SparkLink and VR authoring.
+6. Complete runtime conversion, Xbox, Mac Legacy, Linux/macOS/Windows support, community workflows and final release acceptance.
+7. Finish polishing, packaging, installation, documentation and verified public distribution.
+
+For every cycle:
+- Review the relevant existing implementation and recent upstream changes.
+- Select a concrete incomplete workflow or measured defect.
+- Implement useful production code.
+- Run proportionate focused tests and the necessary native/UI acceptance.
+- Keep original files and prior-good builds unchanged.
+- Commit locally on the authorized branch with a clean working tree.
+- **Never push without permission.**
+- No hosted/paid CI, unnecessary broad fixture repetition or documentation-only cycles.
+- If blocked, preserve exact evidence and continue another independently useful feature.
+
+**SUCCESS IS A COMPLETE, SAFE, CROSS-PLATFORM HALO CREATION SUITE THAT LETS PEOPLE ACTUALLY BUILD, EDIT, CONVERT, LIGHT, TEST AND PLAY WHAT THEY CREATE.**
+
+**ALL THE TOOLS, AND THEN SOME.**

@@ -3929,6 +3929,52 @@ test('immediate Save after a map tab click belongs to the selected project in th
 });
 
 
+test('a held Save in one map does not stall another map’s saved acknowledgement',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});
+ const baseline=page.getByRole('tab',{name:'Synthetic baseline',exact:true});
+ const candidate=page.getByRole('tab',{name:'Synthetic candidate',exact:true});
+ await velocity.fill('39');await velocity.press('Tab');
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await chooseTool(page,'Tag editor');await velocity.fill('45');await velocity.press('Tab');
+ await expect(baseline).toHaveAttribute('aria-description','Unsaved changes');
+ await expect(candidate).toHaveAttribute('aria-description','Unsaved changes');
+ await page.evaluate(()=>{
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+   if(command==='save_project'&&args.project.id==='a')await new Promise<void>(resolve=>{w.__releaseBaselineSave=resolve;});
+   return invoke(command,args);
+  };
+ });
+ await baseline.click();await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>typeof (window as any).__releaseBaselineSave)).toBe('function');
+ try{
+  await candidate.click();await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>{
+   const saved=(window as any).__sparkMock.saved;
+   return saved?.id==='b'?saved.tagEdits[0]?.value:null;
+  })).toBe(45);
+  await expect(candidate).not.toHaveAttribute('aria-description','Unsaved changes',{timeout:2500});
+  await page.getByRole('button',{name:'Close map Synthetic candidate',exact:true}).click();
+  await expect(candidate).toHaveCount(0,{timeout:2500});
+  await expect(page.getByRole('dialog',{name:'Save changes before closing?',exact:true})).toHaveCount(0);
+  await expect(baseline).toHaveAttribute('aria-description','Unsaved changes');
+ }finally{
+  await page.evaluate(()=>(window as any).__releaseBaselineSave());
+ }
+ await expect.poll(()=>page.evaluate(()=>{
+  const saved=(window as any).__sparkMock.saved;
+  return saved?.id==='a'?saved.tagEdits[0]?.value:null;
+ })).toBe(39);
+ await expect(baseline).not.toHaveAttribute('aria-description','Unsaved changes');
+ await chooseTool(page,'Map library');
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await expect(candidate).toHaveAttribute('aria-selected','true');
+ await chooseTool(page,'Tag editor');
+ await expect(candidate).not.toHaveAttribute('aria-description','Unsaved changes');
+ await expect(velocity).toHaveValue('45');
+});
+
 test('Tools reachability audit follows a later measured page when mounted commands grow',async({page})=>{
  await page.setViewportSize({width:1280,height:600});await mockDesktop(page);
  await page.evaluate(async()=>{const fixture='/tests/ui/fixtures/lateToolsSurface.tsx';(await import(fixture)).mountLateTools();});

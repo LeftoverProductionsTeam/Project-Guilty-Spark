@@ -249,7 +249,7 @@ export default function App() {
   useEffect(()=>{if(native)document.documentElement.dataset.gsNativeFrame='true';},[]);
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
-  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveQueues = useRef(new Map<string, Promise<void>>());
   const libraryRefresh = useRef<ReturnType<typeof createLatestRefresh<void,Bootstrap>> | null>(null);
   const current = history.current;
   const unsaved=history.dirty||!!data.entries.find(entry=>entry.id===current?.id)?.sessionOnly;
@@ -434,7 +434,9 @@ export default function App() {
         const nativeSave=native?windowHistories.current.save(project.id,history,publish).then(entry=>({entry}),error=>({error})):null;
         return {project,nativeSave,publish};
       }).then(snapshot=>({snapshot}),error=>({error}));
-      const operation = saveQueue.current.then(async () => {
+      // Keep receipts ordered for this document while another map saves or reports its error.
+      const queues=saveQueues.current;
+      const operation = (queues.get(p.id)??Promise.resolve()).then(async () => {
         try {
           const settled = await snapshot;
           if ('error' in settled) throw settled.error;
@@ -451,7 +453,9 @@ export default function App() {
           throw e;
         }
       });
-      saveQueue.current = operation.catch(() => {});
+      const settled = operation.catch(() => {});
+      queues.set(p.id,settled);
+      void settled.then(()=>{if(queues.get(p.id)===settled)queues.delete(p.id);});
       return operation;
     },
     [notice],
