@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - validate the retained Black Echo mission in approved Forerunner
-Status: implementation incomplete
-Starting revision: a981a9dfa276fe7729c1014b9d472f96c6c98852, canonical master.
-Latest verified revision: a981a9d plus native workspace handoff repair. Eight Windows window/history scenarios and seven focused browser checks pass.
-Next action: Match the current approved Forerunner binary and capability profile to the retained corrected Black Echo CE609 cache and verify native map acknowledgement and mission flight. If interactive input remains unavailable, continue independently with the read-only tab close path, which still attempts to stage through the writer-only Save queue. Original Save37944 remains open.
+Task: Operation110 - repair Black Echo Pelican departure against the compiled BSP
+Status: awaiting human verification
+Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
+Latest verified revision: 8eaffb2 plus native Black Echo Pelican route candidate 0ec05e41. Forerunner 1284c03e two-client trace on predecessor dee2d9a7 confirms load, Spirit landing and paired Pelican boarding.
+Next action: Relaunch the retained 0ec05e41 CE609 candidate in the privately reviewed Forerunner profile after the owner handles the Windows firewall prompt. Complete profile setup, confirm the loaded hash, and verify Pelican lift, insertion, disembark, return, then paired crew and mission settlement. The last disposable app and game are closed. If the interactive gate remains blocked, continue existing read-only tab close repair. Original Save37944 stays open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov Pelican route 0ec05e41: actual paired predecessor trace matched the collision BSP obstruction. The fresh CE609 candidate preserves unrelated scenario data and verifies nine revised route legs. Build/source/readback identities and engine boundaries are in RUNTIME_INTEGRATION_20261107.
 
 18Nov workspace transfer: reproduced missing Pop out IPC and Close prompt while render frames were held. Fixed both along with background writes in observers. Actual Windows Workshop moves and closes with the WebView render callbacks held. Selection, independent ownership, explicit Save, press/release drag, reopening and Undo/Redo pass. RUNTIME_INTEGRATION_20261107 has exact hashes and test evidence.
 
@@ -106,6 +108,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+18Nov run-LRDY8K closed. Spark stopped only owned Forerunner PID4580, retained its diagnostics through stop, and exited0. Disposed 3,023,142,765 logical bytes, root absent, runs/issues zero. Retained exactly the new map and its two source files (113,362,688 bytes).
 
 18Nov run-f7IUXC and run-94ldKr closed. Their owned test apps and scripts exited; temporary output disposed 2,081,487,353 and 2,168,372,640 logical bytes. Both roots absent with zero development runs or issues.
 
