@@ -1,6 +1,6 @@
 /** In-flight source transactions. Geometry blocks history until committed;
  * resource bindings settle before Save without blocking Undo or GPU rendering. */
-interface Mutation { history: boolean; settled: Promise<void>; }
+interface Mutation { history: boolean; settled: Promise<Error | undefined>; }
 const locks = new Map<string, Map<symbol, Mutation>>();
 export function projectMutationPending(id: string) {
   return [...(locks.get(id)?.values() ?? [])].some(mutation => mutation.history);
@@ -8,22 +8,22 @@ export function projectMutationPending(id: string) {
 export function beginProjectMutation(id: string, options: { history?: boolean } = {}) {
   const token = Symbol();
   const set = locks.get(id) ?? new Map<symbol, Mutation>();
-  let complete!: () => void;
-  const settled = new Promise<void>(resolve => { complete = resolve; });
+  let complete!: (failure?: Error) => void;
+  const settled = new Promise<Error | undefined>(resolve => { complete = resolve; });
   set.set(token, { history: options.history !== false, settled });
   locks.set(id, set);
   let released = false;
-  return () => {
+  return (failure?: Error) => {
     if (released) return;
     released = true;
     set.delete(token);
     if (!set.size) locks.delete(id);
-    complete();
+    complete(failure);
   };
 }
 /** Capture after the source operations already in flight at this Save request.
  * New unrelated operations cannot extend the wait or change a queued snapshot.
- * Timeout preserves the pending work and reports failure, never a false Save. */
+ * A pending operation can refuse this snapshot if it rejects the requested edit. */
 export function afterProjectMutation<T>(id: string, snapshot: () => T, timeoutMs = 15000): Promise<T> {
   const pending = [...(locks.get(id)?.values() ?? [])].map(mutation => mutation.settled);
   if (!pending.length) {
@@ -35,9 +35,11 @@ export function afterProjectMutation<T>(id: string, snapshot: () => T, timeoutMs
       finished = true;
       reject(Error('Source changes or default material discovery are still pending. Keep this project open and Save again when they finish.'));
     }, timeoutMs);
-    void Promise.all(pending).then(() => {
+    void Promise.all(pending).then(outcomes => {
       if (finished) return;
       finished = true; clearTimeout(timer);
+      const failure = outcomes.find(Boolean);
+      if (failure) { reject(failure); return; }
       try { resolve(snapshot()); } catch (error) { reject(error); }
     });
   });

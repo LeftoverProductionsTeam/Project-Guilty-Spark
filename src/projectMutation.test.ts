@@ -19,6 +19,16 @@ describe('Save boundaries around in-flight source changes',()=>{
   const release=beginProjectMutation('save-idle');source='later';expect(await saved).toBe('at Save');release();release();
   expect(projectMutationPending('save-idle')).toBe(false);
  });
+ it('refuses the captured save when a pending geometry edit fails, and allows a later save',async()=>{
+  const release=beginProjectMutation('save-rejected'),capture=vi.fn(()=> 'accepted geometry');
+  const pending=afterProjectMutation('save-rejected',capture);
+  const reason=Error('Geometry rejected');
+  release(reason);
+  await expect(pending).rejects.toBe(reason);
+  expect(capture).not.toHaveBeenCalled();
+  expect(await afterProjectMutation('save-rejected',capture)).toBe('accepted geometry');
+  expect(capture).toHaveBeenCalledTimes(1);
+ });
  it('reports a stalled source transaction without cancelling it or capturing stale data',async()=>{
   vi.useFakeTimers();const release=beginProjectMutation('save-stalled');const capture=vi.fn(()=> 'stale');
   const saved=afterProjectMutation('save-stalled',capture,100);const refused=expect(saved).rejects.toThrow(/still pending/);

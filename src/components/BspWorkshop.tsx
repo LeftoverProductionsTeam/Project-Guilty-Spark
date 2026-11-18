@@ -25,6 +25,7 @@ import RendererQuality from './RendererQuality';
 import { useRendererQuality } from './RendererQuality';
 import { NumberField, HelpTip, Notice } from './ui';
 import { call } from '../api';
+import { downloadLocalText } from '../exportHelpers';
 import useEndToFloor from '../useEndToFloor';
 import { useMapState } from '../mapSession';
 import { beginProjectMutation } from '../projectMutation';
@@ -672,6 +673,7 @@ export default function BspWorkshop(props: Props) {
     operation.current = true;
     const expected = latest.current,
       release = beginProjectMutation(projectId);
+    let saveFailure: Error | undefined;
     setBusy(true);
     props.onBusy?.(true);
     setError('');
@@ -697,12 +699,13 @@ export default function BspWorkshop(props: Props) {
       }
       throw Error('Source kept changing during validation. The unapplied BSP source is retained for export');
     } catch (e) {
+      saveFailure = new Error('Save stopped because Workshop rejected the pending geometry edit. Review or export the unapplied edit before saving again.');
       if (alive.current) {
         setError(String(e));
         setRetainedDraft({ basis: expected, document: next });
       }
     } finally {
-      release();
+      release(saveFailure);
       operation.current = false;
       props.onBusy?.(false);
       if (alive.current) setBusy(false);
@@ -802,6 +805,23 @@ export default function BspWorkshop(props: Props) {
       setError(String(e));
     }
   }
+  const retainedDraftNotice = retainedDraft && (
+    <Notice>
+      <span>An unapplied BSP source edit is retained.</span>{' '}
+      <button
+        type="button"
+        onClick={() => {
+          try {
+            downloadLocalText('Workshop-unapplied-source.json', JSON.stringify({ schemaVersion: 1, projectId, ...retainedDraft }, null, 2), 'application/json');
+          } catch (error) {
+            setError(String(error));
+          }
+        }}
+      >
+        Export unapplied source
+      </button>
+    </Notice>
+  );
   if (!w)
     return (
       <section className="bsp-intro">
@@ -852,6 +872,7 @@ export default function BspWorkshop(props: Props) {
           project.
         </p>
         {error && <Notice>{error}</Notice>}
+        {retainedDraftNotice}
       </section>
     );
   return (
@@ -911,28 +932,7 @@ export default function BspWorkshop(props: Props) {
           editing permission to change Workshop source.
         </Notice>
       )}
-      {retainedDraft && (
-        <Notice>
-          <span>An unapplied BSP source edit is retained.</span>{' '}
-          <button
-            type="button"
-            onClick={() => {
-              const url = URL.createObjectURL(
-                new Blob([JSON.stringify({ schemaVersion: 1, projectId, ...retainedDraft }, null, 2)], {
-                  type: 'application/json',
-                }),
-              );
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'Workshop-unapplied-source.json';
-              a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-            }}
-          >
-            Export unapplied source
-          </button>
-        </Notice>
-      )}
+      {retainedDraftNotice}
       <div className="bsp-shape-toolbar">
         <details ref={shapeMenu}><summary>Shapes ▾</summary><div role="group" aria-label="Drop-in BSP shapes">{(['room','box','wall','ramp','stairs'] as WorkshopPrimitive[]).map(kind=><button key={kind} disabled={disabled} aria-label={'Place BSP '+kind} title="Click to add at the origin, or drag into a 3D or orthographic view. Select the volume to resize, reshape, name and assign materials." onPointerDown={event=>{shapeDrop.begin({key:kind},event);}} onClick={event=>shapeDrop.activate({key:kind},event,[0,0,0])}>{kind[0].toUpperCase()+kind.slice(1)}</button>)}</div></details>
         <small>Drop a shape → select its volume or face → drag an axis or edit Properties. Rooms are playable air; walls, ramps and stairs are solid.</small>

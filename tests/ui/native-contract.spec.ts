@@ -166,16 +166,21 @@ test('C63 immediate Undo then Save in one frame saves the undone revision',async
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='save_project')?.args.project.tagEdits)).toEqual([]);
 });
 
-for(const close of [false,true])test((close?'Window close':'Save')+' waits for the in-flight Workshop example before capturing its source revision',async({page})=>{
+for(const action of ['save','close','rejected'] as const)test(action==='rejected'?'Save refuses a rejected in-flight Workshop edit and preserves the accepted project':(action==='close'?'Window close':'Save')+' waits for the in-flight Workshop example before capturing its source revision',async({page})=>{
+ const close=action==='close',rejected=action==='rejected';
+ if(rejected)await page.setViewportSize({width:800,height:600});
  await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Pending geometry',template:'customBlank',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[{id:'metal',name:'Metal',color:'#777777',shaderPath:'levels/test/metal',uScale:1,vScale:1}],spawns:[],objectives:[],placements:[]})));
  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
  await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();
- await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;let held=false;
+ await page.evaluate(rejected=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;let held=false;
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
-   if(command==='quickforge_validate'&&!held&&args.document.workshop?.brushes?.length){held=true;w.__geometryHeld=true;await new Promise<void>(resolve=>{w.__releaseGeometry=resolve;});}
+   if(command==='quickforge_validate'&&!held&&args.document.workshop?.brushes?.length){
+    held=true;w.__geometryHeld=true;await new Promise<void>(resolve=>{w.__releaseGeometry=resolve;});
+    if(rejected)return {valid:false,issues:[{severity:'error',code:'WORKSHOP_TEST_INVALID',message:'Rejected Workshop test geometry'}]};
+   }
    return invoke(command,args);
   };w.__sparkMock.calls.length=0;
- });
+ },rejected);
  await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).__geometryHeld)).toBe(true);
  const review=page.getByRole('dialog',{name:'Save changes before closing?',exact:true});
@@ -185,6 +190,24 @@ for(const close of [false,true])test((close?'Window close':'Save')+' waits for t
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>['save_project','close_application'].includes(call.command)))).toBe(false);
  await page.evaluate(()=>(window as any).__releaseGeometry());
  if(close)await review.getByRole('button',{name:'Save changes',exact:true}).click();
+ if(rejected){
+  await expect(page.getByText(/Rejected Workshop test geometry/)).toBeVisible();
+  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='save_project').length)).toBe(0);
+  await expect(page.getByText(/Save stopped because Workshop rejected the pending geometry edit/)).toBeVisible();
+  const exportDraft=page.getByRole('button',{name:'Export unapplied source',exact:true});
+  const download=page.waitForEvent('download',{timeout:8000}).catch(()=>null);
+  await exportDraft.click({timeout:4000});
+  const draft=await download;
+  expect(draft,await page.locator('.bsp-intro').innerText()).not.toBeNull();
+  expect(draft!.suggestedFilename()).toBe('Workshop-unapplied-source.json');
+  const bytes=await (await import('node:fs/promises')).readFile((await draft!.path())!,'utf8');
+  expect(JSON.parse(bytes).document.workshop.brushes).toHaveLength(4);
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='save_project').length)).toBe(1);
+  expect(await page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop?.brushes?.length??0)).toBe(0);
+  return;
+ }
 
  try {
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop?.brushes?.length)).toBe(4);

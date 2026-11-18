@@ -261,6 +261,8 @@
 .bsp-intro {
   padding: 22px;
   max-width: 780px;
+  min-height: 0;
+  overflow: auto;
 }
 .bsp-entry-actions {
   display: flex;
