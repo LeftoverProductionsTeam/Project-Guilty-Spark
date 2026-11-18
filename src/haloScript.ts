@@ -102,6 +102,16 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
   if(moving)globals.push('(global object gs_nav_target none)','(global object gs_nav_previous none)');
   const manualSetters:string[]=[];
   const branches=missionBranchGroups(studio.missions);
+  const collectionVisits=new Map<string,{key:string;volume:string}[]>();
+  studio.missions.forEach((beat,local)=>{
+    if(beat.conditionVisitDuring==null)return;
+    const index=(indices?.[local]??local)+1,key='gs_visit_'+index;
+    const volume=ensureName(beat.conditionVolume??undefined,'Beat '+index+' optional condition volume');
+    const visits=collectionVisits.get(beat.conditionVisitDuring)??[];
+    visits.push({key,volume});
+    collectionVisits.set(beat.conditionVisitDuring,visits);
+    globals.push('(global boolean '+key+' false)');
+  });
   for(const {index} of branches.values())globals.push('(global boolean gs_branch_'+index+'_ready false)','(global boolean gs_branch_'+index+'_inside false)');
   const cueLines=(beat:CreatorStudioDocument['missions'][number],index:number,phase:'start'|'complete'):string[]=>{
     const cue=beat.soundCue;if(!cue||cue.phase!==phase)return [];
@@ -132,7 +142,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     if(beat.conditionVolume!=null){
       const volume=ensureName(beat.conditionVolume,`Beat ${i+1} optional condition volume`);deps.push('trigger_volume:'+volume);
       const group=beat.conditionGroup==null?undefined:branches.get(beat.conditionGroup);
-      let condition='(volume_test_objects '+volume+' (players))';
+      let condition=beat.conditionVisitDuring!=null?'gs_visit_'+(i+1):'(volume_test_objects '+volume+' (players))';
       if(group){
         const key='gs_branch_'+group.index;
         scripted.push('  (if (not '+key+'_ready) (begin',...(scope?wait('(> (list_count (players)) 0)',1):['    (sleep_until (> (list_count (players)) 0) 1)']),'    (set '+key+'_inside '+condition+')','    (set '+key+'_ready true)','  ))');
@@ -164,10 +174,13 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         break;
       case 'weaponOwned': {
         const path=beat.weaponPath??'';if(!validMissionWeaponPath(path))throw Error('Choose an included native technology weapon for objective '+(i+1)+'.');
+        const visits=collectionVisits.get(beat.id)??[];
+        for(const {key} of visits)scripted.push('  (set '+key+' false)');
         if(beat.createWeaponObject!=null){const name=ensureName(beat.createWeaponObject,'Collection weapon object');deps.push('weapon_object:'+name+':'+path);scripted.push('  (object_create '+name+')');}
         deps.push('weapon:'+path);const cursor='gs_collector_'+(i+1),found='gs_collected_'+(i+1);
         globals.push('(global short '+cursor+' 0)','(global boolean '+found+' false)');
         scripted.push('  (sleep_until (begin',
+          ...visits.map(({key,volume})=>'    (if (volume_test_objects '+volume+' (players)) (set '+key+' true))'),
           '    (if (>= '+cursor+' (list_count (players))) (set '+cursor+' 0))',
           '    (if (and (< '+cursor+' (list_count (players))) (unit_has_weapon (unit (list_get (players) '+cursor+')) "'+path.replaceAll('/','\\')+'")) (set '+found+' true))',
           '    (set '+cursor+' (+ '+cursor+' 1))', scope?'    (or gs_aborted '+empty+' '+found+')':'    '+found, '  ) 1)');if(scope)scripted.push(markAbort);break;
@@ -416,7 +429,7 @@ export interface NativeMissionBinding {
 }
 
 // Exhaustive against the saved beat type: new creator fields must remain reviewable.
-const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
+const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionVisitDuring:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
 async function nativeMissionHash(body:string):Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
     .map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -445,6 +458,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     (beat.createWeaponObject!=null&&typeof beat.createWeaponObject!=='string')||
     (beat.conditionVolume!=null&&typeof beat.conditionVolume!=='string')||
     (beat.conditionGroup!=null&&typeof beat.conditionGroup!=='string')||
+    (beat.conditionVisitDuring!=null&&typeof beat.conditionVisitDuring!=='string')||
     (beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')||
     (beat.minimumSurvivors!=null&&typeof beat.minimumSurvivors!=='number')||
     (beat.escortRequiresPlayer!=null&&(beat.trigger!=='escort'||typeof beat.escortRequiresPlayer!=='boolean'))||
@@ -473,7 +487,7 @@ export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissi
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,guidance:beat.guidance?{flag:beat.guidance.flag??null,object:beat.guidance.object??null,height:beat.guidance.height}:null,
     transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortRequiresPlayer:beat.escortRequiresPlayer===true,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
-    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
+    hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionVisitDuring:beat.conditionVisitDuring??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
 export interface NativeMissionReview {

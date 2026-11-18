@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 562e747 plus verified native faction body authoring. Exact paired 05415099 advanced from Pelican insertion through rescue, Covenant combat and replicated technology pickup. It entered the Flood branch and stopped before extraction. CE609 Covenant body candidate 2c8990af compiled and passed independent readback.
-Next action: Finish the active Flood branch and defense before extraction. Review the overlapping be_containment and technology pickup area so players can choose an actual alternate path. Verify physical evacuation and durable settlement. On Covenant candidate 2c8990af verify the actual Grunt selection, compatible kit and Spirit boarding, then add the missing Spirit mission entry. Original Save37944 stays open.
+Latest verified revision: 8f15db0 plus verified optional collection branches. Exact CE609 Black Echo candidate 70641e81 compiled and passed independent script, HUD, BSP and scenario readback. In predecessor 2c8990af, two peers confirmed Covenant bodies and kit in one run and UNSC rescue, combat and technology ownership in another.
+Next action: Pair-play exact 70641e81 through direct pickup without the Flood and with a deliberate containment visit before pickup. Check defense, real evac, settlement and redeployment. On Covenant, diagnose both hub casualties and the Spirit drift before adding the separate Covenant objective entry; preserve the Pelican gate. Original Save37944 remains open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov Black Echo optional Flood route: the native containment box no longer overlaps the pickup. Mission Director branches can remember an area visit during an earlier weapon collection in the same scope. Browser six, frontend 54, Rust 24 plus one explicit skip, HaloScript checks and native CE609 compile/readbacks pass. Scope, full candidate hashes and companion results are in RUNTIME_INTEGRATION_20261107. The exact new cache has not been played.
 
 18Nov Black Echo faction body and technology: Spark’s existing native faction editor now reviews a nonautomatic native biped and signed permutation for an accepted kit. CE609 2c8990af and a disposable random-permutation build passed native compile and both readbacks. TypeScript, Windows cargo check, six Rust tests and three browser checks passed. Exact paired 05415099 verified a living rally, Covenant combat and physical technology ownership on both clients. The next gameplay gate is the Flood branch before defense and evacuation. See RUNTIME_INTEGRATION_20261107.
 

@@ -84,6 +84,8 @@ export interface MissionBeat {
   conditionVolume?: string | null;
   /** Shared native volume decision, sampled once at the first member. */
   conditionGroup?: string | null;
+  /** Remember entries into the branch area while an earlier weapon objective is active. */
+  conditionVisitDuring?: string | null;
   conditionOutside?: boolean | null;
   conditionResult?: {beatId:string;failed:boolean} | null;
   soundCue?: MissionSoundCue | null;
@@ -191,7 +193,25 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
   for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
   for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
  }else if(base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
- return {...base,studio:{...studio,missions:beats.map((beat,index)=>index===0&&beat.trigger==='triggerVolume'&&beat.triggerRef==='be_insert'?{...beat,trigger:'deviceActivated',triggerRef:'extraction_deploy',objective:'Activate the native deployment terminal to begin the operation. Runtime insertion and physical flight remain separate gameplay checks.'}:index===3?{...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',objective:'Collect the selected native technology weapon. Actual player inventory ownership completes this objective; entering its area does not.'}:index===6?{...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'}:beat)}};
+ const pickup=beats[3],containment=beats[4];
+ const useContainmentVisit=containment.conditionVolume==='be_containment'&&
+   containment.conditionGroup==null&&containment.conditionVisitDuring==null&&
+   containment.conditionOutside==null&&containment.conditionResult==null&&
+   containment.objective.startsWith('Optional containment branch: when this step begins,')&&
+   (pickup.squadNumber??0)===(containment.squadNumber??0)&&pickup.conditionVolume==null&&pickup.conditionResult==null;
+ const missions=beats.map((beat,index):MissionBeat=>{
+  if(index===0&&beat.trigger==='triggerVolume')return {...beat,trigger:'deviceActivated',triggerRef:'extraction_deploy',
+   objective:'Activate the native deployment terminal to begin the operation. Runtime insertion and physical flight remain separate gameplay checks.'};
+  if(index===3&&(beat.trigger==='manual'||useContainmentVisit))return {...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',
+   objective:useContainmentVisit?'Collect the selected native technology weapon. Visit the separate containment area while this objective is active to opt into the Flood encounter.':'Collect the selected native technology weapon. Actual player inventory ownership completes this objective.',
+   hudText:useContainmentVisit&&beat.hudText==='Recover classified technology'?'Recover the technology. Visit the containment area before pickup to investigate the Flood.':beat.hudText};
+  if(index===4&&useContainmentVisit)return {...beat,conditionVisitDuring:pickup.id,
+   objective:'This optional encounter runs if anyone visited the containment area during technology recovery. Otherwise continue to extraction defense.'};
+  if(index===6&&beat.trigger==='manual')return {...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',
+   objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'};
+  return beat;
+ });
+ return missions.every((beat,index)=>beat===beats[index])?base:{...base,studio:{...studio,missions}};
 }
 /** Bind only an explicitly read existing native campaign. No native tag, marker,
  * original placement, recipe or script is changed by the metadata action. */
@@ -220,7 +240,7 @@ export function addBlackEchoDraft(project:Project,nextId:()=>string,nativeSource
     throw Error('Preserve and reconcile the existing mission or handwritten logic before adding a generated operation.');
   const areas:[string,string,number,number,number][]=[
     ['be_insert','Black Echo · Insertion',0,0,4],['be_survivors','Black Echo · Marine rescue',8,0,4],
-    ['be_artifact','Black Echo · Classified technology',24,0,4],['be_containment','Black Echo · Optional Flood branch',25,1,2],
+    ['be_artifact','Black Echo · Classified technology',24,0,4],['be_containment','Black Echo · Optional Flood branch',31,3,4],
     ['be_extract','Black Echo · Evacuation',40,0,6],
   ];
   const existing=document.logic?.triggers??[];
@@ -248,8 +268,11 @@ const runtimes = new Set<ServerRuntime>(['haloCustomEdition', 'haloPC', 'haloDem
 const verdicts = new Set<PlaytestVerdict>(['notRun', 'pass', 'fail', 'blocked']);
 const safeText = (s: string, max: number) => typeof s === 'string' && s.length <= max && !/[\x00-\x1f\x7f]/.test(s);
 const boundedPos = (v: number[]) => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= 4096);
-/** Validates the exact schema persisted in the Rust project. */
-/** Stable editor IDs; native globals use bounded first-occurrence numbers. */
+/** A collection can drive a visit decision only when it always runs in that objective scope. */
+export function missionCollectionSources(missions:MissionBeat[],index:number):MissionBeat[] {
+  return missions.slice(0,index).filter(source=>source.trigger==='weaponOwned'&&(source.squadNumber??0)===(missions[index]?.squadNumber??0)&&source.conditionVolume==null&&source.conditionResult==null);
+}
+/** Validate area conditions and assign stable numbers to shared decisions. */
 export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:string;firstBeat:MissionBeat;index:number}> {
   const groups=new Map<string,{volume:string;firstBeat:MissionBeat;index:number}>();
   for(const [index,beat] of missions.entries()){
@@ -262,6 +285,10 @@ export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:s
     }
     if(beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')throw Error('Invalid mission branch outcome');
     if((beat.conditionGroup!=null||beat.conditionOutside!=null)&&beat.conditionVolume==null)throw Error('Mission branch decisions need an optional condition volume');
+    if(beat.conditionVisitDuring!=null&&(
+      beat.conditionVolume==null||beat.conditionGroup!=null||
+      !missionCollectionSources(missions,index).some(source=>source.id===beat.conditionVisitDuring)
+    ))throw Error('Choose an earlier unconditional weapon collection in the same scope and a separate area decision');
     if(beat.conditionGroup==null)continue;
     if(typeof beat.conditionGroup!=='string'||!recordId.test(beat.conditionGroup))throw Error('Invalid shared mission decision');
     const known=groups.get(beat.conditionGroup);
@@ -270,6 +297,7 @@ export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:s
   }
   return groups;
 }
+/** Validate the exact schema persisted by the Rust project. */
 export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
   if(doc.engineMachinima){const e=doc.engineMachinima;if(typeof e.enabled!=='boolean'||!['fixed','sequence'].includes(e.playback)||typeof e.autoStart!=='boolean'||(e.cameraId!=null&&!doc.shots?.some(s=>s.id===e.cameraId))||(e.enabled&&(!doc.shots?.length||doc.shots.length>64)))return ['Invalid game-native machinima take: choose 1–64 camera keys and an existing selected camera'];}
   const failures: string[] = [];

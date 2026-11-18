@@ -275,8 +275,24 @@ it('connects Forerunner Black Echo to real ownership and settled-return source w
  expect(project.studio!.missions).toHaveLength(0);expect(connected.studio!.missions[0].trigger).toBe('deviceActivated');expect(connected.studio!.missions[0].triggerRef).toBe('extraction_deploy');expect(connected.studio!.missions[3].trigger).toBe('weaponOwned');expect(connected.studio!.missions[6].trigger).toBe('forerunnerExtractionSettled');
  expect(connected.quickForge!.logic!.handwrittenSources).toEqual(project.quickForge!.logic!.handwrittenSources);
  const beats=connected.studio!.missions;expect(()=>exportHaloCeMission(connected.studio!)).toThrow(/Forerunner/);
+ expect(beats[4].conditionVisitDuring).toBe(beats[3].id);
+ expect(connectBlackEchoObjectives(connected,()=> 'unused')).toBe(connected);
+ const areas=connected.quickForge!.logic!.triggers;
+ const pickup=areas.find(area=>area.nativeName==='be_artifact')!,detour=areas.find(area=>area.nativeName==='be_containment')!;
+ expect(detour.position[0]-detour.dimensions[0]/2).toBeGreaterThan(pickup.position[0]+pickup.dimensions[0]/2);
+ for(const patch of [{conditionVisitDuring:beats[5].id},{conditionGroup:'shared'},{conditionVolume:undefined},{squadNumber:1}]){
+  const invalid=structuredClone(connected);Object.assign(invalid.studio!.missions[4],patch);
+  expect(validateCreatorStudio(invalid.studio!)).toContainEqual(expect.stringContaining('earlier unconditional weapon collection'));
+ }
  beats[3].weaponPath='weapons/technology';const output=exportHaloCeMission(connected.studio!,{forerunner:true});
  expect(output.content).toContain('(unit_has_weapon (unit (list_get (players) gs_collector_4)) "weapons\\technology")');
+ const visit='(if (volume_test_objects be_containment (players)) (set gs_visit_5 true))';
+ const pickupPoll='(unit_has_weapon (unit (list_get (players) gs_collector_4))';
+ expect(output.content).toContain('(global boolean gs_visit_5 false)');
+ expect(output.content.split('volume_test_objects be_containment').length).toBe(2);
+ expect(output.content.indexOf('(set gs_visit_5 false)')).toBeLessThan(output.content.indexOf(visit));
+ expect(output.content.indexOf(visit)).toBeLessThan(output.content.indexOf(pickupPoll));
+ expect(output.content.indexOf('(if gs_visit_5 (begin')).toBeGreaterThan(output.content.indexOf(pickupPoll));
  expect(output.content).toContain('(script dormant forerunner_extraction_complete');expect(output.content).not.toContain('gs_complete_4');expect(output.content).not.toContain('gs_complete_7');
  expect(output.content.indexOf('(device_set_power extraction_activate 0)')).toBeLessThan(output.content.indexOf('(ai_place be_marines)'));
  expect(output.content.indexOf('(device_set_power extraction_activate 1)')).toBeGreaterThan(output.content.indexOf('(ai_place be_defense)'));
@@ -289,7 +305,7 @@ it('connects Forerunner Black Echo to real ownership and settled-return source w
  for(const [name,powered]of [['extraction_deploy',true],['extraction_activate',false]] as const){connected.quickForge!.placements.push({id:name,tagClass:'ctrl',tagPath:'devices/terminal',position:name==='extraction_deploy'?[2,3,1]:[10,3,1]} as never);connected.quickForge!.logic!.devices.push({placementId:name,nativeName:name,powered,initialPosition:0} as never);}
  for(const name of ['extraction_zone','extraction_return'])connected.quickForge!.logic!.triggers.push({id:name,nativeName:name,name,position:name==='extraction_return'?[2,3,1]:[10,3,1],rotation:[0,0,0],dimensions:name==='extraction_return'?[8,8,4]:[2,2,3]} as never);
  const prepared=await attachNativeCampaignMission(connected,'startup'),review=await reviewNativeCampaignMission(JSON.parse(JSON.stringify(prepared)));
- expect(review.binding.missions[3].weaponPath).toBe('weapons/technology');expect(review.binding.missions[6].trigger).toBe('forerunnerExtractionSettled');
+ expect(review.binding.missions[3].weaponPath).toBe('weapons/technology');expect(review.binding.missions[4].conditionVisitDuring).toBe(beats[3].id);expect(sameMissionData(review.binding.missions,beats)).toBe(true);expect(review.binding.missions[6].trigger).toBe('forerunnerExtractionSettled');
  const legacy=structuredClone(connected);legacy.quickForge!.runtimeId='mccSteam';await expect(attachNativeCampaignMission(legacy,'startup')).rejects.toThrow(/legacy/);
  const starting=structuredClone(connected);starting.studio!.missions[3].weaponPath=starting.quickForge!.startingProfile!.primaryWeapon;starting.quickForge!.placements[0].tagPath=starting.studio!.missions[3].weaponPath!;await expect(attachNativeCampaignMission(starting,'startup')).rejects.toThrow(/starting equipment/);
 });

@@ -98,6 +98,8 @@ pub struct MissionBeat {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub condition_group:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub condition_visit_during:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub condition_outside:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub condition_result:Option<MissionOutcomeCondition>,
@@ -662,6 +664,10 @@ impl CreatorStudio {
                 if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.squad_number==beat.squad_number&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}
             }
             if (beat.condition_group.is_some()||beat.condition_outside.is_some())&&beat.condition_volume.is_none(){return invalid("Mission branch decisions need an optional condition volume");}
+            if let Some(visit)=&beat.condition_visit_during {
+                let valid=self.missions[..index].iter().any(|source|source.id==*visit&&source.squad_number==beat.squad_number&&source.trigger=="weaponOwned"&&source.condition_volume.is_none()&&source.condition_result.is_none());
+                if !valid||beat.condition_volume.is_none()||beat.condition_group.is_some(){return invalid("Choose an earlier unconditional weapon collection in the same scope and a separate area decision");}
+            }
             if let Some(group)=&beat.condition_group {
                 if !valid_id(group){return invalid("Invalid shared mission decision");}
                 let volume=beat.condition_volume.as_deref().unwrap();
@@ -844,6 +850,21 @@ mod tests {
         let mut different=document.clone();different.missions[1].condition_volume=Some("elsewhere".into());assert!(different.validate().is_err());
         let mut missing=document.clone();missing.missions[1].condition_volume=None;assert!(missing.validate().is_err());
         let mut invalid=document.clone();invalid.missions[1].condition_group=Some("not a decision id".into());assert!(invalid.validate().is_err());
+    }
+    #[test]
+    fn collection_visit_requires_an_earlier_unconditional_objective_in_the_same_scope() {
+        let mut document=studio();
+        for value in [
+            serde_json::json!({"id":"collect","title":"Collect","objective":"Pick up a weapon","trigger":"weaponOwned","encounterName":"","weaponPath":"weapons/technology"}),
+            serde_json::json!({"id":"branch","title":"Contain","objective":"Enter containment","trigger":"timer","timerSeconds":1,"encounterName":"","conditionVolume":"containment","conditionVisitDuring":"collect"}),
+        ]{document.missions.push(serde_json::from_value(value).unwrap());}
+        document.validate().unwrap();
+        let restored:CreatorStudio=serde_json::from_slice(&serde_json::to_vec(&document).unwrap()).unwrap();
+        assert_eq!(restored.missions,document.missions);
+        let mut other_scope=document.clone();other_scope.missions[0].squad_number=Some(1);assert!(other_scope.validate().is_err());
+        let mut skipped=document.clone();skipped.missions[0].condition_volume=Some("skip_pickup".into());assert!(skipped.validate().is_err());
+        let mut shared=document.clone();shared.missions[1].condition_group=Some("shared".into());assert!(shared.validate().is_err());
+        document.missions.swap(0,1);assert!(document.validate().is_err());
     }
     #[test]
     fn optional_objective_condition_survives_project_save_without_changing_legacy_fields() {
