@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - repair four actual Black Echo authored-content failures
-Status: implementation incomplete
-Starting revision: 8693c4f0d1d587629c9c9a7d1a6080c6036cf02e, canonical master.
-Latest verified revision: d7a54529243316caf42f300ae961d9155d881fd0 retained CE609 b3c5bc47/fdc6ec89 with two Marine migration flags and 13 LM seat references. This cycle adds explicit major-variant policy at encounter creation. Browser and installed Invader loose-tag checks pass. Full mission acceptance remains open.
-Next action: use Append native AI encounter and Major-variant upgrades → None to review and accept spirit_driver with the compatible imported pilot graph. Bind the controller to the reviewed new group, compile/read back, and correct the Spirit touchdown/route against the sampled BSP before testing the exact candidate in isolated Forerunner.
+Task: Operation110 - prove the revised Black Echo mission in Forerunner
+Status: awaiting human verification
+Starting revision: db126b73bb6008110f9c2eca177ef2e65e02bbb0, canonical master.
+Latest verified revision: db126b73 retains the tested projectile picker and frame fix. Its Windows build c0f9e9e5 authored, compiled and independently read back the four Black Echo source corrections. Retained CE609 candidate dee2d9a7. Private Forerunner startup reached awaitingMapStartup; game hash remains null.
+Next action: Review the current Forerunner executable, reopen the exact retained dee2d9a7 through the private Spark workflow, complete temporary profile setup if prompted and confirm game load before pilot, touchdown, boarding, rescue and full mission checks. Pursue Save37944 or P8 rendering independently while physical input is unavailable.
 
 ## Acceptance
 
@@ -69,6 +69,8 @@ Older detailed source/check summaries were consolidated here to keep the existin
 
 ## Failures and blockers
 
+17Nov current candidate dee2d9a7 compiled and passed independent Invader checks with the compatible Spirit pilot, revised touchdown pose/return route, Pelican seat and both Marine flags. Prior entries below are historical. Runtime startup in the private profile did not confirm a map load. Full physics/AI and two-player mission acceptance stay open. Exact native identities in RUNTIME_INTEGRATION_20261107.
+
 Latest Forerunner gameplay evidence remains7ec2: Spirit up.k .918 needs>=.95 and old Grunt lacks c_dropship driver. New retained fdc6 candidate independently verifies both be_marines migration flags1 and13P-riderLM/0LF script references, preserving13scripts/17globals; it has not been launched. Compatible pilot import Preview/Accept/Restore passes after complete scenario-review repair, but the appended group remains recipe-owned and its exact-variant upgrade policy must be authored/reconciled before adoption. Retained source/pilot-unverified.scenario is a draft, not a compiled/gameplay fix. Actual pathfinding, seats, landing and complete mission acceptance remain OPEN.
 
 Current: releases/black-echo-native-crew-20261117 retains partial native candidatefdc6, matching sourceSCNR6d711c28, reviewed HSCd0765076 and explicitly uncompiled pilot draft5e4b41e7. Old7ec2/source71e6 remain protected. No game launched in this slice; five-terminal use, flight/boarding, objectives/audio/combat/extraction/settlement/two clients, reflection and broader37944 remain OPEN. Embedded CDP controls are distinct from physical desktop acceptance.
@@ -96,6 +98,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+17Nov run-hH9GHn closed. Spark and the isolated Forerunner process exited. Owned workspace disposed 3,751,531,999 logical bytes. Root absent, no development runs or issues. Latest cache and two reviewed files independently hash-verified under releases/black-echo-native-pilot-landing-20261117.
 
 QA61647/run-wsWoBU,91709/run-0v0sq0 and50103/node12444/run-kXE610 CLOSED/absent; app18840 closed0, all writers exited. Initial cleanup refused100000entry cap despite166219entries admitted under200000; shared-cap source fix5focused storage checks pass. Existing dead-owner recovery disposed11247798547logicalB, receipts retired, root absent/runs[]/issues[]. Large-tree physical reclamation unmeasured. Candidate7ec2/source71e6/HSC3ff1 retained and freshly hash-matched. Experiment2a10 disposed; original terminal9a0e restored beforehand. Native app05fda346 predates camera-mode fix. QA61093/node run-gzri03: native apps17232/19792/6704 closed normally; all test/build writers exited. Existing sealed cleanup disposed4180915095logicalB; physical disposal allocation unavailable. Root absent, development storage runs[]/issues[]. Four retained candidate/source files total112361259B; exact copied hashes match. Exact native candidate/source retained and hash-verified outside disposable output. Do not kill unrelated Forerunner clients or dispose protected historical inputs. No game/Forerunner writes/push.
 
