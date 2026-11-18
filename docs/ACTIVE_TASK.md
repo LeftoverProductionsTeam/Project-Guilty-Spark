@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - native terminal workflow verified; resume moving-reflection investigation
+Task: Operation110 - repair four actual Black Echo authored-content failures
 Status: implementation incomplete
 Starting revision: 0b7671b4f95bbb93a62bc7dbfc284456b0d8f5d5, canonical master.
-Latest verified revision: f72ce07 plus terminal source. Compatible CE609 job90237d46/map2a10ec6a passes; independent controltag matchesfd8011dd byte-for-byte and five scalar values. Source scenario71e6ac22/extracted6a7d657d exposed fields match except reconstructed source_files, unchanged from7ec2. Final Windows app05fda346; core1/browser2 and final terminal+layout/role/zero-console regression1, TSC/guide pass.
-Next action: Commit verified terminal slice and manifests, then identify the exact moving gold-base surface/material in the existing renderer and fix its measured cause. Reuse bounded active QA50103; candidate7ec2/source/scripts retained. Physical Black Echo/gameplay still owner-Firewall gated. No repeated blocked game trial or new UI architecture.
+Latest verified revision: 03c732bb3973a6abed4e977f6db088b10293dc58 terminal source/native milestone; pending scoped camera-mode fix23session tests/TypeScript PASS, cleanup shared-bound fix5storage tests PASS. Grounded7ec2 compiles/readbacks but actual Forerunner reports Spirit up.k .918, incompatible Grunt driver, Marine seat conflict and disabled rescue migration. No gameplay acceptance.
+Next action: Closed QA12444 cleanup recovered exactly; use existing native behavior/asset/script/BSP workflows to correct Spirit touchdown/driver, Pelican Marine P-riderLM and both be_marines migration flags. Forerunner contract top gives exact evidence/thresholds; reuse compatible existing pilot assets read-only. Compile/read back/export revised candidate, then approved isolated game validation.
 
 ## Acceptance
 
@@ -57,11 +57,13 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 Current verified source through45763a8: recovered actor dependency import, source-backed native palette, Source Guardian full-field hashing, protected source merge, saved-profile recovery, and native build-history persistence. Exact hashes/actions/tests/limits remain in c40-native-save-integrity.json and RUNTIME_INTEGRATION_20261107.
 
-Current uncommitted Spirit slice: native trigger append/viewport review, controller ownership distinct from protected native fields, retained owned actor listing, explicit pose-only append revision preserving actor/population/wave ownership, and shared Forerunner extraction-area guards. Corrected pilot native compilation/readback passes. Actual controls authored two separate Spirit pads/routes, shared-area bounds and raised aircraft; HSC Undo/Redo/Save/full restart passes. Final native compilation/readback/export/Open compiled map/Save/full restart/reopen passes;3BSP warnings cleared,18media warnings remain. Exact evidence:nativeSpiritAuthoring20261117. No gameplay or physical desktop-input acceptance.
+Committed Spirit slice f72ce07: native trigger append/viewport review, controller ownership distinct from protected native fields, retained owned actor listing, explicit pose-only append revision preserving actor/population/wave ownership, and shared Forerunner extraction-area guards. Corrected pilot native compilation/readback passes. Actual controls authored two separate Spirit pads/routes, shared-area bounds and raised aircraft; HSC Undo/Redo/Save/full restart passes. Final native compilation/readback/export/Open compiled map/Save/full restart/reopen passes;3BSP warnings cleared,18media warnings remain. Exact evidence:nativeSpiritAuthoring20261117. No gameplay or physical desktop-input acceptance.
 
 Older detailed source/check summaries were consolidated here to keep the existing checkpoint bounded. They remain unchanged in45763a8:docs/ACTIVE_TASK.md, the Verified milestones above, RUNTIME_INTEGRATION_20261107, UI_INTERACTION_AUDIT, HUMAN_TEST_PLAN and their cited fixtures/commits. This changes no requirement status or historical evidence; all475IDs and M1–M6 remain.
 
 ## Failures and blockers
+
+Latest owner/Forerunner evidence: map7ec2 Spirit up.k .918 must reach .95 through actual level touchdown geometry/route/attitude; imported Grunt lacks c_dropship driver. Existing Forerunner-owned native fixture has a separate compatible pilot graph/actor; inspect/reuse via protected importer, never change player assets or bypass seats. Move Marine scripted load and both checks P-riderLF to P-riderLM, retain Spartan LF/RF. Enable automatic_migration for be_marines/native_squad and be_return; both currently0. Source/native and actual pathfinding/flight/mission/two-client acceptance remain distinct. Current Forerunner SPARK_INTEGRATION_CONTRACT.md top is authoritative; Forerunner remains read-only.
 
 Current: Grounded CE609 candidate7ec2a25a compiles/readbacks and reopens saved in Spark. Existing mission is Pelican-based; independent Spirit controller has no NPC crew. Owner Firewall gate prevents physical/game acceptance. Normal5terminal use, real pilot/flight/landing/boarding, objectives/audio/combat/extraction/settlement/two clients, reflection/37944 remain OPEN; no repeated blocked game retry.
 
@@ -89,7 +91,7 @@ Current: Grounded CE609 candidate7ec2a25a compiles/readbacks and reopens saved i
 
 ## Operations and safe checkpoint
 
-QA61647/run-wsWoBU and91709/run-0v0sq0 CLOSED/absent. QA50103/node12444/run-kXE610 ACTIVE12GiB; app18840/05fda346 open. Grounded handoff7ec2/source71e6/HSC3ff1 retained; experiment2a10 compiled/readback, original terminal9a0e restored through UI. Mission/scene unchanged; pageErrors0. Candidate7ec2 is still gameplay candidate, not experiment. Current source/evidence ready for local commit. Reuse this bounded context for next renderer investigation, dispose through wrapper before ending. No game/Forerunner writes/push.
+QA61647/run-wsWoBU,91709/run-0v0sq0 and50103/node12444/run-kXE610 CLOSED/absent; app18840 closed0, all writers exited. Initial cleanup refused100000entry cap despite166219entries admitted under200000; shared-cap source fix5focused storage checks pass. Existing dead-owner recovery disposed11247798547logicalB, receipts retired, root absent/runs[]/issues[]. Large-tree physical reclamation unmeasured. Candidate7ec2/source71e6/HSC3ff1 retained and freshly hash-matched. Experiment2a10 disposed; original terminal9a0e restored beforehand. Native app05fda346 predates camera-mode fix. No active Spark/game/test workspace; no Forerunner writes/push.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

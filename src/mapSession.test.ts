@@ -239,3 +239,33 @@ test('Black Echo setup choices remain independent per project and native window'
 
 
 test('native transport choices remain independent across workspace windows',async()=>{const session=await import('./mapSession');session.configureMapViewWindow('main');session.writeMapSession('a','sourceScripts.transport',{faction:'unsc',crew:[{group:'ship_crew',seat:'P-riderLF'}]});session.configureMapViewWindow('other');session.writeMapSession('a','sourceScripts.transport',{faction:'covenant',crew:[]});session.configureMapViewWindow('main');expect(session.readMapSession('a','sourceScripts.transport',null)).toEqual({faction:'unsc',crew:[{group:'ship_crew',seat:'P-riderLF'}]});});
+
+test('player-start camera mode belongs to its window and survives reopening independently', async () => {
+  let session = await import('./mapSession');
+  session.configureMapViewWindow('main');
+  session.writeMapSession('a', 'world.playerView', true);
+  session.writeMapSession('a', 'world.start', 'spawn-main');
+  const changed = vi.fn();
+  const stop = session.subscribeMapSession(['a'], 'world.playerView', changed);
+
+  session.configureMapViewWindow('detached');
+  expect(session.readMapSession('a', 'world.playerView', false)).toBe(true);
+  session.writeMapSession('a', 'world.playerView', false);
+  session.writeMapSession('a', 'world.start', 'spawn-other');
+
+  session.configureMapViewWindow('main');
+  expect(session.readMapSession('a', 'world.playerView', false)).toBe(true);
+  expect(session.readMapSession('a', 'world.start', null)).toBe('spawn-main');
+  expect(changed).not.toHaveBeenCalled();
+  stop();
+
+  vi.resetModules();
+  session = await import('./mapSession');
+  session.configureMapViewWindow('main');
+  expect(session.readMapSession('a', 'world.playerView', false)).toBe(true);
+  session.configureMapViewWindow('detached');
+  expect(session.readMapSession('a', 'world.playerView', true)).toBe(false);
+  expect(session.readMapSession('a', 'world.start', null)).toBe('spawn-other');
+  session.configureMapViewWindow('new-window');
+  expect(session.readMapSession('a', 'world.playerView', true)).toBe(false);
+});

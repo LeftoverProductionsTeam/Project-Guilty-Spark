@@ -3483,5 +3483,176 @@
       "Complete Object Tags schema editing and all475/M1-M6 remain open",
       "Destroyed-trigger test cache was rejected, not a previous-good release"
     ]
+  },
+  "goldFaceP8Diagnosis20261117": {
+    "parent": "03c732bb3973a6abed4e977f6db088b10293dc58",
+    "appSha256": "05fda346c26f5ccaa07f91162dbfe1e5b1fea2651141e4f34abc5cc1dcd7d960",
+    "sourceSha256": "09bb4034f0bdc40f26b2c9977ae08aec7a0dba18c1fcf5c0e6bf743cc19ae4d4",
+    "shader": {
+      "id": 3895723712,
+      "index": 1728,
+      "class": "senv",
+      "path": "levels\\b30\\shaders\\metal panels ext unearthed",
+      "dataOffset": 108003580,
+      "external": false,
+      "fields": [],
+      "references": [
+        {
+          "label": "Base map",
+          "targetId": 3895789249,
+          "class": "bitm",
+          "offset": 108003716
+        },
+        {
+          "label": "Micro detail map",
+          "targetId": 3804954967,
+          "class": "bitm",
+          "offset": 108003832
+        },
+        {
+          "label": "Bump map",
+          "targetId": 3895854786,
+          "class": "bitm",
+          "offset": 108003876
+        },
+        {
+          "label": "Reflection cube map",
+          "targetId": 3782934535,
+          "class": "bitm",
+          "offset": 108004384
+        }
+      ],
+      "primaryBitmapStatus": "resolved",
+      "shaderPreview": {
+        "firstMapScreenspace": false,
+        "scaleFirstMapWithDistance": false,
+        "detailMask": 0,
+        "detailAfterReflection": false,
+        "detailVScale": 1,
+        "bumpIsSpecular": false,
+        "reflection": {
+          "bitmapTagId": 3782934535,
+          "nativeType": 0,
+          "perpendicularBrightness": 0.8,
+          "parallelBrightness": 0.8,
+          "perpendicularTint": [
+            0.839216,
+            0.588235,
+            0.211765
+          ],
+          "parallelTint": [
+            0.666667,
+            0.423529,
+            0.207843
+          ],
+          "falloff": 0,
+          "cutoff": 0
+        },
+        "multipurposeXbox": false,
+        "bumpScale": 1,
+        "alphaTest": false,
+        "twoSided": false,
+        "uvScale": [
+          1,
+          1
+        ],
+        "kind": "environment",
+        "shaderType": 0,
+        "detailFunction": 0,
+        "microDetailFunction": 0,
+        "detailScales": [
+          1,
+          1,
+          30
+        ],
+        "framebufferBlend": 0,
+        "layers": [],
+        "stages": [],
+        "decal": false,
+        "alphaBlended": false
+      }
+    },
+    "bumpBitmapTagId": 3895854786,
+    "bumpPath": "levels/b30/bitmaps/metal panels generic bump",
+    "format": "P8_BUMP",
+    "encoding": 17,
+    "normalMapLoaded": false,
+    "errorCode": "unsupported-format",
+    "error": "Bitmap pixel format 17 is not yet supported for automatic preview",
+    "samples": [
+      {
+        "pose": "{\"type\":\"PerspectiveCamera\",\"position\":[28.839403,-88.819107,4.001278],\"quaternion\":[0.583609,-0.192499,-0.247113,0.749186],\"zoom\":1,\"fov\":55,\"target\":[34.608105,-81.025856,1.554378]}",
+        "sha256": "3767f72bbd9c4877295a7700fa96492d94588a3682f3b50ef901da1735afecd6",
+        "time": 1794965385323
+      },
+      {
+        "pose": "{\"type\":\"PerspectiveCamera\",\"position\":[28.839403,-88.819107,4.001278],\"quaternion\":[0.583609,-0.192499,-0.247113,0.749186],\"zoom\":1,\"fov\":55,\"target\":[34.608105,-81.025856,1.554378]}",
+        "sha256": "3767f72bbd9c4877295a7700fa96492d94588a3682f3b50ef901da1735afecd6",
+        "time": 1794965388418
+      },
+      {
+        "pose": "{\"type\":\"PerspectiveCamera\",\"position\":[28.839403,-88.819107,4.001278],\"quaternion\":[0.583609,-0.192499,-0.247113,0.749186],\"zoom\":1,\"fov\":55,\"target\":[34.608105,-81.025856,1.554378]}",
+        "sha256": "3767f72bbd9c4877295a7700fa96492d94588a3682f3b50ef901da1735afecd6",
+        "time": 1794965391513
+      }
+    ],
+    "screenshot": {
+      "path": "docs/screenshots/workspaces/gold-reflection-diagnostic-embedded-20261117.jpg",
+      "sha256": "9337b5cfcbe2eb07fdb69f3e7ca2dcee8fcfe9fb4c6603160549584984d6aef6"
+    },
+    "crop": {
+      "path": "docs/screenshots/workspaces/gold-reflection-stationary-crop-20261117.png",
+      "sha256": "3767f72bbd9c4877295a7700fa96492d94588a3682f3b50ef901da1735afecd6",
+      "rect": [
+        795,
+        485,
+        85,
+        60
+      ]
+    },
+    "stationaryMovementReproduced": false,
+    "measuredIntervalMs": 6190,
+    "method": "Existing native Material Lens picked the shader; diagnostic camera seeded in owned QA view storage, not source. Three independent gold-face captures at identical pose.",
+    "blocked": "Correct P8 normal palette/decoding with compatible licensing; no GPL code/table copied, no guessed normals/source rewrite. Halo and Stubbs palettes differ.",
+    "gameplay": false,
+    "reflectionAccepted": false
+  },
+  "playerCameraModeIsolation20261117": {
+    "parent": "03c732bb3973a6abed4e977f6db088b10293dc58",
+    "red": "main camera mode became false after detached window changed it",
+    "fix": "world.playerView uses existing window-local view store",
+    "unitPassed": 23,
+    "typeScript": "PASS",
+    "nativeAcceptance": false,
+    "reflectionCauseProven": false
+  },
+  "qaCleanupEntryLimitRepair20261117": {
+    "failure": "QA inventory exceeds its bounded file/depth limit",
+    "root": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-kXE610",
+    "cause": "Cleanup cap100000 differed from existing admission/monitor cap200000",
+    "fix": "Shared200000-descendant cap, same depth32/bytes/hash/inode/link/process guards",
+    "before": {
+      "logicalBytes": 11247834270,
+      "allocatedBytes": 11265032168,
+      "files": 142233,
+      "sharedFiles": 220,
+      "directories": 23986,
+      "availableBytes": 1679902814208,
+      "verifiedAt": "2026-11-18T01:51:52.508Z",
+      "reason": "filesystem"
+    },
+    "allWritersExited": true,
+    "monitorError": null,
+    "sourceMonitorError": null,
+    "focusedStoragePassed": 5,
+    "recovery": "PASS: existing dead-owner recovery",
+    "candidateSha256": "7ec2a25af96ce53db421b875458b3b256166ad53ba7aa34f54f4302ca4ee1cb7",
+    "disposedLogicalBytes": 11247798547,
+    "remainingReceiptBytes": 13709,
+    "status": "interrupted",
+    "active": false,
+    "rootAbsent": true,
+    "runs": [],
+    "issues": []
   }
 }

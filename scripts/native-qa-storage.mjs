@@ -11,6 +11,8 @@ import os from 'node:os';
 const policy = JSON.parse(
   await fs.readFile(new URL('./maintenance/retention-policy.json', import.meta.url), 'utf8'),
 );
+// Admission, live measurement and sealed cleanup share one bounded tree capacity.
+const MAX_QA_TREE_ENTRIES = 200000;
 const ordinary = (value) =>
   process.platform === 'win32' && value.startsWith('\\\\?\\')
     ? value.slice(0, 8).toUpperCase() === '\\\\?\\UNC\\'
@@ -194,7 +196,7 @@ async function snapshot(root, maxBytes = policy.qaRunBytes) {
     const file = pending.pop();
     const info = await fs.lstat(file, { bigint: true });
     if (info.isSymbolicLink()) throw Error('QA disposable inventory refuses links or junctions');
-    if (rows.length >= 100000 || path.relative(root, file).split(path.sep).length > 32)
+    if (rows.length > MAX_QA_TREE_ENTRIES || path.relative(root, file).split(path.sep).length > 32)
       throw Error('QA inventory exceeds its bounded file/depth limit');
     const row = {
       path: path.relative(root, file),
@@ -283,7 +285,7 @@ async function measureOnce(root, maxBytes, excludeNames, liveMeasurement) {
               : null;
         }
       } else throw Error('QA output contains a non-regular file');
-      if (bytes > maxBytes || files + directories > 200000)
+      if (bytes > maxBytes || files + directories > MAX_QA_TREE_ENTRIES)
         throw Error('QA output exceeds its hard byte/file budget; preserved for review');
     }
   }
@@ -455,7 +457,7 @@ async function prepareAllocationMeter(run, finish) {
           value.directories,
           value.multiLinkEntries,
         ].every((n) => Number.isSafeInteger(n) && n >= 0) ||
-        value.files + value.directories > 200000
+        value.files + value.directories > MAX_QA_TREE_ENTRIES
       )
         throw Error(
           'Native allocation inventory refused: ' +

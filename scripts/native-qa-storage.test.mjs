@@ -9,6 +9,7 @@ import {
   assertQaOutputPath,
   beginQaStorage,
   disposeQaScratch,
+  sealQaScratch,
   admitCargoOutput,
   recoverQaScratch,
   qaProcessOwnershipActive,
@@ -984,3 +985,41 @@ test('a completed development namespace disappearing during recovery does not ab
  }
  await assert.rejects(fs.stat(prior),{code:'ENOENT'});await assert.rejects(fs.stat(parked),{code:'ENOENT'});
 });
+
+
+test('sealed inventory admits monitored large trees and retains the same hard entry ceiling', () =>
+  fixture(async parent => {
+    const root = await mkdir(path.join(parent, 'run'));
+    const finish = await beginQaStorage(root, options(parent));
+    const scratch = await finish.createScratch('large-tree');
+    const template = await fs.lstat(scratch, {bigint:true});
+    const original = {lstat:fs.lstat, readdir:fs.readdir};
+    let count = 100001;
+    // A metadata-only tree exercises the real inventory limit without creating
+    // hundreds of thousands of disposable NTFS entries just to test a bound.
+    const virtualIndex = file => {
+      if (path.dirname(String(file)) !== scratch) return null;
+      const match = /^entry-(\d+)$/.exec(path.basename(String(file)));
+      return match && Number(match[1]) < count ? Number(match[1]) : null;
+    };
+    fs.lstat = async (file, ...args) => {
+      const index = virtualIndex(file);
+      return index === null ? original.lstat(file, ...args)
+        : {...template, ino:BigInt(index+1), isDirectory:()=>true,
+            isFile:()=>false, isSymbolicLink:()=>false};
+    };
+    fs.readdir = async (file, ...args) => {
+      if (String(file) === scratch) return Array.from({length:count}, (_, i)=>'entry-'+i);
+      return virtualIndex(file) === null ? original.readdir(file, ...args) : [];
+    };
+    try {
+      const seal = await sealQaScratch(root, scratch);
+      assert.equal(seal.inventory.rows.length, count+1, 'Include the pinned root and every descendant');
+      assert.equal(seal.inventory.bytes, 0);
+      count = 200001;
+      await assert.rejects(sealQaScratch(root, scratch), error => error.message === 'QA inventory exceeds its bounded file/depth limit');
+    } finally {
+      Object.assign(fs, original);
+      await finish('passed');
+    }
+  }));
