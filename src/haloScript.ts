@@ -973,7 +973,11 @@ export function nativeSoloFirefightRules(config: FirefightConfig): FirefightConf
 
 /** Original Spark source generator using the documented native Forerunner
  * contract. Native tags/AI/paths remain owned by the existing scenario editors. */
-export interface NativeTransportCrew {group:string;seat:string;create?:boolean;releaseAtInsertion?:boolean}
+export interface NativeTransportCrew {
+  group:string;seat:string;create?:boolean;releaseAtInsertion?:boolean;
+  /** Suspend this controller’s deferred troop until its captured actor leaves the craft. */
+  holdUntilInsertion?:boolean;
+}
 export interface NativeTransportOptions {
   /** NPC seat assignments, optionally released at first campaign insertion. */
   crew?:NativeTransportCrew[];
@@ -1003,7 +1007,8 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   if(options.crew!=null&&(!Array.isArray(options.crew)||options.crew.length>8))throw Error('Review at most eight permanent native crew assignments.');
   const crew=options.crew??[],groups=[pilot.toLowerCase()],seats=[options.pilotSeat.toLowerCase()];
   for(const member of crew){
-    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create','releaseAtInsertion'].includes(key))||!seatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean'||member.releaseAtInsertion!=null&&typeof member.releaseAtInsertion!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
+    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create','releaseAtInsertion','holdUntilInsertion'].includes(key))||!seatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean'||member.releaseAtInsertion!=null&&typeof member.releaseAtInsertion!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
+    if(member.holdUntilInsertion!=null&&(typeof member.holdUntilInsertion!=='boolean'||member.holdUntilInsertion&&(!member.create||!member.releaseAtInsertion)))throw Error('Holding a troop requires deferred crew owned by this controller and Disembark at first insertion.');
     const group=ensureName(member.group,'Crew encounter / squad',true).toLowerCase(),seat=member.seat.toLowerCase();
     if(groups.some(old=>old===group||old.startsWith(group+'/')||group.startsWith(old+'/'))||seats.includes(seat))throw Error('Pilot and crew need separate, nonoverlapping native groups and unique seats.');
     groups.push(group);seats.push(seat);
@@ -1027,6 +1032,11 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   const releaseTroops=troops.length?['  ; First campaign insertion: release only the captured NPC units, never players.','  (if (not '+delivered+') (begin',...troops.flatMap(member=>[
     '    (set '+troopUnit+' '+troopHandle(member.index)+')','    (if (and (!= '+troopUnit+' none) (> (unit_get_health '+troopUnit+') 0) ('+aboard+')) (unit_exit_vehicle '+troopUnit+'))',
     '    (sleep_until (begin','      (set '+troopUnit+' '+troopHandle(member.index)+')','      (or (= '+troopUnit+' none) (<= (unit_get_health '+troopUnit+') 0) (not ('+aboard+')))','    ) 1)',
+    ...(member.holdUntilInsertion?[
+      '    (if (and (!= '+troopUnit+' none) (> (unit_get_health '+troopUnit+') 0) (= (ai_living_count '+member.group+') 1)',
+      '        (= '+troopUnit+' (unit (list_get (ai_actors '+member.group+') 0))))',
+      '      (ai_braindead '+member.group+' false))',
+    ]:[]),
   ]),'    (set '+delivered+' true)','  ))']:[];
   const health='(> (unit_get_health (unit '+craft+')) 0)';
   // Keep the named vehicle typed as a vehicle: an explicit unit cast compiles in CE
@@ -1050,6 +1060,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     ...crew.flatMap((member,index)=>[
       ...(member.create?['  ; Explicit deferred NPC crew ownership; no erase or replacement.','  (if (= (ai_living_count '+member.group+') 0) (ai_place '+member.group+'))']:[]),
       '  (sleep_until (and '+health+' (= (ai_living_count '+member.group+') 1)) 1)',
+      ...(member.holdUntilInsertion?['  (ai_braindead '+member.group+' true)']:[]),
       '  (vehicle_load_magic (unit '+craft+') "'+member.seat+'" (ai_actors '+member.group+'))',
       '  (sleep_until (and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list '+craft+' "'+member.seat+'" (ai_actors '+member.group+'))) 1)',
       ...(member.releaseAtInsertion?['  (set '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))']:[]),

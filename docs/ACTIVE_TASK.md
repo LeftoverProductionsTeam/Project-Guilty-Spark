@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 8f15db0 plus verified optional collection branches. Exact CE609 Black Echo candidate 70641e81 compiled and passed independent script, HUD, BSP and scenario readback. In predecessor 2c8990af, two peers confirmed Covenant bodies and kit in one run and UNSC rescue, combat and technology ownership in another.
-Next action: Pair-play exact 70641e81 through direct pickup without the Flood and with a deliberate containment visit before pickup. Check defense, real evac, settlement and redeployment. On Covenant, diagnose both hub casualties and the Spirit drift before adding the separate Covenant objective entry; preserve the Pelican gate. Original Save37944 remains open.
+Latest verified revision: 73f4379 plus the verified dropship crew standby workflow. Exact CE609 a5bf6680 compiled and passed independent source, BSP and HUD readback. On 70641e81, two Forerunner peers boarded and landed. The direct-route run reached the Marine rally, then stalled before technology pickup.
+Next action: Use the exact 70641e81 southern-route receipt to isolate the field movement issue and verify direct/visited Flood decisions, defense, evacuation and settlement. Pair-play a5bf6680 with the Covenant hub approach and UNSC Marine seating/release. Diagnose the Spirit pad drift and finish the separate Covenant objective entry, preserving the Pelican gate. Original Save37944 remains open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov insertion crew standby: the existing transport editor can keep a deferred insertion troop out of combat until its captured actor disembarks. Four browser workflows, 25 unit tests, TypeScript and a5bf6680 native compile/readback pass. The new candidate still needs native flight and combat validation. Direct 70641e81 run stalled at the rally-to-pickup lane. Sampled BSP and posed Spirit collision did not intersect at infantry heights. Current evidence and hashes are in RUNTIME_INTEGRATION_20261107.
 
 18Nov Black Echo optional Flood route: the native containment box no longer overlaps the pickup. Mission Director branches can remember an area visit during an earlier weapon collection in the same scope. Browser six, frontend 54, Rust 24 plus one explicit skip, HaloScript checks and native CE609 compile/readbacks pass. Scope, full candidate hashes and companion results are in RUNTIME_INTEGRATION_20261107. The exact new cache has not been played.
 
