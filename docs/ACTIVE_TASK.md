@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 4e76040 plus verified rescue rally authoring. CE609 candidate 05415099 compiled and passed independent readback. Paired predecessor 833f7081 completed rescue with the Marine alive and found no native technology pickup action.
-Next action: On exact 05415099, prove the Marine alone leaves the rescue beat pending and a player entering be_survivors starts native combat. Use the 833f7081 settlement-trial pickup trace to verify native targeting and item eligibility, then complete collection, extraction and settlement. Covenant Spirit boarding and original Save37944 stay open.
+Latest verified revision: d098375 plus independently compiled 539f6fa0 field alignment. Newer Forerunner 4d4630bc landed the predecessor inside the field volume and both peers reached living rescue and technology spawn. The collector stopped before pickup.
+Next action: Verify exact rally cache 05415099 on the newer companion engine and continue physical technology pickup, extraction and settlement. Use aligned alternate 539f6fa0 to compare both observed starts if the field approach still misses. Keep native landing gates intact. The independently actionable Covenant contract needs a named nonautomatic faction body and a mission entry after Spirit insertion. Original Save37944 stays open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov Black Echo field approach: the same native route reached the target from the usual boarding pose but stopped north of the field volume from a farther, reversed pose. Candidate 539f6fa0 adds a separate above-pad alignment command before the original descent. Eight compiled BSP legs from the two observed origins were clear. Native compile and both readbacks pass. The new candidate still needs paired gameplay. See RUNTIME_INTEGRATION_20261107.
 
 18Nov Black Echo rescue rally: opt-in player presence in the existing rescue volume survives project history, Save and source review. New Black Echo drafts enable it. The corrected CE609 cache 05415099 preserves 13 scripts, 17 globals and 3,313 tags in order. Independent scenario readback matches exactly. Forerunner gameplay of the new cache remains open. See RUNTIME_INTEGRATION_20261107.
 
