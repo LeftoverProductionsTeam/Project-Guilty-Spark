@@ -100,8 +100,9 @@ const expect=assertion.configure({timeout:60000});
 const hash=async file=>{const digest=crypto.createHash('sha256');for await(const b of createReadStream(file))digest.update(b);return digest.digest('hex');};
 await fs.mkdir(await assertQaOutputPath(output));
 const missionSaveStress=process.env.SPARK_NATIVE_MISSION_SAVE_STRESS==='1';
-if(missionSaveStress&&(!saveOnly||ceMissionReview))throw Error('Mission Save stress requires the isolated no-SDK Save workflow');
-const report={scope:missionSaveStress?'native-seven-objective-save-stress':saveOnly?'native-workshop-immediate-save-only':'native-solo-creator',schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
+const recoveryFailure=process.env.SPARK_NATIVE_SAVE_RECOVERY_FAILURE==='1';
+if((missionSaveStress||recoveryFailure)&&(!saveOnly||ceMissionReview))throw Error('Mission Save stress and recovery checks require the isolated no-SDK Save workflow');
+const report={scope:recoveryFailure?'native-save-recovery-failure':missionSaveStress?'native-seven-objective-save-stress':saveOnly?'native-workshop-immediate-save-only':'native-solo-creator',schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
 let browser,page,child,call,ceScenario;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
  const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
@@ -454,6 +455,59 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    report.immediateWorkshopSave={realUi:true,brushes:p.quickForge.workshop.brushes.length,dirty:(await state(created.project.id)).history.head.dirty};
    if(saveOnly){
     report.sourcePreparation={scope:'No SDK/tag staging or native compilation required for this Save reproduction'};
+    if(recoveryFailure){
+     const id=created.project.id,record=report.recoveryFailure={};
+     await chooseTool(page,'Settings & tools');
+     await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
+     const storage=page.getByRole('region',{name:'Storage and cache settings',exact:true});
+     const limit=storage.getByLabel('Maximum automatic map backups',{exact:true});
+     await revealPagedControl(limit);await limit.selectOption('3');
+     const saveLimit=storage.getByRole('button',{name:'Save limit',exact:true});
+     await revealPagedControl(saveLimit);await saveLimit.click();
+     const projectDir=await assertQaOutputPath(path.join(library,'projects',id),{reservationBytes:0});
+     const descriptor=path.join(projectDir,'project.gsproject');
+     await expect.poll(async()=>JSON.parse(await fs.readFile(descriptor,'utf8')).automaticBackupRetention).toBe(3);
+     await expect.poll(async()=>(await state(id)).history.head.dirty).toBe(false);
+     const lastSaved=await state(id),head=path.join(projectDir,'window-history','head.json');
+     const before={descriptor:await hash(descriptor),head:await hash(head)};
+     const obstruction=await assertQaOutputPath(path.join(path.dirname(head),'qa-checkpoint-obstruction'),{reservationBytes:0});
+     await fs.mkdir(obstruction);
+     try{
+      await chooseTool(page,'Creator Studio');await openMissionBeats(page);
+      const add=page.getByRole('button',{name:'Add beat',exact:true});await revealPagedControl(add);await add.click();
+      const title=page.locator('.studio-mission-record').first().getByRole('textbox',{name:'Title',exact:true});
+      await revealPagedControl(title);await title.fill('First retained edit');
+      const warning=page.locator('.toast.error').filter({hasText:'Automatic recovery could not be updated'});
+      await expect(warning).toContainText('Unexpected history directory entry');
+      const titleAtHead=async()=>(await state(id)).project.studio?.missions[0]?.title;
+      await expect.poll(titleAtHead).toBe('First retained edit');
+      const first=(await state(id)).history.revision;
+      await title.fill('Second retained edit');
+      await expect.poll(titleAtHead).toBe('Second retained edit');
+      const second=(await state(id)).history.revision;
+      expect(first).toBeGreaterThan(lastSaved.history.revision);expect(second).toBeGreaterThan(first);
+      const director=page.getByRole('tab',{name:'Mission director',exact:true});
+      await director.focus();await page.keyboard.press('Control+z');await expect.poll(titleAtHead).toBe('First retained edit');
+      await director.focus();await page.keyboard.press('Control+y');await expect.poll(titleAtHead).toBe('Second retained edit');
+      await page.keyboard.press('Control+s');
+      await expect(page.locator('.toast.error')).toContainText('Unexpected history directory entry');
+      await expect(warning).toHaveCount(0);
+      expect((await state(id)).history.head.dirty).toBe(true);
+      expect(await hash(descriptor)).toBe(before.descriptor);
+      expect(await hash(head)).toBe(before.head);
+      Object.assign(record,{first,second,acceptedWhileBlocked:true,undoRedo:true,explicitSaveRefused:true,previousDiskHashes:before});
+     }finally{await fs.rmdir(obstruction);}
+     await save(id);
+     const final=await state(id);record.savedHead=final.history.head;
+     record.savedDescriptorSha256=await hash(descriptor);expect(record.savedDescriptorSha256).not.toBe(before.descriptor);
+     await close();await start();await chooseTool(page,'Map library');await open(created.project.title);
+     const resumed=await state(id);
+     expect(resumed.history.head).toEqual(record.savedHead);
+     expect(resumed.project.studio.missions[0].title).toBe('Second retained edit');
+     expect(await hash(descriptor)).toBe(record.savedDescriptorSha256);
+     record.restart=true;
+     await close();return;
+    }
     if(missionSaveStress){
      const record=report.missionSaveStress={hud:{},actualControls:true,gameplayVerified:false};
      await chooseTool(page,'Creator Studio');

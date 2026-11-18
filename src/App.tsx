@@ -156,7 +156,16 @@ export default function App() {
   const [ready, setReady] = useState(!native);
   const [initialDocumentReady,setInitialDocumentReady]=useState(()=>!new URLSearchParams(location.search).has('project'));
   const [documents,dispatchDocument]=useReducer(documentReducer,readHistoryLimit(),emptyMapDocuments);
-  const windowHistories=useRef(new WindowHistories());
+  const [windowRecoveryWarnings,setWindowRecoveryWarnings]=useState<Record<string,string>>({});
+  const windowHistories=useRef(new WindowHistories((id,warning)=>{
+    setWindowRecoveryWarnings(old=>{
+      const next={...old};
+      if(warning)next[id]=warning;
+      else delete next[id];
+      return next;
+    });
+    if(warning)notice('Automatic recovery could not be updated. You can keep editing in this window. '+warning,'error');
+  }));
   const closingDocuments=useRef(new Set<string>());
   const [windowWriters,setWindowWriters]=useState<Record<string,boolean>>({});
   const [windowHistoryErrors,setWindowHistoryErrors]=useState<Record<string,string>>({});
@@ -416,7 +425,9 @@ export default function App() {
         if(!project||!history)throw Error('The project closed before its pending source edit could be saved.');
         const publish=async()=>{
           if(native&&windowWritersRef.current[project.id]===false)throw Error('This window follows another editor. Choose Edit here in Changes before saving; your draft remains open.');
-          return checkedSaveReceipt(project,await call<LibraryEntry>(announce||!native?'save_project':'update_project',{project}));
+          const entry=checkedSaveReceipt(project,await call<LibraryEntry>(announce||!native?'save_project':'update_project',{project}));
+          if(announce)windowHistories.current.clearRecoveryWarning(project.id);
+          return entry;
         };
         // Reserve the native Save at capture, before later edits can enter the
         // journal. The UI receipt queue must not flush past this frozen head.
@@ -1793,9 +1804,12 @@ export default function App() {
                     </div>
                   )}
                   {native&&current&&<div className="gs-edit-history-controls" role="group" aria-label="Workspace window ownership">
-                    <span>{windowWriters[current.id]===false?'Following the editing window':'Editing here · durable window history'}</span>
+                    <span>{windowWriters[current.id]===false?'Following the editing window':'Editing here · window history'}</span>
                     {windowWriters[current.id]===false?<button onClick={()=>void (async()=>{try{await call('take_project_document',{id:current.id});const next=await windowHistories.current.attach(current.id);setWindowWriters(old=>({...old,[current.id]:next.status.writable}));if(next.history)dispatchDocument({type:'window-history',id:current.id,history:next.history});}catch(e){notice(String(e),'error');}})()}>Edit here</button>:<button disabled={busy||!!activeJob} onClick={()=>void (async()=>{try{await save(false,current.id);await windowHistories.current.flush(current.id);await call('open_project_window',{id:current.id,workspace:workspaceRef.current,observe:true});}catch(e){notice(String(e),'error');}})()}>Open another view</button>}
                   </div>}
+                  {native&&current&&windowRecoveryWarnings[current.id]&&<Notice>
+                    Automatic recovery could not be updated. Keep this window open until you can save your edits. {windowRecoveryWarnings[current.id]}
+                  </Notice>}
                   {native&&current&&windowHistoryErrors[current.id]&&<Notice tone="error">{windowHistoryErrors[current.id]} <button onClick={()=>void (async()=>{try{const h=documentsRef.current.documents.find(d=>d.id===current.id)?.history;if(!h)return;const recovered=await windowHistories.current.retainAndRefresh(current.id,h);if(recovered.history)dispatchDocument({type:'window-history',id:current.id,history:recovered.history});setWindowWriters(old=>({...old,[current.id]:recovered.status.writable}));setWindowHistoryErrors(old=>{const next={...old};delete next[current.id];return next;});notice(`Draft preserved at ${recovered.retained}. Showing the accepted revision.`,'success');}catch(e){notice(String(e),'error');}})()}>Save draft and use accepted revision</button></Notice>}
                   <ExternalMapSync
                     documents={documents.documents.flatMap((d) =>

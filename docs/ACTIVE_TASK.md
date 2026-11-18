@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - prove the revised Black Echo mission in Forerunner
-Status: awaiting human verification
-Starting revision: db126b73bb6008110f9c2eca177ef2e65e02bbb0, canonical master.
-Latest verified revision: db126b73 retains the tested projectile picker and frame fix. Its Windows build c0f9e9e5 authored, compiled and independently read back the four Black Echo source corrections. Retained CE609 candidate dee2d9a7. Private Forerunner startup reached awaitingMapStartup; game hash remains null.
-Next action: Review the current Forerunner executable, reopen the exact retained dee2d9a7 through the private Spark workflow, complete temporary profile setup if prompted and confirm game load before pilot, touchdown, boarding, rescue and full mission checks. Pursue Save37944 or P8 rendering independently while physical input is unavailable.
+Task: Operation110 - restore the native bumped-reflection preview
+Status: implementation incomplete
+Starting revision: 27b854d4837717c3c52e5681c03377e07c3fbc4d, canonical master.
+Latest verified revision: 27b854d plus this scoped Save recovery repair. Windows fault injection kept Undo and editing live, protected both previous disk files, and passed explicit Save/restart after repair. Black Echo candidate dee2d9a7 remains compiled and independently read back.
+Next action: Trace the actual P8_BUMP gold-face material through the existing bitmap decoder and native compatibility path. Use licensed or user-owned palette evidence and compare the real editor render. Black Echo waits for interactive temporary profile setup and mission load evidence; original intermittent Save37944 awaits a distinct recurrence.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+17Nov Save recovery isolation (parent27b854d): embedded native Window History acknowledges edits, Undo and Redo while a genuine optional checkpoint failure keeps the descriptor and latest recovery head hash-identical. Explicit Save correctly refuses until the owned blocker is removed, then persists the exact draft through full restart. Frontend25/browser5/Rust11 pass. Exact app/disk hashes and limits in RUNTIME_INTEGRATION_20261107.
 
 17Nov arch(parent54c1984): repaired generated roof refinement, f32 collision fins and redundant portal contours; unchanged quality/budget/source transforms.83BSP+2explicit skips,CEprofile3,native CE609/Invader readback/Windows3 actual controls PASS.194connector/32460total triangles;869samples each way/68spawns. Remaining Tool warnings/gameplay gates in MEGAWORLD_SEAM_ROUTES_20261108; R157 retained.
 
@@ -98,6 +100,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+17Nov run-ItuFaA closed, 2,209,867,051 logical bytes disposed. Temporary run absent, development runs/issues zero. Both test apps closed normally. No SDK prep, game or remote work.
 
 17Nov run-hH9GHn closed. Spark and the isolated Forerunner process exited. Owned workspace disposed 3,751,531,999 logical bytes. Root absent, no development runs or issues. Latest cache and two reviewed files independently hash-verified under releases/black-echo-native-pilot-landing-20261117.
 

@@ -18,8 +18,14 @@ pub(super) async fn read_workspace_history(app:tauri::AppHandle,window:tauri::We
     let owner=lock(&state.document_owners)?.get(&project_id).cloned();
     Ok(Status{writable:owner.as_deref()==Some(window.label()),owner,history})}).await.map_err(error)?
 }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct CommitReceipt {
+    revision: u64,
+    recovery_warning: Option<String>,
+}
 #[tauri::command]
-pub(super) async fn commit_workspace_history(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,revision:u64,head:Head,snapshots:Vec<Snapshot>)->Reply<u64>{
+pub(super) async fn commit_workspace_history(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,revision:u64,head:Head,snapshots:Vec<Snapshot>)->Reply<CommitReceipt>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
     let mut guard=lock(&state.window_history)?;
     let library=lock(&state.library)?;let p=library.get(&project_id).map_err(error)?;
@@ -27,16 +33,18 @@ pub(super) async fn commit_workspace_history(app:tauri::AppHandle,window:tauri::
     let writable=lock(&state.document_owners)?.get(&project_id).map(String::as_str)==Some(window.label());
     if !writable{let retained=guard.retain_draft(&p,revision,&head,&snapshots).map_err(error)?;return Err(format!("Editing moved to another window. Retained {retained}"));}
     if p.source.is_some(){let inspection=inspect(&state,&p)?;for item in &snapshots{project::validate_edits(&item.project,&inspection).map_err(error)?;}}
+    let saved = library.is_saved(&project_id).map_err(error)?;
+    let legacy_retention = lock(&state.settings)?.snapshot_retention;
     let revision=match guard.commit(&directory,&p,revision,head.clone(),snapshots.clone()){Ok(revision)=>revision,Err(reason)=>{let retained=guard.retain_draft(&p,revision,&head,&snapshots).map_err(error)?;return Err(format!("{reason} Retained {retained}"));}};
-    let current=guard.read(&directory,&p).map_err(error)?.and_then(|view|view.snapshots.into_iter().find(|snapshot|snapshot.key==head.current)).map(|snapshot|snapshot.project).unwrap_or(p);
-    // New documents need one explicit Save before automatic recovery has a
-    // durable library entry through which it can be reopened after a crash.
-    if library.is_saved(&project_id).map_err(error)?&&current.effective_automatic_backup_retention(lock(&state.settings)?.snapshot_retention).map_err(error)?>0{guard.checkpoint(&directory,&current).map_err(error)?;}
-    // The UI can request Save while this commit is completing. Release both
-    // state locks before dispatching an event back to that window.
+    // A disk checkpoint can fail after the RAM journal has advanced. Return
+    // that accepted revision to the writer so subsequent edits can still use it.
+    // New projects need an explicit Save before recovery can be reopened.
+    let recovery_warning = if saved {
+        guard.checkpoint_automatic(&directory, &p, legacy_retention).err().map(|reason|reason.to_string())
+    } else { None };
     drop(library);drop(guard);
     let _=window.app_handle().emit("spark:window-history",serde_json::json!({"projectId":project_id,"revision":revision,"owner":window.label()}));
-    Ok(revision)}).await.map_err(error)?
+    Ok(CommitReceipt { revision, recovery_warning })}).await.map_err(error)?
 }
 #[tauri::command]
 pub(super) async fn retain_workspace_draft(app:tauri::AppHandle,project_id:String,revision:u64,head:Head,snapshots:Vec<Snapshot>)->Reply<String>{

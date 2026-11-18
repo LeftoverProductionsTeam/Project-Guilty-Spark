@@ -486,7 +486,7 @@ async function mockDesktop(page: Page, preferredHalo: 'mccSteam' | null = 'mccSt
           for(const snapshot of args.snapshots)snapshots.set(snapshot.key,structuredClone(snapshot));
           const keys=new Set([args.head.current,...args.head.past,...args.head.future]);
           const next={revision:args.revision+1,head:structuredClone(args.head),snapshots:[...snapshots.values()].filter((s:any)=>keys.has(s.key))};
-          windowHistories.set(args.projectId,next);return next.revision;
+          windowHistories.set(args.projectId,next);return {revision:next.revision,recoveryWarning:null};
         }
         if(command==='retain_workspace_draft')return 'C:/synthetic/rejected-draft.json';
         if (command === 'auto_connect_classic_textures') return null;

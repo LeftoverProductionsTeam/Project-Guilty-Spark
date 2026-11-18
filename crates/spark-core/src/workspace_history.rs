@@ -212,6 +212,16 @@ fn write_head(dir:&Path,state:&Stored)->Result<()> {
 pub struct Session { documents:BTreeMap<String,MemoryDocument>, drafts:BTreeMap<String,Vec<u8>> }
 #[derive(Clone)]
 struct MemoryDocument { state:Option<Stored>, snapshots:BTreeMap<String,Vec<u8>>, immutable:BTreeMap<String,String>, disk_head:project::FileRevision, descriptor:project::FileRevision }
+impl MemoryDocument {
+    fn snapshot(&self, key: &str, sha: &str, registered: &Project) -> Result<Project> {
+        let bytes = self.snapshots.get(key).ok_or_else(||crate::SparkError::Invalid("Shared history snapshot is missing".into()))?;
+        if digest(bytes) != sha { return invalid("Shared history checksum differs"); }
+        let project: Project = serde_json::from_slice(bytes)?;
+        project.validate()?;
+        if !same_source(&project, registered) { return invalid("Shared history has another source identity"); }
+        Ok(project)
+    }
+}
 impl Session {
     const MAX_BYTES:usize=256*1024*1024;
     fn bytes(&self)->usize{self.documents.values().map(|d|d.snapshots.values().map(Vec::len).sum::<usize>()+d.immutable.iter().map(|(key,hash)|key.len()+hash.len()).sum::<usize>()).sum::<usize>()+self.drafts.values().map(Vec::len).sum::<usize>()}
@@ -235,11 +245,8 @@ impl Session {
     pub fn read(&mut self,dir:&Path,registered:&Project)->Result<Option<View>> {
         self.attach(dir,registered)?;let document=&self.documents[&registered.id];let Some(state)=&document.state else{return Ok(None)};
         let mut snapshots=vec![];
-        for(key,sha)in &state.hashes{
-            let bytes=document.snapshots.get(key).ok_or_else(||crate::SparkError::Invalid("Shared history snapshot is missing".into()))?;
-            if digest(bytes)!=*sha{return invalid("Shared history checksum differs");}
-            let p:Project=serde_json::from_slice(bytes)?;p.validate()?;if !same_source(&p,registered){return invalid("Shared history has another source identity");}
-            snapshots.push(Snapshot{key:key.clone(),project:p});
+        for (key, sha) in &state.hashes {
+            snapshots.push(Snapshot { key:key.clone(), project:document.snapshot(key, sha, registered)? });
         }
         Ok(Some(View{revision:state.revision,head:state.head.clone(),snapshots}))
     }
@@ -260,6 +267,19 @@ impl Session {
         let before=document.snapshots.values().map(Vec::len).sum::<usize>()+document.immutable.iter().map(|(key,hash)|key.len()+hash.len()).sum::<usize>();let after=next.snapshots.values().map(Vec::len).sum::<usize>()+next.immutable.iter().map(|(key,hash)|key.len()+hash.len()).sum::<usize>();
         if self.bytes()-before+after>Self::MAX_BYTES{return invalid("Shared Undo history reached its 256 MiB RAM budget. Existing acknowledged edits were retained");}
         self.documents.insert(registered.id.clone(),next);Ok(revision)
+    }
+    /// Use the acknowledged draft's preference, which may differ from the saved descriptor.
+    pub fn checkpoint_automatic(&mut self, dir: &Path, registered: &Project, legacy_default: usize) -> Result<()> {
+        self.attach(dir, registered)?;
+        let document = &self.documents[&registered.id];
+        let Some(state) = &document.state else { return Ok(()); };
+        let key = &state.head.current;
+        let sha = state.hashes.get(key).ok_or_else(||crate::SparkError::Invalid("History references an unacknowledged snapshot".into()))?;
+        let current = document.snapshot(key, sha, registered)?;
+        if current.effective_automatic_backup_retention(legacy_default)? > 0 {
+            self.checkpoint(dir, registered)?;
+        }
+        Ok(())
     }
     pub fn checkpoint(&mut self,dir:&Path,registered:&Project)->Result<()> {
         self.checkpoint_with_budget(dir,registered,MAX_TRANSFER)

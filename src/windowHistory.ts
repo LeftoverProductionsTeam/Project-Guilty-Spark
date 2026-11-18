@@ -6,7 +6,8 @@ type Head={current:string;past:string[];future:string[];dirty:boolean;limit:numb
 type Snapshot={key:string;project:Project};
 export type WindowHistoryView={revision:number;head:Head;snapshots:Snapshot[]};
 export type WindowHistoryStatus={writable:boolean;owner:string|null;history:WindowHistoryView|null};
-type Entry={revision:number;keys:WeakMap<Project,string>;known:Set<string>;tail:Promise<void>;blocked:boolean;last?:HistoryState};
+type CommitReceipt={revision:number;recoveryWarning:string|null};
+type Entry={revision:number;keys:WeakMap<Project,string>;known:Set<string>;tail:Promise<void>;blocked:boolean;last?:HistoryState;recoveryWarning?:string};
 // These fields are overlaid from the registered native project by
 // read_workspace_history. Changing them is not a new authored Undo snapshot.
 // Keep source identity, author timestamps and every editable field in comparison.
@@ -31,10 +32,16 @@ export function queuedWindowRefresh(refresh:(id:string)=>Promise<void>,failed:(e
  * history. A lease permits one writer; all other views observe that same head. */
 export class WindowHistories {
   private entries=new Map<string,Entry>();
+  constructor(private readonly onRecoveryWarning?: (id:string, warning:string|null)=>void) {}
+  private reportRecovery(id:string,entry:Entry,warning:string|null){
+    if(entry.recoveryWarning===(warning??undefined))return;
+    entry.recoveryWarning=warning??undefined;
+    this.onRecoveryWarning?.(id,warning);
+  }
   async attach(id:string):Promise<{status:WindowHistoryStatus;history:HistoryState|null}>{
     await this.flush(id);
     const status=await call<WindowHistoryStatus>('read_workspace_history',{projectId:id});
-    const entry:Entry={revision:status.history?.revision??0,keys:new WeakMap(),known:new Set(),tail:Promise.resolve(),blocked:!status.writable};
+    const entry:Entry={revision:status.history?.revision??0,keys:new WeakMap(),known:new Set(),tail:Promise.resolve(),blocked:!status.writable,recoveryWarning:this.entries.get(id)?.recoveryWarning};
     let history:HistoryState|null=null;
     if(status.history){
       const byKey=new Map(status.history.snapshots.map(s=>{entry.keys.set(s.project,s.key);entry.known.add(s.key);return[s.key,s.project] as const;}));
@@ -46,15 +53,15 @@ export class WindowHistories {
   writable(id:string){const e=this.entries.get(id);return !e||!e.blocked;}
   revision(id:string){return this.entries.get(id)?.revision??0;}
   block(id:string){const e=this.entries.get(id);if(e)e.blocked=true;}
-  async release(id:string){await this.flush(id);this.entries.delete(id);}
-  forgetDiscarded(id:string){this.entries.delete(id);}
+  async release(id:string){await this.flush(id);this.forgetDiscarded(id);}
+  forgetDiscarded(id:string){this.clearRecoveryWarning(id);this.entries.delete(id);}
   async retainAndRefresh(id:string,history:HistoryState){
     if(!history.current)throw Error('No local draft to retain');
     const keys=new Map<Project,string>(),key=(p:Project)=>{let k=keys.get(p);if(!k){k=crypto.randomUUID();keys.set(p,k);}return k;};
     const head:Head={current:key(history.current),past:history.past.map(key),future:history.future.map(key),dirty:history.dirty,limit:history.limit};
     const snapshots=[...keys].map(([project,key])=>({key,project}));
     const retained=await call<string>('retain_workspace_draft',{projectId:id,revision:this.revision(id),head,snapshots});
-    this.entries.delete(id);return{retained,...await this.attach(id)};
+    this.forgetDiscarded(id);return{retained,...await this.attach(id)};
   }
   persist(id:string,history:HistoryState):Promise<void>{
     const entry=this.entries.get(id);if(!entry||entry.blocked||!history.current||entry.last===history)return entry?.tail??Promise.resolve();
@@ -80,8 +87,10 @@ export class WindowHistories {
     const operation=entry.tail.then(async()=>{
       if(entry.blocked)throw Error('Window history is awaiting conflict review. Your draft remains open.');
       const snapshots=all.filter((p,i)=>!entry.known.has(key(p))&&all.indexOf(p)===i).map(project=>({key:key(project),project}));
-      entry.revision=await call<number>('commit_workspace_history',{projectId:id,revision:entry.revision,head,snapshots});
+      const receipt=await call<CommitReceipt>('commit_workspace_history',{projectId:id,revision:entry.revision,head,snapshots});
+      entry.revision=receipt.revision;
       entry.known=new Set([head.current,...head.past,...head.future]);
+      this.reportRecovery(id,entry,receipt.recoveryWarning);
     });
     entry.tail=operation.catch(error=>{entry.blocked=true;throw error;});
     // The caller reports the failure. Attach/close must still observe it.
@@ -98,6 +107,10 @@ export class WindowHistories {
     // preventing further safe edits. A failed history commit stays blocked.
     entry.tail=operation.then(()=>{},error=>{if(entry.blocked)throw error;});
     void entry.tail.catch(()=>{});return operation;
+  }
+  clearRecoveryWarning(id:string){
+    const entry=this.entries.get(id);
+    if(entry)this.reportRecovery(id,entry,null);
   }
   async flush(id?:string){if(id)await this.entries.get(id)?.tail;else await Promise.all([...this.entries.values()].map(e=>e.tail));}
 }
