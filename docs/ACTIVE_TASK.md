@@ -65,7 +65,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-Projectile paths now use the full field row and wrap in the picker. The native window and tint share the lower-right curve with the upper-right. Edge at 800 px passes with a long synthetic path. Isolated Windows build 43ce062c72a2c5483e988c1479b35d991713cf6a9a5d0e7ce6b021a0a6a042f9 verified the actual Blood Gulch pistol list (21 entries, 339 px box), matching 20 px corners, and unchanged original map 81764a45. No installed app was replaced.
+Projectile paths use the full field row and wrap in the picker. The current window frame and tint have matching 16 px lower-left and lower-right curves. Three focused Edge tests pass, including long picker text at 800 and 1500 px, short and unresolved references, Undo/Redo, Save and shared bottom corners. Earlier isolated Windows build 43ce062c72a2c5483e988c1479b35d991713cf6a9a5d0e7ce6b021a0a6a042f9 verified the actual Blood Gulch pistol list (21 entries, 339 px box) and unchanged original map 81764a45, using the earlier 20 px lower-right curve. No installed app was replaced.
 
 New encounter authoring carries a chosen major-variant upgrade policy through one-group and queued preview, native scalar verification and compiled expectation. Legacy requests and controller-owned Firefight use their prior defaults. Existing recipe-owned restrictions still apply. Native operations 26/26 including installed Invader, ownership 1/1 and combined picker/frame/encounter browser checks 4/4. Actual Black Echo pilot adoption and gameplay are still open.
 

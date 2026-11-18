@@ -1230,9 +1230,11 @@ test('the Spark corner visual clears the curved frame and stays above window gla
  await expect(emblem).toHaveCSS('pointer-events','none');
  await expect(button).toHaveCSS('margin-left','0px');
  const frame=page.locator('.application'), glass=page.locator('.gs-window-tint');
- await expect(frame).toHaveCSS('border-top-right-radius','20px');
- await expect(frame).toHaveCSS('border-bottom-right-radius','20px');
- await expect(glass).toHaveCSS('border-bottom-right-radius','20px');
+ for(const layer of [frame,glass]){
+  await expect(layer).toHaveCSS('border-top-right-radius','20px');
+  await expect(layer).toHaveCSS('border-bottom-left-radius','16px');
+  await expect(layer).toHaveCSS('border-bottom-right-radius','16px');
+ }
  for(const width of [1440,960]){
   await page.setViewportSize({width,height:800});
   await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-Math.max(0,hit.x-24))<1&&Math.abs(mark.y-Math.max(0,hit.y-24))<1&&mark.x>=0&&mark.y>=0&&mark.x+mark.width<=width;}).toBe(true);
@@ -5471,11 +5473,6 @@ for(const missing of [false,true])test('projectile choices distinguish tank shel
  await expect(picker.getByRole('option',{name:'tank shell · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'rocket · weapons/rocket launcher',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · weapons/pistol',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.locator('option[value="14"]')).toHaveCount(0);
  if(missing)await expect(picker.getByRole('option',{name:'Unresolved reference · 999',exact:true})).toHaveAttribute('disabled','');
  if(!missing){
-  const bottomCorners=await page.locator('.application').evaluate(element=>{
-   const style=getComputedStyle(element);
-   return [style.borderBottomLeftRadius,style.borderBottomRightRadius];
-  });
-  expect(bottomCorners).toEqual(['16px','16px']);
   const longOption=picker.locator('option[value="15"]');
   await expect(picker).toHaveJSProperty('value','10');
   await expect(longOption).toBeVisible();
