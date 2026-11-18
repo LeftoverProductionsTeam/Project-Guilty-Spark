@@ -74,6 +74,7 @@ export interface MissionBeat {
   createWeaponObject?: string | null;
   timerSeconds?: number | null;
   minimumSurvivors?: number | null;
+  escortRequiresPlayer?: boolean | null;
   escortFailure?: 'stop' | 'continue' | null;
   hudObjective?: boolean | null;
   hudText?: string | null;
@@ -164,7 +165,7 @@ export function blackEchoMission(nextId:()=>string,options?:BlackEchoOptions):Mi
   if(!['unsc','covenant'].includes(roles.faction)||[roles.rescue,roles.facility,roles.defense].some(name=>!/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(name))||[roles.facility,roles.defense,'be_flood'].includes(roles.rescue)||roles.facility==='be_flood'||roles.defense==='be_flood')throw Error('Choose valid, nonconflicting native rescue, opposing facility and defense encounters.');
   const rows:[string,string,MissionBeat['trigger'],string,string?][]=[
     ['Squad insertion','Reach the insertion area and review the operation briefing.','triggerVolume','be_insert'],
-    ['Rescue stranded Marines','Escort the surviving Marines to the rescue rally area. The native mission creates be_marines, assigns the human team and follows the closest players; all remaining survivors must arrive, with at least one alive. Loot settlement is separate.','escort','be_marines'],
+    ['Rescue stranded Marines','Reach the rescue rally alongside the surviving Marines before engaging the facility defenders.','escort','be_marines'],
     ['Investigate the Covenant facility','Clear the facility defenders and search for the classified package.','encounterCleared','be_covenant'],
     ['Recover classified technology','This step waits for actual technology collection logic to call gs_complete_4. The reference area is an authoring marker; entering it alone cannot acquire or bank equipment.','manual','be_artifact'],
     ['Contain the Flood emergency','Optional containment branch: when this step begins, a player in be_containment requests the Flood encounter. Otherwise continue to extraction defense.','encounterCleared','be_flood','be_containment'],
@@ -173,10 +174,10 @@ export function blackEchoMission(nextId:()=>string,options?:BlackEchoOptions):Mi
   ];
   return rows.map(([title,objective,trigger,reference,conditionVolume],index)=>({
     id:nextId(),title:covenant&&index===1?'Rescue stranded Covenant':covenant&&index===2?'Investigate the UNSC facility':title,
-    objective:covenant&&index===1?'Escort the surviving Covenant allies to the rescue rally area. Author Covenant actors and playable navigation; physical rescue and gear settlement remain separate.':covenant&&index===2?'Clear the UNSC defenders and recover the classified package.':objective,trigger,
+    objective:covenant&&index===1?'Reach the rescue rally alongside your surviving Covenant allies before engaging the UNSC defenders.':covenant&&index===2?'Clear the UNSC defenders and recover the classified package.':objective,trigger,
     encounterName:index===1?roles.rescue:index===2?roles.facility:index===5?roles.defense:trigger==='encounterCleared'?reference:'',
     ...(options&&(trigger==='escort'||trigger==='encounterCleared')?{encounterTeam:index===4?'flood' as const:(index===1)==covenant?'covenant' as const:'human' as const}:{}),
-    ...(trigger==='escort'?{triggerRef:'be_survivors',minimumSurvivors:1}:trigger!=='encounterCleared'?{triggerRef:reference}:{}),...(conditionVolume?{conditionVolume}:{}),
+    ...(trigger==='escort'?{triggerRef:'be_survivors',minimumSurvivors:1,escortRequiresPlayer:true}:trigger!=='encounterCleared'?{triggerRef:reference}:{}),...(conditionVolume?{conditionVolume}:{}),
     hudObjective:true,hudText:covenant&&index===1?'Rescue stranded Covenant':covenant&&index===2?'Investigate the UNSC facility':title,
   }));
 }
@@ -296,6 +297,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.createWeaponObject!=null&&(typeof m.createWeaponObject!=='string'||!scriptIdent.test(m.createWeaponObject)||m.trigger!=='weaponOwned')) ||
       (m.transportInsertion!=null&&(m.trigger!=='escort'||m.squadNumber!=null||!['pelican','spirit'].includes(m.transportInsertion))) ||
       (m.encounterTeam!=null&&(!['escort','encounterCleared'].includes(m.trigger)||!['source','human','covenant','flood'].includes(m.encounterTeam))) ||
+      (m.escortRequiresPlayer != null && (m.trigger !== 'escort' || typeof m.escortRequiresPlayer !== 'boolean')) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||

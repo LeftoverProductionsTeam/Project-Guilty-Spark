@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: dd9b064. Exact paired 833f7081 proves both Covenant players can select and deploy, and both UNSC players can land and disembark. A later UNSC run reached the Marine rescue volume and technology spawn. The Marine died before the players collected technology.
-Next action: Use the exact paired 833f7081 trace to protect the Marine during the native post-rescue fight and verify technology pickup, extraction and settlement. On the Covenant branch, walk past the measured Spirit approach stall without changing the proven terminals. Compiled BSP traces are clear on both reported stalled segments. Original Save37944 stays open.
+Latest verified revision: 4e76040 plus verified rescue rally authoring. CE609 candidate 05415099 compiled and passed independent readback. Paired predecessor 833f7081 completed rescue with the Marine alive and found no native technology pickup action.
+Next action: On exact 05415099, prove the Marine alone leaves the rescue beat pending and a player entering be_survivors starts native combat. Use the 833f7081 settlement-trial pickup trace to verify native targeting and item eligibility, then complete collection, extraction and settlement. Covenant Spirit boarding and original Save37944 stay open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov Black Echo rescue rally: opt-in player presence in the existing rescue volume survives project history, Save and source review. New Black Echo drafts enable it. The corrected CE609 cache 05415099 preserves 13 scripts, 17 globals and 3,313 tags in order. Independent scenario readback matches exactly. Forerunner gameplay of the new cache remains open. See RUNTIME_INTEGRATION_20261107.
 
 18Nov paired Black Echo 833f7081: both authenticated Covenant players used the native faction terminal and deployed. A separate UNSC run reached rescue and spawned technology on both clients. Marine health went from full at tick 4830 to a death at tick 5370, before the first recorded player engagement. Both observed walking stalls have floor support and clear sampled compiled BSP traces. See RUNTIME_INTEGRATION_20261107 for the exact receipts and remaining gates.
 

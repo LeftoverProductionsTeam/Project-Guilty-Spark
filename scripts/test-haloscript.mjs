@@ -48,9 +48,10 @@ const optional=exportHaloCeMission(operation),gate=optional.content.indexOf('(if
 assert.ok(gate>=0&&gate<spawn&&spawn<end&&end<next);assert.ok(optional.content.indexOf('(hud_set_objective_text gs_mission_obj_5)',gate)<spawn);
 assert.ok(optional.dependencies.includes('trigger_volume:be_containment'));
 assert.ok(optional.content.includes('(ai_set_team be_marines human)'));assert.ok(optional.content.includes('(ai_follow_target_players be_marines)'));
-assert.ok(optional.content.includes('(sleep_until (or (< (ai_living_count be_marines) 1) (volume_test_objects_all be_survivors (ai_actors be_marines))) 15)'));
+assert.ok(optional.content.includes('(sleep_until (or (< (ai_living_count be_marines) 1) (and (volume_test_objects_all be_survivors (ai_actors be_marines)) (volume_test_objects be_survivors (players)))) 15)'));
 assert.ok(optional.content.includes('(hud_set_objective_text gs_mission_fail_2)'));assert.ok(optional.content.includes('(sleep_until false 15)'));assert.ok(optional.content.includes('(sleep_until gs_manual_4_done 15)'));assert.ok(optional.content.includes('(sleep_until gs_manual_7_done 15)'));assert.ok(!optional.content.includes('(volume_test_objects be_artifact (players))'));
-assert.ok(!optional.content.includes('(volume_test_objects be_survivors (players))'));
+operation.missions[1].escortRequiresPlayer=undefined;
+assert.ok(!exportHaloCeMission(operation).content.includes('(volume_test_objects be_survivors (players))'));
 assert.ok(optional.dependencies.includes('ai_encounter:be_marines'));assert.ok(optional.dependencies.includes('trigger_volume:be_survivors'));assert.ok(!optional.content.includes('(volume_test_objects be_extract (players))'));
 assert.ok(!optional.content.includes('(game_won)'));assert.ok(!optional.content.includes('(sleep 18000)'));
 const body=optional.content.split(/\r?\n/).filter(line=>!line.trimStart().startsWith(';')).join('');assert.equal([...body].filter(c=>c==='(').length,[...body].filter(c=>c===')').length);
@@ -102,7 +103,7 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   assert.ok(activationControlIndex>=0&&nativeControls.lastIndexOf(activationNameIndex)===activationControlIndex);
   const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',
    soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
-   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue'},
+   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue',escortRequiresPlayer:true},
    {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionOutside:true,soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}},
    {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'extraction_activate'},
    {id:'rescue_success',title:'Success path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionResult:{beatId:'escort',failed:false}},

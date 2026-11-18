@@ -82,6 +82,8 @@ pub struct MissionBeat {
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub minimum_survivors:Option<u16>,
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub escort_requires_player:Option<bool>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub escort_failure:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub hud_objective:Option<bool>,
@@ -654,6 +656,7 @@ impl CreatorStudio {
             { return invalid("Invalid Creator Studio mission beat"); }
             if beat.transport_insertion.as_deref().is_some_and(|role|beat.trigger!="escort"||beat.squad_number.is_some()||!["pelican","spirit"].contains(&role)){return invalid("Dropship troop handoff requires shared native campaign rescue scope");}
             if beat.encounter_team.as_deref().is_some_and(|team|!matches!(beat.trigger.as_str(),"escort"|"encounterCleared")||!["source","human","covenant","flood"].contains(&team)){return invalid("Encounter team needs a native combat or survivor objective");}
+            if beat.escort_requires_player.is_some()&&beat.trigger!="escort"{return invalid("Requiring a player at rescue arrival needs a survivor escort");}
             if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}
             if let Some(result)=&beat.condition_result {
                 if !self.missions[..index].iter().any(|source|source.id==result.beat_id&&source.squad_number==beat.squad_number&&source.trigger=="escort"&&source.escort_failure.as_deref()==Some("continue")){return invalid("Choose an earlier survivor escort configured to continue on failure");}

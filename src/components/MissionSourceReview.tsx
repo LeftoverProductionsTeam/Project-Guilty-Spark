@@ -15,6 +15,7 @@ function BeatView({side,beat,other,index}:{side:string;beat?:MissionBeat;other?:
     {field:'allowSharedPresentation',label:'Shared HUD / radio',value:beat.allowSharedPresentation?'Explicitly allowed':'Not opted in'},
     {field:'transportInsertion',label:'Rescue troop source',value:beat.transportInsertion?'First '+(beat.transportInsertion==='pelican'?'Pelican':'Spirit')+' insertion':beat.trigger==='escort'?'Mission spawns this group':'Not applicable'},
     {field:'minimumSurvivors',label:'Minimum survivors',value:beat.trigger==='escort'?String(beat.minimumSurvivors??1):'Not applicable'},
+    {field:'escortRequiresPlayer',label:'Rescue arrival',value:beat.trigger!=='escort'?'Not applicable':beat.escortRequiresPlayer?'Survivors and a player':'Survivors'},
     {field:'escortFailure',label:'On rescue failure',value:beat.trigger!=='escort'?'Not applicable':beat.escortFailure==='continue'?'Continue to authored failure handling':'Stop mission; world stays active'},
     {field:'weaponPath',label:'Collected native weapon',value:beat.weaponPath||'Not selected'},
     {field:'conditionVolume',label:'Optional branch area',value:beat.conditionVolume||'No area condition'},

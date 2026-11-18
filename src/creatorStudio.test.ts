@@ -205,10 +205,11 @@ it('authors stable shared mission paths through history, source review and save 
 it('routes a continued rescue failure separately from success and refuses dangling outcome references',async()=>{
  const project=campaignDraft();project.history=[];project.quickForge!.logic!.triggers=[{id:'rally',nativeName:'rally',name:'Rescue destination',position:[0,0,0],rotation:[0,0,0],dimensions:[4,4,4],visible:true,locked:false}];
  project.quickForge!.campaignEncounters=[{name:'survivors',actorPath:'characters/marine_armored/marine_armored assault rifle',position:[0,0,0],startActive:false,count:2,spacing:1}];
- project.studio!.missions=[{id:'rescue',title:'Rescue',objective:'Escort',trigger:'escort',encounterName:'survivors',triggerRef:'rally',minimumSurvivors:1,escortFailure:'continue',checkpoint:true},
+ project.studio!.missions=[{id:'rescue',title:'Rescue',objective:'Escort',trigger:'escort',encounterName:'survivors',triggerRef:'rally',minimumSurvivors:1,escortFailure:'continue',escortRequiresPlayer:true,checkpoint:true},
  {id:'success',title:'Success',objective:'Normal route',trigger:'manual',encounterName:'',conditionResult:{beatId:'rescue',failed:false}},
  {id:'failure',title:'Failure',objective:'Recovery route',trigger:'manual',encounterName:'',conditionResult:{beatId:'rescue',failed:true}}];
  expect(validateCreatorStudio(project.studio!)).toEqual([]);const body=exportHaloCeMission(project.studio!).content;
+ expect(body).toContain('(or (< (ai_living_count survivors) 1) (and (volume_test_objects_all rally (ai_actors survivors)) (volume_test_objects rally (players))))');
  expect(body).toContain('(set gs_result_1_failed true)');expect(body).toContain('(set gs_result_1_done true)');expect(body).not.toContain('(sleep_until false 15)');
  expect(body).toContain('(if (not gs_result_1_failed) (begin');expect(body).toContain('(if (and gs_result_1_done (not gs_result_1_failed)) (begin');expect(body).toContain('(if (and gs_result_1_done gs_result_1_failed) (begin');
  expect(body.indexOf('(if (not gs_result_1_failed) (begin')).toBeLessThan(body.indexOf('(game_save)'));
@@ -218,7 +219,7 @@ it('routes a continued rescue failure separately from success and refuses dangli
  }
  for(const patch of [{escortFailure:'stop'},{trigger:'timer'},{escortFailure:'invalid'}]) {const bad=structuredClone(project);Object.assign(bad.studio!.missions[0],patch);expect(validateCreatorStudio(bad.studio!)).not.toEqual([]);}
  const mixed=structuredClone(project);mixed.studio!.missions[1].conditionVolume='rally';mixed.studio!.missions[1].conditionGroup='rally_decision';expect(validateCreatorStudio(mixed.studio!)).toEqual([]);const combined=exportHaloCeMission(mixed.studio!).content;expect(combined.indexOf('(if (and gs_result_1_done (not gs_result_1_failed))')).toBeLessThan(combined.indexOf('(set gs_branch_1_inside'));await attachNativeCampaignMission(mixed,'manual');
- const legacy=emptyCreatorStudio();legacy.missions=[{...project.studio!.missions[0],escortFailure:undefined}];const original=exportHaloCeMission(legacy).content;expect(original).toContain('(sleep_until false 15)');expect(original).not.toContain('gs_result_');
+ const legacy=emptyCreatorStudio();legacy.missions=[{...project.studio!.missions[0],escortFailure:undefined,escortRequiresPlayer:undefined}];const original=exportHaloCeMission(legacy).content;expect(original).toContain('(sleep_until false 15)');expect(original).not.toContain('gs_result_');expect(original).not.toContain('(volume_test_objects rally (players))');
 });
 
 

@@ -4164,8 +4164,13 @@ test('Black Echo draft uses one project history action and selects its native ar
 
  await expect(page.locator('.studio-record').nth(3).getByRole('combobox',{name:/^Mission trigger \d+$/,exact:true})).toHaveValue('manual');
  const survivor=page.locator('.studio-record').nth(1);await expect(survivor.getByRole('combobox',{name:/^Mission trigger \d+$/,exact:true})).toHaveValue('escort');
+ const rally=survivor.getByRole('checkbox',{name:'A player must reach the rescue area',exact:true});await expect(rally).toBeChecked();
+ await rally.press('Space');await expect(rally).not.toBeChecked();
+ await page.keyboard.press('Control+z');await expect(rally).toBeChecked();await page.keyboard.press('Control+y');await expect(rally).not.toBeChecked();
+ await rally.press('Space');await expect(rally).toBeChecked();
  const minimum=survivor.getByRole('spinbutton',{name:'Minimum survivors 2',exact:true});await minimum.fill('2');await minimum.press('Tab');
  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[1].minimumSurvivors)).toBe(2);
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio.missions[1].escortRequiresPlayer)).toBe(true);
 
  // Tab moved into the direction textarea. Its Ctrl+Z belongs to text editing;
  // return by keyboard to the numeric control before requesting project history.

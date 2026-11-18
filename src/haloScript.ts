@@ -207,12 +207,16 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
       case 'escort':{
         const ref=ensureName(beat.encounterName,'Beat '+(i+1)+' survivor encounter',true),destination=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' survivor destination');
         const minimum=beat.minimumSurvivors??1;
+        const survivorsArrived = '(volume_test_objects_all '+destination+' (ai_actors '+ref+'))';
+        const arrival = beat.escortRequiresPlayer
+          ? '(and '+survivorsArrived+' (volume_test_objects '+destination+' (players)))'
+          : survivorsArrived;
         deps.push('ai_encounter:'+ref,'trigger_volume:'+destination,'hud_message:gs_mission_fail_'+(i+1));
         if(beat.transportInsertion){if(scope||!options.forerunner)throw Error('Dropship troop handoff requires shared Forerunner campaign scope. Independent squad delivery remains unsupported.');deps.push('transport_insertion:'+beat.transportInsertion+':'+ref);}
         if(scope){
           scripted.push('  (ai_place '+ref+')',...wait('(> (ai_living_count '+ref+') 0)',15,300),'  (if (not gs_aborted) (begin',...(beat.encounterTeam&&beat.encounterTeam!=='source'?['  (ai_set_team '+ref+' '+beat.encounterTeam+')']:[]),
             '  (sleep_until (begin','    (if (> (list_count (players)) 0) (ai_follow_target_unit '+ref+' (unit (list_get (players) 0))))',
-            '    (or gs_aborted '+empty+' (< (ai_living_count '+ref+') '+minimum+') (and (> (ai_living_count '+ref+') 0) (volume_test_objects_all '+destination+' (ai_actors '+ref+'))))','  ) 15)',markAbort,
+            '    (or gs_aborted '+empty+' (< (ai_living_count '+ref+') '+minimum+') (and (> (ai_living_count '+ref+') 0) '+arrival+'))','  ) 15)',markAbort,
             '  (if (and (not gs_aborted) (< (ai_living_count '+ref+') '+minimum+')) (begin');
           if(beat.allowSharedPresentation)scripted.push('    (hud_set_objective_text gs_mission_fail_'+(i+1)+')');
           scripted.push('    (print "gs survivor objective failed")',beat.escortFailure==='continue'?'    (set gs_result_'+(i+1)+'_failed true)':'    (set gs_aborted true)','  ))');
@@ -223,7 +227,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         }
         scripted.push(...(beat.transportInsertion?['  (sleep_until gs_'+beat.transportInsertion+'_insertion_complete 1)']:['  (ai_place '+ref+')']),'  (sleep_until (> (ai_living_count '+ref+') 0) 15 300)',
           ...(beat.encounterTeam==null?['  (ai_allegiance player human)','  (ai_set_team '+ref+' human)']:beat.encounterTeam==='source'?[]:['  (ai_set_team '+ref+' '+beat.encounterTeam+')']),'  (ai_follow_target_players '+ref+')',
-          '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') (volume_test_objects_all '+destination+' (ai_actors '+ref+'))) 15)',
+          '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') '+arrival+') 15)',
           '  (if (< (ai_living_count '+ref+') '+minimum+') (begin',
           '    (hud_set_objective_text gs_mission_fail_'+(i+1)+')','    (print "gs survivor objective failed")');
         if(beat.escortFailure==='continue')scripted.push('    (set gs_result_'+(i+1)+'_failed true)');
@@ -412,7 +416,7 @@ export interface NativeMissionBinding {
 }
 
 // Exhaustive against the saved beat type: new creator fields must remain reviewable.
-const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
+const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
 async function nativeMissionHash(body:string):Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
     .map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -443,6 +447,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     (beat.conditionGroup!=null&&typeof beat.conditionGroup!=='string')||
     (beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')||
     (beat.minimumSurvivors!=null&&typeof beat.minimumSurvivors!=='number')||
+    (beat.escortRequiresPlayer!=null&&(beat.trigger!=='escort'||typeof beat.escortRequiresPlayer!=='boolean'))||
     (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')||
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
     [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
@@ -467,7 +472,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,guidance:beat.guidance?{flag:beat.guidance.flag??null,object:beat.guidance.object??null,height:beat.guidance.height}:null,
-    transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
+    transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortRequiresPlayer:beat.escortRequiresPlayer===true,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
