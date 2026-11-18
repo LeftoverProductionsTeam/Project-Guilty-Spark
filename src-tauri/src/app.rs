@@ -553,6 +553,39 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         Ok(result)
     }).await.map_err(error)?
 }
+fn preview_project_bitmap_batch(
+    state: &AppState,
+    project: &Project,
+    requests: &[core::bitmap_preview::OwnedBitmapRequest],
+    include_mips: bool,
+) -> Reply<core::bitmap_preview::OwnedBitmapBatch> {
+    use core::bitmap_preview as bitmap;
+    let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
+    let inspection = inspect(state, project)?;
+    if inspection.header.version == 13 && source.resource_sha256.contains_key("mcc-textures") {
+        let preview = if include_mips { bitmap::preview_mcc_bitmap_chains } else { bitmap::preview_mcc_bitmap_batch };
+        let folder = source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?;
+        return preview(&source.preserved_path, &source.sha256, &inspection, requests, folder, &source.resource_sha256).map_err(error);
+    }
+    // External pixels still require this project's exact resource-map pin.
+    let pinned = source.resource_directory.as_ref().and_then(|folder| {
+        source.resource_sha256.get("bitmaps.map").map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
+    });
+    let resource = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
+    bitmap::preview_owned_bitmap_batch_with_palette(
+        &source.preserved_path, &source.sha256, &inspection, requests, resource, include_mips,
+        || {
+            let target = project.active_build_target.as_ref()
+                .and_then(|id| project.build_targets.iter().find(|target| &target.id == id))
+                .and_then(|target| target.hek_directory.clone());
+            let configured = lock(&state.settings).ok().and_then(|settings| settings.hek_directory.clone());
+            let detected = lock(&state.installation).ok().and_then(|installation| installation.editing_tools.clone());
+            [target, configured, detected].into_iter().flatten()
+                .find_map(|root| bitmap::HaloBumpPalette::read_guerilla(&root.join("guerilla.exe")).ok())
+        },
+    ).map_err(error)
+}
+
 #[tauri::command]
 async fn preview_owned_cache_bitmap(
     app: tauri::AppHandle,
@@ -562,28 +595,14 @@ async fn preview_owned_cache_bitmap(
     mip_level: Option<usize>,
 ) -> Reply<core::bitmap_preview::OwnedBitmapPreview> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mip_level=mip_level.unwrap_or(0);
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
-        let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
-        let inspection = inspect(&state, &project)?;
-        if inspection.header.version==13&&source.resource_sha256.contains_key("mcc-textures") {
-            let folder=source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?;let request=core::bitmap_preview::OwnedBitmapRequest {bitmap_tag_id,image_index,mip_level};
-            let batch=core::bitmap_preview::preview_mcc_bitmap_batch(&source.preserved_path,&source.sha256,&inspection,&[request],folder,&source.resource_sha256).map_err(error)?;
-            let item=batch.items.into_iter().next().ok_or("MCC bitmap response missing")?;return item.preview.ok_or_else(||item.error.unwrap_or_else(||"MCC bitmap unavailable".into()));
-        }
-        // Resource-map access requires a per-project explicitly selected
-        // directory and its recorded hash; global preferences are not trusted
-        // for copyrighted shared pixels. Internal bitmap reads need neither.
-        let pinned = source.resource_directory.as_ref().and_then(|folder| {
-            source.resource_sha256.get("bitmaps.map")
-                .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
-        });
-        let resource_args = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
-        core::bitmap_preview::preview_owned_bitmap_mip_with_resources(
-            &source.preserved_path, &source.sha256, &inspection,
-            bitmap_tag_id, image_index, mip_level, resource_args,
-        ).map_err(error)
+        let request = core::bitmap_preview::OwnedBitmapRequest {
+            bitmap_tag_id, image_index, mip_level: mip_level.unwrap_or(0),
+        };
+        let batch = preview_project_bitmap_batch(&state, &project, &[request], false)?;
+        let item = batch.items.into_iter().next().ok_or("Bitmap response missing")?;
+        item.preview.ok_or_else(|| item.error.unwrap_or_else(|| "Bitmap preview refused".into()))
     }).await.map_err(error)?
 }
 /// Optional native sequence metadata for HUD/bitmap inspection. Ordinary model
@@ -634,21 +653,7 @@ async fn preview_owned_cache_bitmap_batch(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
-        let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
-        let inspection = inspect(&state, &project)?;
-        if inspection.header.version==13&&source.resource_sha256.contains_key("mcc-textures") {
-            let preview=if include_mips.unwrap_or(false){core::bitmap_preview::preview_mcc_bitmap_chains}else{core::bitmap_preview::preview_mcc_bitmap_batch};
-            return preview(&source.preserved_path,&source.sha256,&inspection,&requests,source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?,&source.resource_sha256).map_err(error);
-        }
-        let pinned = source.resource_directory.as_ref().and_then(|folder| {
-            source.resource_sha256.get("bitmaps.map")
-                .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
-        });
-        let resource_args = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
-        let preview=if include_mips.unwrap_or(false){core::bitmap_preview::preview_owned_bitmap_chains_with_resources}else{core::bitmap_preview::preview_owned_bitmap_batch_with_resources};
-        preview(
-            &source.preserved_path, &source.sha256, &inspection, &requests, resource_args,
-        ).map_err(error)
+        preview_project_bitmap_batch(&state, &project, &requests, include_mips.unwrap_or(false))
     }).await.map_err(error)?
 }
 

@@ -8,7 +8,7 @@
 //! See docs/CONTINUATION_20_ENGINEERING.md and c20 H1 bitmap/map field guides.
 use crate::{binary::Reader, invalid, maps::{self, MapHeader, MapInspection}, Result, SparkError};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs::File, path::Path};
+use std::{cell::OnceCell, collections::HashSet, fs::File, io::{Read, Seek, SeekFrom}, path::Path};
 #[path="bitmap_alias.rs"] mod bitmap_alias;
 use bitmap_alias::BitmapAliases;
 #[path="bitmap_layout.rs"] mod bitmap_layout;
@@ -21,6 +21,45 @@ const MAX_IMAGES_PER_TAG: usize = 2048;
 const MAX_BATCH_REQUESTS: usize = 24;
 const MAX_BATCH_RAW_BYTES: usize = 16 * 1024 * 1024;
 const MAX_BATCH_RGBA_BYTES:usize=64*1024*1024;
+const HALO_BUMP_PALETTE_SHA256: &str = "b58960eb51a53850a9145e1f7e8c1123af23a47c6e18bf6f723a40323dad1517";
+
+/// The Halo-only 256-entry BGRA table is read from the user's editing kit.
+pub struct HaloBumpPalette([u8; 1024]);
+impl HaloBumpPalette {
+    pub fn read_guerilla(path: &Path) -> Result<Self> {
+        crate::library::validate_local_input_path(path)?;
+        crate::reject_links(path)?;
+        let mut file = File::open(path)?;
+        let metadata = file.metadata()?;
+        if !metadata.is_file() || !(64..=256 * 1024 * 1024).contains(&metadata.len()) {
+            return invalid("Invalid local Halo Guerilla file size");
+        }
+        let mut signature = [0; 2];
+        file.read_exact(&mut signature)?;
+        if &signature != b"MZ" { return invalid("Expected the local Halo Guerilla executable"); }
+        // MCC HCEEK and classic HEK respectively. Offsets alone do not
+        // identify the palette: confirm the exact Xbox Halo BGRA fingerprint.
+        for offset in [0x3b7ff0, 0x5b9a80] {
+            let mut table = [0; 1024];
+            if offset + table.len() as u64 > metadata.len() { continue; }
+            file.seek(SeekFrom::Start(offset))?;
+            file.read_exact(&mut table)?;
+            use sha2::{Digest, Sha256};
+            if crate::hex_bytes(Sha256::digest(table)) == HALO_BUMP_PALETTE_SHA256 {
+                return Ok(Self(table));
+            }
+        }
+        invalid("The local Halo Guerilla executable has no recognized Halo P8 bump palette")
+    }
+    fn expand_bgra(&self, indices: &[u8]) -> Vec<u8> {
+        let mut pixels = Vec::with_capacity(indices.len() * 4);
+        for &index in indices {
+            let offset = usize::from(index) * 4;
+            pixels.extend_from_slice(&self.0[offset..offset + 4]);
+        }
+        pixels
+    }
+}
 fn check_chain_pixel_budget(width:usize,height:usize,spent:usize)->Result<()>{
     let bytes=width.checked_mul(height).and_then(|n|n.checked_mul(4)).and_then(|n|n.checked_add(spent)).ok_or_else(||SparkError::Invalid("Original chain pixel size overflow".into()))?;
     if bytes>MAX_BATCH_RGBA_BYTES{return invalid("Combined original mip pixels exceed 64 MiB");}Ok(())
@@ -36,6 +75,7 @@ fn bitmap_failure(error: &SparkError) -> (&'static str, String) {
     }
     let code = if reason.contains("pinned bitmaps.map") || reason.contains("Choose and hash") {
         "missing-resource"
+    } else if reason.contains("P8 bump preview needs") { "missing-bump-palette"
     } else if reason.contains("pixel format") { "unsupported-format"
     } else if reason.contains("Swizzled") || reason.contains("dimensionality") || reason.contains("2D single") || reason.contains("external metadata") || reason.contains("tag-body provenance") {
         "unsupported-layout"
@@ -471,6 +511,10 @@ fn read_image_metadata_layout(bytes:&[u8],header:&MapHeader,tag_data:usize,index
         14 => ("DXT1", true, 8usize),
         15 => ("DXT3", true, 16usize),
         16 => ("DXT5", true, 16usize),
+        // Stubbs shares the version 5 header but uses a different palette.
+        17 if kind == 0 && (matches!(header.version, 6 | 7 | 609)
+            || header.version == 5 && matches!(header.build.as_str(), "01.10.12.2276" | "01.01.14.2342"))
+            => ("P8_BUMP", false, 1usize),
         6 => ("R5G6B5", false, 2usize),
         8 => ("A1R5G5B5", false, 2usize),
         9 => ("A4R4G4B4", false, 2usize),
@@ -773,18 +817,20 @@ pub fn preview_owned_bitmap_mip_with_resources(
 /// One unsupported image produces an explicit per-item refusal, not a guessed
 /// pixel buffer; a broken source or changed opened resource fails the batch.
 pub fn preview_owned_bitmap_batch_with_resources(path:&Path,expected_sha256:&str,inspection:&MapInspection,requests:&[OwnedBitmapRequest],resources:Option<(&Path,&str)>)->Result<OwnedBitmapBatch>{
-    preview_owned_bitmap_batch_inner(path,expected_sha256,inspection,requests,resources,false)
+    preview_owned_bitmap_batch_with_palette(path,expected_sha256,inspection,requests,resources,false,|| None)
 }
 pub fn preview_owned_bitmap_chains_with_resources(path:&Path,expected_sha256:&str,inspection:&MapInspection,requests:&[OwnedBitmapRequest],resources:Option<(&Path,&str)>)->Result<OwnedBitmapBatch>{
-    preview_owned_bitmap_batch_inner(path,expected_sha256,inspection,requests,resources,true)
+    preview_owned_bitmap_batch_with_palette(path,expected_sha256,inspection,requests,resources,true,|| None)
 }
 fn enqueue_original_mips(request:&OwnedBitmapRequest,preview:&OwnedBitmapPreview,pending:&mut Vec<OwnedBitmapRequest>)->Result<()>{
     if request.mip_level!=0||preview.mip_level!=0||!(1..=17).contains(&preview.mip_levels){return invalid("Invalid original mip chain metadata");}
     for mip_level in 1..preview.mip_levels{pending.push(OwnedBitmapRequest{mip_level,..*request});}
     if pending.len()>MAX_BATCH_REQUESTS*17{return invalid("Original chain request count exceeds its bound");}Ok(())
 }
-fn preview_owned_bitmap_batch_inner(
+/// Decode Halo P8 using a verified local palette, loaded only for a P8 image.
+pub fn preview_owned_bitmap_batch_with_palette(
     path:&Path,expected_sha256:&str,inspection:&MapInspection,requests:&[OwnedBitmapRequest],resources:Option<(&Path,&str)>,include_mips:bool,
+    load_palette: impl Fn() -> Option<HaloBumpPalette>,
 )->Result<OwnedBitmapBatch>{
     if include_mips&&requests.iter().any(|r|r.mip_level!=0){return invalid("Whole original chains require base image requests");}
     if requests.is_empty() || requests.len() > MAX_BATCH_REQUESTS {
@@ -807,6 +853,7 @@ fn preview_owned_bitmap_batch_inner(
         return invalid("Original cache snapshot changed or is an unsupported engine version");
     }
     let mut spent = 0usize;let mut decoded_spent=0usize;
+    let palette = OnceCell::new();
     let mut resource_snapshot: Option<(File, crate::resource_map::ResourceIndex)> = None;
     let mut resource_failure: Option<String> = None;
     let mut aliases=BitmapAliases::default();
@@ -831,7 +878,8 @@ fn preview_owned_bitmap_batch_inner(
             };
             let (selected,span)=select_mip(&meta,request.mip_level)?;
             if include_mips{check_chain_pixel_budget(selected.width as usize,selected.height as usize,decoded_spent)?;}
-            let next = spent.checked_add(selected.size).ok_or_else(|| SparkError::Invalid("Preview batch size overflow".into()))?;
+            let preview_bytes = if meta.format == "P8_BUMP" { selected.size * 4 } else { selected.size };
+            let next = spent.checked_add(preview_bytes).ok_or_else(|| SparkError::Invalid("Preview batch size overflow".into()))?;
             if next > MAX_BATCH_RAW_BYTES {
                 return invalid("Combined decoded bitmap mips exceed the 16 MiB batch limit");
             }
@@ -859,7 +907,12 @@ fn preview_owned_bitmap_batch_inner(
                 (data, "internal-cache", None,None)
             };
             let pixels=linear_top_mip(&selected,&pixels)?;
-            let dds = dds_top_mip(selected.width, selected.height, meta.format, &pixels)?;
+            let (format, pixels) = if meta.format == "P8_BUMP" {
+                let palette = palette.get_or_init(&load_palette).as_ref().ok_or_else(||
+                    SparkError::Invalid("P8 bump preview needs a recognized Halo Tag editor (Guerilla). Connect your Halo editing kit in Settings & tools and retry the material preview.".into()))?;
+                ("BGRA8", palette.expand_bgra(&pixels))
+            } else { (meta.format, pixels) };
+            let dds = dds_top_mip(selected.width, selected.height, format, &pixels)?;
             spent = next;
             Ok(OwnedBitmapPreview {
                 bitmap_tag_id: request.bitmap_tag_id,
@@ -868,7 +921,7 @@ fn preview_owned_bitmap_batch_inner(
                 image_count:meta.image_count,shared_native_bitmap_path,
                 width: selected.width,
                 height: selected.height,
-                format: meta.format.into(),
+                format: format.into(),
                 source_sha256: snapshot_hash.clone(),
                 dds_base64: base64(&dds),
                 source_kind: source_kind.into(),
@@ -961,6 +1014,73 @@ mod tests {
         assert_eq!(flat_mip_span(8,8,true,8,4,3,56,false).unwrap().offset,48);
         assert!(flat_mip_span(4,4,false,4,4,0,1000,false).is_err());
         let old:OwnedBitmapRequest=serde_json::from_str(r#"{"bitmapTagId":1,"imageIndex":0}"#).unwrap();assert_eq!(old.mip_level,0);
+    }
+    #[test]
+    fn p8_bump_matches_bgra_entries_for_ce_and_swizzled_xbox_mips() {
+        let palette: [u8; 1024] = std::array::from_fn(|i| match i % 4 {
+            0 => (i / 4) as u8, 1 => 0x91, 2 => 0x37, _ => 255 - (i / 4) as u8,
+        });
+        let bgra = |first: u8, count: u8| -> Vec<u8> {
+            (first..first + count).flat_map(|index| [index, 0x91, 0x37, 255 - index]).collect()
+        };
+        for version in [609, 5] {
+            let xbox = version == 5;
+            let (source, mut inspection) = compatibility_fixture(version, if xbox { 8 } else { 0 }, 0x1234);
+            let mut bytes = std::fs::read(source.path()).unwrap();
+            if xbox {
+                bytes[0x964..0x968].copy_from_slice(&0x803a_6180u32.to_le_bytes());
+                bytes[0x40..0x60].fill(0);
+                bytes[0x40..0x4d].copy_from_slice(b"01.10.12.2276");
+            }
+            bytes[0x98c..0x98e].copy_from_slice(&17u16.to_le_bytes());
+            bytes[0x994..0x996].copy_from_slice(&2u16.to_le_bytes());
+            bytes[0x99c..0x9a0].copy_from_slice(&21u32.to_le_bytes());
+            let linear: [u8; 16] = std::array::from_fn(|i| i as u8);
+            let swizzled = [0,1,4,5,2,3,6,7,8,9,12,13,10,11,14,15];
+            bytes[0x2000..0x2010].copy_from_slice(if xbox { &swizzled } else { &linear });
+            bytes[0x2010..0x2015].copy_from_slice(&[16,17,18,19,20]);
+            std::fs::write(source.path(), &bytes).unwrap();
+            inspection.sha256 = maps::hash_file(source.path()).unwrap();
+            let requests = [OwnedBitmapRequest { bitmap_tag_id:0x1234, image_index:0, mip_level:0 }];
+            let missing = preview_owned_bitmap_chains_with_resources(source.path(), &inspection.sha256, &inspection, &requests, None).unwrap();
+            assert_eq!(missing.items[0].error_code.as_deref(), Some("missing-bump-palette"));
+            assert!(missing.items[0].preview.is_none());
+            let reads = std::cell::Cell::new(0);
+            let chain = preview_owned_bitmap_batch_with_palette(source.path(), &inspection.sha256, &inspection, &requests, None, true, || {
+                reads.set(reads.get() + 1);
+                Some(HaloBumpPalette(palette))
+            }).unwrap();
+            assert_eq!(reads.get(), 1);
+            assert_eq!(chain.items.len(), 1);
+            assert_eq!(chain.mip_items.len(), 2);
+            for (level, (item, (first,count))) in chain.items.iter().chain(&chain.mip_items).zip([(0,16),(16,4),(20,1)]).enumerate() {
+                let preview = item.preview.as_ref().unwrap();
+                let dimension = 4 >> level;
+                assert_eq!((preview.width, preview.height, preview.mip_level, preview.mip_levels), (dimension, dimension, level, 3));
+                assert_eq!(preview.format, "BGRA8");
+                assert_eq!(preview.dds_base64, base64(&dds_top_mip(dimension, dimension, "BGRA8", &bgra(first,count)).unwrap()));
+            }
+            assert_eq!(std::fs::read(source.path()).unwrap(), bytes);
+            if xbox {
+                bytes[0x40..0x60].fill(0);
+                std::fs::write(source.path(), &bytes).unwrap();
+                inspection.sha256 = maps::hash_file(source.path()).unwrap();
+                let unknown = preview_owned_bitmap_batch_with_palette(source.path(), &inspection.sha256, &inspection, &requests, None, true,
+                    || panic!("unknown version 5 builds cannot use Halo's palette")).unwrap();
+                assert_eq!(unknown.items[0].error_code.as_deref(), Some("unsupported-format"));
+                assert!(unknown.items[0].preview.is_none());
+            }
+        }
+    }
+    #[test]
+    fn p8_bump_does_not_accept_an_unverified_tool_table() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("guerilla.exe");
+        let mut file = File::create(&path).unwrap();
+        std::io::Write::write_all(&mut file, b"MZ").unwrap();
+        file.set_len(0x3b7ff0 + 1024).unwrap();
+        drop(file);
+        assert!(HaloBumpPalette::read_guerilla(&path).err().unwrap().to_string().contains("no recognized"));
     }
     #[test]
     fn whole_original_chains_match_individual_reads_without_changing_legacy_protocol(){

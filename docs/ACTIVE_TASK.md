@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - restore the native bumped-reflection preview
+Task: Operation110 - verify project snapshot restore through Save and restart
 Status: implementation incomplete
-Starting revision: 27b854d4837717c3c52e5681c03377e07c3fbc4d, canonical master.
-Latest verified revision: 27b854d plus this scoped Save recovery repair. Windows fault injection kept Undo and editing live, protected both previous disk files, and passed explicit Save/restart after repair. Black Echo candidate dee2d9a7 remains compiled and independently read back.
-Next action: Trace the actual P8_BUMP gold-face material through the existing bitmap decoder and native compatibility path. Use licensed or user-owned palette evidence and compare the real editor render. Black Echo waits for interactive temporary profile setup and mission load evidence; original intermittent Save37944 awaits a distinct recurrence.
+Starting revision: 8490c85c33faa3874c8de67a36a1655d98c4f523, canonical master.
+Latest verified revision: 8490c85 plus scoped P8 preview repair. Exact Black Echo CE and original Xbox B30 mip chains independently match the owned disc palette. Final embedded Windows build841040a9 reproduces the repaired gold-face crop.
+Next action: Reproduce snapshot restore in the owning Spark window and verify the restored edits remain current through Save, Undo/Redo and restart. Black Echo requires interactive profile setup and mission load evidence. Original intermittent Save37944 and in-game reflection parity remain open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+17Nov P8_BUMP gold-face preview: verified owned Halo palette, exact CE609 and Halo Xbox mip chains, actual Windows texture upload and stable matching native renders. Wrong tables and unrecognized version 5 builds refuse. Rust29/frontend33 pass. See RUNTIME_INTEGRATION_20261107 and the retained gold-face crops. Game parity remains open.
 
 17Nov Save recovery isolation (parent27b854d): embedded native Window History acknowledges edits, Undo and Redo while a genuine optional checkpoint failure keeps the descriptor and latest recovery head hash-identical. Explicit Save correctly refuses until the owned blocker is removed, then persists the exact draft through full restart. Frontend25/browser5/Rust11 pass. Exact app/disk hashes and limits in RUNTIME_INTEGRATION_20261107.
 
@@ -100,6 +102,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+17Nov run-4VnRhV closed. Two isolated embedded apps exited0. Temporary output disposed 2,274,487,462 logical bytes, root absent and development runs/issues zero. Only the verified 10,170-byte screenshot crop was retained.
 
 17Nov run-ItuFaA closed, 2,209,867,051 logical bytes disposed. Temporary run absent, development runs/issues zero. Both test apps closed normally. No SDK prep, game or remote work.
 
