@@ -591,6 +591,20 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
      const saved=await state(created.project.id);expect(saved.history.head.dirty).toBe(false);expect(saved.history.head.past.length).toBeGreaterThan(0);
      const previous=saved.history.snapshots.find(row=>row.key===saved.history.head.past.at(-1)).project;
      record.savedHead=saved.history.head;record.savedStudioSha256=crypto.createHash('sha256').update(JSON.stringify(saved.project.studio)).digest('hex');
+     const descriptor=path.join(library,'projects',created.project.id,'project.gsproject');
+     const recovery=descriptor+'.bak';
+     const revision=async file=>({sha256:await hash(file),fileId:String((await fs.stat(file,{bigint:true})).ino)});
+     const expected={descriptor:await revision(descriptor),recovery:await revision(recovery)};
+     expect(expected.recovery.sha256).not.toBe(expected.descriptor.sha256);
+     const savedMessage=page.locator('.toast.success').filter({hasText:'Project saved.'});
+     await expect(savedMessage).toBeVisible();
+     await savedMessage.getByRole('button',{name:'Dismiss message',exact:true}).click();
+     await page.keyboard.press('Control+s');
+     await expect(savedMessage).toBeVisible();
+     expect(await revision(descriptor)).toEqual(expected.descriptor);
+     expect(await revision(recovery)).toEqual(expected.recovery);
+     expect((await state(created.project.id)).history.head).toEqual(saved.history.head);
+     record.repeatedSavePreserved=expected;
      await close();await start();await chooseTool(page,'Map library');await open(created.project.title);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
      const resumed=await state(created.project.id);expect(resumed.history.head).toEqual(saved.history.head);expect(resumed.project.studio).toEqual(saved.project.studio);
      for(const [i,step]of ceMissionHudSteps.entries()){

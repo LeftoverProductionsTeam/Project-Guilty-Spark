@@ -3,8 +3,9 @@ use crate::{
     project::{self, Project, Source},
     Result,
 };
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -358,9 +359,28 @@ impl Library {
     /// Only the explicit Save command adopts a workbench document on disk.
     /// Source maps remain referenced in place and must still match their hash.
     pub fn save_with_history(&self,history:&mut crate::workspace_history::Session,project:&Project)->Result<LibraryEntry>{
-        self.validate_explicit_save(project)?;
+        let expected = self.validate_explicit_save(project)?;
         let dir=self.project_dir(&project.id)?;fs::create_dir_all(&dir)?;
         let _save_owner=crate::storage::lock(&dir.join("save.lock"))?;
+        // Saving identical content should keep the prior-good descriptor.
+        // Take the durable index timestamp only when the resulting bytes
+        // match the verified saved file.
+        let mut unchanged = None;
+        if let Some(sha256) = expected.sha256.as_deref() {
+            let timestamp = self.db.query_row(
+                "SELECT json_extract(summary, '$.modifiedAt') FROM projects WHERE id=?1",
+                [&project.id], |row| row.get::<_, Option<String>>(0),
+            ).optional()?.flatten();
+            if let Some(timestamp) = timestamp.filter(|stamp| stamp != &project.modified_at) {
+                let mut candidate = project.clone();
+                candidate.modified_at = timestamp;
+                let bytes = project::encoded_project(&dir.join("project.gsproject"), &candidate)?;
+                if crate::hex_bytes(Sha256::digest(bytes)) == sha256 {
+                    unchanged = Some(candidate);
+                }
+            }
+        }
+        let project = unchanged.as_ref().unwrap_or(project);
         // The publisher rechecks inputs under this lock, after the recovery
         // checkpoint. Reading them again immediately before it adds a full
         // map/asset scan without protecting descriptor publication.
@@ -996,6 +1016,56 @@ mod import_retention_report_tests {
 mod save_session_tests {
     use super::*;
     use crate::workspace_history::{Head, Session, Snapshot};
+
+    #[test]
+    fn repeat_save_preserves_the_prior_good_descriptor() {
+        let root = tempfile::tempdir().unwrap();
+        let library = Library::workspace(root.path()).unwrap();
+        let mut project = library.create("First saved version").unwrap();
+        let dir = library.project_dir(&project.id).unwrap();
+        let descriptor = dir.join("project.gsproject");
+        let recovery = project::project_recovery_path(&descriptor).unwrap();
+        let journal = dir.join("window-history");
+        let mut history = Session::default();
+        let first = uuid::Uuid::new_v4().to_string();
+        history.commit(&journal, &project, 0,
+            Head { current: first.clone(), past: vec![], future: vec![], dirty: true, limit: 8 },
+            vec![Snapshot { key: first.clone(), project: project.clone() }],
+        ).unwrap();
+        library.save_with_history(&mut history, &project).unwrap();
+
+        project.title = "Second saved version".into();
+        project.modified_at = "2026-11-18T12:00:00Z".into();
+        let current = uuid::Uuid::new_v4().to_string();
+        history.commit(&journal, &project, 1,
+            Head { current: current.clone(), past: vec![first.clone()], future: vec![], dirty: true, limit: 8 },
+            vec![Snapshot { key: current.clone(), project: project.clone() }],
+        ).unwrap();
+        library.save_with_history(&mut history, &project).unwrap();
+
+        assert_eq!(project::load_project(&recovery).unwrap().title, "First saved version");
+        let saved = project::FileRevision::capture(&descriptor).unwrap();
+        let saved_recovery = project::FileRevision::capture(&recovery).unwrap();
+
+        // The desktop command supplies a fresh timestamp on every explicit Save.
+        let durable_timestamp = project.modified_at.clone();
+        project.modified_at = "2026-11-18T12:01:00Z".into();
+        let receipt = library.save_with_history(&mut history, &project).unwrap();
+
+        assert_eq!(project::FileRevision::capture(&recovery).unwrap(), saved_recovery);
+        assert_eq!(project::FileRevision::capture(&descriptor).unwrap(), saved);
+        assert_eq!(receipt.modified_at, durable_timestamp);
+        assert_eq!(library.get(&project.id).unwrap().modified_at, durable_timestamp);
+
+        drop(library);
+        let library = Library::workspace(root.path()).unwrap();
+        let reopened = library.get(&project.id).unwrap();
+        let view = Session::default().read(&journal, &reopened).unwrap().unwrap();
+        assert_eq!(reopened.title, "Second saved version");
+        assert_eq!(view.head.current, current);
+        assert_eq!(view.head.past, [first]);
+        assert!(!view.head.dirty);
+    }
 
     #[test]
     fn session_write_failures_leave_the_saved_descriptor_and_undo_selection_intact() {

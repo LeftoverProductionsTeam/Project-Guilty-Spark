@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: The 88ff1040 two-client run on 42b59977 passed Covenant deployment and physical Spirit seats 5 and 6, then both departure commands hit the BSP. The revised 8e8d3312 CE609 cache passes independent native readback and compiled outbound/return geometry checks. The 42-edit Windows Save and restart pass stands.
-Next action: Pair-test exact 8e8d3312 on the reviewed Forerunner build. Confirm native outbound command execution with both boarded players, field touchdown/disembarkation, empty return, recall, objectives and final settlement. Read the next actual rejection before changing source. Original Save37944 remains open.
+Latest verified revision: The 8e8d3312 paired trial on 098a5d79 proved Covenant deployment, boarding, outbound Spirit flight, field landing and both exits. The installed turret blocks the empty-rider count. Windows Save now preserves the exact previous-good copy on unchanged content and passed the 42-edit, restart and Undo/Redo checks.
+Next action: Use the native seat/rider and player lists to exclude installed components from the Spirit empty checks, including return, recall and final reset. Preserve live pilot, landing and former-passenger gates. Recompile and pair-test the arrival latch, empty return, recall, rescue, combat and settlement. Original Save37944 remains open.
 
 ## Acceptance
 
