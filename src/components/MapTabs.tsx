@@ -15,6 +15,7 @@ export default function MapTabs({
   onSelect,
   onClose,
   onWindow,
+  isReadOnly,
   onReturn,
   onReorder,
   onOpenSaved,
@@ -24,6 +25,7 @@ export default function MapTabs({
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onWindow: (id: string) => Promise<boolean>;
+  isReadOnly: (id: string) => boolean;
   onReturn?: (id:string)=>void;
   onReorder?:(ids:string[])=>void;
   onOpenSaved:()=>void;
@@ -90,9 +92,10 @@ export default function MapTabs({
     window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);
   },[state.activeId,state.documents,disabled,onSelect]);
   useLayoutEffect(()=>{if(context)contextRoot.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();},[context]);
+  const returnId=state.activeId&&!isReadOnly(state.activeId)?state.activeId:null;
   if (!state.documents.length) return null;
   return (
-    <><div className="map-tab-bar" data-overflow={condensed?'dropdown':undefined} style={{width:Math.min(state.documents.length,8)*180+68+(onReturn?32:0)}}>
+    <><div className="map-tab-bar" data-overflow={condensed?'dropdown':undefined} style={{width:Math.min(state.documents.length,8)*180+68+(onReturn&&returnId?32:0)}}>
       {state.documents.length>0&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
         if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-file-menu[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
       }} onKeyDown={event=>{
@@ -107,7 +110,7 @@ export default function MapTabs({
         const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
         if(buttons[next])focusCompositeItem(buttons[next]);
       }}>
-        <summary aria-label="Choose open map" title="Switch between open maps, or choose Open saved project to browse your library. The arrow moves an open map and its draft to another window." onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
+        <summary aria-label="Choose open map" title="Switch between open maps, or choose Open saved project to browse your library. The arrow moves a tab to another window." onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
         <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
           <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
           <PagedSurface name="map-switcher" label="Open maps" maxHeight={360}><div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
@@ -117,7 +120,7 @@ export default function MapTabs({
               else pendingFocus.current=d.id;
               onSelect(d.id);
             }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
-            <button aria-label={'Move '+d.history.current?.title+' to another window'} title="Move this map and its history to a separate window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
+            <button aria-label={'Move '+d.history.current?.title+' to another window'} title={isReadOnly(d.id)?'Move this read-only view to a separate window':'Move this map and its history to a separate window'} disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
           </div>)}</div></PagedSurface>
           {!matches.length&&<p role="status">No open maps match.</p>}
           <button className="gs-map-open-saved" role="menuitem" disabled={disabled} title="Browse all saved projects without closing the maps already open" onClick={()=>{if(menu.current)menu.current.open=false;onOpenSaved();}}>Open saved project…</button>
@@ -181,7 +184,7 @@ export default function MapTabs({
             </button>
             <button
               className="map-tab-action"
-              title="Close map; choose Save, Discard or Cancel for unsaved changes"
+              title={isReadOnly(d.id)?'Close this read-only view':'Close map; choose Save, Discard or Cancel for unsaved changes'}
               aria-label={'Close map ' + d.history.current?.title}
               disabled={disabled}
               onClick={() => onClose(d.id)}
@@ -194,10 +197,10 @@ export default function MapTabs({
       {context&&<div className="gs-tab-context" ref={contextRoot} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();setContext(null);tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();}else navigateComposite(event);}} role="menu" aria-label="Map tab actions" style={{position:'fixed',left:Math.max(8,context.x),top:Math.max(8,context.y)}}>
         <button role="menuitem" disabled={disabled} onClick={()=>{pin(context.id);setContext(null);}}>{pinned.includes(context.id)?'Unpin tab':'Pin tab'}</button>
         <button role="menuitem" disabled={disabled} onClick={()=>{void requestWindow(context.id);setContext(null);}}>Move to another window</button>
-        {onReturn&&<button role="menuitem" disabled={disabled} onClick={()=>{onReturn(context.id);setContext(null);}}>Return to original window</button>}
+        {onReturn&&!isReadOnly(context.id)&&<button role="menuitem" disabled={disabled} onClick={()=>{onReturn(context.id);setContext(null);}}>Return to original window</button>}
         <button role="menuitem" disabled={disabled} onClick={()=>{onClose(context.id);setContext(null);}}>Close map</button>
       </div>}
-      {onReturn&&state.activeId&&<button className="small-button" aria-label="Return map to workspace" disabled={disabled} title="Return this map and its in-memory editing history to the original Spark window" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return</button>}
-    </div>{feedback&&createPortal(<div className="gs-tab-tear-preview" data-tab-drag-phase={feedback.phase} role="status" aria-live="polite" style={{left:feedback.x,top:feedback.y}}><ExternalLink size={18}/><div><strong>{feedback.title}</strong><small>{feedback.phase==='ready'?'Release to open in another window':feedback.phase==='dragging'?'Pull outside the tab bar to make a window':feedback.phase==='transferring'?'Opening window and transferring the map…':feedback.phase==='completed'?'Window opened':"Couldn't finish the move. Your tab is retained."}</small></div></div>,document.body)}</>
+      {onReturn&&returnId&&<button className="small-button" aria-label="Return map to workspace" disabled={disabled} title="Return this map and its in-memory editing history to the original Spark window" onClick={()=>onReturn(returnId)}><CornerUpLeft size={14}/>Return</button>}
+    </div>{feedback&&createPortal(<div className="gs-tab-tear-preview" data-tab-drag-phase={feedback.phase} role="status" aria-live="polite" style={{left:feedback.x,top:feedback.y}}><ExternalLink size={18}/><div><strong>{feedback.title}</strong><small>{feedback.phase==='ready'?'Release to open in another window':feedback.phase==='dragging'?'Pull outside the tab bar to make a window':feedback.phase==='transferring'?(isReadOnly(feedback.id)?'Moving the read-only view…':'Opening window and transferring the map…'):feedback.phase==='completed'?'Window opened':"Couldn't finish the move. Your tab is retained."}</small></div></div>,document.body)}</>
   );
 }

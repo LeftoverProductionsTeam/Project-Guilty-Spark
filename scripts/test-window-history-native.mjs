@@ -70,6 +70,36 @@ try{
   await observer.waitForTimeout(1600);
   await expect(observer.locator('.toast.error').filter({hasText:'No writable native history is attached'})).not.toBeVisible();
   step('another native window observes the same committed transform',{propagationMs:Math.round(propagationMs),independentWriter:false});
+  const ownerBeforeMove=await state(editor,id),savedBeforeMove=await digest(descriptor);
+  const observedTab=page=>page.getByRole('tab',{name:'C43 history A',exact:true});
+  await expect(observedTab(observer)).toHaveAttribute('aria-description','Unsaved changes');
+  await expect(observer.getByRole('button',{name:'Return map to workspace',exact:true})).toHaveCount(0);
+  await observer.keyboard.press('Control+Shift+p');
+  const work=observer.getByRole('dialog',{name:'Open work',exact:true});
+  await work.getByRole('tab',{name:'Saved projects',exact:true}).click();
+  previous=new Set(pages());
+  await work.getByRole('button',{name:'Open saved project C43 history A in another window',exact:true}).click();
+  const extraView=await nextPage(previous);
+  await value(extraView,0.75);
+  expect((await state(extraView,id)).writable).toBe(false);
+  await expect(observedTab(observer)).toBeVisible();
+  await openViewMenu(extraView);previous=new Set(pages());
+  await extraView.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  const movedView=await nextPage(previous);
+  await expect(observedTab(extraView)).toHaveCount(0);
+  await value(movedView,0.75);
+  expect((await state(movedView,id)).writable).toBe(false);
+  await movedView.keyboard.press('Control+w');
+  await expect(observedTab(movedView)).toHaveCount(0);
+  for(const view of [observer,extraView,movedView]){
+   await expect(view.getByRole('dialog',{name:'Save changes before closing?',exact:true})).toHaveCount(0);
+   await expect(view.locator('.toast.error')).toHaveCount(0);
+  }
+  expect((await state(editor,id)).writable).toBe(true);
+  expect((await state(editor,id)).owner).toBe(ownerBeforeMove.owner);
+  expect((await state(editor,id)).history).toEqual(ownerBeforeMove.history);
+  expect(await digest(descriptor)).toBe(savedBeforeMove);
+  step('read-only saved-project window, pop out and keyboard close preserve the writer, its draft and the saved descriptor',{descriptorSha256:savedBeforeMove,historyRevision:ownerBeforeMove.history.revision});
   await changes(observer);await observer.getByRole('button',{name:'Edit here',exact:true}).click();await expect.poll(async()=>(await state(observer,id)).writable).toBe(true);await expect.poll(async()=>(await state(editor,id)).writable).toBe(false);
   await closeChanges(observer);await observer.keyboard.press('Control+z');await value(observer,0.5);await value(editor,0.5);await observer.keyboard.press('Control+y');await value(observer,0.75);
   const current=await acknowledged(observer,id,0.75),beforeRevision=current.history.revision;

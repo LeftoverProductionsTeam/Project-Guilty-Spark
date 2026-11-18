@@ -470,6 +470,7 @@ async function mockDesktop(page: Page, preferredHalo: 'mccSteam' | null = 'mccSt
         if (command === 'list_runtime_registrations') return [];
         if (command === 'inspect_runtime_launch') return {environment:{},warnings:[]};
         if (command === 'bootstrap') return structuredClone(bootstrap);
+        if (command === 'workspace_layout_names') return [];
         if (command === 'open_workspace_window') return 'synthetic-workspace-window';
         if (command === 'open_project_window') {
           if(mock.enforceTransfer){mock.transferredId=args.id;await new Promise(resolve=>setTimeout(resolve,80));}
@@ -484,7 +485,14 @@ async function mockDesktop(page: Page, preferredHalo: 'mccSteam' | null = 'mccSt
           return {id:'synthetic-import', sourceProjectId:args.sourceProjectId,sourceSha256:args.sourceSha256,tagId:tag.id,tagClass:tag.class,tagPath:tag.path,nativePath:'synthetic-import/'+tag.path,receiptSha256:'c'.repeat(64),fileCount:1};
         }
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
-        if (command === 'read_workspace_history') return {writable:true,owner:'main',history:structuredClone(windowHistories.get(args.projectId)??null)};
+        if (command === 'read_workspace_history') {
+          if(new URLSearchParams(location.search).get('observe')==='1'){
+            if(args.projectId!=='a')return {writable:false,owner:null,history:null};
+            const original=structuredClone(projects.a.project),draft={...original,tagEdits:[{tagId:1,fieldKey:'velocity',value:27}]};
+            return {writable:false,owner:'writer',history:{revision:2,head:{current:'draft',past:['saved'],future:[],dirty:true,limit:100},snapshots:[{key:'draft',project:draft},{key:'saved',project:original}]}};
+          }
+          return {writable:true,owner:'main',history:structuredClone(windowHistories.get(args.projectId)??null)};
+        }
         if (command === 'commit_workspace_history') {
           if(mock.transferredId===args.projectId)throw Error('Editing moved to another window');
           const previous=windowHistories.get(args.projectId);
@@ -933,6 +941,30 @@ test('popping out a map editor stages the focused edit before transferring its d
   const afterTransfer=await page.evaluate(()=>(window as any).__sparkMock.calls);
   expect(afterTransfer.slice(move+1).filter((call:any)=>call.command==='commit_workspace_history')).toEqual([]);
   await expect(page.getByText('Editing moved to another window',{exact:true})).toHaveCount(0);
+});
+
+for(const action of ['close','move','open another view','open a different project'] as const)test('a read-only map can '+action+' without touching the editing window',async({page})=>{
+ await mockDesktop(page);await page.goto('/?observe=1');await openFixture(page);
+ const tab=page.getByRole('tab',{name:'Synthetic baseline',exact:true});
+ await expect(tab).toHaveAttribute('aria-description','Unsaved changes');
+ if(action==='open another view'||action==='open a different project'){
+  await page.keyboard.press('Control+Shift+p');
+  const work=page.getByRole('dialog',{name:'Open work',exact:true});
+  await work.getByRole('tab',{name:'Saved projects',exact:true}).click();
+  await work.getByRole('button',{name:action==='open another view'?'Open saved project Synthetic baseline in another window':'Open saved project Synthetic candidate',exact:true}).click();
+ }else if(action==='move'){
+  await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+ }else{
+  await page.keyboard.press('Control+w');
+ }
+ if(action==='close'||action==='move')await expect(tab).toHaveCount(0);
+ else await expect(tab).toHaveAttribute('aria-description','Unsaved changes');
+ if(action==='move'||action==='open another view')await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='open_project_window')?.args)).toMatchObject({id:'a',workspace:'tags',another:true,observe:true});
+ if(action==='open a different project')await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.getByRole('dialog',{name:'Save changes before closing?',exact:true})).toHaveCount(0);
+ const writes=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>['save_project','update_project','commit_workspace_history','discard_project_changes','release_project_document','take_project_document'].includes(c.command)));
+ expect(writes).toEqual([]);
+ expect(await page.locator('.toast.error').allTextContents()).toEqual([]);
 });
 
 test('explicit pop-out routes survive completed onboarding and legacy help links stay usable',async({page})=>{

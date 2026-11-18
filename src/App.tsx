@@ -912,7 +912,8 @@ export default function App() {
     const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){selectMap(id,stayInWorkspace);return true;}
     setBusy(true);
     try {
-      if (historyRef.current.dirty) await save();
+      const prior=historyRef.current;
+      if(prior.dirty&&prior.current&&(!native||windowWritersRef.current[prior.current.id]!==false))await save();
       const open = await call<OpenProject>('open_project', { id });
       await load(open);
       // Compare navigation intent, including leaving and returning to the same route.
@@ -953,9 +954,13 @@ export default function App() {
     flushSync(()=>{
       if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     });
-    await save(false,id,true);
-    const latest=documentsRef.current.documents.find(d=>d.id===id);
-    if(latest&&native&&windowHistories.current.writable(id))await windowHistories.current.persist(id,latest.history);
+    // A blocked writer still needs to resolve its draft. Only an acknowledged
+    // observer can skip staging because its edits belong to another window.
+    if(!native||windowWritersRef.current[id]!==false){
+      await save(false,id,true);
+      const latest=documentsRef.current.documents.find(d=>d.id===id);
+      if(latest&&native&&windowHistories.current.writable(id))await windowHistories.current.persist(id,latest.history);
+    }
     await windowHistories.current.flush(id);window.dispatchEvent(new Event('gs:save-viewport-context'));
   }
   async function detachTagPanel(id:string,tagId:number):Promise<boolean>{
@@ -989,6 +994,8 @@ export default function App() {
   }
   async function closeMap(id:string,separateWindow:boolean|'main'=false,another=false){
     if(closingDocuments.current.has(id))return false;
+    const readOnly=native&&windowWritersRef.current[id]===false;
+    if(readOnly&&separateWindow==='main')return false;
     const handoffWorkspace=separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,
       handoffSection=handoffWorkspace==='settings'?settingsTab:handoffWorkspace==='learning'?learningSection:null;
     // Stop background journal writes before transferring the native writer
@@ -997,13 +1004,31 @@ export default function App() {
     setBusy(true);try{
       await flushWindowHandoff(id);
       const document=documentsRef.current.documents.find(doc=>doc.id===id);
-      if(!separateWindow&&document?.history.dirty&&windowHistories.current.writable(id)){
+      if(!separateWindow&&!readOnly&&document?.history.dirty&&windowHistories.current.writable(id)){
         const choice=await chooseClose(document.history.current?[document.history.current]:[]);
         if(choice==='cancel')return false;
         if(choice==='save')await save(true,id);
         else if(native){await call('discard_project_changes',{id});windowHistories.current.block(id);}
       }
-      if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call(separateWindow==='main'?'return_project_to_main':'open_project_window',{id,workspace:handoffWorkspace,...(handoffSection&&separateWindow!=='main'?{section:handoffSection}:{}),...(another?{another:true}:{}),...(separateWindow==='main'?{panel:new URLSearchParams(location.search).get('panel')}:{} )});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});return true;
+      if(separateWindow){
+        if(!native)throw new Error('Separate editor windows require the desktop application.');
+        if(separateWindow==='main'){
+          await call('return_project_to_main',{id,workspace:handoffWorkspace,panel:new URLSearchParams(location.search).get('panel')});
+        }else{
+          await call('open_project_window',{
+            id,workspace:handoffWorkspace,
+            ...(handoffSection?{section:handoffSection}:{}),
+            ...(readOnly?{observe:true,another:true}:another?{another:true}:{}),
+          });
+        }
+      }else if(native&&!readOnly)await call('release_project_document',{id});
+      await windowHistories.current.release(id);
+      const state=documentsRef.current;
+      if(state.activeId===id){
+        const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];
+        setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');
+      }
+      dispatchDocument({type:'close',id});return true;
     }catch(e){notice(String(e),'error');return false;}finally{closingDocuments.current.delete(id);setBusy(false);}
   }
   async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{const section=workspaceRef.current==='learning'?learningSection:workspaceRef.current==='settings'?settingsTab:null;await call('open_workspace_window',{workspace:workspaceRef.current,section,context:section==='academy'?readMapSession<string>('global','learning.lesson','preservation'):null});notice('Workspace opened in a resizable window. Drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
@@ -1012,7 +1037,7 @@ export default function App() {
     try{
       if(current&&mapWorkspaces.includes(target)){
         if(busy){notice('Finish the current map operation before opening another view.');return;}
-        if(windowHistories.current.writable(current.id))await flushWindowHandoff(current.id);
+        await flushWindowHandoff(current.id);
         await call('open_project_window',{id:current.id,workspace:target,observe:true,another});
       }else await call('open_workspace_window',{workspace:target,section:target==='learning'?learningSection:target==='settings'?settingsTab:null,another});
       await workspaceWindows.refresh();
@@ -1549,6 +1574,7 @@ export default function App() {
                 onReorder={ids=>dispatchDocument({type:'reorder',ids})}
                 onClose={(id) => void closeMap(id)}
                 onWindow={(id) => closeMap(id, true, true)}
+                isReadOnly={id=>windowWriters[id]===false}
                 onReturn={native&&getCurrentWindow().label.startsWith('editor-')?(id)=>void closeMap(id,'main'):undefined}
 
               />
