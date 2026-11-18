@@ -27,7 +27,7 @@
 .model-collision-status {position:absolute;left:8px;bottom:10px;max-width:calc(100% - 16px);padding:5px 8px;background:var(--panel);border:1px solid var(--line);font-size:11px;}
 .tag-properties-pane .field-table-title {margin:6px 0;gap:5px;flex-wrap:wrap;}
 .tag-properties-pane .field-table-title h3 {font-size:12px;margin:0;}
-.tag-properties-pane .field-table .property-row {padding:5px 0;gap:8px;grid-template-columns:minmax(75px,1fr) minmax(110px,160px);}
+.tag-properties-pane .field-table .property-row {padding:5px 0;gap:8px;grid-template-columns:var(--gs-tag-field-columns,minmax(75px,1fr) minmax(110px,160px));}
 .tag-properties-pane .property-row > div:first-child {min-width:0;overflow-wrap:anywhere;gap:3px;}
 .tag-properties-pane .analysis-card {padding:8px;margin-block:6px;}
 .tag-properties-pane .reference-list {margin-top:10px;}

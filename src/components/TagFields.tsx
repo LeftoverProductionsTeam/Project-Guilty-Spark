@@ -33,7 +33,7 @@ export default function TagFields({
         const references=field.kind==='reference' ? tags.filter(candidate=>candidate.class===field.targetClass) : [];
         if(projectileField)references.sort((a,b)=>shortPath(renamedTagPath(project,a)).localeCompare(shortPath(renamedTagPath(project,b)))||renamedTagPath(project,a).localeCompare(renamedTagPath(project,b)));
         return (
-          <div className={`property-row ${changed ? 'changed' : ''}`} key={field.key}>
+          <div className={['property-row', changed && 'changed', projectileField && 'property-row--projectile'].filter(Boolean).join(' ')} key={field.key}>
             <div>
               <label htmlFor={`${prefix}-${field.key}`}>{field.label}</label>
               <small>
@@ -79,6 +79,7 @@ export default function TagFields({
                 <RotateCcw size={13} />
               </button>
             </div>
+            {projectileField && <small className="property-reference-path">{referencePath(value)}</small>}
             {changed && (
               <div className="property-diff">
                 <span>

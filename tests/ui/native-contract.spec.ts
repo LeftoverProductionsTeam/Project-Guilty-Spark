@@ -1205,6 +1205,10 @@ test('the Spark corner visual clears the curved frame and stays above window gla
  expect(await emblem.evaluate(element=>element.parentElement===document.body)).toBe(true);
  await expect(emblem).toHaveCSS('pointer-events','none');
  await expect(button).toHaveCSS('margin-left','0px');
+ const frame=page.locator('.application'), glass=page.locator('.gs-window-tint');
+ await expect(frame).toHaveCSS('border-top-right-radius','20px');
+ await expect(frame).toHaveCSS('border-bottom-right-radius','20px');
+ await expect(glass).toHaveCSS('border-bottom-right-radius','20px');
  for(const width of [1440,960]){
   await page.setViewportSize({width,height:800});
   await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-Math.max(0,hit.x-24))<1&&Math.abs(mark.y-Math.max(0,hit.y-24))<1&&mark.x>=0&&mark.y>=0&&mark.x+mark.width<=width;}).toBe(true);
@@ -5352,8 +5356,13 @@ test('recovered native encounters import an actor through the existing reviewed 
  const browser=imported.locator('.asset-source-browser');await browser.locator(':scope > summary').click();await browser.getByRole('combobox',{name:'Discovered asset source',exact:true}).selectOption('spirit-actor');await browser.getByRole('button',{name:'Read native encounter actor source',exact:true}).click();
  await imported.getByRole('searchbox',{name:'Find native source actor',exact:true}).fill('forerunner/transport/spirit_pilot'); await imported.getByRole('combobox',{name:'Imported native encounter actor',exact:true}).selectOption('77');await imported.getByRole('button',{name:'Prepare actor dependencies',exact:true}).click();
  const actor=await page.evaluate(()=>(window as any).__actorBinding.nativePath);await expect(encounter.getByRole('combobox',{name:'Native encounter actor',exact:true})).toHaveValue(actor);
- await encounter.getByRole('textbox',{name:'Native encounter name',exact:true}).fill('spirit_pilot');await encounter.getByRole('button',{name:'Preview encounter append',exact:true}).click();
- const request=await page.evaluate(()=>(window as any).__actorPreviewCalls.at(-1));expect(request.operation).toMatchObject({kind:'appendEncounter',name:'spirit_pilot',actorPath:actor,count:1});expect(request.actorImport).toMatchObject({tagClass:'actv',sourceSha256:'b'.repeat(64)});
+ await encounter.getByRole('textbox',{name:'Native encounter name',exact:true}).fill('spirit_pilot');
+ const upgrades=encounter.getByRole('combobox',{name:'Major-variant upgrades',exact:true});
+ await revealPagedControl(upgrades);
+ await expect(upgrades).toHaveValue('');
+ await upgrades.selectOption('none');
+ await encounter.getByRole('button',{name:'Preview encounter append',exact:true}).click();
+ const request=await page.evaluate(()=>(window as any).__actorPreviewCalls.at(-1));expect(request.operation).toMatchObject({kind:'appendEncounter',name:'spirit_pilot',actorPath:actor,count:1,majorUpgrade:'none'});expect(request.actorImport).toMatchObject({tagClass:'actv',sourceSha256:'b'.repeat(64)});
  await native.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__actorAccepted)).toBe(true);
  await native.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__actorAccepted)).toBe(false);await native.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
  await imported.getByRole('button',{name:'Clear actor selection',exact:true}).click();await expect(encounter.getByRole('combobox',{name:'Native encounter actor',exact:true}).locator('option',{hasText:actor})).toHaveCount(1);
@@ -5418,10 +5427,30 @@ for(const missing of [false,true])test('projectile choices distinguish tank shel
  await mockDesktop(page);await page.evaluate(missing=>{
   const open=(window as any).__sparkMock.projects.a,template=open.inspection.tags[0];
   template.fields=[{key:'projectile',label:'Trigger 1 · projectile',offset:4,kind:'reference',value:missing?999:10,min:0,max:4294967295,unit:'',targetClass:'proj'}];
-  open.inspection.tags=[template,...[{id:10,path:'weapons/pistol/bullet',class:'proj'},{id:11,path:'vehicles/scorpion/bullet',class:'proj'},{id:12,path:'weapons/rocket launcher/rocket',class:'proj'},{id:13,path:'vehicles/scorpion/tank shell',class:'proj'},{id:14,path:'wrong-class/rocket',class:'weap'}].map((tag,index)=>({...template,...tag,index:index+1,fields:[],references:[]}))];
+  open.inspection.tags=[template,...[{id:10,path:'weapons/pistol/bullet',class:'proj'},{id:11,path:'vehicles/scorpion/bullet',class:'proj'},{id:12,path:'weapons/rocket launcher/rocket',class:'proj'},{id:13,path:'vehicles/scorpion/tank shell',class:'proj'},{id:14,path:'wrong-class/rocket',class:'weap'},{id:15,path:'vehicles/scorpion/nested/with a long custom folder name/another long custom folder name/squad cannon projectile',class:'proj'}].map((tag,index)=>({...template,...tag,index:index+1,fields:[],references:[]}))];
  },missing);await openFixture(page);
  const picker=page.getByRole('combobox',{name:'Trigger 1 · projectile',exact:true});
  await expect(picker).toHaveValue(missing?'999':'10');await expect(picker.getByRole('option',{name:'tank shell · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'rocket · weapons/rocket launcher',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · weapons/pistol',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.locator('option[value="14"]')).toHaveCount(0);
  if(missing)await expect(picker.getByRole('option',{name:'Unresolved reference · 999',exact:true})).toHaveAttribute('disabled','');
+ if(!missing){
+  await page.setViewportSize({width:800,height:650});
+  const shortHeight=(await picker.boundingBox())!.height;
+  await picker.click();
+  const longOption=picker.locator('option[value="15"]');
+  await expect(picker).toHaveJSProperty('value','10');
+  await expect(longOption).toBeVisible();
+  const lines=await longOption.evaluate(option=>{
+   const range=document.createRange();
+   range.selectNodeContents(option);
+   return new Set(Array.from(range.getClientRects(),rect=>rect.top)).size;
+  });
+  expect(lines).toBeGreaterThan(1);
+  await longOption.click();
+  await expect(picker).toHaveValue('15');
+  await expect.poll(async()=>(await picker.boundingBox())!.height).toBeGreaterThan(shortHeight);
+  expect(await picker.evaluate(select=>select.closest('.property-row')!.scrollWidth-select.closest('.property-row')!.clientWidth)).toBeLessThanOrEqual(1);
+  await page.keyboard.press('Control+z');
+  await expect(picker).toHaveValue('10');
+ }
  await picker.selectOption('13');await expect(picker).toHaveValue('13');await expect(page.locator('.property-diff')).toContainText('vehicles/scorpion/tank shell');await page.keyboard.press('Control+z');await expect(picker).toHaveValue(missing?'999':'10');await page.keyboard.press('Control+y');await expect(picker).toHaveValue('13');await picker.selectOption('12');await picker.press('Tab');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits)).toEqual([{tagId:1,fieldKey:'projectile',value:12}]);
 });

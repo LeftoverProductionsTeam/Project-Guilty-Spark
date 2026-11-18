@@ -2204,11 +2204,60 @@ small {
 }
 .property-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(130px, 205px);
+  grid-template-columns: var(--gs-tag-field-columns, minmax(120px, 1fr) minmax(130px, 205px));
   gap: 12px;
   border-bottom: 1px solid #273b46;
   padding: 13px 0;
   align-items: center;
+}
+.property-row--projectile {
+  --gs-tag-field-columns: minmax(0, 1fr);
+}
+.property-row--projectile .property-value > select {
+  flex: 1;
+  min-width: 0;
+}
+.property-row .property-reference-path {
+  color: var(--muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.property-row--projectile .property-diff {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.property-row--projectile .property-diff svg {
+  flex: none;
+}
+@supports (appearance: base-select) and selector(::picker(select)) {
+  .property-row--projectile select,
+  .property-row--projectile select::picker(select) {
+    appearance: base-select;
+  }
+  .property-row--projectile select,
+  .property-row--projectile option {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .property-row--projectile select::picker(select) {
+    width: anchor-size(width);
+    min-width: 0;
+    max-height: min(320px, 65vh);
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .property-row--projectile option {
+    padding: 5px 8px;
+  }
+  .property-row--projectile option:is(:hover, :focus-visible) {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .property-row--projectile .property-reference-path {
+    display: none;
+  }
 }
 .property-row > div:first-child {
   display: flex;
@@ -2256,7 +2305,7 @@ small {
   flex-shrink: 0;
 }
 .property-diff {
-  grid-column: 1/3;
+  grid-column: 1/-1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3844,9 +3893,11 @@ small {
 @media(max-width:1150px){.gs-connection-steps{grid-template-columns:1fr}.gs-connect-games h2{font-size:21px}}
 @media(prefers-reduced-transparency:reduce){:root[data-gs-theme='covenant'] .surface,:root[data-gs-theme='covenant'] .analysis-card{background:#2b2040;backdrop-filter:none}}
 
-/* Frameless native shell: transparent asymmetric curves, original controls. */
+/* One shape for the native frame and the glass laid over it. */
+:root[data-gs-native-frame='true'] { --gs-window-radius: 36px 20px 20px 16px; }
+:root:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) { --gs-window-radius: 0px; }
 :root[data-gs-native-frame='true'],:root[data-gs-native-frame='true'] body{background:transparent!important}
-:root[data-gs-native-frame='true'] .application{width:100vw;height:100vh;min-height:0;margin:0;border:1px solid #96e9f07a;border-radius:36px 20px 32px 16px;overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24;box-sizing:border-box}
+:root[data-gs-native-frame='true'] .application{width:100vw;height:100vh;min-height:0;margin:0;border:1px solid #96e9f07a;border-radius:var(--gs-window-radius);overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24;box-sizing:border-box}
 :root[data-gs-native-frame='true'] .app-header{padding-left:20px;border-radius:35px 19px 28px 5px;position:relative;user-select:none;cursor:grab}
 :root[data-gs-native-frame='true'] .app-header:active{cursor:grabbing}.gs-window-controls{display:flex;align-items:center;gap:7px;padding:0 4px 0 11px;margin-left:8px;border-left:1px solid #a7b9e12b;flex-shrink:0;cursor:default}
 .gs-window-button{display:grid;place-items:center;width:32px;height:32px;padding:4px;min-width:0;border:1px solid #8adce46b!important;border-radius:50% 45% 50% 35%;background:linear-gradient(145deg,#7154a035,#6bdbe70d)!important;color:#bdf1f5;box-shadow:inset 0 0 10px #98dfea0a;cursor:pointer}
@@ -3870,7 +3921,7 @@ small {
 
 .gs-window-content { width:100%;height:100%;opacity:var(--gs-window-opacity,1);position:relative;isolation:isolate; }
 .gs-window-tint { position:fixed;inset:0;z-index:2147483646;pointer-events:none;background:var(--gs-window-tint,#65c5ff);opacity:var(--gs-window-tint-strength,0); }
-:root[data-gs-native-frame='true'] .gs-window-tint { inset:0;border-radius:36px 20px 32px 16px; }
+:root[data-gs-native-frame='true'] .gs-window-tint { inset:0;border-radius:var(--gs-window-radius); }
 .gs-window-appearance label { display:flex;align-items:center;gap:14px;margin:14px 0;flex-wrap:wrap; }
 .gs-window-appearance input[type='range'] { width:min(420px,100%); }
 .gs-window-appearance small { display:block;margin-top:12px;color:var(--muted); }

@@ -790,7 +790,7 @@ html[data-gs-fullscreen='true'] .gs-workspace-shell { --gs-tools-height: 30px; }
 html[data-gs-fullscreen='true'] .gs-window-actions .gs-window-button { height:26px;min-height:26px; }
 /* The saved drawer height belongs to its source form, not an empty shell. */
 .gs-workspace-panel[data-panel-id='object-tags'] .gs-panel-content { padding:8px 10px; }
-.viewport-tags .property-row { padding:7px 0;min-height:0;gap:8px;grid-template-columns:minmax(0,1fr) 128px; }
+.viewport-tags .property-row { padding:7px 0;min-height:0;gap:8px;grid-template-columns:var(--gs-tag-field-columns,minmax(0,1fr) 128px); }
 .viewport-tags .property-row label { font-size:11px; }.viewport-tags .property-row small { font-size:9px;margin-top:2px; }
 .viewport-tags .property-value :is(input[type='number'],select) { min-height:27px;padding:4px 6px;font-size:11px;width:100%; }
 .viewport-tags .property-value { gap:3px; }.viewport-tags .field-reset { width:20px;min-height:22px;padding:2px; }

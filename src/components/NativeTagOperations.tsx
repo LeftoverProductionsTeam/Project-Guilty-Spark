@@ -19,6 +19,7 @@ import {
   notifyNativeSource, campaignTacticalModes,campaignMccSearchReview,
   type NativeCombatSource,
   type NativeOperation,
+  nativeMajorUpgrades,
   type NativeEncounterAppend,
   type NativeTagContext,
   type NativePreview,
@@ -107,10 +108,11 @@ export default function NativeTagOperations({
   const [hudArray,setHudArray]=useState(''),[hudIndex,setHudIndex]=useState('0');
   const hudGroup=context?.hudArrays?.find(array=>array.name===hudArray);
   const canDuplicateHudDraft=!!context?.canDuplicateHud&&/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&hudIndex.trim()!==''&&!!hudGroup&&hudGroup.count!=null&&hudGroup.count>0&&hudGroup.count<hudGroup.maximum&&Number.isInteger(Number(hudIndex))&&Number(hudIndex)>=0&&Number(hudIndex)<hudGroup.count;
+  const [majorUpgrade, setMajorUpgrade] = useState<NativeEncounterAppend["majorUpgrade"]>();
   const [encounterQueue,setEncounterQueue]=useState<NativeEncounterAppend[]>([]);
   const queuedActors=encounterQueue.reduce((sum,entry)=>sum+(entry.count??1),0);
   const validEncounterDraft=!!context?.canAppendEncounter&&nativeActorChoices.includes(actorPath)&&/^[A-Za-z0-9_]{1,31}$/.test(encounterName)&&Number.isInteger(Number(actorCount))&&Number(actorCount)>=1&&Number(actorCount)<=32&&actorSpacing.trim()!==''&&Number.isFinite(Number(actorSpacing))&&Number(actorSpacing)>=0.25&&Number(actorSpacing)<=16&&actorPosition.every(v=>v.trim()!==''&&Number.isFinite(Number(v))&&Math.abs(Number(v))<=2048);
-  const encounterDraft=():NativeEncounterAppend=>({name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive,count:Number(actorCount),spacing:Number(actorSpacing)});
+  const encounterDraft=():NativeEncounterAppend=>({name:encounterName,actorPath,position:actorPosition.map(Number) as [number,number,number],startActive,count:Number(actorCount),spacing:Number(actorSpacing),...(majorUpgrade ? {majorUpgrade} : {})});
   const generation = useRef(0),proposalGeneration=useRef(0);
   function invalidateProposal(){proposalGeneration.current++;if(!accepted)setPreview(null);}
   const projectId = project.id;
@@ -433,6 +435,19 @@ export default function NativeTagOperations({
             </div>
             <p className="subtle">Starts use an X/Y grid centered below, with spacing in native world units. Review every position in the preview; spacing is not collision or pathfinding validation.</p>
             <fieldset><legend>Native spawn grid center</legend><div className="native-encounter-position">{(['X','Y','Z'] as const).map((axis,index)=><label key={axis}>{axis}<input aria-label={'Native actor '+axis} type="number" step="0.25" min={-2048} max={2048} disabled={busy||dirty} value={actorPosition[index]} onChange={e=>{setActorPosition(old=>old.map((v,i)=>i===index?e.target.value:v) as [string,string,string]);if(!accepted)setPreview(null);}}/></label>)}</div></fieldset>
+            <label>
+              Major-variant upgrades
+              <select value={majorUpgrade ?? ''} disabled={busy || dirty}
+                onChange={event => {
+                  setMajorUpgrade(nativeMajorUpgrades.find(choice => choice === event.target.value));
+                  if (!accepted) setPreview(null);
+                }}>
+                <option value="">Native default</option>
+                {nativeMajorUpgrades.map(choice => <option key={choice} value={choice}>
+                  {choice === 'none' ? 'None · keep the exact actor variant' : choice}
+                </option>)}
+              </select>
+            </label>
             <label><input type="checkbox" checked={startActive} disabled={busy||dirty} onChange={e=>{setStartActive(e.target.checked);if(!accepted)setPreview(null);}}/>Allow initial creation</label>
             <p className="subtle">Unchecked keeps the new encounter not initially created. Activate its name through reviewed scenario HaloScript; this does not attach a Firefight controller or prove spawning.</p>
             <div className="native-encounter-actions">
@@ -443,7 +458,7 @@ export default function NativeTagOperations({
             {!!encounterQueue.length&&<section aria-label="Reviewed encounter group list">
               <p className="subtle">{encounterQueue.length} groups · {queuedActors} starts. This is a temporary review list; Accept retains the resulting native source. Each name can then be bound to a Firefight wave through source-backed controller export after native build/readback.</p>
               <ol className="native-encounter-queue">{encounterQueue.map((entry,index)=><li key={entry.name}>
-                <span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>{entry.position.join(' / ')} · spacing {entry.spacing} · {entry.startActive?'initially active':'script activation'}</small></span>
+                <span><strong>{entry.name}</strong> · {entry.count} × {entry.actorPath}<small>{entry.position.join(' / ')} · spacing {entry.spacing} · {entry.startActive?'initially active':'script activation'}{entry.majorUpgrade && ' · upgrades: ' + entry.majorUpgrade}</small></span>
                 <button aria-label={'Remove queued encounter '+entry.name} disabled={busy||dirty} onClick={()=>{setEncounterQueue(rows=>rows.filter((_,i)=>i!==index));setPreview(null);setAccepted(null);}}>Remove</button>
               </li>)}</ol>
               <button disabled={busy||dirty||!context.canAppendEncounter||encounterQueue.some(entry=>!nativeActorChoices.includes(entry.actorPath))} onClick={()=>makePreview({kind:'appendEncounters',encounters:encounterQueue})}>Preview all queued encounters</button>

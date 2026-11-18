@@ -3,8 +3,8 @@
 Task: Operation110 - repair four actual Black Echo authored-content failures
 Status: implementation incomplete
 Starting revision: 8693c4f0d1d587629c9c9a7d1a6080c6036cf02e, canonical master.
-Latest verified revision: scoped source after8693c4f (resolve the commit containing c40 nativeSquadCrew20261117). Core25/explicit native1/browser2+2/TypeScript/Vite/parser6/final Windows build pass. Actual CE609 b3c5bc47 readback fdc6ec89 verifies two migration flags and13Marine LM references. Final executable8ec3f6d462975125aa9208a1cc19393235a4f11bc0ad5829f13c9bb3db75b3d3 compiled, not relaunched. Game acceptance remains open.
-Next action: finish compatible Spirit pilot through existing encounter authoring/reconciliation, including no-major-upgrades without bypassing recipe ownership; adopt/rebind reviewed source and compile/read back. Then correct level touchdown/route using recorded20BSP ground samples and test exact candidate in isolated Forerunner. Pistol request is visibility only and complete in source/native UI; do not add new weapon gameplay or repeat the missing-option investigation.
+Latest verified revision: d7a54529243316caf42f300ae961d9155d881fd0 retained CE609 b3c5bc47/fdc6ec89 with two Marine migration flags and 13 LM seat references. This cycle adds explicit major-variant policy at encounter creation. Browser and installed Invader loose-tag checks pass. Full mission acceptance remains open.
+Next action: use Append native AI encounter and Major-variant upgrades → None to review and accept spirit_driver with the compatible imported pilot graph. Bind the controller to the reviewed new group, compile/read back, and correct the Spirit touchdown/route against the sampled BSP before testing the exact candidate in isolated Forerunner.
 
 ## Acceptance
 
@@ -54,6 +54,10 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 - M3 R277:287connector/32252source/15862render/16230collision triangles; human-verified region connections0. Native/readback/map-load evidence does not close foot/Warthog/ridge/cave/projectile/material/light gates or19regions.
 
 ## Changed work
+
+Projectile paths now use the full field row and wrap in the picker. The native window and tint share the lower-right curve with the upper-right. Edge at 800 px passes with a long synthetic path. Isolated Windows build 43ce062c72a2c5483e988c1479b35d991713cf6a9a5d0e7ce6b021a0a6a042f9 verified the actual Blood Gulch pistol list (21 entries, 339 px box), matching 20 px corners, and unchanged original map 81764a45. No installed app was replaced.
+
+New encounter authoring carries a chosen major-variant upgrade policy through one-group and queued preview, native scalar verification and compiled expectation. Legacy requests and controller-owned Firefight use their prior defaults. Existing recipe-owned restrictions still apply. Native operations 26/26 including installed Invader, ownership 1/1 and combined picker/frame/encounter browser checks 4/4. Actual Black Echo pilot adoption and gameplay are still open.
 
 Current scoped slice(parent8693c4f): original-native squad migration/major policy through existing UI/Invader/readback; recovered Marine seat revision; scenario-only complete4MiB source review while display/non-scenario512KiB/integrity64MiB/5s guards remain; bounded error messages. Pistol projectile labels now sort/disambiguate existing choices with explicit unresolved references; no gameplay presets added. Exact tests, corrected failures, source/executable hashes, native artifacts and limitations:c40 nativeSquadCrew20261117/RUNTIME/UI_INTERACTION_AUDIT.
 

@@ -88,7 +88,8 @@ pub enum Operation {
     CutsceneCamera {point:crate::maps::NativeCameraPoint,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
         #[serde(default="single_actor")] count:u16, #[serde(default="actor_spacing")] spacing:f32,
-        #[serde(default,skip_serializing_if="Option::is_none")] difficulty:Option<EncounterDifficulty> },
+        #[serde(default,skip_serializing_if="Option::is_none")] difficulty:Option<EncounterDifficulty>,
+        #[serde(rename="majorUpgrade",default,skip_serializing_if="Option::is_none")] major_upgrade:Option<String> },
     AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     EncounterSquadCounts { encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,#[serde(rename="normalCount")] normal_count:u16,#[serde(rename="insaneCount")] insane_count:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     EncounterSquadCountsBatch { edits:Vec<SquadCountEdit>,#[serde(rename="sourceSha256")] source_sha256:String },
@@ -166,6 +167,8 @@ fn is_unlocked_start(value:&bool)->bool{!*value}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct EncounterAppend {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub major_upgrade: Option<String>,
     pub name:String,pub actor_path:String,pub position:[f32;3],pub start_active:bool,
     #[serde(default,skip_serializing_if="Option::is_none")] pub difficulty:Option<EncounterDifficulty>,
     #[serde(default="single_actor")] pub count:u16,
@@ -203,7 +206,7 @@ impl EncounterAppend {
         Ok(crate::firefight::native_actor_start_grid(self.position,total,offset,usize::from(self.count),self.spacing)?.into_iter().enumerate().map(|(i,value)|EncounterStart{id:format!("grid-{i}"),position:value.0,facing_radians:0.,visible:true,locked:false}).collect())
     }
     pub fn positions(&self)->Result<Vec<[f32;3]>> {Ok(self.poses()?.into_iter().map(|value|value.position).collect())}
-    pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing,difficulty:self.difficulty.clone()}}
+    pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing,difficulty:self.difficulty.clone(),major_upgrade:self.major_upgrade.clone()}}
 }
 fn single_actor()->u16{1}
 fn actor_spacing()->f32{0.75}
@@ -241,7 +244,7 @@ impl Operation {
     pub fn is_encounter_append(&self)->bool {matches!(self,Self::AppendEncounter{..}|Self::AppendEncounters{..})}
     pub fn encounter_appends(&self)->Result<Vec<EncounterAppend>> {
         match self {
-            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=>Ok(vec![EncounterAppend{name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None,starts:None,behavior:None,patrol:None,combat:None}]),
+            Self::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty,major_upgrade}=>Ok(vec![EncounterAppend{major_upgrade:major_upgrade.clone(),name:name.clone(),actor_path:actor_path.clone(),position:*position,start_active:*start_active,count:*count,spacing:*spacing,difficulty:difficulty.clone(),grid:None,starts:None,behavior:None,patrol:None,combat:None}]),
             Self::AppendEncounters{encounters,..}=>{
                 if encounters.is_empty()||encounters.len()>16{return invalid("Review 1–16 native encounter groups in one operation");}
                 Ok(encounters.clone())
@@ -290,7 +293,8 @@ impl Operation {
             Self::CutsceneCamera{point,source_sha256,..}=>{
                 if class!="scnr"||point.index>=512||point.name.len()>32||point.name.chars().any(char::is_control)||point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.orientation_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU+1e-6)||!point.fov_radians.is_finite()||!(5f32.to_radians()..=150f32.to_radians()).contains(&point.fov_radians)||source_sha256.len()!=64||!source_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return invalid("Native camera editing needs exact source/index/name, finite pose and5–150degree FOV");}
             }
-            Self::AppendEncounter {name,actor_path,position,count,spacing,difficulty,..} => {
+            Self::AppendEncounter {name,actor_path,position,count,spacing,difficulty,major_upgrade,..} => {
+                if let Some(value) = major_upgrade { major_upgrade_index(value)?; }
                 if class!="scnr" {return invalid("Append encounter requires a native scenario tag");}
                 if name.is_empty()||name.len()>31||!name.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_') {return invalid("Encounter name needs1–31ASCII letters, digits or underscores");}
                 safe_relative(actor_path)?;
@@ -305,7 +309,7 @@ impl Operation {
                 if let Some(rules)=source_rules{crate::firefight::validate(rules)?;}
                 let entries=self.encounter_appends()?;let mut names=std::collections::BTreeSet::new();let mut total=0usize;
                 for entry in entries {
-                    if source_rules.is_some()&&(entry.difficulty.is_some()||entry.starts.is_some()||entry.behavior.is_some()||entry.patrol.is_some()||entry.combat.is_some()){return invalid("Prepared Firefight groups require the exact controller population, starting grid and actor states. Use Firefight wave rules rather than independent campaign overrides");}
+                    if source_rules.is_some()&&(entry.major_upgrade.is_some()||entry.difficulty.is_some()||entry.starts.is_some()||entry.behavior.is_some()||entry.patrol.is_some()||entry.combat.is_some()){return invalid("Prepared Firefight groups require the exact controller population, starting grid and actor states. Use Firefight wave rules rather than independent campaign overrides");}
                     entry.operation().validate(class,tag)?;
                     let _=entry.positions()?;
                     if !names.insert(entry.name.to_ascii_lowercase()){return invalid("Each appended encounter needs a distinct native name");}
@@ -614,6 +618,9 @@ impl Operation {
         args.extend(["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into(),"-I".into(),format!("{squad}.starting_locations"),count.to_string(),"end".into(),"-I".into(),format!("{e}.firing_positions"),firing.len().to_string(),"end".into()]);
         for(key,value)in [(format!("{e}.name"),name.clone()),(format!("{e}.flags.not_initially_created"),if *start_active{"0"}else{"1"}.into()),(format!("{e}.manual_bsp_index"),"-1".into()),
             (format!("{squad}.name"),"source_squad".into()),(format!("{squad}.actor_type"),actor.to_string()),(format!("{squad}.normal_diff_count"),normal_count.to_string()),(format!("{squad}.insane_diff_count"),insane_count.to_string()),(format!("{squad}.initial_state"),initial_state.native().0.into()),(format!("{squad}.return_state"),return_state.native().0.into())] {args.extend(["-S".into(),key,value]);}
+        if let Some(value) = &entry.major_upgrade {
+            args.extend(["-S".into(), format!("{squad}.major_upgrade"), value.clone()]);
+        }
         if let Some(combat)=&entry.combat{let masks=combat.groups.masks()?;for(i,(field,_))in combat.groups.fields().iter().enumerate(){for bit in 0..26{args.extend(["-S".into(),format!("{squad}.{field}.{}",char::from(b'a'+bit)),if masks[i]&(1u32<<bit)!=0{"1"}else{"0"}.into()]);}}}
         if !patrol.is_empty(){args.extend(["-I".into(),format!("{squad}.move_positions"),patrol.len().to_string(),"end".into()]);}
         for(index,point)in patrol.iter().enumerate(){let p=format!("{squad}.move_positions[{index}]");for(key,value)in [("position",point.position.map(|v|v.to_string()).join(",")),("facing",point.facing_radians.to_string()),("weight",point.weight.to_string()),("time",point.wait_seconds.map(|v|v.to_string()).join(",")),("animation","-1".into()),("sequence_id","0".into())]{args.extend(["-S".into(),format!("{p}.{key}"),value]);}}
@@ -698,7 +705,7 @@ fn compare_scenario_remainder(before:&str,after:&str,old:[&ArrayListing;2],new:[
     invalid(format!("{context}: row {index} outside edited arrays, before={:?}, after={:?}; row counts{}→{}. No revision was selected",snippet(&a),snippet(&b),a.len(),b.len()))
 }
 fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
-    let Operation::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty}=operation else{return invalid("Not an encounter append");};
+    let Operation::AppendEncounter{name,actor_path,position,start_active,count,spacing,difficulty,major_upgrade}=operation else{return invalid("Not an encounter append");};
     let (old_encounters,old_palette,actor)=encounter_append_layout(before,name,actor_path)?;
     let new_encounters=array_listing(after,"encounters")?;let new_palette=array_listing(after,"actor_palette")?;
     let added=usize::from(actor==old_palette.count);
@@ -709,7 +716,8 @@ fn reviewed_encounter_append(before:&str,after:&str,operation:&Operation)->Resul
     }
     compare_scenario_remainder(before,after,[&old_encounters,&old_palette],[&new_encounters,&new_palette],"Native encounter append changed other scenario fields")?;
     let difficulty=difficulty.as_ref().map(|value|format!("; native normal={}, insane={}",value.normal,value.insane)).unwrap_or_default();
-    Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")+&difficulty}])
+    let upgrades = major_upgrade.as_ref().map(|value| format!("; major-variant upgrades={value}")).unwrap_or_default();
+    Ok(vec![FieldDifference{before:format!("encounters[{}] / actor_palette[{}]",old_encounters.count,old_palette.count),after:format!("encounters[{}] / actor_palette[{}]: {name} → {actor_path}",new_encounters.count,new_palette.count)+&format!(" at grid center {position:?}; actors={count}, spacing={spacing}; initial creation={start_active}")+&difficulty+&upgrades}])
 }
 
 fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)->Result<Vec<FieldDifference>> {
@@ -734,7 +742,8 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
         let combat=entry.combat.as_ref().map(|c|format!("; {} independent firing points and reviewed squad tactical groups",c.points.len())).unwrap_or_default();
         let patrol=entry.patrol.as_ref().map(|p|format!("; {} native patrol points with facing/weight/wait",p.points.len())).unwrap_or_default();
         let behavior=entry.behavior.as_ref().map(|b|format!("; native initial={}, return={}",b.initial_state.native().0,b.return_state.native().0)).unwrap_or_default();
-        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+&patrol+&combat+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
+        let upgrades = entry.major_upgrade.as_ref().map(|value| format!("; major-variant upgrades={value}")).unwrap_or_default();
+        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+&patrol+&combat+&upgrades+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
     }
     Ok(differences)
 }
@@ -777,7 +786,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
     for(w,wave)in config.waves.iter().enumerate(){for(g,group)in wave.groups.iter().enumerate(){
         let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||crate::SparkError::Invalid("Saved wave actor is missing".into()))?;
         let layout=crate::firefight::native_group_grid(config,w,g,&players)?;
-        encounters.push(EncounterAppend{name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None,behavior:None,patrol:None,combat:None});
+        encounters.push(EncounterAppend{major_upgrade:None,name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None,behavior:None,patrol:None,combat:None});
     }}
     let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
     operation.validate("scnr","planned.scenario")?;
@@ -813,6 +822,11 @@ pub(crate) fn verify_compiled_append(entry:&EncounterAppend,map:&crate::maps::Ma
         if actors.len()!=1{return invalid("Compiled source actor is missing, ambiguous or has no embedded body");}
         let actor=Some(actors[0].id);let squad=&details.squads[0];
         if squad.name!="source_squad"||squad.actor_variant_tag_id!=actor||squad.normal_count!=normal_count as i16||squad.insane_count!=insane_count as i16||squad.initial_state!=initial_state.native().1||squad.return_state!=return_state.native().1||squad.starting_locations.len()!=*count as usize{return invalid("Compiled native squad differs from the accepted source append");}
+        if let Some(value) = &entry.major_upgrade {
+            if squad.major_upgrade != Some(major_upgrade_index(value)?) {
+                return invalid("Compiled major-variant upgrade policy differs from the accepted source append");
+            }
+        }
         let expected=entry.patrol_points()?;
         if !expected.is_empty(){let actual=squad.move_positions.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled patrol telemetry unavailable; rebuild/read the current source".into()))?;
             if actual.len()!=expected.len(){return invalid("Compiled native patrol count differs from source");}
@@ -1379,6 +1393,10 @@ pub struct ScenarioStartBehavior {pub index:u16,pub initial_state:String,pub ret
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ScenarioSquadBehavior {#[serde(default,skip_serializing_if="Option::is_none")] pub major_upgrade:Option<String>,#[serde(skip)] major_upgrade_lines:Vec<usize>,#[serde(default,skip_serializing_if="Option::is_none")] pub automatic_migration:Option<bool>,#[serde(skip)] migration_line:Option<usize>,pub initial_state:String,pub return_state:String,pub starts:Vec<ScenarioStartBehavior>,pub patrol_count:usize,#[serde(skip)] state_lines:Vec<Vec<usize>>}
 const NATIVE_MAJOR_UPGRADES:[&str;5]=["normal","few","many","none","all"];
+fn major_upgrade_index(value: &str) -> Result<u16> {
+    NATIVE_MAJOR_UPGRADES.iter().position(|choice| *choice == value).map(|index| index as u16)
+        .ok_or_else(|| crate::SparkError::Invalid("Unknown native major-variant upgrade policy".into()))
+}
 fn source_state(value:&str)->Result<u16>{NATIVE_SOURCE_STATES.iter().position(|v|*v==value).map(|i|i as u16).ok_or_else(||crate::SparkError::Invalid("Unknown native AI state".into()))}
 fn source_state_route(value:&str,count:usize)->Result<()>{let state=source_state(value)?;let needed=match state{4..=6=>2,3|7=>1,_=>0};if count<needed{return invalid(format!("Native {value} requires at least{needed}authored patrol positions. Preserve/edit the route through its native source workflow first"));}Ok(())}
 impl ScenarioSquadBehavior{
@@ -1431,7 +1449,7 @@ fn verify_native_combat(op:&Operation,map:&crate::maps::MapInspection)->Result<(
     let(_,e,index)=op.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Not a native combat edit".into()))?;let region=map.encounters.get(usize::from(e)).filter(|r|Some(r.name.as_str())==op.combat_encounter_name()).ok_or_else(||crate::SparkError::Invalid("Compiled combat encounter identity differs from source".into()))?;let details=region.details.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled combat telemetry unavailable".into()))?;match op{
         Operation::EncounterSquadPatrol{squad_name,route,..}=>{let native=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).and_then(|s|s.move_positions.as_ref()).ok_or_else(||crate::SparkError::Invalid("Compiled patrol unavailable".into()))?;if native.len()!=route.points.len(){return invalid("Compiled patrol count differs from source");}for(p,n)in route.points.iter().zip(native){let value=ScenarioPatrolPoint{source_index:None,position:n.position,facing_radians:n.facing,weight:n.weight,wait_seconds:n.wait_seconds,animation:n.animation,sequence_id:n.sequence_id,fields:vec![]};if !patrol_point_close(p,&value){return invalid("Compiled patrol fields differ from source");}}},
         Operation::EncounterFiringPosition{position,group,..}=>{let p=details.firing_positions.get(usize::from(index)).ok_or_else(||crate::SparkError::Invalid("Compiled firing position unavailable".into()))?;if !positions_close(*position,p.position)||p.group_index!=u16::from(group.as_bytes()[0]-b'a'){return invalid("Compiled firing position/group differs from reviewed native source");}},
-        Operation::EncounterSquadBehavior{squad_name,behavior,..}=>{let member=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Compiled behavior squad identity differs".into()))?;if member.initial_state!=source_state(&behavior.initial_state)?||member.return_state!=source_state(&behavior.return_state)?||member.starting_locations.len()!=behavior.starts.len(){return invalid("Compiled squad behavior/start inventory differs from source");}if let Some(expected)=&behavior.major_upgrade{let index=NATIVE_MAJOR_UPGRADES.iter().position(|value|value==expected).ok_or_else(||crate::SparkError::Invalid("Native upgrade policy unavailable".into()))? as u16;if member.major_upgrade!=Some(index){return invalid("Compiled native major-variant upgrade policy differs");}}if behavior.automatic_migration.is_some_and(|expected|member.automatic_migration!=Some(expected)){return invalid("Compiled squad automatic migration differs from reviewed source");}let route=member.move_positions.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled patrol count unavailable".into()))?;if route.len()!=behavior.patrol_count{return invalid("Compiled patrol inventory differs from source");}for(p,n)in behavior.starts.iter().zip(&member.starting_locations){if n.initial_state!=source_state(&p.initial_state)?||n.return_state!=source_state(&p.return_state)?{return invalid("Compiled starting-location behavior differs from source");}}},
+        Operation::EncounterSquadBehavior{squad_name,behavior,..}=>{let member=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Compiled behavior squad identity differs".into()))?;if member.initial_state!=source_state(&behavior.initial_state)?||member.return_state!=source_state(&behavior.return_state)?||member.starting_locations.len()!=behavior.starts.len(){return invalid("Compiled squad behavior/start inventory differs from source");}if let Some(expected)=&behavior.major_upgrade{let index = major_upgrade_index(expected)?;if member.major_upgrade!=Some(index){return invalid("Compiled native major-variant upgrade policy differs");}}if behavior.automatic_migration.is_some_and(|expected|member.automatic_migration!=Some(expected)){return invalid("Compiled squad automatic migration differs from reviewed source");}let route=member.move_positions.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled patrol count unavailable".into()))?;if route.len()!=behavior.patrol_count{return invalid("Compiled patrol inventory differs from source");}for(p,n)in behavior.starts.iter().zip(&member.starting_locations){if n.initial_state!=source_state(&p.initial_state)?||n.return_state!=source_state(&p.return_state)?{return invalid("Compiled starting-location behavior differs from source");}}},
         Operation::EncounterSquadFiringGroups{squad_name,groups,..}=>{let squad=details.squads.get(usize::from(index)).filter(|s|s.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Compiled tactical squad identity differs".into()))?;let g=squad.firing_groups.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled tactical telemetry unavailable".into()))?;let actual=[g.attacking,g.attacking_search,g.attacking_guard,g.defending,g.defending_search,g.defending_guard];if groups.masks()?!=actual{return invalid(format!("Compiled tactical masks differ from reviewed native source: actual{actual:?}. Review target compiler search-group requirements; output was not accepted"));}},_=>return invalid("Not a native combat edit")};Ok(())
 }
 fn reviewed_combat(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDifference>>{
@@ -1762,7 +1780,7 @@ mod tests {
         let groups=FiringGroups{attacking:vec!["a".into(),"z".into()],attacking_search:vec!["b".into()],attacking_guard:vec!["z".into()],defending:vec!["a".into()],defending_search:vec![],defending_guard:vec!["b".into(),"z".into()]};let tactical=Operation::EncounterSquadFiringGroups{encounter:1,squad:1,encounter_name:"original_1".into(),squad_name:"squad_1".into(),groups,source_sha256:firing_sha.clone()};for batch in tactical.argument_batches(tactical.arguments_with_fields(&tags,"scnr",tag,&revised).unwrap(),false).unwrap(){run(batch);}let final_fields=fields();assert_eq!(reviewed_difference(&revised,&final_fields,&tactical).unwrap().len(),7);let read=run(tactical.readback_arguments(&tags,"scnr",tag,&revised).unwrap().unwrap());tactical.verify_readback(&tags,"scnr",tag,&revised,&read).unwrap();let hash=crate::maps::hash_file(&file).unwrap();let targets=current_combat_targets(&final_fields,&hash,&[firing.clone(),tactical.clone()]).unwrap();let snapshot=ScenarioSquadReadback{named_objects:None,cutscene_flags:None,extraction_squads:None,faction_kits:None,transports:None,command_lists:None,devices:None,volumes:None,cameras:None,source_sha256:hash.clone(),squads:scenario_squad_start_choices(&final_fields).unwrap(),include_starts:true,combat:targets};snapshot.validate().unwrap();let restored_targets=current_combat_targets(&before,&before_sha,&snapshot.combat).unwrap();assert!(matches!(&restored_targets[0],Operation::EncounterFiringPosition{position,group,..}if *position==[0.,0.,0.]&&group=="a"));assert!(matches!(&restored_targets[1],Operation::EncounterSquadFiringGroups{groups,..}if groups.masks().unwrap()==[0;6]));println!("Original native firing/tactics:pointSHA={firing_sha}; groupsSHA={hash}; scalarSHA={}; exact fields/restore scope verified",crate::hex_bytes(Sha256::digest(read.as_bytes())));fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         fs::create_dir_all(tags.join("actors")).unwrap();run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-N".into(),"actors/behavior.actor_variant".into()]);
         let states=[CampaignAiState::Sleeping,CampaignAiState::Alert,CampaignAiState::Guarding,CampaignAiState::Searching,CampaignAiState::Fleeing];
-        let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]}),patrol:None,combat:None}).collect();
+        let entries=states.iter().enumerate().map(|(i,state)|EncounterAppend{major_upgrade:(i==0).then(||"none".into()),name:format!("behavior_{i}"),actor_path:"actors/behavior".into(),position:[i as f32,0.,0.],start_active:false,count:1,spacing:0.75,difficulty:None,grid:None,starts:None,behavior:Some(EncounterBehavior{initial_state:*state,return_state:states[states.len()-1-i]}),patrol:None,combat:None}).collect();
         let behavior=Operation::AppendEncounters{encounters:entries,source_rules:None};run(behavior.arguments_with_fields(&tags,"scnr",tag,&before).unwrap());let authored=fields();assert_eq!(reviewed_difference(&before,&authored,&behavior).unwrap().len(),5);let result=run(behavior.readback_arguments(&tags,"scnr",tag,&before).unwrap().unwrap());behavior.verify_readback(&tags,"scnr",tag,&before,&result).unwrap();let authored_sha=crate::maps::hash_file(&file).unwrap();
         // Restore only the generated fixture; production sources are never written by this test.
         fs::write(&file,original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
@@ -1973,7 +1991,7 @@ mod tests {
             .replace("script_marker", &format!("{added}script_marker"));
         let operation = Operation::AppendEncounters { encounters: vec![EncounterAppend {
             name: "survivors".into(), actor_path: "actors/grunt".into(), position: [0.;3],
-            start_active: false, difficulty: None, count: 1, spacing: 1., grid: None, starts: None, behavior: None, patrol: None, combat: None,
+            start_active: false, difficulty: None, major_upgrade: None, count: 1, spacing: 1., grid: None, starts: None, behavior: None, patrol: None, combat: None,
         }], source_rules: None };
         assert_eq!(reviewed_difference(before, &after, &operation).unwrap().len(), 1);
         let identity = owned_encounter_identity(&after, &operation).unwrap();
