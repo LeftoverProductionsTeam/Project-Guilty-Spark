@@ -75,6 +75,8 @@ export interface MissionBeat {
   timerSeconds?: number | null;
   minimumSurvivors?: number | null;
   escortRequiresPlayer?: boolean | null;
+  /** Existing native ground command list that leads the escort into its rally area. */
+  escortRoute?: string | null;
   escortFailure?: 'stop' | 'continue' | null;
   hudObjective?: boolean | null;
   hudText?: string | null;
@@ -341,6 +343,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.transportInsertion!=null&&(!['escort','triggerVolume'].includes(m.trigger)||m.squadNumber!=null||!['pelican','spirit'].includes(m.transportInsertion))) ||
       (m.encounterTeam!=null&&(!['escort','encounterCleared'].includes(m.trigger)||!['source','human','covenant','flood'].includes(m.encounterTeam))) ||
       (m.escortRequiresPlayer != null && (m.trigger !== 'escort' || typeof m.escortRequiresPlayer !== 'boolean')) ||
+      (m.escortRoute != null && (m.trigger !== 'escort' || typeof m.escortRoute !== 'string' || !scriptIdent.test(m.escortRoute))) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||
       (m.timerSeconds != null && (!Number.isInteger(m.timerSeconds) || m.timerSeconds<0 || m.timerSeconds>600)) ||
       (m.hudText != null && !safeText(m.hudText,254)) ||

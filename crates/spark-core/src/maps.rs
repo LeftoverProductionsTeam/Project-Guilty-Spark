@@ -1799,7 +1799,7 @@ pub fn bsp_geometry_review(
  }
  let mut route_review = route.map(|list| {
      let mut review = BspFlightReview { origin, issue: None, legs: Vec::new() };
-     match list.flight_destinations() {
+     match list.movement_destinations() {
          Ok(destinations) => {
              let mut previous = None;
              for (action, point) in destinations {
@@ -2285,7 +2285,7 @@ mod bsp_point_tests {
              let logic = scenario_logic_readback(&cache, &inspection).unwrap();
              let name_index = logic.names.iter().position(|name| name.name == "extraction_pelican").unwrap();
              let aircraft = logic.vehicles.iter().find(|vehicle| vehicle.name_index == name_index as i16).unwrap();
-             let (_, arrival) = field.flight_destinations().unwrap().into_iter().last().unwrap();
+             let (_, arrival) = field.movement_destinations().unwrap().into_iter().last().unwrap();
              Some([aircraft.position, field.points[arrival]])
          } else {
              None

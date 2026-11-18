@@ -148,18 +148,18 @@ pub fn pilot_bindings(fields:&str,choices:&NativeTransportChoices,mut read:impl 
 /// A conservative native command profile; advanced programs keep the manual source path.
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct TransportFlightRoute {pub name:String,pub points:usize,pub commands:usize,pub final_position:Option<[f32;3]>,pub arrival_volumes:Vec<String>,pub issue:Option<String>}
-pub fn flight_route(route:&NativeCommandList,volumes:&[crate::maps::ScenarioLogicVolume])->TransportFlightRoute {
+pub struct NativeMovementRoute {pub name:String,pub points:usize,pub commands:usize,pub final_position:Option<[f32;3]>,pub arrival_volumes:Vec<String>,pub issue:Option<String>}
+pub(crate) fn movement_route(route:&NativeCommandList,volumes:&[crate::maps::ScenarioLogicVolume],require_stop:bool)->NativeMovementRoute {
  let check=||->Result<[f32;3]>{
-  let destinations=route.flight_destinations()?;
+  let destinations=route.movement_destinations()?;
   let (action, point)=destinations[destinations.len()-1];
-  if route.commands[action].modifier!=0{return invalid(format!("Route {} must end with a go-to Stop at point; a keep-moving point or completed command is not a landing",route.name));}
+  if require_stop&&route.commands[action].modifier!=0{return invalid(format!("Route {} must end with a go-to Stop at point; a keep-moving point or completed command is not a landing",route.name));}
   Ok(route.points[point])
  };
  let (final_position,issue)=match check(){Ok(point)=>(Some(point),None),Err(issue)=>(None,Some(issue.to_string()))};
  let mut names=std::collections::BTreeMap::new();for volume in volumes{*names.entry(volume.name.as_str()).or_insert(0usize)+=1;}
  let arrival_volumes=final_position.map(|point|volumes.iter().filter(|v|names.get(v.name.as_str())==Some(&1)&&v.geometry.as_ref().is_some_and(|g|g.contains(point))).map(|v|v.name.clone()).collect()).unwrap_or_default();
- TransportFlightRoute{name:route.name.clone(),points:route.points.len(),commands:route.commands.len(),final_position,arrival_volumes,issue}
+ NativeMovementRoute{name:route.name.clone(),points:route.points.len(),commands:route.commands.len(),final_position,arrival_volumes,issue}
 }
 
 #[cfg(test)]
@@ -190,10 +190,14 @@ mod tests{
   let partial=before.replace("name (original_power)","name (extraction_pelican_landed)");assert!(arguments(Path::new("tags"),"level.scenario",&partial,&value).is_err());
  }
  #[test]fn flight_route_profile_checks_physical_commands_and_rotated_pad_bounds(){
+  let flight_route=|route:&NativeCommandList,volumes:&[crate::maps::ScenarioLogicVolume]|movement_route(route,volumes,true);
   let command=|point,modifier|NativeCommand{atom:"go_to".into(),modifier,parameters:[0.;2],point1:point,point2:-1,animation:-1,script:-1,recording:-1,command:-1,object_name:-1};
   let route=NativeCommandList{index:0,name:"approach".into(),flags:[false;6],bsp:-1,points:vec![[2.,2.,8.],[2.,2.,1.]],commands:vec![command(0,1),command(1,0)]};
   let pad=crate::maps::ScenarioLogicVolume{name:"pad".into(),kind:1,geometry:Some(crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[4.,0.,0.],dimensions:[4.;3]})};
   let ready=flight_route(&route,&[pad.clone()]);assert!(ready.issue.is_none());assert_eq!(ready.final_position,Some([2.,2.,1.]));assert_eq!(ready.arrival_volumes,vec!["pad"]);
+  let mut ground=route.clone();ground.commands[1].modifier=1;
+  assert_eq!(movement_route(&ground,&[pad.clone()],false).arrival_volumes,vec!["pad"]);
+  assert!(flight_route(&ground,&[pad.clone()]).issue.is_some());
   let mut wrong=route.clone();wrong.points[1]=[5.,2.,1.];assert!(flight_route(&wrong,&[pad.clone()]).arrival_volumes.is_empty());
   for fault in 0..7{let mut wrong=route.clone();match fault{0=>wrong.commands[1].modifier=1,1=>wrong.commands[0].atom="teleport".into(),2=>wrong.commands[0].atom="loop".into(),3=>wrong.commands[1].point1=-1,4=>wrong.commands[0].atom="script".into(),5=>wrong.commands[0].modifier=2,_=>wrong.commands.clear()};assert!(flight_route(&wrong,&[pad.clone()]).issue.is_some(),"Unsupported route fault {fault}");}
   let mut facing=route.clone();facing.commands[1].atom="go_to_and_face".into();facing.commands[1].point2=0;assert!(flight_route(&facing,&[pad.clone()]).issue.is_none());facing.commands[1].point2=-1;assert!(flight_route(&facing,&[pad.clone()]).issue.is_some());

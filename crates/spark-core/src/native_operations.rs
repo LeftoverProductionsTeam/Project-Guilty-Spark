@@ -14,9 +14,16 @@ pub fn validate_faction_control_source(fields:&str)->Result<()>{factions::valida
 pub fn native_faction_snapshots(fields:&str)->Result<Vec<NativeFactionSnapshot>>{factions::snapshots(fields)}
 pub fn verify_native_faction_control_values(trigger:&str,initially_off:&str)->Result<()>{factions::verify_control_values(trigger,initially_off)}
 pub fn verify_native_faction_kits(expected:&[NativeFactionSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_cache(expected,cache,map)}
-pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,TransportFlightRoute,NativeTransportPilotBinding};
+pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,NativeMovementRoute,NativeTransportPilotBinding};
+pub use transport::NativeMovementRoute as TransportFlightRoute;
 pub fn native_transport_pilot_bindings(fields:&str,choices:&NativeTransportChoices,read:impl FnMut(&str)->Result<String>,graph:impl FnMut(&str)->Result<Vec<String>>)->Result<Vec<NativeTransportPilotBinding>>{transport::pilot_bindings(fields,choices,read,graph)}
-pub fn native_transport_routes(fields:&str)->Result<Vec<TransportFlightRoute>>{let routes=native_command_source(fields)?;let volumes=scenario_volume_choices(fields)?;Ok(routes.lists.iter().map(|route|transport::flight_route(route,&volumes)).collect())}
+pub fn native_transport_routes(fields:&str)->Result<Vec<TransportFlightRoute>>{native_movement_routes(fields,true)}
+pub fn native_escort_routes(fields:&str)->Result<Vec<NativeMovementRoute>>{native_movement_routes(fields,false)}
+fn native_movement_routes(fields:&str,require_stop:bool)->Result<Vec<NativeMovementRoute>>{
+    let routes=native_command_source(fields)?;
+    let volumes=scenario_volume_choices(fields)?;
+    Ok(routes.lists.iter().map(|route|transport::movement_route(route,&volumes,require_stop)).collect())
+}
 pub fn native_vehicle_flight(fields:&str)->Result<VehicleFlightTuning>{transport::flight_source(fields)}
 pub fn scenario_transport_snapshots(fields:&str,names:&[String])->Result<Vec<TransportSnapshot>>{transport::snapshots(fields,names)}
 pub fn complete_transport_snapshots(fields:&str)->Result<Vec<TransportSnapshot>>{let values=scenario_transport_choices(fields)?;let names=values.vehicles.iter().filter(|vehicle|["boarded","called","landed"].iter().all(|suffix|values.groups.contains(&format!("{}_{suffix}",vehicle.name)))).map(|v|v.name.clone()).collect::<Vec<_>>();transport::snapshots(fields,&names)}

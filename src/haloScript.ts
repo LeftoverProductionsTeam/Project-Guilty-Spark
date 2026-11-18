@@ -225,6 +225,10 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
       case 'escort':{
         const ref=ensureName(beat.encounterName,'Beat '+(i+1)+' survivor encounter',true),destination=ensureName(beat.triggerRef??undefined,'Beat '+(i+1)+' survivor destination');
         const minimum=beat.minimumSurvivors??1;
+        const route=beat.escortRoute==null?null:ensureName(beat.escortRoute,'Escort route');
+        const startRoute=route?'  (ai_command_list '+ref+' '+route+')':null;
+        const followScope='(if (> (list_count (players)) 0) (ai_follow_target_unit '+ref+' (unit (list_get (players) 0))))';
+        if(route)deps.push('command_list:'+route);
         const survivorsArrived = '(volume_test_objects_all '+destination+' (ai_actors '+ref+'))';
         const arrival = beat.escortRequiresPlayer
           ? '(and '+survivorsArrived+' (volume_test_objects '+destination+' (players)))'
@@ -233,24 +237,26 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         if(beat.transportInsertion){if(scope||!options.forerunner)throw Error('Dropship troop handoff requires shared Forerunner campaign scope. Independent squad delivery remains unsupported.');deps.push('transport_insertion:'+beat.transportInsertion+':'+ref);}
         if(scope){
           scripted.push('  (ai_place '+ref+')',...wait('(> (ai_living_count '+ref+') 0)',15,300),'  (if (not gs_aborted) (begin',...(beat.encounterTeam&&beat.encounterTeam!=='source'?['  (ai_set_team '+ref+' '+beat.encounterTeam+')']:[]),
-            '  (sleep_until (begin','    (if (> (list_count (players)) 0) (ai_follow_target_unit '+ref+' (unit (list_get (players) 0))))',
+            ...(startRoute?[startRoute]:[]),'  (sleep_until (begin',...(startRoute?[]:['    '+followScope]),
             '    (or gs_aborted '+empty+' (< (ai_living_count '+ref+') '+minimum+') (and (> (ai_living_count '+ref+') 0) '+arrival+'))','  ) 15)',markAbort,
             '  (if (and (not gs_aborted) (< (ai_living_count '+ref+') '+minimum+')) (begin');
           if(beat.allowSharedPresentation)scripted.push('    (hud_set_objective_text gs_mission_fail_'+(i+1)+')');
           scripted.push('    (print "gs survivor objective failed")',beat.escortFailure==='continue'?'    (set gs_result_'+(i+1)+'_failed true)':'    (set gs_aborted true)','  ))');
+          if(startRoute)scripted.push('  (if (and (not gs_aborted) (>= (ai_living_count '+ref+') '+minimum+')) '+followScope+')');
           if(beat.escortFailure==='continue')scripted.push('  (if (not gs_aborted) (set gs_result_'+(i+1)+'_done true))');
           scripted.push('  ))');
           if(beat.escortFailure==='continue')scripted.push('  (if (not gs_result_'+(i+1)+'_failed) (begin');
           break;
         }
         scripted.push(...(beat.transportInsertion?['  (sleep_until gs_'+beat.transportInsertion+'_insertion_complete 1)']:['  (ai_place '+ref+')']),'  (sleep_until (> (ai_living_count '+ref+') 0) 15 300)',
-          ...(beat.encounterTeam==null?['  (ai_allegiance player human)','  (ai_set_team '+ref+' human)']:beat.encounterTeam==='source'?[]:['  (ai_set_team '+ref+' '+beat.encounterTeam+')']),'  (ai_follow_target_players '+ref+')',
+          ...(beat.encounterTeam==null?['  (ai_allegiance player human)','  (ai_set_team '+ref+' human)']:beat.encounterTeam==='source'?[]:['  (ai_set_team '+ref+' '+beat.encounterTeam+')']),startRoute??'  (ai_follow_target_players '+ref+')',
           '  (sleep_until (or (< (ai_living_count '+ref+') '+minimum+') '+arrival+') 15)',
           '  (if (< (ai_living_count '+ref+') '+minimum+') (begin',
           '    (hud_set_objective_text gs_mission_fail_'+(i+1)+')','    (print "gs survivor objective failed")');
         if(beat.escortFailure==='continue')scripted.push('    (set gs_result_'+(i+1)+'_failed true)');
         else scripted.push('    (sleep_until false 15)');
         scripted.push('  ))');
+        if(startRoute)scripted.push('  (if (>= (ai_living_count '+ref+') '+minimum+') (ai_follow_target_players '+ref+'))');
         if(beat.escortFailure==='continue')scripted.push('  (set gs_result_'+(i+1)+'_done true)','  (if (not gs_result_'+(i+1)+'_failed) (begin');
         break;
       }
@@ -319,6 +325,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     ...(studio.missions.some(beat=>beat.trigger==='escort')?[scope?"Scoped rescue follows a current squad participant and uses its explicit encounter team, or preserves source teams when no override is selected. All surviving actors must reach the destination with the required minimum alive. Failure stops this operation or follows the authored rescue-result path. AI allegiance, navigation and multiplayer behavior require gameplay testing.":'Survivor escort places its source group and follows the closest players. Its selected encounter team applies; the legacy default assigns the native human team and player-human allegiance. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
     ...(guided?['Personal native waypoints target current native squad units, requerying after bodies/membership change and removing prior markers on transitions, failure or settlement. At most six participants are supported; oversized lists refuse partial display. The standard four-marker HUD budget and engine relay cache still apply. Moving targets requery their actual native object identity, clear the previous target before rebinding and wait while absent; no spawn or inventory award is added. Current compatible Forerunner is required; rendering/real peers remain unverified.']:[]),
+    ...(studio.missions.some(beat=>beat.escortRoute!=null)?['The escort starts the selected native command list. Mission progress still checks rally arrival, the survivor minimum and any required player presence.']:[]),
     ...(studio.missions.some(beat=>beat.encounterTeam!=null)?['Explicit encounter teams affect only that native AI group at runtime; Source preserves its authored team. Actor assets and global alliances are unchanged. Player factions, allegiance and actual combat still require compatible game acceptance.']:[]),
     'Mission source requires hand-authored scenario trigger volumes, encounters, objectives, AI navigation, BSP and tag assets.',
     'Opt-in HUD objectives need their matching standard message tag. Native checkpoint requests may time out when unsafe; level completion can advance the campaign. Compilation/gameplay remain unverified.',
@@ -434,7 +441,7 @@ export interface NativeMissionBinding {
 }
 
 // Exhaustive against the saved beat type: new creator fields must remain reviewable.
-const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionVisitDuring:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
+const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionVisitDuring:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortRoute:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
 async function nativeMissionHash(body:string):Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
     .map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -467,6 +474,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
     (beat.conditionOutside!=null&&typeof beat.conditionOutside!=='boolean')||
     (beat.minimumSurvivors!=null&&typeof beat.minimumSurvivors!=='number')||
     (beat.escortRequiresPlayer!=null&&(beat.trigger!=='escort'||typeof beat.escortRequiresPlayer!=='boolean'))||
+    (beat.escortRoute!=null&&(beat.trigger!=='escort'||typeof beat.escortRoute!=='string'))||
     (beat.timerSeconds!=null&&typeof beat.timerSeconds!=='number')||
     (beat.hudText!=null&&typeof beat.hudText!=='string')||
     [beat.hudObjective,beat.checkpoint,beat.completeMission].some(value=>value!=null&&typeof value!=='boolean')))
@@ -491,7 +499,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
     squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,guidance:beat.guidance?{flag:beat.guidance.flag??null,object:beat.guidance.object??null,height:beat.guidance.height}:null,
-    transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortRequiresPlayer:beat.escortRequiresPlayer===true,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
+    transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortRequiresPlayer:beat.escortRequiresPlayer===true,escortRoute:beat.escortRoute??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionVisitDuring:beat.conditionVisitDuring??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
@@ -598,6 +606,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const shots=project.studio?.shots??[];
   const forerunner=missions.some(beat=>beat.trigger==='forerunnerExtractionSettled');
   if(forerunner&&!['haloCustomEdition','chupathingyCe'].includes(doc.runtimeId))throw Error('Forerunner Extraction objectives require a standard CE campaign build target. This callback is unsupported in legacy/MCC/Xbox runtime exports.');
+  if(missions.some(beat=>beat.escortRoute!=null))throw Error('Escort command lists require reviewed native scenario source. Build the base map and prepare this mission against its working tags.');
   const output=exportHaloCeMission({...emptyCreatorStudio(),missions,shots},{forerunner});
   const bindings=inspectScenarioBindings([output],null,doc,shots.map(cinematicMarker));
   const missing=bindings.filter(binding=>binding.status!=='presentInAuthoringSource'&&!binding.dependency.startsWith('hud_message:')&&!binding.dependency.startsWith('sound:'));

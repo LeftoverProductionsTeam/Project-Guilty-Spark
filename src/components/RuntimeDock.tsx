@@ -652,6 +652,16 @@ export default function RuntimeDock({
         if(guide.object!=null){if(refs.objectIssue)throw Error(refs.objectIssue);if(refs.objects?.filter(object=>object.name.toLowerCase()===guide.object!.toLowerCase()).length!==1)throw Error('Objective waypoint object is missing or ambiguous. Bind a unique native object in the source, accept/build and read source again.');}
         else if(refs.flags?.filter(flag=>flag.name.toLowerCase()===guide.flag?.toLowerCase()).length!==1)throw Error('Objective waypoint flag is missing or ambiguous. Author it in AI & scenario, accept/build, then read source again.');
       }
+      for(const beat of studio.missions){
+        const routeName=beat.escortRoute?.toLowerCase();
+        if(!routeName)continue;
+        if(!refs.escortRoutes)throw Error('Read a native scenario with a valid command-list inventory before preparing its escort.');
+        const routes=refs.escortRoutes.filter(route=>route.name.toLowerCase()===routeName);
+        if(routes.length!==1)throw Error('Escort route is missing or ambiguous: '+beat.escortRoute);
+        const route=routes[0];
+        if(route.issue||!route.finalPosition)throw Error('Escort route '+route.name+' needs a finite go-to command list. Review it in AI & scenario.');
+        if(!route.arrivalVolumes.includes(beat.triggerRef??''))throw Error('Escort route '+route.name+' must finish inside its reviewed rescue area '+beat.triggerRef+'.');
+      }
       const insertionModules=new Map<string,NativeTransportOptions>();
       for(const beat of studio.missions.filter(beat=>beat.transportInsertion)){
         const role=beat.transportInsertion!,filename='gs_'+role+'_transport.hsc';let config=insertionModules.get(role);
@@ -664,7 +674,7 @@ export default function RuntimeDock({
       }
       const bindings=inspectScenarioBindings([generated],null,null,[],review.triggerVolumes.map(name=>({name})),refs.devices,refs.squads,refs.weapons);
       for(const row of bindings){
-        if(['hud_message:','sound:','weapon:','forerunner_extraction:','forerunner_squad:','cutscene_flag:','waypoint_object:','transport_insertion:','transport_arrival:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
+        if(['hud_message:','sound:','weapon:','forerunner_extraction:','forerunner_squad:','cutscene_flag:','waypoint_object:','transport_insertion:','transport_arrival:','command_list:'].some(prefix=>row.dependency.startsWith(prefix)))continue;
         if(row.dependency.startsWith('cutscene_camera_point:')){if(review.cameras.filter(camera=>camera.name===row.dependency.slice('cutscene_camera_point:'.length)).length!==1)throw Error('Native camera reference is missing or ambiguous: '+row.dependency);continue;}
         if(row.status!=='presentInNativeSource')throw Error('Native mission reference is missing or ambiguous: '+row.dependency);
       }

@@ -101,9 +101,17 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   assert.ok(activationNameIndex>=0&&nativeNames.lastIndexOf('extraction_activate')===activationNameIndex);
   const nativeControls=(await run('invader-edit',['-G','controls[*].name',scenario+'.scenario'],true)).split(/\r?\n/).map(Number),activationControlIndex=nativeControls.indexOf(activationNameIndex);
   assert.ok(activationControlIndex>=0&&nativeControls.lastIndexOf(activationNameIndex)===activationControlIndex);
+  const routePosition='2,2,2',routeName='gs_test_rescue_route';
+  const routeIndex=Number(await run('invader-edit',['-C','command_lists',scenario+'.scenario'],true));
+  assert.ok(Number.isInteger(routeIndex)&&routeIndex>=0&&routeIndex<256);
+  const commandList='command_lists['+routeIndex+']';
+  await run('invader-edit',['-I','command_lists','1','end','-S',commandList+'.name',routeName,
+   '-I',commandList+'.commands','1','end','-I',commandList+'.points','1','end',
+   '-S',commandList+'.commands[0].atom_type','go_to','-S',commandList+'.commands[0].atom_modifier','1',
+   '-S',commandList+'.commands[0].point_1','0','-S',commandList+'.points[0].position',routePosition,scenario+'.scenario']);
   const native=emptyCreatorStudio();native.missions=[{id:'native_radio',title:'Native cue',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',
    soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'start',gain:.5,delayMs:500,caption:'Radio: native cue.'}},
-   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue',escortRequiresPlayer:true},
+   {id:'escort',title:'Native escort',objective:'Native syntax only',trigger:'escort',encounterName:'survivors',triggerRef:'radio_area',minimumSurvivors:1,escortFailure:'continue',escortRequiresPlayer:true,escortRoute:routeName},
    {id:'native_complete',title:'Complete',objective:'Manual gate',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionOutside:true,soundCue:{importId:'owned_sound',soundPath:'sound/radio',phase:'complete',gain:1,delayMs:0,caption:''}},
    {id:'terminal',title:'Restore communications',objective:'Native syntax only',trigger:'deviceActivated',encounterName:'',triggerRef:'extraction_activate'},
    {id:'rescue_success',title:'Success path',objective:'Native syntax only',trigger:'manual',encounterName:'',conditionVolume:'radio_area',conditionGroup:'native_route',conditionResult:{beatId:'escort',failed:false}},
@@ -115,6 +123,9 @@ if(process.env.SPARK_NATIVE_MISSION_AUDIO==='1') {
   const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'),results=[];
   for(const engine of ['gbx-custom','mcc-cea','xbox-ntsc']){
    await run('invader-script',['-d',data,'-E','-g',engine,scenario]);
+   assert.equal(await run('invader-edit',['-G',commandList+'.name',scenario+'.scenario'],true),routeName);
+   assert.equal(await run('invader-edit',['-G',commandList+'.commands[0].atom_modifier',scenario+'.scenario'],true),'1');
+   assert.deepEqual((await run('invader-edit',['-G',commandList+'.points[0].position',scenario+'.scenario'],true)).split(',').map(Number),routePosition.split(',').map(Number));
    const count=await run('invader-edit',['-C','scripts',scenario+'.scenario'],true);assert.equal(count,'5');
    const names=await run('invader-edit',['-G','scripts[*].name',scenario+'.scenario'],true);
    for(const name of ['gs_complete_1','gs_complete_3','gs_complete_5','gs_complete_6','gs_mission'])assert.ok(names.split(/\r?\n/).includes(name));

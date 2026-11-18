@@ -18,8 +18,8 @@ impl NativeCommandList {
   for c in &self.commands{if !COMMAND_ATOMS.contains(&c.atom.as_str())||c.parameters.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!reference(c.point1,self.points.len())||!reference(c.point2,self.points.len())||!reference(c.command,self.commands.len())||[c.animation,c.script,c.recording,c.object_name].iter().any(|v|*v< -1){return invalid("Native command has an unknown action, invalid parameter or missing local reference");}}
   Ok(())
  }
- /// Movement actions used by the generated physical-flight profile.
- pub(crate) fn flight_destinations(&self) -> Result<Vec<(usize, usize)>> {
+ /// Finite route actions used by generated transport and escort scripts.
+ pub(crate) fn movement_destinations(&self) -> Result<Vec<(usize, usize)>> {
     self.validate()?;
     let mut destinations = Vec::new();
     for (index, command) in self.commands.iter().enumerate() {
@@ -33,7 +33,7 @@ impl NativeCommandList {
             "set_radius" if command.parameters[0] > 0. => {}
             "pause" if command.parameters[0] >= 0. => {}
             _ => return invalid(format!(
-                "Route {} action {} ({}) is outside the generated physical-flight profile. Use go-to (stop/keep-moving), go-to-and-face (stop with Point 2), positive set-radius or pause. Advanced source remains available manually.",
+                "Route {} action {} ({}) is outside the generated movement profile. Use go-to (stop/keep-moving), go-to-and-face (stop with Point 2), positive set-radius or pause. Advanced source remains available manually.",
                 self.name, index, command.atom
             )),
         }

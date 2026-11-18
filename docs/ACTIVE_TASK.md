@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: eed5856b / 37973e1c proved both Covenant exits with the Pelican parked, rescue spawn and both players reaching the rally. The ally stayed outside. The empty Spirit stalled below return waypoint 1. New dfa84b95 passes native compile and readback for both route repairs.
-Next action: Pair-test exact dfa84b95 via the proven east corridor. Verify the Covenant ally reaches be_survivors, the Spirit lands empty at the hub, facility and defense combat proceed, and recall, final extraction, and settlement complete. Verify the independent UNSC itinerary. Original Save37944 remains open.
+Latest verified revision: paired dfa84b95 / 0350d66a proves Covenant insertion, the living escort entering the rally, and the empty Spirit landing back in its hub volume. The facility Marine spawned about 1.91 units from the approaching guest, who died at tick 16170.
+Next action: Use the reviewed native encounter editor and compiled BSP to resolve the facility spawn beside the rally approach. Keep the fight and both accepted route repairs. Pair-test facility/defense combat, recall, extraction and settlement, then the independent UNSC itinerary. Original Save37944 remains open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov recovered escort authoring: Mission Director can select an existing native command list, review its last movement destination inside the rescue volume, and attach the saved script through the existing compiler. Four focused browser cases, TypeScript, 25 focused Rust tests with one skipped, Windows cargo check, and CE/MCC/Xbox Invader script compilation and independent scenario readback passed. Paired gameplay passed the route and hub return before the guest died in facility combat. See RUNTIME_INTEGRATION_20261107.
 
 18Nov passenger insertion: the existing dropship controller records a living rider after grounded disembarkation. Mission Director can require this event on a named Spirit or Pelican pad. Three browser workflows, 55 unit tests, 24 Rust tests plus one skip, TypeScript and installed Invader pass. Disposable CE609 76441903 preserved the Pelican mission and independently read back the Spirit arrival source. Full paired receipts, pad survey and limits are in RUNTIME_INTEGRATION_20261107.
 
