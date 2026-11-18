@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: aad75b4 plus the duplicate explicit Save input scan removal in this checkpoint. Windows Save/library/history regressions pass, including a source change after opening the Save lock. Diagnostic c93c4377 still lost the Spirit pad with zero throttle; the compiled 88ff1040 remains pending.
-Next action: Pair-test the exact 88ff1040 cache against a reviewed Forerunner build. Temporary native AI pause on c93c4377 did not keep either hull stable; the current engine’s parked-physics guard requires alert action, which ai_braindead resets. Compare normal boarding, true flight/landing and complete Covenant extraction without weakening the engine gates. Original Save37944 remains open.
+Latest verified revision: 81de3a7 plus corrected initial pilot hold timing and the compiled CE609 comparison map 77682fd3. Exact 88ff1040 loaded and deployed on both clients but ended before boarding. The prior Save change passed the real Windows 42-edit, seven-objective Save and restart workflow.
+Next action: Pair-test 77682fd3 and measure startup heading, grounded pad, boarding, flight, field landing and full Covenant extraction. Refresh the runtime capability review if its executable changed. The newest independent 88ff1040 boarding replay on engine 42b59977 was live at this checkpoint; finish reading the actual receipt. Original Save37944 remains open.
 
 ## Acceptance
 

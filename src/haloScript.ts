@@ -1002,6 +1002,9 @@ export interface NativeTransportOptions {
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
+  return generateNativeTransport(options);
+}
+function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHold=false):ScriptExport {
   if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
@@ -1105,7 +1108,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '(script startup '+stem+'_pilot',
     ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
-    ...setPilotStandby(true),
+    ...(legacyPreSeatHold?setPilotStandby(true):[]),
     '  (vehicle_load_magic (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))',
     '  (sleep_until '+pilotSeated+' 1)',
     ...crew.flatMap((member,index)=>[
@@ -1116,12 +1119,15 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       '  (sleep_until (and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list '+craft+' "'+member.seat+'" (ai_actors '+member.group+'))) 1)',
       ...(member.releaseAtInsertion?['  (set '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))']:[]),
     ]),
+    // Give the native driver a tick to attach and sample the actual craft pose.
+    ...(options.holdParkedPilot&&!legacyPreSeatHold?['  (sleep 1)']:[]),
     '  (set '+stem+'_ready true)',')','',
     '(script continuous forerunner_'+role+'_complete',
     '  (sleep -1)',
     '  (set '+stem+'_settled true)',')','',
     '(script continuous '+stem+'_trip',
     '  (sleep_until (and '+stem+'_ready '+pad(hub)+') 1)',
+    ...(!legacyPreSeatHold?setPilotStandby(true):[]),
     enter(true),
     waitFor(hubBoarding),
     ...depart(outbound,hubBoarding,true,['  (set '+stem+'_settled false)',...(troops.length?['  (set '+started+' true)']:[])]),
@@ -1158,7 +1164,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       ...crew.map(member=>'ai_encounter:'+member.group),'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
-      ...(options.holdParkedPilot?['Only the dedicated pilot AI is paused. Each flight resumes the pilot after its native pad and boarding, empty-return or recall condition; confirmed landings pause it again. Collision, landing, seat checks and settlement remain engine-owned.']:[]),
+      ...(options.holdParkedPilot?['Only the dedicated pilot AI is paused, beginning after the pilot is seated and the first native landing is confirmed. Each flight resumes the same pilot after its native pad and boarding, empty-return or recall condition; confirmed landings pause it again. Collision, landing, seat checks and settlement remain engine-owned.']:[]),
       ...(crew.length?[troops.length?'NPC assignments use dedicated source groups and compatible seats. First insertion releases only captured troops after landing; permanent crew remains seated. Empty return counts pilot plus permanent crew. Missing/dead delivered troops still fail the mission survivor minimum. This is one shared campaign delivery, not repeatable squad insertion, automatic casualty recovery or proven gameplay.':'Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats; empty return counts pilot plus crew, not player passengers. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
       'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
@@ -1172,7 +1178,11 @@ export function readNativeTransportSource(content:string):NativeTransportOptions
   const expected=exportHaloCeTransport(options).content;
   // Recognize the exact previous generated template for an explicit reviewed upgrade.
   // Never rewrite stored source merely by opening it, or accept unrelated hand edits.
-  const legacy=expected.replace(/\(vehicle_test_seat_list (extraction_(?:pelican|spirit)) /g,'(vehicle_test_seat_list (unit $1) ');
-  if(expected!==content&&legacy!==content)throw Error('Existing transport source was edited. Use Edit selected module; automatic regeneration would discard those edits.');
-  return options;
+  const legacySeatCast=(source:string)=>source.replace(/\(vehicle_test_seat_list (extraction_(?:pelican|spirit)) /g,'(vehicle_test_seat_list (unit $1) ');
+  if(expected===content||legacySeatCast(expected)===content)return options;
+  if(options.holdParkedPilot){
+    const previous=generateNativeTransport(options,true).content;
+    if(previous===content||legacySeatCast(previous)===content)return options;
+  }
+  throw Error('Existing transport source was edited. Use Edit selected module; automatic regeneration would discard those edits.');
 }

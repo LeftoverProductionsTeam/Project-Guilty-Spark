@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { blackEchoMission, connectBlackEchoObjectives, defaultBlackEchoOptions, emptyCreatorStudio } from '../src/creatorStudio.ts';
-import { recoveredCampaignMission, exportHaloCeTransport, attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
+import { recoveredCampaignMission, exportHaloCeTransport, readNativeTransportSource, attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
 const studio=emptyCreatorStudio();
 studio.missions=[
   {id:'one',title:'First Contact',objective:'Move to the bridge',trigger:'triggerVolume',triggerRef:'gs_bridge',encounterName:''},
@@ -218,7 +218,21 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
      assert.equal(flights.length,returnAfterInsertion?4:2);
      for(const i of flights){assert.equal(lines[i-1].trim(),resume);assert.ok(lines.slice(i-4,i).some(line=>line.includes('(sleep_until (and')&&line.includes('volume_test_object')&&line.includes('_landed')));}
      assert.equal(lines.filter(line=>line.trim()===freeze).length,flights.length+1);
-     assert.ok(source.content.indexOf(freeze)<source.content.indexOf('(vehicle_load_magic'));
+     const pilotStart=source.content.indexOf('(script startup gs_'+role+'_pilot'),tripStart=source.content.indexOf('(script continuous gs_'+role+'_trip');
+     const startup=source.content.slice(pilotStart,tripStart);
+     const trip=source.content.slice(tripStart);
+     assert.ok(!startup.includes(freeze)&&startup.includes('(vehicle_load_magic')&&startup.includes('(sleep 1)'));
+     const initialPause=trip.indexOf(freeze),initialLanding=trip.indexOf('volume_test_object extraction_return extraction_'+role);
+     assert.ok(initialLanding>=0&&initialPause>initialLanding&&initialPause<trip.indexOf('(unit_set_enterable_by_player'));
+     const previous=source.content.replace('  (sleep 1)\n  (set gs_'+role+'_ready true)','  (set gs_'+role+'_ready true)')
+      .replace('  '+freeze+'\n  (unit_set_enterable_by_player','  (unit_set_enterable_by_player')
+      .replace('  (vehicle_load_magic','  '+freeze+'\n  (vehicle_load_magic');
+     const previousSha=crypto.createHash('sha256').update(previous).digest('hex');
+     const parkedV1=returnAfterInsertion?{pelican:'06e255b10415f365afaf411a19b3964425a342614d8f7dcee2f15261e576fa2e',spirit:'1496943def62d63582a679fc36ca4e9877cd0e4e29f37d392cde97849ed00a0b'}:{pelican:'dd1410ff6a23421cb60314b5c823d582c00b31f4fa7350f6113106896cdc4ecb',spirit:'be6952e932e6241fff0af7f28c2e560a2cfbc8558d01621d23b3f8341291219a'};
+     assert.equal(previousSha,parkedV1[role]);
+     assert.deepEqual(readNativeTransportSource(previous),options);
+     assert.deepEqual(readNativeTransportSource(source.content),options);
+     assert.throws(()=>readNativeTransportSource(previous.replace('(depart_cue)','(arrive_cue)')), /was edited/);
      const afterCue=source.content.slice(source.content.indexOf('(depart_cue)'));
      const departureRead=afterCue.indexOf('_boarded'),lock=afterCue.indexOf('(unit_set_enterable_by_player (unit extraction_'+role+') false)');
      assert.ok(departureRead>=0&&lock>departureRead,'After a departure cue, native boarding is rechecked before locking the craft');
