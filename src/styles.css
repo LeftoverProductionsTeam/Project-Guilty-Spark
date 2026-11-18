@@ -2244,6 +2244,8 @@ small {
   pointer-events: none;
 }
 .property-projectile-path {
+  min-inline-size: 0;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .property-projectile-picker option {
@@ -2266,11 +2268,14 @@ small {
     display: none;
   }
   .property-projectile-picker > select::picker(select) {
-    inline-size: anchor-size(inline);
+    /* Right-align to the control so a wider list fits beside the model viewer. */
+    position-area: block-end span-inline-start;
+    position-try-fallbacks: flip-block;
+    inline-size: max(anchor-size(inline), 22rem);
     min-inline-size: 0;
-    max-inline-size: calc(100vi - 16px);
+    max-inline-size: min(100%, calc(100vi - 16px));
     max-block-size: min(320px, 65vh);
-    overflow: auto;
+    overflow: hidden auto;
     scrollbar-gutter: stable;
     background: var(--panel);
     color: var(--text);
@@ -2278,12 +2283,12 @@ small {
     border-radius: var(--gs-control-radius);
   }
   .property-projectile-picker option {
-    padding: 5px 8px;
+    padding: 5px 10px;
     white-space: normal;
-    overflow-wrap: anywhere;
   }
   .property-projectile-picker option > span {
     min-inline-size: 0;
+    overflow-wrap: anywhere;
   }
   .property-projectile-picker option:is(:hover, :focus-visible) {
     outline: 1px solid var(--accent);
@@ -3937,22 +3942,29 @@ small {
 
 /* The oversized corner clears the monitor emblem. Every other corner shares one curve. */
 :root[data-gs-native-frame='true'] {
+  --gs-window-inset: 16px 0 0 16px;
   --gs-window-emblem-corner: 36px;
   --gs-window-corner: 16px;
   --gs-window-radius: var(--gs-window-emblem-corner) var(--gs-window-corner) var(--gs-window-corner);
 }
-:root:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) {
+:root[data-gs-native-frame='true']:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) {
+  --gs-window-inset: 0;
   --gs-window-emblem-corner: 0px;
   --gs-window-corner: 0px;
 }
 :root[data-gs-native-frame='true'],:root[data-gs-native-frame='true'] body{background:transparent!important}
-:root[data-gs-native-frame='true'] .application{width:100vw;height:100vh;min-height:0;margin:0;border:1px solid #96e9f07a;border-radius:var(--gs-window-radius);overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24;box-sizing:border-box}
+:root[data-gs-native-frame='true'] :is(.application, .gs-window-tint) {
+  position: fixed;
+  inset: var(--gs-window-inset);
+  border-radius: var(--gs-window-radius);
+}
+:root[data-gs-native-frame='true'] .application{width:auto;height:auto;min-height:0;margin:0;border:1px solid #96e9f07a;overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24}
 :root[data-gs-native-frame='true'] .app-header{padding-left:20px;border-radius:max(0px, calc(var(--gs-window-emblem-corner) - 1px)) max(0px, calc(var(--gs-window-corner) - 1px)) 28px 5px;position:relative;user-select:none;cursor:grab}
 :root[data-gs-native-frame='true'] .app-header:active{cursor:grabbing}.gs-window-controls{display:flex;align-items:center;gap:7px;padding:0 4px 0 11px;margin-left:8px;border-left:1px solid #a7b9e12b;flex-shrink:0;cursor:default}
 .gs-window-button{display:grid;place-items:center;width:32px;height:32px;padding:4px;min-width:0;border:1px solid #8adce46b!important;border-radius:50% 45% 50% 35%;background:linear-gradient(145deg,#7154a035,#6bdbe70d)!important;color:#bdf1f5;box-shadow:inset 0 0 10px #98dfea0a;cursor:pointer}
 .gs-window-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.gs-window-button:hover{background:#8de5ef35!important;color:#fff;box-shadow:0 0 10px #8de5ef38}.gs-window-button:focus-visible{outline:2px solid #d6faff;outline-offset:3px}.gs-window-close:hover{background:#af437659!important;border-color:#ffb3cf!important;color:#ffd8e7}
 .gs-resize-edges{position:fixed;inset:0;pointer-events:none;z-index:1000}.gs-resize-edge{position:absolute;pointer-events:auto}.gs-resize-North,.gs-resize-South{height:6px;left:30px;right:30px;cursor:ns-resize}.gs-resize-North{top:0}.gs-resize-South{bottom:0}.gs-resize-East,.gs-resize-West{width:6px;top:30px;bottom:30px;cursor:ew-resize}.gs-resize-East{right:0}.gs-resize-West{left:0}.gs-resize-NorthEast,.gs-resize-NorthWest,.gs-resize-SouthEast,.gs-resize-SouthWest{width:18px;height:18px}.gs-resize-NorthEast{top:0;right:0;cursor:nesw-resize}.gs-resize-NorthWest{top:0;left:0;cursor:nwse-resize}.gs-resize-SouthEast{bottom:0;right:0;cursor:nwse-resize}.gs-resize-SouthWest{bottom:0;left:0;cursor:nesw-resize}
-:root[data-gs-maximized='true'] .application{width:100vw;height:100vh;margin:0;border-radius:0;border:0}:root[data-gs-maximized='true'] .app-header{border-radius:0}:root[data-gs-maximized='true'] .gs-resize-edges{display:none}
+:root[data-gs-native-frame='true'][data-gs-maximized='true'] .application{border:0}:root[data-gs-maximized='true'] .app-header{border-radius:0}:root[data-gs-maximized='true'] .gs-resize-edges{display:none}
 .gs-map-sounds { padding: 12px; border-bottom: 1px solid var(--border); }
 .gs-map-sounds summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
 .gs-map-sounds select { width: 100%; min-width: 0; }
@@ -3970,7 +3982,6 @@ small {
 
 .gs-window-content { width:100%;height:100%;opacity:var(--gs-window-opacity,1);position:relative;isolation:isolate; }
 .gs-window-tint { position:fixed;inset:0;z-index:2147483646;pointer-events:none;background:var(--gs-window-tint,#65c5ff);opacity:var(--gs-window-tint-strength,0); }
-:root[data-gs-native-frame='true'] .gs-window-tint { inset:0;border-radius:var(--gs-window-radius); }
 .gs-window-appearance label { display:flex;align-items:center;gap:14px;margin:14px 0;flex-wrap:wrap; }
 .gs-window-appearance input[type='range'] { width:min(420px,100%); }
 .gs-window-appearance small { display:block;margin-top:12px;color:var(--muted); }

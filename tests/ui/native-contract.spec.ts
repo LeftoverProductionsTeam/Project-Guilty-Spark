@@ -1267,8 +1267,14 @@ test('the Spark corner visual clears the curved frame and stays above window gla
   await expect(layer).toHaveCSS('border-bottom-left-radius','16px');
   await expect(layer).toHaveCSS('border-bottom-right-radius','16px');
  }
- for(const width of [1440,960]){
-  await page.setViewportSize({width,height:800});
+ for(const [width,height] of [[1440,800],[959,733]]){
+  await page.setViewportSize({width,height});
+  expect(await frame.boundingBox()).toEqual(await glass.boundingBox());
+  expect(await frame.evaluate(shell=>{
+   const {left,top,right,bottom}=shell.getBoundingClientRect();
+   return [[right,top,-1,1],[right,bottom,-1,-1],[left,bottom,1,-1]].map(([x,y,dx,dy])=>
+    [2,8].map(inset=>document.elementsFromPoint(x+dx*inset,y+dy*inset).includes(shell)));
+  })).toEqual([[false,true],[false,true],[false,true]]);
   await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-Math.max(0,hit.x-24))<1&&Math.abs(mark.y-Math.max(0,hit.y-24))<1&&mark.x>=0&&mark.y>=0&&mark.x+mark.width<=width;}).toBe(true);
   if(await button.getAttribute('aria-expanded')!=='true')await button.click();
   await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
@@ -5590,17 +5596,31 @@ for(const missing of [false,true])test('projectile choices distinguish tank shel
   const longOption=picker.locator('option[value="15"]');
   await expect(picker).toHaveJSProperty('value','10');
   await expect(longOption).toBeVisible();
+  await longOption.scrollIntoViewIfNeeded();
   const optionText=await longOption.evaluate(option=>{
+   const label=option.querySelector('span')!;
    const range=document.createRange();
-   range.selectNodeContents(option.querySelector('span')!);
+   range.selectNodeContents(label);
    const lines=Array.from(range.getClientRects()),bounds=option.getBoundingClientRect();
-   return{lines:new Set(lines.map(rect=>rect.top)).size,fits:lines.every(rect=>rect.right<=bounds.right+1)};
+   const select=option.closest('select')!.getBoundingClientRect();
+   const lastLine=lines.at(-1)!,point={x:lastLine.right-2,y:(lastLine.top+lastLine.bottom)/2};
+   return {
+    lines:new Set(lines.map(rect=>rect.top)).size,
+    fits:lines.every(rect=>rect.right<bounds.right&&rect.left>bounds.left),
+    widerThanField:bounds.width>select.width,
+    withinWindow:bounds.left>=0&&bounds.right<=innerWidth,
+    tailIsClickable:option.contains(document.elementFromPoint(point.x,point.y)),
+    point,
+   };
   });
   expect(optionText.lines).toBeGreaterThan(1);
   expect(optionText.fits).toBe(true);
+  expect(optionText.withinWindow).toBe(true);
+  expect(optionText.widerThanField).toBe(true);
+  expect(optionText.tailIsClickable).toBe(true);
   expect(await picker.evaluate(select=>getComputedStyle(select,'::picker(select)').borderBottomRightRadius))
    .toBe(await picker.evaluate(select=>getComputedStyle(select).borderBottomRightRadius));
-  await longOption.click();
+  await page.mouse.click(optionText.point.x,optionText.point.y);
   await expect(picker).toHaveValue('15');
   const selectedPath=page.locator('.property-projectile-picker .property-projectile-path');
   await expect(selectedPath).toHaveText(/^vehicles\/scorpion\/nested\/.+\/squad cannon projectile$/);

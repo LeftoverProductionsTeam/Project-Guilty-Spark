@@ -548,8 +548,6 @@ html[data-gs-focus-mode='true'] .map-tab-bar {
 }
 html[data-gs-fullscreen='true'] .application {
   grid-template-rows: 28px minmax(0, 1fr) auto !important;
-  width: 100vw !important;
-  height: 100vh !important;
   margin: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
