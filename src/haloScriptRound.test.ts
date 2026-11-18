@@ -181,6 +181,27 @@ describe('Forerunner native transport source',()=>{
   }
   expect(()=>exportHaloCeTransport({...options,returnAfterInsertion:'yes'} as any)).toThrow('whether');
  });
+ it('checks player occupancy in all reviewed seats without dropping crew or former-passenger gates',()=>{
+  const settings={...options,faction:'covenant' as const,returnAfterInsertion:true,trackPlayerInsertion:true,createPilot:true,holdParkedPilot:true,
+    occupancySeats:[options.pilotSeat,'CD-passengerL01','CD-passengerR01','gunseat'],
+    crew:[{group:'aircrew',seat:'CD-passengerL01'}]};
+  const source=exportHaloCeTransport(settings).content;
+  expect(readNativeTransportSource(source).occupancySeats).toEqual(settings.occupancySeats);
+  const occupiedChecks=[...source.matchAll(/\(begin \(set gs_spirit_occupancy_players \(players\)\)[^\n]+/g)];
+  expect(occupiedChecks).toHaveLength(5);
+  for(const [check] of occupiedChecks){
+    expect(check).toContain('(and (> (list_count gs_spirit_occupancy_players) 0) (not (or');
+    for(const seat of settings.occupancySeats)expect(check).toContain('(vehicle_test_seat_list extraction_spirit "'+seat+'" gs_spirit_occupancy_players)');
+  }
+  expect(source).not.toContain('(list_count (vehicle_riders');
+  expect(source).toContain('(vehicle_test_seat_list extraction_spirit "CD-passengerL01" (ai_actors aircrew))');
+  expect(source).toContain('(set gs_spirit_arrival_riders (vehicle_riders (unit extraction_spirit)))');
+  expect(source).toContain('(volume_test_object extraction_zone gs_spirit_arrival_unit)');
+  expect(source).toContain('(set gs_spirit_player_arrived true)');
+  for(const occupancySeats of [[],['gunseat',options.pilotSeat],['CD-passengerL01',options.pilotSeat,'GunSeat','gunseat'],['CD-passengerL01',options.pilotSeat,'invalid"']]){
+    expect(()=>exportHaloCeTransport({...settings,occupancySeats})).toThrow('every native aircraft seat');
+  }
+ });
  it('creates only an explicitly deferred pilot once without erasing existing actors',()=>{
   const original=exportHaloCeTransport(options);expect(original.content).not.toContain('(ai_place pilot)');
   const script=exportHaloCeTransport({...options,createPilot:true});expect(readNativeTransportSource(script.content).createPilot).toBe(true);expect(script.content).toContain('(if (= (ai_living_count pilot) 0) (ai_place pilot))');expect(script.content.indexOf('(ai_place pilot)')).toBeLessThan(script.content.indexOf('(vehicle_load_magic'));expect(script.content).not.toMatch(/ai_erase|object_destroy/);expect(()=>exportHaloCeTransport({...options,createPilot:'yes' as any})).toThrow('ownership');

@@ -991,6 +991,8 @@ export interface NativeTransportOptions {
   departureCue?:string; arrivalCue?:string;
   insertionCamera?:{marker:string;durationMs:number};
   departureCamera?:{marker:string;durationMs:number};
+  /** Complete seat labels from the reviewed vehicle for player occupancy checks. */
+  occupancySeats?:string[];
   /** Reuse the reviewed return/insertion routes for empty hub return and recall. */
   returnAfterInsertion?:boolean;
   /** Record an actual surviving rider leaving the first grounded insertion. */
@@ -1000,12 +1002,19 @@ export interface NativeTransportOptions {
   /** Suspend autonomous pilot AI on a verified pad until the next authored flight. */
   holdParkedPilot?:boolean;
 }
+const nativeSeatLabel=(seat:unknown):seat is string=>typeof seat==='string'&&seat.length>0&&seat.length<=31&&/^[\x20-\x21\x23-\x5b\x5d-\x7e]+$/.test(seat)&&!!seat.trim();
+
+export function validNativeTransportSeats(labels:unknown):labels is string[] {
+  return Array.isArray(labels)&&labels.length>=2&&labels.length<=16&&labels.every(nativeSeatLabel)
+    &&new Set(labels.map(label=>label.toLowerCase())).size===labels.length;
+}
+
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
   return generateNativeTransport(options);
 }
 function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHold=false):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew','occupancySeats'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
   if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
@@ -1015,17 +1024,21 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
   const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
   const hub=ensureName(options.hub,'Hub volume'),field=ensureName(options.field,'Landing volume');
   if(hub===field||outbound===inbound)throw Error('Use distinct hub/landing volumes and insertion/return command lists.');
-  const seatLabel=(seat:unknown):seat is string=>typeof seat==='string'&&seat.length>0&&seat.length<=31&&/^[\x20-\x21\x23-\x5b\x5d-\x7e]+$/.test(seat)&&!!seat.trim();
-  if(!seatLabel(options.pilotSeat))
+  if(!nativeSeatLabel(options.pilotSeat))
     throw Error('Copy a real native pilot seat label (1–31 printable characters, without quotes or backslashes).');
   if(options.crew!=null&&(!Array.isArray(options.crew)||options.crew.length>8))throw Error('Review at most eight permanent native crew assignments.');
   const crew=options.crew??[],groups=[pilot.toLowerCase()],seats=[options.pilotSeat.toLowerCase()];
   for(const member of crew){
-    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create','releaseAtInsertion','holdUntilInsertion'].includes(key))||!seatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean'||member.releaseAtInsertion!=null&&typeof member.releaseAtInsertion!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
+    if(!member||typeof member!=='object'||Array.isArray(member)||Object.keys(member).some(key=>!['group','seat','create','releaseAtInsertion','holdUntilInsertion'].includes(key))||!nativeSeatLabel(member.seat)||member.create!=null&&typeof member.create!=='boolean'||member.releaseAtInsertion!=null&&typeof member.releaseAtInsertion!=='boolean')throw Error('Crew needs a native group, exact seat label and explicit creation ownership.');
     if(member.holdUntilInsertion!=null&&(typeof member.holdUntilInsertion!=='boolean'||member.holdUntilInsertion&&(!member.create||!member.releaseAtInsertion)))throw Error('Holding a troop requires deferred crew owned by this controller and Disembark at first insertion.');
     const group=ensureName(member.group,'Crew encounter / squad',true).toLowerCase(),seat=member.seat.toLowerCase();
     if(groups.some(old=>old===group||old.startsWith(group+'/')||group.startsWith(old+'/'))||seats.includes(seat))throw Error('Pilot and crew need separate, nonoverlapping native groups and unique seats.');
     groups.push(group);seats.push(seat);
+  }
+  const occupancySeats=options.occupancySeats;
+  if(occupancySeats!==undefined&&(!validNativeTransportSeats(occupancySeats)
+    ||![options.pilotSeat,...crew.map(member=>member.seat)].every(seat=>occupancySeats.includes(seat)))) {
+    throw Error('Review every native aircraft seat and its unique exact label before preparing passenger occupancy.');
   }
   const cues=[options.departureCue,options.arrivalCue].map((cue,index)=>cue?ensureName(cue,index?'Arrival camera/dialogue function':'Departure camera/dialogue function'):null);
   const role=options.faction==='unsc'?'pelican':'spirit',craft='extraction_'+role,stem='gs_'+role;
@@ -1059,7 +1072,13 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
   const landed='(> (device_group_get '+craft+'_landed) 0.5)';
   const crewSeated=crew.map((member,index)=>{const seated='(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list '+craft+' "'+member.seat+'" (ai_actors '+member.group+')))';return member.releaseAtInsertion?'(or '+started+' (and '+seated+' (= '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))))':seated;});
   const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+pilotSeated+(crewSeated.length?' '+crewSeated.join(' '):'')+' (volume_test_object '+name+' '+craft+') '+landed+')';
-  const empty='(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.filter(member=>!member.releaseAtInsertion).length)+')';
+  const occupancyPlayers=stem+'_occupancy_players';
+  const occupancyGlobals=occupancySeats?['(global object_list '+occupancyPlayers+' (list_get (players) 32767))']:[];
+  const seatedPlayers=occupancySeats?.map(seat=>'(vehicle_test_seat_list '+craft+' "'+seat+'" '+occupancyPlayers+')')??[];
+  const seatGroups=seatedPlayers.length<=8?seatedPlayers:['(or '+seatedPlayers.slice(0,8).join(' ')+')','(or '+seatedPlayers.slice(8).join(' ')+')'];
+  const empty=occupancySeats
+    ? '(begin (set '+occupancyPlayers+' (players)) (and (> (list_count '+occupancyPlayers+') 0) (not (or '+seatGroups.join(' ')+'))))'
+    : '(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.filter(member=>!member.releaseAtInsertion).length)+')';
   const playerArrival=stem+'_player_arrived',arrivalRiders=stem+'_arrival_riders',arrivalPlayers=stem+'_arrival_players';
   const arrivalIndex=stem+'_arrival_index',arrivalUnit=stem+'_arrival_unit';
   const riderMatches=Array.from({length:32},(_,i)=>'(= '+arrivalUnit+' (unit (list_get '+arrivalRiders+' '+i+')))');
@@ -1104,7 +1123,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
     '; Forerunner only: requires actual native ground contact and durable crew callback.',
     '; No player force-boarding, loot grant, banking, teleport or raid timer.',
     '(global boolean '+stem+'_ready false)',
-    '(global boolean '+stem+'_settled false)',...troopGlobals,...arrivalGlobals,
+    '(global boolean '+stem+'_settled false)',...troopGlobals,...arrivalGlobals,...occupancyGlobals,
     '(script startup '+stem+'_pilot',
     ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
@@ -1141,6 +1160,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
       '  ; Empty return: every passenger disembarks normally before this flight.',
       waitFor(fieldEmpty),
       ...confirmArrival,
+      ...(occupancySeats&&options.trackPlayerInsertion&&!options.holdParkedPilot?[waitFor(fieldEmpty)]:[]),
       ...depart(inbound,fieldEmpty),
       ...arriveAt(hub),
       '  ; Keep the empty ship closed while the deployed field crew requests pickup.',
@@ -1165,7 +1185,8 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
       ...(options.holdParkedPilot?['Only the dedicated pilot AI is paused, beginning after the pilot is seated and the first native landing is confirmed. Each flight resumes the same pilot after its native pad and boarding, empty-return or recall condition; confirmed landings pause it again. Collision, landing, seat checks and settlement remain engine-owned.']:[]),
-      ...(crew.length?[troops.length?'NPC assignments use dedicated source groups and compatible seats. First insertion releases only captured troops after landing; permanent crew remains seated. Empty return counts pilot plus permanent crew. Missing/dead delivered troops still fail the mission survivor minimum. This is one shared campaign delivery, not repeatable squad insertion, automatic casualty recovery or proven gameplay.':'Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats; empty return counts pilot plus crew, not player passengers. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
+      ...(occupancySeats?['Empty return, recall and the post-settlement reset use current player bodies in every reviewed aircraft seat. Installed units can stay seated. A live pilot, required crew, native landing and former-passenger confirmation keep their own checks.']:[]),
+      ...(crew.length?[troops.length?'NPC assignments use dedicated source groups and compatible seats. First insertion releases only captured troops after landing; permanent crew remains seated. Missing/dead delivered troops still fail the mission survivor minimum. This is one shared campaign delivery, not repeatable squad insertion, automatic casualty recovery or proven gameplay.':'Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
       'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',
       'Optional relative camera coordinates are offsets in the craft frame, not world positions. These shared cinematics affect all viewers and temporarily control input; source points and restoration need game testing. Optional camera/dialogue functions must exist and return control, ending any cinematic before settlement. Compile/readback, flight, clearance, callbacks, repeat trips and multiplayer require independent acceptance.']};

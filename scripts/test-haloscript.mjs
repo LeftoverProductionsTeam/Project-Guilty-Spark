@@ -207,11 +207,13 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   await run('invader-edit',['-n',...args,scenario]);
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');
   const results=[];
-  for(const [returnAfterInsertion,holdParkedPilot] of [[false,false],[true,false],[false,true],[true,true]]){
+  for(const [returnAfterInsertion,holdParkedPilot,checkPlayerSeats] of [[false,false,false],[true,false,false],[false,true,false],[true,true,false],[true,true,true]]){
    const sources=[];
    for(const faction of ['unsc','covenant']){
-    const role=faction==='unsc'?'pelican':'spirit';const options={faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:faction==='covenant'?'spirit_zone':'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{}),...(holdParkedPilot?{createPilot:true,holdParkedPilot:true}:{})};const source=exportHaloCeTransport(options);
-    if(holdParkedPilot){
+    const role=faction==='unsc'?'pelican':'spirit';const options={faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:faction==='covenant'?'spirit_zone':'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{}),...(holdParkedPilot?{createPilot:true,holdParkedPilot:true}:{})};
+    if(checkPlayerSeats)options.occupancySeats=[options.pilotSeat,...Array.from({length:faction==='unsc'?7:12},(_,i)=>'passenger'+i),'gunseat'];
+    const source=exportHaloCeTransport(options);
+    if(holdParkedPilot&&!checkPlayerSeats){
      assert.throws(()=>exportHaloCeTransport({...options,createPilot:false}),/dedicated deferred pilot/);
      const pilot=options.pilot,freeze='(ai_braindead '+pilot+' true)',resume='(ai_braindead '+pilot+' false)';
      const lines=source.content.split('\n'),flights=lines.map((line,i)=>line.includes('(ai_command_list '+pilot+' ')?i:-1).filter(i=>i>=0);
@@ -247,7 +249,11 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
     for(const name of ['gs_'+role+'_pilot','gs_'+role+'_trip','forerunner_'+role+'_complete'])assert.ok(names.includes(name),name);
     assert.equal(types[names.indexOf('forerunner_'+role+'_complete')],'continuous');
    }
-   results.push({returnAfterInsertion,holdParkedPilot,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
+   if(checkPlayerSeats){
+    const globals=(await run('invader-edit',['-G','globals[*].name',scenario])).split(/\r?\n/);
+    for(const role of ['pelican','spirit'])assert.ok(globals.includes('gs_'+role+'_occupancy_players'));
+   }
+   results.push({returnAfterInsertion,holdParkedPilot,checkPlayerSeats,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
   }
   const buildId='reviewed_source',project={id:'transport',quickForge:null,studio:emptyCreatorStudio(),builds:[{id:buildId,status:'validated'}]};
   const native={projectId:project.id,buildId,class:'scnr',sourceTarget:'gbx-custom',canAppendEncounter:true,tagSha256:'a'.repeat(64),

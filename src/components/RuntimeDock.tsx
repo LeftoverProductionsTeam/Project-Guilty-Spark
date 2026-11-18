@@ -22,7 +22,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission } from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,validNativeTransportSeats,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission } from '../haloScript';
 import type {NativeTransportOptions,NativeMissionReview} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
 import { useMapState, readMapSession, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
@@ -279,17 +279,31 @@ export default function RuntimeDock({
       const point=matches[0];if(!Number.isFinite(point.fovRadians)||point.fovRadians<5*Math.PI/180||point.fovRadians>150*Math.PI/180)return 'Relative camera '+camera.marker+' has an unsupported lens. Review its native point before preparing.';
     }return null;
   }
+  function reviewedTransportSeats(options:NativeTransportOptions){
+    const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
+    const matches=modules?.transportReview?.vehicles.filter(vehicle=>vehicle.name===name);
+    return matches?.length===1&&validNativeTransportSeats(matches[0].seats)?matches[0].seats:undefined;
+  }
+  function transportSeatsMatch(options:NativeTransportOptions){
+    const expected=options.occupancySeats, reviewed=reviewedTransportSeats(options);
+    return !expected||reviewed?.length===expected.length&&expected.every((label,index)=>label===reviewed[index]);
+  }
   function transportReferencesMatch(options:NativeTransportOptions){
     const refs=modules?.transportReview;if(!refs)return false;const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
     const vehicles=refs.vehicles.filter(v=>v.name===name);
-    return !transportCrewIssue(options)&&!transportCameraIssue(options)&&!transportPilotIssue(options)&&(!options.createPilot||refs.scriptCreatedPilots?.filter(name=>name===options.pilot).length===1)&&!transportFlightIssue(options)&&!transportRouteIssue(options)&&vehicles.length===1&&vehicles[0].pilotSeats?.filter(seat=>seat===options.pilotSeat).length===1&&refs.pilots.filter(value=>value===options.pilot).length===1&&
+    return transportSeatsMatch(options)&&
+      !transportCrewIssue(options)&&!transportCameraIssue(options)&&!transportPilotIssue(options)&&(!options.createPilot||refs.scriptCreatedPilots?.filter(name=>name===options.pilot).length===1)&&!transportFlightIssue(options)&&!transportRouteIssue(options)&&vehicles.length===1&&vehicles[0].pilotSeats?.filter(seat=>seat===options.pilotSeat).length===1&&refs.pilots.filter(value=>value===options.pilot).length===1&&
       [options.departureCue,options.arrivalCue].filter((cue):cue is string=>!!cue).every(cue=>nativeCameras?.scriptNames.filter(value=>value===cue).length===1)&&
       [options.outbound,options.inbound].every(route=>refs.routes.filter(value=>value===route).length===1)&&
       ['_boarded','_called','_landed'].every(suffix=>refs.groups.includes(name+suffix));
   }
-  let currentTransportIdentity:string|null=null;
+  let currentTransportIdentity:string|null=null, transportDraftSeatsChanged=false;
   if(nativeTransportDraft&&nativeCameras&&report?.workingSource?.target==='gbx-custom'&&nativeCameras.scenarioType===0){
-    try{const options=readNativeTransportSource(selectedScript!.content);if(transportReferencesMatch(options)&&[options.hub,options.field].every(name=>nativeCameras.triggerVolumes.filter(v=>v===name).length===1))currentTransportIdentity=nativeCameras.tagIdentity;}catch{/* Edited source needs the explicit manual-source route. */}
+    try{
+      const options=readNativeTransportSource(selectedScript!.content);
+      transportDraftSeatsChanged=!!modules?.transportReview&&!transportSeatsMatch(options);
+      if(transportReferencesMatch(options)&&[options.hub,options.field].every(name=>nativeCameras.triggerVolumes.filter(v=>v===name).length===1))currentTransportIdentity=nativeCameras.tagIdentity;
+    }catch{/* Edited source needs the explicit manual-source route. */}
   }
   useEffect(()=>{
     moduleRequest.current++;setModuleBusy(false);
@@ -694,13 +708,16 @@ export default function RuntimeDock({
     setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
     try{
       if(source.target!=='gbx-custom'||review.scenarioType!==0)throw Error('Transport controllers need reviewed CE609 solo source for Forerunner. Other engines do not drive these signals.');
-      const generated=exportHaloCeTransport(options);
+      const occupancySeats=reviewedTransportSeats(options);
+      if(!occupancySeats)throw Error('Read native transport source with a complete set of unique, named aircraft seats.');
+      const reviewed={...options,occupancySeats};
+      const generated=exportHaloCeTransport(reviewed);
       const crewIssue=transportCrewIssue(options);if(crewIssue)throw Error(crewIssue+' No draft was replaced.');
       const cameraIssue=transportCameraIssue(options);if(cameraIssue)throw Error(cameraIssue+' No draft was replaced.');
       const pilotIssue=transportPilotIssue(options);if(pilotIssue)throw Error(pilotIssue+' No draft was replaced.');
       const flightIssue=transportFlightIssue(options);if(flightIssue)throw Error(flightIssue+' Open AI & scenario → Edit native scenario & assets, select the matching native vehicle, then Native aircraft AI flight settings. Preview, Accept, Save/rebuild and read transport source again. No draft was replaced.');
       const routeIssue=transportRouteIssue(options);if(routeIssue)throw Error(routeIssue+' Open AI & scenario → Edit native scenario & assets → Map scenario → Existing AI command lists, review the route against the map, Preview/Accept, Save/rebuild and read transport source again. No draft was replaced.');
-      if(!transportReferencesMatch(options))throw Error('Choose the actual named aircraft, one unique native pilot seat, a single-pilot encounter/squad with matching creation ownership, two nonempty native routes and all three dedicated signals. Read native transport source after authoring them; no source was replaced.');
+      if(!transportReferencesMatch(reviewed))throw Error('Choose the actual named aircraft, one unique native pilot seat, a single-pilot encounter/squad with matching creation ownership, two nonempty native routes and all three dedicated signals. Read native transport source after authoring them; no source was replaced.');
       for(const name of [options.hub,options.field])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Missing or ambiguous native pad volume '+name+'. Author it with the existing scenario area tools, Save/rebuild and read source again.');
       const previous=inventory.modules.find(module=>module.filename.toLowerCase()===generated.filename.toLowerCase());
       let original:string|undefined;
@@ -1185,7 +1202,9 @@ export default function RuntimeDock({
                 {transportPilotIssue(transport)&&<Notice>{transportPilotIssue(transport)} Review Available native transport references below. Use the existing AI/source tools to import/select a compatible actor and its graph; refresh before preparing.</Notice>}
                 {transportFlightIssue(transport)&&<Notice>{transportFlightIssue(transport)} Open AI & scenario → Edit native scenario & assets, select the matching vehicle, then Native aircraft AI flight settings. Preview → Accept → Save/rebuild → read transport source again.</Notice>}
                 {transportRouteIssue(transport)&&<Notice>{transportRouteIssue(transport)} Edit AI & scenario → Edit native scenario & assets → Map scenario → Existing AI command lists; use Show command route in Level Editor. Native pad geometry can be edited in the same source controls. Preview/Accept, Save/rebuild and read source again. These checks do not prove hull clearance or ground contact.</Notice>}
-                <button type="button" disabled={!!transportCrewIssue(transport)||!!transportCameraIssue(transport)||!!transportPilotIssue(transport)||!!transportFlightIssue(transport)||!!transportRouteIssue(transport)||!!transport.createPilot&&!modules?.transportReview?.scriptCreatedPilots?.includes(transport.pilot)} onClick={()=>void prepareTransportSource()}>Prepare transport script draft</button>
+                {modules?.transportReview&&!reviewedTransportSeats(transport)&&<Notice>The aircraft needs a complete set of unique, named seats. Review its native vehicle tag and read the source again.</Notice>}
+                {transportDraftSeatsChanged&&<Notice>The saved draft uses different aircraft seats. Prepare a new transport script draft to review the current seats.</Notice>}
+                <button type="button" disabled={!reviewedTransportSeats(transport)||!!transportCrewIssue(transport)||!!transportCameraIssue(transport)||!!transportPilotIssue(transport)||!!transportFlightIssue(transport)||!!transportRouteIssue(transport)||!!transport.createPilot&&!modules?.transportReview?.scriptCreatedPilots?.includes(transport.pilot)} onClick={()=>void prepareTransportSource()}>Prepare transport script draft</button>
               </fieldset>}
               <p className="subtle">Use CE609 solo source. Create pilot AI and real seats with the existing AI/tag tools; routes with AI & scenario → Edit native scenario & assets → Map scenario → Existing AI command lists. Pad volumes must already exist. Read native transport source again after restarting or changing source; generated builds pin the current tag identity. Load transport configuration from draft restores its saved choices. Bind the matching craft and three dedicated boarding/recall/landing groups. The source waits for both real landing and its pad; it never treats hover or time as arrival. Optional camera/dialogue functions must already exist and end cinematics. Players disembark normally; returning craft stays closed until Forerunner wakes its crew-settlement callback. Native compilation checks references; pilot failure/recovery, clearances, repeat trips and multiplayer need actual game acceptance. Hand-edited modules are preserved and require Edit selected module.</p>
             </details>

@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: The 8e8d3312 paired trial on 098a5d79 proved Covenant deployment, boarding, outbound Spirit flight, field landing and both exits. The installed turret blocks the empty-rider count. Windows Save now preserves the exact previous-good copy on unchanged content and passed the 42-edit, restart and Undo/Redo checks.
-Next action: Use the native seat/rider and player lists to exclude installed components from the Spirit empty checks, including return, recall and final reset. Preserve live pilot, landing and former-passenger gates. Recompile and pair-test the arrival latch, empty return, recall, rescue, combat and settlement. Original Save37944 remains open.
+Latest verified revision: 8e8d3312 on 098a5d79 proved two-client deployment, boarding, outbound flight, field landing and both exits before the installed turret blocked the old raw rider count. Candidate 7b3940f6 independently reads back direct player occupancy across all 14 native Spirit seats. Windows unchanged-Save recovery passed separately.
+Next action: Pair-test exact 7b3940f6 on the reviewed Forerunner build. Confirm the former-passenger signal and empty return after both exits with the original installed turret seated. Continue through recall, rescue, combat and settlement. Original Save37944 remains open.
 
 ## Acceptance
 
