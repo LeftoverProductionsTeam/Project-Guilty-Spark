@@ -66,7 +66,7 @@ export interface MissionBeat {
   encounterName: string;
   /** Explicit runtime team for this encounter only; absent retains legacy behavior. */
   encounterTeam?:'source'|'human'|'covenant'|'flood'|null;
-  /** Reviewed source/controller owns spawn; transport owns boarding/release, escort owns follow. */
+  /** Escort uses delivered NPCs; an area beat can require a real player insertion at its pad. */
   transportInsertion?:'pelican'|'spirit'|null;
   triggerRef?: string | null;
   weaponPath?: string | null;
@@ -323,7 +323,7 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (m.soundCue != null && !validMissionSoundCue(m.soundCue)) ||
       (m.weaponPath!=null&&m.weaponPath!==''&&(typeof m.weaponPath!=='string'||!validMissionWeaponPath(m.weaponPath))) ||
       (m.createWeaponObject!=null&&(typeof m.createWeaponObject!=='string'||!scriptIdent.test(m.createWeaponObject)||m.trigger!=='weaponOwned')) ||
-      (m.transportInsertion!=null&&(m.trigger!=='escort'||m.squadNumber!=null||!['pelican','spirit'].includes(m.transportInsertion))) ||
+      (m.transportInsertion!=null&&(!['escort','triggerVolume'].includes(m.trigger)||m.squadNumber!=null||!['pelican','spirit'].includes(m.transportInsertion))) ||
       (m.encounterTeam!=null&&(!['escort','encounterCleared'].includes(m.trigger)||!['source','human','covenant','flood'].includes(m.encounterTeam))) ||
       (m.escortRequiresPlayer != null && (m.trigger !== 'escort' || typeof m.escortRequiresPlayer !== 'boolean')) ||
       (m.minimumSurvivors != null && (!Number.isInteger(m.minimumSurvivors)||m.minimumSurvivors<1||m.minimumSurvivors>32)) ||

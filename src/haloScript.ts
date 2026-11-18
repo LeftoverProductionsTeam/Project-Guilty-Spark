@@ -207,6 +207,11 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
       case 'triggerVolume':{
         const ref=ensureName(beat.triggerRef??undefined,`Beat ${i+1} trigger volume`);
         deps.push(`trigger_volume:${ref}`);
+        if(beat.transportInsertion){
+          if(scope||!options.forerunner)throw Error('Passenger insertion requires shared Forerunner campaign scope.');
+          deps.push('transport_arrival:'+beat.transportInsertion+':'+ref);
+          scripted.push(...wait('gs_'+beat.transportInsertion+'_player_arrived',1));break;
+        }
         scripted.push(...wait(scope?'(and (> (list_count (players)) 0) (volume_test_objects '+ref+' (players)))':'(volume_test_objects '+ref+' (players))',15));break;
       }
       case 'deviceActivated':{
@@ -588,7 +593,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
   if(missions.some(beat=>beat.squadNumber!=null))throw Error('Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates. Build a base map, open its compiled source and use Prepare recovered mission source. The saved mission fields are preserved.');
-  if(missions.some(beat=>beat.transportInsertion!=null))throw Error('Dropship troop handoff requires reviewed CE609 working tags with the matching built transport module. Build/open a base map and use Prepare recovered mission source; the saved mission fields are preserved.');
+  if(missions.some(beat=>beat.transportInsertion!=null))throw Error('Dropship insertion requires reviewed CE609 working tags with the matching built transport module. Build/open a base map and use Prepare recovered mission source; the saved mission fields are preserved.');
   const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
   const shots=project.studio?.shots??[];
   const forerunner=missions.some(beat=>beat.trigger==='forerunnerExtractionSettled');
@@ -988,13 +993,16 @@ export interface NativeTransportOptions {
   departureCamera?:{marker:string;durationMs:number};
   /** Reuse the reviewed return/insertion routes for empty hub return and recall. */
   returnAfterInsertion?:boolean;
+  /** Record an actual surviving rider leaving the first grounded insertion. */
+  trackPlayerInsertion?:boolean;
   /** Explicit ownership of a not-initially-created native pilot. */
   createPilot?:boolean;
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','createPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
+  if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
   if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
   const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
@@ -1046,12 +1054,37 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   const crewSeated=crew.map((member,index)=>{const seated='(and (= (ai_living_count '+member.group+') 1) (vehicle_test_seat_list '+craft+' "'+member.seat+'" (ai_actors '+member.group+')))';return member.releaseAtInsertion?'(or '+started+' (and '+seated+' (= '+troopHandle(index)+' (unit (list_get (ai_actors '+member.group+') 0)))))':seated;});
   const pad=(name:string)=>'(and '+health+' (= (ai_living_count '+pilot+') 1) '+pilotSeated+(crewSeated.length?' '+crewSeated.join(' '):'')+' (volume_test_object '+name+' '+craft+') '+landed+')';
   const empty='(= (list_count (vehicle_riders (unit '+craft+'))) '+(1+crew.filter(member=>!member.releaseAtInsertion).length)+')';
+  const playerArrival=stem+'_player_arrived',arrivalRiders=stem+'_arrival_riders',arrivalPlayers=stem+'_arrival_players';
+  const arrivalIndex=stem+'_arrival_index',arrivalUnit=stem+'_arrival_unit';
+  const riderMatches=Array.from({length:32},(_,i)=>'(= '+arrivalUnit+' (unit (list_get '+arrivalRiders+' '+i+')))');
+  const knownRider='(or '+Array.from({length:4},(_,i)=>'(or '+riderMatches.slice(i*8,i*8+8).join(' ')+')').join(' ')+')';
+  const arrivalGlobals=options.trackPlayerInsertion?[
+    '(global boolean '+playerArrival+' false)',
+    '(global object_list '+arrivalRiders+' (list_get (players) 32767))',
+    '(global object_list '+arrivalPlayers+' (list_get (players) 32767))',
+    '(global short '+arrivalIndex+' 0)','(global unit '+arrivalUnit+' none)',
+  ]:[];
+  const confirmArrival=options.trackPlayerInsertion?[
+    '  (if (not '+playerArrival+') (begin',
+    '    (set '+arrivalPlayers+' (players))', '    (set '+arrivalIndex+' 0)',
+    '    (sleep_until (begin',
+    '      (set '+arrivalUnit+' (unit (list_get '+arrivalPlayers+' '+arrivalIndex+')))',
+    '      (if (and '+pad(field)+' (!= '+arrivalUnit+' none) (> (unit_get_health '+arrivalUnit+') 0)',
+    '          (volume_test_object '+field+' '+arrivalUnit+') '+knownRider+') (set '+playerArrival+' true))',
+    '      (set '+arrivalIndex+' (+ '+arrivalIndex+' 1))',
+    '      (or '+playerArrival+' (not '+pad(field)+') (>= '+arrivalIndex+' (list_count '+arrivalPlayers+')))',
+    '    ) 1)',
+    '    (set '+arrivalPlayers+' (list_get (players) 32767))',
+    '    (set '+arrivalRiders+' (list_get (players) 32767))',
+    '    (set '+arrivalUnit+' none)',
+    '  ))',
+  ]:[];
   const enter=(enabled:boolean)=>'  (unit_set_enterable_by_player (unit '+craft+') '+enabled+')';
   const lines=[nativeTransportPrefix.trimEnd(),'; configuration: '+JSON.stringify(options),...heading('Native '+role+' insertion and evacuation'),
     '; Forerunner only: requires actual native ground contact and durable crew callback.',
     '; No player force-boarding, loot grant, banking, teleport or raid timer.',
     '(global boolean '+stem+'_ready false)',
-    '(global boolean '+stem+'_settled false)',...troopGlobals,
+    '(global boolean '+stem+'_settled false)',...troopGlobals,...arrivalGlobals,
     '(script startup '+stem+'_pilot',
     ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
@@ -1079,12 +1112,15 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     ...(cues[0]?['  ('+cues[0]+')']:[]),
     '  (ai_command_list '+pilot+' '+outbound+')',
     ...insertionCamera,
-    '  (sleep_until '+pad(field)+' 1)',...releaseTroops,
+    '  (sleep_until '+pad(field)+' 1)',
+    ...(options.trackPlayerInsertion?['  (if (not '+playerArrival+') (set '+arrivalRiders+' (vehicle_riders (unit '+craft+'))))']:[]),
+    ...releaseTroops,
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     enter(true),
     ...(options.returnAfterInsertion?[
       '  ; Empty return: every passenger disembarks normally before this flight.',
       '  (sleep_until (and '+pad(field)+' '+empty+') 1)',
+      ...confirmArrival,
       enter(false),
       ...(cues[0]?['  ('+cues[0]+')']:[]),
       '  (ai_command_list '+pilot+' '+inbound+')',

@@ -341,7 +341,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Unsupported prepared mission binding or source hash");
     }
     validate_working_mission(project,&binding)?;
-    if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){return invalid("Troop delivery needs the reviewed CE609 working-tag transport module; build/open the base map and use recovered source");}
+    if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){return invalid("Dropship insertion needs the reviewed CE609 working-tag transport module; build/open the base map and use recovered source");}
     if binding.missions.iter().any(|beat|beat.squad_number.is_some()){return invalid("Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates; preserve mission data and use the recovered source workflow");}
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
         return invalid("Prepared mission HaloScript was edited. Preserve/export the handwritten module in Logic / Events before explicit regeneration; no source was replaced");
@@ -463,7 +463,25 @@ pub fn verify_native_mission(binding:&NativeMissionBinding,map:&crate::maps::Map
 
 pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&crate::maps::MapInspection,cache:&std::path::Path,retained_hud:Option<(&str,&[crate::maps::NativeHudMessage])>)->Result<()> {
     validate_mission_scopes(&binding.missions)?;
-    if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){if map.header.version!=609||map.header.extended{return invalid("Dropship troop handoff needs standard Forerunner CE609 source");}let globals=crate::maps::scenario_global_readback(cache,map)?;for role in binding.missions.iter().filter_map(|beat|beat.transport_insertion.as_ref()){let name=format!("gs_{role}_insertion_complete");if globals.iter().filter(|g|g.name==name&&g.value_type==5).count()!=1||globals.iter().filter(|g|g.name.eq_ignore_ascii_case(&name)).count()!=1{return invalid("Compiled native troop delivery global is missing, ambiguous or not boolean");}let helper=format!("gs_{role}_troop_aboard");if map.scripts.iter().filter(|s|s.name==helper&&s.script_type==3&&s.return_type==5).count()!=1{return invalid("Compiled native troop rider helper is missing or has the wrong type");}}}
+    if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()) {
+        if map.header.version!=609||map.header.extended{return invalid("Dropship insertion needs standard Forerunner CE609 source");}
+        let globals=crate::maps::scenario_global_readback(cache,map)?;
+        for beat in binding.missions.iter().filter(|beat|beat.transport_insertion.is_some()) {
+            let role=beat.transport_insertion.as_deref().unwrap();
+            let passenger=beat.trigger=="triggerVolume";
+            let name=if passenger{format!("gs_{role}_player_arrived")}else{format!("gs_{role}_insertion_complete")};
+            if globals.iter().filter(|g|g.name==name&&g.value_type==5).count()!=1||globals.iter().filter(|g|g.name.eq_ignore_ascii_case(&name)).count()!=1{return invalid(if passenger{"Compiled native passenger arrival global is missing, ambiguous or not boolean"}else{"Compiled native troop delivery global is missing, ambiguous or not boolean"});}
+            if passenger {
+                let volumes=crate::maps::scenario_volume_readback(cache,map)?;
+                if volumes.iter().filter(|area|Some(area.name.as_str())==beat.trigger_ref.as_deref()).count()!=1{return invalid("Compiled passenger insertion pad is missing or ambiguous");}
+                let controller=format!("gs_{role}_trip");
+                if map.scripts.iter().filter(|s|s.name==controller&&s.script_type==2).count()!=1{return invalid("Compiled passenger insertion controller is missing or has the wrong type");}
+            }else{
+                let helper=format!("gs_{role}_troop_aboard");
+                if map.scripts.iter().filter(|s|s.name==helper&&s.script_type==3&&s.return_type==5).count()!=1{return invalid("Compiled native troop rider helper is missing or has the wrong type");}
+            }
+        }
+    }
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
     let scoped=binding.missions.iter().filter_map(|beat|beat.squad_number).collect::<std::collections::BTreeSet<_>>();
@@ -656,7 +674,7 @@ impl CreatorStudio {
                 || beat.timer_seconds.is_some_and(|n| n>600)
                 || beat.hud_text.as_ref().is_some_and(|text|text.encode_utf16().count()>254||text.chars().any(char::is_control))
             { return invalid("Invalid Creator Studio mission beat"); }
-            if beat.transport_insertion.as_deref().is_some_and(|role|beat.trigger!="escort"||beat.squad_number.is_some()||!["pelican","spirit"].contains(&role)){return invalid("Dropship troop handoff requires shared native campaign rescue scope");}
+            if beat.transport_insertion.as_deref().is_some_and(|role|!["escort","triggerVolume"].contains(&beat.trigger.as_str())||beat.squad_number.is_some()||!["pelican","spirit"].contains(&role)){return invalid("Dropship insertion requires a shared native escort or area objective");}
             if beat.encounter_team.as_deref().is_some_and(|team|!matches!(beat.trigger.as_str(),"escort"|"encounterCleared")||!["source","human","covenant","flood"].contains(&team)){return invalid("Encounter team needs a native combat or survivor objective");}
             if beat.escort_requires_player.is_some()&&beat.trigger!="escort"{return invalid("Requiring a player at rescue arrival needs a survivor escort");}
             if beat.escort_failure.as_deref().is_some_and(|mode|beat.trigger!="escort"||!["stop","continue"].contains(&mode)){return invalid("Rescue failure handling requires a survivor escort");}

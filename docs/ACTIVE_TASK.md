@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 73f4379 plus the verified dropship crew standby workflow. Exact CE609 a5bf6680 compiled and passed independent source, BSP and HUD readback. On 70641e81, two Forerunner peers boarded and landed. The direct-route run reached the Marine rally, then stalled before technology pickup.
-Next action: Use the exact 70641e81 southern-route receipt to isolate the field movement issue and verify direct/visited Flood decisions, defense, evacuation and settlement. Pair-play a5bf6680 with the Covenant hub approach and UNSC Marine seating/release. Diagnose the Spirit pad drift and finish the separate Covenant objective entry, preserving the Pelican gate. Original Save37944 remains open.
+Latest verified revision: e805365 plus the passenger insertion workflow. The 70641e81 southern run stalled before pickup. On a5bf6680, both Covenant peers deployed and remained alive at the later approach stall. The Spirit had drifted outside both hub volumes despite reporting landed.
+Next action: Correct the Spirit parking and terminal-to-seat path using measured native terrain and hull constraints, then exercise the new passenger arrival gate in the separate Covenant mission. Preserve the Pelican mission. Pair-play 70641e81 through pickup, both Flood decisions and settlement. Original Save37944 remains open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov passenger insertion: the existing dropship controller records a living rider after grounded disembarkation. Mission Director can require this event on a named Spirit or Pelican pad. Three browser workflows, 55 unit tests, 24 Rust tests plus one skip, TypeScript and installed Invader pass. Disposable CE609 76441903 preserved the Pelican mission and independently read back the Spirit arrival source. Full paired receipts, pad survey and limits are in RUNTIME_INTEGRATION_20261107.
 
 18Nov insertion crew standby: the existing transport editor can keep a deferred insertion troop out of combat until its captured actor disembarks. Four browser workflows, 25 unit tests, TypeScript and a5bf6680 native compile/readback pass. The new candidate still needs native flight and combat validation. Direct 70641e81 run stalled at the rally-to-pickup lane. Sampled BSP and posed Spirit collision did not intersect at infantry heights. Current evidence and hashes are in RUNTIME_INTEGRATION_20261107.
 

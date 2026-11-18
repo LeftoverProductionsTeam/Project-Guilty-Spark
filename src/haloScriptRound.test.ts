@@ -256,6 +256,28 @@ it('seats dedicated permanent NPC crew without force-boarding players or confusi
 });
 
 
+it('binds a shared arrival beat to a surviving passenger on the selected dropship',()=>{
+ const options={faction:'covenant' as const,pilot:'pilot',pilotSeat:'c_dropship driver',outbound:'field_route',inbound:'hub_route',hub:'hub',field:'field',returnAfterInsertion:true,trackPlayerInsertion:true};
+ const transport=exportHaloCeTransport(options);
+ expect(readNativeTransportSource(transport.content)).toEqual(options);
+ const capture='(set gs_spirit_arrival_riders (vehicle_riders (unit extraction_spirit)))';
+ const confirmed='(set gs_spirit_player_arrived true)';
+ expect(transport.content).toContain('(global boolean gs_spirit_player_arrived false)');
+ expect(transport.content.indexOf(capture)).toBeLessThan(transport.content.indexOf(confirmed));
+ expect(transport.content.lastIndexOf('(= (list_count (vehicle_riders (unit extraction_spirit))) 1)',transport.content.indexOf(confirmed))).toBeGreaterThan(transport.content.indexOf(capture));
+ expect(transport.content).toContain('(volume_test_object field gs_spirit_arrival_unit)');
+ expect(transport.content).toContain('(= gs_spirit_arrival_unit (unit (list_get gs_spirit_arrival_riders 31)))');
+ expect(transport.content).toContain('(> (unit_get_health gs_spirit_arrival_unit) 0)');
+ expect(()=>exportHaloCeTransport({...options,returnAfterInsertion:false})).toThrow(/empty-return/);
+ const studio=emptyCreatorStudio();studio.missions=[{id:'arrive',title:'Arrive',objective:'Leave the Spirit',trigger:'triggerVolume',triggerRef:'field',encounterName:'',transportInsertion:'spirit'}];
+ const mission=exportHaloCeMission(studio,{forerunner:true});
+ expect(mission.dependencies).toContain('transport_arrival:spirit:field');
+ expect(mission.content).toContain('(sleep_until gs_spirit_player_arrived 1)');
+ expect(mission.content).not.toContain('(volume_test_objects field (players))');
+ expect(()=>exportHaloCeMission(studio)).toThrow(/Forerunner/);
+ expect(()=>exportHaloCeMission({...studio,missions:[{...studio.missions[0],squadNumber:1}]},{forerunner:true})).toThrow();
+});
+
 it('hands captured insertion troops to a shared escort without spawning duplicates or unloading players',()=>{
  const options={faction:'unsc' as const,pilot:'pilot',pilotSeat:'P-driver',outbound:'field_route',inbound:'hub_route',hub:'hub',field:'field',returnAfterInsertion:true,crew:[{group:'rescue',seat:'P-riderLF',create:true,releaseAtInsertion:true,holdUntilInsertion:true},{group:'gunner',seat:'P-riderRF',create:true}]};const output=exportHaloCeTransport(options);expect(readNativeTransportSource(output.content)).toEqual(options);
  const held=output.content.indexOf('(ai_braindead rescue true)'),resumed=output.content.indexOf('(ai_braindead rescue false)');
