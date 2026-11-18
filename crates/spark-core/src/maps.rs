@@ -374,6 +374,10 @@ pub struct SquadFiringGroups {pub attacking:u32,pub attacking_search:u32,pub att
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct EncounterSquad {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub major_upgrade:Option<u16>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub automatic_migration:Option<bool>,
     pub name:String,
     pub actor_palette_index:i16,
     pub actor_variant_tag_id:Option<u32>,
@@ -1165,7 +1169,7 @@ fn encounter_details(r:&Reader,space:&Space,at:usize,palette:&[Option<u32>])->Re
             });
         }
         let(move_at,move_count)=space.block(r,p+196,80,64)?;let mut move_positions=vec![];for i in 0..move_count{let q=move_at+i*80;move_positions.push(AiMovePosition{position:vec3(r,q)?,facing:r.f32(q+12)?,weight:r.f32(q+16)?,wait_seconds:[r.f32(q+20)?,r.f32(q+24)?],animation:r.u16(q+28)? as i16,sequence_id:r.bytes(q+30,1)?[0] as i8});}
-        squads.push(EncounterSquad {firing_groups:Some(SquadFiringGroups{attacking:r.u32(p+84)?,attacking_search:r.u32(p+88)?,attacking_guard:r.u32(p+92)?,defending:r.u32(p+96)?,defending_search:r.u32(p+100)?,defending_guard:r.u32(p+104)?}),move_positions:Some(move_positions),name:r.string(p,32)?,actor_palette_index:actor_index,actor_variant_tag_id:default_actor,
+        squads.push(EncounterSquad {major_upgrade:Some(r.u16(p+128)?),automatic_migration:Some(r.u32(p+40)?&(1<<5)!=0),firing_groups:Some(SquadFiringGroups{attacking:r.u32(p+84)?,attacking_search:r.u32(p+88)?,attacking_guard:r.u32(p+92)?,defending:r.u32(p+96)?,defending_search:r.u32(p+100)?,defending_guard:r.u32(p+104)?}),move_positions:Some(move_positions),name:r.string(p,32)?,actor_palette_index:actor_index,actor_variant_tag_id:default_actor,
             normal_count:r.u16(p+124)? as i16,insane_count:r.u16(p+126)? as i16,initial_state:r.u16(p+36)?,return_state:r.u16(p+38)?,starting_locations});
     }
     let (firing_at,firing_count)=space.block(r,at+152,24,512)?;

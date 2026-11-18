@@ -37,7 +37,7 @@ function NativeAiDraftFixture(){
 }
 function NativeBehaviorFixture(){
  const [dirty,setDirty]=useState(false),[revision,setRevision]=useState(0),[operation,setOperation]=useState<unknown>(null);
- const source={initialState:'none',returnState:'alert',patrolCount:0,starts:[{index:0,initialState:'alert',returnState:'none'},{index:1,initialState:'none',returnState:'none'}]};
+ const source={...(new URLSearchParams(location.search).has('upgrades')?{majorUpgrade:'normal'}:{}),...(new URLSearchParams(location.search).has('migration')?{automaticMigration:false}:{}),initialState:'none',returnState:'alert',patrolCount:0,starts:[{index:0,initialState:'alert',returnState:'none'},{index:1,initialState:'none',returnState:'none'}]};
  const context={projectId:'behavior-fixture',buildId:'build',class:'scnr',tag:'level.scenario',tagSha256:(revision?'b':'a').repeat(64)} as NativeTagContext;
  return <><button onClick={()=>setDirty(!dirty)}>Toggle project dirty</button><button onClick={()=>setRevision(revision+1)}>Refresh source revision</button><output data-testid="behavior-original">{JSON.stringify(source)}</output><output data-testid="behavior-operation">{JSON.stringify(operation)}</output><NativeSquadBehaviorEditor context={context} squadChoice={{encounter:0,squad:0,encounterName:'guards',name:'original',normalCount:1,insaneCount:1}} source={source} issue={null} busy={false} dirty={dirty} onPreview={setOperation} onDraftChange={()=>setOperation(null)}/></>;
 }

@@ -3654,5 +3654,472 @@
     "rootAbsent": true,
     "runs": [],
     "issues": []
+  },
+  "nativeSquadCrew20261117": {
+    "sourceParent": "8693c4f0d1d587629c9c9a7d1a6080c6036cf02e",
+    "status": "partial native authoring acceptance; gameplay open",
+    "candidate": {
+      "build": {
+        "id": "b3c5bc47-159c-4b05-a109-79197fbe232b",
+        "timestamp": "2026-11-18T03:15:17.914494100+00:00",
+        "status": "validated",
+        "target": "gbx-custom",
+        "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-gzri03\\output\\library\\jobs\\b3c5bc47-159c-4b05-a109-79197fbe232b\\output\\be_native.map",
+        "sha256": "fdc6ec89f9aac3e4068c3cbeee55fa391514988995bf2e70765425b63731ea39",
+        "message": "Revised exact reviewed reviewed module extracted.hsc (SHA256 d0765076b2b6bbd4d6dd6b39d25dc71b218f58e81ed345f1892ab4fb4effeee3) in separate native source; parent source, other modules and original script signatures retained. Native compilation/readback passed, gameplay remains untested.",
+        "projectFingerprint": "764749f9fae19ee7d90a777bcf63ebee42653812a96207bd78f34dd1520cd8cc"
+      },
+      "retained": "releases/black-echo-native-crew-20261117/be_native.map",
+      "sourceSha256": "6d711c28fb571a10f2d5cba64f6e9b64b0881da32933ad49a54300ceb1a352b0",
+      "scriptSha256": "d0765076b2b6bbd4d6dd6b39d25dc71b218f58e81ed345f1892ab4fb4effeee3",
+      "independentScenarioSha256": "0b83c818f5a2c3109d9ac6586120f9f3470dac6e9b5639c2f882234a0adbb3a7",
+      "independentScriptSha256": "7699ade5ade10792ec07448bd5384cf7110fcd05fc4f2f4bdb5a69b28f0a46ad",
+      "migrationFlags": [
+        true,
+        true
+      ],
+      "pelicanLMReferences": 13,
+      "pelicanLFReferences": 0,
+      "scripts": 13,
+      "globals": 17
+    },
+    "protectedInputs": {
+      "\\\\?\\D:\\Project Guilty Spark\\Runtimes\\Halo Custom Edition\\maps\\bloodgulch.map": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "D:/Project Forerunner/build/native-dropship-fixture/maps/be_spirit.map": "bc2b80b52d519e166c318bd1d8c24a585c1b94a7965222a3fb10524ddc2b5f25",
+      "D:/Project Guilty Spark/releases/black-echo-spirit-routing-20261117/grounded/be_native.map": "7ec2a25af96ce53db421b875458b3b256166ad53ba7aa34f54f4302ca4ee1cb7",
+      "D:/Project Guilty Spark/Runtimes/Halo Custom Edition/maps/bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "D:/Project Guilty Spark/Runtimes/Halo Custom Edition/maps/loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+      "D:/Project Guilty Spark/Runtimes/Halo Custom Edition/maps/sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+    },
+    "tests": {
+      "coreNativeOperations": {
+        "passed": 25,
+        "installedOptInSkipped": 1,
+        "exitCode": 0
+      },
+      "installedNativeRoundtrip": 0,
+      "browserBehavior": 0,
+      "projectileBrowser": 0,
+      "typescript": 0,
+      "vite": 0,
+      "nativeParser": 0,
+      "nativeParserPassed": 6,
+      "windowsBuild": 0,
+      "finalExecutableSha256": "8ec3f6d462975125aa9208a1cc19393235a4f11bc0ad5829f13c9bb3db75b3d3",
+      "finalExecutableLaunched": false
+    },
+    "failures": [
+      "Initial major-policy query used unique_leader_type, rejected by real Invader; corrected to major_upgrade and compiled offset128; native test passes.",
+      "First parser suite omitted required pilot fixture environment:5pass/1setup failure; corrected environment final6pass.",
+      "Pilot no-upgrade edit correctly refuses recipe-owned group; not bypassed."
+    ],
+    "pilot": {
+      "importedActor": "gs_assets_3290bc87b35344ef83659c75f6648598/forerunner/transport/spirit_pilot",
+      "graphSha256": "57071afc702f5f9a75b39e59ca9d0d4e5353320bb68edcb80b57f347a1b5d417",
+      "driverSeat": "c_dropship driver",
+      "appendPreviewAcceptRestore": true,
+      "draftSha256": "5e4b41e747a69a0f8cb9a2c4c597ba11b6c297992052b6613ea89461227d6ecc",
+      "draft": "releases/black-echo-native-crew-20261117/source/pilot-unverified.scenario",
+      "runtimeAdopted": false,
+      "blocker": "Add exact-variant upgrade policy through existing encounter authoring/reconciliation; preserve recipe ownership. Existing donor major_variant points to stock Grunt graph."
+    },
+    "geometry": {
+      "buildId": "b3c5bc47-159c-4b05-a109-79197fbe232b",
+      "tagSha256": "6d711c28fb571a10f2d5cba64f6e9b64b0881da32933ad49a54300ceb1a352b0",
+      "outputSha256": "fdc6ec89f9aac3e4068c3cbeee55fa391514988995bf2e70765425b63731ea39",
+      "groundDrop": 16,
+      "points": [
+        {
+          "point": [
+            57,
+            -92,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.025951684
+            }
+          ]
+        },
+        {
+          "point": [
+            57,
+            -89,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.060551245
+            }
+          ]
+        },
+        {
+          "point": [
+            57,
+            -86,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.057385087
+            }
+          ]
+        },
+        {
+          "point": [
+            57,
+            -83,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.10139496
+            }
+          ]
+        },
+        {
+          "point": [
+            61,
+            -92,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.500062
+            }
+          ]
+        },
+        {
+          "point": [
+            61,
+            -89,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.24736166
+            }
+          ]
+        },
+        {
+          "point": [
+            61,
+            -86,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.16318648
+            }
+          ]
+        },
+        {
+          "point": [
+            61,
+            -83,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.21963677
+            }
+          ]
+        },
+        {
+          "point": [
+            65,
+            -92,
+            7
+          ],
+          "bsps": [],
+          "nearPartition": false,
+          "supports": [
+            {
+              "bsp": 0,
+              "z": 6.8046565
+            }
+          ],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 6.146545
+            }
+          ]
+        },
+        {
+          "point": [
+            65,
+            -89,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 1.4191699
+            }
+          ]
+        },
+        {
+          "point": [
+            65,
+            -86,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 1.2879438
+            }
+          ]
+        },
+        {
+          "point": [
+            65,
+            -83,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 0.9796726
+            }
+          ]
+        },
+        {
+          "point": [
+            69,
+            -92,
+            7
+          ],
+          "bsps": [],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 4.7499967
+            }
+          ]
+        },
+        {
+          "point": [
+            69,
+            -89,
+            7
+          ],
+          "bsps": [],
+          "nearPartition": false,
+          "supports": [
+            {
+              "bsp": 0,
+              "z": 6.9120445
+            }
+          ],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 5.536276
+            }
+          ]
+        },
+        {
+          "point": [
+            69,
+            -86,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [
+            {
+              "bsp": 0,
+              "z": 7.471492
+            }
+          ],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 5.6686134
+            }
+          ]
+        },
+        {
+          "point": [
+            69,
+            -83,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 2.8191602
+            }
+          ]
+        },
+        {
+          "point": [
+            73,
+            -92,
+            7
+          ],
+          "bsps": [
+            0
+          ],
+          "nearPartition": false,
+          "supports": [
+            {
+              "bsp": 0,
+              "z": 7.155054
+            }
+          ],
+          "ground": [
+            {
+              "bsp": 0,
+              "z": 4.714386
+            }
+          ]
+        },
+        {
+          "point": [
+            73,
+            -89,
+            7
+          ],
+          "bsps": [],
+          "nearPartition": false,
+          "supports": [],
+          "ground": []
+        },
+        {
+          "point": [
+            73,
+            -86,
+            7
+          ],
+          "bsps": [],
+          "nearPartition": false,
+          "supports": [],
+          "ground": []
+        },
+        {
+          "point": [
+            73,
+            -83,
+            7
+          ],
+          "bsps": [],
+          "nearPartition": false,
+          "supports": [],
+          "ground": []
+        }
+      ]
+    },
+    "nativeReview": {
+      "wireBytes": 526119,
+      "retainedBytes": 520369,
+      "displayLimit": 524288,
+      "scenarioReviewLimit": 4194304,
+      "integrityStreamLimit": 67108864,
+      "timeoutSeconds": 5,
+      "errorPreviewCharacters": 240
+    },
+    "projectile": {
+      "request": "Visibility only; no new rocket/shell gameplay requested or implemented",
+      "map": "Blood Gulch CE609",
+      "originalSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "nativeOptions": 21,
+      "labels": [
+        "tank shell · vehicles/scorpion",
+        "rocket · weapons/rocket launcher"
+      ],
+      "selectedUnchanged": "3816096257 · weapons/pistol/bullet",
+      "uiExecutableSha256": "0ce3cdde8ee32ec56efe4394bdbc5967608f62d5218abb75dabdf8af0b89eed6",
+      "browserCasesPassed": 2,
+      "installedApplicationUpdated": false
+    },
+    "cleanup": {
+      "workflow": "black-echo-four-corrections",
+      "temporaryOutputDisposed": true,
+      "disposedLogicalBytes": 4180915095,
+      "disposedAllocatedFileBytes": null,
+      "peakLogicalBytes": 4180922995,
+      "lastMeasuredAllocatedBytes": 3978398584,
+      "monitoringSamples": 588,
+      "rootAbsent": true,
+      "runs": [],
+      "issues": [],
+      "retainedCandidateAndSourceBytes": 112361259,
+      "oldCandidatesAndOriginalInputsUnchanged": true
+    }
   }
 }

@@ -12,7 +12,11 @@ pub(super) struct Cache {
     results: BTreeMap<String, (String, Finding)>,
 }
 const MAX_FIELD_STREAM:u64=64*1024*1024;
-fn output<R: Read + Send + 'static>(mut reader:R,identity:bool)->std::thread::JoinHandle<(String,bool)> {
+const MAX_REVIEW_FIELDS:usize=4*1024*1024;
+fn output<R: Read + Send + 'static>(reader:R,identity:bool)->std::thread::JoinHandle<(String,bool)> {
+    output_bounded(reader,identity,512*1024)
+}
+fn output_bounded<R: Read + Send + 'static>(mut reader:R,identity:bool,text_limit:usize)->std::thread::JoinHandle<(String,bool)> {
     std::thread::spawn(move||{
         use sha2::{Digest,Sha256};
         let mut digest=Sha256::new();let mut bytes=0u64;
@@ -23,7 +27,7 @@ fn output<R: Read + Send + 'static>(mut reader:R,identity:bool)->std::thread::Jo
             Ok(n)=>{
                 bytes=bytes.saturating_add(n as u64);
                 if identity {cut|=bytes>MAX_FIELD_STREAM;if !cut{digest.update(&block[..n]);}}
-                else{let room=(512*1024usize).saturating_sub(data.len());cut|=n>room;data.extend_from_slice(&block[..n.min(room)]);}
+                else{let room=text_limit.saturating_sub(data.len());cut|=n>room;data.extend_from_slice(&block[..n.min(room)]);}
             }
         }}
         if identity {(format!("{}:{bytes}",core::hex_bytes(digest.finalize())),cut)}
@@ -47,6 +51,9 @@ pub(super) fn fields(
 ) -> Reply<(bool, String, bool)> {
     read_keys(executable,tags,relative,&["-L".into()])
 }
+/// Internal source review needs complete values, including recovered scenario scripts.
+/// Keep the UI preview at 512 KiB and full-field integrity hashing at 64 MiB.
+pub(super) fn review_fields(executable:&Path,tags:&Path,relative:&str)->Reply<(bool,String,bool)>{if relative.ends_with(".scenario"){read_keys_bounded(executable,tags,relative,&["-L".into()],false,MAX_REVIEW_FIELDS)}else{fields(executable,tags,relative)}}
 /// Read only the real seat table, not megabytes of unrelated animation frames.
 pub(super) fn animation_seats(executable:&Path,tags:&Path,relative:&str)->Reply<Vec<String>>{
     if !relative.ends_with(".model_animations"){return Err("Pilot seat review requires a native animation graph".into());}
@@ -61,7 +68,8 @@ fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(b
 // Full native deserialization and field traversal, bounded in time and total
 // bytes. Hash every emitted field instead of retaining a truncated listing.
 fn field_identity(executable:&Path,tags:&Path,relative:&str)->Reply<(bool,String,bool)>{read_keys_mode(executable,tags,relative,&["-L".into()],true)}
-fn read_keys_mode(executable:&Path,tags:&Path,relative:&str,keys:&[String],identity:bool)->Reply<(bool,String,bool)>{
+fn read_keys_mode(executable:&Path,tags:&Path,relative:&str,keys:&[String],identity:bool)->Reply<(bool,String,bool)>{read_keys_bounded(executable,tags,relative,keys,identity,512*1024)}
+fn read_keys_bounded(executable:&Path,tags:&Path,relative:&str,keys:&[String],identity:bool,text_limit:usize)->Reply<(bool,String,bool)>{
     let tags = reader_root(tags, relative)?;
     let mut command = Command::new(executable);
     command.args(["-t",tags.to_str().ok_or("Tag path is not Unicode")?]).args(keys).arg(relative);
@@ -76,7 +84,7 @@ fn read_keys_mode(executable:&Path,tags:&Path,relative:&str,keys:&[String],ident
         command.creation_flags(0x08000000);
     }
     let mut child = command.spawn().map_err(error)?;
-    let stdout = output(child.stdout.take().ok_or("Missing validator stdout")?,identity);
+    let stdout = output_bounded(child.stdout.take().ok_or("Missing validator stdout")?,identity,text_limit);
     let stderr = output(child.stderr.take().ok_or("Missing validator stderr")?,false);
     let began = Instant::now();
     let status = loop {
@@ -128,6 +136,27 @@ mod path_tests {
         assert!(output(Broken,true).join().unwrap().1);
     }
     #[test]
+    fn complete_source_review_retains_preview_and_integrity_limits(){
+        let data=vec![b'x';600*1024];
+        assert!(output(std::io::Cursor::new(data.clone()),false).join().unwrap().1);
+        let(text,cut)=output_bounded(std::io::Cursor::new(data.clone()),false,MAX_REVIEW_FIELDS).join().unwrap();
+        assert!(!cut);assert_eq!(text.as_bytes(),data);
+        let(text,cut)=output_bounded(std::io::repeat(b'x').take(MAX_REVIEW_FIELDS as u64+1),false,MAX_REVIEW_FIELDS).join().unwrap();
+        assert!(cut);assert_eq!(text.len(),MAX_REVIEW_FIELDS);
+    }
+    #[test]
+    #[ignore="Requires explicit installed Invader and legitimate read-only scenario exceeding512KiB"]
+    fn installed_large_scenario_review_keeps_complete_native_source(){
+        let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_INVADER_EDIT").expect("Installed reader"));
+        assert_eq!(maps::hash_file(&executable).unwrap(),VALIDATOR_SHA);
+        let tags=PathBuf::from(std::env::var_os("SPARK_NATIVE_SCENARIO_TAG_ROOT").expect("Read-only prepared scenario"));
+        let tag="be_native.scenario";let before=maps::hash_file(&tags.join(tag)).unwrap();
+        let(valid,_,cut)=fields(&executable,&tags,tag).unwrap();assert!(valid&&cut,"Display still refuses oversized values");
+        let(valid,text,cut)=review_fields(&executable,&tags,tag).unwrap();assert!(valid&&!cut);assert!(text.contains("structure_bsps[1]"));assert!(text.contains("spirit_driver"));
+        assert_eq!(before,maps::hash_file(&tags.join(tag)).unwrap());
+        println!("Complete native source review PASS: {}retained bytes; display bound unchanged; sourceSHA={before}",text.len());
+    }
+    #[test]
     fn reader_rejects_traversal_and_option_tags_before_process_launch() {
         let dir = tempfile::tempdir().unwrap();
         assert!(reader_root(dir.path(), "../outside.weapon").is_err());
@@ -139,7 +168,7 @@ mod path_tests {
         let executable=PathBuf::from(std::env::var_os("SPARK_NATIVE_INVADER_EDIT").expect("Explicit installed native reader"));let tags=PathBuf::from(std::env::var_os("SPARK_NATIVE_PILOT_TAG_ROOT").expect("Explicit read-only native tagset"));
         for (tag,seat,large) in [("characters/marine/marine.model_animations","P-driver",true),("forerunner/transport/spirit_pilot.model_animations","c_dropship driver",false)]{
             let file=tags.join(tag);let before=maps::hash_file(&file).unwrap();let labels=animation_seats(&executable,&tags,tag).unwrap();assert!(labels.len()<=32);assert_eq!(labels.iter().filter(|label|label.as_str()==seat).count(),1);
-            if large{let(valid,_,cut)=fields(&executable,&tags,tag).unwrap();assert!(valid&&cut,"Large full inventory must retain its existing truncation guard");}
+            if large{for reader in [fields,review_fields]{let(valid,_,cut)=reader(&executable,&tags,tag).unwrap();assert!(valid&&cut,"Large non-scenario inventory must retain its existing truncation guard");}}
             assert_eq!(before,maps::hash_file(&file).unwrap());println!("Installed bounded pilot seats PASS: {tag}; {}labels; exact={seat}; sourceSHA={before}; originals unchanged",labels.len());
         }
     }

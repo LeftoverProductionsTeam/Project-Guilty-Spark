@@ -20,11 +20,18 @@ export default function TagFields({
   change: (field: TagField, value: number) => void;
 }) {
   const prefix = useId();
+  const referencePath = (id:number) => {
+    const target=tags.find(candidate=>candidate.id===id);
+    return target ? renamedTagPath(project,target) : 'Unresolved reference · '+id;
+  };
   return tag.fields.length ? (
     <>
       {tag.fields.map((field) => {
         const value = fieldValue(project, tag, field),
           changed = value !== field.value;
+        const projectileField=field.kind==='reference'&&field.targetClass==='proj';
+        const references=field.kind==='reference' ? tags.filter(candidate=>candidate.class===field.targetClass) : [];
+        if(projectileField)references.sort((a,b)=>shortPath(renamedTagPath(project,a)).localeCompare(shortPath(renamedTagPath(project,b)))||renamedTagPath(project,a).localeCompare(renamedTagPath(project,b)));
         return (
           <div className={`property-row ${changed ? 'changed' : ''}`} key={field.key}>
             <div>
@@ -43,13 +50,13 @@ export default function TagFields({
                   id={`${prefix}-${field.key}`}
                   aria-label={field.label}
                   value={value}
+                  title={referencePath(value)}
                   onChange={(event) => change(field, Number(event.target.value))}
                 >
-                  {tags
-                    .filter((candidate) => candidate.class === field.targetClass)
-                    .map((candidate) => (
+                  {!references.some(candidate=>candidate.id===value)&&<option value={value} disabled>Unresolved reference · {value}</option>}
+                  {references.map((candidate) => (
                       <option key={candidate.id} value={candidate.id}>
-                        {shortPath(renamedTagPath(project,candidate))}
+                        {shortPath(renamedTagPath(project,candidate))}{projectileField&&' · '+(renamedTagPath(project,candidate).split(/[\\/]/).slice(0,-1).join('/')||'map root')}
                       </option>
                     ))}
                 </select>
@@ -76,15 +83,13 @@ export default function TagFields({
               <div className="property-diff">
                 <span>
                   {field.kind === 'reference'
-                    ? shortPath(
-                        tags.find((candidate) => candidate.id === field.value)?.path ?? String(field.value),
-                      )
+                    ? projectileField ? referencePath(field.value) : shortPath(referencePath(field.value))
                     : formatNumber(field.value)}
                 </span>
                 <ArrowRight size={11} />
                 <strong>
                   {field.kind === 'reference'
-                    ? shortPath(tags.find((candidate) => candidate.id === value)?.path ?? String(value))
+                    ? projectileField ? referencePath(value) : shortPath(referencePath(value))
                     : formatNumber(value)}
                 </strong>
               </div>

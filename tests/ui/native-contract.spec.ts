@@ -5412,3 +5412,16 @@ test('Object Tags edits native terminal behavior through reviewed source without
  await page.evaluate(()=>(window as any).__sparkMock.controlRequired=true);await revealPagedControl(panel.getByRole('button',{name:'Refresh source',exact:true}));await panel.getByRole('button',{name:'Refresh source',exact:true}).click();await expect(trigger.locator('option[value=destroyed]')).toHaveJSProperty('disabled',true);await expect(preview).toBeDisabled();await revealPagedControl(trigger);await trigger.selectOption('touched_by_player');await trigger.focus();await page.keyboard.press('ArrowDown');await expect(trigger).toHaveValue('touched_by_player');await expect(preview).toBeEnabled();
  await page.evaluate(()=>(window as any).__sparkMock.controlIssue='Shared source must be edited by its owning window');const refresh=panel.getByRole('button',{name:'Refresh source',exact:true});await revealPagedControl(refresh);await refresh.click();await expect(type).toBeDisabled();await expect(preview).toBeDisabled();expect(errors).toEqual([]);expect(consoleErrors).toEqual([]);expect(missionBefore).not.toBe(roles);
 });
+
+
+for(const missing of [false,true])test('projectile choices distinguish tank shell, rocket and duplicate bullets'+(missing?' with an unresolved current reference':''),async({page})=>{
+ await mockDesktop(page);await page.evaluate(missing=>{
+  const open=(window as any).__sparkMock.projects.a,template=open.inspection.tags[0];
+  template.fields=[{key:'projectile',label:'Trigger 1 · projectile',offset:4,kind:'reference',value:missing?999:10,min:0,max:4294967295,unit:'',targetClass:'proj'}];
+  open.inspection.tags=[template,...[{id:10,path:'weapons/pistol/bullet',class:'proj'},{id:11,path:'vehicles/scorpion/bullet',class:'proj'},{id:12,path:'weapons/rocket launcher/rocket',class:'proj'},{id:13,path:'vehicles/scorpion/tank shell',class:'proj'},{id:14,path:'wrong-class/rocket',class:'weap'}].map((tag,index)=>({...template,...tag,index:index+1,fields:[],references:[]}))];
+ },missing);await openFixture(page);
+ const picker=page.getByRole('combobox',{name:'Trigger 1 · projectile',exact:true});
+ await expect(picker).toHaveValue(missing?'999':'10');await expect(picker.getByRole('option',{name:'tank shell · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'rocket · weapons/rocket launcher',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · weapons/pistol',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.locator('option[value="14"]')).toHaveCount(0);
+ if(missing)await expect(picker.getByRole('option',{name:'Unresolved reference · 999',exact:true})).toHaveAttribute('disabled','');
+ await picker.selectOption('13');await expect(picker).toHaveValue('13');await expect(page.locator('.property-diff')).toContainText('vehicles/scorpion/tank shell');await page.keyboard.press('Control+z');await expect(picker).toHaveValue(missing?'999':'10');await page.keyboard.press('Control+y');await expect(picker).toHaveValue('13');await picker.selectOption('12');await picker.press('Tab');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits)).toEqual([{tagId:1,fieldKey:'projectile',value:12}]);
+});

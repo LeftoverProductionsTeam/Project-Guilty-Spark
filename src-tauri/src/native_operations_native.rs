@@ -383,7 +383,7 @@ fn require_flight_transport(state:&AppState,source:&Source)->Reply<()> {
     Ok(())
 }
 pub(super) fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str) -> Reply<String> {
-    checked_read(state,project,tags,tag,|parser,tags,tag|{let(valid,text,cut)=native_tag_parser::fields(parser,tags,tag)?;if !valid||cut{return Err(format!("The reviewed native reader could not validate this tag: {text}"));}Ok(text)})
+    checked_read(state,project,tags,tag,|parser,tags,tag|{let(valid,text,cut)=native_tag_parser::review_fields(parser,tags,tag)?;if cut{return Err("Native source review exceeded its field limit or timed out; no source edit was accepted. Use the native kit for this larger tag.".into());}if !valid{return Err(format!("The reviewed native reader could not validate this tag: {}",text.chars().take(240).collect::<String>()));}Ok(text)})
 }
 pub(super) fn animation_seats(state:&AppState,project:&Project,tags:&Path,tag:&str)->Reply<Vec<String>>{
     checked_read(state,project,tags,tag,native_tag_parser::animation_seats)
