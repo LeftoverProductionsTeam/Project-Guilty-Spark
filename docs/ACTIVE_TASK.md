@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 54f1e82 plus the parked-pilot authoring option and its isolated CE609 comparison candidate 88ff1040. The real two-client test of c93c4377 loaded and deployed successfully but ended at the same Spirit drift and physical seat timeout. The revised cache changes only the Spirit pilot standby and resume calls.
-Next action: On the same Forerunner build and exterior route, confirm 88ff1040 holds the occupied pilot seat and authored pad until both players board through normal input. Then verify it resumes the real outbound route, lands inside spirit_zone and runs the active Covenant rescue through settlement. Keep the prior cache and accepted Pelican workflows. Original Save37944 remains open.
+Latest verified revision: aad75b4 plus the duplicate explicit Save input scan removal in this checkpoint. Windows Save/library/history regressions pass, including a source change after opening the Save lock. Diagnostic c93c4377 still lost the Spirit pad with zero throttle; the compiled 88ff1040 remains pending.
+Next action: Pair-test the exact 88ff1040 cache against a reviewed Forerunner build. Temporary native AI pause on c93c4377 did not keep either hull stable; the current engine’s parked-physics guard requires alert action, which ai_braindead resets. Compare normal boarding, true flight/landing and complete Covenant extraction without weakening the engine gates. Original Save37944 remains open.
 
 ## Acceptance
 

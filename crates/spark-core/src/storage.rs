@@ -1516,6 +1516,70 @@ mod tests {
         if let Some(hook) = hook { hook(); }
     }
     #[test]
+    fn history_save_rechecks_native_source_after_the_save_lock_opens() {
+        use crate::{library::Library, maps, project::{self, Project, Source}, workspace_history::{Head, Session, Snapshot}};
+
+        let root = tempfile::tempdir().unwrap();
+        let library = Library::workspace(&root.path().join("library")).unwrap();
+        let source_file = root.path().join("source.map");
+        let original = b"original test-owned source";
+        fs::write(&source_file, original).unwrap();
+        let mut project = Project::new("Saved source");
+        project.source = Some(Source {
+            original_path: source_file.clone(), preserved_path: source_file.clone(),
+            sha256: maps::hash_file(&source_file).unwrap(), cache_version: 609,
+            engine: "Halo Custom Edition".into(), scenario_path: "levels/test".into(),
+            archive: None, resource_directory: None, resource_sha256: Default::default(), audio_resources: None,
+        });
+        library.save(&project, None).unwrap();
+        let directory = library.project_dir(&project.id).unwrap();
+        let descriptor = directory.join("project.gsproject");
+        let journal = directory.join("window-history");
+        let mut history = Session::default();
+        let original_key = uuid::Uuid::new_v4().to_string();
+        history.commit(&journal, &project, 0,
+            Head { current: original_key.clone(), past: vec![], future: vec![], dirty: true, limit: 8 },
+            vec![Snapshot { key: original_key.clone(), project: project.clone() }],
+        ).unwrap();
+        library.save_with_history(&mut history, &project).unwrap();
+        let saved = project::FileRevision::capture(&descriptor).unwrap();
+        let recovery = project::project_recovery_path(&descriptor).unwrap();
+        let previous_recovery = project::FileRevision::capture(&recovery).unwrap();
+
+        project.title = "Acknowledged draft".into();
+        let draft_key = uuid::Uuid::new_v4().to_string();
+        history.commit(&journal, &project, 1,
+            Head { current: draft_key.clone(), past: vec![original_key.clone()], future: vec![], dirty: true, limit: 8 },
+            vec![Snapshot { key: draft_key.clone(), project: project.clone() }],
+        ).unwrap();
+        let changed = b"edited independently during Save";
+        let target = source_file.clone();
+        LOCK_OPEN_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            fs::write(target, changed).unwrap();
+        })));
+        let error = library.save_with_history(&mut history, &project).unwrap_err().to_string();
+        assert!(error.contains("source map changed outside Spark"), "{error}");
+        assert_eq!(fs::read(&source_file).unwrap(), changed);
+        assert_eq!(project::FileRevision::capture(&descriptor).unwrap(), saved);
+        assert_eq!(project::FileRevision::capture(&recovery).unwrap(), previous_recovery);
+        let durable_head = Session::default().read(&journal, &project).unwrap().unwrap().head;
+        assert_eq!(durable_head.current, original_key);
+        assert!(!durable_head.dirty);
+        let pending_head = history.read(&journal, &project).unwrap().unwrap().head;
+        assert_eq!(pending_head.current, draft_key);
+        assert!(pending_head.dirty);
+
+        fs::write(&source_file, original).unwrap();
+        library.save_with_history(&mut history, &project).unwrap();
+        let reopened_library = Library::workspace(&root.path().join("library")).unwrap();
+        assert_eq!(reopened_library.saved_project(&project.id).unwrap().title, project.title);
+        let reopened = Session::default().read(&journal, &project).unwrap().unwrap().head;
+        assert_eq!(reopened.current, draft_key);
+        assert_eq!(reopened.past, vec![original_key]);
+        assert!(!reopened.dirty);
+    }
+
+    #[test]
     fn lock_admission_refuses_a_replaced_name_after_opening_the_original() {
         let root = tempfile::tempdir().unwrap();let target = root.path().join("operation.lock");
         fs::write(&target, b"").unwrap();let candidate = target.clone();

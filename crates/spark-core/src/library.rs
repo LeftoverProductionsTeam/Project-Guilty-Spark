@@ -361,7 +361,9 @@ impl Library {
         self.validate_explicit_save(project)?;
         let dir=self.project_dir(&project.id)?;fs::create_dir_all(&dir)?;
         let _save_owner=crate::storage::lock(&dir.join("save.lock"))?;
-        self.validate_explicit_save(project)?;
+        // The publisher rechecks inputs under this lock, after the recovery
+        // checkpoint. Reading them again immediately before it adds a full
+        // map/asset scan without protecting descriptor publication.
         history.save_with(&dir.join("window-history"),project,||self.save_explicit_unlocked(project,None))
     }
     pub fn save_explicit(&self,project:&Project,inspection:Option<&maps::MapInspection>)->Result<LibraryEntry>{
