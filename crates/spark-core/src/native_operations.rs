@@ -7,7 +7,7 @@ use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
 #[path="native_factions.rs"] mod factions;
-pub use factions::{NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
+pub use factions::{NativeFactionBody,NativeFactionBodyBinding,NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
 pub fn native_squad_terminal_snapshots(fields:&str)->Result<Vec<NativeSquadTerminalSnapshot>>{factions::squad_snapshots(fields)}
 pub fn verify_native_squad_terminals(expected:&[NativeSquadTerminalSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_squad_cache(expected,cache,map)}
 pub fn validate_faction_control_source(fields:&str)->Result<()>{factions::validate_control_source(fields)}
@@ -77,6 +77,7 @@ pub fn native_vehicle_pilot_seats(fields:&str)->Result<Vec<String>>{
 pub enum Operation {
     VehicleFlight {tuning:VehicleFlightTuning,#[serde(rename="sourceSha256")] source_sha256:String},
     SquadTerminals {terminals:Vec<NativeSquadTerminal>,#[serde(rename="sourceSha256")] source_sha256:String},
+    FactionBody {body:NativeFactionBody,#[serde(rename="sourceSha256")] source_sha256:String},
     FactionKits {kits:Vec<NativeFactionKit>,#[serde(rename="sourceSha256")] source_sha256:String},
     AppendTransport {transport:TransportAppend,#[serde(rename="sourceSha256")] source_sha256:String},
     CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
@@ -213,11 +214,11 @@ fn actor_spacing()->f32{0.75}
 impl Operation {
     /// One exhaustive source binding for preview, retained reviews and readback.
     pub fn expected_source_sha256(&self)->Option<&str>{match self{
-        Self::ControlSettings{source_sha256,..}|Self::SquadTerminals{source_sha256,..}|Self::FactionKits{source_sha256,..}|Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::PlayerStartPosition{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneFlag{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
+        Self::ControlSettings{source_sha256,..}|Self::SquadTerminals{source_sha256,..}|Self::FactionKits{source_sha256,..}|Self::FactionBody{source_sha256,..}|Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::PlayerStartPosition{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneFlag{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
         Self::Dependencies|Self::AppendEncounter{..}|Self::AppendEncounters{..}|Self::BoundingRadius{..}|Self::LensFlareScaleRepair=>None,
     }}
     pub fn is_vehicle_flight(&self)->bool{matches!(self,Self::VehicleFlight{..})}
-    pub fn is_faction_edit(&self)->bool{matches!(self,Self::FactionKits{..}|Self::SquadTerminals{..})}
+    pub fn is_faction_edit(&self)->bool{matches!(self,Self::FactionKits{..}|Self::FactionBody{..}|Self::SquadTerminals{..})}
     pub fn is_transport_append(&self)->bool{matches!(self,Self::AppendTransport{..})}
     pub fn is_command_edit(&self)->bool{matches!(self,Self::CommandList{..})}
     pub fn is_device_edit(&self)->bool{matches!(self,Self::DevicePlacement{..})}
@@ -255,20 +256,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -281,6 +282,7 @@ impl Operation {
         match self {
             Self::VehicleFlight{tuning,source_sha256}=>{if class!="vehi"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Vehicle flight editing needs an exact native vehicle source hash");}tuning.validate()?;}
             Self::SquadTerminals{terminals,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Squad terminals need a reviewed scenario source hash");}factions::validate_squad_batch(terminals)?;},
+            Self::FactionBody{body,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction body requires its exact reviewed scenario");}body.validate()?;},
             Self::FactionKits{kits,source_sha256}=>{if class!="scnr"||kits.is_empty()||kits.len()>2||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction kits require a reviewed scenario source hash and one or two kits");}factions::validate_batch(kits)?;},
             Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
@@ -381,7 +383,7 @@ impl Operation {
         match self {
             Self::Dependencies => args.push("-r".into()),
             Self::ControlSettings{settings,..}=>{for(key,value)in settings.values(){args.extend(["-S".into(),key.into(),value]);}}
-            Self::SquadTerminals{..}|Self::FactionKits{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::PlayerStartPosition{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneFlag{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("This native edit requires the original scenario or asset field inventory"),
+            Self::SquadTerminals{..}|Self::FactionKits{..}|Self::FactionBody{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::PlayerStartPosition{..}|Self::DevicePlacement{..}|Self::TriggerVolume{..}|Self::CutsceneFlag{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("This native edit requires the original scenario or asset field inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -532,6 +534,7 @@ impl Operation {
         self.validate(class,tag)?;
         if let Self::VehicleFlight{tuning,..}=self{return transport::flight_arguments(tags,tag,before,tuning);}
         if let Self::SquadTerminals{terminals,..}=self{return factions::squad_arguments(tags,tag,before,terminals);}
+        if let Self::FactionBody{body,..}=self{return factions::body_arguments(tags,tag,before,body);}
         if let Self::FactionKits{kits,..}=self{return factions::arguments(tags,tag,before,kits);}
         if let Self::AppendTransport{transport,..}=self{return transport::arguments(tags,tag,before,transport);}
         if let Self::CommandList{list,append,..}=self{return if *append{command_lists::append_arguments(tags,tag,before,list)}else{command_lists::arguments(tags,tag,before,list)};}
@@ -894,6 +897,7 @@ pub fn reviewed_difference(
 ) -> Result<Vec<FieldDifference>> {
     if let Operation::VehicleFlight{tuning,..}=operation{return transport::reviewed_flight(before,after,tuning);}
     if let Operation::SquadTerminals{terminals,..}=operation{return factions::reviewed_squads(before,after,terminals);}
+    if let Operation::FactionBody{body,..}=operation{return factions::review_body(before,after,body);}
     if let Operation::FactionKits{kits,..}=operation{return factions::reviewed(before,after,kits);}
     if let Operation::AppendTransport{transport,..}=operation{return transport::reviewed(before,after,transport);}
     if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}

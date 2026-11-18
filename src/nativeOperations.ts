@@ -88,6 +88,7 @@ export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVol
 export interface NativeDevicePlacement {class:'ctrl'|'mach'|'vehi';index:number;nameIndex:number;name:string;tagPath:string;position:[number,number,number];rotationRadians:[number,number,number];usableFromBothSides?:boolean}
 export interface NativeVehicleFlight {throttle:number;avoidanceDistance:number;pathfindingRadius:number}
 export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_spirit';tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
+export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number}
 export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];profile:import('./firefight').NativePlayerProfile}
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
 export interface NativeControlSettings {controlType:string;trigger:string;callValue:number;automaticActivationRadius:number;delaySeconds:number}
@@ -95,6 +96,7 @@ export type NativeOperation =
   | {kind:'controlSettings';settings:NativeControlSettings;sourceSha256:string}
   | {kind:'playerStartPosition';index:number;position:[number,number,number];facingRadians:number;sourceSha256:string}
   | {kind:'squadTerminals';terminals:NativeSquadTerminal[];sourceSha256:string}
+  | {kind:'factionBody';body:NativeFactionBody;sourceSha256:string}
   | {kind:'factionKits';kits:NativeFactionKit[];sourceSha256:string} | {kind:'vehicleFlight';tuning:NativeVehicleFlight;sourceSha256:string} | {kind:'appendTransport';transport:NativeTransportAppend;sourceSha256:string} | {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string;append?:boolean}|{kind:'cutsceneFlag';point:NativeCutsceneFlag;sourceSha256:string;append?:boolean}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string;append?:boolean}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
@@ -120,7 +122,8 @@ export interface NativeTagContext {
   actorVariants?:string[];
   canAppendEncounter?:boolean;
   canAppendTransport?:boolean;vehicleSources?:string[];
-  canAppendFactionKits?:boolean;controlSources?:string[];weaponSources?:string[];
+  canAppendFactionKits?:boolean;controlSources?:string[];weaponSources?:string[];bipedSources?:string[];
+  factionKits?:{kit:NativeFactionKit;body?:{bipedTagPath:string;permutation:number}|null}[];factionBodyIssue?:string|null;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
   scenarioPlayerStarts?:{index:number;position:[number,number,number];facingRadians?:number|null}[];

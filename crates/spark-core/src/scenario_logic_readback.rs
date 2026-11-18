@@ -132,6 +132,37 @@ pub fn scenario_named_object_readback(path:&Path,map:&MapInspection)->Result<Vec
   }Ok(result)
  })
 }
+pub fn scenario_faction_body_readback(
+    path: &Path, map: &MapInspection, name: &str,
+) -> Result<Option<crate::native_operations::NativeFactionBodyBinding>> {
+    with_scenario(path, map, |r, space, sc| {
+        let names = parse_names(r, space, sc)?;
+        let matches = names.iter().enumerate().filter(|(_, row)| row.name.eq_ignore_ascii_case(name)).collect::<Vec<_>>();
+        let [(name_index, binding)] = matches.as_slice() else {
+            return if matches.is_empty() { Ok(None) } else { invalid("Compiled faction body name is duplicated") };
+        };
+        if binding.name != name || binding.object_type != 0 || binding.object_index < 0 {
+            return invalid("Compiled faction body name must bind a native biped");
+        }
+        let index = binding.object_index as usize;
+        let (_, _, _, _, _, offset, palette, stride, kind) = NAMED_OBJECT_BLOCKS[1];
+        let (at, count) = space.block(r, sc + offset, stride, 4096)?;
+        if index >= count { return invalid("Compiled faction biped placement is missing"); }
+        let p = at + index * stride;
+        let permutation = r.u16(p + 6)? as i16;
+        if r.u16(p + 2)? as usize != *name_index || r.u16(p + 4)? & 1 == 0 || permutation < -1 {
+            return invalid("Compiled faction biped name, nonautomatic flag or permutation is invalid");
+        }
+        let mut diagnostics = Vec::new();
+        let placed = placements(r, space, sc, (offset, palette, stride, kind), &map.tags, &mut diagnostics)?;
+        if !diagnostics.is_empty() { return invalid("Compiled faction biped placement or palette is invalid"); }
+        let object = &placed[index];
+        let sources = map.tags.iter().filter(|tag| Some(tag.id) == object.tag_id && tag.class == "bipd" && !tag.external).collect::<Vec<_>>();
+        let [tag] = sources.as_slice() else { return invalid("Compiled faction biped tag is missing or ambiguous"); };
+        Ok(Some(crate::native_operations::NativeFactionBodyBinding {biped_tag_path: tag.path.replace('\\', "/"),
+            permutation, index: index as u16, name_index: *name_index as u16, position: object.position}))
+    })
+}
 fn parse_names(r:&Reader,space:&Space,sc:usize)->Result<Vec<ScenarioLogicName>>{
     let(at,count)=space.block(r,sc+0x204,36,512)?;let mut names=vec![];
     for index in 0..count{let p=at+index*36;names.push(ScenarioLogicName{name:r.string(p,32)?,object_type:r.u16(p+32)? as i16,object_index:r.u16(p+34)? as i16});}Ok(names)

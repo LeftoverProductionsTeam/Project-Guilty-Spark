@@ -290,7 +290,38 @@ pub fn arguments(
     args.push(tag.into());
     Ok(args)
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeFactionBody {
+    pub faction: String,
+    pub biped_tag_path: String,
+    pub permutation: i16,
+}
+
+impl NativeFactionBody {
+    fn name(&self) -> String { format!("extraction_{}_body", self.faction) }
+
+    pub fn validate(&self) -> Result<()> {
+        if !["unsc", "covenant"].contains(&self.faction.as_str()) || self.permutation < -1
+            || self.biped_tag_path.to_ascii_lowercase().ends_with(".biped")
+        {
+            return invalid("Choose a faction, native biped tag without its extension and a valid permutation");
+        }
+        validate_hub_pose(&self.biped_tag_path, [0.; 3], [0.; 3])
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeFactionBodyBinding {
+    pub biped_tag_path: String,
+    pub permutation: i16,
+    pub index: u16,
+    pub name_index: u16,
+    pub position: [f32; 3],
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NativeFactionSnapshot {
     pub kit: NativeFactionKit,
@@ -299,6 +330,91 @@ pub struct NativeFactionSnapshot {
     pub profile_index: usize,
     pub power_group: i16,
     pub position_group: i16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<NativeFactionBodyBinding>,
+}
+
+fn existing_body(fields: &str, names: &[String], faction: &str) -> Result<Option<NativeFactionBodyBinding>> {
+    let name = format!("extraction_{faction}_body");
+    let matching = names.iter().enumerate().filter(|(_, row)| row.eq_ignore_ascii_case(&name)).collect::<Vec<_>>();
+    if matching.is_empty() { return Ok(None); }
+    if matching.len() != 1 || matching[0].1 != &name { return invalid("Faction body name is ambiguous or incorrectly cased"); }
+    let name_index = matching[0].0;
+    let placement_block = array_listing(fields, "bipeds")?;
+    let placements = array_items(&placement_block, "bipeds")?;
+    let rows = placements.iter().map(|row| direct_struct_fields(row)).collect::<Result<Vec<_>>>()?;
+    let mut found = None;
+    for (index, row) in rows.iter().enumerate() {
+        if native_index(row, "name")? != name_index as i16 { continue; }
+        let (_, flags) = native_children(row, "not_placed", "bitmask", 5)?;
+        if found.is_some() || !flags.iter().any(|(_, flag)| flag.split_whitespace().eq(["automatically", "(1)", "bitfield"])) {
+            return invalid("Faction body needs exactly one nonautomatic native biped placement");
+        }
+        let palette_index = usize::try_from(native_index(row, "type")?).map_err(|_| crate::SparkError::Invalid("Faction biped placement has no palette entry".into()))?;
+        let palette_block = array_listing(fields, "biped_palette")?;
+        let palette = array_items(&palette_block, "biped_palette")?;
+        let entry = palette.get(palette_index).ok_or_else(|| crate::SparkError::Invalid("Faction biped palette index is missing".into()))?;
+        let biped_tag_path = native_dependency_path(&direct_struct_fields(entry)?, "name", "biped")?
+            .ok_or_else(|| crate::SparkError::Invalid("Faction biped palette reference is null".into()))?;
+        let permutation = native_index(row, "desired_permutation")?;
+        let request = NativeFactionBody { faction: faction.into(), biped_tag_path, permutation };
+        request.validate()?;
+        let (position, _) = native_vector(row, "position")?;
+        validate_hub_pose(&request.biped_tag_path, position, [0.; 3])?;
+        found = Some(NativeFactionBodyBinding { biped_tag_path: request.biped_tag_path, permutation: request.permutation,
+            index: index as u16, name_index: name_index as u16, position });
+    }
+    found.map(Some).ok_or_else(|| crate::SparkError::Invalid("Faction body name does not bind to a native biped".into()))
+}
+
+fn body_layout(fields: &str, body: &NativeFactionBody) -> Result<(Vec<NativeFactionSnapshot>, usize, usize, usize, bool)> {
+    body.validate()?;
+    let existing = snapshots(fields)?;
+    let kit = existing.iter().find(|row| row.kit.faction == body.faction)
+        .ok_or_else(|| crate::SparkError::Invalid("Author the matching faction terminal and equipment profile first".into()))?;
+    if kit.body.is_some() { return invalid("This faction already has a named player body"); }
+    let names = array_listing(fields, "object_names")?.count;
+    let bipeds = array_listing(fields, "bipeds")?.count;
+    let palette = named(fields, "biped_palette")?;
+    let reference = format!("{}.biped", body.biped_tag_path.replace('\\', "/"));
+    let matches = palette.iter().enumerate().filter(|(_, tag)| tag.replace('\\', "/").eq_ignore_ascii_case(&reference)).collect::<Vec<_>>();
+    // Native CE scenario limits: 128 biped placements and 100 palette entries.
+    if names >= 512 || bipeds >= 128 || palette.len() + usize::from(matches.is_empty()) > 100 || matches.len() > 1 {
+        return invalid("Faction biped append exceeds supported scenario capacity or has an ambiguous palette reference");
+    }
+    Ok((existing, names, bipeds, matches.first().map_or(palette.len(), |row| row.0), matches.is_empty()))
+}
+
+pub fn body_arguments(tags: &Path, tag: &str, before: &str, body: &NativeFactionBody) -> Result<Vec<String>> {
+    let (existing, name, index, palette, new_palette) = body_layout(before, body)?;
+    let kit = existing.iter().find(|row| row.kit.faction == body.faction).unwrap();
+    // Like the guarded hub-control append, the owned candidate needs the
+    // native name table unlocked. Review pins the unchanged indices and rows.
+    let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned(), "-n".into()];
+    for array in ["object_names", "bipeds"].into_iter().chain(new_palette.then_some("biped_palette")) {
+        args.extend(["-I".into(), array.into(), "1".into(), "end".into()]);
+    }
+    let mut set = |key: String, value: String| args.extend(["-S".into(), key, value]);
+    if new_palette { set(format!("biped_palette[{palette}].name"), format!("{}.biped", body.biped_tag_path.replace('\\', "/"))); }
+    set(format!("object_names[{name}].name"), body.name());
+    for (key, value) in [("type", palette.to_string()), ("name", name.to_string()),
+        ("not_placed.automatically", "1".into()), ("desired_permutation", body.permutation.to_string()),
+        ("position", kit.kit.position.map(|n| n.to_string()).join(","))] {
+        set(format!("bipeds[{index}].{key}"), value);
+    }
+    args.push(tag.into());
+    Ok(args)
+}
+
+pub fn review_body(before: &str, after: &str, body: &NativeFactionBody) -> Result<Vec<FieldDifference>> {
+    let (mut expected, name_index, index, _, new_palette) = body_layout(before, body)?;
+    transport::preserved_arrays(before, after, &[("object_names", 1), ("bipeds", 1), ("biped_palette", usize::from(new_palette))])?;
+    let kit = expected.iter_mut().find(|row| row.kit.faction == body.faction).unwrap();
+    kit.body = Some(NativeFactionBodyBinding { biped_tag_path: body.biped_tag_path.replace('\\', "/"),
+        permutation: body.permutation, index: index as u16, name_index: name_index as u16, position: kit.kit.position });
+    if expected != snapshots(after)? { return invalid("Native body and matching profiles differ from the reviewed additions"); }
+    Ok(vec![FieldDifference { before: format!("No {}", body.name()),
+        after: format!("{} uses {} · permutation {} · biped index {} · nonautomatic", body.name(),body.biped_tag_path,body.permutation,index) }])
 }
 fn profile_from_fields(root: &str) -> Result<crate::firefight::NativePlayerProfile> {
     let count = |key: &str| -> Result<u16> {
@@ -349,7 +465,8 @@ pub fn snapshots(fields: &str) -> Result<Vec<NativeFactionSnapshot>> {
             .enumerate()
             .filter(|(_, n)| n.eq_ignore_ascii_case(&name))
             .collect::<Vec<_>>();
-        if named.is_empty() && profiles.is_empty() {
+        let body = existing_body(fields, &names, faction)?;
+        if named.is_empty() && profiles.is_empty() && body.is_none() {
             continue;
         }
         if named.len() != 1 || profiles.len() != 1 || *named[0].1 != name || *profiles[0].1 != name
@@ -410,6 +527,7 @@ pub fn snapshots(fields: &str) -> Result<Vec<NativeFactionSnapshot>> {
             profile_index: profiles[0].0,
             power_group: power,
             position_group: position,
+            body,
         });
     }
     Ok(result)
@@ -456,6 +574,7 @@ pub fn reviewed(
                 .zip(kit.rotation_radians)
                 .any(|(a, b)| !facings_close(*a, b))
             || row.kit.profile != kit.profile
+            || row.body.is_some()
         {
             return invalid(
                 "Native faction output differs from the reviewed profile/control request",
@@ -475,6 +594,8 @@ pub fn verify_cache(
     }
     let read = crate::maps::scenario_logic_readback(cache, map)?;
     for row in expected {
+        let actual = crate::maps::scenario_faction_body_readback(cache, map, &format!("{}_body", row.kit.name()))?;
+        if actual != row.body { return invalid("Compiled native faction biped binding differs from source"); }
         row.kit.validate()?;
         crate::firefight::verify_native_equipment_profile(
             &row.kit.profile,
@@ -612,6 +733,18 @@ mod tests {
                 plasma_grenades: 0,
             },
         }
+    }
+    #[test]
+    fn faction_body_uses_signed_native_selection_and_requires_a_matching_kit() {
+        let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1 };
+        let operation = Operation::FactionBody { body: body.clone(), source_sha256: "a".repeat(64) };
+        let serialized = serde_json::to_value(&operation).unwrap();
+        assert_eq!(serialized["body"]["permutation"], -1);
+        assert_eq!(serde_json::from_value::<Operation>(serialized).unwrap(), operation);
+        operation.validate("scnr", "test.scenario").unwrap();
+        assert!(body_arguments(Path::new("owned"), "test.scenario", &before(), &body).is_err());
+        assert!(NativeFactionBody { permutation: -2, ..body.clone() }.validate().is_err());
+        assert!(NativeFactionBody { biped_tag_path: "../grunt".into(), ..body }.validate().is_err());
     }
     fn before() -> String {
         let mut fields="object_names[1] array\n    object_names[0] struct\n        name (original) string\ncontrols[0] array\ncontrol_palette[0] array\ndevice_groups[0] array\nplayer_starting_profile[0] array\nmachines[0] array\ntrigger_volumes[2] array\n".replace("\\n","\n");
