@@ -207,11 +207,25 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   await run('invader-edit',['-n',...args,scenario]);
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');
   const results=[];
-  for(const returnAfterInsertion of [false,true]){
+  for(const [returnAfterInsertion,holdParkedPilot] of [[false,false],[true,false],[false,true],[true,true]]){
    const sources=[];
    for(const faction of ['unsc','covenant']){
-    const role=faction==='unsc'?'pelican':'spirit';const source=exportHaloCeTransport({faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:faction==='covenant'?'spirit_zone':'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{})});
-    await fs.writeFile(path.join(data,'scripts',source.filename),source.content);sources.push({filename:source.filename,sha256:crypto.createHash('sha256').update(source.content).digest('hex')});
+    const role=faction==='unsc'?'pelican':'spirit';const options={faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:faction==='covenant'?'spirit_zone':'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{}),...(holdParkedPilot?{createPilot:true,holdParkedPilot:true}:{})};const source=exportHaloCeTransport(options);
+    if(holdParkedPilot){
+     assert.throws(()=>exportHaloCeTransport({...options,createPilot:false}),/dedicated deferred pilot/);
+     const pilot=options.pilot,freeze='(ai_braindead '+pilot+' true)',resume='(ai_braindead '+pilot+' false)';
+     const lines=source.content.split('\n'),flights=lines.map((line,i)=>line.includes('(ai_command_list '+pilot+' ')?i:-1).filter(i=>i>=0);
+     assert.equal(flights.length,returnAfterInsertion?4:2);
+     for(const i of flights){assert.equal(lines[i-1].trim(),resume);assert.ok(lines.slice(i-4,i).some(line=>line.includes('(sleep_until (and')&&line.includes('volume_test_object')&&line.includes('_landed')));}
+     assert.equal(lines.filter(line=>line.trim()===freeze).length,flights.length+1);
+     assert.ok(source.content.indexOf(freeze)<source.content.indexOf('(vehicle_load_magic'));
+     const afterCue=source.content.slice(source.content.indexOf('(depart_cue)'));
+     const departureRead=afterCue.indexOf('_boarded'),lock=afterCue.indexOf('(unit_set_enterable_by_player (unit extraction_'+role+') false)');
+     assert.ok(departureRead>=0&&lock>departureRead,'After a departure cue, native boarding is rechecked before locking the craft');
+    }
+    const sha256=crypto.createHash('sha256').update(source.content).digest('hex');
+    if(!holdParkedPilot&&returnAfterInsertion)assert.equal(sha256,role==='pelican'?'27493fc955364ef3b3988310959df0a2a50e627e8c9ab4d8b45431e680aac9c3':'928a10b3b6a5995ca3c3b237cdadf95e4c3568ce7cfad4bbaa65367a204c2d39','Existing controllers must keep their exact bytes');
+    await fs.writeFile(path.join(data,'scripts',source.filename),source.content);sources.push({filename:source.filename,sha256});
    }
    await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
    const names=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/),types=(await run('invader-edit',['-G','scripts[*].script_type',scenario])).split(/\r?\n/);
@@ -219,7 +233,7 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
     for(const name of ['gs_'+role+'_pilot','gs_'+role+'_trip','forerunner_'+role+'_complete'])assert.ok(names.includes(name),name);
     assert.equal(types[names.indexOf('forerunner_'+role+'_complete')],'continuous');
    }
-   results.push({returnAfterInsertion,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
+   results.push({returnAfterInsertion,holdParkedPilot,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
   }
   const buildId='reviewed_source',project={id:'transport',quickForge:null,studio:emptyCreatorStudio(),builds:[{id:buildId,status:'validated'}]};
   const native={projectId:project.id,buildId,class:'scnr',sourceTarget:'gbx-custom',canAppendEncounter:true,tagSha256:'a'.repeat(64),

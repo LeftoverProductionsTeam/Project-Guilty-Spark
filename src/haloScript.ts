@@ -997,13 +997,16 @@ export interface NativeTransportOptions {
   trackPlayerInsertion?:boolean;
   /** Explicit ownership of a not-initially-created native pilot. */
   createPilot?:boolean;
+  /** Suspend autonomous pilot AI on a verified pad until the next authored flight. */
+  holdParkedPilot?:boolean;
 }
 export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
   if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
+  if(options.holdParkedPilot!==undefined&&(typeof options.holdParkedPilot!=='boolean'||options.holdParkedPilot&&!options.createPilot))throw Error('Holding the parked pilot requires a dedicated deferred pilot owned by this controller.');
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
   const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
   const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
@@ -1080,6 +1083,20 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '  ))',
   ]:[];
   const enter=(enabled:boolean)=>'  (unit_set_enterable_by_player (unit '+craft+') '+enabled+')';
+  const waitFor=(condition:string)=>'  (sleep_until '+condition+' 1)';
+  const setPilotStandby=(held:boolean)=>options.holdParkedPilot?['  (ai_braindead '+pilot+' '+held+')']:[];
+  const arriveAt=(volume:string)=>[waitFor(pad(volume)),...setPilotStandby(true)];
+  const boarded='(> (device_group_get '+craft+'_boarded) 0.5)',called='(> (device_group_get '+craft+'_called) 0.5)';
+  const hubBoarding='(and '+pad(hub)+' '+boarded+')',fieldBoarding='(and '+pad(field)+' '+called+' '+boarded+')';
+  const fieldEmpty='(and '+pad(field)+' '+empty+')',recall='(and '+pad(hub)+' '+called+' '+empty+')';
+  const departureCue=cues[0]?['  ('+cues[0]+')']:[];
+  const depart=(route:string,ready:string,close=true,beforeCue:string[]=[],afterCue:string[]=[])=>[
+    // A cue or arrival confirmation may sleep. Let passengers finish boarding before locking the craft.
+    ...(options.holdParkedPilot?[...(close?departureCue:[]),waitFor(ready)]:[]),
+    ...(close?[enter(false)]:[]),...beforeCue,
+    ...(!options.holdParkedPilot&&close?departureCue:[]),...afterCue,
+    ...setPilotStandby(false),'  (ai_command_list '+pilot+' '+route+')',
+  ];
   const lines=[nativeTransportPrefix.trimEnd(),'; configuration: '+JSON.stringify(options),...heading('Native '+role+' insertion and evacuation'),
     '; Forerunner only: requires actual native ground contact and durable crew callback.',
     '; No player force-boarding, loot grant, banking, teleport or raid timer.',
@@ -1088,6 +1105,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '(script startup '+stem+'_pilot',
     ...(options.createPilot?['  ; Reviewed deferred pilot; existing source must not also own its creation.','  (if (= (ai_living_count '+pilot+') 0) (ai_place '+pilot+'))']:[]),
     '  (sleep_until (and '+health+' (= (ai_living_count '+pilot+') 1)) 1)',
+    ...setPilotStandby(true),
     '  (vehicle_load_magic (unit '+craft+') "'+options.pilotSeat+'" (ai_actors '+pilot+'))',
     '  (sleep_until '+pilotSeated+' 1)',
     ...crew.flatMap((member,index)=>[
@@ -1105,40 +1123,31 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
     '(script continuous '+stem+'_trip',
     '  (sleep_until (and '+stem+'_ready '+pad(hub)+') 1)',
     enter(true),
-    '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_boarded) 0.5)) 1)',
-    enter(false),
-    '  (set '+stem+'_settled false)',
-    ...(troops.length?['  (set '+started+' true)']:[]),
-    ...(cues[0]?['  ('+cues[0]+')']:[]),
-    '  (ai_command_list '+pilot+' '+outbound+')',
+    waitFor(hubBoarding),
+    ...depart(outbound,hubBoarding,true,['  (set '+stem+'_settled false)',...(troops.length?['  (set '+started+' true)']:[])]),
     ...insertionCamera,
-    '  (sleep_until '+pad(field)+' 1)',
+    ...arriveAt(field),
     ...(options.trackPlayerInsertion?['  (if (not '+playerArrival+') (set '+arrivalRiders+' (vehicle_riders (unit '+craft+'))))']:[]),
     ...releaseTroops,
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     enter(true),
     ...(options.returnAfterInsertion?[
       '  ; Empty return: every passenger disembarks normally before this flight.',
-      '  (sleep_until (and '+pad(field)+' '+empty+') 1)',
+      waitFor(fieldEmpty),
       ...confirmArrival,
-      enter(false),
-      ...(cues[0]?['  ('+cues[0]+')']:[]),
-      '  (ai_command_list '+pilot+' '+inbound+')',
-      '  (sleep_until '+pad(hub)+' 1)',
+      ...depart(inbound,fieldEmpty),
+      ...arriveAt(hub),
       '  ; Keep the empty ship closed while the deployed field crew requests pickup.',
-      '  (sleep_until (and '+pad(hub)+' (> (device_group_get '+craft+'_called) 0.5) '+empty+') 1)',
-      '  (ai_command_list '+pilot+' '+outbound+')',
-      '  (sleep_until '+pad(field)+' 1)',
+      waitFor(recall),
+      ...depart(outbound,recall,false),
+      ...arriveAt(field),
       ...(cues[1]?['  ('+cues[1]+')']:[]),
       enter(true),
     ]:[]),
-    '  (sleep_until (and '+pad(field)+' (> (device_group_get '+craft+'_called) 0.5) (> (device_group_get '+craft+'_boarded) 0.5)) 1)',
-    enter(false),
-    ...(cues[0]?['  ('+cues[0]+')']:[]),
-    ...(options.returnAfterInsertion?['  (set '+stem+'_settled false)']:[]),
-    '  (ai_command_list '+pilot+' '+inbound+')',
+    waitFor(fieldBoarding),
+    ...depart(inbound,fieldBoarding,true,[],options.returnAfterInsertion?['  (set '+stem+'_settled false)']:[]),
     ...departureCamera,
-    '  (sleep_until '+pad(hub)+' 1)',
+    ...arriveAt(hub),
     ...(cues[1]?['  ('+cues[1]+')']:[]),
     '  (sleep_until (and '+pad(hub)+' '+stem+'_settled) 1)',
     enter(true),
@@ -1149,6 +1158,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
       ...crew.map(member=>'ai_encounter:'+member.group),'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
+      ...(options.holdParkedPilot?['Only the dedicated pilot AI is paused. Each flight resumes the pilot after its native pad and boarding, empty-return or recall condition; confirmed landings pause it again. Collision, landing, seat checks and settlement remain engine-owned.']:[]),
       ...(crew.length?[troops.length?'NPC assignments use dedicated source groups and compatible seats. First insertion releases only captured troops after landing; permanent crew remains seated. Empty return counts pilot plus permanent crew. Missing/dead delivered troops still fail the mission survivor minimum. This is one shared campaign delivery, not repeatable squad insertion, automatic casualty recovery or proven gameplay.':'Permanent NPC crew uses dedicated source groups and compatible non-driver seats. Startup waits for exactly one actor in each group, seats only those AI and never erases/recreates a lost crew member. Arrival/departure requires those actors in their assigned seats; empty return counts pilot plus crew, not player passengers. Source creation ownership, animations, seats, casualty recovery and real flight remain independent game acceptance.']:[]),
       'The scenario or explicitly reviewed pilot creation must provide exactly one living pilot in the selected encounter/squad, its exact seat label and reachable native flight routes. Arrival requires both the matching pad volume and actual landing; a stalled/destroyed craft or pilot keeps the controller waiting.',
       'Players board and disembark normally. Gear, faction assignment, deployment, extraction activation, rewards and banking remain Forerunner-owned. At return the craft stays closed until the real crew-settlement callback; it is not replaced or destroyed.',

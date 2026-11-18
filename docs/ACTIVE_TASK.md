@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 680aaf6 plus the independent Covenant handoff in this checkpoint. Separate CE609 candidate c93c4377 uses the authored seven-objective Spirit mission and passed native compilation/readback. Prior Pelican cache a5bf6680 is preserved. The newer two-client exterior run on a5bf6680 measured powered Spirit movement away from the hub before either player approached the seat.
-Next action: Isolate the Spirit pilot AI command/behavior before boarding. On Forerunner 1fec50db both players were on foot over 10 units away when the Spirit throttled to 0.276 at tick 4650. Verify no departure is issued without the actual boarding signal. Use the existing checked native pilot/route authoring to hold only parked AI if it is the measured cause, preserving physics and settlement safeguards. Test actual boarding and play c93c4377 through field exit, rescue and extraction. Original Save37944 remains open.
+Latest verified revision: 54f1e82 plus the parked-pilot authoring option and its isolated CE609 comparison candidate 88ff1040. The real two-client test of c93c4377 loaded and deployed successfully but ended at the same Spirit drift and physical seat timeout. The revised cache changes only the Spirit pilot standby and resume calls.
+Next action: On the same Forerunner build and exterior route, confirm 88ff1040 holds the occupied pilot seat and authored pad until both players board through normal input. Then verify it resumes the real outbound route, lands inside spirit_zone and runs the active Covenant rescue through settlement. Keep the prior cache and accepted Pelican workflows. Original Save37944 remains open.
 
 ## Acceptance
 
