@@ -2312,6 +2312,63 @@ mod bsp_point_tests {
          assert_eq!(hash_file(&cache).unwrap(), hash);
      }
  }
+
+ #[test]
+ #[ignore = "requires the reviewed original and revised Black Echo Spirit CE609 caches"]
+ fn black_echo_spirit_departure_and_return_crossings() {
+     let load = |env, sha| {
+         let path = std::path::PathBuf::from(std::env::var_os(env).expect(env));
+         let inspection = inspect_map(&path, None).unwrap();
+         assert_eq!(inspection.sha256, sha);
+         let routes = scenario_command_readback(&path, &inspection).unwrap();
+         (path, inspection, routes)
+     };
+     // Measured after the pilot resumed with two living players aboard.
+     let departure = [57.281, -87.291, 1.416];
+     let (old, old_inspection, prior) = load(
+         "SPARK_BLACK_ECHO_SPIRIT_PREDECESSOR",
+         "88ff10400e68b6e6773bdcf20f90f7228c0392c2d591d0721190e79e07a0091d",
+     );
+     let field = prior.iter().find(|route| route.name == "spirit_field").unwrap();
+     for (destination, impact_x) in [(0, 61.185), (1, 62.436)] {
+         // The pilot rejected both movements from the same parked pose.
+         let mut attempt = field.clone();
+         attempt.commands.retain(|action| action.point1 == destination);
+         let route = bsp_geometry_review(
+             &old, &old_inspection, &attempt.points, None, Some(&attempt), Some(departure),
+         ).unwrap().route.unwrap();
+         let hit = route.legs[0].crossing.as_ref().expect("The previous leg passed through terrain");
+         assert_eq!(hit.bsp, 0);
+         assert!((hit.point[0] - impact_x).abs() < 0.02);
+     }
+
+     let (new, inspection, routes) = load(
+         "SPARK_BLACK_ECHO_SPIRIT_REVISED",
+         "8e8d33127c1ca3936e9f0c907f894884ccec3f8ba4d843ae3e55bb2d180e3121",
+     );
+     // The field return starts just above the authored pad for this geometry check.
+     for (name, start, length) in [
+         ("spirit_field", departure, 8),
+         ("spirit_home", [94.0, -128.0, 2.7], 9),
+     ] {
+         let route = routes.iter().find(|route| route.name == name).unwrap();
+         assert!(route.flags[5]);
+         assert_eq!(route.bsp, 0);
+         let review = bsp_geometry_review(&new, &inspection, &route.points, None, Some(route), Some(start))
+             .unwrap().route.unwrap();
+         assert_eq!(review.origin, Some(start));
+         assert!(review.issue.is_none());
+         assert_eq!(review.legs.len(), length);
+         assert_eq!(review.legs[0].from, None);
+         for leg in &review.legs {
+             assert_eq!(leg.shared_bsps, [0], "{name}: {leg:?}");
+             assert!(leg.crossing.is_none(), "{name}: {leg:?}");
+         }
+     }
+     assert_eq!(hash_file(&old).unwrap(), old_inspection.sha256);
+     assert_eq!(hash_file(&new).unwrap(), inspection.sha256);
+ }
+
  fn tree()->Vec<u8>{let mut b=vec![0u8;256];for(at,n,p)in[(0,1u32,128u32),(12,1,144),(24,1,160)]{b[at..at+4].copy_from_slice(&n.to_le_bytes());b[at+4..at+8].copy_from_slice(&p.to_le_bytes());}b[132..136].copy_from_slice(&u32::MAX.to_le_bytes());b[136..140].copy_from_slice(&0x80000000u32.to_le_bytes());b[144..148].copy_from_slice(&1f32.to_le_bytes());b}
  #[test]fn follows_native_front_back_and_leaf_flags_without_changing_bytes(){
   let b=tree();let original=b.clone();let space=Space{begin:0,end:b.len(),address:0};let mut budget=64;

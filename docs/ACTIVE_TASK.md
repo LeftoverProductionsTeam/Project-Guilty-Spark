@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 81de3a7 plus corrected initial pilot hold timing and the compiled CE609 comparison map 77682fd3. Exact 88ff1040 loaded and deployed on both clients but ended before boarding. The prior Save change passed the real Windows 42-edit, seven-objective Save and restart workflow.
-Next action: Pair-test 77682fd3 and measure startup heading, grounded pad, boarding, flight, field landing and full Covenant extraction. Refresh the runtime capability review if its executable changed. The newest independent 88ff1040 boarding replay on engine 42b59977 was live at this checkpoint; finish reading the actual receipt. Original Save37944 remains open.
+Latest verified revision: The 88ff1040 two-client run on 42b59977 passed Covenant deployment and physical Spirit seats 5 and 6, then both departure commands hit the BSP. The revised 8e8d3312 CE609 cache passes independent native readback and compiled outbound/return geometry checks. The 42-edit Windows Save and restart pass stands.
+Next action: Pair-test exact 8e8d3312 on the reviewed Forerunner build. Confirm native outbound command execution with both boarded players, field touchdown/disembarkation, empty return, recall, objectives and final settlement. Read the next actual rejection before changing source. Original Save37944 remains open.
 
 ## Acceptance
 
