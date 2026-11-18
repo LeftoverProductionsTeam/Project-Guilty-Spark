@@ -2222,7 +2222,8 @@ small {
   gap: 8px;
   flex: 1;
   min-inline-size: 0;
-  padding: 7px 9px;
+  min-block-size: 30px;
+  padding: 7px 11px;
   color: var(--text);
   font-size: 10px;
   line-height: 1.35;
@@ -2233,6 +2234,7 @@ small {
   inline-size: 100%;
   block-size: 100%;
   appearance: none;
+  padding: 0;
   overflow: clip;
   color: transparent;
   font: inherit;
@@ -2256,6 +2258,9 @@ small {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.property-row--projectile .property-diff > :is(span, strong) {
+  min-inline-size: 0;
+}
 .property-row--projectile .property-diff svg {
   flex: none;
 }
@@ -2268,25 +2273,32 @@ small {
     display: none;
   }
   .property-projectile-picker > select::picker(select) {
-    /* Right-align to the control so a wider list fits beside the model viewer. */
-    position-area: block-end span-inline-start;
+    /* Use the full viewport width for alignment, even beside a narrow pane. */
+    position-area: block-end span-all;
+    justify-self: anchor-center;
     position-try-fallbacks: flip-block;
-    inline-size: max(anchor-size(inline), 22rem);
+    inline-size: max(anchor-size(inline), 24rem);
     min-inline-size: 0;
-    max-inline-size: min(100%, calc(100vi - 16px));
+    max-inline-size: calc(100vi - 16px);
+    margin: 4px 8px;
     max-block-size: min(320px, 65vh);
     overflow: hidden auto;
     scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
     background: var(--panel);
     color: var(--text);
     border: 1px solid var(--line);
     border-radius: var(--gs-control-radius);
   }
   .property-projectile-picker option {
-    padding: 5px 10px;
+    min-inline-size: 0;
+    padding: 6px 11px;
     white-space: normal;
+    line-height: 1.35;
   }
   .property-projectile-picker option > span {
+    flex: 1;
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }
@@ -3942,10 +3954,11 @@ small {
 
 /* The oversized corner clears the monitor emblem. Every other corner shares one curve. */
 :root[data-gs-native-frame='true'] {
-  --gs-window-inset: 16px 0 0 16px;
+  /* Keep the round outline inside the WebView at fractional display scales. */
+  --gs-window-inset: 16px 2px 2px 16px;
   --gs-window-emblem-corner: 36px;
   --gs-window-corner: 16px;
-  --gs-window-radius: var(--gs-window-emblem-corner) var(--gs-window-corner) var(--gs-window-corner);
+  --gs-window-radius: var(--gs-window-emblem-corner) var(--gs-window-corner) var(--gs-window-corner) var(--gs-window-corner);
 }
 :root[data-gs-native-frame='true']:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) {
   --gs-window-inset: 0;

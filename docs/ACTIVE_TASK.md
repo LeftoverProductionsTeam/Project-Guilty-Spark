@@ -4,7 +4,7 @@ Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
 Latest verified revision: 8e8d3312 on 098a5d79 proved two-client deployment, boarding, outbound flight, field landing and both exits before the installed turret blocked the old raw rider count. Candidate 7b3940f6 independently reads back direct player occupancy across all 14 native Spirit seats. Windows unchanged-Save recovery passed separately.
-Next action: Pair-test exact 7b3940f6 on the reviewed Forerunner build. Confirm the former-passenger signal and empty return after both exits with the original installed turret seated. Continue through recall, rescue, combat and settlement. Original Save37944 remains open.
+Next action: Use the existing collision readback to verify a walkable approach from the Covenant deployment point to the parked Spirit. In the exact 7b3940f6 / 37973e1c paired run, both deployed but player 0 stopped before boarding at [55.703, -103.951, 0.003] en route to [55.73, -102.32]. Receipt SHA-256 b1272aec1330fcb0ee9fd8a13cbea9a2a7992c01ee59b7e6309b5bc6e6674fdb. Then pair-test both seats through field exit, empty return, recall, rescue and settlement. Original Save37944 remains open.
 
 ## Acceptance
 
@@ -93,7 +93,7 @@ Reuse historical evidence; run proportionate focused checks under the updated po
 
 ## Changed work
 
-The projectile field wraps the full selected path and the open list expands toward the model viewer to fit long choices. The desktop frame and tint share the same viewport inset and outline. TypeScript and seven focused Windows Edge tests pass, covering 800 and 1500 px, emulated 150% scaling, selecting the end of a long choice, restored corner hit testing, fullscreen/maximize transitions, Object Tags, Undo/Redo and Save. Earlier isolated Windows build 43ce062c72a2c5483e988c1479b35d991713cf6a9a5d0e7ce6b021a0a6a042f9 verified the actual Blood Gulch pistol list and unchanged original map. The layout follow-up has no fresh desktop-binary verification.
+The projectile list now uses the available window width, with wrapping options and space beside the scrollbar. The selected full path wraps inside the field. The restored frame and tint share a two-pixel trailing inset and matching curves. TypeScript and ten focused Windows Edge tests passed, including emulated 150% scaling, clicking a long label by its last line, fullscreen/maximize, Object Tags, Undo/Redo and Save. In source-matched Windows Spark, the Blood Gulch pistol viewer selected tank shell by clicking the end of its label and restored the original choice by Undo at 1120 x 800 and 800 x 600. Computed radii and corner hit testing agreed on all three ordinary frame corners. The native harness timed out waiting for normal child-window closure after the layout measurements. Its owned scratch was reclaimed and the original map hash matches the retained baseline.
 
 New encounter authoring carries a chosen major-variant upgrade policy through one-group and queued preview, native scalar verification and compiled expectation. Legacy requests and controller-owned Firefight use their prior defaults. Existing recipe-owned restrictions still apply. Native operations 26/26 including installed Invader, ownership 1/1 and combined picker/frame/encounter browser checks 4/4. Actual Black Echo pilot adoption and gameplay are still open.
 

@@ -1272,9 +1272,12 @@ test('the Spark corner visual clears the curved frame and stays above window gla
   expect(await frame.boundingBox()).toEqual(await glass.boundingBox());
   expect(await frame.evaluate(shell=>{
    const {left,top,right,bottom}=shell.getBoundingClientRect();
-   return [[right,top,-1,1],[right,bottom,-1,-1],[left,bottom,1,-1]].map(([x,y,dx,dy])=>
-    [2,8].map(inset=>document.elementsFromPoint(x+dx*inset,y+dy*inset).includes(shell)));
-  })).toEqual([[false,true],[false,true],[false,true]]);
+   return {
+    trailingGutters: [innerWidth-right,innerHeight-bottom],
+    cornerHits: [[right,top,-1,1],[right,bottom,-1,-1],[left,bottom,1,-1]].map(([x,y,dx,dy])=>
+      [2,8].map(inset=>document.elementsFromPoint(x+dx*inset,y+dy*inset).includes(shell))),
+   };
+  })).toEqual({trailingGutters:[2,2],cornerHits:[[false,true],[false,true],[false,true]]});
   await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-Math.max(0,hit.x-24))<1&&Math.abs(mark.y-Math.max(0,hit.y-24))<1&&mark.x>=0&&mark.y>=0&&mark.x+mark.width<=width;}).toBe(true);
   if(await button.getAttribute('aria-expanded')!=='true')await button.click();
   await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
@@ -5661,6 +5664,16 @@ for(const missing of [false,true])test('projectile choices distinguish tank shel
    expect(wrap.inputAtText, JSON.stringify({width,scale,...wrap})).toBe(true);
    expect(wrap.overflow, JSON.stringify({width,scale,...wrap})).toBeLessThanOrEqual(1);
   }
+  await picker.press('Space');
+  await longOption.scrollIntoViewIfNeeded();
+  expect(await longOption.evaluate(option=>{
+   const bounds=option.getBoundingClientRect(),range=document.createRange();
+   range.selectNodeContents(option.querySelector('span')!);
+   const tail=Array.from(range.getClientRects()).at(-1)!;
+   return bounds.left>=8&&bounds.right<=innerWidth-8&&tail.right<=bounds.right-8&&
+     option.contains(document.elementFromPoint(tail.right-2,(tail.top+tail.bottom)/2));
+  })).toBe(true);
+  await picker.press('Escape');
   await cdp.send("Emulation.clearDeviceMetricsOverride");
   await cdp.detach();
   await page.keyboard.press('Control+z');
