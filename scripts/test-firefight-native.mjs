@@ -101,8 +101,9 @@ const hash=async file=>{const digest=crypto.createHash('sha256');for await(const
 await fs.mkdir(await assertQaOutputPath(output));
 const missionSaveStress=process.env.SPARK_NATIVE_MISSION_SAVE_STRESS==='1';
 const recoveryFailure=process.env.SPARK_NATIVE_SAVE_RECOVERY_FAILURE==='1';
-if((missionSaveStress||recoveryFailure)&&(!saveOnly||ceMissionReview))throw Error('Mission Save stress and recovery checks require the isolated no-SDK Save workflow');
-const report={scope:recoveryFailure?'native-save-recovery-failure':missionSaveStress?'native-seven-objective-save-stress':saveOnly?'native-workshop-immediate-save-only':'native-solo-creator',schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
+const snapshotRestore=process.env.SPARK_NATIVE_SNAPSHOT_RESTORE==='1';
+if((missionSaveStress||recoveryFailure||snapshotRestore)&&(!saveOnly||ceMissionReview))throw Error('Save stress and recovery checks require the isolated no-SDK Save workflow');
+const report={scope:snapshotRestore?'native-project-snapshot-restore':recoveryFailure?'native-save-recovery-failure':missionSaveStress?'native-seven-objective-save-stress':saveOnly?'native-workshop-immediate-save-only':'native-solo-creator',schemaVersion:1,complete:false,mockedIpc:false,gameplayVerified:false,appSha256:await hash(app),sourcePreparation:{},errors:[],normalRestarts:0};
 let browser,page,child,call,ceScenario;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
  const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
@@ -455,6 +456,73 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    report.immediateWorkshopSave={realUi:true,brushes:p.quickForge.workshop.brushes.length,dirty:(await state(created.project.id)).history.head.dirty};
    if(saveOnly){
     report.sourcePreparation={scope:'No SDK/tag staging or native compilation required for this Save reproduction'};
+    if(snapshotRestore){
+     const id=created.project.id,record=report.snapshotRestore={};
+     const projectDir=await assertQaOutputPath(path.join(library,'projects',id),{reservationBytes:0});
+     const descriptor=path.join(projectDir,'project.gsproject');
+     const readTitle=async()=>(await state(id)).project.studio?.missions[0]?.title;
+     const savedTitle=async()=>JSON.parse(await fs.readFile(descriptor,'utf8')).studio?.missions[0]?.title;
+     const openDirector=async()=>{await chooseTool(page,'Creator Studio');await openMissionBeats(page);};
+     const title=()=>page.locator('.studio-mission-record').first().getByRole('textbox',{name:'Title',exact:true});
+     const writeTitle=async value=>{const field=title();await revealPagedControl(field);await field.fill(value);await expect.poll(readTitle).toBe(value);};
+     await openDirector();
+     const add=page.getByRole('button',{name:'Add beat',exact:true});
+     await revealPagedControl(add);await add.click();
+     await writeTitle('Snapshotted objective');await save(id);
+     const snapshots=page.locator('.gs-snapshots');
+     const list=()=>call('list_project_snapshots',{projectId:id});
+     await chooseTool(page,'Preservation record');
+     const create=snapshots.getByRole('button',{name:'Create snapshot now',exact:true});
+     await revealPagedControl(create);await create.click();
+     await expect.poll(async()=>(await list()).filter(row=>row.reason==='manual').length).toBe(1);
+     const manual=(await list()).find(row=>row.reason==='manual');
+     record.snapshotSha256=manual.sha256;
+     await openDirector();await writeTitle('Later saved objective');await save(id);
+     record.beforeDescriptorSha256=await hash(descriptor);
+     await writeTitle('Unsaved before restore');
+     expect(await savedTitle()).toBe('Later saved objective');
+     const before=(await state(id)).history.head;
+     await chooseTool(page,'Preservation record');
+     const preview=snapshots.getByRole('button',{name:'Preview restore',exact:true});
+     await revealPagedControl(preview);await preview.click();
+     const review=snapshots.getByRole('region',{name:'Snapshot restore preview',exact:true});
+     const confirm=review.getByRole('button',{name:'Confirm restore',exact:true});
+     await expect(confirm).toBeDisabled();
+     const acknowledge=review.getByRole('checkbox');
+     await revealPagedControl(acknowledge);await acknowledge.check();await revealPagedControl(confirm);await confirm.click();
+     await expect(review).toHaveCount(0,{timeout:12000});
+     const restored=await state(id);
+     record.workingAfterConfirm=await readTitle();record.descriptorAfterConfirm=await savedTitle();
+     expect(record.workingAfterConfirm).toBe('Snapshotted objective');
+     expect(record.descriptorAfterConfirm).toBe('Snapshotted objective');
+     expect(restored.history.head.dirty).toBe(false);
+     expect(restored.history.head.past.at(-1)).toBe(before.current);
+     record.restoredDescriptorSha256=await hash(descriptor);
+     const preserved=(await list()).find(row=>row.reason==='before-restore');
+     expect(preserved).toBeTruthy();
+     const safety=await call('preview_project_snapshot',{projectId:id,snapshotId:preserved.id,sha256:preserved.sha256});
+     expect(safety.studio.missions[0].title).toBe('Unsaved before restore');
+     expect((await list()).find(row=>row.id===manual.id).sha256).toBe(manual.sha256);
+     record.safetySha256=preserved.sha256;
+     const beforeStale=await list();
+     const stale=await call('prepare_project_snapshot_restore',{projectId:id,snapshotId:manual.id,sha256:manual.sha256,
+      confirmed:true,expectedRevision:restored.history.revision-1}).then(()=>'',String);
+     expect(stale).toContain('Project edits changed after restore began');
+     expect(await list()).toEqual(beforeStale);
+     expect(await hash(descriptor)).toBe(record.restoredDescriptorSha256);
+     record.staleRevisionRefused=true;
+     await close();await start();await chooseTool(page,'Map library');await open(created.project.title);
+     await openDirector();await expect(title()).toHaveValue('Snapshotted objective');
+     expect((await state(id)).history.head).toEqual(restored.history.head);
+     const director=page.getByRole('tab',{name:'Mission director',exact:true});
+     await director.focus();await page.keyboard.press('Control+z');
+     await expect(title()).toHaveValue('Unsaved before restore');
+     await director.focus();await page.keyboard.press('Control+y');
+     await expect(title()).toHaveValue('Snapshotted objective');
+     await save(id);expect(await savedTitle()).toBe('Snapshotted objective');
+     record.undoRedoAfterRestart=true;record.savedAgain=true;
+     await close();return;
+    }
     if(recoveryFailure){
      const id=created.project.id,record=report.recoveryFailure={};
      await chooseTool(page,'Settings & tools');

@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - verify project snapshot restore through Save and restart
+Task: Operation110 - verify detached workspace handoff without render frames
 Status: implementation incomplete
-Starting revision: 8490c85c33faa3874c8de67a36a1655d98c4f523, canonical master.
-Latest verified revision: 8490c85 plus scoped P8 preview repair. Exact Black Echo CE and original Xbox B30 mip chains independently match the owned disc palette. Final embedded Windows build841040a9 reproduces the repaired gold-face crop.
-Next action: Reproduce snapshot restore in the owning Spark window and verify the restored edits remain current through Save, Undo/Redo and restart. Black Echo requires interactive profile setup and mission load evidence. Original intermittent Save37944 and in-game reflection parity remain open.
+Starting revision: 7a9ff968b0458e727acac792d5bbd22fe94d4c73, canonical master.
+Latest verified revision: 7a9ff96 plus scoped snapshot restore repair. Native Windows verified backup preservation, persisted restore, restart and Undo/Redo. Projectile picker browser layout verified separately in 2831d76.
+Next action: Reproduce a workspace pop-out with animation frames withheld, then verify the focused edit and Undo history reach the receiving window through the existing native handoff. Black Echo gameplay and original Save37944 remain open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov project snapshots: reproduced restore leaving the pre-restore Undo head and descriptor. Windows fix durably restores the chosen checkpoint, backs up the current unsaved edit, refuses a stale revision and preserves Undo/Redo across restart. Frontend29 and Rust16 pass. Exact receipts and scope in RUNTIME_INTEGRATION_20261107.
 
 17Nov P8_BUMP gold-face preview: verified owned Halo palette, exact CE609 and Halo Xbox mip chains, actual Windows texture upload and stable matching native renders. Wrong tables and unrecognized version 5 builds refuse. Rust29/frontend33 pass. See RUNTIME_INTEGRATION_20261107 and the retained gold-face crops. Game parity remains open.
 
@@ -102,6 +104,8 @@ Current: releases/black-echo-native-crew-20261117 retains partial native candida
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+18Nov run-qjZQox closed. All native test writers exited and owned scratch disposed 2,245,630,569 logical bytes. Physical allocation unmeasured. Run root absent with zero development runs or issues.
 
 17Nov run-4VnRhV closed. Two isolated embedded apps exited0. Temporary output disposed 2,274,487,462 logical bytes, root absent and development runs/issues zero. Only the verified 10,170-byte screenshot crop was retained.
 

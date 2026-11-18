@@ -268,14 +268,17 @@ impl Session {
         if self.bytes()-before+after>Self::MAX_BYTES{return invalid("Shared Undo history reached its 256 MiB RAM budget. Existing acknowledged edits were retained");}
         self.documents.insert(registered.id.clone(),next);Ok(revision)
     }
-    /// Use the acknowledged draft's preference, which may differ from the saved descriptor.
-    pub fn checkpoint_automatic(&mut self, dir: &Path, registered: &Project, legacy_default: usize) -> Result<()> {
+    pub fn current_project(&mut self, dir: &Path, registered: &Project) -> Result<Option<(u64, Project)>> {
         self.attach(dir, registered)?;
         let document = &self.documents[&registered.id];
-        let Some(state) = &document.state else { return Ok(()); };
+        let Some(state) = &document.state else { return Ok(None); };
         let key = &state.head.current;
         let sha = state.hashes.get(key).ok_or_else(||crate::SparkError::Invalid("History references an unacknowledged snapshot".into()))?;
-        let current = document.snapshot(key, sha, registered)?;
+        Ok(Some((state.revision, document.snapshot(key, sha, registered)?)))
+    }
+    /// Use the acknowledged draft's preference, which may differ from the saved descriptor.
+    pub fn checkpoint_automatic(&mut self, dir: &Path, registered: &Project, legacy_default: usize) -> Result<()> {
+        let Some((_, current)) = self.current_project(dir, registered)? else { return Ok(()); };
         if current.effective_automatic_backup_retention(legacy_default)? > 0 {
             self.checkpoint(dir, registered)?;
         }

@@ -583,6 +583,27 @@ export default function App() {
     },
     [notice],
   );
+  async function restoreSnapshot(id:string,snapshotId:string,sha256:string){
+    const currentHistory=()=>documentsRef.current.documents.find(document=>document.id===id)?.history;
+    const before=await afterProjectMutation(id,currentHistory);
+    if(!before?.current)throw Error('Reopen the project before restoring a snapshot.');
+    const checkCurrent=()=>{
+      if(closingDocuments.current.has(id)||currentHistory()?.current!==before.current)
+        throw Error('Project edits changed after restore began. Review the snapshot again.');
+      if(windowWritersRef.current[id]===false||!windowHistories.current.writable(id))
+        throw Error('Choose Edit here in Changes before restoring a snapshot.');
+    };
+    checkCurrent();
+    await windowHistories.current.persist(id,before);
+    checkCurrent();
+    const expectedRevision=windowHistories.current.revision(id);
+    const restored=await call<Project>('prepare_project_snapshot_restore',{projectId:id,snapshotId,sha256,confirmed:true,expectedRevision});
+    checkCurrent();
+    if(restored.id!==id||windowHistories.current.revision(id)!==expectedRevision)
+      throw Error('Project history changed after restore began. Review the snapshot again.');
+    flushSync(()=>dispatchDocument({type:'history',id,action:{type:'edit',project:restored,description:'Restore project snapshot'}}));
+    await save(true,id);
+  }
   const applyResourceMetadata=useCallback(async(open:OpenProject)=>{const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);if(existing)dispatchDocument({type:'resources',project:open.project,inspection:open.inspection});else await load(open);},[load]);
   useEffect(()=>{const opened=(event:Event)=>{const result=(event as CustomEvent<OpenProject>).detail;if(!result?.project?.id)return;void (async()=>{try{await save();await load(result);writeMapSession(result.project.id,'bsp.open',true);setWorkspace('world');await refresh();}catch(e){notice(String(e),'error');}})();};window.addEventListener('gs:atlas-open',opened);return()=>window.removeEventListener('gs:atlas-open',opened);},[load,save,refresh,notice,setWorkspace]);
   const applyDependencyChoice=useCallback((open:OpenProject)=>{
@@ -1447,7 +1468,8 @@ export default function App() {
       case 'scenario':
         return <Scenario project={current} dirty={history.dirty} projectId={current?.id} inspection={inspection} onWorld={() => setWorkspace('world')} onTag={current?tagId=>{void openSourceTag(current.id,tagId);}:undefined} onFirefight={current?()=>setWorkspace('firefight'):undefined} />;
       case 'preservation':
-        return <Preservation project={current} inspection={inspection} edit={edit} onBeforeSave={save} onRestore={load} />;
+        return <Preservation key={current.id} project={current} inspection={inspection} edit={edit} readOnly={windowWriters[current.id]===false}
+          onBeforeSave={()=>save(false,current.id)} onRestore={(snapshotId,sha256)=>restoreSnapshot(current.id,snapshotId,sha256)} />;
       case 'build':
         return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(current!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={persist=>save(persist===true,current.id)} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onReviewAiStart={()=>reviewAiStart(current.id)} onReviewTrigger={()=>reviewAiStart(current.id,'world.trigger-volume')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(activeMap?.savedRevision??0)} dirty={history.dirty} /> : current.source ? (
           <Build

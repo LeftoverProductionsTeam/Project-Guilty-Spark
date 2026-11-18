@@ -430,7 +430,7 @@ export function Scenario({ inspection, onWorld, onTag, onFirefight, projectId, p
     </div>
   );
 }
-export function Preservation({ project, inspection, edit,onBeforeSave,onRestore }: { project: Project; inspection: MapInspection|null; edit: (p: Project, d: string) => void;onBeforeSave:()=>Promise<void>;onRestore:(p:import('../types').OpenProject)=>Promise<void> }) {
+export function Preservation({ project, inspection, edit,readOnly,onBeforeSave,onRestore }: { project: Project; inspection: MapInspection|null; edit: (p: Project, d: string) => void;readOnly:boolean;onBeforeSave:()=>Promise<void>;onRestore:(snapshotId:string,sha256:string)=>Promise<void> }) {
   const v = project.provenance;
   return (
     <div className="preservation-page">
@@ -441,7 +441,7 @@ export function Preservation({ project, inspection, edit,onBeforeSave,onRestore 
       />
       <SourceRecovery project={project} inspection={inspection}/>
       <div className="preservation-columns">
-        <ProjectSnapshots project={project} onBeforeSave={onBeforeSave} onRestore={onRestore}/>
+        <ProjectSnapshots project={project} readOnly={readOnly} onBeforeSave={onBeforeSave} onRestore={onRestore}/>
         <section className="surface metadata-form">
           <div className="section-heading">
             <h3>Archive record</h3>

@@ -604,7 +604,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     [
       'Save the active project.',
       'Open Preservation record and inspect snapshots.',
-      'Restore a selected project revision after reviewing its source identity.',
+      'Preview a selected backup and confirm the restore. Spark backs up your current edits and saves the restored project. Undo returns to the edits you had before the restore.',
     ],
   ),
   f(

@@ -1109,17 +1109,50 @@ fn preview_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:
     core::snapshots::preview(&lib.project_dir(&project_id).map_err(error)?,&p,&snapshot_id,&sha256).map_err(error)
 }
 #[tauri::command]
-fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:String,sha256:String,confirmed:bool)->Reply<OpenProject> {
-    if !confirmed {return Err("Preview and confirm the project snapshot before restoring".into());}
-    let lib=lock(&state.library)?;let current=lib.get(&project_id).map_err(error)?;
-    let dir=lib.project_dir(&project_id).map_err(error)?;
-    let mut restored=core::snapshots::preview(&dir,&current,&snapshot_id,&sha256).map_err(error)?;
-    core::snapshots::create(&dir,&current,"before-restore",lock(&state.settings)?.snapshot_retention.max(1)).map_err(error)?;
-    restored.modified_at=chrono::Utc::now().to_rfc3339();restored.builds=current.builds;
-    lib.save(&restored,None).map_err(error)?;drop(lib);
-    lock(&state.inspections)?.remove(&project_id);
-    let inspection=if restored.source.is_some(){Some((*inspect(&state,&restored)?).clone())}else{None};
-    Ok(OpenProject{project:restored,inspection})
+async fn prepare_project_snapshot_restore(
+    app: tauri::AppHandle, window: tauri::WebviewWindow, project_id: String, snapshot_id: String,
+    sha256: String, confirmed: bool, expected_revision: u64,
+) -> Reply<Project> {
+    if !confirmed { return Err("Preview and confirm the project snapshot before restoring".into()); }
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let (directory, current) = {
+            let mut history = lock(&state.window_history)?;
+            check_document_owner(&state, &project_id, window.label())?;
+            if runtime_workbench::has_running(&state, &project_id)? {
+                return Err("Close the active native tool before restoring this project".into());
+            }
+            if lock(&state.forge_session)?.as_ref().is_some_and(|session| session.project_id == project_id) {
+                return Err("Leave the shared editing session before restoring this project".into());
+            }
+            let library = lock(&state.library)?;
+            let registered = library.get(&project_id).map_err(error)?;
+            let directory = library.project_dir(&project_id).map_err(error)?;
+            let (revision, mut current) = history.current_project(&directory.join("window-history"), &registered)
+                .map_err(error)?.ok_or("The project has no acknowledged working revision. Reopen its editing window and review the snapshot again.")?;
+            if revision != expected_revision {
+                return Err("Project edits changed after restore began. Review the snapshot again.".into());
+            }
+            current.source = registered.source;
+            current.assets = registered.assets;
+            current.builds = registered.builds;
+            current.created_at = registered.created_at;
+            (directory, current)
+        };
+        // Inspect the backup and preserved source off the UI thread and
+        // outside the shared library lock. Publication uses normal Save.
+        let mut restored = core::snapshots::preview(&directory, &current, &snapshot_id, &sha256).map_err(error)?;
+        restored.source = current.source.clone();
+        restored.assets = current.assets.clone();
+        restored.builds = current.builds.clone();
+        restored.created_at = current.created_at.clone();
+        restored.history = current.history.clone();
+        restored.validate().map_err(error)?;
+        check_document_owner(&state, &project_id, window.label())?;
+        let retention = lock(&state.settings)?.snapshot_retention.max(1);
+        core::snapshots::create(&directory, &current, "before-restore", retention).map_err(error)?;
+        Ok(restored)
+    }).await.map_err(error)?
 }
 
 #[tauri::command]
@@ -3435,7 +3468,7 @@ pub fn run() {
             project_backup_overview,
             cleanup_project_backups,
             preview_project_snapshot,
-            restore_project_snapshot,
+            prepare_project_snapshot_restore,
             export_project,
             choose_setting_path,
             validate_setting_path,
