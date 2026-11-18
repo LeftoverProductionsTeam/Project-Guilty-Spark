@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 54307ee plus the Covenant blueprint connection in this checkpoint. CE609 script compile/readback and six authoring workflows pass. The finalized a5bf6680 paired run held the Spirit at its authored pad through preparation, then timed out at physical seat entry; no Covenant flight or new mission execution was witnessed.
-Next action: Review the Black Echo Spirit passenger ingress from the exterior against the actual native seat marker, collision and facing. The closest unlocked sampled approach was 1.131 units and the runtime requires less than 1.0. Test an actual normal entry on the matched candidate and engine before authoring another pad or weakening any check. Then run the separate Covenant mission through flight, disembarkation, rescue and settlement. Preserve the Pelican mission. Original Save37944 remains open.
+Latest verified revision: 680aaf6 plus the independent Covenant handoff in this checkpoint. Separate CE609 candidate c93c4377 uses the authored seven-objective Spirit mission and passed native compilation/readback. Prior Pelican cache a5bf6680 is preserved. The newer two-client exterior run on a5bf6680 measured powered Spirit movement away from the hub before either player approached the seat.
+Next action: Isolate the Spirit pilot AI command/behavior before boarding. On Forerunner 1fec50db both players were on foot over 10 units away when the Spirit throttled to 0.276 at tick 4650. Verify no departure is issued without the actual boarding signal. Use the existing checked native pilot/route authoring to hold only parked AI if it is the measured cause, preserving physics and settlement safeguards. Test actual boarding and play c93c4377 through field exit, rescue and extraction. Original Save37944 remains open.
 
 ## Acceptance
 
