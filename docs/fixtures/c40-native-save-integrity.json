@@ -3289,4 +3289,91 @@
     ],
     "screenshot": "docs/screenshots/workspaces/native-build-history-no-save-embedded-20261117.jpg"
   }
+,
+  "nativeSpiritAuthoring20261117": {
+    "parentRevision": "45763a877cc80a430b68cd871da1d7dc61804714",
+    "appSha256": "cd83e0fd55f26ed616a2ff046f982d7ebffd8f426e6e975d9a6444dd056eacd9",
+    "build": {
+      "id": "3339d69c-f68b-4789-acad-bc4adcfdbc1d",
+      "timestamp": "2026-11-18T00:21:13.692302700+00:00",
+      "status": "validated",
+      "target": "gbx-custom",
+      "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-kXE610\\output\\library\\jobs\\3339d69c-f68b-4789-acad-bc4adcfdbc1d\\output\\be_native.map",
+      "sha256": "7ec2a25af96ce53db421b875458b3b256166ad53ba7aa34f54f4302ca4ee1cb7",
+      "message": "Current working tags compiled without re-extraction; source identities and native cache checks passed. Existing compiled scripts are retained; edited .hsc files require Compile scripts & build. Gameplay and peers remain untested.",
+      "projectFingerprint": "c87400760cb1fb01f6618e956bbab9ba3af1786de156fc931b79b8be9bd61c90"
+    },
+    "toolIdentities": {
+      "invaderBuild": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+      "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invaderExtract": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138",
+      "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+    },
+    "retainedCandidate": "releases/black-echo-spirit-routing-20261117/grounded/be_native.map",
+    "bytes": 111466588,
+    "scenarioSha256": "71e6ac22346687437291ebc8829ae54e34afb58338971f741a2780b666cea84f",
+    "scriptSha256": "3ff1bdd67ae5a3787e539c078291fbd9ca12cf71b49bc21c2f5ac2d4688d61ef",
+    "scriptBytes": 6810,
+    "descriptorSha256": "c1af704591c5a5bd0da3cc5dd88b09d281fb7d58ceca19dfc3fa22f4295410c1",
+    "independentScenarioSha256": "6a7d657dc16b20f5efd54d6c65d1d7776646a9be3fc457da94cc4609b9ea3b76",
+    "exposedFieldsMatchExceptReconstructedSourceFiles": true,
+    "scripts": 13,
+    "globals": 17,
+    "volumes": 9,
+    "routes": 5,
+    "pelicanPilot": [
+      49,
+      -110,
+      0.58104014
+    ],
+    "spiritPilot": [
+      65,
+      -87.472,
+      1.2526845
+    ],
+    "warningsBefore": 21,
+    "warningsAfter": 18,
+    "resolvedWarnings": [
+      "pilot partially outside BSP0",
+      "field_route completely outside BSP0",
+      "hub_route completely outside BSP0"
+    ],
+    "remainingWarnings": "Bitmap/LoD/lens-flare/null-sound/HUD",
+    "focusedChecks": {
+      "controllerOwnership": 1,
+      "nativeTrigger": 2,
+      "frontendTrigger": 3,
+      "workingTags": 18,
+      "workingTagsExplicitInstalledHudSkip": 1,
+      "landingAreaBrowser": 1,
+      "covenantNoCrewBrowser": 1,
+      "typeScript": "PASS",
+      "windowsDebug": "PASS",
+      "workbenchGuide": "PASS:20workspace contexts, focus/Escape tooltips and safe navigation"
+    },
+    "embeddedWorkflow": "Area create/viewport/review/Accept/exact Restore/reaccept; retained source actor; source Prepare/Undo/Redo/Save/full restart/reload/review/Attach compile; route grounding/Save/restart/compile; export/Open compiled map/first Save/restart/Library reopen with Saved label",
+    "compiledProjectId": "c8222ff3-2dc3-4f40-a9fe-6389982c9652",
+    "pageErrors": [],
+    "physicalDesktopInput": false,
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "twoPlayerAccepted": false,
+    "protectedInputsRehashedUnchanged": 7,
+    "limits": [
+      "Existing mission remains Pelican-based; independent Spirit controller has no permanent NPC rescue crew",
+      "Accepted pose-only reappend must be rebuilt before further source revisions; ordinary parent receipt merges remain strict",
+      "No complete binary SCNR equality: Invader reconstructs source_files. Diagnostic erasure of this read-only field in an isolated copy refused with exit3221226505; no bypass/retry",
+      "Short native-I/O polling timeouts corrected with90second observation; assertions unchanged",
+      "Descriptor retains QA paths; retained source overlay is not a portable SDK installation",
+      "Owner Firewall gate;18media warnings; all flight/landing/boarding/5terminal/objective/audio/combat/extraction/settlement/real-peer and broader37944/reflection/full-roadmap gates OPEN"
+    ],
+    "screenshots": [
+      {
+        "path": "docs/screenshots/workspaces/native-spirit-compiled-map-embedded-20261117.jpg",
+        "bytes": 222142,
+        "sha256": "b2642e77781c4b3c008ffda68cd6cf7169b67dd44a41be63ae0c25eda060ecda",
+        "kind": "Actual Tauri embedded controls, not physical desktop input"
+      }
+    ]
+  }
 }

@@ -3,7 +3,7 @@ import type {NativeTagContext,NativeTriggerVolume,NativeVolumeGeometry} from './
 import type {Vec3} from './types';
 export const NATIVE_VOLUME_VIEW='world.trigger-volume';
 type Fields={center:[string,string,string];rotation:[string,string,string];dimensions:[string,string,string]};
-export interface NativeVolumeView extends Fields {projectId:string;buildId:string|null;tag:string;sourceSha256:string;index:number;original:NativeTriggerVolume;active:boolean;focus:number;reviewRequest?:number;locked?:boolean;mode?:'translate'|'rotate'|'scale'}
+export interface NativeVolumeView extends Fields {projectId:string;buildId:string|null;tag:string;sourceSha256:string;index:number;original:NativeTriggerVolume;active:boolean;focus:number;reviewRequest?:number;locked?:boolean;mode?:'translate'|'rotate'|'scale';append?:boolean}
 const vector=(v:Vec3)=>new Vector3(...v),strings=(v:number[])=>v.map(String) as [string,string,string];
 export function volumeQuaternion(g:NativeVolumeGeometry){const f=vector(g.forward),u=vector(g.up);return new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(f,u.clone().cross(f),u)).normalize();}
 export function volumeCenter(g:NativeVolumeGeometry):Vec3 {const f=vector(g.forward),u=vector(g.up),side=u.clone().cross(f);return vector(g.corner).addScaledVector(f,g.dimensions[0]/2).addScaledVector(side,g.dimensions[1]/2).addScaledVector(u,g.dimensions[2]/2).toArray() as Vec3;}
@@ -20,8 +20,8 @@ export function volumeGeometry(v:Fields&{original:NativeTriggerVolume}):NativeVo
  return {forward:forward.toArray() as Vec3,up:up.toArray() as Vec3,corner,dimensions:dimensions as Vec3};
 }
 export function volumeClose(a:NativeVolumeGeometry,b:NativeVolumeGeometry){return (['forward','up','corner','dimensions'] as const).every(k=>a[k].every((v,i)=>Math.abs(v-b[k][i])<=Math.max(1e-6,Math.abs(v)*2**-22)));}
-export function nativeVolumeMatches(v:NativeVolumeView,context:NativeTagContext){const original=context.scenarioVolumes?.[v.index];return context.class==='scnr'&&!context.triggerEditIssue&&v.projectId===context.projectId&&v.buildId===context.buildId&&v.sourceSha256===context.tagSha256&&v.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&JSON.stringify(original)===JSON.stringify(v.original);}
-export function volumeViewKey(v:NativeVolumeView){return JSON.stringify([v.projectId,v.buildId,v.tag,v.sourceSha256,v.index,v.original]);}
+export function nativeVolumeMatches(v:NativeVolumeView,context:NativeTagContext){const original=context.scenarioVolumes?.[v.index];return context.class==='scnr'&&!context.triggerEditIssue&&v.projectId===context.projectId&&v.buildId===context.buildId&&v.sourceSha256===context.tagSha256&&v.tag.replaceAll('\\','/')===context.tag.replaceAll('\\','/')&&(v.append?v.index===(context.scenarioVolumes?.length??-1)&&v.original.kind===1&&!!v.original.geometry:JSON.stringify(original)===JSON.stringify(v.original));}
+export function volumeViewKey(v:NativeVolumeView){return JSON.stringify([v.projectId,v.buildId,v.tag,v.sourceSha256,v.index,v.original,!!v.append]);}
 export function volumeDrag(start:NativeVolumeView|null,current:NativeVolumeView|null,pose:{center:Vec3;rotation:Vec3;dimensions:Vec3},enabled:boolean):NativeVolumeView|null{
  if(!enabled||!start?.active||!current?.active||current.locked||volumeViewKey(start)!==volumeViewKey(current)||JSON.stringify([start.center,start.rotation,start.dimensions])!==JSON.stringify([current.center,current.rotation,current.dimensions]))return null;
  const next={...current,center:strings(pose.center),rotation:strings(pose.rotation),dimensions:strings(pose.dimensions)};return volumeGeometry(next)?next:null;

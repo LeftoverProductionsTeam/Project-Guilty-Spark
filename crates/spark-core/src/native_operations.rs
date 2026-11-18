@@ -54,7 +54,7 @@ pub enum Operation {
     CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     Dependencies,
     DevicePlacement {device:NativeDevicePlacement,#[serde(rename="sourceSha256")] source_sha256:String},
-    TriggerVolume {index:u16,name:String,geometry:crate::maps::ScenarioLogicVolumeGeometry,#[serde(rename="sourceSha256")] source_sha256:String},
+    TriggerVolume {index:u16,name:String,geometry:crate::maps::ScenarioLogicVolumeGeometry,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     CutsceneFlag {point:crate::maps::NativeCutsceneFlag,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     CutsceneCamera {point:crate::maps::NativeCameraPoint,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     AppendEncounter { name:String, #[serde(rename="actorPath")] actor_path:String, position:[f32;3], #[serde(rename="startActive")] start_active:bool,
@@ -253,7 +253,7 @@ impl Operation {
             Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source and finite position/rotation");}}
-            Self::TriggerVolume{index,name,geometry,source_sha256}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
+            Self::TriggerVolume{index,name,geometry,source_sha256,append}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||*append&&!crate::creative::script_ident(name)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
             Self::CutsceneFlag{point,source_sha256,..}=>{
                 if class!="scnr"||point.index>=512||point.name.len()>32||point.name.chars().any(char::is_control)||point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.facing_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU+1e-6)||source_sha256.len()!=64||!source_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return invalid("Flag editing needs exact source/index/name and finite XYZ/yaw/pitch");}
             }
@@ -505,10 +505,16 @@ impl Operation {
             if !original.0.same_identity(device)||original.0.same_pose(device){return invalid("Device source identity changed or already matches");}
             let prefix=format!("{}[{}]",device.array(),device.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];for(field,values)in [("position",device.position),("rotation",device.rotation_radians)]{args.extend(["-S".into(),format!("{prefix}.{field}"),values.map(|v|v.to_string()).join(",")]);}args.push(tag.into());return Ok(args);
         }
-        if let Self::TriggerVolume{index,name,geometry,..}=self{
-            let row=native_volume_fields(before)?.into_iter().nth(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Native trigger index changed".into()))?.0;
-            if row.name!=*name||row.kind!=1||row.geometry.as_ref().is_none_or(|g|volume_geometry_close(g,geometry)){return invalid("Trigger source changed, is unsupported or already matches");}
-            let prefix=format!("trigger_volumes[{index}]");let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];for(field,value)in volume_values(geometry){args.extend(["-S".into(),format!("{prefix}.{field}"),value.map(|v|v.to_string()).join(",")]);}args.push(tag.into());return Ok(args);
+        if let Self::TriggerVolume{index,name,geometry,append,..}=self{
+            let rows=scenario_volume_choices(before)?;let prefix=format!("trigger_volumes[{index}]");let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+            if *append {
+                if *index as usize!=rows.len()||rows.iter().any(|row|row.name.eq_ignore_ascii_case(name)){return invalid("Append a uniquely named trigger at the end of its current source");}
+                args.extend(["-I".into(),"trigger_volumes".into(),"1".into(),"end".into(),"-S".into(),format!("{prefix}.name"),name.clone(),"-S".into(),format!("{prefix}.type"),"rotational".into()]);
+            }else{
+                let row=rows.get(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Native trigger index changed".into()))?;
+                if row.name!=*name||row.kind!=1||row.geometry.as_ref().is_none_or(|g|volume_geometry_close(g,geometry)){return invalid("Trigger source changed, is unsupported or already matches");}
+            }
+            for(field,value)in volume_values(geometry){args.extend(["-S".into(),format!("{prefix}.{field}"),value.map(|v|v.to_string()).join(",")]);}args.push(tag.into());return Ok(args);
         }
         if let Self::CutsceneFlag{point,append,..}=self{
             let old=scenario_flag_choices(before)?;let prefix=format!("cutscene_flags[{}]",point.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
@@ -639,7 +645,7 @@ impl Operation {
             }else if (self.is_flag_edit()&&key.ends_with(".facing"))||key.ends_with(".orientation")||key.ends_with(".field_of_view")||key.ends_with(".rotation"){
                 let parse=|v:&str|v.split(',').map(|s|s.trim().parse::<f32>()).collect::<std::result::Result<Vec<_>,_>>();
                 match(parse(&value),parse(actual)){(Ok(a),Ok(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|facings_close(*a,b.to_radians())),_=>false}
-            }else if self.is_vehicle_flight()||self.is_trigger_edit()||key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight")||self.is_command_edit()&&(key.ends_with(".parameter1")||key.ends_with(".parameter2")) {
+            }else if self.is_vehicle_flight()||self.is_trigger_edit()&&![".name",".type"].iter().any(|suffix|key.ends_with(suffix))||key.ends_with(".position")||key.ends_with(".time")||key.ends_with(".weight")||self.is_command_edit()&&(key.ends_with(".parameter1")||key.ends_with(".parameter2")) {
                 let parse=|s:&str|s.split(',').map(|v|v.trim().parse::<f64>().ok().filter(|v|v.is_finite())).collect::<Option<Vec<_>>>();
                 match(parse(&value),parse(actual)){(Some(a),Some(b))=>a.len()==b.len()&&a.iter().zip(b).all(|(a,b)|(a-b).abs()<=0.000001f64.max(a.abs()*f64::from(f32::EPSILON)*2.)),_=>false}
             }else if key.ends_with(".reference"){actual.replace('\\',"/").eq_ignore_ascii_case(&value.replace('\\',"/"))}
@@ -829,7 +835,15 @@ pub fn reviewed_difference(
     if let Operation::AppendTransport{transport,..}=operation{return transport::reviewed(before,after,transport);}
     if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}
     if let Operation::DevicePlacement{device,..}=operation{return reviewed_device(before,after,device);}
-    if let Operation::TriggerVolume{index,name,geometry,..}=operation{return reviewed_volume(before,after,*index,name,geometry);}
+    if let Operation::TriggerVolume{index,name,geometry,append,..}=operation{
+        if *append {
+            operation.validate("scnr","readback.scenario")?;let old=scenario_volume_choices(before)?;let new=scenario_volume_choices(after)?;
+            if *index as usize!=old.len()||old.iter().any(|row|row.name.eq_ignore_ascii_case(name))||new.len()!=old.len()+1||!new.last().is_some_and(|row|row.name==*name&&row.kind==1&&row.geometry.as_ref().is_some_and(|g|volume_geometry_close(g,geometry))){return invalid("Appended trigger differs from reviewed source");}
+            transport::preserved_arrays(before,after,&[("trigger_volumes",1)])?;
+            return Ok(vec![FieldDifference{before:format!("{} native areas",old.len()),after:format!("Append {name} at index{index}; original areas and script references retained")}]);
+        }
+        return reviewed_volume(before,after,*index,name,geometry);
+    }
     if let Operation::CutsceneFlag{point,append,..}=operation{
         let old=native_flag_fields(before)?;let new=native_flag_fields(after)?;
         if *append{
@@ -1681,7 +1695,7 @@ mod tests {
         let original=pose([1.,1.,1.],std::f32::consts::FRAC_PI_4);run(original.arguments_with_fields(&tags,"scnr",tag,&after_pose).unwrap());assert_eq!(before,fields());assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
         let original_bytes=fs::read(&file).unwrap();
         run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"cutscene_camera_points".into(),"2".into(),"end".into(),"-S".into(),"cutscene_camera_points[1].name".into(),"native_camera".into(),"-S".into(),"cutscene_camera_points[1].field_of_view".into(),70f32.to_radians().to_string(),tag.into()]);let camera_before=fields();let mut point=scenario_camera_choices(&camera_before).unwrap()[1].clone();point.position=[4.25,-5.5,6.75];point.orientation_radians=[1.25,-0.2,0.4];point.fov_radians=80f32.to_radians();let edit=Operation::CutsceneCamera{append:false,point:point.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};run(edit.arguments_with_fields(&tags,"scnr",tag,&camera_before).unwrap());let camera_after=fields();assert_eq!(reviewed_difference(&camera_before,&camera_after,&edit).unwrap().len(),3);let result=run(edit.readback_arguments(&tags,"scnr",tag,&camera_before).unwrap().unwrap());edit.verify_readback(&tags,"scnr",tag,&camera_before,&result).unwrap();assert!(camera_points_close(&point,&scenario_camera_choices(&camera_after).unwrap()[1]));println!("Native cutscene camera:index/name preserved; pose/lens roundtrip; sourceSHA={}",crate::maps::hash_file(&file).unwrap());fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
-        run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"trigger_volumes".into(),"1".into(),"end".into(),"-S".into(),"trigger_volumes[0].type".into(),"rotational".into(),"-S".into(),"trigger_volumes[0].name".into(),"native_volume".into(),"-S".into(),"trigger_volumes[0].rotation_vector_forward".into(),"1,0,0".into(),"-S".into(),"trigger_volumes[0].rotation_vector_up".into(),"0,0,1".into(),"-S".into(),"trigger_volumes[0].starting_corner".into(),"0,0,0".into(),"-S".into(),"trigger_volumes[0].ending_corner_offset".into(),"4,4,4".into(),tag.into()]);let volume_before=fields();let volume=Operation::TriggerVolume{index:0,name:"native_volume".into(),geometry:crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.25,-2.5,3.75],dimensions:[6.,7.,8.]},source_sha256:crate::maps::hash_file(&file).unwrap()};run(volume.arguments_with_fields(&tags,"scnr",tag,&volume_before).unwrap());let volume_after=fields();assert_eq!(reviewed_difference(&volume_before,&volume_after,&volume).unwrap().len(),3);let read=run(volume.readback_arguments(&tags,"scnr",tag,&volume_before).unwrap().unwrap());volume.verify_readback(&tags,"scnr",tag,&volume_before,&read).unwrap();fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
+        run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"trigger_volumes".into(),"1".into(),"end".into(),"-S".into(),"trigger_volumes[0].type".into(),"rotational".into(),"-S".into(),"trigger_volumes[0].name".into(),"native_volume".into(),"-S".into(),"trigger_volumes[0].rotation_vector_forward".into(),"1,0,0".into(),"-S".into(),"trigger_volumes[0].rotation_vector_up".into(),"0,0,1".into(),"-S".into(),"trigger_volumes[0].starting_corner".into(),"0,0,0".into(),"-S".into(),"trigger_volumes[0].ending_corner_offset".into(),"4,4,4".into(),tag.into()]);let volume_before=fields();let volume=Operation::TriggerVolume{append:false,index:0,name:"native_volume".into(),geometry:crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.25,-2.5,3.75],dimensions:[6.,7.,8.]},source_sha256:crate::maps::hash_file(&file).unwrap()};run(volume.arguments_with_fields(&tags,"scnr",tag,&volume_before).unwrap());let volume_after=fields();assert_eq!(reviewed_difference(&volume_before,&volume_after,&volume).unwrap().len(),3);let read=run(volume.readback_arguments(&tags,"scnr",tag,&volume_before).unwrap().unwrap());volume.verify_readback(&tags,"scnr",tag,&volume_before,&read).unwrap();fs::write(&file,&original_bytes).unwrap();assert_eq!(before_sha,crate::maps::hash_file(&file).unwrap());
 
         run(vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"command_lists".into(),"2".into(),"end".into(),"-S".into(),"command_lists[0].name".into(),"guard".into(),"-S".into(),"command_lists[1].name".into(),"patrol".into(),tag.into()]);
         let commands=fields();let lists=scenario_command_list_choices(&commands).unwrap();assert_eq!(lists.len(),2);assert_eq!(lists[1].name,"patrol");
@@ -1754,9 +1768,29 @@ mod tests {
         let before="trigger_volumes[1] array\n    trigger_volumes[0] struct\n        type enum
             fixed enum value
             rotational (*) enum value\n        name (intro_area) tagstring\n        rotation_vector_forward (1,0,0) vector3d\n        rotation_vector_up (0,0,1) vector3d\n        starting_corner (0,0,0) point3d\n        ending_corner_offset (4,4,4) vector3d\nscript_marker (preserve) tagstring\n";
-        let geometry=crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.,2.,3.],dimensions:[6.,7.,8.]};let op=Operation::TriggerVolume{index:0,name:"intro_area".into(),geometry:geometry.clone(),source_sha256:"a".repeat(64)};op.validate("scnr","owned.scenario").unwrap();let args=op.arguments_with_fields(Path::new("tags"),"scnr","owned.scenario",before).unwrap();assert!(args.iter().any(|s|s=="trigger_volumes[0].starting_corner"));assert!(!args.iter().any(|s|s.ends_with(".name")||s.ends_with(".type")));op.verify_readback(Path::new("tags"),"scnr","owned.scenario",before,"0,1,0\n0,0,1\n1,2,3\n6,7,8").unwrap();
+        let geometry=crate::maps::ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[1.,2.,3.],dimensions:[6.,7.,8.]};let op=Operation::TriggerVolume{append:false,index:0,name:"intro_area".into(),geometry:geometry.clone(),source_sha256:"a".repeat(64)};op.validate("scnr","owned.scenario").unwrap();let args=op.arguments_with_fields(Path::new("tags"),"scnr","owned.scenario",before).unwrap();assert!(args.iter().any(|s|s=="trigger_volumes[0].starting_corner"));assert!(!args.iter().any(|s|s.ends_with(".name")||s.ends_with(".type")));op.verify_readback(Path::new("tags"),"scnr","owned.scenario",before,"0,1,0\n0,0,1\n1,2,3\n6,7,8").unwrap();
         let after=before.replace("(1,0,0)","(0,1,0)").replace("(0,0,0)","(1,2,3)").replace("(4,4,4)","(6,7,8)");assert_eq!(reviewed_difference(before,&after,&op).unwrap().len(),3);for changed in [after.replace("name (intro_area)","name (other)"),after.replace("script_marker (preserve)","script_marker (lost)"),after.replace("rotational (*)","fixed (*)")]{assert!(reviewed_difference(before,&changed,&op).is_err());}
-        let mut bad=geometry;bad.dimensions[0]=0.;assert!(Operation::TriggerVolume{index:0,name:"intro_area".into(),geometry:bad,source_sha256:"a".repeat(64)}.validate("scnr","owned.scenario").is_err());assert!(op.arguments_with_fields(Path::new("tags"),"scnr","owned.scenario",&before.replace("rotational (*)","rotational").replace("fixed enum","fixed (*) enum")).is_err());
+        let mut bad=geometry;bad.dimensions[0]=0.;assert!(Operation::TriggerVolume{append:false,index:0,name:"intro_area".into(),geometry:bad,source_sha256:"a".repeat(64)}.validate("scnr","owned.scenario").is_err());assert!(op.arguments_with_fields(Path::new("tags"),"scnr","owned.scenario",&before.replace("rotational (*)","rotational").replace("fixed enum","fixed (*) enum")).is_err());
+    }
+    #[test]
+    fn native_trigger_append_preserves_existing_areas_and_script_bindings(){
+        let empty="trigger_volumes[0] array\nscript_marker (preserve) tagstring\n";
+        let row="    trigger_volumes[0] struct\n        type enum\n            fixed enum value\n            rotational (*) enum value\n        name (spirit_pad) tagstring\n        rotation_vector_forward (1,0,0) vector3d\n        rotation_vector_up (0,0,1) vector3d\n        starting_corner (0,0,0) point3d\n        ending_corner_offset (4,4,4) vector3d\n";
+        let first=format!("trigger_volumes[1] array\n{row}script_marker (preserve) tagstring\n");
+        let geometry=crate::maps::ScenarioLogicVolumeGeometry{forward:[1.,0.,0.],up:[0.,0.,1.],corner:[0.,0.,0.],dimensions:[4.,4.,4.]};
+        let mut op=Operation::TriggerVolume{index:0,name:"spirit_pad".into(),geometry,source_sha256:"a".repeat(64),append:true};
+        op.validate("scnr","owned.scenario").unwrap();let args=op.arguments_with_fields(Path::new("owned"),"scnr","owned.scenario",empty).unwrap();assert!(args.windows(4).any(|v|v==["-I","trigger_volumes","1","end"]));
+        op.verify_readback(Path::new("owned"),"scnr","owned.scenario",empty,"spirit_pad\nrotational\n1,0,0\n0,0,1\n0,0,0\n4,4,4").unwrap();
+        assert_eq!(reviewed_difference(empty,&first,&op).unwrap().len(),1);
+        assert!(reviewed_difference(empty,&first.replace("preserve","lost"),&op).is_err());
+        assert!(op.arguments_with_fields(Path::new("owned"),"scnr","owned.scenario",&first).is_err());
+        if let Operation::TriggerVolume{index,name,..}=&mut op{*index=1;*name="spirit_return".into();}
+        let second=format!("trigger_volumes[2] array\n{row}{}script_marker (preserve) tagstring\n",row.replace("[0]","[1]").replace("spirit_pad","spirit_return"));
+        op.arguments_with_fields(Path::new("owned"),"scnr","owned.scenario",&first).unwrap();reviewed_difference(&first,&second,&op).unwrap();
+        assert!(reviewed_difference(&first,&second.replacen("(spirit_pad)","(changed)",1),&op).is_err());
+        if let Operation::TriggerVolume{name,..}=&mut op{*name="SPIRIT_PAD".into();}assert!(op.arguments_with_fields(Path::new("owned"),"scnr","owned.scenario",&first).is_err());
+        if let Operation::TriggerVolume{name,..}=&mut op{*name="bad name".into();}assert!(op.validate("scnr","owned.scenario").is_err());
+        let mut legacy=serde_json::to_value(&op).unwrap();legacy.as_object_mut().unwrap().remove("append");assert!(matches!(serde_json::from_value::<Operation>(legacy).unwrap(),Operation::TriggerVolume{append:false,..}));
     }
     #[test]
     fn native_cinematic_area_inventory_preserves_names_and_refuses_malformed_fields(){

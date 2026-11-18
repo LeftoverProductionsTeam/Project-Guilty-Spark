@@ -703,7 +703,7 @@ fn prepare(
         if fs::metadata(&extract)?.len()>256*1024*1024{return invalid("Native faction extractor exceeds its identity limit");}
         tools.insert("invaderExtract".into(),maps::hash_file(&extract)?);
     }
-    if let Some(expected)=&input.expected_encounter{retain_encounter_expectation(&mut encounter_expectations,expected.clone())?;}
+    if let Some(expected)=&input.expected_encounter{retain_reviewed_encounter_revision(&mut encounter_expectations,expected.clone(),parent_generated_firefight.as_ref())?;}
     if input.script_attachment.as_ref().is_some_and(|attachment|attachment.replaces_sha256.is_some()&&parent_generated_firefight.as_ref().is_some_and(|generated|generated.controller.filename.eq_ignore_ascii_case(&attachment.filename))) {
         return invalid("This module is an owned generated Firefight controller. Use its existing reviewed controller-revision workflow instead of manual replacement");
     }
@@ -1156,6 +1156,31 @@ fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) 
 
 // Keep native expectations through later tag/script builds. A conflicting
 // definition is a source-review failure, never permission to drop an old check.
+// Only the currently accepted native operation reaches this path. The parent
+// cache/expectations were verified before it. An explicit Restore + reappend
+// can revise a manually authored spawn pose, without discarding actor/count,
+// wave-controller or other-group checks. Ordinary receipt merges stay strict.
+fn retain_reviewed_encounter_revision(values:&mut Vec<crate::native_operations::Operation>,value:crate::native_operations::Operation,generated:Option<&GeneratedFirefightSource>)->Result<()> {
+    use crate::native_operations::Operation;
+    if !value.is_encounter_append(){return retain_encounter_expectation(values,value);}
+    value.validate("scnr","review.scenario")?;
+    let incoming=value.encounter_appends()?;let owned=generated.map(|g|g.operation.encounter_appends()).transpose()?.unwrap_or_default();
+    let mut revised=values.clone();
+    for original in &mut revised {
+        if !original.is_encounter_append(){continue;}
+        let mut entries=original.encounter_appends()?;let mut changed=false;
+        for old in &mut entries {
+            let Some(next)=incoming.iter().find(|entry|entry.name.eq_ignore_ascii_case(&old.name)) else{continue;};
+            if old==next{continue;}
+            if owned.iter().any(|entry|entry.name.eq_ignore_ascii_case(&old.name))||matches!(original,Operation::AppendEncounters{source_rules:Some(_),..}){return invalid("Generated encounter poses remain owned by their existing controller; use its source revision workflow");}
+            let mut proposed=old.clone();proposed.position=next.position;proposed.starts=next.starts.clone();
+            if &proposed!=next{return invalid("A reviewed append pose revision cannot change actor identity, population, rules, behavior, patrol or combat data");}
+            *old=proposed;changed=true;
+        }
+        if changed{*original=Operation::AppendEncounters{encounters:entries,source_rules:None};}
+    }
+    retain_encounter_expectation(&mut revised,value)?;*values=revised;Ok(())
+}
 fn retain_encounter_expectation(values:&mut Vec<crate::native_operations::Operation>,value:crate::native_operations::Operation)->Result<()> {
     value.validate("scnr","review.scenario")?;
     if let Some(key)=value.combat_target_key(){
@@ -1802,6 +1827,18 @@ mod test_fixture;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reviewed_append_pose_revision_keeps_other_groups_and_rejects_unowned_changes(){
+        use crate::native_operations::Operation;
+        let append=|name:&str,z:f32|->Operation{serde_json::from_value(serde_json::json!({"kind":"appendEncounter","name":name,"actorPath":"actors/pilot","position":[1,2,z],"startActive":false,"count":1,"spacing":0.75})).unwrap()};
+        let original=append("spirit_pilot",0.1);let next=append("spirit_pilot",1.25);let other=append("other",2.);
+        let mut retained=vec![original.clone(),other.clone()];assert!(retain_encounter_expectation(&mut retained,next.clone()).is_err());
+        retain_reviewed_encounter_revision(&mut retained,next.clone(),None).unwrap();assert_eq!(retained[0].encounter_appends().unwrap(),next.encounter_appends().unwrap());assert_eq!(retained[1],other);
+        let saved=retained.clone();let mut wrong=append("spirit_pilot",3.);if let Operation::AppendEncounter{actor_path,..}=&mut wrong{*actor_path="actors/other".into();}assert!(retain_reviewed_encounter_revision(&mut retained,wrong,None).is_err());assert_eq!(retained,saved);
+        let generated=GeneratedFirefightSource{operation:original.clone(),controller:ScriptAttachmentIdentity{filename:"waves.hsc".into(),sha256:"a".repeat(64)},hud:None,encounter_fields_sha256:None,player_profile:None};let mut protected=vec![original];assert!(retain_reviewed_encounter_revision(&mut protected,next,Some(&generated)).is_err());
+        // Restart/parent merging must accept the revised identity consistently.
+        let mut restarted=vec![];for value in retained.clone(){retain_encounter_expectation(&mut restarted,value).unwrap();}assert_eq!(retained,restarted);
+    }
     #[test]
     fn reviewed_combat_expectations_keep_distinct_targets_and_replace_only_the_same_source_field(){
         use crate::native_operations::Operation;let point=|e,p,x|Operation::EncounterFiringPosition{encounter:e,point:p,encounter_name:format!("encounter_{e}"),position:[x,0.,0.],group:"z".into(),source_sha256:"a".repeat(64)};let mut values=vec![];retain_encounter_expectation(&mut values,point(0,0,1.)).unwrap();retain_encounter_expectation(&mut values,point(0,1,2.)).unwrap();retain_encounter_expectation(&mut values,point(0,0,3.)).unwrap();assert_eq!(values.len(),2);assert_eq!(values[0],point(0,0,3.));let groups=serde_json::from_value(serde_json::json!({"attacking":["z"],"attackingSearch":[],"attackingGuard":[],"defending":[],"defendingSearch":[],"defendingGuard":[]})).unwrap();let op=Operation::EncounterSquadFiringGroups{encounter:0,squad:0,encounter_name:"encounter_0".into(),squad_name:"guards".into(),groups,source_sha256:"a".repeat(64)};retain_encounter_expectation(&mut values,op.clone()).unwrap();assert_eq!(values.len(),3);retain_encounter_expectation(&mut values,op).unwrap();assert_eq!(values.len(),3);assert!(retain_encounter_expectation(&mut values,Operation::BoundingRadius{value:1.}).is_err());let mut invalid=point(0,0,4.);if let Operation::EncounterFiringPosition{source_sha256,..}=&mut invalid{*source_sha256="bad".into();}assert!(retain_encounter_expectation(&mut values,invalid).is_err());
