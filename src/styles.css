@@ -15,6 +15,7 @@
   --cyan: #77c6dc;
   --amber: #e1b875;
   --sidebar: 216px;
+  --gs-control-radius: 5px;
   color-scheme: dark;
   font-size: 13px;
 }
@@ -516,7 +517,7 @@ textarea {
   border: 1px solid #34424e;
   background: #10171e;
   color: #dbe5ee;
-  border-radius: 5px;
+  border-radius: var(--gs-control-radius);
   padding: 8px 10px;
   min-width: 0;
 }
@@ -2212,20 +2213,42 @@ small {
 }
 .property-row--projectile {
   --gs-tag-field-columns: minmax(0, 1fr);
-  --gs-projectile-radius: 5px;
 }
-.property-row--projectile .property-value > select {
+.property-projectile-picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
   flex: 1;
-  min-width: 0;
-  border-radius: var(--gs-projectile-radius);
-}
-.property-projectile-trigger {
-  display: none;
-}
-.property-row .property-reference-path {
-  color: var(--muted);
+  min-inline-size: 0;
+  padding: 7px 9px;
+  color: var(--text);
   font-size: 10px;
+  line-height: 1.35;
+}
+.property-projectile-picker > select {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  appearance: none;
+  overflow: clip;
+  color: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+/* The native select owns focus and input. The full path sizes its visible face. */
+.property-projectile-picker > :is(span, svg) {
+  position: relative;
+  pointer-events: none;
+}
+.property-projectile-path {
   overflow-wrap: anywhere;
+}
+.property-projectile-picker option {
+  color: var(--text);
+  background: var(--panel);
 }
 .property-row--projectile .property-diff {
   min-width: 0;
@@ -2235,47 +2258,47 @@ small {
   flex: none;
 }
 @supports (appearance: base-select) and selector(::picker(select)) {
-  .property-row--projectile select,
-  .property-row--projectile select::picker(select) {
+  .property-projectile-picker > select,
+  .property-projectile-picker > select::picker(select) {
     appearance: base-select;
   }
-  .property-row--projectile select::picker(select) {
+  .property-projectile-picker > select::picker-icon {
+    display: none;
+  }
+  .property-projectile-picker > select::picker(select) {
     inline-size: anchor-size(inline);
     min-inline-size: 0;
+    max-inline-size: calc(100vi - 16px);
     max-block-size: min(320px, 65vh);
     overflow: auto;
     scrollbar-gutter: stable;
     background: var(--panel);
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: var(--gs-projectile-radius);
+    border-radius: var(--gs-control-radius);
   }
-  .property-row--projectile .property-projectile-trigger {
-    all: unset;
-    display: block;
-    flex: 1;
-    min-inline-size: 0;
-  }
-  .property-row--projectile :is(.property-projectile-trigger, option) {
+  .property-projectile-picker option {
+    padding: 5px 8px;
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .property-row--projectile select::picker-icon {
-    flex: none;
-    align-self: center;
-  }
-  .property-row--projectile option {
-    padding: 5px 8px;
-  }
-  .property-row--projectile option > span {
+  .property-projectile-picker option > span {
     min-inline-size: 0;
   }
-  .property-row--projectile option:is(:hover, :focus-visible) {
+  .property-projectile-picker option:is(:hover, :focus-visible) {
     outline: 1px solid var(--accent);
     outline-offset: -1px;
   }
-  .property-row--projectile .property-reference-path {
-    display: none;
+}
+@media (forced-colors: active) {
+  .property-projectile-picker > select {
+    forced-color-adjust: none;
+    background: Canvas !important;
+    border-color: ButtonText;
+    outline-color: Highlight;
+  }
+  .property-projectile-picker option {
+    forced-color-adjust: auto;
   }
 }
 .property-row > div:first-child {
@@ -3912,12 +3935,19 @@ small {
 @media(max-width:1150px){.gs-connection-steps{grid-template-columns:1fr}.gs-connect-games h2{font-size:21px}}
 @media(prefers-reduced-transparency:reduce){:root[data-gs-theme='covenant'] .surface,:root[data-gs-theme='covenant'] .analysis-card{background:#2b2040;backdrop-filter:none}}
 
-/* One shape for the native frame and the glass laid over it. */
-:root[data-gs-native-frame='true'] { --gs-window-radius: 36px 20px 16px 16px; }
-:root:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) { --gs-window-radius: 0px; }
+/* The oversized corner clears the monitor emblem. Every other corner shares one curve. */
+:root[data-gs-native-frame='true'] {
+  --gs-window-emblem-corner: 36px;
+  --gs-window-corner: 16px;
+  --gs-window-radius: var(--gs-window-emblem-corner) var(--gs-window-corner) var(--gs-window-corner);
+}
+:root:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) {
+  --gs-window-emblem-corner: 0px;
+  --gs-window-corner: 0px;
+}
 :root[data-gs-native-frame='true'],:root[data-gs-native-frame='true'] body{background:transparent!important}
 :root[data-gs-native-frame='true'] .application{width:100vw;height:100vh;min-height:0;margin:0;border:1px solid #96e9f07a;border-radius:var(--gs-window-radius);overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24;box-sizing:border-box}
-:root[data-gs-native-frame='true'] .app-header{padding-left:20px;border-radius:35px 19px 28px 5px;position:relative;user-select:none;cursor:grab}
+:root[data-gs-native-frame='true'] .app-header{padding-left:20px;border-radius:max(0px, calc(var(--gs-window-emblem-corner) - 1px)) max(0px, calc(var(--gs-window-corner) - 1px)) 28px 5px;position:relative;user-select:none;cursor:grab}
 :root[data-gs-native-frame='true'] .app-header:active{cursor:grabbing}.gs-window-controls{display:flex;align-items:center;gap:7px;padding:0 4px 0 11px;margin-left:8px;border-left:1px solid #a7b9e12b;flex-shrink:0;cursor:default}
 .gs-window-button{display:grid;place-items:center;width:32px;height:32px;padding:4px;min-width:0;border:1px solid #8adce46b!important;border-radius:50% 45% 50% 35%;background:linear-gradient(145deg,#7154a035,#6bdbe70d)!important;color:#bdf1f5;box-shadow:inset 0 0 10px #98dfea0a;cursor:pointer}
 .gs-window-button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.gs-window-button:hover{background:#8de5ef35!important;color:#fff;box-shadow:0 0 10px #8de5ef38}.gs-window-button:focus-visible{outline:2px solid #d6faff;outline-offset:3px}.gs-window-close:hover{background:#af437659!important;border-color:#ffb3cf!important;color:#ffd8e7}

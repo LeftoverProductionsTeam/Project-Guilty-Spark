@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { ArrowRight, FileCode2, RotateCcw } from 'lucide-react';
+import { ArrowRight, ChevronDown, FileCode2, RotateCcw } from 'lucide-react';
 import { classNames, fieldValue, formatNumber, shortPath } from '../editor';
 import type { Project, Tag, TagField } from '../types';
 import { NumberField } from './ui';
@@ -32,6 +32,29 @@ export default function TagFields({
         const projectileField=field.kind==='reference'&&field.targetClass==='proj';
         const references=field.kind==='reference' ? tags.filter(candidate=>candidate.class===field.targetClass) : [];
         if(projectileField)references.sort((a,b)=>shortPath(renamedTagPath(project,a)).localeCompare(shortPath(renamedTagPath(project,b)))||renamedTagPath(project,a).localeCompare(renamedTagPath(project,b)));
+        const picker = field.kind === 'reference' && (
+          <select
+            id={`${prefix}-${field.key}`}
+            aria-label={field.label}
+            value={value}
+            title={referencePath(value)}
+            onChange={(event) => change(field, Number(event.target.value))}
+          >
+            {!references.some(candidate => candidate.id === value) && (
+              <option value={value} disabled>Unresolved reference · {value}</option>
+            )}
+            {references.map((candidate) => {
+              const path = renamedTagPath(project, candidate);
+              return (
+                <option key={candidate.id} value={candidate.id}>
+                  {projectileField
+                    ? <span>{shortPath(path)} · {path.split(/[\\/]/).slice(0, -1).join('/') || 'map root'}</span>
+                    : shortPath(path)}
+                </option>
+              );
+            })}
+          </select>
+        );
         return (
           <div className={['property-row', changed && 'changed', projectileField && 'property-row--projectile'].filter(Boolean).join(' ')} key={field.key}>
             <div>
@@ -46,32 +69,13 @@ export default function TagFields({
             </div>
             <div className="property-value">
               {field.kind === 'reference' ? (
-                <select
-                  id={`${prefix}-${field.key}`}
-                  aria-label={field.label}
-                  value={value}
-                  title={referencePath(value)}
-                  onChange={(event) => change(field, Number(event.target.value))}
-                >
-                  {projectileField && (
-                    <button type="button" className="property-projectile-trigger">
-                      <span>{referencePath(value)}</span>
-                    </button>
-                  )}
-                  {!references.some(candidate => candidate.id === value) && (
-                    <option value={value} disabled>Unresolved reference · {value}</option>
-                  )}
-                  {references.map((candidate) => {
-                    const path = renamedTagPath(project, candidate);
-                    return (
-                      <option key={candidate.id} value={candidate.id}>
-                        {projectileField
-                          ? <span>{shortPath(path)} · {path.split(/[\\/]/).slice(0, -1).join('/') || 'map root'}</span>
-                          : shortPath(path)}
-                      </option>
-                    );
-                  })}
-                </select>
+                projectileField ? (
+                  <div className="property-projectile-picker">
+                    {picker}
+                    <span className="property-projectile-path" aria-hidden="true">{referencePath(value)}</span>
+                    <ChevronDown size={13} aria-hidden="true" />
+                  </div>
+                ) : picker
               ) : (
                 <NumberField
                   label={field.label}
@@ -91,7 +95,6 @@ export default function TagFields({
                 <RotateCcw size={13} />
               </button>
             </div>
-            {projectileField && <small className="property-reference-path">{referencePath(value)}</small>}
             {changed && (
               <div className="property-diff">
                 <span>

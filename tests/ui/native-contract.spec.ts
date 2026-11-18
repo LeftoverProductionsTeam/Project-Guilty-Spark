@@ -1263,7 +1263,7 @@ test('the Spark corner visual clears the curved frame and stays above window gla
  await expect(button).toHaveCSS('margin-left','0px');
  const frame=page.locator('.application'), glass=page.locator('.gs-window-tint');
  for(const layer of [frame,glass]){
-  await expect(layer).toHaveCSS('border-top-right-radius','20px');
+  await expect(layer).toHaveCSS('border-top-right-radius','16px');
   await expect(layer).toHaveCSS('border-bottom-left-radius','16px');
   await expect(layer).toHaveCSS('border-bottom-right-radius','16px');
  }
@@ -5590,28 +5590,37 @@ for(const missing of [false,true])test('projectile choices distinguish tank shel
    .toBe(await picker.evaluate(select=>getComputedStyle(select).borderBottomRightRadius));
   await longOption.click();
   await expect(picker).toHaveValue('15');
-  const selectedPath=picker.locator('.property-projectile-trigger > span');
+  const selectedPath=page.locator('.property-projectile-picker .property-projectile-path');
   await expect(selectedPath).toHaveText(/^vehicles\/scorpion\/nested\/.+\/squad cannon projectile$/);
   await expect.poll(async()=>(await picker.boundingBox())!.height).toBeGreaterThan(shortHeight);
-  for(const width of [800,1500]){
-   await page.setViewportSize({width,height:650});
+  const cdp=await page.context().newCDPSession(page);
+  for(const [width,scale] of [[800,1],[800,1.5],[1500,1]]){
+   await cdp.send("Emulation.setDeviceMetricsOverride",{width:Math.floor(width/scale),height:Math.floor(650/scale),deviceScaleFactor:scale,mobile:false});
+   await selectedPath.scrollIntoViewIfNeeded();
    const wrap=await selectedPath.evaluate(label=>{
-    const trigger=label.parentElement!,select=trigger.parentElement!,row=select.closest('.property-row')!;
+    const trigger=label.parentElement!,select=trigger.querySelector('select')!,arrow=trigger.querySelector('svg')!,row=select.closest('.property-row')!;
     const range=document.createRange();
     range.selectNodeContents(label);
-    const bounds=trigger.getBoundingClientRect(),rects=Array.from(range.getClientRects());
+    const bounds=select.getBoundingClientRect(),icon=arrow.getBoundingClientRect();
+    const rects=Array.from(range.getClientRects()),last=rects.at(-1)!;
+    const hit=document.elementFromPoint((last.left+last.right)/2,(last.top+last.bottom)/2);
     return {
      lines:rects.length,
-     fits:rects.every(rect=>rect.right<=bounds.right+1&&rect.bottom<=bounds.bottom+1),
-     roomForArrow:select.getBoundingClientRect().right-bounds.right>10,
+     fits:rects.every(rect=>rect.left>bounds.left&&rect.top>bounds.top&&rect.right<icon.left&&rect.bottom<bounds.bottom),
+     roomForArrow:icon.right<bounds.right,
+     inputAtText:hit===select,
+     hit:hit?.className ?? null,
      overflow:row.scrollWidth-row.clientWidth,
     };
    });
    expect(wrap.lines).toBeGreaterThan(1);
    expect(wrap.fits).toBe(true);
    expect(wrap.roomForArrow).toBe(true);
-   expect(wrap.overflow).toBeLessThanOrEqual(1);
+   expect(wrap.inputAtText, JSON.stringify({width,scale,...wrap})).toBe(true);
+   expect(wrap.overflow, JSON.stringify({width,scale,...wrap})).toBeLessThanOrEqual(1);
   }
+  await cdp.send("Emulation.clearDeviceMetricsOverride");
+  await cdp.detach();
   await page.keyboard.press('Control+z');
   await expect(picker).toHaveValue('10');
  }else{
