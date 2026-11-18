@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 7b3940f6 / 37973e1c proved both Covenant exits, the rescue latch and the start of empty Spirit return. eed5856b / 37973e1c confirmed the Pelican remained parked through the failed approach. Native Windows Undo to Save, normal close, restart and Redo passed.
-Next action: Follow exact eed5856b / 37973e1c eastern-corridor run (build/native-spark-black-echo-eed5-east-corridor). Confirm both aircraft remain correctly parked or routed, then prove safe exits, empty return, rescue, recall, extraction and settlement. Independently verify the UNSC Pelican itinerary. Original Save37944 remains open.
+Latest verified revision: eed5856b / 37973e1c proved both Covenant exits with the Pelican parked, rescue spawn and both players reaching the rally. The ally stayed outside. The empty Spirit stalled below return waypoint 1. New dfa84b95 passes native compile and readback for both route repairs.
+Next action: Pair-test exact dfa84b95 via the proven east corridor. Verify the Covenant ally reaches be_survivors, the Spirit lands empty at the hub, facility and defense combat proceed, and recall, final extraction, and settlement complete. Verify the independent UNSC itinerary. Original Save37944 remains open.
 
 ## Acceptance
 
