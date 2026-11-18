@@ -5425,32 +5425,70 @@ test('Object Tags edits native terminal behavior through reviewed source without
 
 for(const missing of [false,true])test('projectile choices distinguish tank shell, rocket and duplicate bullets'+(missing?' with an unresolved current reference':''),async({page})=>{
  await mockDesktop(page);await page.evaluate(missing=>{
-  const open=(window as any).__sparkMock.projects.a,template=open.inspection.tags[0];
+  const w=window as any,open=w.__sparkMock.projects.a,template=open.inspection.tags[0];
+  const invoke=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   if(command!=='preview_owned_object_model')return invoke(command,args);
+   return{sourceSha256:args.sourceSha256,objectTagId:args.tagId,modelTagId:700,resourceSha256:null,mesh:{label:'Synthetic weapon model',source:'halo-model-untextured',positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],materialRanges:[]},tags:[]};
+  };
   template.fields=[{key:'projectile',label:'Trigger 1 · projectile',offset:4,kind:'reference',value:missing?999:10,min:0,max:4294967295,unit:'',targetClass:'proj'}];
-  open.inspection.tags=[template,...[{id:10,path:'weapons/pistol/bullet',class:'proj'},{id:11,path:'vehicles/scorpion/bullet',class:'proj'},{id:12,path:'weapons/rocket launcher/rocket',class:'proj'},{id:13,path:'vehicles/scorpion/tank shell',class:'proj'},{id:14,path:'wrong-class/rocket',class:'weap'},{id:15,path:'vehicles/scorpion/nested/with a long custom folder name/another long custom folder name/squad cannon projectile',class:'proj'}].map((tag,index)=>({...template,...tag,index:index+1,fields:[],references:[]}))];
+  open.inspection.tags=[template,...[{id:10,path:'weapons/pistol/bullet',class:'proj'},{id:11,path:'vehicles/scorpion/bullet',class:'proj'},{id:12,path:'weapons/rocket launcher/rocket',class:'proj'},{id:13,path:'vehicles/scorpion/tank shell',class:'proj'},{id:14,path:'wrong-class/rocket',class:'weap'},{id:15,path:'vehicles/scorpion/nested/with a long custom folder name/'+ 'unbrokenfolder'.repeat(7)+'/squad cannon projectile',class:'proj'}].map((tag,index)=>({...template,...tag,index:index+1,fields:[],references:[]}))];
  },missing);await openFixture(page);
  const picker=page.getByRole('combobox',{name:'Trigger 1 · projectile',exact:true});
- await expect(picker).toHaveValue(missing?'999':'10');await expect(picker.getByRole('option',{name:'tank shell · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'rocket · weapons/rocket launcher',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · weapons/pistol',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.locator('option[value="14"]')).toHaveCount(0);
+ await expect(picker).toHaveValue(missing?'999':'10');
+ await page.setViewportSize({width:800,height:650});
+ await expect(page.getByRole('region',{name:'Actual model preview',exact:true})).toBeVisible();
+ const shortHeight=(await picker.boundingBox())!.height;
+ await picker.press('Space');
+ await expect(picker.getByRole('option',{name:'tank shell · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'rocket · weapons/rocket launcher',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · weapons/pistol',exact:true})).toHaveCount(1);await expect(picker.getByRole('option',{name:'bullet · vehicles/scorpion',exact:true})).toHaveCount(1);await expect(picker.locator('option[value="14"]')).toHaveCount(0);
  if(missing)await expect(picker.getByRole('option',{name:'Unresolved reference · 999',exact:true})).toHaveAttribute('disabled','');
  if(!missing){
-  await page.setViewportSize({width:800,height:650});
-  const shortHeight=(await picker.boundingBox())!.height;
-  await picker.click();
+  const bottomCorners=await page.locator('.application').evaluate(element=>{
+   const style=getComputedStyle(element);
+   return [style.borderBottomLeftRadius,style.borderBottomRightRadius];
+  });
+  expect(bottomCorners).toEqual(['16px','16px']);
   const longOption=picker.locator('option[value="15"]');
   await expect(picker).toHaveJSProperty('value','10');
   await expect(longOption).toBeVisible();
-  const lines=await longOption.evaluate(option=>{
+  const optionText=await longOption.evaluate(option=>{
    const range=document.createRange();
-   range.selectNodeContents(option);
-   return new Set(Array.from(range.getClientRects(),rect=>rect.top)).size;
+   range.selectNodeContents(option.querySelector('span')!);
+   const lines=Array.from(range.getClientRects()),bounds=option.getBoundingClientRect();
+   return{lines:new Set(lines.map(rect=>rect.top)).size,fits:lines.every(rect=>rect.right<=bounds.right+1)};
   });
-  expect(lines).toBeGreaterThan(1);
+  expect(optionText.lines).toBeGreaterThan(1);
+  expect(optionText.fits).toBe(true);
+  expect(await picker.evaluate(select=>getComputedStyle(select,'::picker(select)').borderBottomRightRadius))
+   .toBe(await picker.evaluate(select=>getComputedStyle(select).borderBottomRightRadius));
   await longOption.click();
   await expect(picker).toHaveValue('15');
+  const selectedPath=picker.locator('.property-projectile-trigger > span');
+  await expect(selectedPath).toHaveText(/^vehicles\/scorpion\/nested\/.+\/squad cannon projectile$/);
   await expect.poll(async()=>(await picker.boundingBox())!.height).toBeGreaterThan(shortHeight);
-  expect(await picker.evaluate(select=>select.closest('.property-row')!.scrollWidth-select.closest('.property-row')!.clientWidth)).toBeLessThanOrEqual(1);
+  for(const width of [800,1500]){
+   await page.setViewportSize({width,height:650});
+   const wrap=await selectedPath.evaluate(label=>{
+    const trigger=label.parentElement!,select=trigger.parentElement!,row=select.closest('.property-row')!;
+    const range=document.createRange();
+    range.selectNodeContents(label);
+    const bounds=trigger.getBoundingClientRect(),rects=Array.from(range.getClientRects());
+    return {
+     lines:rects.length,
+     fits:rects.every(rect=>rect.right<=bounds.right+1&&rect.bottom<=bounds.bottom+1),
+     roomForArrow:select.getBoundingClientRect().right-bounds.right>10,
+     overflow:row.scrollWidth-row.clientWidth,
+    };
+   });
+   expect(wrap.lines).toBeGreaterThan(1);
+   expect(wrap.fits).toBe(true);
+   expect(wrap.roomForArrow).toBe(true);
+   expect(wrap.overflow).toBeLessThanOrEqual(1);
+  }
   await page.keyboard.press('Control+z');
   await expect(picker).toHaveValue('10');
+ }else{
+  await page.keyboard.press('Escape');
  }
  await picker.selectOption('13');await expect(picker).toHaveValue('13');await expect(page.locator('.property-diff')).toContainText('vehicles/scorpion/tank shell');await page.keyboard.press('Control+z');await expect(picker).toHaveValue(missing?'999':'10');await page.keyboard.press('Control+y');await expect(picker).toHaveValue('13');await picker.selectOption('12');await picker.press('Tab');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits)).toEqual([{tagId:1,fieldKey:'projectile',value:12}]);
 });

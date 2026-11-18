@@ -2212,10 +2212,15 @@ small {
 }
 .property-row--projectile {
   --gs-tag-field-columns: minmax(0, 1fr);
+  --gs-projectile-radius: 5px;
 }
 .property-row--projectile .property-value > select {
   flex: 1;
   min-width: 0;
+  border-radius: var(--gs-projectile-radius);
+}
+.property-projectile-trigger {
+  display: none;
 }
 .property-row .property-reference-path {
   color: var(--muted);
@@ -2234,22 +2239,36 @@ small {
   .property-row--projectile select::picker(select) {
     appearance: base-select;
   }
-  .property-row--projectile select,
-  .property-row--projectile option {
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
   .property-row--projectile select::picker(select) {
-    width: anchor-size(width);
-    min-width: 0;
-    max-height: min(320px, 65vh);
+    inline-size: anchor-size(inline);
+    min-inline-size: 0;
+    max-block-size: min(320px, 65vh);
+    overflow: auto;
+    scrollbar-gutter: stable;
     background: var(--panel);
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: var(--gs-projectile-radius);
+  }
+  .property-row--projectile .property-projectile-trigger {
+    all: unset;
+    display: block;
+    flex: 1;
+    min-inline-size: 0;
+  }
+  .property-row--projectile :is(.property-projectile-trigger, option) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .property-row--projectile select::picker-icon {
+    flex: none;
+    align-self: center;
   }
   .property-row--projectile option {
     padding: 5px 8px;
+  }
+  .property-row--projectile option > span {
+    min-inline-size: 0;
   }
   .property-row--projectile option:is(:hover, :focus-visible) {
     outline: 1px solid var(--accent);
@@ -3894,7 +3913,7 @@ small {
 @media(prefers-reduced-transparency:reduce){:root[data-gs-theme='covenant'] .surface,:root[data-gs-theme='covenant'] .analysis-card{background:#2b2040;backdrop-filter:none}}
 
 /* One shape for the native frame and the glass laid over it. */
-:root[data-gs-native-frame='true'] { --gs-window-radius: 36px 20px 20px 16px; }
+:root[data-gs-native-frame='true'] { --gs-window-radius: 36px 20px 16px 16px; }
 :root:is([data-gs-maximized='true'], [data-gs-fullscreen='true']) { --gs-window-radius: 0px; }
 :root[data-gs-native-frame='true'],:root[data-gs-native-frame='true'] body{background:transparent!important}
 :root[data-gs-native-frame='true'] .application{width:100vw;height:100vh;min-height:0;margin:0;border:1px solid #96e9f07a;border-radius:var(--gs-window-radius);overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24;box-sizing:border-box}

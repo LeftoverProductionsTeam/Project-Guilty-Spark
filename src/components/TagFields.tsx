@@ -53,12 +53,24 @@ export default function TagFields({
                   title={referencePath(value)}
                   onChange={(event) => change(field, Number(event.target.value))}
                 >
-                  {!references.some(candidate=>candidate.id===value)&&<option value={value} disabled>Unresolved reference · {value}</option>}
-                  {references.map((candidate) => (
+                  {projectileField && (
+                    <button type="button" className="property-projectile-trigger">
+                      <span>{referencePath(value)}</span>
+                    </button>
+                  )}
+                  {!references.some(candidate => candidate.id === value) && (
+                    <option value={value} disabled>Unresolved reference · {value}</option>
+                  )}
+                  {references.map((candidate) => {
+                    const path = renamedTagPath(project, candidate);
+                    return (
                       <option key={candidate.id} value={candidate.id}>
-                        {shortPath(renamedTagPath(project,candidate))}{projectileField&&' · '+(renamedTagPath(project,candidate).split(/[\\/]/).slice(0,-1).join('/')||'map root')}
+                        {projectileField
+                          ? <span>{shortPath(path)} · {path.split(/[\\/]/).slice(0, -1).join('/') || 'map root'}</span>
+                          : shortPath(path)}
                       </option>
-                    ))}
+                    );
+                  })}
                 </select>
               ) : (
                 <NumberField
