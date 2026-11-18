@@ -2064,6 +2064,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                     <p className="subtle">{tagProject.title} · source tags</p>
                     <ViewportTags
                       project={tagProject}
+                      dirty={tagDocument.history.dirty}
                       inspection={tagDocument.inspection}
                       requestedTagId={tagRequest}
                       requestRevision={tagRevision}

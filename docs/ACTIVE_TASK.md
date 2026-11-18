@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - grounded Black Echo and native Spirit source verified; gameplay gated
+Task: Operation110 - native terminal workflow verified; resume moving-reflection investigation
 Status: implementation incomplete
 Starting revision: 0b7671b4f95bbb93a62bc7dbfc284456b0d8f5d5, canonical master.
-Latest verified revision: 45763a877cc80a430b68cd871da1d7dc61804714 plus current verified Spirit source. Job3339d69c validates CE609 SHA7ec2a25af96ce53db421b875458b3b256166ad53ba7aa34f54f4302ca4ee1cb7; source71e6ac22; independent scenario6a7d657d. Exact evidence:c40 nativeSpiritAuthoring20261117/RUNTIME. No game claim.
-Next action: Finish source/manifest integrity and local commit of verified Spirit milestone, then next independent creator blocker. Candidate/source retained at releases/black-echo-spirit-routing-20261117/grounded. Owner Firewall blocks physical/game input; do not re-ask or alter security. Full roadmap active.
+Latest verified revision: f72ce07 plus terminal source. Compatible CE609 job90237d46/map2a10ec6a passes; independent controltag matchesfd8011dd byte-for-byte and five scalar values. Source scenario71e6ac22/extracted6a7d657d exposed fields match except reconstructed source_files, unchanged from7ec2. Final Windows app05fda346; core1/browser2 and final terminal+layout/role/zero-console regression1, TSC/guide pass.
+Next action: Commit verified terminal slice and manifests, then identify the exact moving gold-base surface/material in the existing renderer and fix its measured cause. Reuse bounded active QA50103; candidate7ec2/source/scripts retained. Physical Black Echo/gameplay still owner-Firewall gated. No repeated blocked game trial or new UI architecture.
 
 ## Acceptance
 
@@ -89,7 +89,7 @@ Current: Grounded CE609 candidate7ec2a25a compiles/readbacks and reopens saved i
 
 ## Operations and safe checkpoint
 
-QA61647/run-wsWoBU and91709/run-0v0sq0 CLOSED/absent. QA50103/node12444/run-kXE610 ACTIVE12GiB; app18700/cd83e0fd after compiled-map Save/restart. Job3339d69c complete; map7ec2a25a/source71e6ac22/HSC3ff1bdd6 and authored descriptor retained.7protected hashes unchanged. Close owned app/dispose through wrapper before ending operation. Unused e26a5aeb actor import never accepted. No game/Forerunner writes/push.
+QA61647/run-wsWoBU and91709/run-0v0sq0 CLOSED/absent. QA50103/node12444/run-kXE610 ACTIVE12GiB; app18840/05fda346 open. Grounded handoff7ec2/source71e6/HSC3ff1 retained; experiment2a10 compiled/readback, original terminal9a0e restored through UI. Mission/scene unchanged; pageErrors0. Candidate7ec2 is still gameplay candidate, not experiment. Current source/evidence ready for local commit. Reuse this bounded context for next renderer investigation, dispose through wrapper before ending. No game/Forerunner writes/push.
 
 17Nov seam QA Node17603/run-U2tZRe CLOSED: all owned writers settled; disposed1,933,265,960 logical bytes, peak1,957,455,356; last allocated1,909,313,696, disposal allocated unavailable. Run root absent/runs[]/issues[]. Original maps/banks and2,506 extracted file hashes unchanged. No app/game/Forerunner write/push. Exact diagnostics and source hashes in existing native-terrain fixture.
 

@@ -48,6 +48,7 @@ export default function NativeTagOperations({
   epoch = 0,
   onLevelEditor,
   workspace = false,
+  label,
 }: {
   project: Project;
   tagId?: number;
@@ -55,12 +56,18 @@ export default function NativeTagOperations({
   epoch?: number;
   onLevelEditor?:()=>void;
   workspace?:boolean;
+  label?:string;
 }) {
   const [expanded, setExpanded] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [context, setContext] = useState<NativeTagContext | null>(null),
     [radius, setRadius] = useState('');
+  const [control,setControl]=useState({controlType:'toggle_switch',trigger:'touched_by_player',callValue:'0',automaticActivationRadius:'0',delaySeconds:'0'});
+  useEffect(()=>{const v=context?.controlSettings;if(v)setControl({...v,callValue:String(v.callValue),automaticActivationRadius:String(v.automaticActivationRadius),delaySeconds:String(v.delaySeconds)});},[context?.tagSha256,JSON.stringify(context?.controlSettings)]);
+  const controlNumbers=([control.callValue,control.automaticActivationRadius,control.delaySeconds] as const).map(Number);
+  const controlValid=[control.callValue,control.automaticActivationRadius,control.delaySeconds].every(v=>v.trim()!==''&&Number.isFinite(Number(v)))&&controlNumbers[0]>=0&&controlNumbers[0]<=1&&controlNumbers[1]>=0&&controlNumbers[1]<=10000&&controlNumbers[2]>=0&&controlNumbers[2]<=300;
+  const controlChanged=!!context?.controlSettings&&(['controlType','trigger'] as const).some(key=>control[key]!==context.controlSettings![key])||!!context?.controlSettings&&(['callValue','automaticActivationRadius','delaySeconds'] as const).some(key=>Number(control[key])!==context.controlSettings![key]);
   const [preview, setPreview] = useState<NativePreview | null>(null),
     [accepted, setAccepted] = useState<NativeAccepted | null>(null),
     [dependencies, setDependencies] = useState<NativeDependencies | null>(null);
@@ -231,7 +238,7 @@ export default function NativeTagOperations({
   return (
     <details className={'native-tag-operations'+(workspace?' native-source-workspace':'')} open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
       <summary>
-        {workspace?'Edit native scenario & assets':'Invader · native checks & reviewed edits'} <Pill>Working source</Pill>
+        {label??(workspace?'Edit native scenario & assets':'Invader · native checks & reviewed edits')} <Pill>Working source</Pill>
       </summary>
       <p className="subtle">
         {workspace?'Preview → review → accept a source revision. Save, then rebuild to update the map.':'Check native dependencies or preview a specific tag edit. Accepted edits become a separate source revision; use Build working tag edits to compile a new map.'}
@@ -359,6 +366,18 @@ export default function NativeTagOperations({
           {context.class==='scnr'&&<NativeFactionKits context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='scnr'&&<NativeTransportAppend context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='scnr'&&<NativeCommandLists context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
+          {context.class==='ctrl'&&<details className="native-control-settings" open><summary>Native terminal behavior</summary>
+            <p className="subtle">Shared device-control tag: these settings affect every copy. Mission roles and scenario power/position groups are separate. Preview → Accept → Save → Build working tag edits; Restore recovers the preceding tag.</p>
+            {context.controlSettingsIssue&&<Notice>{context.controlSettingsIssue}</Notice>}
+            {context.controlRequiresPlayerActivation&&<Notice tone="info">This tag supplies a native faction or squad terminal. Player-touch activation is required; its mission binding stays protected.</Notice>}
+            {context.controlSettings&&<><div className="studio-fields">
+              <label>Control type<select aria-label="Native control type" value={control.controlType} disabled={busy||dirty||!!context.controlSettingsIssue} onChange={e=>{setControl({...control,controlType:e.target.value});invalidateProposal();}}><option value="toggle_switch">Toggle switch</option><option value="on_button">On button</option><option value="off_button">Off button</option><option value="call_button">Call button</option></select></label>
+              <label>Trigger<select aria-label="Native control trigger" value={control.trigger} disabled={busy||dirty||!!context.controlSettingsIssue} onChange={e=>{setControl({...control,trigger:e.target.value});invalidateProposal();}}><option value="touched_by_player">Touched by player</option><option value="destroyed" disabled={context.controlRequiresPlayerActivation}>Destroyed</option></select></label>
+              {([['callValue','Call value',0,1,.05],['automaticActivationRadius','Automatic activation radius',0,10000,.1],['delaySeconds','Activation delay · seconds',0,300,.1]] as const).map(([key,label,min,max,step])=><label key={key}>{label}<input aria-label={label} type="number" min={min} max={max} step={step} value={control[key]} disabled={busy||dirty||!!context.controlSettingsIssue} onChange={e=>{setControl({...control,[key]:e.target.value});invalidateProposal();}}/></label>)}
+            </div><p className="subtle">Call value is used by a Call button. Automatic activation radius is the native proximity behavior; it is not a player interaction-distance setting. Zero retains no automatic proximity activation. Engine behavior requires gameplay testing.</p>
+            <button disabled={busy||dirty||!!context.controlSettingsIssue||!controlValid||!!context.controlRequiresPlayerActivation&&control.trigger!=='touched_by_player'||!controlChanged||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>makePreview({kind:'controlSettings',settings:{controlType:control.controlType,trigger:control.trigger,callValue:controlNumbers[0],automaticActivationRadius:controlNumbers[1],delaySeconds:controlNumbers[2]},sourceSha256:context.tagSha256!})}>Preview native terminal behavior</button>
+            <button disabled={busy||!controlChanged} onClick={()=>{const v=context.controlSettings!;setControl({...v,callValue:String(v.callValue),automaticActivationRadius:String(v.automaticActivationRadius),delaySeconds:String(v.delaySeconds)});invalidateProposal();}}>Reset terminal draft</button></>}
+          </details>}
           {context.class==='scnr'&&<NativeDevicePlacements context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
           {context.class==='scnr'&&<NativeTriggerVolumes context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={onLevelEditor}/>}
           {context.class==='scnr'&&<NativeObjectiveFlags context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}

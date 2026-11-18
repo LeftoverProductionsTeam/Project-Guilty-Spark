@@ -233,3 +233,6 @@ Owner addendum: full in-game HUD editor is required, not just Firefight text or 
 
 
 17Nov native Spirit/source milestone: dedicated area creation, retained actor reuse, guarded pilot binding/pose revisions and shared Forerunner area checks now reach embedded HSC Undo/Redo/Save/restart, CE609 compile/independent readback and compiled-map reopen/Save/restart. Pilot/route grounding clears3BSP warnings;18media/HUD warnings remain. Exact candidate7ec2a25a/evidence:c40 nativeSpiritAuthoring20261117/RUNTIME. Existing mission remains Pelican-based; Spirit has no rescue crew. Physical/gameplay/peers,37944/reflection/full475/M1–M6/Operation110 remain OPEN;475CSV records unchanged.
+
+
+17Nov Object Tags native terminal source slice: type/trigger/call value/proximity/delay now reach existing Review/Accept/Restore/Save/restart/native CE output and independent byte/scalar readback. Existing faction/squad bindings refuse incompatible activation before writes and in compilation. Original tag restored; all5terminal roles/scene/script inventories preserved. UI key/layout regressions fixed; full schema editor, physical/gameplay,37944/reflection/all475/M1–M6 remain OPEN. Exact evidence:c40 nativeTerminalBehavior20261117/RUNTIME.475CSV unchanged.

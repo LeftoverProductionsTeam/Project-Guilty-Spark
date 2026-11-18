@@ -122,3 +122,7 @@
  .native-source-workspace .native-source-editors { grid-template-columns:minmax(0,1fr); }
  .native-source-workspace > .native-history { width:100%; margin-right:0; }
 }
+
+.native-control-settings .studio-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:8px; max-width:760px; }
+.native-control-settings .studio-fields label { display:grid; gap:4px; min-width:0; }
+.native-control-settings .studio-fields :is(input,select) { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }

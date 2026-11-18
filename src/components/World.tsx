@@ -1771,6 +1771,7 @@ export default function World({
               <ViewportTags
                 key={tagContext.project.id}
                 project={tagContext.project}
+                dirty={tagDocument?.history.dirty??false}
                 inspection={tagContext.inspection}
                 requestedTagId={tagRequest}
                 requestRevision={tagRevision}

@@ -3375,5 +3375,113 @@
         "kind": "Actual Tauri embedded controls, not physical desktop input"
       }
     ]
+  },
+  "nativeTerminalBehavior20261117": {
+    "parentRevision": "f72ce072ae105c21a4e3ce9ffb25a0856f338b2d",
+    "appSha256": "05fda346c26f5ccaa07f91162dbfe1e5b1fea2651141e4f34abc5cc1dcd7d960",
+    "build": {
+      "id": "90237d46-de52-48c1-9c1e-971dbc0fe010",
+      "timestamp": "2026-11-18T01:15:15.128806400+00:00",
+      "status": "validated",
+      "target": "gbx-custom",
+      "output": "\\\\?\\C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-kXE610\\output\\library\\jobs\\90237d46-de52-48c1-9c1e-971dbc0fe010\\output\\be_native.map",
+      "sha256": "2a10ec6a478171c5db6d0c3afb6cda5d54a283f9de838568fa29fc95c61390a4",
+      "message": "Current working tags compiled without re-extraction; source identities and native cache checks passed. Existing compiled scripts are retained; edited .hsc files require Compile scripts & build. Gameplay and peers remain untested.",
+      "projectFingerprint": "c87400760cb1fb01f6618e956bbab9ba3af1786de156fc931b79b8be9bd61c90"
+    },
+    "rejectedBuild": {
+      "id": "a62a5850-301b-47b7-994a-00d908eb5cd0",
+      "timestamp": "2026-11-18T01:02:19.398883800+00:00",
+      "status": "failed",
+      "target": "gbx-custom",
+      "output": null,
+      "sha256": null,
+      "message": "Compiled faction terminal is not touched-by-player and initially enabled",
+      "projectFingerprint": "c87400760cb1fb01f6618e956bbab9ba3af1786de156fc931b79b8be9bd61c90"
+    },
+    "sourceControlBefore": "9a0ef5174575c52b72f9922a219330539be13e276c2bbde756f530cb5e44a60e",
+    "sourceControlAfter": "fd8011dddf0f926f2cc09286bea51ecaa67628ac92d8ea346b76d7fef42f6a03",
+    "settings": {
+      "controlType": "call_button",
+      "trigger": "touched_by_player",
+      "callValue": 0.75,
+      "automaticActivationRadius": 3.5,
+      "delaySeconds": 1.25
+    },
+    "independentControlSha256": "fd8011dddf0f926f2cc09286bea51ecaa67628ac92d8ea346b76d7fef42f6a03",
+    "independentScalars": [
+      "call_button",
+      "touched_by_player",
+      "0.750000",
+      "3.500000",
+      "1.250000"
+    ],
+    "scenarioSourceSha256": "71e6ac22346687437291ebc8829ae54e34afb58338971f741a2780b666cea84f",
+    "scenarioReadbackSha256": "6a7d657dc16b20f5efd54d6c65d1d7776646a9be3fc457da94cc4609b9ea3b76",
+    "exposedScenarioMatchExceptSourceFiles": true,
+    "counts": {
+      "scripts": 13,
+      "globals": 17,
+      "controls": 5
+    },
+    "nativeLayout": {
+      "viewport": [
+        1546,
+        948
+      ],
+      "width": 314,
+      "scrollWidth": 314,
+      "fields": [
+        {
+          "width": 313.85308837890625,
+          "labelAbove": true,
+          "inside": true
+        },
+        {
+          "width": 313.85308837890625,
+          "labelAbove": true,
+          "inside": true
+        },
+        {
+          "width": 313.85308837890625,
+          "labelAbove": true,
+          "inside": true
+        },
+        {
+          "width": 313.85308837890625,
+          "labelAbove": true,
+          "inside": true
+        },
+        {
+          "width": 313.85308837890625,
+          "labelAbove": true,
+          "inside": true
+        }
+      ]
+    },
+    "exactBaselineRestore": true,
+    "missionAndSceneUnchanged": true,
+    "roleRefusal": "Error: page.evaluate: This tag supplies a native faction/squad terminal. Its trigger must remain touched-by-player; original source was not changed",
+    "checks": {
+      "core": 1,
+      "browserUnique": 2,
+      "finalTerminalBrowser": 1,
+      "typeScript": "PASS",
+      "guide": "PASS",
+      "nativeWindows": "PASS"
+    },
+    "pageErrors": [],
+    "physicalInput": false,
+    "gameplay": false,
+    "screenshot": {
+      "path": "docs/screenshots/workspaces/native-terminal-behavior-embedded-20261117.jpg",
+      "sha256": "eb78594199a347e8d1d503acf1e6ba38d7da12335ab231903f039c920cdd2745"
+    },
+    "limits": [
+      "Native Restore is separate from project Undo",
+      "Physical input/gameplay/all-display acceptance open",
+      "Complete Object Tags schema editing and all475/M1-M6 remain open",
+      "Destroyed-trigger test cache was rejected, not a previous-good release"
+    ]
   }
 }

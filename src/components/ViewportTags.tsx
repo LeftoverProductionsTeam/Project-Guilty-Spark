@@ -3,6 +3,7 @@ import { classNames, effectiveReferenceId, setTagValue, shortPath } from '../edi
 import { useMapState } from '../mapSession';
 import type { MapInspection, Project, TagField } from '../types';
 import TagFields from './TagFields';
+import NativeTagOperations from './NativeTagOperations';
 import BitmapPreview from './BitmapPreview';
 import SmartEditPanel from './SmartEditPanel';
 import { Notice, Pill } from './ui';
@@ -22,7 +23,9 @@ export default function ViewportTags({
   onSave,
   onSelectMap,
   instance,
+  dirty = false,
 }: {
+  dirty?:boolean;
   instance?:{id:string;name:string;busy:boolean;onEdit:()=>void};
   project: Project;
   inspection: MapInspection;
@@ -79,6 +82,7 @@ export default function ViewportTags({
       </label></>}
       {tag.class==='bitm'&&<BitmapPreview key={`${project.id}:${tag.id}`} project={project} tagId={tag.id}/>}
       <TagFields project={project} tag={tag} tags={inspection.tags} advanced={advanced} change={change} />
+      {tag.class==='ctrl'&&<NativeTagOperations key={'native-control:'+tag.id} label="Edit native terminal behavior" project={project} tagId={tag.id} dirty={dirty}/>}
       <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
       {tag.external && (
         <Notice>
