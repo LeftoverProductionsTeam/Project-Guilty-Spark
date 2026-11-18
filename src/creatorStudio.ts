@@ -185,12 +185,25 @@ export function blackEchoMission(nextId:()=>string,options?:BlackEchoOptions):Mi
 }
 /** Explicitly bind this known blueprint to Forerunner's existing native contract.
  * Existing objective IDs, authored text, source modules and other beats survive. */
-export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null):Project {
- const base=project.studio?.missions.length?project:addBlackEchoDraft(project,nextId,nativeSource),studio=base.studio!,beats=studio.missions;
- if(beats.length!==7||!['triggerVolume','deviceActivated'].includes(beats[0].trigger)||!['be_insert','extraction_deploy'].includes(beats[0].triggerRef??'')||beats[1].trigger!=='escort'||beats[1].triggerRef!=='be_survivors'||beats[2].trigger!=='encounterCleared'||beats[4].trigger!=='encounterCleared'||beats[4].encounterName!=='be_flood'||beats[5].trigger!=='encounterCleared'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
+export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nativeSource?:NativeTagContext|null,options?:BlackEchoOptions):Project {
+ const base=project.studio?.missions.length?project:addBlackEchoDraft(project,nextId,nativeSource,options),studio=base.studio!,beats=studio.missions;
+ const insertion=beats[0];
+ const starterArea=insertion?.trigger==='triggerVolume'&&insertion.triggerRef==='be_insert'&&insertion.transportInsertion==null;
+ const terminal=insertion?.trigger==='deviceActivated'&&insertion.triggerRef==='extraction_deploy'&&insertion.transportInsertion==null;
+ const authoredArrival=insertion?.trigger==='triggerVolume'&&insertion.transportInsertion!=null&&scriptIdent.test(insertion.triggerRef??'');
+ if(beats.length!==7||!(starterArea||terminal||authoredArrival)||beats[1].trigger!=='escort'||beats[1].triggerRef!=='be_survivors'||beats[2].trigger!=='encounterCleared'||beats[4].trigger!=='encounterCleared'||beats[4].encounterName!=='be_flood'||beats[5].trigger!=='encounterCleared'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
+ const terminalObjective='Activate the native deployment terminal to begin the operation. Runtime insertion and physical flight remain separate gameplay checks.';
+ // Only upgrade the old generated terminal objective. A creator's own terminal or pad binding stays intact.
+ const connectSpirit=beats[1].encounterTeam==='covenant'&&insertion.squadNumber==null&&
+  (starterArea||(terminal&&insertion.objective===terminalObjective));
+ const arrivalPad=connectSpirit?'spirit_zone':authoredArrival?insertion.triggerRef:null;
  if(!base.quickForge||base.quickForge.native){
   requireNativeBlackEcho(base,nativeSource,{rescue:beats[1].encounterName,facility:beats[2].encounterName,defense:beats[5].encounterName});if(nativeSource!.sourceTarget!=='gbx-custom')throw Error('Forerunner settlement requires reviewed standard CE609 solo source; other engines do not provide its callback.');
   for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
+  if(arrivalPad){
+   const pads=nativeSource.scenarioVolumes?.filter(row=>row.name.toLowerCase()===arrivalPad.toLowerCase())??[];
+   if(pads.length!==1||pads[0].name!==arrivalPad||pads[0].kind!==1||!pads[0].geometry)throw Error('Author a unique readable native arrival pad: '+arrivalPad+'. Accept, build and read native source again.');
+  }
   for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
  }else if(base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
  const pickup=beats[3],containment=beats[4];
@@ -200,8 +213,10 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
    containment.objective.startsWith('Optional containment branch: when this step begins,')&&
    (pickup.squadNumber??0)===(containment.squadNumber??0)&&pickup.conditionVolume==null&&pickup.conditionResult==null;
  const missions=beats.map((beat,index):MissionBeat=>{
-  if(index===0&&beat.trigger==='triggerVolume')return {...beat,trigger:'deviceActivated',triggerRef:'extraction_deploy',
-   objective:'Activate the native deployment terminal to begin the operation. Runtime insertion and physical flight remain separate gameplay checks.'};
+  if(index===0&&connectSpirit)return {...beat,trigger:'triggerVolume',triggerRef:'spirit_zone',transportInsertion:'spirit',
+   objective:beat.objective===terminalObjective||beat.objective==='Reach the insertion area and review the operation briefing.'?'Board the Spirit at the hub. Disembark alive after it lands at the field pad to begin the rescue.':beat.objective,
+   hudText:beat.hudText==='Squad insertion'?'Ride the Spirit to the field and disembark.':beat.hudText};
+  if(index===0&&starterArea)return {...beat,trigger:'deviceActivated',triggerRef:'extraction_deploy',objective:terminalObjective};
   if(index===3&&(beat.trigger==='manual'||useContainmentVisit))return {...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',
    objective:useContainmentVisit?'Collect the selected native technology weapon. Visit the separate containment area while this objective is active to opt into the Flood encounter.':'Collect the selected native technology weapon. Actual player inventory ownership completes this objective.',
    hudText:useContainmentVisit&&beat.hudText==='Recover classified technology'?'Recover the technology. Visit the containment area before pickup to investigate the Flood.':beat.hudText};

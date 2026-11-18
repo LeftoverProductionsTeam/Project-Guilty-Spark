@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: e805365 plus the passenger insertion workflow. The 70641e81 southern run stalled before pickup. On a5bf6680, both Covenant peers deployed and remained alive at the later approach stall. The Spirit had drifted outside both hub volumes despite reporting landed.
-Next action: Correct the Spirit parking and terminal-to-seat path using measured native terrain and hull constraints, then exercise the new passenger arrival gate in the separate Covenant mission. Preserve the Pelican mission. Pair-play 70641e81 through pickup, both Flood decisions and settlement. Original Save37944 remains open.
+Latest verified revision: 54307ee plus the Covenant blueprint connection in this checkpoint. CE609 script compile/readback and six authoring workflows pass. The finalized a5bf6680 paired run held the Spirit at its authored pad through preparation, then timed out at physical seat entry; no Covenant flight or new mission execution was witnessed.
+Next action: Review the Black Echo Spirit passenger ingress from the exterior against the actual native seat marker, collision and facing. The closest unlocked sampled approach was 1.131 units and the runtime requires less than 1.0. Test an actual normal entry on the matched candidate and engine before authoring another pad or weakening any check. Then run the separate Covenant mission through flight, disembarkation, rescue and settlement. Preserve the Pelican mission. Original Save37944 remains open.
 
 ## Acceptance
 

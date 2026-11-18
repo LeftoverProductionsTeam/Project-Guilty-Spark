@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { blackEchoMission, emptyCreatorStudio } from '../src/creatorStudio.ts';
+import { blackEchoMission, connectBlackEchoObjectives, defaultBlackEchoOptions, emptyCreatorStudio } from '../src/creatorStudio.ts';
 import { recoveredCampaignMission, exportHaloCeTransport, attachNativeCampaignMission, exportHaloCeMission, exportHaloCeCinematic, exportHaloCeFirefight, scriptManifest } from '../src/haloScript.ts';
 const studio=emptyCreatorStudio();
 studio.missions=[
@@ -191,22 +191,26 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   const tags=path.join(root,'tags'),data=path.join(root,'data');await fs.mkdir(tags);await fs.mkdir(path.join(data,'scripts'),{recursive:true});
   const invader=path.resolve(process.env.SPARK_QA_INVADER??'tools/invader');
   const run=async(tool,args)=>{const value=await exec(path.join(invader,tool+'.exe'),['-t',tags,...args],{cwd:root,windowsHide:true,maxBuffer:1024*1024});assert.ok(!/ERROR:|Failed to/i.test(value.stdout+'\n'+value.stderr),value.stderr);return value.stdout.trim();};
-  const scenario='transport.scenario';await run('invader-edit',['-N',scenario]);
-  await run('invader-edit',['-n','-I','vehicles','2','end','-I','object_names','2','end','-I','encounters','2','end','-I','command_lists','2','end','-I','trigger_volumes','2','end','-I','device_groups','6','end',scenario]);
+  const scenario='transport.scenario',encounters=['pilot_pelican','pilot_spirit','be_covenant','be_marines','be_flood','be_defense'];
+  const volumes=['extraction_return','extraction_zone','spirit_zone','be_survivors','be_containment'],devices=['extraction_deploy','extraction_activate'];
+  await run('invader-edit',['-N',scenario]);
+  await run('invader-edit',['-n','-S','type','singleplayer','-I','vehicles','2','end','-I','controls','2','end','-I','object_names','4','end','-I','encounters',String(encounters.length),'end','-I','command_lists','2','end','-I','trigger_volumes',String(volumes.length),'end','-I','device_groups','6','end',scenario]);
   const args=[];
   for(const [i,role]of ['pelican','spirit'].entries()){
-   args.push('-S','object_names['+i+'].name','extraction_'+role,'-S','vehicles['+i+'].name',String(i),'-S','encounters['+i+'].name','pilot_'+role);
+   args.push('-S','object_names['+i+'].name','extraction_'+role,'-S','vehicles['+i+'].name',String(i));
    for(const [j,suffix]of ['boarded','called','landed'].entries())args.push('-S','device_groups['+(i*3+j)+'].name','extraction_'+role+'_'+suffix,'-S','device_groups['+(i*3+j)+'].initial_value','0');
   }
   for(const[i,name]of ['field_route','hub_route'].entries())args.push('-S','command_lists['+i+'].name',name);
-  for(const[i,name]of ['extraction_return','extraction_zone'].entries())args.push('-S','trigger_volumes['+i+'].name',name);
+  for(const [i,name]of volumes.entries())args.push('-S','trigger_volumes['+i+'].name',name);
+  for(const [i,name]of encounters.entries())args.push('-S','encounters['+i+'].name',name);
+  for(const [i,name]of devices.entries())args.push('-S','object_names['+(i+2)+'].name',name,'-S','controls['+i+'].name',String(i+2));
   await run('invader-edit',['-n',...args,scenario]);
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');
   const results=[];
   for(const returnAfterInsertion of [false,true]){
    const sources=[];
    for(const faction of ['unsc','covenant']){
-    const role=faction==='unsc'?'pelican':'spirit';const source=exportHaloCeTransport({faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{})});
+    const role=faction==='unsc'?'pelican':'spirit';const source=exportHaloCeTransport({faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:faction==='covenant'?'spirit_zone':'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{})});
     await fs.writeFile(path.join(data,'scripts',source.filename),source.content);sources.push({filename:source.filename,sha256:crypto.createHash('sha256').update(source.content).digest('hex')});
    }
    await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
@@ -217,8 +221,20 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
    }
    results.push({returnAfterInsertion,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
   }
-  const recoveredStudio={...emptyCreatorStudio(),missions:[{id:'arrive',title:'Arrive',objective:'Leave the Spirit at the landing zone',trigger:'triggerVolume',triggerRef:'extraction_zone',encounterName:'',transportInsertion:'spirit'},{id:'clear',title:'Clear',objective:'Defeat the authored group',trigger:'encounterCleared',encounterName:'pilot_pelican'}]};
-  const recovered=[];for(const activation of ['manual','startup']){const source=recoveredCampaignMission(recoveredStudio,activation,true);await fs.writeFile(path.join(data,'scripts',source.filename),source.content);await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);const scripts=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/),globals=(await run('invader-edit',['-G','globals[*].name',scenario])).split(/\r?\n/);assert.ok(scripts.includes('gs_mission_bootstrap')&&scripts.includes('gs_mission'));assert.ok(!globals.includes('gs_logic_ready'));assert.ok(globals.includes('gs_spirit_player_arrived')&&globals.includes('gs_pelican_player_arrived'));assert.ok(source.content.includes('(sleep_until gs_spirit_player_arrived 1)'));recovered.push({activation,sourceSha256:crypto.createHash('sha256').update(source.content).digest('hex'),scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex'),scripts});}
+  const buildId='reviewed_source',project={id:'transport',quickForge:null,studio:emptyCreatorStudio(),builds:[{id:buildId,status:'validated'}]};
+  const native={projectId:project.id,buildId,class:'scnr',sourceTarget:'gbx-custom',canAppendEncounter:true,tagSha256:'a'.repeat(64),
+   scenarioVolumes:[...new Set([...volumes,'be_insert','be_artifact','be_extract'])].map(name=>({name,kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,4,4]}})),
+   scenarioDevices:devices.map(name=>({name,class:'ctrl'})),scenarioSquads:encounters.map((encounterName,encounter)=>({encounterName,encounter})),
+   missionSource:{encounters:encounters.map(name=>({name,initiallyCreated:false})),weapons:[]}};
+  let next=0;const {studio:recoveredStudio}=connectBlackEchoObjectives(project,()=> 'covenant_'+(++next),native,defaultBlackEchoOptions('covenant'));
+  assert.equal(recoveredStudio.missions.length,7);
+  recoveredStudio.missions[3].weaponPath='technology';
+  await run('invader-edit',['-N','technology.weapon']);
+  const hud=recoveredStudio.missions.map((beat,index)=>'gs_mission_obj_'+(index+1)+'='+beat.hudText).join('\r\n');
+  await fs.writeFile(path.join(data,'transport_messages.hmt'),Buffer.concat([Buffer.from([255,254]),Buffer.from(hud+'\r\n'+'gs_mission_fail_2=Rescue failed.\r\n','utf16le')]));
+  await run('invader-string',['-d',data,'-T','hud_message_text','transport_messages']);
+  await run('invader-edit',['-n','-S','hud_messages','transport_messages.hud_message_text',scenario]);
+  const recovered=[];for(const activation of ['manual','startup']){const source=recoveredCampaignMission(recoveredStudio,activation,true);await fs.writeFile(path.join(data,'scripts',source.filename),source.content);await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);const scripts=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/),globals=(await run('invader-edit',['-G','globals[*].name',scenario])).split(/\r?\n/);assert.ok(scripts.includes('gs_mission_bootstrap')&&scripts.includes('gs_mission'));assert.ok(!globals.includes('gs_logic_ready'));assert.ok(globals.includes('gs_spirit_player_arrived')&&globals.includes('gs_pelican_player_arrived'));assert.ok(source.content.includes('(sleep_until gs_spirit_player_arrived 1)'));assert.ok(scripts.includes('forerunner_extraction_complete')&&globals.includes('gs_visit_5')&&globals.includes('gs_settled_7'));assert.ok(source.content.indexOf('(sleep_until gs_spirit_player_arrived 1)')<source.content.indexOf('(ai_place be_covenant)'));recovered.push({activation,sourceSha256:crypto.createHash('sha256').update(source.content).digest('hex'),scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex'),scripts});}
   console.log(JSON.stringify({nativeTransportSyntax:'pass',results,recoveredMissionSyntax:recovered,cacheBuilt:false,gameplayVerified:false}));
  },{reservationBytes:32*1024*1024});
 }
