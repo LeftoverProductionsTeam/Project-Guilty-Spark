@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - Black Echo Marine escort after native Pelican insertion
-Status: awaiting human verification
+Task: Operation110 - stabilize the native Black Echo Pelican departure
+Status: implementation incomplete
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 08fea886. CE609 rescue cache 51ba08d6 compiled and independently read back. Two Forerunner clients flew and disembarked on predecessor 0ec05e41.
-Next action: Load exact 51ba08d6 in the existing reviewed two-client Forerunner trial. Observe the living Marine reach be_survivors, then Covenant reinforcements, later objectives and settlement. Independently investigate Covenant terminal targeting and original Save37944 when new evidence becomes available.
+Latest verified revision: 3c592d0 plus the verified Save session-publication repair. Exact 51ba08d6 paired trace reached Marine rescue and technology spawn.
+Next action: Compare the failed Pelican origin (50.323,-101.451,2.003) and northward drift with the successful trace and compiled BSP. Make the initial movement and climb reliable from observed headings before subsequent field legs. Test both paired trials through actual collection and settlement. Covenant terminal activation and original Save37944 remain open.
 
 ## Acceptance
 
@@ -15,6 +15,8 @@ Owner's current Engineering Correction d377d97b and Development & Verification/V
 Full Operation110, M1–M6 and all475 historical requirement IDs remain active. Updated goal6abac492, anti-overengineering8e568da0 and unified Spark–Forerunner65a424af are preserved in existing Master Engineering Prompts. Spark authors; Forerunner executes. Owner explicitly provides D:/Project Forerunner. Only Spark is modified. No new runtime manager/editor/queue/contract system, branch/worktree/clone/archive, push or publication. Preserve original Halo files/ISOs/maps/mods/tags/SDKs/runtimes, source/Git/stashes and accepted C49/preview5 releases. Owner subsequently authorized bounded automatically deleted external test output for native checks. All source work stays in D:/Project Guilty Spark; no other project writes, persistent test warehouse, policy bypass or unrelated Codex cleanup.
 
 ## Verified milestones
+
+18Nov Save publication: a Windows session database refusal reproduced a changed descriptor after failed Save. Session draft and baseline writes now stage before descriptor and recovery publication. Focused core84 and native seven-objective, 42-edit workflow passed. The original intermittent Save37944 report has not been linked to this cause. Paired Black Echo 51ba08d6 reached successful native Marine rescue, Covenant combat and technology spawn. A separate trial rejected two outgoing Pelican commands. Full hashes and boundaries are in RUNTIME_INTEGRATION_20261107.
 
 18Nov Black Echo Marine rescue: paired predecessor flight and disembarkation passed. The Marine remained stationary after squad transfer. CE609 candidate 51ba08d6 adds a grounded native command route with 22 waypoints and passes independent readback. Evidence and hashes are in RUNTIME_INTEGRATION_20261107. Candidate gameplay is pending.
 

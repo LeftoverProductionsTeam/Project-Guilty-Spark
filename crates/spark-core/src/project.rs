@@ -456,6 +456,16 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
     atomic_write_checked(path,bytes,backup,None)
 }
 pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:Option<&FileRevision>)->Result<Option<PathBuf>> {
+    atomic_write_before_publish(path, bytes, backup, expected, |_| Ok(()))
+}
+
+fn atomic_write_before_publish(
+    path: &Path,
+    bytes: &[u8],
+    backup: bool,
+    expected: Option<&FileRevision>,
+    prepare: impl FnOnce(&FileRevision) -> Result<()>,
+) -> Result<Option<PathBuf>> {
     reject_links(path)?;
     if let Some(expected)=expected{expected.verify(path)?;}
     #[cfg(windows)]
@@ -493,6 +503,7 @@ pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:O
         use sha2::{Digest, Sha256};
         staged_revision = Some(StagedRevision { file: FileRevision { identity: Some(identity), sha256: Some(crate::hex_bytes(Sha256::digest(bytes))) }, len: bytes.len() as u64 });
         drop(f);
+        prepare(&staged_revision.as_ref().unwrap().file)?;
         let bak = if !create_only && backup && path.is_file() {
             let bak = parent.join(format!(
                 "{}.bak-{}",
@@ -686,13 +697,21 @@ pub fn save_project(path:&Path,project:&Project)->Result<()> {
 /// revision. These new ownership checks do not alter portable serialization.
 pub(crate) fn save_managed_project(path:&Path,project:&Project)->Result<()> {
     let expected=FileRevision::capture(path)?;
-    save_managed_project_checked(path,project,&expected)
+    save_managed_project_prepared(path, project, &expected, |_| Ok(()))
 }
-pub(crate) fn save_managed_project_checked(path:&Path,project:&Project,expected:&FileRevision)->Result<()> {
+pub(crate) fn save_managed_project_prepared(
+    path: &Path,
+    project: &Project,
+    expected: &FileRevision,
+    prepare: impl FnOnce(&FileRevision) -> Result<()>,
+) -> Result<()> {
     expected.verify(path)?;
     let bytes=encoded_project(path,project)?;
-    if path.is_file()&&fs::metadata(path)?.len()==bytes.len() as u64&&fs::read(path)?==bytes{return Ok(());}
-    if path.is_file() {
+    if path.is_file()&&fs::metadata(path)?.len()==bytes.len() as u64&&fs::read(path)?==bytes{
+        prepare(expected)?;
+        return expected.verify(path);
+    }
+    let recovery = if path.is_file() {
         let previous=load_project(path)?;
         // A validated source-less descriptor may receive its first source.
         // Existing source bindings remain immutable; Library::save retains
@@ -709,13 +728,21 @@ pub(crate) fn save_managed_project_checked(path:&Path,project:&Project,expected:
                 return invalid("Existing project recovery backup belongs to another source or project; it was retained");
             }
         }
-        // One independently written previous-good recovery copy is separate
-        // from optional versioned backups. Legacy UUID backups stay untouched.
-        let recovery_revision=FileRevision::capture(&recovery)?;
-        expected.verify(path)?;
-        atomic_write_checked(&recovery,&fs::read(path)?,false,Some(&recovery_revision))?;
-    }
-    atomic_write_checked(path, &bytes, false,Some(expected))?;
+        let recovery_revision = FileRevision::capture(&recovery)?;
+        Some((recovery, recovery_revision))
+    } else {
+        None
+    };
+    atomic_write_before_publish(path, &bytes, false, Some(expected), |revision| {
+        prepare(revision)?;
+        if let Some((recovery, recovery_revision)) = recovery {
+            // Keep one independently written previous-good copy. A refused
+            // preparation never rotates it or publishes the new descriptor.
+            expected.verify(path)?;
+            atomic_write_checked(&recovery, &fs::read(path)?, false, Some(&recovery_revision))?;
+        }
+        Ok(())
+    })?;
     Ok(())
 }
 pub fn project_recovery_path(path:&Path)->Result<PathBuf> {

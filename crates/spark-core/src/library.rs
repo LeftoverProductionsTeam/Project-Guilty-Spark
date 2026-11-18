@@ -139,7 +139,7 @@ impl Library {
             if project.id!=id||!crate::workspace_history::recoverable_save(&path.join("window-history"),&project)?{continue;}
             // Same descriptor bytes; retain that identity across an index wait.
             // No map, dependency tree or historical archive is copied.
-            self.save_internal_checked(&project,None,false,Some(&expected))?;
+            self.save_internal_checked(&project,None,false,Some(&expected),None)?;
         }
         Ok(())
     }
@@ -394,17 +394,19 @@ impl Library {
     }
     fn save_explicit_unlocked(&self,project:&Project,inspection:Option<&maps::MapInspection>)->Result<LibraryEntry>{
         let expected=self.validate_explicit_save(project)?;
-        let entry=self.save_internal_checked(project,inspection,false,Some(&expected))?;
-        if let Some(session)=&self.session{
-            session.save(project,inspection)?;
-            session.set_setting(&format!("savedBaseline.{}",project.id),&project::FileRevision::capture(&self.project_dir(&project.id)?.join("project.gsproject"))?)?;
-        }
-        Ok(entry)
+        self.save_internal_checked(project, inspection, false, Some(&expected), self.session.as_deref())
     }
     fn save_internal(&self,project:&Project,inspection:Option<&maps::MapInspection>,preview:bool)->Result<LibraryEntry> {
-        self.save_internal_checked(project,inspection,preview,None)
+        self.save_internal_checked(project, inspection, preview, None, None)
     }
-    fn save_internal_checked(&self,project:&Project,inspection:Option<&maps::MapInspection>,preview:bool,expected:Option<&project::FileRevision>)->Result<LibraryEntry> {
+    fn save_internal_checked(
+        &self,
+        project: &Project,
+        inspection: Option<&maps::MapInspection>,
+        preview: bool,
+        expected: Option<&project::FileRevision>,
+        save_session: Option<&Self>,
+    ) -> Result<LibraryEntry> {
         project.validate()?;
         let dir = self.project_dir(&project.id)?;
         let file = dir.join("project.gsproject");
@@ -484,9 +486,32 @@ impl Library {
             self.db.execute("INSERT INTO projects(id,summary) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary",params![project.id,serde_json::to_string(&entry)?])?;
             // The index can wait on another writer. Keep the pre-wait source
             // revision through publication rather than adopting changed bytes.
-            if let Some(expected)=expected{project::save_managed_project_checked(&file,project,expected)?;}
-            else{project::save_managed_project(&file,project)?;}
-            if let Some(transaction)=transaction{transaction.commit()?;}return Ok(entry);
+            let session_transaction = if let Some(session) = save_session {
+                let transaction = session.db.unchecked_transaction()?;
+                session.save(project, inspection)?;
+                Some(transaction)
+            } else {
+                None
+            };
+            if let Some(expected) = expected {
+                project::save_managed_project_prepared(&file, project, expected, |revision| {
+                    if let Some(session) = save_session {
+                        // Stage the exact identity of the descriptor about to be
+                        // published. A refused session write leaves both files intact.
+                        session.set_setting(&format!("savedBaseline.{}", project.id), revision)?;
+                    }
+                    Ok(())
+                })?;
+            } else {
+                project::save_managed_project(&file, project)?;
+            }
+            if let Some(transaction) = transaction {
+                transaction.commit()?;
+            }
+            if let Some(transaction) = session_transaction {
+                transaction.commit()?;
+            }
+            return Ok(entry);
         }
         self.db.execute("INSERT INTO projects(id,summary) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary",params![project.id,serde_json::to_string(&entry)?])?;
         Ok(entry)
@@ -962,5 +987,72 @@ mod import_retention_report_tests {
         assert!(message.contains("Original import failure"));assert!(message.contains(&fs::canonicalize(&directory).unwrap().display().to_string()));
         assert!(message.contains("retained"));drop(files);assert_eq!(fs::read(directory.join("independent.txt")).unwrap(),b"must remain");
         assert!(directory.join(".spark-import-owner").is_file());
+    }
+}
+
+#[cfg(test)]
+mod save_session_tests {
+    use super::*;
+    use crate::workspace_history::{Head, Session, Snapshot};
+
+    #[test]
+    fn session_write_failures_leave_the_saved_descriptor_and_undo_selection_intact() {
+        for (table, trigger_predicate) in [
+            ("documents", "1"),
+            ("settings", "NEW.key LIKE 'savedBaseline.%'"),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let library = Library::workspace(root.path()).unwrap();
+            let mut project = library.create("Saved source").unwrap();
+            let dir = library.project_dir(&project.id).unwrap();
+            let descriptor = dir.join("project.gsproject");
+            let recovery = project::project_recovery_path(&descriptor).unwrap();
+            let journal = dir.join("window-history");
+            let mut history = Session::default();
+            let previous_key = uuid::Uuid::new_v4().to_string();
+            history.commit(&journal, &project, 0,
+                Head { current: previous_key.clone(), past: vec![], future: vec![], dirty: true, limit: 8 },
+                vec![Snapshot { key: previous_key.clone(), project: project.clone() }],
+            ).unwrap();
+            library.save_with_history(&mut history, &project).unwrap();
+            let saved = project::FileRevision::capture(&descriptor).unwrap();
+            let saved_recovery = project::FileRevision::capture(&recovery).unwrap();
+
+            project.title = "Acknowledged draft".into();
+            let draft_key = uuid::Uuid::new_v4().to_string();
+            history.commit(&journal, &project, 1,
+                Head { current: draft_key.clone(), past: vec![previous_key.clone()], future: vec![], dirty: true, limit: 8 },
+                vec![Snapshot { key: draft_key.clone(), project: project.clone() }],
+            ).unwrap();
+            let session = library.session.as_ref().unwrap();
+            session.db.execute_batch(&format!(
+                "CREATE TRIGGER refuse_session_save BEFORE INSERT ON {table}
+                 WHEN {trigger_predicate} BEGIN SELECT RAISE(ABORT, 'session write refused'); END;",
+            )).unwrap();
+
+            let reason = library.save_with_history(&mut history, &project).unwrap_err();
+            assert!(reason.to_string().contains("session write refused"));
+            assert_eq!(project::FileRevision::capture(&descriptor).unwrap(), saved, "{table}");
+            assert_eq!(project::FileRevision::capture(&recovery).unwrap(), saved_recovery, "{table}");
+            assert_eq!(library.saved_project(&project.id).unwrap().title, "Saved source");
+            assert_eq!(library.get(&project.id).unwrap().title, "Saved source");
+            let pending = history.read(&journal, &project).unwrap().unwrap();
+            assert!(pending.head.dirty);
+            assert_eq!(pending.head.current, draft_key);
+            let recovered = Session::default().read(&journal, &project).unwrap().unwrap();
+            assert!(!recovered.head.dirty);
+            assert_eq!(recovered.head.current, previous_key);
+
+            session.db.execute_batch("DROP TRIGGER refuse_session_save").unwrap();
+            library.save_with_history(&mut history, &project).unwrap();
+            drop(library);
+            let library = Library::workspace(root.path()).unwrap();
+            let reopened = library.get(&project.id).unwrap();
+            let view = Session::default().read(&journal, &reopened).unwrap().unwrap();
+            assert_eq!(reopened.title, "Acknowledged draft");
+            assert!(!view.head.dirty);
+            assert_eq!(view.head.current, draft_key);
+            assert_eq!(view.head.past, vec![previous_key]);
+        }
     }
 }
