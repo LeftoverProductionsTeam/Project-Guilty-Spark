@@ -125,7 +125,7 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
       if (action.type === 'mesh') return { ...d, meshes: { ...d.meshes, [action.assetId]: action.mesh } };
       if (action.type === 'saved')
         return { ...d, savedRevision: (d.savedRevision ?? 0) + 1,
-          history: d.history.current === action.project ? historyReducer(d.history, { type: 'saved' }) : d.history };
+          history: historyReducer(d.history, { type: 'saved', project: action.project }) };
       return { ...d, history: historyReducer(d.history, action.action) };
     }),
   };

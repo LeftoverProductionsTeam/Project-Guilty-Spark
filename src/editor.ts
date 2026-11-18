@@ -9,6 +9,7 @@ export interface HistoryState {
   past: Project[];
   future: Project[];
   dirty: boolean;
+  saved?: Project;
   limit:number;
 }
 export type HistoryAction =
@@ -16,7 +17,7 @@ export type HistoryAction =
   | { type: 'edit'; project: Project; description: string }
   | { type: 'undo' }
   | { type: 'redo' }
-  | { type: 'saved' }
+  | { type: 'saved'; project: Project }
   | { type: 'forge-remote';projectId:string;document:QuickForgeDocument }
   | { type: 'forge-defaults';projectId:string;materials:ForgeMaterial[] }
   | { type: 'builds'; project: Project }
@@ -26,8 +27,12 @@ export type HistoryAction =
 export const initialHistory: HistoryState = { current: null, past: [], future: [], dirty: false,limit:DEFAULT_HISTORY_LIMIT };
 export function historyReducer(state: HistoryState, action: HistoryAction): HistoryState {
   if(action.type==='history-limit')return validHistoryLimit(action.limit)?{...state,limit:action.limit,past:state.past.slice(-action.limit),future:state.future.slice(0,action.limit)}:state;
-  if (action.type === 'load') return { current: action.project, past: [], future: [], dirty: false,limit:state.limit };
-  if (action.type === 'saved') return { ...state, dirty: false };
+  if (action.type === 'load') return { current: action.project, saved: action.project, past: [], future: [], dirty: false,limit:state.limit };
+  if (action.type === 'saved') {
+    const saved=action.project;
+    return state.current&&saved.id===state.current.id
+      ?{...state,saved,dirty:!sameAuthoredSnapshot(state.current,saved)}:state;
+  }
   if (!state.current) return state;
   if(action.type==='forge-defaults'){
     const current=state.current;
@@ -85,24 +90,18 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
         { id: crypto.randomUUID(), timestamp: new Date().toISOString(), description: action.description },
       ].slice(-2000),
     };
-    return { current: p, past: [...state.past, state.current].slice(-state.limit), future: [], dirty: true,limit:state.limit };
+    return { ...state, current: p, past: [...state.past, state.current].slice(-state.limit), future: [], dirty: true };
   }
-  if (action.type === 'undo' && state.past.length)
-    return {
-      current: state.past.at(-1)!,
-      past: state.past.slice(0, -1),
-      future: [state.current, ...state.future],
-      dirty: true,
-      limit:state.limit,
-    };
-  if (action.type === 'redo' && state.future.length)
-    return {
-      current: state.future[0],
-      past: [...state.past, state.current].slice(-state.limit),
-      future: state.future.slice(1),
-      dirty: true,
-      limit:state.limit,
-    };
+  if (action.type === 'undo' && state.past.length) {
+    const current=state.past.at(-1)!;
+    return {...state,current,past:state.past.slice(0,-1),future:[state.current,...state.future],
+      dirty:!state.saved||!sameAuthoredSnapshot(current,state.saved)};
+  }
+  if (action.type === 'redo' && state.future.length) {
+    const current=state.future[0];
+    return {...state,current,past:[...state.past,state.current].slice(-state.limit),future:state.future.slice(1),
+      dirty:!state.saved||!sameAuthoredSnapshot(current,state.saved)};
+  }
   if ((action.type === 'builds'||action.type==='assets') && action.project.id === state.current.id) {
     const merge = (p: Project) => action.type==='assets'?({ ...p, assets:action.project.assets }):({ ...p, builds: action.project.builds });
     return {
@@ -114,6 +113,14 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
   }
   return state;
 }
+// Native tool receipts and resources update every snapshot outside Undo.
+export function sameAuthoredSnapshot(a:Project,b:Project) {
+  if(a===b)return true;
+  if(a.id!==b.id||a.createdAt!==b.createdAt||a.modifiedAt!==b.modifiedAt)return false;
+  const authored=(p:Project)=>({...p,assets:[],builds:[],source:p.source?{...p.source,resourceDirectory:null,resourceSha256:{},audioResources:null}:null});
+  return sameJson(authored(a),authored(b));
+}
+
 export function fieldValue(project: Project, tag: Tag, field: TagField): number {
   return project.tagEdits.find((e) => e.tagId === tag.id && e.fieldKey === field.key)?.value ?? field.value;
 }

@@ -161,7 +161,7 @@ describe('project history', () => {
       description: 'Move object',
     });
     expect(h.current?.scene[0].position).toEqual([1, 2, 3]);
-    h = historyReducer(h, { type: 'saved' });
+    h = historyReducer(h, { type: 'saved', project: h.current! });
     h = historyReducer(h, { type: 'undo' });
     expect(h.current?.scene[0].position).toEqual([0, 0, 0]);
     expect(h.dirty).toBe(true);

@@ -20,7 +20,10 @@ it('serializes rapid revisions, sends each immutable snapshot once and retains u
   expect(call.mock.calls.filter(c=>c[0]==='commit_workspace_history').map(c=>c[1].snapshots.length)).toEqual([1,1]);
   const restored=await broker.attach(p.id);expect(restored.history?.current?.title).toBe('edited');expect(restored.history?.past[0].title).toBe('one');
   await broker.persist(p.id,historyReducer(restored.history!,{type:'undo'}));
-  expect(call.mock.calls.at(-1)?.[1].snapshots).toEqual([]);expect((await broker.attach(p.id)).history?.future[0].title).toBe('edited');
+  expect(call.mock.calls.at(-1)?.[1].snapshots).toEqual([]);
+  const undone=(await broker.attach(p.id)).history!;
+  expect(undone.dirty).toBe(false);expect(undone.saved).toBe(undone.current);expect(undone.future[0].title).toBe('edited');
+  expect(historyReducer(undone,{type:'redo'}).dirty).toBe(true);
 });
 it('keeps rejected edits blocked and observable to save/close instead of acknowledging them',async()=>{
   call.mockResolvedValueOnce({writable:true,owner:'owner',history:null}).mockRejectedValueOnce(Error('Revision conflict; draft retained'));

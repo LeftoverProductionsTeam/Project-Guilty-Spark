@@ -13,6 +13,8 @@ const MAX_TRANSFER: usize = 64 * 1024 * 1024;
 pub struct Head {
     pub current: String, pub past: Vec<String>, pub future: Vec<String>,
     pub dirty: bool, pub limit: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_key: Option<String>,
 }
 impl Head {
     fn keys(&self) -> impl Iterator<Item=&String> { std::iter::once(&self.current).chain(&self.past).chain(&self.future) }
@@ -20,7 +22,7 @@ impl Head {
         if !(1..=1000).contains(&self.limit) || self.past.len()>self.limit || self.future.len()>self.limit {
             return invalid("Window history exceeds its configured bound");
         }
-        for key in self.keys() { uuid::Uuid::parse_str(key).map_err(|_|crate::SparkError::Invalid("Invalid history snapshot identity".into()))?; }
+        for key in self.keys().chain(self.saved_key.iter()) { uuid::Uuid::parse_str(key).map_err(|_|crate::SparkError::Invalid("Invalid history snapshot identity".into()))?; }
         Ok(())
     }
 }
@@ -250,8 +252,18 @@ impl Session {
         }
         Ok(Some(View{revision:state.revision,head:state.head.clone(),snapshots}))
     }
-    pub fn commit(&mut self,dir:&Path,registered:&Project,expected:u64,head:Head,additions:Vec<Snapshot>)->Result<u64>{
+    pub fn commit(&mut self,dir:&Path,registered:&Project,expected:u64,mut head:Head,additions:Vec<Snapshot>)->Result<u64>{
         self.attach(dir,registered)?;let document=&self.documents[&registered.id];
+        head.validate()?;
+        // A queued edit may predate a Save already published by this journal.
+        // Keep the acknowledged baseline even after it falls out of the Undo ring.
+        if let Some(previous)=document.state.as_ref().map(|state|&state.head){
+            if let Some(saved)=previous.saved_key.as_ref().or_else(||(!previous.dirty).then_some(&previous.current)){
+                head.saved_key=Some(saved.clone());
+            }
+        }
+        if head.saved_key.is_none()&&!head.dirty{head.saved_key=Some(head.current.clone());}
+        if let Some(saved)=&head.saved_key{head.dirty=&head.current!=saved;}
         for item in &additions{let sha=digest(&serde_json::to_vec(&item.project)?);if document.immutable.get(&item.key).is_some_and(|known|*known!=sha){return invalid("An immutable history snapshot cannot be overwritten");}}
         let repeated_head=additions.is_empty()&&document.state.as_ref().is_some_and(|state|state.head==head);
         let prepared=prepare_commit(registered,document.state.clone(),expected,head,additions,MAX_TRANSFER,|key|Ok(document.snapshots.get(key).cloned()))?;
@@ -365,6 +377,7 @@ impl Session {
         let previous_state=checked(dir,registered)?;
         let desired=digest(&project::encoded_project(&descriptor,registered)?);
         state.head.dirty=false;
+        state.head.saved_key=Some(state.head.current.clone());
         // A repeated Save has no new descriptor boundary. Its previous state
         // would have the same hash, so one ordinary acknowledged head suffices.
         let boundary=(before.sha256.as_deref()!=Some(&desired)).then(||SaveBoundary{
@@ -383,7 +396,7 @@ impl Session {
     }
     pub fn saved_checkpoint(&mut self,dir:&Path,registered:&Project)->Result<()> {
         self.attach(dir,registered)?;let previous=self.documents[&registered.id].clone();
-        if let Some(state)=&mut self.documents.get_mut(&registered.id).unwrap().state{state.head.dirty=false;}
+        if let Some(state)=&mut self.documents.get_mut(&registered.id).unwrap().state{state.head.dirty=false;state.head.saved_key=Some(state.head.current.clone());}
         let result=self.checkpoint(dir,registered);
         if result.is_err(){self.documents.insert(registered.id.clone(),previous);}
         result
@@ -398,8 +411,10 @@ impl Session {
     pub fn reset_saved(&mut self,dir:&Path,registered:&Project)->Result<()> {
         self.attach(dir,registered)?;let previous=self.documents[&registered.id].clone();
         let revision=previous.state.as_ref().map_or(0,|state|state.revision);
-        let key=uuid::Uuid::new_v4().to_string();let head=Head{current:key.clone(),past:vec![],future:vec![],dirty:false,limit:previous.state.as_ref().map_or(100,|state|state.head.limit)};
-        let result=(||{self.commit(dir,registered,revision,head,vec![Snapshot{key,project:registered.clone()}])?;
+        let key=uuid::Uuid::new_v4().to_string();let head=Head{current:key.clone(),past:vec![],future:vec![],dirty:false,limit:previous.state.as_ref().map_or(100,|state|state.head.limit),saved_key:Some(key.clone())};
+        let result=(||{self.commit(dir,registered,revision,head,vec![Snapshot{key:key.clone(),project:registered.clone()}])?;
+            let saved=&mut self.documents.get_mut(&registered.id).unwrap().state.as_mut().unwrap().head;
+            saved.saved_key=Some(key);saved.dirty=false;
             if dir.join("head.json").exists(){self.checkpoint(dir,registered)?;}Ok(())})();
         if result.is_err(){self.documents.insert(registered.id.clone(),previous);}
         result
@@ -451,7 +466,7 @@ impl Session {
         assert_eq!(fs::read(dir.path().join("head.json")).unwrap(),accepted);assert_eq!(read(dir.path(),&good).unwrap().unwrap().revision,1);
         let mut foreign=snapshots;foreign[0].project.id=uuid::Uuid::new_v4().to_string();assert!(retain_draft(dir.path(),&good,1,&h,&foreign).is_err());
     }
-    fn head(key:String)->Head{Head{current:key,past:vec![],future:vec![],dirty:true,limit:100}}
+    fn head(key:String)->Head{Head{current:key,past:vec![],future:vec![],dirty:true,limit:100,saved_key:None}}
     #[test] fn durable_handoff_undo_redo_and_stale_owner_conflicts(){
         let dir=tempfile::tempdir().unwrap();let p=Project::new("A");let a=uuid::Uuid::new_v4().to_string();
         let mut h=head(a.clone());assert_eq!(commit(dir.path(),&p,0,h.clone(),vec![Snapshot{key:a.clone(),project:p.clone()}]).unwrap(),1);

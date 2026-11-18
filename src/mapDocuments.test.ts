@@ -33,6 +33,11 @@ describe('Independent open map documents',()=>{
     const saved=state.documents.find(d=>d.id==='a')!;
     expect(saved.savedRevision).toBe(1);expect(saved.history.current).toBe(latestStored);expect(saved.history.dirty).toBe(true);
     expect(saved.history.past.at(-1)).toBe(pending);expect(state.documents.find(d=>d.id==='b')).toBe(bBefore);
+    const move=(action:'undo'|'redo')=>{state=documentReducer(state,{type:'history',id:'a',action:{type:action}});return state.documents.find(d=>d.id==='a')!.history;};
+    const undone=move('undo');expect(undone.current).toBe(pending);expect(undone.dirty).toBe(false);expect(undone.future).toEqual([latestStored]);
+    expect(move('undo').dirty).toBe(true);
+    expect(move('redo').dirty).toBe(false);
+    expect(move('redo').dirty).toBe(true);
     expect(state.activeId).toBe('b');
   });
   it('retains verified immutable geometry on reopen and invalidates it for source or resource changes',()=>{

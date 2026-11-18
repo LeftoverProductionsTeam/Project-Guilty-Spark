@@ -110,7 +110,7 @@ fn failed_explicit_save_keeps_descriptor_and_history_together() {
     let temp=tempfile::tempdir().unwrap();let library=Library::workspace(&temp.path().join("library")).unwrap();
     let mut saved=library.create("Accepted Save").unwrap();let dir=library.project_dir(&saved.id).unwrap().join("window-history");
     let mut history=Session::default();let a=uuid::Uuid::new_v4().to_string();
-    let mut head=Head{current:a.clone(),past:vec![],future:vec![],dirty:true,limit:100};
+    let mut head=Head{current:a.clone(),past:vec![],future:vec![],dirty:true,limit:100,saved_key:None};
     history.commit(&dir,&saved,0,head.clone(),vec![Snapshot{key:a.clone(),project:saved.clone()}]).unwrap();
     let file=library.save_with_history(&mut history,&saved).unwrap().project_path;
     let accepted=std::fs::read(&file).unwrap();saved.title="New unsaved edit".into();let b=uuid::Uuid::new_v4().to_string();
@@ -160,7 +160,7 @@ fn malformed_optional_build_metadata_keeps_source_and_undo_accessible() {
     p.quick_forge=Some(quickforge::create_arena("Recoverable source","smallIndoorArena").unwrap());
     library.save(&p,None).unwrap();let mut history=Session::default();let key=uuid::Uuid::new_v4().to_string();
     let dir=library.project_dir(&p.id).unwrap();let journal=dir.join("window-history");
-    let head=Head{current:key.clone(),past:vec![],future:vec![],dirty:true,limit:100};
+    let head=Head{current:key.clone(),past:vec![],future:vec![],dirty:true,limit:100,saved_key:None};
     history.commit(&journal,&p,0,head,vec![Snapshot{key:key.clone(),project:p.clone()}]).unwrap();
     let file=library.save_with_history(&mut history,&p).unwrap().project_path;
     let original=std::fs::read(&file).unwrap();let saved_head=std::fs::read(journal.join("head.json")).unwrap();drop(library);

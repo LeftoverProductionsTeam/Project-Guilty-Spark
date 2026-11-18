@@ -1,21 +1,12 @@
-import type { HistoryState } from './editor';
+import {sameAuthoredSnapshot,type HistoryState} from './editor';
 import type { Project } from './types';
 import { call } from './api';
-import {sameJson} from './semanticJson';
-type Head={current:string;past:string[];future:string[];dirty:boolean;limit:number};
+type Head={current:string;past:string[];future:string[];dirty:boolean;limit:number;savedKey?:string};
 type Snapshot={key:string;project:Project};
 export type WindowHistoryView={revision:number;head:Head;snapshots:Snapshot[]};
 export type WindowHistoryStatus={writable:boolean;owner:string|null;history:WindowHistoryView|null};
 type CommitReceipt={revision:number;recoveryWarning:string|null};
 type Entry={revision:number;keys:WeakMap<Project,string>;known:Set<string>;tail:Promise<void>;blocked:boolean;last?:HistoryState;recoveryWarning?:string};
-// These fields are overlaid from the registered native project by
-// read_workspace_history. Changing them is not a new authored Undo snapshot.
-// Keep source identity, author timestamps and every editable field in comparison.
-function sameAuthoredSnapshot(a:Project,b:Project){
-  if(a.id!==b.id||a.createdAt!==b.createdAt||a.modifiedAt!==b.modifiedAt)return false;
-  const authored=(p:Project)=>({...p,assets:[],builds:[],source:p.source?{...p.source,resourceDirectory:null,resourceSha256:{},audioResources:null}:null});
-  return sameJson(authored(a),authored(b));
-}
 /** A notification received during an in-flight read requires another read.
  * Dropping it can leave an observing window permanently one revision behind. */
 export function queuedWindowRefresh(refresh:(id:string)=>Promise<void>,failed:(error:unknown)=>void){
@@ -46,7 +37,9 @@ export class WindowHistories {
     if(status.history){
       const byKey=new Map(status.history.snapshots.map(s=>{entry.keys.set(s.project,s.key);entry.known.add(s.key);return[s.key,s.project] as const;}));
       const get=(key:string)=>{const p=byKey.get(key);if(!p||p.id!==id)throw Error('Window history contains an unknown project snapshot');return p;};
-      const h=status.history.head;history={current:get(h.current),past:h.past.map(get),future:h.future.map(get),dirty:h.dirty,limit:h.limit};entry.last=history;
+      const h=status.history.head,current=get(h.current);
+      const saved=h.savedKey?byKey.get(h.savedKey):h.dirty?undefined:current;
+      history={current,past:h.past.map(get),future:h.future.map(get),dirty:h.dirty,limit:h.limit,saved};entry.last=history;
     }
     this.entries.set(id,entry);return{status,history};
   }
@@ -59,6 +52,7 @@ export class WindowHistories {
     if(!history.current)throw Error('No local draft to retain');
     const keys=new Map<Project,string>(),key=(p:Project)=>{let k=keys.get(p);if(!k){k=crypto.randomUUID();keys.set(p,k);}return k;};
     const head:Head={current:key(history.current),past:history.past.map(key),future:history.future.map(key),dirty:history.dirty,limit:history.limit};
+    if(history.saved){const saved=[...keys].find(([project])=>sameAuthoredSnapshot(project,history.saved!));if(saved)head.savedKey=saved[1];}
     const snapshots=[...keys].map(([project,key])=>({key,project}));
     const retained=await call<string>('retain_workspace_draft',{projectId:id,revision:this.revision(id),head,snapshots});
     this.forgetDiscarded(id);return{retained,...await this.attach(id)};
@@ -81,7 +75,11 @@ export class WindowHistories {
     const key=(p:Project)=>{let k=entry.keys.get(p);if(!k){k=crypto.randomUUID();entry.keys.set(p,k);}return k;};
     const all=[history.current,...history.past,...history.future];
     const head:Head={current:key(history.current),past:history.past.map(key),future:history.future.map(key),dirty:history.dirty,limit:history.limit};
-    if(previous?.current&&previous.dirty===head.dirty&&previous.limit===head.limit&&
+    if(history.saved){
+      head.savedKey=entry.keys.get(history.saved);
+      if(!head.savedKey){const retained=all.find(p=>sameAuthoredSnapshot(p,history.saved!));if(retained)head.savedKey=key(retained);}
+    }
+    if(previous?.current&&previous.saved===history.saved&&previous.dirty===head.dirty&&previous.limit===head.limit&&
        entry.keys.get(previous.current)===head.current&&previous.past.length===head.past.length&&previous.future.length===head.future.length&&
        previous.past.every((p,i)=>entry.keys.get(p)===head.past[i])&&previous.future.every((p,i)=>entry.keys.get(p)===head.future[i]))return entry.tail;
     const operation=entry.tail.then(async()=>{

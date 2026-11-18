@@ -1538,7 +1538,7 @@ mod tests {
         let mut history = Session::default();
         let original_key = uuid::Uuid::new_v4().to_string();
         history.commit(&journal, &project, 0,
-            Head { current: original_key.clone(), past: vec![], future: vec![], dirty: true, limit: 8 },
+            Head { current: original_key.clone(), past: vec![], future: vec![], dirty: true, limit: 8,saved_key:None },
             vec![Snapshot { key: original_key.clone(), project: project.clone() }],
         ).unwrap();
         library.save_with_history(&mut history, &project).unwrap();
@@ -1549,7 +1549,7 @@ mod tests {
         project.title = "Acknowledged draft".into();
         let draft_key = uuid::Uuid::new_v4().to_string();
         history.commit(&journal, &project, 1,
-            Head { current: draft_key.clone(), past: vec![original_key.clone()], future: vec![], dirty: true, limit: 8 },
+            Head { current: draft_key.clone(), past: vec![original_key.clone()], future: vec![], dirty: true, limit: 8,saved_key:None },
             vec![Snapshot { key: draft_key.clone(), project: project.clone() }],
         ).unwrap();
         let changed = b"edited independently during Save";

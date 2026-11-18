@@ -1029,7 +1029,7 @@ mod save_session_tests {
         let mut history = Session::default();
         let first = uuid::Uuid::new_v4().to_string();
         history.commit(&journal, &project, 0,
-            Head { current: first.clone(), past: vec![], future: vec![], dirty: true, limit: 8 },
+            Head { current: first.clone(), past: vec![], future: vec![], dirty: true, limit: 8,saved_key:None },
             vec![Snapshot { key: first.clone(), project: project.clone() }],
         ).unwrap();
         library.save_with_history(&mut history, &project).unwrap();
@@ -1038,7 +1038,7 @@ mod save_session_tests {
         project.modified_at = "2026-11-18T12:00:00Z".into();
         let current = uuid::Uuid::new_v4().to_string();
         history.commit(&journal, &project, 1,
-            Head { current: current.clone(), past: vec![first.clone()], future: vec![], dirty: true, limit: 8 },
+            Head { current: current.clone(), past: vec![first.clone()], future: vec![], dirty: true, limit: 8,saved_key:None },
             vec![Snapshot { key: current.clone(), project: project.clone() }],
         ).unwrap();
         library.save_with_history(&mut history, &project).unwrap();
@@ -1063,8 +1063,25 @@ mod save_session_tests {
         let view = Session::default().read(&journal, &reopened).unwrap().unwrap();
         assert_eq!(reopened.title, "Second saved version");
         assert_eq!(view.head.current, current);
-        assert_eq!(view.head.past, [first]);
+        assert_eq!(view.head.past, [first.clone()]);
         assert!(!view.head.dirty);
+        assert_eq!(view.head.saved_key.as_deref(), Some(current.as_str()));
+
+        let mut reopened_history=Session::default();
+        let undo=Head { current: first.clone(), past: vec![], future: vec![current.clone()], dirty: false, limit: 8, saved_key: Some(first.clone()) };
+        let revision=reopened_history.commit(&journal,&reopened,view.revision,undo,vec![]).unwrap();
+        let undone=reopened_history.read(&journal,&reopened).unwrap().unwrap();
+        // The renderer may have queued this Undo before the second Save was acknowledged.
+        assert!(undone.head.dirty);
+        assert_eq!(undone.head.saved_key.as_deref(), Some(current.as_str()));
+        let redo=Head { current: current.clone(), past: vec![first], future: vec![], dirty: true, limit: 8, saved_key: None };
+        reopened_history.commit(&journal,&reopened,revision,redo,vec![]).unwrap();
+        reopened_history.checkpoint(&journal,&reopened).unwrap();
+        let restored=Session::default().read(&journal,&reopened).unwrap().unwrap();
+        assert!(!restored.head.dirty);
+        assert_eq!(restored.head.current,current);
+        assert_eq!(project::FileRevision::capture(&descriptor).unwrap(), saved);
+        assert_eq!(project::FileRevision::capture(&recovery).unwrap(), saved_recovery);
     }
 
     #[test]
@@ -1083,7 +1100,7 @@ mod save_session_tests {
             let mut history = Session::default();
             let previous_key = uuid::Uuid::new_v4().to_string();
             history.commit(&journal, &project, 0,
-                Head { current: previous_key.clone(), past: vec![], future: vec![], dirty: true, limit: 8 },
+                Head { current: previous_key.clone(), past: vec![], future: vec![], dirty: true, limit: 8,saved_key:None },
                 vec![Snapshot { key: previous_key.clone(), project: project.clone() }],
             ).unwrap();
             library.save_with_history(&mut history, &project).unwrap();
@@ -1093,7 +1110,7 @@ mod save_session_tests {
             project.title = "Acknowledged draft".into();
             let draft_key = uuid::Uuid::new_v4().to_string();
             history.commit(&journal, &project, 1,
-                Head { current: draft_key.clone(), past: vec![previous_key.clone()], future: vec![], dirty: true, limit: 8 },
+                Head { current: draft_key.clone(), past: vec![previous_key.clone()], future: vec![], dirty: true, limit: 8,saved_key:None },
                 vec![Snapshot { key: draft_key.clone(), project: project.clone() }],
             ).unwrap();
             let session = library.session.as_ref().unwrap();

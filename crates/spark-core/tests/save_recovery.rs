@@ -4,7 +4,7 @@ use std::{fs,path::{Path,PathBuf},process::Command};
 
 fn select(history:&mut Session,dir:&Path,p:&Project) {
     let old=history.read(dir,p).unwrap();let key=uuid::Uuid::new_v4().to_string();
-    let mut head=old.as_ref().map(|s|s.head.clone()).unwrap_or(Head{current:key.clone(),past:vec![],future:vec![],dirty:true,limit:100});
+    let mut head=old.as_ref().map(|s|s.head.clone()).unwrap_or(Head{current:key.clone(),past:vec![],future:vec![],dirty:true,limit:100,saved_key:None});
     if old.is_some(){head.past.push(head.current.clone());}head.current=key.clone();head.future.clear();head.dirty=true;
     history.commit(dir,p,old.map_or(0,|s|s.revision),head,vec![Snapshot{key,project:p.clone()}]).unwrap();
 }
