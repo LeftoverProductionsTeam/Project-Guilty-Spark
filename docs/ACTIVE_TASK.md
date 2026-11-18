@@ -3,8 +3,8 @@
 Task: Operation110 - verify Black Echo faction use, rescue, and extraction
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 8e8d3312 on 098a5d79 proved two-client deployment, boarding, outbound flight, field landing and both exits before the installed turret blocked the old raw rider count. Candidate 7b3940f6 independently reads back direct player occupancy across all 14 native Spirit seats. Windows unchanged-Save recovery passed separately.
-Next action: Use the existing collision readback to verify a walkable approach from the Covenant deployment point to the parked Spirit. In the exact 7b3940f6 / 37973e1c paired run, both deployed but player 0 stopped before boarding at [55.703, -103.951, 0.003] en route to [55.73, -102.32]. Receipt SHA-256 b1272aec1330fcb0ee9fd8a13cbea9a2a7992c01ee59b7e6309b5bc6e6674fdb. Then pair-test both seats through field exit, empty return, recall, rescue and settlement. Original Save37944 remains open.
+Latest verified revision: 7b3940f6 / 37973e1c confirmed west approach, two Covenant boardings and field landing. One passenger died after exit while the uncommanded Pelican was nearby. Candidate eed5856b compiles and independently verifies a Pelican parked-pilot hold. Windows unchanged-Save recovery passed separately.
+Next action: Pair-test exact eed5856b via the proven west approach. Track both aircraft at the hub and field, safe player exit, former-passenger latch and empty return. Then prove recall, objectives, extraction and settlement. Repeat the Pelican route in an independent UNSC run. Original Save37944 remains open.
 
 ## Acceptance
 
