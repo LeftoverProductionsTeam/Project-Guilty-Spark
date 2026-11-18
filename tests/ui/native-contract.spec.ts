@@ -5110,19 +5110,73 @@ for(const mode of ['shared','flags','objects','covenant','insertion','covenant-i
 
 async function mockNativePointReview(page:Page){await page.evaluate(()=>{const w=window as any,m=w.__sparkMock,invoke=w.__TAURI_INTERNALS__.invoke;m.geometryCalls=[];m.geometryStale=false;m.geometryDeferred=false;
  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
-  if(command==='native_scenario_geometry'){m.geometryCalls.push(structuredClone(args));const result={buildId:args.expectedBuildId,tagSha256:m.geometryStale?'f'.repeat(64):args.expectedTagSha256,outputSha256:'c'.repeat(64),points:args.points.map((point:number[])=>({point:point.map(Math.fround),bsps:[0],nearPartition:false,supports:Math.abs(point[2])<=0.5?[{bsp:0,z:0}]:[],...(args.groundDrop!==undefined?{ground:m.geometryWrongGround?[{bsp:0,z:point[2]+1}]:point[2]>=0&&point[2]<=args.groundDrop?[{bsp:0,z:0}]:[]}: {})})),...(args.groundDrop!==undefined?{groundDrop:args.groundDrop}:{})};if(m.geometryDeferred){m.geometryDeferred=false;return new Promise(resolve=>m.finishGeometry=()=>resolve(result));}return result;}
+  if(command==='native_scenario_geometry'){m.geometryCalls.push(structuredClone(args));const result={buildId:args.expectedBuildId,tagSha256:m.geometryStale?'f'.repeat(64):args.expectedTagSha256,outputSha256:'c'.repeat(64),points:args.points.map((point:number[])=>({point:point.map(Math.fround),bsps:[0],nearPartition:false,supports:Math.abs(point[2])<=0.5?[{bsp:0,z:0}]:[],...(args.groundDrop!==undefined?{ground:m.geometryWrongGround?[{bsp:0,z:point[2]+1}]:point[2]>=0&&point[2]<=args.groundDrop?[{bsp:0,z:0}]:[]}: {})})),...(args.groundDrop!==undefined?{groundDrop:args.groundDrop}:{})};
+   if(args.commandRoute){
+    const destinations=args.commandRoute.commands.flatMap((step:any,action:number)=>step.atom.startsWith('go_to')?[{point:step.point1,action}]:[]);
+    let from:number|null=null;
+    const legs=destinations.flatMap(({point,action}:any,index:number)=>{
+     const prior=from;from=point;
+     if(prior===null&&!args.routeOrigin)return[];
+     const a=args.routeOrigin&&prior===null?args.routeOrigin:args.points[prior!],b=args.points[point];
+     const crossing=m.geometryCrossing&&index===0?{bsp:0,fraction:.5,point:a.map((n:number,i:number)=>(Math.fround(n)+Math.fround(b[i]))/2)}:null;
+     return [{action,from:prior,to:point,sharedBsps:[0],crossing}];
+    });
+    Object.assign(result,{route:{origin:args.routeOrigin?.map(Math.fround)??null,issue:null,legs}});
+   }
+   if(m.geometryDeferred){m.geometryDeferred=false;return new Promise(resolve=>m.finishGeometry=()=>resolve(result));}
+   return result;}
   if(command==='native_tag_context'){const value=await invoke(command,args);value.scenarioStartSquads=[{encounter:0,squad:0,encounterName:'guards',name:'source_squad',normalCount:1,insaneCount:1,starts:[{index:0,position:[2,3,1],facingRadians:0,commandList:-1}]}];return value;}
   return invoke(command,args);
  };
 });}
 
 test('native BSP review separates collision space from surface anchors and rejects stale or late route results',async({page})=>{
- const form=await mockNativeCommandRoutes(page);await mockNativePointReview(page);const check=form.getByRole('button',{name:'Check route points against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});await revealPagedControl(check);await check.click();await expect(results).toContainText('No collision surface within ±0.5');await expect(results).toContainText('inside collision space');
+ const form=await mockNativeCommandRoutes(page);await mockNativePointReview(page);const check=form.getByRole('button',{name:'Check route against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});await revealPagedControl(check);await check.click();await expect(results).toContainText('No collision surface within ±0.5');await expect(results).toContainText('inside collision space');
  const select=results.getByRole('button',{name:'Point 0',exact:true});await select.click();const x=form.getByRole('spinbutton',{name:'Command point X',exact:true}),z=form.getByRole('spinbutton',{name:'Command point Z',exact:true});await expect(x).toBeFocused();await x.fill('1.123456789');await z.fill('0.25');await expect(results).toHaveCount(0);await revealPagedControl(check);await check.click();await expect(results).toContainText('surface BSP 0 at Z 0');expect(await page.evaluate(()=>(window as any).__sparkMock.geometryCalls.at(-1).points[0])).toEqual([1.123456789,0,0.25]);
  await page.evaluate(()=>(window as any).__sparkMock.geometryDeferred=true);await check.click();await z.fill('0.125');await page.evaluate(()=>(window as any).__sparkMock.finishGeometry());await expect(results).toHaveCount(0);await revealPagedControl(check);await check.click();await expect(results).toContainText('surface BSP 0 at Z 0');await page.evaluate(()=>(window as any).__sparkMock.geometryStale=true);await check.click();await expect(form).toContainText('different native source or coordinate revision');await expect(results).toHaveCount(0);
  await revealPagedControl(form.getByRole('button',{name:'Preview command list',exact:true}));await form.getByRole('button',{name:'Preview command list',exact:true}).click();const operation=await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1));expect(operation.list.points[0]).toEqual([1.123456789,0,0.125]);expect(await page.evaluate(()=>(window as any).__sparkMock.commandLists[0].points[0])).toEqual([0,0,1]);
 });
 
+test('native BSP flight review checks the supplied first leg and navigates native go-to destinations',async({page})=>{
+ const form=await mockNativeCommandRoutes(page);await mockNativePointReview(page);
+ await page.evaluate(()=>{
+  const m=(window as any).__sparkMock,route=m.commandLists[0],move=route.commands[0];
+  route.points.push([99,99,99]);
+  route.commands=[{...move,point1:1}, {...move,atom:'pause',point1:-1}, {...move,atom:'go_to_and_face',point1:0,point2:2}];
+  m.geometryCrossing=true;
+ });
+ await page.locator('.native-tag-operations:visible').getByRole('button',{name:'Refresh source',exact:true}).click();
+ const check=form.getByRole('button',{name:'Check route against compiled BSP',exact:true});
+ const legs=form.getByRole('list',{name:'Compiled BSP flight legs',exact:true});
+ await revealPagedControl(check);await check.click();
+ await expect(legs.getByRole('listitem')).toHaveCount(1);
+ await expect(legs).toContainText('Point 1 → Point 0 · action 2');
+ const start=form.getByText('First flight leg start',{exact:true});await revealPagedControl(start);await start.click();
+ const mode=form.getByRole('combobox',{name:'Flight start',exact:true});await revealPagedControl(mode);await mode.selectOption('custom');
+ await expect(check).toBeDisabled();
+ for(const [axis,value] of [['X','-4'],['Y','0'],['Z','3']]){const input=form.getByRole('spinbutton',{name:'Flight start '+axis,exact:true});await revealPagedControl(input);await input.fill(value);}
+ await revealPagedControl(check);await check.click();
+ await expect(legs.getByRole('listitem')).toHaveCount(2);
+ await expect(legs).toContainText('Start → Point 1 · action 0');
+ await expect(legs).toContainText('Surface crossing in BSP 0 at 0, 0, 2.5 (50% along leg).');
+ await expect(legs).toContainText('No interior centerline crossing detected.');
+ const destination=legs.getByRole('button',{name:'Edit destination point 1',exact:true});await revealPagedControl(destination);await destination.focus();await page.keyboard.press('Enter');
+ const x=form.getByRole('spinbutton',{name:'Command point X',exact:true});
+ await expect(x).toHaveValue('4');await expect(x).toBeFocused();await x.fill('6');
+ await expect(legs).toHaveCount(0);
+ await revealPagedControl(check);await check.click();
+ await expect(legs).toContainText('Surface crossing in BSP 0 at 1, 0, 2.5 (50% along leg).');
+ const requests=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls);
+ expect(requests.at(-1).routeOrigin).toEqual([-4,0,3]);
+ expect(requests.at(-1).commandRoute.commands[2]).toMatchObject({point1:0,point2:2});
+ await page.evaluate(()=>(window as any).__sparkMock.commandProtected=[0]);
+ await page.locator('.native-tag-operations:visible').getByRole('button',{name:'Refresh source',exact:true}).click();
+ await expect(form).toContainText('recipe-owned AI group');
+ await revealPagedControl(check);await check.click();
+ await expect(legs).toBeVisible();
+ await expect(legs.getByRole('button',{name:/Edit destination point/})).toHaveCount(0);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews)).toEqual([]);
+});
 test('native AI starting-position review uses the same compiled BSP query without writing a tag',async({page})=>{
  await mockNativeCommandRoutes(page);await mockNativePointReview(page);const native=page.locator('.native-tag-operations:visible');await native.getByRole('button',{name:'Refresh source',exact:true}).click();const form=page.locator('.native-ai-starts');await revealPagedControl(form.locator('> summary'));await form.locator('> summary').click();const check=form.getByRole('button',{name:'Check AI start against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});await revealPagedControl(check);await check.click();await expect(results).toContainText('No collision surface within ±0.5');const z=form.getByRole('spinbutton',{name:'AI start Z',exact:true});await revealPagedControl(z);await z.fill('0.125');await expect(results).toHaveCount(0);await revealPagedControl(check);await check.click();await expect(results).toContainText('surface BSP 0 at Z 0');const request=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls.at(-1));expect(request.expectedBuildId).toBe('command-source');expect(request.expectedTagSha256).toBe('a'.repeat(64));expect(request.points).toEqual([[2,3,0.125]]);expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews)).toEqual([]);
  const preview=form.getByRole('button',{name:'Preview AI starting position',exact:true});await revealPagedControl(preview);await preview.click();expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1))).toMatchObject({kind:'encounterStartPosition',encounterName:'guards',position:[2,3,0.125],sourceSha256:'a'.repeat(64)});
@@ -5324,7 +5378,7 @@ for(const delivery of [null,'pelican','spirit'] as const)test('recovered radio r
 
 test('native ground projection repairs route and AI drafts without writing until review and preserves source Restore',async({page},testInfo)=>{
  await page.setViewportSize({width:800,height:600});const form=await mockNativeCommandRoutes(page);await mockNativePointReview(page);
- const find=form.getByRole('checkbox',{name:'Find ground below points',exact:true}),check=form.getByRole('button',{name:'Check route points against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});
+ const find=form.getByRole('checkbox',{name:'Find ground below points',exact:true}),check=form.getByRole('button',{name:'Check route against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});
  await revealPagedControl(find);await find.check();const drop=form.getByRole('spinbutton',{name:'Maximum ground search drop',exact:true});await drop.fill('.5');await drop.press('Tab');await revealPagedControl(check);await check.click();await expect(results).toContainText('No upward-facing ground below within 0.5 units');
  await drop.fill('16');await drop.press('Tab');await expect(results).toHaveCount(0);await revealPagedControl(check);await check.click();const ground=form.getByRole('button',{name:'Use ground for point 0 · BSP 0 · Z 0',exact:true});await revealPagedControl(ground);const layout=await form.locator('.native-bsp-point-check').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));expect(layout.scroll).toBeLessThanOrEqual(layout.client+1);await ground.focus();await page.keyboard.press('Enter');const z=form.getByRole('spinbutton',{name:'Command point Z',exact:true});await expect(z).toHaveValue('0');await expect(z).toBeFocused();expect(await page.evaluate(()=>(window as any).__sparkMock.commandLists[0].points[0])).toEqual([0,0,1]);await expect(results).toHaveCount(0);
  const preview=form.getByRole('button',{name:'Preview command list',exact:true});await revealPagedControl(preview);await preview.click();const native=page.locator('.native-tag-operations:visible'),accept=native.getByRole('button',{name:'Accept as new source revision',exact:true});await revealPagedControl(accept);await accept.click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.commandLists[0].points[0])).toEqual([0,0,0]);
@@ -5338,7 +5392,7 @@ test('native ground projection repairs route and AI drafts without writing until
 
 test('native ground repair rejects invalid heights and late replies after switching equal-coordinate routes',async({page})=>{
  const form=await mockNativeCommandRoutes(page);await mockNativePointReview(page);await page.evaluate(()=>{const m=(window as any).__sparkMock;m.commandLists[1].points=structuredClone(m.commandLists[0].points);m.geometryWrongGround=true;});const native=page.locator('.native-tag-operations:visible');await native.getByRole('button',{name:'Refresh source',exact:true}).click();
- const find=form.getByRole('checkbox',{name:'Find ground below points',exact:true}),check=form.getByRole('button',{name:'Check route points against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});await revealPagedControl(find);await find.check();await revealPagedControl(check);await check.click();await expect(form).toContainText('invalid downward surface');await expect(results).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews)).toEqual([]);
+ const find=form.getByRole('checkbox',{name:'Find ground below points',exact:true}),check=form.getByRole('button',{name:'Check route against compiled BSP',exact:true}),results=form.getByRole('list',{name:'Native BSP point results',exact:true});await revealPagedControl(find);await find.check();await revealPagedControl(check);await check.click();await expect(form).toContainText('invalid downward surface');await expect(results).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews)).toEqual([]);
  await page.evaluate(()=>{const m=(window as any).__sparkMock;m.geometryWrongGround=false;m.geometryDeferred=true;});await check.click();await expect.poll(()=>page.evaluate(()=>typeof (window as any).__sparkMock.finishGeometry)).toBe('function');const route=form.getByRole('combobox',{name:'Native command source list',exact:true});await revealPagedControl(route);await route.selectOption('1');await page.evaluate(()=>(window as any).__sparkMock.finishGeometry());await expect(check).toBeEnabled();await expect(results).toHaveCount(0);await expect(form.getByRole('spinbutton',{name:'Command point Z',exact:true})).toHaveValue('1');
  await revealPagedControl(check);await check.click();const ground=form.getByRole('button',{name:'Use ground for point 0 · BSP 0 · Z 0',exact:true});await revealPagedControl(ground);await ground.click();const preview=form.getByRole('button',{name:'Preview command list',exact:true});await revealPagedControl(preview);await preview.click();expect(await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1))).toMatchObject({list:{index:1,name:'pilot_return',points:[[0,0,0],[4,0,2]]}});expect(await page.evaluate(()=>(window as any).__sparkMock.commandLists[0].points)).toEqual([[0,0,1],[4,0,2]]);
 });

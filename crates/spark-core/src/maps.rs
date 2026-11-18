@@ -1751,7 +1751,68 @@ fn collision_leaf_at(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&mut
  }
  invalid("Compiled BSP tree is cyclic or exceeds the supported traversal depth")
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BspGeometryReview {
+    pub points: Vec<BspPointLocation>,
+    pub route: Option<BspFlightReview>,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BspFlightReview {
+    pub origin: Option<[f32; 3]>,
+    pub issue: Option<String>,
+    pub legs: Vec<BspFlightLeg>,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BspFlightLeg {
+    pub action: usize,
+    pub from: Option<usize>,
+    pub to: usize,
+    pub shared_bsps: Vec<u16>,
+    pub crossing: Option<BspFlightCrossing>,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BspFlightCrossing {
+    pub bsp: u16,
+    pub fraction: f64,
+    pub point: [f64; 3],
+}
 pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]],ground_drop:Option<f32>)->Result<Vec<BspPointLocation>>{
+ Ok(bsp_geometry_review(path,inspection,points,ground_drop,None,None)?.points)
+}
+pub fn bsp_geometry_review(
+    path: &Path,
+    inspection: &MapInspection,
+    points: &[[f32; 3]],
+    ground_drop: Option<f32>,
+    route: Option<&crate::native_operations::NativeCommandList>,
+    origin: Option<[f32; 3]>,
+) -> Result<BspGeometryReview> {
+ if origin.is_some_and(|p| p.iter().any(|v| !v.is_finite() || v.abs() > 1e6)) || origin.is_some() && route.is_none() {
+     return invalid("A flight start needs finite world coordinates and a command route");
+ }
+ if route.is_some_and(|list| list.points.as_slice() != points) {
+     return invalid("Flight command route and reviewed point coordinates differ");
+ }
+ let mut route_review = route.map(|list| {
+     let mut review = BspFlightReview { origin, issue: None, legs: Vec::new() };
+     match list.flight_destinations() {
+         Ok(destinations) => {
+             let mut previous = None;
+             for (action, point) in destinations {
+                 if previous.is_some() || origin.is_some() {
+                     review.legs.push(BspFlightLeg { action, from: previous, to: point, shared_bsps: Vec::new(), crossing: None });
+                 }
+                 previous = Some(point);
+             }
+         }
+         Err(error) => review.issue = Some(error.to_string()),
+     }
+     review
+ });
  if ground_drop.is_some_and(|value|!value.is_finite()||!(0.5..=64.).contains(&value)){return invalid("Ground search needs a finite downward distance from0.5to64 world units");}
  if points.is_empty()||points.len()>1024||points.iter().flatten().any(|v|!v.is_finite()||v.abs()>1e6){return invalid("Review needs1–1024 finite native BSP points within supported bounds");}
  let(header,bytes,hash)=read_cache_snapshot_shared(path)?;if hash!=inspection.sha256{return invalid("Compiled map changed after BSP inspection");}
@@ -1759,6 +1820,12 @@ pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]
  let scenarios=inspection.tags.iter().filter(|tag|tag.class=="scnr"&&tag.path==inspection.scenario_path).collect::<Vec<_>>();
  if scenarios.len()!=1{return invalid("Compiled scenario is missing or ambiguous");}let sc=scenarios[0].data_offset.ok_or_else(||SparkError::Invalid("Compiled scenario data is unavailable".into()))? as usize;
  let(table,count)=space.block(&r,sc+0x5a4,32,16)?;if count==0{return invalid("Compiled scenario has no structure BSP");}
+ let manual_bsp = route.filter(|list| list.flags[5]).map(|list| list.bsp);
+ if manual_bsp.is_some_and(|index| index < 0 || index as usize >= count) {
+     return invalid("The route's manual BSP is unavailable in this compiled reference");
+ }
+ let mut scratch = Vec::new();
+ let mut crossing_budget = 4_000_000;
  let mut rows=points.iter().map(|point|BspPointLocation{point:*point,bsps:vec![],near_partition:false,supports:vec![],ground:vec![]}).collect::<Vec<_>>();let mut budget=1_000_000usize;
  let(mesh,_)=collision_snapshot(&header,&bytes,inspection)?;
  for index in 0..count{
@@ -1772,8 +1839,31 @@ pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]
    if let Some(z)=ground_drop.and_then(|drop|checker.native_ground_z(row.point,drop)){row.ground.push(BspPointSupport{bsp:index as u16,z});}
   }
   for row in &mut rows{let(inside,near)=collision_leaf_at(&r,&bsp_space,blocks,row.point,&mut budget)?;if inside{row.bsps.push(index as u16);}row.near_partition|=near;}
+  if let Some(review) = route_review.as_mut().filter(|review| !review.legs.is_empty() && manual_bsp.is_none_or(|bsp| bsp as usize == index)) {
+      let bsp = index as u16;
+      let origin_inside = match origin {
+          Some(point) => collision_leaf_at(&r, &bsp_space, blocks, point, &mut budget)?.0,
+          None => false,
+      };
+      for leg in &mut review.legs {
+          let Some(from) = leg.from.map(|point| points[point]).or(origin) else {
+              return invalid("Flight leg is missing its starting point");
+          };
+          let to = points[leg.to];
+          let from_inside = leg.from.map_or(origin_inside, |point| rows[point].bsps.contains(&bsp));
+          if from_inside && rows[leg.to].bsps.contains(&bsp) {
+              leg.shared_bsps.push(bsp);
+          }
+          if let Some(fraction) = checker.native_route_crossing(from, to, &mut scratch, &mut crossing_budget)? {
+              if leg.crossing.as_ref().is_none_or(|hit| fraction < hit.fraction) {
+                  let point = std::array::from_fn(|axis| f64::from(from[axis]) + fraction * (f64::from(to[axis]) - f64::from(from[axis])));
+                  leg.crossing = Some(BspFlightCrossing { bsp, fraction, point });
+              }
+          }
+      }
+  }
  }
- Ok(rows)
+ Ok(BspGeometryReview { points: rows, route: route_review })
 }
 pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
     let (header,bytes,hash)=read_cache_snapshot(path)?;
@@ -2177,6 +2267,51 @@ mod shader_dependency_tests {
 #[cfg(test)]
 mod bsp_point_tests {
  use super::*;
+
+ #[test]
+ #[ignore = "requires the reviewed predecessor and revised Black Echo CE609 caches"]
+ fn black_echo_compiled_bsp_flight_crossings() {
+     let cases = [
+         ("SPARK_BLACK_ECHO_PREDECESSOR", "dee2d9a79a6e9ca3cb13828852c340896d6ceba7985f798f6e97a9c5efb8dc94", Some([54.075, -111.809, 1.900])),
+         ("SPARK_BLACK_ECHO_REVISED", "0ec05e4139e4f9a910eaee0527c6c25574ab363ee21b0aa4e8f49acb62d8bfd6", None),
+     ];
+     for (env, hash, previous_origin) in cases {
+         let cache = std::path::PathBuf::from(std::env::var_os(env).expect(env));
+         let inspection = inspect_map(&cache, None).unwrap();
+         assert_eq!(inspection.sha256, hash);
+         let routes = scenario_command_readback(&cache, &inspection).unwrap();
+         let field = routes.iter().find(|route| route.name == "field_route").unwrap();
+         let revised_starts = if previous_origin.is_none() {
+             let logic = scenario_logic_readback(&cache, &inspection).unwrap();
+             let name_index = logic.names.iter().position(|name| name.name == "extraction_pelican").unwrap();
+             let aircraft = logic.vehicles.iter().find(|vehicle| vehicle.name_index == name_index as i16).unwrap();
+             let (_, arrival) = field.flight_destinations().unwrap().into_iter().last().unwrap();
+             Some([aircraft.position, field.points[arrival]])
+         } else {
+             None
+         };
+         for (index, name) in ["field_route", "hub_route"].into_iter().enumerate() {
+             let route = routes.iter().find(|route| route.name == name).expect(name);
+             let origin = revised_starts.map(|starts| starts[index]).or(previous_origin.filter(|_| index == 0));
+             let review = bsp_geometry_review(&cache, &inspection, &route.points, None, Some(route), origin)
+                 .unwrap().route.unwrap();
+             eprintln!("{hash} {name}: {}", serde_json::to_string(&review).unwrap());
+             assert!(review.issue.is_none());
+             if previous_origin.is_some() && index == 0 {
+                 let first = &review.legs[0];
+                 let hit = first.crossing.as_ref().expect("The reported Pelican takeoff crossed terrain");
+                 assert_eq!(hit.bsp, 0);
+                 assert!(hit.fraction > 0.15 && hit.fraction < 0.35);
+                 assert!((hit.point[0] - 57.241).abs() < 0.25);
+             } else if previous_origin.is_none() {
+                 assert_eq!(review.legs.len(), [3, 6][index]);
+                 assert_eq!(review.legs[0].from, None);
+                 assert!(review.legs.iter().all(|leg| leg.crossing.is_none() && leg.shared_bsps == [0]));
+             }
+         }
+         assert_eq!(hash_file(&cache).unwrap(), hash);
+     }
+ }
  fn tree()->Vec<u8>{let mut b=vec![0u8;256];for(at,n,p)in[(0,1u32,128u32),(12,1,144),(24,1,160)]{b[at..at+4].copy_from_slice(&n.to_le_bytes());b[at+4..at+8].copy_from_slice(&p.to_le_bytes());}b[132..136].copy_from_slice(&u32::MAX.to_le_bytes());b[136..140].copy_from_slice(&0x80000000u32.to_le_bytes());b[144..148].copy_from_slice(&1f32.to_le_bytes());b}
  #[test]fn follows_native_front_back_and_leaf_flags_without_changing_bytes(){
   let b=tree();let original=b.clone();let space=Space{begin:0,end:b.len(),address:0};let mut budget=64;

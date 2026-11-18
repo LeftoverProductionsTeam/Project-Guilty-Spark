@@ -151,19 +151,10 @@ pub fn pilot_bindings(fields:&str,choices:&NativeTransportChoices,mut read:impl 
 pub struct TransportFlightRoute {pub name:String,pub points:usize,pub commands:usize,pub final_position:Option<[f32;3]>,pub arrival_volumes:Vec<String>,pub issue:Option<String>}
 pub fn flight_route(route:&NativeCommandList,volumes:&[crate::maps::ScenarioLogicVolume])->TransportFlightRoute {
  let check=||->Result<[f32;3]>{
-  route.validate()?;
-  for(index,command)in route.commands.iter().enumerate(){
-   match command.atom.as_str(){
-    "go_to" if [0,1].contains(&command.modifier)&&command.point1>=0=>{},
-    "go_to_and_face" if command.modifier==0&&command.point1>=0&&command.point2>=0=>{},
-    "set_radius" if command.parameters[0]>0.=>{},
-    "pause" if command.parameters[0]>=0.=>{},
-    _=>return invalid(format!("Route {} action{} ({}) is outside the generated physical-flight profile. Use go-to (stop/keep-moving), go-to-and-face (stop with Point2), positive set-radius or pause; advanced source remains available manually",route.name,index,command.atom)),
-   }
-  }
-  let final_step=route.commands.iter().rfind(|command|matches!(command.atom.as_str(),"go_to"|"go_to_and_face")).ok_or_else(||crate::SparkError::Invalid(format!("Route {} has no physical go-to actions",route.name)))?;
-  if final_step.modifier!=0{return invalid(format!("Route {} must end with a go-to Stop at point; a keep-moving point or completed command is not a landing",route.name));}
-  route.points.get(final_step.point1 as usize).copied().ok_or_else(||crate::SparkError::Invalid(format!("Route {} final landing point is unavailable",route.name)))
+  let destinations=route.flight_destinations()?;
+  let (action, point)=destinations[destinations.len()-1];
+  if route.commands[action].modifier!=0{return invalid(format!("Route {} must end with a go-to Stop at point; a keep-moving point or completed command is not a landing",route.name));}
+  Ok(route.points[point])
  };
  let (final_position,issue)=match check(){Ok(point)=>(Some(point),None),Err(issue)=>(None,Some(issue.to_string()))};
  let mut names=std::collections::BTreeMap::new();for volume in volumes{*names.entry(volume.name.as_str()).or_insert(0usize)+=1;}

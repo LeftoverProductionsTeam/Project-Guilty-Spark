@@ -198,17 +198,18 @@ fn segment_distance(a: V, b: V, c: V, d: V) -> f64 {
     let delta = sub(add(a, mul(u, s)), add(c, mul(v, t)));
     dot(delta, delta)
 }
+fn triangle_crossing(a: V, direction: V, triangle: Tri, normal: V) -> Option<f64> {
+    let denominator = dot(normal, direction);
+    if denominator.abs() <= 1e-20 { return None; }
+    let t = dot(normal, sub(triangle[0], a)) / denominator;
+    if !(0. ..=1.).contains(&t) { return None; }
+    let point = add(a, mul(direction, t));
+    let delta = sub(point, closest(point, triangle));
+    (dot(delta, delta) < 1e-16).then_some(t)
+}
 fn segment_triangle_distance(a: V, b: V, triangle: Tri) -> f64 {
-    let direction = sub(b, a);
-    let n = cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
-    let denominator = dot(n, direction);
-    if denominator.abs() > 1e-20 {
-        let t = dot(n, sub(triangle[0], a)) / denominator;
-        if (0. ..=1.).contains(&t) {
-            let p = add(a, mul(direction, t)); let delta = sub(p, closest(p, triangle));
-            if dot(delta, delta) < 1e-16 { return 0.; }
-        }
-    }
+    let normal = cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
+    if triangle_crossing(a, sub(b, a), triangle, normal).is_some() { return 0.; }
     let distance = |p| { let delta = sub(p, closest(p, triangle)); dot(delta, delta) };
     (0..3).map(|k| segment_distance(a, b, triangle[k], triangle[(k + 1) % 3]))
         .fold(distance(a).min(distance(b)), f64::min)
@@ -266,6 +267,34 @@ impl RouteChecker {
     pub(crate) fn native_ground_z(&self,point:[f32;3],drop:f32)->Option<f32>{
         if !drop.is_finite()||!(0.5..=64.).contains(&drop)||point.iter().any(|v|!v.is_finite()||v.abs()>1e6){return None;}
         self.index.floor_in_range(point.map(f64::from),&mut vec![],f64::from(drop),0.).map(|z|z as f32)
+    }
+    /// Earliest two-sided crossing of a collision triangle along a straight
+    /// centerline. An endpoint on ground and coplanar travel are separate.
+    pub(crate) fn native_route_crossing(
+        &self,
+        from: [f32; 3],
+        to: [f32; 3],
+        scratch: &mut Vec<usize>,
+        budget: &mut usize,
+    ) -> Result<Option<f64>> {
+        let (a, b) = (from.map(f64::from), to.map(f64::from));
+        let direction = sub(b, a);
+        let length = dot(direction, direction).sqrt();
+        let end_trim = 0.001 / length;
+        if end_trim >= 0.5 { return Ok(None); }
+        scratch.clear();
+        self.index.root.query(
+            std::array::from_fn(|k| a[k].min(b[k]) - 1e-8),
+            std::array::from_fn(|k| a[k].max(b[k]) + 1e-8),
+            scratch,
+        );
+        *budget = budget.checked_sub(scratch.len()).ok_or_else(||
+            SparkError::Invalid("Route leg review exceeds its collision budget. Review a shorter route.".into())
+        )?;
+        Ok(scratch.iter().filter_map(|id| {
+            let fraction = triangle_crossing(a, direction, self.index.triangles[*id], self.index.planes[*id].0)?;
+            (fraction > end_trim && fraction < 1. - end_trim).then_some(fraction)
+        }).min_by(f64::total_cmp))
     }
     /// Static standing-capsule check, not a native movement/scenery test.
     pub(crate) fn verify_start(&self, position: V) -> Result<f64> {
@@ -351,6 +380,26 @@ pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<us
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_flight_centerline_finds_nearest_bsp_crossing_in_either_direction() {
+        let mesh = MeshData {
+            positions: vec![2., -1., -1., 2., 1., -1., 2., 0., 1., 1., -1., -1., 1., 1., -1., 1., 0., 1.],
+            indices: vec![0, 1, 2, 3, 4, 5],
+            ..Default::default()
+        };
+        let checker = RouteChecker::new(&mesh).unwrap();
+        let mut scratch = Vec::new();
+        let mut budget = 32;
+        let a = [0., 0., 0.];
+        let b = [3., 0., 0.];
+        assert_eq!(checker.native_route_crossing(a, b, &mut scratch, &mut budget).unwrap(), Some(1. / 3.));
+        assert_eq!(checker.native_route_crossing(b, a, &mut scratch, &mut budget).unwrap(), Some(1. / 3.));
+        assert_eq!(checker.native_route_crossing(a, [1., 0., 0.], &mut scratch, &mut budget).unwrap(), None);
+        assert_eq!(checker.native_route_crossing([0., 0., 2.], [3., 0., 2.], &mut scratch, &mut budget).unwrap(), None);
+        assert_eq!(checker.native_route_crossing(a, a, &mut scratch, &mut budget).unwrap(), None);
+        assert!(checker.native_route_crossing(a, b, &mut scratch, &mut 0).is_err());
+    }
     use crate::project::Source;
     fn plan() -> BspAssembly {
         BspAssembly {

@@ -18,6 +18,31 @@ impl NativeCommandList {
   for c in &self.commands{if !COMMAND_ATOMS.contains(&c.atom.as_str())||c.parameters.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!reference(c.point1,self.points.len())||!reference(c.point2,self.points.len())||!reference(c.command,self.commands.len())||[c.animation,c.script,c.recording,c.object_name].iter().any(|v|*v< -1){return invalid("Native command has an unknown action, invalid parameter or missing local reference");}}
   Ok(())
  }
+ /// Movement actions used by the generated physical-flight profile.
+ pub(crate) fn flight_destinations(&self) -> Result<Vec<(usize, usize)>> {
+    self.validate()?;
+    let mut destinations = Vec::new();
+    for (index, command) in self.commands.iter().enumerate() {
+        match command.atom.as_str() {
+            "go_to" if [0, 1].contains(&command.modifier) && command.point1 >= 0 => {
+                destinations.push((index, command.point1 as usize));
+            }
+            "go_to_and_face" if command.modifier == 0 && command.point1 >= 0 && command.point2 >= 0 => {
+                destinations.push((index, command.point1 as usize));
+            }
+            "set_radius" if command.parameters[0] > 0. => {}
+            "pause" if command.parameters[0] >= 0. => {}
+            _ => return invalid(format!(
+                "Route {} action {} ({}) is outside the generated physical-flight profile. Use go-to (stop/keep-moving), go-to-and-face (stop with Point 2), positive set-radius or pause. Advanced source remains available manually.",
+                self.name, index, command.atom
+            )),
+        }
+    }
+    if destinations.is_empty() {
+        return invalid(format!("Route {} has no physical go-to actions", self.name));
+    }
+    Ok(destinations)
+ }
  pub fn close(&self,b:&Self)->bool{let scalar=|a:f32,b:f32|(a-b).abs()<=1e-4;self.index==b.index&&self.name==b.name&&self.flags==b.flags&&self.bsp==b.bsp&&self.points.len()==b.points.len()&&self.points.iter().zip(&b.points).all(|(a,b)|positions_close(*a,*b))&&self.commands.len()==b.commands.len()&&self.commands.iter().zip(&b.commands).all(|(a,b)|a.atom==b.atom&&a.modifier==b.modifier&&a.parameters.iter().zip(b.parameters).all(|(a,b)|scalar(*a,b))&&a.point1==b.point1&&a.point2==b.point2&&a.animation==b.animation&&a.script==b.script&&a.recording==b.recording&&a.command==b.command&&a.object_name==b.object_name)}
 }
 fn integer(fields:&str,key:&str)->Result<i16>{let n=number(fields,key)?;if n.fract()!=0.||n<f64::from(i16::MIN)||n>f64::from(i16::MAX){return invalid("Native command modifier is not a signed short");}Ok(n as i16)}
