@@ -3,8 +3,8 @@
 Task: Operation110 - source Save integrity and the Black Echo native handoff
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Black Echo d4ca73c8 is the local CE609 Covenant pickup handoff. Invader and Spark readback passed. The Grunt-compatible pp weapon and HaloScript reference preserve the Marine route. BSP probe parity and benchmark are at 568f067.
-Next action: Run Forerunner paired acceptance of exact d4ca73c8 and the revised technology tag, then defense, evacuation, banking, settlement and redeployment. Keep Save37944 open pending a reproducer. Investigate abnormal test-app shutdown if repeated.
+Latest verified revision: Exact Black Echo d4ca73c8 loaded into two real local Forerunner clients (9a4aed01). Including the matching Xbox carousel fixed the lobby stall. The peer confirmed map size and hash. CE609 and unchanged Marine route readback are at c64f214; indexed lighting at 568f067.
+Next action: Starting from the verified paired lobby payload, exercise Covenant deployment and actual pickup of technology_grunt, then defense, evacuation, banking, settlement and redeployment. Keep Save37944 open pending a reproducer.
 
 ## Acceptance
 
