@@ -3,13 +3,18 @@ import type { NativePlayerProfile } from './firefight';
 import type { NativeOperation } from './nativeOperations';
 
 const localForgeFeature = 'forge.hmv_local_devices.v1';
+const localForgePhysicsFeature = 'forge.hmv_local_physics.v1';
 
-export async function verifyForerunnerLocalForge() {
+export async function verifyForerunnerLocalForge(requiresPhysics = false) {
   const { call } = await import('./api');
   const profiles = await call<RuntimeRegistration[]>('list_runtime_registrations');
+  const required = requiresPhysics ? [localForgeFeature, localForgePhysicsFeature] : [localForgeFeature];
   const candidates = profiles.filter(profile => profile.runtimeId === 'openCe'
-    && profile.reviewedCompanion?.capabilities.native_features?.includes(localForgeFeature));
-  if (!candidates.length) throw Error('Review a Forerunner build with Local Forge support in Games & Tools.');
+    && required.every(feature => profile.reviewedCompanion?.capabilities.native_features?.includes(feature)));
+  if (!candidates.length) {
+    const support = requiresPhysics ? 'Local Forge Fixed and Phased physics' : 'Local Forge support';
+    throw Error(`Review a Forerunner build with ${support} in Games & Tools.`);
+  }
   for (const registration of candidates) {
     try {
       const result = await call<import('./types').RuntimeInstallation>('inspect_runtime_registration', { registration });

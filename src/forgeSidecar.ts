@@ -163,6 +163,7 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     writeMarker: layout.write,
     metadata: { details: layout.details, date: layout.date },
     forerunnerLocalIssue: layout.forerunnerLocalIssue ?? unresolved,
+    forerunnerLocalNeedsPhysics: layout.forerunnerLocalNeedsPhysics,
     forerunner: {
       mapName: layout.mapName,
       issue: layout.forerunnerIssue ?? unresolved,
@@ -179,7 +180,8 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives, devices,
     metadata: 'metadata' in parsed ? parsed.metadata : undefined,
     hmvConversionIssue: 'hmvConversionIssue' in parsed ? parsed.hmvConversionIssue : undefined,
-    forerunnerLocalIssue: 'forerunnerLocalIssue' in parsed ? parsed.forerunnerLocalIssue : undefined };
+    forerunnerLocalIssue: 'forerunnerLocalIssue' in parsed ? parsed.forerunnerLocalIssue : undefined,
+    forerunnerLocalNeedsPhysics: 'forerunnerLocalNeedsPhysics' in parsed && parsed.forerunnerLocalNeedsPhysics };
 }
 
 export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {

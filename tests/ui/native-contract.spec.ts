@@ -6020,7 +6020,7 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   await page.locator('.hierarchy').getByRole('button',{name:'test',exact:true}).click();
   await openLayout.click();
   const placement = panel.getByRole('group',{name:'Placement properties'});
-  const target = panel.getByRole('button',{name:'Export for Forerunner'});
+  const target = panel.getByRole('button',{name:'Export for Forerunner',exact:true});
   await placement.getByLabel('Team').selectOption('1');
   await placement.getByLabel('Physics').selectOption('fixed');
   await expect(target).toBeDisabled();
@@ -6041,7 +6041,7 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   await page.keyboard.press('Control+s');
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[84])).toBe(1);
   const downloaded = page.waitForEvent('download');
-  await panel.getByRole('button',{name:'Export for Forerunner'}).click();
+  await panel.getByRole('button',{name:'Export for Forerunner',exact:true}).click();
   const file = await downloaded;
   const fs=await import('node:fs/promises');
   const output = await fs.readFile((await file.path())!);
@@ -6086,7 +6086,11 @@ test('Chupathingy Forge places and reopens a base-map control', async ({page}) =
         capabilities:{native_features:['forge.hmv_local_devices.v1']}}};
     w.__sparkMock.staleLocalForge = true;
     w.__TAURI_INTERNALS__.invoke = async (command:string,args:any) => {
-      if (command === 'list_runtime_registrations') return [profile];
+      if (command === 'list_runtime_registrations') {
+        const reported = structuredClone(profile);
+        if (w.__sparkMock.localForgePhysics) reported.reviewedCompanion.capabilities.native_features.push('forge.hmv_local_physics.v1');
+        return [reported];
+      }
       if (command === 'inspect_runtime_registration') {
         if (w.__sparkMock.staleLocalForge) throw Error('SDL changed');
         return {registrationId:profile.id,validation:'pass',executableSha256:sha};
@@ -6107,13 +6111,29 @@ test('Chupathingy Forge places and reopens a base-map control', async ({page}) =
   expect(localBytes.readUInt16LE(4)).toBe(1);
   const physics = panel.getByRole('group',{name:'Placement properties'}).getByLabel('Physics');
   await physics.selectOption('fixed');
-  await expect(localExport).toHaveCount(0);
+  await expect(localExport).toBeEnabled();
+  await localExport.click();
+  await expect(panel.getByText('Review a Forerunner build with Local Forge Fixed and Phased physics',{exact:false})).toBeVisible();
+  await page.evaluate(() => { (window as any).__sparkMock.localForgePhysics = true; });
+  const fixedPending = page.waitForEvent('download');
+  await localExport.click();
+  const fixedExport = await readLocal((await (await fixedPending).path())!);
+  const recordStart = 64 + 5 + fixedExport[68];
+  expect(fixedExport.readUInt16LE(4)).toBe(7);
+  expect(fixedExport[recordStart + 34]).toBe(0x11);
+  await physics.selectOption('phased');
+  const phasedPending = page.waitForEvent('download');
+  await localExport.click();
+  const phasedExport = await readLocal((await (await phasedPending).path())!);
+  expect(phasedExport[recordStart + 34]).toBe(0x21);
+  await page.keyboard.press('Control+z');
+  await expect(physics).toHaveValue('fixed');
   await physics.blur();
   await page.keyboard.press('Control+z');
   await expect(physics).toHaveValue('normal');
   await page.keyboard.press('Control+y');
   await expect(physics).toHaveValue('fixed');
-  await expect(panel.getByRole('button',{name:'Export for Forerunner'})).toBeDisabled();
+  await expect(panel.getByRole('button',{name:'Export for Forerunner',exact:true})).toBeDisabled();
   await expect(panel.getByText('Forerunner’s standard HMV import does not place devices.',{exact:false})).toBeVisible();
   await page.keyboard.press('Control+s');
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[4])).toBe(7);
@@ -6151,7 +6171,7 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   const source = Buffer.from('SEZSRwQAQAABAAAAdGVzdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAEwCEAAAAsn6lSXBhZXcMd2VhcG9uc1x0ZXN0AAAA/wAAgD8AAABAAABAQAAAAAAAAIA+AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAA//8C/wAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAVGVzdCBGb3JnZQBTcGFyawAAAA==','base64');
   await panel.getByLabel('Import Forge layout').setInputFiles({name:'test-forge.hmv',mimeType:'application/octet-stream',buffer:source});
   await expect(panel.getByRole('status')).toContainText('1 editable placements · 1 other records preserved.');
-  await expect(panel.getByRole('button',{name:'Export for Forerunner'})).toBeDisabled();
+  await expect(panel.getByRole('button',{name:'Export for Forerunner',exact:true})).toBeDisabled();
   await expect(panel).toContainText('Forerunner cannot import record 1.');
   await page.keyboard.press('Control+z');
   await expect(panel.getByLabel('Import Forge layout')).toBeVisible();
@@ -6240,7 +6260,7 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   supported.writeUInt32LE(supported.length-64,56);
   supported.writeUInt32LE(crc32(supported.subarray(64)),60);
   await panel.getByLabel('Import Forge layout').setInputFiles({name:'forerunner.hmv',mimeType:'application/octet-stream',buffer:supported});
-  const exportForerunner = panel.getByRole('button',{name:'Export for Forerunner'});
+  const exportForerunner = panel.getByRole('button',{name:'Export for Forerunner',exact:true});
   await expect(exportForerunner).toBeEnabled();
   const targetDownload = page.waitForEvent('download');
   await exportForerunner.click();

@@ -186,6 +186,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
   let forerunnerLocalIssue = map.header.scenarioType === 1 ? forerunnerIssue : 'Local Forge needs a multiplayer base map.';
+  let forerunnerLocalNeedsPhysics = false;
   const objectiveRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvObjectiveProperties }[] = [];
   let markers = false, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
@@ -200,16 +201,17 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
     markers ||= kind !== 0;
     const group = ref?.group ?? '';
-    const plain = kind === 0 && count === 1 && flags === 1 && !respawn && !modes && !variant && !aiTeam;
-    const placementIssue = () => `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
-    if (!forerunnerIssue && (!plain || !basePlacementGroups.has(group))) {
+    const ordinary = kind === 0 && count === 1 && (flags & ~physicsMask) === 1 && !respawn && !modes && !variant && !aiTeam;
+    const placementIssue = (target: string, physicsRule: string) => `${target} cannot import record ${index + 1}. It must be one base-map object placed at start with ${physicsRule} and no respawn timer, AI or game-mode settings.`;
+    if (!forerunnerIssue && (!ordinary || physics || !basePlacementGroups.has(group))) {
       forerunnerIssue = isHmvDeviceGroup(group)
         ? `Forerunner’s standard HMV import does not place devices. Record ${index + 1} needs Local Forge or a Forge layout copy.`
-        : placementIssue();
+        : placementIssue('Forerunner', 'standard physics');
     }
-    if (!forerunnerLocalIssue && (!plain || !isHmvPlacementGroup(group))) {
-      forerunnerLocalIssue = placementIssue();
+    if (!forerunnerLocalIssue && (!ordinary || !isHmvPlacementGroup(group))) {
+      forerunnerLocalIssue = placementIssue('Local Forge', 'supported physics');
     }
+    forerunnerLocalNeedsPhysics ||= !!physics;
 
     if (kind === 5 || kind === 7 || kind === 8) {
       requireLayout(pathIndex === 0xffff && team >= 0 && !respawn && !count && !modes && !flags
@@ -363,6 +365,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     mapName,
     forerunnerIssue,
     forerunnerLocalIssue,
+    forerunnerLocalNeedsPhysics,
     write(index: number, position: Vec3, rotation: Vec3) {
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));
     },

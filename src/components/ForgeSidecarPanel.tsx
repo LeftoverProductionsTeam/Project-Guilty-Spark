@@ -92,7 +92,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     try {
       if (target === 'forerunner-local') {
         setCheckingLocalForge(true);
-        await verifyForerunnerLocalForge();
+        await verifyForerunnerLocalForge(summary?.forerunnerLocalNeedsPhysics);
       }
       if (request !== ticket.current) return;
       if (snapshot.project !== current.current.project || snapshot.map !== current.current.map) {
@@ -345,10 +345,10 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       {summary?.forerunner && <div>
         <button type="button" disabled={!compatible || checkingLocalForge || !!summary.forerunner.issue}
           onClick={() => void exportForerunner('forerunner')}>Export for Forerunner</button>
-        {!!summary.devices.length && summary.forerunnerLocalIssue === null && <>
+        {(summary.devices.length > 0 || summary.forerunnerLocalNeedsPhysics) && summary.forerunnerLocalIssue === null && <>
           <button type="button" disabled={!compatible || checkingLocalForge}
             onClick={() => void exportForerunner('forerunner-local')}>{checkingLocalForge ? 'Checking Local Forge…' : 'Export for Forerunner Local Forge'}</button>
-          <p className="subtle">Put <code>import.hmv</code> in <code>forge/{summary.forerunner.mapName}/</code> under the reviewed runtime’s save folder. Open <strong>Forge → Local Forge</strong> on the exact map, then choose <strong>Forge Tools → Load Layout (.HMV)</strong>.</p>
+          <p className="subtle">Put <code>import.hmv</code> in <code>forge/{summary.forerunner.mapName}/</code> under the reviewed runtime’s save folder. Open <strong>Forge → Local Forge</strong> on the exact map, then choose <strong>Forge Tools → Load Layout (.HMV)</strong>.{summary.forerunnerLocalNeedsPhysics && ' Fixed and Phased physics require a reviewed runtime with local physics support.'}</p>
         </>}
         <p className="subtle">{summary.forerunner.issue ?? <>Copy <code>import.hmv</code> to <code>forge/{summary.forerunner.mapName}/</code> in the save folder of a Forerunner build with HMV support. In an empty Forge session on this map, choose <strong>Forge Tools → Load Layout (.HMV)</strong>.{summary.forerunner.hasScenery && ' A network host cannot load layouts with scenery.'}</>}</p>
       </div>}

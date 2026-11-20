@@ -169,6 +169,29 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(() => addHmvPlacement(withNative, map, { ...native, scale: [2, 2, 2] })).toThrow('unscaled');
   });
 
+  it('allows Fixed and Phased ordinary placements through Local Forge only', () => {
+    const native = {
+      id: 'native-pistol', name: 'Pistol', tagId: 10, kind: 'Weapon',
+      position: [1, 2, 3], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true,
+      sourceOffset: 0, rotationOffset: 0, assetId: null,
+    } as Project['scene'][number];
+    const fixed = { team: -1, respawnSeconds: 0, placeAtStart: true, physics: 'fixed' } as const;
+    let authored: Project = addHmvPlacement({ ...project, scene: [native] }, map, native).project;
+    authored = updateHmvPlacementProperties(authored, map, authored.scene[1], fixed);
+    authored = addHmvPlacement(authored, map, authored.scene[1]).project;
+    authored = updateHmvPlacementProperties(authored, map, authored.scene[2], { ...fixed, physics: 'phased' });
+    const output = exportForgeSidecar(authored, map, 'forerunner-local') as Uint8Array;
+    const layout = readHmv(Array.from(output), map);
+    expect(layout.forerunnerLocalNeedsPhysics).toBe(true);
+    expect(layout.objectRecords.map(row => row.properties.physics)).toEqual(['fixed','phased']);
+    expect(() => exportForgeSidecar(authored, map, 'forerunner')).toThrow('standard physics');
+    for (const unsupported of [{ respawnSeconds: 10 }, { placeAtStart: false }]) {
+      const blocked = updateHmvPlacementProperties(authored, map, authored.scene[1], { ...fixed, ...unsupported });
+      expect(() => exportForgeSidecar(blocked, map, 'forerunner-local')).toThrow('placed at start');
+      expect(exportForgeSidecar(blocked, map)).toBeInstanceOf(Uint8Array);
+    }
+  });
+
   it('retains opaque HMV records and preserves current poses across structural changes', () => {
     const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
     const first = loaded.scene[0];
@@ -338,7 +361,7 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(() => addHmvPlacement(full, map, full.scene.at(-1)!)).toThrow('64-objective limit');
   });
 
-  it('round-trips native device tags, transforms and properties without promoting them to Forerunner', () => {
+  it('round-trips native Local Forge devices while keeping the standard export restricted', () => {
     const deviceMap = {
       ...map,
       tags: [...map.tags,
@@ -363,8 +386,9 @@ describe('Chupathingy Forge binary layouts', () => {
     const moved = { ...edited, scene: edited.scene.map(row =>
       row.id === placed.id ? { ...row, position: [10, 2, 3] as [number, number, number] } : row) };
     expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner')).toThrow('does not place devices');
-    expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner-local')).toThrow('standard physics');
     const output = exportForgeSidecar(moved, deviceMap) as Uint8Array;
+    expect(exportForgeSidecar(moved, deviceMap, 'forerunner-local')).toEqual(output);
+    expect(inspectForgeSidecar(moved.forgeSidecar!, deviceMap).forerunnerLocalNeedsPhysics).toBe(true);
     expect(new DataView(output.buffer).getUint16(4, true)).toBe(7);
     const reopened = importForgeSidecar(starting, deviceMap, 'devices.hmv', output).project;
     expect(reopened.scene.slice(-2).map(row => row.sourceModel?.class)).toEqual(['mach', 'ctrl']);

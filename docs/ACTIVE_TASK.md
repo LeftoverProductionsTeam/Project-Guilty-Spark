@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Forerunner loaded, saved, undid and reloaded Spark’s exact Danger Canyon control. Spark now converts compatible Forerunner text layouts to HMV. TypeScript, production web build, 18 unit tests, three browser workflows and independent Windows decoder pass. See RUNTIME_INTEGRATION_20261107.
-Next action: Finish both factions on Black Echo 04d9ccd1 with two authenticated players. Keep HUD A/B separate. For Forge, play a converted text layout and test advanced placements with a Forge-capable Chupathingy build. Use one exact reviewed map and runtime for remote-host replication.
+Latest verified revision: Forerunner Windows loaded and saved Spark’s converted Blood Gulch layout. Spark’s reviewed Local Forge export carries Fixed and Phased. Native playback verified Fixed pose and both flags through Save Layout. TypeScript, production web build, 19 unit tests and two browser workflows pass. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish Black Echo 04d9ccd1 with two authenticated players, closing defense and evacuation before banking and redeployment for both factions. Use a private loopback Forge test to verify Phased collision, then confirm supported remote-host editing, replicated objects and late-join state on an exact reviewed build. Device switch wiring remains separate.
 
 ## Acceptance
 
