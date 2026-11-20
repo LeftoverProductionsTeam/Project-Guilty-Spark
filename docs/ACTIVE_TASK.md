@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Black Echo CE609 HUD readback passed for 18 edits. Radar artwork sizing and visual acceptance remain open. The offline defense retest left extraction unarmed. The checkout cleanup preserved source and map hashes. See RUNTIME_INTEGRATION_20261107.
-Next action: Run exact CE609 04d9ccd1 with two authenticated players. Use the south facility route, confirm the equipped weapon after pickup, then test defense, evacuation, banking and redeployment for both factions. Compare actual radar sprite sizes before an in-game HUD A/B.
+Latest verified revision: Spark previews CE HUD bitmap scale. Black Echo radar 0.5 correction compiled and passed independent readback for 22 edits; the exact retained candidate and resource banks were preserved. Forerunner render and paired gameplay remain open. See RUNTIME_INTEGRATION_20261107.
+Next action: On exact CE609 04d9ccd1, use the south facility route and confirm the equipped weapon before defense. Verify evacuation, banking and redeployment with two authenticated players for both factions. Compare the radar correction in a separate Forerunner A/B.
 
 ## Acceptance
 

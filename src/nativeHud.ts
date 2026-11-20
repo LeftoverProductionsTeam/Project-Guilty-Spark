@@ -77,6 +77,16 @@ export function nativeHudAnchor(project:Project,tag:Tag,layer:HudLayer):number {
   if(n<0)n=resolve('hud:anchor');
   return Number.isInteger(n)&&n>=0&&n<HUD_ANCHORS.length?n:-1;
 }
+/** CE bitmap dimensions before game viewport scaling. Overlay and crosshair
+ * items use bitmap flags without their own high-resolution placement bit. */
+export function ceHudArtworkScale(tagClass:string,prefix:string|undefined,placementFlags:number,groupFlags:number|undefined){
+  if(groupFlags===undefined||!['unhi','wphi','grhi'].includes(tagClass))return 1;
+  const respectsPlacement=tagClass==='unhi'
+    || tagClass==='wphi'&&/^hud:(static_elements|meter_elements)\[\d+\]\.$/.test(prefix??'')
+    || tagClass==='grhi'&&(prefix==='hud:background_'||prefix==='hud:total_grenades_background_');
+  const highResolution=(respectsPlacement&&(placementFlags&4)!==0)||(groupFlags&128)!==0;
+  return (highResolution?0.5:1)*((groupFlags&16)!==0?0.5:1);
+}
 export function hudAnchorBasis(anchor:number,width:number,height:number){
   const normalized=HUD_ANCHORS[anchor]??HUD_ANCHORS[0];
   // Native right/bottom corner and edge-center offsets increase inward.

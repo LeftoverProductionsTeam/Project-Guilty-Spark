@@ -5,7 +5,7 @@ import {textureResourceScope} from './textureResourceScope';
 export interface BitmapLayoutImage {width:number;height:number;kind:number;registration:[number,number]}
 export interface BitmapLayoutSprite {imageIndex:number;left:number;right:number;top:number;bottom:number;registration:[number,number]}
 export interface BitmapLayoutSequence {name:string;firstImage:number;imageCount:number;sprites:BitmapLayoutSprite[]}
-export interface OwnedBitmapLayout {bitmapTagId:number;sourceSha256:string;sourceKind:'internal-cache'|'verified-resource';resourceSha256?:string|null;images:BitmapLayoutImage[];sequences:BitmapLayoutSequence[]}
+export interface OwnedBitmapLayout {bitmapTagId:number;sourceSha256:string;sourceKind:'internal-cache'|'verified-resource';resourceSha256?:string|null;groupFlags?:number;images:BitmapLayoutImage[];sequences:BitmapLayoutSequence[]}
 const integer=(n:unknown,min:number,max:number):n is number=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=min&&n<=max;
 const finite=(n:unknown,min:number,max:number):n is number=>typeof n==='number'&&Number.isFinite(n)&&n>=min&&n<=max;
 const pair=(v:unknown,min:number,max:number,whole=false):v is [number,number]=>Array.isArray(v)&&v.length===2&&v.every(n=>whole?integer(n,min,max):finite(n,min,max));
@@ -15,6 +15,7 @@ export function validateOwnedBitmapLayout(layout:OwnedBitmapLayout,target:{bitma
   if(layout.sourceKind==='verified-resource'){
     if(!target.resourceSha256||!/^[a-f0-9]{64}$/i.test(target.resourceSha256)||layout.resourceSha256!==target.resourceSha256)throw Error('HUD bitmap metadata resource identity changed.');
   }else if(layout.sourceKind!=='internal-cache'||layout.resourceSha256!=null)throw Error('Unverified HUD bitmap metadata provenance.');
+  if(layout.groupFlags!==undefined&&!integer(layout.groupFlags,0,65535))throw Error('Invalid native bitmap group flags.');
   if(!Array.isArray(layout.images)||layout.images.length===0||layout.images.length>2048||!Array.isArray(layout.sequences)||layout.sequences.length>256)throw Error('HUD bitmap layout exceeds its bounded native inventory.');
   for(const image of layout.images)if(!image||!integer(image.width,1,4096)||!integer(image.height,1,4096)||!integer(image.kind,0,2)||!pair(image.registration,-32768,32767,true))throw Error('Invalid native HUD bitmap dimensions or registration.');
   let sprites=0;

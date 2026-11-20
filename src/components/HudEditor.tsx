@@ -3,7 +3,7 @@ import type {KeyboardEvent,PointerEvent} from 'react';
 import type {Project,Tag,TagField} from '../types';
 import type {DdsImage} from '../haloDds';
 import {fieldValue,setTagValue,shortPath} from '../editor';
-import {hudAnchorBasis,nativeHudAnchor,nativeHudArtwork,nativeHudDefinition,nativeHudLayers} from '../nativeHud';
+import {ceHudArtworkScale,hudAnchorBasis,nativeHudAnchor,nativeHudArtwork,nativeHudDefinition,nativeHudLayers} from '../nativeHud';
 import type {HudLayer} from '../nativeHud';
 import {useMapState} from '../mapSession';
 import {NumberField} from './ui';
@@ -25,6 +25,8 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
   const [query,setQuery]=useState('');
   const [showArtwork,setShowArtwork]=useMapState(project.id,stateKey+':artwork',true);
   const [allElements,setAllElements]=useMapState(project.id,stateKey+':allElements',true);
+  const [ceScale,setCeScale]=useMapState(project.id,stateKey+':ceScale',true);
+  const canPreviewCeScale=project.source?.cacheVersion===609&&['unhi','wphi','grhi'].includes(tag.class);
   const artworkCanvas=useRef<HTMLCanvasElement>(null),atlasCanvases=useRef(new Map<DdsImage,HTMLCanvasElement>());
   const [previewBitmap,setPreviewBitmap]=useState<number|null>(null);
   const [ghost,setGhost]=useState<{layer:string;x:number;y:number}|null>(null);
@@ -93,7 +95,8 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
     const scaleY=tag.fields.find(field=>field.key===layer.prefix+'height_scale');
     const supported=!!(target&&art.sequence&&layer.x&&layer.y&&scaleX&&scaleY&&nativeHudAnchor(project,tag,layer)>=0);
     const reason=!art.reference?'No admitted bitmap dependency (text/number elements need native font composition).':!target?'The bitmap dependency is unavailable in this source.':!art.sequence?'No admitted native sequence field.':!scaleX||!scaleY?'Native scale fields are unavailable.':nativeHudAnchor(project,tag,layer)<0?'The native anchor is not admitted.':'';
-    return {layer,bitmap:target,sequence:art.sequence,supported,reason,scaleX:value(scaleX,1),scaleY:value(scaleY,1)};
+    const flags=layer.fields.find(field=>field.key===layer.prefix+'scaling_flags');
+    return {layer,bitmap:target,sequence:art.sequence,supported,reason,scaleX:value(scaleX,1),scaleY:value(scaleY,1),placementFlags:value(flags)};
   });
   const targets=placed.filter(item=>item.supported&&(allElements||item.layer.id===chosen?.id)).map(item=>({
     layerId:item.layer.id,bitmapTagId:item.bitmap!.id,sequenceIndex:value(item.sequence,-1),
@@ -104,10 +107,14 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
   const issues=[...composition.errors,...unavailable.map(item=>({layerId:item.layer.id,reason:item.reason}))];
   const drawn=composition.layers.flatMap(art=>{
     const item=placed.find(candidate=>candidate.layer.id===art.layerId);if(!item)return [];
-    const [x,y]=position(item.layer),{normalized}=basis(item.layer),w=art.frame.width*item.scaleX,h=art.frame.height*item.scaleY;
+    const factor=canPreviewCeScale&&ceScale?ceHudArtworkScale(tag.class,item.layer.prefix,item.placementFlags,art.groupFlags):1;
+    const scaleX=item.scaleX*factor,scaleY=item.scaleY*factor;
+    const [x,y]=position(item.layer),{normalized}=basis(item.layer),w=art.frame.width*scaleX,h=art.frame.height*scaleY;
     if(!Number.isFinite(w)||!Number.isFinite(h)||Math.max(Math.abs(w),Math.abs(h))>1_000_000)return [];
-    return [{...item,art,left:x-normalized[0]*w,top:y-normalized[1]*h,width:w,height:h}];
+    return [{...item,art,scaleX,scaleY,left:x-normalized[0]*w,top:y-normalized[1]*h,width:w,height:h}];
   });
+  const selectedArtwork=drawn.find(item=>item.layer.id===chosen?.id);
+  const dimensions=(w:number,h:number)=>`${Math.abs(w).toFixed(1)} × ${Math.abs(h).toFixed(1)}`;
   useLayoutEffect(()=>{
     const context=artworkCanvas.current?.getContext('2d');if(!context)return;
     context.clearRect(0,0,width,canvasHeight);
@@ -138,8 +145,9 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
         <option value="640x480">640 × 480 · 4:3</option><option value="854x480">854 × 480 · 16:9</option><option value="1280x720">1280 × 720 · 16:9</option>
       </select></label><label className="checkbox-label"><input type="checkbox" checked={split} onChange={event=>{cancelDrag();setSplit(event.target.checked);}}/> Half-height reference</label><label className="checkbox-label"><input type="checkbox" checked={showArtwork} onChange={event=>setShowArtwork(event.target.checked)}/> Source artwork</label><label>View <select aria-label="HUD artwork composition" value={allElements?'all':'selected'} onChange={event=>setAllElements(event.target.value==='all')}><option value="all">All bitmap elements</option><option value="selected">Selected element</option></select></label>
     </div>
+    {canPreviewCeScale&&<label className="checkbox-label"><input type="checkbox" checked={ceScale} onChange={event=>setCeScale(event.target.checked)}/> Preview CE artwork scale</label>}
     <p className="subtle">Drag artwork or an anchor; arrow keys move it (Shift: 10 units). Each completed move is one Undo action.</p>
-    <details className="hud-reference-notes"><summary>About this reference view</summary><p className="subtle">Corner offsets increase inward. Artwork uses this tag’s native bitmap sequences and scales; other elements use their first real frame. Reference size and Half-height reference leave source units unchanged. Native visibility rules, draw order, tint, meter fill, fonts, native scaling flags, safe-area, zoom and split-screen scaling are not simulated.</p></details>
+    <details className="hud-reference-notes"><summary>About this reference view</summary><p className="subtle">Corner offsets increase inward. Artwork uses this tag’s native bitmap sequences and scales; other elements use their first real frame. Reference size and Half-height reference leave source units unchanged. CE artwork scale accounts for the native bitmap and placement size flags on compatible CE maps. Runtime overrides, visibility, draw order, tint, meter fill, text, safe areas, zoom and split-screen scaling are outside this reference view.</p></details>
     <svg ref={svg} className="hud-layout-canvas" viewBox={'0 0 '+width+' '+canvasHeight} role="group" aria-label="HUD anchor layout"
       onPointerMove={move} onPointerUp={event=>finish(event)} onPointerCancel={event=>finish(event,true)}
       onLostPointerCapture={event=>{if(drag.current?.pointer===event.pointerId){drag.current=null;setGhost(null);}}}
@@ -158,6 +166,8 @@ export default function HudEditor({project,tag,tags,advanced,edit,notify,onNavig
       </g>;})}
     </svg>
     {showArtwork&&<div className="hud-artwork-status" role="status"><span>{composition.loading?'Reading shared source artwork…':drawn.length+' / '+targets.length+' requested bitmap elements shown'} · {placed.filter(item=>item.layer.x&&item.layer.y).length} native layout elements</span>
+      {selectedArtwork&&<span>Source frame {dimensions(selectedArtwork.art.frame.width,selectedArtwork.art.frame.height)} px · Preview {dimensions(selectedArtwork.width,selectedArtwork.height)} units</span>}
+      {canPreviewCeScale&&ceScale&&drawn.some(item=>item.art.groupFlags===undefined)&&<span>Some artwork is missing native bitmap flags and uses tag scale alone.</span>}
       {composition.errors.length>0&&<button className="small-button" onClick={composition.retry}>Retry artwork</button>}</div>}
     {showArtwork&&issues.length>0&&<details className="hud-artwork-issues"><summary>{issues.length} elements need attention</summary><ul>{issues.map((issue,index)=><li key={issue.layerId+':'+index}><strong>{layers.find(layer=>layer.id===issue.layerId)?.label??'HUD artwork'}: </strong>{issue.reason}</li>)}</ul></details>}
     {showArtwork&&drawn.length<composition.layers.length&&<p role="status">Some elements exceed the reference view’s display extent; their native values are unchanged.</p>}

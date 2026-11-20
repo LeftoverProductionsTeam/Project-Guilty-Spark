@@ -9,7 +9,7 @@ import {pixelPreviewBudget} from '../resourceBudgets';
 import {textureResourceScope} from '../textureResourceScope';
 
 export interface HudArtworkTarget {layerId:string;bitmapTagId:number;sequenceIndex:number;frameIndex:number}
-export interface HudArtworkLayer {layerId:string;bitmapTagId:number;frame:BitmapSequenceFrame;image:DdsImage}
+export interface HudArtworkLayer {layerId:string;bitmapTagId:number;frame:BitmapSequenceFrame;groupFlags?:number;image:DdsImage}
 interface ArtworkState {scope:string;layers:HudArtworkLayer[];errors:{layerId:string;reason:string}[];loading:boolean}
 
 /** HUD composition borrows the existing checked decoder/cache. It retains no
@@ -83,7 +83,7 @@ export function useHudArtworks(project:Project,targets:HudArtworkTarget[],enable
       const layers:HudArtworkLayer[]=[];
       for(const {target,frame,key} of planned){
         const image=decoded.get(key);
-        if(image)layers.push({layerId:target.layerId,bitmapTagId:target.bitmapTagId,frame,image});
+        if(image)layers.push({layerId:target.layerId,bitmapTagId:target.bitmapTagId,frame,groupFlags:metadata.get(target.bitmapTagId)?.groupFlags,image});
         else errors.push({layerId:target.layerId,reason:imageErrors.get(key)??'Original image did not load.'});
       }
       setState({scope,layers,errors,loading:false});

@@ -22,10 +22,13 @@ pub struct BitmapLayoutSequence {
 pub struct OwnedBitmapLayout {
     pub bitmap_tag_id:u32,pub source_sha256:String,pub source_kind:String,
     #[serde(skip_serializing_if="Option::is_none")]pub resource_sha256:Option<String>,
+    pub group_flags:u16,
     pub images:Vec<BitmapLayoutImage>,pub sequences:Vec<BitmapLayoutSequence>,
 }
-fn read_layout(bytes:&[u8],region:TagRegion,at:usize)->Result<(Vec<BitmapLayoutImage>,Vec<BitmapLayoutSequence>)>{
+struct BitmapLayout {group_flags:u16,images:Vec<BitmapLayoutImage>,sequences:Vec<BitmapLayoutSequence>}
+fn read_layout(bytes:&[u8],region:TagRegion,at:usize)->Result<BitmapLayout>{
     let r=Reader(bytes);region.contains(at,108)?;
+    let group_flags=r.u16(at+6)?;
     let count=r.u32(at+96)? as usize;
     if count==0||count>MAX_IMAGES_PER_TAG {return invalid("HUD bitmap image table exceeds its native preview bound");}
     let table=region.pointer(r.u32(at+100)?,count*48)?;
@@ -45,7 +48,7 @@ fn read_layout(bytes:&[u8],region:TagRegion,at:usize)->Result<(Vec<BitmapLayoutI
     // Source: pinned native bitmap definitions, not engine implementation code.
     let count=r.u32(at+84)? as usize;
     if count>256 {return invalid("HUD bitmap sequence count exceeds 256; extended layouts require their own admission");}
-    if count==0{return Ok((images,vec![]));}
+    if count==0{return Ok(BitmapLayout{group_flags,images,sequences:vec![]});}
     let table=region.pointer(r.u32(at+88)?,count*64)?;
     if indexed&&table<108{return invalid("Indexed HUD sequence table overlaps its metadata header");}
     let mut sequences=Vec::with_capacity(count);let mut total_sprites=0usize;
@@ -79,7 +82,7 @@ fn read_layout(bytes:&[u8],region:TagRegion,at:usize)->Result<(Vec<BitmapLayoutI
         }
         sequences.push(BitmapLayoutSequence{name,first_image,image_count,sprites});
     }
-    Ok((images,sequences))
+    Ok(BitmapLayout{group_flags,images,sequences})
 }
 /// Read exact source-bound sequence metadata without decoding any pixels.
 /// Indexed CE bodies use the same checked native slot/path and opened resource
@@ -96,17 +99,37 @@ pub fn owned_bitmap_layout(path:&Path,expected:&str,inspection:&MapInspection,bi
     }
     let tag=inspection.tags.iter().find(|tag|tag.id==bitmap_tag_id&&tag.class=="bitm")
         .ok_or_else(||SparkError::Invalid("HUD bitmap tag is absent from this source map".into()))?;
-    let(images,sequences,source_kind,resource_sha256)=if tag.external {
+    let(layout,source_kind,resource_sha256)=if tag.external {
         let(path,hash)=resources.ok_or_else(||SparkError::Invalid("Project-pinned bitmaps.map is required for this HUD bitmap layout".into()))?;
         let(mut file,index)=crate::resource_map::open_verified(path,hash)?;let mut spent=0;
         let body=ce_indexed_body(&bytes,&header,tag,&mut file,&index,&mut spent)?;
-        let(images,sequences)=read_layout(&body,TagRegion{start:0,end:body.len(),memory_address:0},0)?;
+        let layout=read_layout(&body,TagRegion{start:0,end:body.len(),memory_address:0},0)?;
         crate::resource_map::verify_open_handle_hash(&mut file,hash)?;
-        (images,sequences,"verified-resource",Some(hash.to_owned()))
+        (layout,"verified-resource",Some(hash.to_owned()))
     }else{
         let at=tag.data_offset.ok_or_else(||SparkError::Invalid("HUD bitmap layout has no native tag body".into()))?;
-        let(images,sequences)=read_layout(&bytes,TagRegion::from_header(&bytes,&header)?,at)?;
-        (images,sequences,"internal-cache",None)
+        let layout=read_layout(&bytes,TagRegion::from_header(&bytes,&header)?,at)?;
+        (layout,"internal-cache",None)
     };
-    Ok(OwnedBitmapLayout{bitmap_tag_id,source_sha256:actual,source_kind:source_kind.into(),resource_sha256,images,sequences})
+    Ok(OwnedBitmapLayout{bitmap_tag_id,source_sha256:actual,source_kind:source_kind.into(),resource_sha256,group_flags:layout.group_flags,images:layout.images,sequences:layout.sequences})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layout_carries_group_flags_from_the_validated_bitmap_root() {
+        let mut tag = vec![0u8; 156];
+        tag[6..8].copy_from_slice(&0x90u16.to_le_bytes());
+        tag[96..100].copy_from_slice(&1u32.to_le_bytes());
+        tag[100..104].copy_from_slice(&108u32.to_le_bytes());
+        tag[108..112].copy_from_slice(b"mtib");
+        tag[112..114].copy_from_slice(&128u16.to_le_bytes());
+        tag[114..116].copy_from_slice(&64u16.to_le_bytes());
+        let region = TagRegion { start: 0, end: tag.len(), memory_address: 0 };
+        let layout = read_layout(&tag, region, 0).unwrap();
+        assert_eq!(layout.group_flags, 0x90);
+        assert_eq!((layout.images[0].width, layout.images[0].height), (128, 64));
+    }
 }
