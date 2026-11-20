@@ -146,13 +146,21 @@ function incidentSurfaceIndex(mesh:MeshData):IncidentSurfaceIndex|null {
     incidentSurfaces.set(mesh,null);
     return null;
   }
-  const tree=buildCollisionIndexFrom(count,triangle=>{
-    const ids=mesh.indices.slice(triangle*3,triangle*3+3);
-    if(ids.some(id=>!Number.isSafeInteger(id)||id<0||id*3+2>=mesh.positions.length))return null;
-    const a=mesh.positions.slice(ids[0]*3,ids[0]*3+3) as Vec3;
-    const b=mesh.positions.slice(ids[1]*3,ids[1]*3+3) as Vec3;
-    const c=mesh.positions.slice(ids[2]*3,ids[2]*3+3) as Vec3;
-    return a.every(Number.isFinite)&&b.every(Number.isFinite)&&c.every(Number.isFinite)?{a,b,c}:null;
+  // The builder reads the coordinates synchronously and retains only bounds.
+  // Reuse three vectors so opening a dense BSP does not allocate per triangle.
+  const triangle={a:[0,0,0] as Vec3,b:[0,0,0] as Vec3,c:[0,0,0] as Vec3};
+  const vertices=[triangle.a,triangle.b,triangle.c];
+  const tree=buildCollisionIndexFrom(count,id=>{
+    for(let vertex=0;vertex<3;vertex++){
+      const index=mesh.indices[id*3+vertex];
+      const offset=index*3;
+      if(!Number.isSafeInteger(index)||index<0||offset+2>=mesh.positions.length)return null;
+      const x=mesh.positions[offset],y=mesh.positions[offset+1],z=mesh.positions[offset+2];
+      if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return null;
+      const position=vertices[vertex];
+      position[0]=x;position[1]=y;position[2]=z;
+    }
+    return triangle;
   });
   if(!tree){
     incidentSurfaces.set(mesh,null);

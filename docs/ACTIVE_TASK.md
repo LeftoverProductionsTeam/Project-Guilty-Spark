@@ -3,8 +3,8 @@
 Task: Operation110 - source Save integrity and the Black Echo native handoff
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Exact Black Echo d4ca73c8 loaded into two real local Forerunner clients (9a4aed01). Including the matching Xbox carousel fixed the lobby stall. The peer confirmed map size and hash. CE609 and unchanged Marine route readback are at c64f214; indexed lighting at 568f067.
-Next action: Starting from the verified paired lobby payload, exercise Covenant deployment and actual pickup of technology_grunt, then defense, evacuation, banking, settlement and redeployment. Keep Save37944 open pending a reproducer.
+Latest verified revision: Exact Black Echo d4ca73c8 repeated paired Forerunner 9a4aed01 admission, map hash match and normal movement to the Covenant terminal. Native aiming and use are open. CE609 readback and the unchanged Marine path are at c64f214. Indexed lighting at 568f067 now avoids per-triangle build allocations.
+Next action: Use relative mouse or real controller input in the isolated native Windows clients at the Covenant terminal. Confirm control 7 action, both Covenant bodies and normal technology_grunt ownership, then progress through defense and settlement. Keep Save37944 open pending a reproducer.
 
 ## Acceptance
 
