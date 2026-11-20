@@ -85,7 +85,8 @@ export interface NativeCutsceneFlag {index:number;name:string;position:[number,n
 export interface NativeCameraPoint {index:number;name:string;position:[number,number,number];orientationRadians:[number,number,number];fovRadians:number}
 export interface NativeVolumeGeometry {forward:[number,number,number];up:[number,number,number];corner:[number,number,number];dimensions:[number,number,number]}
 export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVolumeGeometry|null}
-export interface NativeDevicePlacement {class:'ctrl'|'mach'|'vehi';index:number;nameIndex:number;name:string;tagPath:string;position:[number,number,number];rotationRadians:[number,number,number];usableFromBothSides?:boolean}
+export interface NativeDevicePlacement {class:'ctrl'|'mach'|'vehi';index:number;nameIndex:number;name:string;tagPath:string;position:[number,number,number];rotationRadians:[number,number,number];usableFromBothSides?:boolean;powerGroup?:number;positionGroup?:number}
+export interface NativeDeviceGroup {index:number;name:string;initialValue:number;changeOnce:boolean;reserved:boolean}
 export interface NativeVehicleFlight {throttle:number;avoidanceDistance:number;pathfindingRadius:number}
 export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_spirit';tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
 export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number;includeFirstPersonArms?:boolean}
@@ -129,6 +130,7 @@ export interface NativeTagContext {
   scenarioPlayerStarts?:{index:number;position:[number,number,number];facingRadians?:number|null}[];
   playerStartEditIssue?:string|null;
   scenarioDevices?:NativeDevicePlacement[];
+  scenarioDeviceGroups?:NativeDeviceGroup[]|null;
   deviceEditIssue?:string|null;
   scenarioVolumes?:NativeTriggerVolume[];
   triggerEditIssue?:string|null;

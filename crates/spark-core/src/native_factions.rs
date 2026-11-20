@@ -51,7 +51,7 @@ fn named(fields: &str, array: &str) -> Result<Vec<String>> {
         .map(|row| native_name(&direct_struct_fields(row)?))
         .collect()
 }
-fn groups(fields: &str) -> Result<Vec<(String, f32, bool)>> {
+pub(super) fn groups(fields: &str) -> Result<Vec<(String, f32, bool)>> {
     array_items(&array_listing(fields, "device_groups")?, "device_groups")?
         .iter()
         .map(|row| {

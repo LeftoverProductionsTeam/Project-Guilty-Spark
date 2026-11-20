@@ -296,7 +296,7 @@ impl Operation {
             Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::ControlSettings{settings,source_sha256}=>{if class!="ctrl"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Control editing requires its exact native device_control source");}settings.validate()?;}
-            Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source and finite position/rotation");}}
+            Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source, finite pose and bounded group indices");}}
             Self::TriggerVolume{index,name,geometry,source_sha256,append}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||*append&&!crate::creative::script_ident(name)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
             Self::CutsceneFlag{point,source_sha256,..}=>{
                 if class!="scnr"||point.index>=512||point.name.len()>32||point.name.chars().any(char::is_control)||point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.facing_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU+1e-6)||source_sha256.len()!=64||!source_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return invalid("Flag editing needs exact source/index/name and finite XYZ/yaw/pitch");}
@@ -564,6 +564,9 @@ impl Operation {
             }
             if let Some(sides) = device.usable_from_both_sides.filter(|sides| Some(*sides) != original.usable_from_both_sides) {
                 args.extend(["-S".into(), format!("{prefix}.control_flags.usable_from_both_sides"), u8::from(sides).to_string()]);
+            }
+            for (field, value) in changed_device_groups(before, original, device)? {
+                args.extend(["-S".into(), format!("{prefix}.{field}"), value.to_string()]);
             }
             if args.len() == 2 { return invalid("Native device placement already matches"); }
             args.push(tag.into());
@@ -2275,18 +2278,77 @@ pub struct NativeDevicePlacement {
     pub rotation_radians: [f32; 3],
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usable_from_both_sides: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_group: Option<i16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position_group: Option<i16>,
 }
 impl NativeDevicePlacement {
     fn array(&self)->&str{match self.class.as_str(){"ctrl"=>"controls","vehi"=>"vehicles",_=>"machines"}}
-    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&(self.class=="ctrl"||self.usable_from_both_sides.is_none())&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
+    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&(self.class=="ctrl"||self.usable_from_both_sides.is_none())
+        && [self.power_group, self.position_group].into_iter().flatten().all(|group| self.class != "vehi" && (-1..128).contains(&group))&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
     fn same_identity(&self,b:&Self)->bool{self.class==b.class&&self.index==b.index&&self.name_index==b.name_index&&self.name==b.name&&self.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))}
     fn same_rotation(&self, other: &Self) -> bool {
         self.rotation_radians.iter().zip(other.rotation_radians).all(|(a, b)| facings_close(*a, b))
     }
 }
 fn native_index(fields:&str,key:&str)->Result<i16>{let n=number(fields,key)?;if n.fract()!=0.||n< -1.||n>65535.{return invalid("Invalid native placement index");}if n==65535.{Ok(-1)}else{i16::try_from(n as i64).map_err(|_|crate::SparkError::Invalid("Native placement index exceeds signed short".into()))}}
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeDeviceGroupChoice {
+    pub index: i16,
+    pub name: String,
+    pub initial_value: f32,
+    pub change_once: bool,
+    pub reserved: bool,
+}
+
+fn extraction_device_binding(name: &str) -> bool {
+    name.to_ascii_lowercase().starts_with("extraction_")
+}
+
+pub fn scenario_device_group_choices(fields: &str) -> Result<Vec<NativeDeviceGroupChoice>> {
+    let groups = factions::groups(fields)?;
+    if groups.len() > 128 { return invalid("Native device group budget exceeded"); }
+    groups.into_iter().enumerate().map(|(index, (name, initial_value, change_once))| {
+        if name.len() > 32 || name.chars().any(char::is_control) || !initial_value.is_finite() {
+            return invalid("Invalid native device group");
+        }
+        Ok(NativeDeviceGroupChoice { index: index as i16, reserved: extraction_device_binding(&name),
+            name, initial_value, change_once })
+    }).collect()
+}
+
+fn changed_device_groups(fields: &str, original: &NativeDevicePlacement, desired: &NativeDevicePlacement)
+    -> Result<Vec<(&'static str, i16)>>
+{
+    let changes = [("power_group", original.power_group, desired.power_group),
+        ("position_group", original.position_group, desired.position_group)].into_iter()
+        .filter_map(|(key, before, after)| after.filter(|value| Some(*value) != before).map(|value| (key, before, value)))
+        .collect::<Vec<_>>();
+    if changes.is_empty() { return Ok(vec![]); }
+    let groups = scenario_device_group_choices(fields)?;
+    let reserved = |value: i16| value >= 0 && groups.get(value as usize).is_some_and(|group| group.reserved);
+    if extraction_device_binding(&original.name) ||
+        [original.power_group, original.position_group].into_iter().flatten().any(reserved) {
+        return invalid("Extraction-owned device wiring must stay with its mission editor");
+    }
+    changes.into_iter().map(|(key, before, value)| {
+        if before.is_none() || value < -1 || value >= groups.len() as i16 || reserved(value) {
+            return invalid("Choose an existing editable device group or Unbound");
+        }
+        Ok((key, value))
+    }).collect()
+}
+
+fn device_group_field(root: &str, key: &str, first_line: usize) -> Result<(Option<i16>, Option<usize>)> {
+    let line = root.lines().position(|line| line.starts_with(&format!("{key} (")));
+    let Some(line) = line else { return Ok((None, None)); };
+    Ok((Some(native_index(root, key)?), Some(first_line + line)))
+}
+
 pub fn scenario_device_choices(fields:&str)->Result<Vec<NativeDevicePlacement>>{Ok(native_device_fields(fields)?.into_iter().map(|row|row.0).collect())}
-fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;3])>>{
+fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;5])>>{
     let names=array_listing(fields,"object_names")?;if names.count>512{return invalid("Native object name table exceeds512entries");}let names=array_items(&names,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
     let mut result=vec![];
     for(array,palette,class,extension)in [("machines","machine_palette","mach","device_machine"),("controls","control_palette","ctrl","device_control"),("vehicles","vehicle_palette","vehi","vehicle")]{
@@ -2307,9 +2369,14 @@ fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<
             } else {
                 (None, None)
             };
-            let row = NativeDevicePlacement { class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides };
+            let ((power_group, power_line), (position_group, position_line)) = if class == "vehi" {
+                ((None, None), (None, None))
+            } else {
+                (device_group_field(&root, "power_group", line + 1)?, device_group_field(&root, "position_group", line + 1)?)
+            };
+            let row = NativeDevicePlacement { class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides, power_group, position_group };
             if !row.valid() { return invalid("Native device identity/pose is invalid"); }
-            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line]));
+            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line, power_line, position_line]));
             line += item.len();
         }
     }Ok(result)
@@ -2322,11 +2389,14 @@ fn reviewed_device(before:&str,after:&str,desired:&NativeDevicePlacement)->Resul
         .ok_or_else(|| crate::SparkError::Invalid("Native device missing".into()))?;
     let (original, lines) = &old[index];
     let (revised, new_lines) = &new[index];
+    changed_device_groups(before, original, desired)?;
     if !original.same_identity(desired) || !revised.same_identity(desired)
         || !positions_close(revised.position, desired.position) || !revised.same_rotation(desired)
         || revised.usable_from_both_sides != desired.usable_from_both_sides.or(original.usable_from_both_sides)
+        || revised.power_group != desired.power_group.or(original.power_group)
+        || revised.position_group != desired.position_group.or(original.position_group)
         || lines != new_lines {
-        return invalid("Device readback differs from the reviewed identity, pose or control sides");
+        return invalid("Device readback differs from the reviewed identity, pose, control sides or group bindings");
     }
     let before = before.lines().collect::<Vec<_>>();
     let after = after.lines().collect::<Vec<_>>();
@@ -2348,7 +2418,7 @@ fn verify_devices_cache(expected:&[NativeDevicePlacement],path:&Path,map:&crate:
     let actual=if vehicles{crate::maps::scenario_placement_readback(path,map)?}else{crate::maps::scenario_logic_readback(path,map)?};
     let rows=actual.devices.iter().chain(actual.vehicles.iter().filter(|_|vehicles)).collect::<Vec<_>>();
     if rows.len()!=expected.len(){return invalid("Compiled native placement inventory differs from source");}
-    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides){return invalid("Compiled device identity, reference, pose or control sides differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
+    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, control sides or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
     Ok(())
 }
 
@@ -2364,6 +2434,111 @@ mod device_placement_tests {
   let mut invalid=desired.clone();invalid.class="weap".into();assert!(!invalid.valid());invalid=desired.clone();invalid.position[0]=f32::NAN;assert!(!invalid.valid());invalid=desired.clone();invalid.name_index=-1;assert!(!invalid.valid());
   let snapshot=ScenarioSquadReadback{named_objects:None,cutscene_flags:None,extraction_squads:None,faction_kits:None,transports:None,command_lists:None,devices:Some(vec![desired]),volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![]};snapshot.validate().unwrap();let mut bad=snapshot.clone();bad.devices.as_mut().unwrap().push(original);assert!(bad.validate().is_err());
  }
+    #[test]
+    fn device_wiring_writes_existing_groups_and_guards_reserved_bindings() {
+        let before = fields() + concat!(
+            "device_groups[3] array\n",
+            "    device_groups[0] struct\n        name (door_power) string\n        initial_value (1) float\n        flags bitmask\n            can_change_only_once (0) bitfield\n",
+            "    device_groups[1] struct\n        name (door_position) string\n        initial_value (0) float\n        flags bitmask\n            can_change_only_once (0) bitfield\n",
+            "    device_groups[2] struct\n        name (extraction_spirit_called) string\n        initial_value (0) float\n        flags bitmask\n            can_change_only_once (0) bitfield\n",
+        );
+        let groups = scenario_device_group_choices(&before).unwrap();
+        assert_eq!(groups[1].name, "door_position");
+        assert!(groups[2].reserved);
+        let mut device = scenario_device_choices(&before).unwrap().remove(0);
+        assert_eq!((device.power_group, device.position_group), (Some(-1), Some(-1)));
+        device.power_group = Some(0);
+        device.position_group = Some(1);
+        let op = |device| Operation::DevicePlacement { device, source_sha256: "a".repeat(64) };
+        let tags = Path::new("tags");
+        let args = op(device.clone()).arguments_with_fields(tags, "scnr", "level.scenario", &before).unwrap();
+        assert_eq!(&args[2..8], ["-S", "controls[0].power_group", "0", "-S", "controls[0].position_group", "1"]);
+        let after = before.replace("power_group (65535)", "power_group (0)").replace("position_group (65535)", "position_group (1)");
+        assert_eq!(reviewed_difference(&before, &after, &op(device.clone())).unwrap().len(), 2);
+        op(device.clone()).verify_readback(tags, "scnr", "level.scenario", &before, "0\n1\n").unwrap();
+        assert!(reviewed_difference(&before, &after.replace("name (door_position)", "name (wrong)"), &op(device.clone())).is_err());
+        for reserved in [before.replace("position_group (65535)", "position_group (2)"), before.replace("name (terminal)", "name (extraction_loadout)")] {
+            let mut change = scenario_device_choices(&reserved).unwrap().remove(0);
+            change.position_group = Some(1);
+            assert!(op(change).arguments_with_fields(tags, "scnr", "level.scenario", &reserved).is_err());
+        }
+        for invalid in [2, 3] {
+            device.position_group = Some(invalid);
+            assert!(op(device.clone()).arguments_with_fields(tags, "scnr", "level.scenario", &before).is_err());
+        }
+    }
+
+    #[test]
+    #[ignore = "Requires an owned Danger Canyon CE cache and installed Invader, with disposable build storage"]
+    fn wiring_readback_matches_an_actual_ce_compile() {
+        let get_path = |key| std::path::PathBuf::from(std::env::var_os(key).expect(key));
+        let original = get_path("SPARK_NATIVE_WIRING_MAP");
+        let invader = get_path("SPARK_NATIVE_WIRING_INVADER");
+        let root = tempfile::tempdir_in(get_path("SPARK_GENERATED_ROOT")).unwrap();
+        let tags = root.path().join("tags");
+        let output = root.path().join("wired.map");
+        std::fs::create_dir(&tags).unwrap();
+        let tag = "levels/test/dangercanyon/dangercanyon.scenario";
+        let original_tag_root = tags.to_str().unwrap();
+        let banks = original.parent().unwrap().to_str().unwrap();
+        let hash = |path: &Path| crate::maps::hash_file(path).unwrap();
+        let original_hash = hash(&original);
+        let run = |name: &str, args: &[&str]| {
+            let result = std::process::Command::new(invader.join(format!("{name}.exe"))).args(args).output().unwrap();
+            assert!(result.status.success(), "{name}: {}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+            String::from_utf8_lossy(&result.stdout).replace("\r\n", "\n")
+        };
+        run("invader-extract", &["-t", original_tag_root, "-m", banks, original.to_str().unwrap()]);
+        let plan = crate::ce_source_recovery::review(&tags).unwrap();
+        let corrected = crate::ce_source_recovery::create(&plan, &root.path().join("corrected"),
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)), |recipe| {
+                let tool = match recipe.tool { crate::ce_source_recovery::Tool::Edit => "invader-edit",
+                    crate::ce_source_recovery::Tool::Repair => "invader-bludgeon" };
+                let args = recipe.args.iter().map(String::as_str).collect::<Vec<_>>();
+                Ok(crate::ce_source_recovery::NativeRecord { recipe: recipe.clone(),
+                    executable_sha256: hash(&invader.join(format!("{tool}.exe"))), stdout: run(tool, &args), stderr: String::new() })
+            }).unwrap();
+        crate::ce_source_recovery::verify(&corrected).unwrap();
+        let tags = corrected.tags_directory;
+        let tag_path = tags.join(tag);
+        let tag_root = tags.to_str().unwrap();
+        assert_eq!(run("invader-edit", &["-t", tag_root, "-C", "device_groups", tag]).trim(), "0");
+        run("invader-edit", &["-t", tag_root, "-I", "device_groups", "2", "end",
+            "-S", "device_groups[0].name", "wiring_power",
+            "-S", "device_groups[0].initial_value", "1",
+            "-S", "device_groups[1].name", "wiring_position", tag]);
+        let original_source = std::fs::read(&tag_path).unwrap();
+        let source_sha256 = hash(&tag_path);
+        let fields = || run("invader-edit", &["-t", tag_root, "-L", tag]);
+        let before = fields();
+        let mut control = scenario_device_choices(&before).unwrap().into_iter()
+            .find(|device| device.class == "ctrl" && device.index == 1).unwrap();
+        assert_eq!((control.power_group, control.position_group), (Some(-1), Some(-1)));
+        control.power_group = Some(0);
+        control.position_group = Some(1);
+        let operation = Operation::DevicePlacement { device: control, source_sha256: source_sha256.clone() };
+        let write = operation.arguments_with_fields(&tags, "scnr", tag, &before).unwrap();
+        run("invader-edit", &write.iter().map(String::as_str).collect::<Vec<_>>());
+        let after = fields();
+        assert_eq!(reviewed_difference(&before, &after, &operation).unwrap().len(), 2);
+        let read = operation.readback_arguments(&tags, "scnr", tag, &before).unwrap().unwrap();
+        let readback = run("invader-edit", &read.iter().map(String::as_str).collect::<Vec<_>>());
+        operation.verify_readback(&tags, "scnr", tag, &before, &readback).unwrap();
+        let revised_source = hash(&tag_path);
+        run("invader-build", &["-t", tag_root, "-R", banks, "-r", "check", "-g", "gbx-custom",
+            "-o", output.to_str().unwrap(), tag.strip_suffix(".scenario").unwrap()]);
+        let cache = crate::maps::inspect_map(&output, Some(original.parent().unwrap())).unwrap();
+        assert_eq!(cache.header.version, 609);
+        verify_devices_cache(&scenario_device_choices(&after).unwrap(), &output, &cache).unwrap();
+        let groups = crate::maps::scenario_logic_readback(&output, &cache).unwrap().groups;
+        assert_eq!(groups.iter().map(|group| (group.name.as_str(), group.initial_value)).collect::<Vec<_>>(),
+            [("wiring_power", 1.), ("wiring_position", 0.)]);
+        println!("Native wiring: original={original_hash} revisedSource={revised_source} compiled={} power=0 position=1", hash(&output));
+        std::fs::write(&tag_path, original_source).unwrap();
+        assert_eq!(hash(&tag_path), source_sha256);
+        assert_eq!(hash(&original), original_hash);
+    }
+
     #[test]
     fn control_sides_use_only_the_selected_native_flag_and_preserve_legacy_pose_edits() {
         let before = fields().replace("scripts[0] array", "        control_flags bitmask\n            usable_from_both_sides (0) bitfield\nscripts[0] array");

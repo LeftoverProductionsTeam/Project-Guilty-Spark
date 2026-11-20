@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Forerunner Windows loaded and saved Spark’s converted Blood Gulch layout. Spark’s reviewed Local Forge export carries Fixed and Phased. Native playback verified Fixed pose and both flags through Save Layout. TypeScript, production web build, 19 unit tests and two browser workflows pass. See RUNTIME_INTEGRATION_20261107.
-Next action: Finish Black Echo 04d9ccd1 with two authenticated players, closing defense and evacuation before banking and redeployment for both factions. Use a private loopback Forge test to verify Phased collision, then confirm supported remote-host editing, replicated objects and late-join state on an exact reviewed build. Device switch wiring remains separate.
+Latest verified revision: Recovered native controls and machines can be wired through existing scenario groups. Browser workflows, Windows Cargo check and independent CE609 readback passed. Forerunner saved and restored all three Forge physics modes after a runtime restart. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish exact Black Echo 04d9ccd1 with two authenticated human players. Close defense and evacuation, then banking and redeployment for both factions. Enable reviewed native device group creation and verify a linked control moves a machine in-game. Continue direct Phased traversal and authenticated remote Forge editing, replication and late join on a reviewed runtime build.
 
 ## Acceptance
 

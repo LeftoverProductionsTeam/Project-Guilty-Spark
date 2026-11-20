@@ -4754,7 +4754,7 @@ async function mockRecoveredMissionAreas(page:Page,withDevice:boolean|'vehicle'=
   w.__sparkMock.placementPreviews=[];w.__sparkMock.placementHistory=[];
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
    if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'levels/test'}];
-   if(command==='native_tag_context'){w.__sparkMock.areaReads++;return {projectId:args.projectId,buildId:'native-area-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:structuredClone(w.__sparkMock.placementHistory),tagSha256:w.__sparkMock.nativeAreaSha,boundingRadius:null,lensFlareScale:null,scenarioVolumes:structuredClone(w.__sparkMock.nativeAreas),triggerEditIssue:null,scenarioDevices:w.__sparkMock.nativeDevices??[],deviceEditIssue:null,scenarioPlayerStarts:w.__sparkMock.nativePlayerStarts??[],playerStartEditIssue:w.__sparkMock.playerStartEditIssue??null};}
+   if(command==='native_tag_context'){w.__sparkMock.areaReads++;return {projectId:args.projectId,buildId:'native-area-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:structuredClone(w.__sparkMock.placementHistory),tagSha256:w.__sparkMock.nativeAreaSha,boundingRadius:null,lensFlareScale:null,scenarioVolumes:structuredClone(w.__sparkMock.nativeAreas),triggerEditIssue:null,scenarioDevices:w.__sparkMock.nativeDevices??[],scenarioDeviceGroups:w.__sparkMock.nativeDeviceGroups??null,deviceEditIssue:null,scenarioPlayerStarts:w.__sparkMock.nativePlayerStarts??[],playerStartEditIssue:w.__sparkMock.playerStartEditIssue??null};}
    if(command==='native_operation_preview'&&args.operation.kind==='playerStartPosition'){const mock=w.__sparkMock;if(args.operation.sourceSha256!==mock.nativeAreaSha)throw Error('Native source changed after selection');mock.playerProposal=structuredClone(args.operation);mock.playerBefore=structuredClone(mock.nativePlayerStarts);return mock.playerPreview={id:'player-start-review',tag:'levels/test.scenario',toolId:'synthetic-invader',beforeSha256:mock.nativeAreaSha,afterSha256:(args.operation.copyFrom===undefined?'b':'c').repeat(64),changedBytes:12,fieldChanges:[{before:'Original native start',after:JSON.stringify(args.operation)}],detail:'Synthetic player source review',currentState:'before'};}
    if(command==='native_operation_accept'&&args.operationId==='player-start-review'){const mock=w.__sparkMock,proposal=mock.playerProposal,start={index:proposal.index,position:proposal.position,facingRadians:proposal.facingRadians};mock.nativePlayerStarts=args.restore?structuredClone(mock.playerBefore):proposal.copyFrom!==undefined?[...mock.playerBefore,start]:mock.playerBefore.map((p:any)=>p.index===proposal.index?start:p);mock.nativeAreaSha=args.restore?mock.playerPreview.beforeSha256:mock.playerPreview.afterSha256;mock.playerPreview.currentState=args.restore?'before':'after';mock.placementHistory=[structuredClone(mock.playerPreview)];return {operationId:'player-start-review',revisionId:'player-source-revision',tagsDirectory:'owned/tags',files:1,restored:!!args.restore,detail:'Synthetic player source revision'};}
    if(command==='native_operation_preview'&&args.operation.kind==='devicePlacement'){const mock=w.__sparkMock;mock.placementPreviews.push(structuredClone(args.operation));mock.placementBefore=structuredClone(mock.nativeDevices[0]);return mock.placementPreview={id:'placement-review',tag:'levels/test.scenario',toolId:'synthetic-invader',beforeSha256:mock.nativeAreaSha,afterSha256:'b'.repeat(64),changedBytes:12,fieldChanges:[{before:JSON.stringify(mock.placementBefore),after:JSON.stringify(args.operation.device)}],detail:'Synthetic reviewed placement',currentState:'before'};}
@@ -4791,6 +4791,43 @@ test('recovered mission terminals move the actual model through native source re
  await mockRecoveredMissionAreas(page,true);const row=page.locator('.studio-mission-record').first();await row.getByRole('combobox',{name:'Mission trigger 1',exact:true}).selectOption('deviceActivated');const controls=page.locator('.studio-native-areas');if(await controls.getAttribute('open')===null)await controls.locator(':scope > summary').click();await controls.getByRole('button',{name:'Read native controls',exact:true}).click();await row.getByRole('combobox',{name:'Mission terminal 1',exact:true}).selectOption('terminal');await page.keyboard.press('Control+s');await row.getByRole('button',{name:'Select objective terminal in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame native device',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'Scale (R)',exact:true})).toBeDisabled();await expect(page.locator('.viewport-object-actions:visible')).toHaveCount(1);for(const width of [800,1280]){await page.setViewportSize({width,height:800});const bar=page.locator('.native-device-actions');expect(await bar.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);await expect(bar.getByRole('button',{name:'Object tags',exact:true})).toBeVisible();await expect(bar.getByRole('button',{name:'Transform',exact:true})).toBeVisible();}
  const canvas=page.locator('canvas[data-gs-gizmo]');await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(s=>s?JSON.parse(s).mode:null)).toBe('translate');const h=await canvas.evaluate(e=>{const r=e.getBoundingClientRect(),g=JSON.parse((e as HTMLElement).dataset.gsGizmo!);return{x:r.x+(g.handles.X[0]+1)*r.width/2,y:r.y+(1-g.handles.X[1])*r.height/2,dx:(g.handles.X[0]-g.origin[0])*r.width/2,dy:-(g.handles.X[1]-g.origin[1])*r.height/2};});const n=Math.hypot(h.dx,h.dy);expect(n).toBeGreaterThan(1);await page.mouse.move(h.x,h.y);await page.mouse.down();await page.mouse.move(h.x+h.dx/n*40,h.y+h.dy/n*40,{steps:10});await page.mouse.up();
  await page.getByRole('button',{name:'Review device source',exact:true}).click();const form=page.locator('.native-device-placements:visible');await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toBeFocused();await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).not.toHaveValue('1');expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.project.scene[0].position)).toEqual([1,2,3]);
+});
+
+test('recovered native switches link to a machine group through source review and restore',async({page})=>{
+ await mockRecoveredMissionAreas(page,true);
+ await page.evaluate(()=>{
+  const mock=(window as any).__sparkMock;
+  Object.assign(mock.nativeDevices[0],{powerGroup:-1,positionGroup:-1});
+  mock.nativeDevices.push({...mock.nativeDevices[0],class:'mach',name:'door',tagPath:'devices/door',
+    powerGroup:0,positionGroup:1});
+  mock.nativeDeviceGroups=[
+    {index:0,name:'Door power',initialValue:1,changeOnce:false,reserved:false},
+    {index:1,name:'Door position',initialValue:0,changeOnce:false,reserved:false},
+    {index:2,name:'extraction_spirit_called',initialValue:0,changeOnce:false,reserved:true},
+  ];
+ });
+ await chooseTool(page,'AI & scenario');
+ const operations=page.locator('.native-tag-operations');
+ await operations.locator(':scope > summary').click();
+ const form=operations.locator('.native-device-placements');
+ await form.locator(':scope > summary').click();
+ const power=form.getByLabel('Power group',{exact:true}), position=form.getByLabel('Position group',{exact:true});
+ await expect(position.locator('option[value="2"]')).toHaveAttribute('disabled','');
+ await power.selectOption('0');
+ await position.selectOption('1');
+ await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
+ const proposal=await page.evaluate(()=>(window as any).__sparkMock.placementPreviews.at(-1));
+ expect(proposal.device).toMatchObject({name:'terminal',powerGroup:0,positionGroup:1,position:[1,2,3]});
+ const preview=page.getByRole('region',{name:'Native edit preview',exact:true});
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].positionGroup)).toBe(1);
+ await preview.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].positionGroup)).toBe(-1);
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await page.keyboard.press('Control+s');
+ await expect(position).toHaveValue('1');
+ await form.getByRole('combobox',{name:'Native source placement',exact:true}).selectOption('mach:0');
+ await expect(position).toHaveValue('1');
 });
 
 test('recovered aircraft use the existing viewport and reviewed native placement workflow',async({page})=>{
