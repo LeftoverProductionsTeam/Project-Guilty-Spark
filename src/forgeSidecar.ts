@@ -1,6 +1,6 @@
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, readHmv, type HmvPlacementProperties } from './forgeHmv';
+import { emptyHmv, HMV_NAME, readHmv, type HmvPlacementProperties, type HmvSpawnProperties } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -78,7 +78,7 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
       },
     });
   }
-  return { rows, retained, finish: () => lines.join(''), forerunner: undefined };
+  return { rows, retained, finish: () => lines.join(''), forerunner: undefined, spawns: [] as LayoutSpawn[] };
 }
 
 interface LayoutPlacement {
@@ -90,6 +90,12 @@ interface LayoutPlacement {
   rotation: Vec3;
   scale: number;
   write(position: Vec3, rotation: Vec3): void;
+}
+
+type LayoutSpawn = { id: string; index: number; position: Vec3; rotation: Vec3; properties: HmvSpawnProperties };
+
+function layoutSpawns(layout: ReturnType<typeof readHmv>, keys: string[]): LayoutSpawn[] {
+  return layout.spawnRecords.map(record => ({ ...record, id: prefix + keys[record.index] }));
 }
 
 function placementTags(map: MapInspection) {
@@ -127,6 +133,8 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     rows,
     retained: layout.recordsCount - rows.length,
     finish: layout.finish,
+    spawns: layoutSpawns(layout, recordKeys),
+    writeSpawn: layout.write,
     forerunner: {
       mapName: layout.mapName,
       issue: layout.forerunnerIssue ?? (rows.length === layout.recordsCount
@@ -137,9 +145,9 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
 }
 
 export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
-  const { rows, retained, forerunner } = parse(sidecar, map);
+  const { rows, retained, forerunner, spawns } = parse(sidecar, map);
   const properties = new Map(rows.flatMap(row => row.properties ? [[prefix + row.key, row.properties] as const] : []));
-  return { editable: rows.length, retained, forerunner, properties };
+  return { editable: rows.length, retained, forerunner, properties, spawns };
 }
 
 export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {
@@ -187,28 +195,54 @@ export function hmvPlacementTag(project: Project, map: MapInspection, object: Sc
   return tag;
 }
 
+function isSpawn(object: SceneObject | undefined): object is SceneObject & { kind: 'Player spawn'; tagId: null } {
+  return !!object && object.kind === 'Player spawn' && object.tagId === null && !object.sourceModel && !object.assetId;
+}
+
+export function canPlaceHmvSpawn(project: Project, map: MapInspection, object: SceneObject | undefined) {
+  return isSpawn(object) && project.source?.sha256 === map.sha256 && map.header.scenarioType === 1
+    && object.scale.every(value => close(value, 1));
+}
+
+function spawnObject(id: string, position: Vec3, rotation: Vec3): SceneObject {
+  return { id, kind: 'Player spawn', name: 'Forge player spawn', tagId: null, position, rotation,
+    scale: [1, 1, 1], visible: true, sourceOffset: null, rotationOffset: null, assetId: null };
+}
+
+export function showHmvSpawns(project: Project, map: MapInspection) {
+  if (!project.forgeSidecar?.bytes || project.source?.sha256 !== map.sha256) {
+    throw Error('Open the preserved base map for this Forge layout.');
+  }
+  const present = new Set(project.scene.map(object => object.id));
+  const added = parse(project.forgeSidecar, map).spawns.filter(record => !present.has(record.id));
+  if (project.scene.length + added.length > 20000) throw Error('This layout exceeds the scene object limit.');
+  if (!added.length) return project;
+  return { ...project, scene: [...project.scene, ...added.map(record => spawnObject(record.id, record.position, record.rotation))] };
+}
+
 export function addHmvPlacement(project: Project, map: MapInspection, object: SceneObject, offsetX = 1) {
   const tag = hmvPlacementTag(project, map, object);
-  if (!tag) throw Error('Select an unscaled scenery, vehicle, weapon or equipment object from the current base map.');
+  const spawn = canPlaceHmvSpawn(project, map, object);
+  if (!tag && !spawn) throw Error('Select a player spawn or unscaled scenery, vehicle, weapon or equipment from the current base map.');
   if (project.forgeSidecar?.text !== undefined) throw Error('Export or remove the OpenCE text layout before creating an HMV.');
   if (project.scene.length >= 20000) throw Error('This layout exceeds the scene object limit.');
-  const candidates = placementTags(map).get(tag.class + '|' + pathKey(tag.path));
-  if (candidates?.length !== 1) throw Error('This base-map tag path is ambiguous.');
+  if (tag && placementTags(map).get(tag.class + '|' + pathKey(tag.path))?.length !== 1) throw Error('This base-map tag path is ambiguous.');
   const previous = project.forgeSidecar;
   if (previous && previous.baseSha256 !== map.sha256) throw Error('Open the preserved base map for this Forge layout.');
   const layout = readHmv(previous?.bytes ?? Array.from(emptyHmv(map)), map);
   const position: Vec3 = [object.position[0] + offsetX, object.position[1], object.position[2]];
-  const tagPath = pathKey(tag.path).replaceAll('/', '\\');
   const recordKeys = previous ? keysForHmv(previous, layout.recordsCount) : [];
-  const index = recordKeys.findIndex(key => prefix + key === object.id);
-  const original = layout.objectRecords.find(record => record.index === index);
-  if (isHmvPlacement(project, object) && (!original || original.group !== tag.class || original.path !== tagPath)) {
-    throw Error('The selected object no longer matches its Forge record.');
-  }
-  const bytes = original ? layout.duplicate(index, position, object.rotation)
-    : layout.append(tag.class, tagPath, position, object.rotation);
   const key = crypto.randomUUID();
-  const placement = placementObject(project, map, { index: layout.recordsCount, key, tag, position, rotation: [...object.rotation], scale: 1 });
+  const rotation: Vec3 = spawn ? [object.rotation[0], 0, 0] : [...object.rotation];
+  const placement = tag
+    ? placementObject(project, map, { index: layout.recordsCount, key, tag, position, rotation, scale: 1 })
+    : spawnObject(prefix + key, position, rotation);
+  const bytes = isHmvPlacement(project, object)
+    ? layout.duplicate(selectedHmvRecord(project, map, object).index, position, rotation)
+    : tag ? layout.append(tag.class, pathKey(tag.path).replaceAll('/', '\\'), position, rotation)
+    : layout.appendSpawn(position, rotation[0]);
+  const savedBytes = Array.from(bytes);
+  if (spawn) readHmv(savedBytes, map);
   return {
     selectedId: placement.id,
     project: {
@@ -216,7 +250,7 @@ export function addHmvPlacement(project: Project, map: MapInspection, object: Sc
       forgeSidecar: {
         name: previous?.name ?? layout.mapName.slice(0, 21) + '-layout.hmv',
         baseSha256: map.sha256,
-        bytes: Array.from(bytes),
+        bytes: savedBytes,
         recordKeys: [...recordKeys, key],
       },
       scene: [...project.scene, placement],
@@ -232,21 +266,36 @@ function selectedHmvRecord(project: Project, map: MapInspection, object: SceneOb
   const layout = readHmv(previous.bytes, map);
   const keys = keysForHmv(previous, layout.recordsCount);
   const index = keys.findIndex(key => prefix + key === object.id);
-  const record = layout.objectRecords.find(record => record.index === index);
-  const tag = hmvPlacementTag(project, map, object, false);
-  if (!record || !tag || tag.class !== record.group || pathKey(tag.path) !== pathKey(record.path)) {
-    throw Error('The selected object no longer matches its Forge record.');
+  if (isSpawn(object)) {
+    const spawn = layout.spawnRecords.find(record => record.index === index);
+    if (spawn) return { previous, layout, keys, index, spawn };
+  } else {
+    const record = layout.objectRecords.find(record => record.index === index);
+    const tag = hmvPlacementTag(project, map, object, false);
+    if (record && tag && tag.class === record.group && pathKey(tag.path) === pathKey(record.path)) {
+      return { previous, layout, keys, index, record };
+    }
   }
-  return { previous, layout, keys, index, record };
+  throw Error('The selected object no longer matches its Forge record.');
 }
 
 export function updateHmvPlacementProperties(project: Project, map: MapInspection, object: SceneObject, properties: HmvPlacementProperties) {
   const { previous, layout, index, record } = selectedHmvRecord(project, map, object);
+  if (!record) throw Error('Select an HMV object placement.');
   if (record.properties.team === properties.team && record.properties.physics === properties.physics
       && record.properties.respawnSeconds === properties.respawnSeconds
       && record.properties.placeAtStart === properties.placeAtStart) return project;
   const bytes = Array.from(layout.writeProperties(index, properties));
   readHmv(bytes, map);
+  return { ...project, forgeSidecar: { ...previous, bytes } } satisfies Project;
+}
+
+export function updateHmvSpawnProperties(project: Project, map: MapInspection, object: SceneObject, properties: HmvSpawnProperties) {
+  const { previous, layout, index, spawn } = selectedHmvRecord(project, map, object);
+  if (!spawn) throw Error('Select an HMV player spawn.');
+  if (spawn.properties.team === properties.team && spawn.properties.initial === properties.initial
+      && spawn.properties.modes === properties.modes) return project;
+  const bytes = Array.from(layout.writeSpawnProperties(index, properties));
   return { ...project, forgeSidecar: { ...previous, bytes } } satisfies Project;
 }
 
@@ -263,7 +312,8 @@ export function removeHmvPlacement(project: Project, map: MapInspection, object:
 export function exportForgeSidecar(project: Project, map: MapInspection, target?: 'forerunner') {
   const sidecar = project.forgeSidecar;
   if (!sidecar || project.source?.sha256 !== map.sha256) throw Error('Open the preserved Forge base map to export this layout.');
-  const { rows, finish, forerunner } = parse(sidecar, map);
+  const layout = parse(sidecar, map);
+  const { rows, finish, forerunner } = layout;
   if (target === 'forerunner' && (!forerunner || forerunner.issue)) {
     throw Error(forerunner?.issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
   }
@@ -278,6 +328,14 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
       throw Error('This layout preserves its original scale. Restore the scale before exporting.');
     }
     row.write(object.position, object.rotation);
+  }
+  if ('writeSpawn' in layout && layout.writeSpawn) for (const marker of layout.spawns) {
+    const object = project.scene.find(candidate => candidate.id === marker.id);
+    if (!object) continue;
+    if (!isSpawn(object) || object.scale.some(value => !close(value, 1))) {
+      throw Error('A Forge player spawn was replaced or scaled. Restore it with Undo before exporting.');
+    }
+    layout.writeSpawn(marker.index, object.position, object.rotation);
   }
   return finish();
 }

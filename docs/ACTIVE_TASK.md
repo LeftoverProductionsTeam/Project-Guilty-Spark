@@ -2,8 +2,8 @@
 
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
-Starting revision: c3cbe3357a7ca677a8e6eab5588a0430151b92bc, canonical master.
-Latest verified revision: Spark authors and edits HMV placement properties. Browser Undo/Redo, Save and compatibility checks passed. Upstream native readback confirmed authored team, respawn, initial placement and physics. Exact Black Echo 04d9ccd1 solo replay has reached the field rally; the most recent completed combat probe reported a living facility opponent.
+Starting revision: 4a2147b11e23b479108afd01ac21afe5351c642f, canonical master.
+Latest verified revision: Spark authors and edits HMV player spawns, including team, first spawn, mode filters and yaw. Browser Save/export and independent native file readback passed. Forerunner’s last completed Black Echo 04d9ccd1 combat receipt still reports one living facility opponent.
 Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Verify both faction routes and distinct Elite colors through the field rally, facility combat, technology collection, defense, evacuation, banking, reconnect and redeployment. Use the reviewed fallback pending CMT redistribution permission. Keep direct Chupathingy playback, HMV replication, and advanced placement editing open.
 
 ## Acceptance

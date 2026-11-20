@@ -5983,6 +5983,20 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   expect(output.subarray(129)).toEqual(source.subarray(129));
   expect(output.readUInt32LE(60)).not.toBe(source.readUInt32LE(60));
 
+  await panel.getByRole('button',{name:'Show layout spawns'}).click();
+  await expect(panel.getByRole('status')).toContainText('2 editable placements');
+  const spawnFields = panel.getByRole('group',{name:'Player spawn properties'});
+  await spawnFields.getByLabel('Spawn team').selectOption('1');
+  await spawnFields.getByLabel('Infection').check();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[160])).toBe(32);
+  const spawnExport = page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
+  const spawnOutput = await fs.readFile((await (await spawnExport).path())!);
+  expect(spawnOutput.readInt8(132)).toBe(1);
+  expect(spawnOutput.readUInt16LE(160)).toBe(32);
+  expect(spawnOutput.subarray(81,129)).toEqual(output.subarray(81,129));
+
   await panel.getByRole('button',{name:'Remove layout from project'}).click();
   const supported = Buffer.concat([source.subarray(0,129),source.subarray(177)]);
   supported.writeUInt8(1,111);

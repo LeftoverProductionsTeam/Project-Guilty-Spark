@@ -10,6 +10,14 @@ const recordSize = 48;
 const physicsBits = { normal: 0, fixed: 0x10, phased: 0x20 } as const;
 const physicsMask = physicsBits.fixed | physicsBits.phased;
 
+export interface HmvSpawnProperties {
+  team: number;
+  initial: boolean;
+  modes: number;
+}
+
+export const HMV_SPAWN_MODES = ['Capture the Flag', 'Slayer', 'Oddball', 'King of the Hill', 'Race', 'Infection'];
+
 export interface HmvPlacementProperties {
   team: number;
   respawnSeconds: number;
@@ -50,10 +58,12 @@ function writeChecksum(bytes: Uint8Array, view: DataView) {
   view.setUint32(60, crc32(bytes.subarray(headerSize)), true);
 }
 
-function writePose(view: DataView, offset: number, position: Vec3, rotation: Vec3) {
+function writePose(view: DataView, offset: number, position: Vec3, rotation: Vec3, yawOnly = false) {
   const values = [...position, rotation[0], -rotation[1], rotation[2]];
   requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');
-  values.forEach((value, index) => view.setFloat32(offset + index * 4, value, true));
+  requireLayout(!yawOnly || rotation[1] === 0 && rotation[2] === 0, 'player spawn points only support yaw.');
+  const count = yawOnly ? 4 : 6;
+  for (let index = 0; index < count; index++) view.setFloat32(offset + index * 4, values[index], true);
 }
 
 export function emptyHmv(map: MapInspection) {
@@ -121,7 +131,8 @@ export function readHmv(input: number[], map: MapInspection) {
 
   const pathList = [...paths.values()];
   const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3; properties: HmvPlacementProperties }[] = [];
-  const features = new Set<number>();
+  const spawnRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvSpawnProperties }[] = [];
+  const recordVersions = new Uint8Array(recordsCount).fill(1);
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
   let markers = false, teleporters = 0, goals = 0, senders = 0, receivers = 0;
@@ -149,13 +160,13 @@ export function readHmv(input: number[], map: MapInspection) {
       if (kind === 5) {
         requireLayout(version >= 6 && team < (goalLimits.get(variant) ?? 0), invalid);
         requireLayout(++goals <= 64 && (variant !== 8 || ++hills[team] <= 12), 'too many game type objects.');
-        features.add(6);
+        recordVersions[index] = 6;
       } else {
         requireLayout(version >= 5 && team < 16 && !variant, invalid);
         requireLayout(++teleporters <= 32, 'too many teleporters.');
         if (kind === 7) senders |= 1 << team;
         else receivers |= 1 << team;
-        features.add(5);
+        recordVersions[index] = 5;
       }
       continue;
     }
@@ -170,10 +181,14 @@ export function readHmv(input: number[], map: MapInspection) {
       && aiTeam < 6 && (version >= 2 && actor || (!aiTeam && !(flags & 2)))
       && (!(flags & 4) || actor && respawn > 0)
       && (!physics || kind === 0 && !actor && physics !== physicsMask), invalid);
-    if (physics) features.add(7);
-    if (kind === 2) features.add(4);
-    if (flags & 4) features.add(3);
-    if (aiTeam || (flags & 2)) features.add(2);
+    if (physics) recordVersions[index] = 7;
+    else if (spawn) recordVersions[index] = 4;
+    else if (flags & 4) recordVersions[index] = 3;
+    else if (aiTeam || (flags & 2)) recordVersions[index] = 2;
+    if (spawn && transform[4] === 0 && transform[5] === 0) {
+      const [x, y, z, yaw] = transform;
+      spawnRecords.push({ index, position: [x, y, z], rotation: [yaw, 0, 0], properties: { team, initial: !!(flags & 8), modes } });
+    }
     if (kind === 0 && ref) {
       const [x, y, z, yaw, pitch, roll] = transform;
       objectRecords.push({
@@ -186,7 +201,7 @@ export function readHmv(input: number[], map: MapInspection) {
     }
   }
   requireLayout(u32(8) === Number(markers) && !(senders & ~receivers), 'marker flags or teleporter pairs are invalid.');
-  requireLayout(version < 3 || features.has(version), 'the declared version is missing its required record type.');
+  requireLayout(version < 3 || recordVersions.includes(version), 'the declared version is missing its required record type.');
 
   const meta = bytes.subarray(recordsEnd);
   const fields = [];
@@ -217,6 +232,8 @@ export function readHmv(input: number[], map: MapInspection) {
       cursor += section.length;
     }
     next.setUint16(4, nextVersion, true);
+    const hasMarkers = records.some(section => section.some((value, byte) => byte % recordSize === 2 && value !== 0));
+    next.setUint32(8, Number(hasMarkers), true);
     next.setUint16(50, pathsCount + (newPath ? 1 : 0), true);
     next.setUint16(52, recordsLength / recordSize, true);
     writeChecksum(output, next);
@@ -229,23 +246,39 @@ export function readHmv(input: number[], map: MapInspection) {
     return record;
   }
 
-  function versionWithoutPhysicsAt(index: number) {
-    if (version !== 7 || objectRecords.some(record => record.index !== index && record.properties.physics !== 'normal')) return version;
-    return Math.max(1, ...Array.from(features).filter(feature => feature !== 7));
+  function versionWithoutFeatureAt(index: number) {
+    if (recordVersions[index] !== version) return version;
+    return Math.max(1, ...recordVersions.filter((_, record) => record !== index));
   }
 
-  function appendRecord(record: Uint8Array, entry?: Uint8Array) {
+  function writeSpawn(view: DataView, offset: number, properties: HmvSpawnProperties) {
+    const { team, initial, modes } = properties;
+    requireLayout(Number.isInteger(team) && team >= -1 && team <= 1 && typeof initial === 'boolean'
+      && Number.isInteger(modes) && modes >= 0 && modes <= 0x3f, 'the player spawn properties are out of range.');
+    view.setInt8(offset + 3, team);
+    view.setUint16(offset + 31, modes, true);
+    view.setUint8(offset + 34, initial ? 8 : 0);
+  }
+
+  function requireEditablePlacement(index: number) {
+    if (spawnRecords.some(record => record.index === index)) return;
+    editableRecord(index);
+  }
+
+  function appendRecord(record: Uint8Array, entry?: Uint8Array, nextVersion = version) {
     requireLayout(recordsCount < 256, 'this layout has reached its 256-record limit.');
-    return rebuild([bytes.subarray(recordsStart, recordsEnd), record], entry);
+    return rebuild([bytes.subarray(recordsStart, recordsEnd), record], entry, nextVersion);
   }
 
   return {
     objectRecords,
+    spawnRecords,
     recordsCount,
     mapName,
     forerunnerIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
-      writePose(view, recordsStart + index * recordSize + 4, position, rotation);
+      const yawOnly = spawnRecords.some(record => record.index === index);
+      writePose(view, recordsStart + index * recordSize + 4, position, rotation, yawOnly);
     },
     append(group: string, path: string, position: Vec3, rotation: Vec3) {
       requireLayout(forerunnerGroups.includes(group) && hmvPathValid(path), 'the selected tag cannot be placed.');
@@ -268,11 +301,20 @@ export function readHmv(input: number[], map: MapInspection) {
       record[34] = 1;
       return appendRecord(record, entry);
     },
+    appendSpawn(position: Vec3, yaw: number) {
+      const record = new Uint8Array(recordSize);
+      const recordView = new DataView(record.buffer);
+      recordView.setUint16(0, 0xffff, true);
+      record[2] = 2;
+      writeSpawn(recordView, 0, { team: -1, initial: false, modes: 0 });
+      writePose(recordView, 4, position, [yaw, 0, 0], true);
+      return appendRecord(record, undefined, Math.max(version, 4));
+    },
     duplicate(index: number, position: Vec3, rotation: Vec3) {
-      editableRecord(index);
+      requireEditablePlacement(index);
       const start = recordsStart + index * recordSize;
       const record = bytes.slice(start, start + recordSize);
-      writePose(new DataView(record.buffer), 4, position, rotation);
+      writePose(new DataView(record.buffer), 4, position, rotation, record[2] === 2);
       return appendRecord(record);
     },
     writeProperties(index: number, properties: HmvPlacementProperties) {
@@ -282,18 +324,24 @@ export function readHmv(input: number[], map: MapInspection) {
         && Number.isInteger(respawnSeconds) && respawnSeconds >= 0 && respawnSeconds <= 600
         && typeof placeAtStart === 'boolean' && Object.hasOwn(physicsBits, physics), 'the placement properties are out of range.');
       const at = recordsStart + index * recordSize;
-      view.setUint16(4, physics !== 'normal' ? 7 : versionWithoutPhysicsAt(index), true);
+      view.setUint16(4, physics !== 'normal' ? 7 : version === 7 ? versionWithoutFeatureAt(index) : version, true);
       view.setInt8(at + 3, team);
       view.setUint16(at + 28, respawnSeconds, true);
       bytes[at + 34] = (bytes[at + 34] & ~(1 | physicsMask)) | physicsBits[physics] | Number(placeAtStart);
       writeChecksum(bytes, view);
       return bytes;
     },
+    writeSpawnProperties(index: number, properties: HmvSpawnProperties) {
+      requireLayout(spawnRecords.some(record => record.index === index), 'select an HMV player spawn.');
+      writeSpawn(view, recordsStart + index * recordSize, properties);
+      writeChecksum(bytes, view);
+      return bytes;
+    },
     remove(index: number) {
-      editableRecord(index);
+      requireEditablePlacement(index);
       const start = recordsStart + index * recordSize;
       const records = [bytes.subarray(recordsStart, start), bytes.subarray(start + recordSize, recordsEnd)];
-      return rebuild(records, undefined, versionWithoutPhysicsAt(index));
+      return rebuild(records, undefined, versionWithoutFeatureAt(index));
     },
     finish() {
       writeChecksum(bytes, view);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvPlacement, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, updateHmvPlacementProperties } from './forgeSidecar';
+import { addHmvPlacement, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvSpawns, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -155,6 +155,46 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(output.subarray(129)).toEqual(source.subarray(129));
     expect(inspectForgeSidecar(trimmed.forgeSidecar!, map).properties.get(first.id)).toEqual({ ...advanced, physics: 'normal' });
     expect(exportForgeSidecar(loaded, map)).toEqual(source);
+  });
+
+  it('exposes retained player spawns on demand, keeps the untouched bytes, and saves marker edits', () => {
+    const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
+    expect(loaded.scene).toHaveLength(1);
+    const shown = showHmvSpawns(loaded, map);
+    const marker = shown.scene[1];
+    expect(marker).toMatchObject({ kind: 'Player spawn', position: [4, 0, 0], sourceOffset: null });
+    expect(exportForgeSidecar(shown, map)).toEqual(source);
+    const properties = { team: 1, initial: false, modes: 0x22 };
+    const revised = updateHmvSpawnProperties(shown, map, marker, properties);
+    revised.scene[1] = { ...marker, position: [5, 6, 7], rotation: [0.4, 0, 0] };
+    const exported = exportForgeSidecar(JSON.parse(JSON.stringify(revised)) as Project, map) as Uint8Array;
+    expect(exported.subarray(64, 129)).toEqual(source.subarray(64, 129));
+    const native = readHmv(Array.from(exported), map).spawnRecords[0];
+    expect(native).toMatchObject({ position: [5, 6, 7], properties });
+    expect(native.rotation[0]).toBeCloseTo(0.4);
+    expect(() => exportForgeSidecar(revised, map, 'forerunner')).toThrow('base-map object');
+
+    const duplicated = addHmvPlacement(revised, map, revised.scene[1]).project;
+    expect(inspectForgeSidecar(duplicated.forgeSidecar!, map).spawns.map(row => row.properties)).toEqual([properties, properties]);
+    const firstRemoved = removeHmvPlacement(duplicated, map, duplicated.scene[1]);
+    const lastRemoved = removeHmvPlacement(firstRemoved, map, firstRemoved.scene[1]);
+    const finalBytes = exportForgeSidecar(lastRemoved, map) as Uint8Array;
+    const header = new DataView(finalBytes.buffer);
+    expect(header.getUint32(8, true)).toBe(0);
+    expect(header.getUint16(4, true)).toBe(1);
+    expect(lastRemoved.scene.map(row => row.id)).toEqual([loaded.scene[0].id]);
+  });
+
+  it('authors a layout from a native spawn without changing the native scene object', () => {
+    const native = { id: 'native-spawn', name: 'Spawn', kind: 'Player spawn', tagId: null,
+      position: [0, 1, 2], rotation: [1, 0, 0], scale: [1, 1, 1], visible: true,
+      sourceOffset: 10, rotationOffset: 22, assetId: null } as Project['scene'][number];
+    const created = addHmvPlacement({ ...project, scene: [native] }, map, native);
+    expect(created.project.scene[0]).toBe(native);
+    const output = exportForgeSidecar(created.project, map) as Uint8Array;
+    expect(readHmv(Array.from(output), map).spawnRecords[0]).toMatchObject({
+      position: [1, 1, 2], rotation: [1, 0, 0], properties: { team: -1, initial: false, modes: 0 },
+    });
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

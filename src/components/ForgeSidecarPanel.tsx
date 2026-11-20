@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvPlacement, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, updateHmvPlacementProperties } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, supportsHmvMap, type HmvPlacementProperties } from '../forgeHmv';
+import { addHmvPlacement, canPlaceHmvSpawn, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvSpawns, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, HMV_SPAWN_MODES, supportsHmvMap, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { Notice, NumberField } from './ui';
@@ -31,7 +31,12 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       || map.header.version === 609 && [0, 1].includes(map.header.scenarioType));
   const canAddHmv = compatible && supportsHmvMap(map) && (!layout || layout.bytes);
   const selectedTag = canAddHmv && hmvPlacementTag(project, map, selected);
+  const selectedSpawn = canAddHmv && canPlaceHmvSpawn(project, map, selected);
   const properties = selected && summary?.properties.get(selected.id);
+  const spawn = summary?.spawns.find(row => row.id === selected?.id);
+  const sceneIds = new Set(project.scene.map(object => object.id));
+  const hiddenSpawns = summary?.spawns.filter(record => !sceneIds.has(record.id)) ?? [];
+  const visibleSpawns = (summary?.spawns.length ?? 0) - hiddenSpawns.length;
   if (!compatible && !layout) return null;
 
   async function open(file: File) {
@@ -75,13 +80,34 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     } catch (error) { setProblem(String(error)); }
   }
 
+  function changeSpawn(patch: Partial<HmvSpawnProperties>) {
+    if (!selected || !spawn) return;
+    try {
+      const next = updateHmvSpawnProperties(project, map, selected, { ...spawn.properties, ...patch });
+      if (next !== project) edit(next, 'Change Forge player spawn');
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
+  function showSpawns() {
+    try {
+      const next = showHmvSpawns(project, map);
+      if (next !== project && hiddenSpawns.length) {
+        edit(next, 'Show Forge player spawns');
+        onSelect(hiddenSpawns[0].id);
+      }
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
   return <details className="forge-sidecar-panel" open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)}>
     <summary>Forge layout</summary>
     {canAddHmv && <>
-      <button type="button" disabled={!selectedTag} onClick={addPlacement}>
-        {layout ? 'Add selected object to HMV' : 'Create HMV from selected object'}
+      <button type="button" disabled={!selectedTag && !selectedSpawn} onClick={addPlacement}>
+        {selectedSpawn ? (layout ? 'Add selected spawn to HMV' : 'Create HMV from selected spawn')
+          : (layout ? 'Add selected object to HMV' : 'Create HMV from selected object')}
       </button>
-      {!selectedTag && <p className="subtle">Select an unscaled scenery, vehicle, weapon or equipment object from this map.</p>}
+      {!selectedTag && !selectedSpawn && <p className="subtle">Select a player spawn or unscaled object from this map.</p>}
     </>}
 
     {compatible && selected && properties && <fieldset key={selected.id}>
@@ -108,10 +134,31 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
         </select>
       </label>
     </fieldset>}
+    {compatible && spawn && <fieldset key={spawn.id}>
+      <legend>Player spawn properties</legend>
+      <label className="field-label">Spawn team
+        <select value={spawn.properties.team} onChange={event => changeSpawn({ team: Number(event.target.value) })}>
+          <option value={-1}>Any team</option>
+          <option value={0}>Red</option>
+          <option value={1}>Blue</option>
+        </select>
+      </label>
+      <label><input type="checkbox" checked={spawn.properties.initial}
+        onChange={event => changeSpawn({ initial: event.target.checked })} /> Initial spawn</label>
+      <p className="subtle">Select the game types that use this spawn. Clear all to include every game type.</p>
+      <div aria-label="Spawn game types" role="group">
+        {HMV_SPAWN_MODES.map((mode, index) => <label key={mode}>
+          <input type="checkbox" checked={!!(spawn.properties.modes & (1 << index))} onChange={() => changeSpawn({
+            modes: spawn.properties.modes ^ (1 << index),
+          })} /> {mode}
+        </label>)}
+      </div>
+    </fieldset>}
     {layout ? <>
       <p>{layout.name}</p>
-      {summary&&<p role="status">{summary.editable} editable placements · {summary.retained} other records preserved.</p>}
-      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit placements.'}</p>
+      {summary&&<p role="status">{summary.editable + visibleSpawns} editable placements · {summary.retained - visibleSpawns} other records preserved.</p>}
+      {!!hiddenSpawns.length && <button type="button" onClick={showSpawns}>Show layout spawns</button>}
+      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit placements. Move player spawns and adjust yaw.'}</p>
       {summary?.forerunner && map.header.version === 5 && <p className="subtle">In Chupathingy builds with Forge, put the copy in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
       <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {
