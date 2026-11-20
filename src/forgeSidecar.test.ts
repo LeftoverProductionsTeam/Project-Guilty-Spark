@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -217,6 +217,30 @@ describe('Chupathingy Forge binary layouts', () => {
     const noSender = removeHmvPlacement(changed, map, sender);
     const noPair = removeHmvPlacement(noSender, map, changed.scene[2]);
     expect(exportForgeSidecar(noPair, map)).toEqual(source);
+  });
+
+  it('edits only native layout metadata and preserves the original date and records', () => {
+    const date = '2026-11-20 13:45';
+    const dated = Buffer.concat([Buffer.from(source.subarray(0, -1)), Buffer.from(date + '\0')]);
+    dated.writeUInt16LE(dated.length - 177, 54);
+    dated.writeUInt32LE(dated.length - 64, 56);
+    dated.writeUInt32LE(crc32(dated.subarray(64)), 60);
+    const { project: loaded } = importForgeSidecar(project, map, 'test.hmv', dated);
+    expect(inspectForgeSidecar(loaded.forgeSidecar!, map).metadata).toEqual({
+      details: { title: 'Test Forge', author: 'Spark', description: '' }, date,
+    });
+    const details = { title: 'Écho Hill', author: 'Créateur', description: 'Three marked paths' };
+    const updated = updateHmvLayoutDetails(loaded, map, details);
+    expect(updateHmvLayoutDetails(updated, map, details)).toBe(updated);
+    const bytes = exportForgeSidecar(updated, map) as Uint8Array;
+    expect(bytes.subarray(0, 54)).toEqual(new Uint8Array(dated.subarray(0, 54)));
+    expect(bytes.subarray(64, 177)).toEqual(new Uint8Array(dated.subarray(64, 177)));
+    expect(readHmv(Array.from(bytes), map)).toMatchObject({ details, date });
+    expect(updated.scene).toBe(loaded.scene);
+    expect(() => updateHmvLayoutDetails(loaded, map, { ...details, title: 'é'.repeat(16) })).toThrow('31 UTF-8 bytes');
+    expect(() => updateHmvLayoutDetails(loaded, map, { ...details, author: 'First\nSecond' })).toThrow('control characters');
+    expect(() => updateHmvLayoutDetails(loaded, map, { ...details, title: '' })).toThrow('enter a layout title');
+    expect(exportForgeSidecar(loaded, map)).toEqual(new Uint8Array(dated));
   });
 
   it('round-trips all four game type objective kinds without changing existing records', () => {

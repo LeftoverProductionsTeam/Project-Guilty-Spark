@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
 import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, supportsHmvMap, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
@@ -33,6 +33,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   const canAddHmv = compatible && supportsHmvMap(map) && (!layout || layout.bytes);
   const selectedTag = canAddHmv && hmvPlacementTag(project, map, selected);
   const selectedSpawn = canAddHmv && canPlaceHmvSpawn(project, map, selected);
+  const metadata = summary?.metadata;
   const properties = selected && summary?.properties.get(selected.id);
   const spawn = summary?.spawns.find(row => row.id === selected?.id);
   const sceneIds = new Set(project.scene.map(object => object.id));
@@ -245,7 +246,36 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       {objectiveDefinition.type === 8 && <p className="subtle">Give the points around one hill the same hill number.</p>}
     </fieldset>}
     {layout ? <>
-      <p>{layout.name}</p>
+      <p>{metadata && <><strong>{metadata.details.title}</strong> · </>}{layout.name}</p>
+      {compatible && metadata && <details>
+        <summary>Layout details</summary>
+        <form key={JSON.stringify(metadata)} onSubmit={event => {
+          event.preventDefault();
+          const values = new FormData(event.currentTarget);
+          try {
+            const next = updateHmvLayoutDetails(project, map, {
+              title: String(values.get('title') ?? ''),
+              author: String(values.get('author') ?? ''),
+              description: String(values.get('description') ?? ''),
+            });
+            if (next !== project) edit(next, 'Edit Forge layout details');
+            setProblem('');
+          } catch (error) { setProblem(String(error)); }
+        }}>
+          <label className="field-label">Layout title
+            <input name="title" defaultValue={metadata.details.title} required maxLength={31} />
+          </label>
+          <label className="field-label">Layout author
+            <input name="author" defaultValue={metadata.details.author} maxLength={31} />
+          </label>
+          <label className="field-label">Layout description
+            <input name="description" defaultValue={metadata.details.description} maxLength={127} />
+          </label>
+          {metadata.date && <p className="subtle">Saved in Forge on {metadata.date}</p>}
+          <p className="subtle">The title and author each allow 31 UTF-8 bytes. The description allows 127.</p>
+          <button type="submit">Apply layout details</button>
+        </form>
+      </details>}
       {summary&&<p role="status">{summary.editable + visibleMarkers} editable placements · {summary.retained - visibleMarkers} other records preserved.</p>}
       {!!hiddenSpawns.length && <button type="button" onClick={() => showMarkers('spawns')}>Show layout spawns</button>}
       {!!hiddenTeleporters.length && <button type="button" onClick={() => showMarkers('teleporters')}>Show layout teleporters</button>}

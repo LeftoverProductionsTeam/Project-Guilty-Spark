@@ -7,6 +7,9 @@ export const HMV_LIMIT = 65536;
 export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
 const headerSize = 64;
 const recordSize = 48;
+const metadataSizes = [32, 32, 128, 17] as const;
+const metadataControl = /[\u0000-\u001f\u007f-\u009f]/;
+export type HmvLayoutDetails = { title: string; author: string; description: string };
 export const HMV_TELEPORTER_CHANNELS = 16;
 const teleporterLimit = 32;
 const objectiveLimit = 64;
@@ -235,27 +238,30 @@ export function readHmv(input: number[], map: MapInspection) {
   const meta = bytes.subarray(recordsEnd);
   const fields = [];
   let start = 0;
-  for (const limit of [32, 32, 128, 17]) {
+  for (const limit of metadataSizes) {
     const end = meta.indexOf(0, start);
     requireLayout(end >= start && end - start < limit, 'invalid layout metadata size.');
     let field: string;
     try { field = decoder.decode(meta.subarray(start, end)); }
     catch { throw Error('Chupathingy Forge layout: metadata must be UTF-8.'); }
-    requireLayout(!/[\u0000-\u001f\u007f-\u009f]/.test(field), 'invalid metadata characters.');
+    requireLayout(!metadataControl.test(field), 'invalid metadata characters.');
     fields.push(field);
     start = end + 1;
   }
   requireLayout(start === meta.length && fields[0] && (!fields[3] || /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(fields[3])),
     'invalid layout title, date or metadata length.');
 
-  function rebuild(records: Uint8Array[], newPath?: Uint8Array, nextVersion = version) {
+  const [title, author, description, date] = fields;
+  const details: HmvLayoutDetails = { title, author, description };
+
+  function rebuild(records: Uint8Array[], newPath?: Uint8Array, nextVersion = version, nextMeta = meta) {
     const recordsLength = records.reduce((sum, record) => sum + record.length, 0);
-    const length = recordsStart + (newPath?.length ?? 0) + recordsLength + metaSize;
-    requireLayout(length <= HMV_LIMIT, 'the new placement would exceed 64 KiB.');
+    const length = recordsStart + (newPath?.length ?? 0) + recordsLength + nextMeta.length;
+    requireLayout(length <= HMV_LIMIT, 'the layout would exceed 64 KiB.');
     const output = new Uint8Array(length);
     const next = new DataView(output.buffer);
     let cursor = 0;
-    const sections = [bytes.subarray(0, recordsStart), ...(newPath ? [newPath] : []), ...records, meta];
+    const sections = [bytes.subarray(0, recordsStart), ...(newPath ? [newPath] : []), ...records, nextMeta];
     for (const section of sections) {
       output.set(section, cursor);
       cursor += section.length;
@@ -265,6 +271,7 @@ export function readHmv(input: number[], map: MapInspection) {
     next.setUint32(8, Number(hasMarkers), true);
     next.setUint16(50, pathsCount + (newPath ? 1 : 0), true);
     next.setUint16(52, recordsLength / recordSize, true);
+    next.setUint16(54, nextMeta.length, true);
     writeChecksum(output, next);
     return output;
   }
@@ -317,11 +324,25 @@ export function readHmv(input: number[], map: MapInspection) {
     spawnRecords,
     teleporterRecords,
     objectiveRecords,
+    details,
+    date,
     recordsCount,
     mapName,
     forerunnerIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));
+    },
+    writeDetails(updated: HmvLayoutDetails) {
+      requireLayout(updated.title.length > 0, 'enter a layout title.');
+      const values = [updated.title, updated.author, updated.description, date];
+      for (const [index, value] of values.entries()) {
+        const encoded = encoder.encode(value);
+        requireLayout(encoded.length < metadataSizes[index] && !metadataControl.test(value)
+          && decoder.decode(encoded) === value,
+          `${['Title', 'Author', 'Description', 'Date'][index]} must fit ${metadataSizes[index] - 1} UTF-8 bytes without control characters.`);
+      }
+      const replacement = encoder.encode(values.join('\0') + '\0');
+      return rebuild([bytes.subarray(recordsStart, recordsEnd)], undefined, version, replacement);
     },
     append(group: string, path: string, position: Vec3, rotation: Vec3) {
       requireLayout(forerunnerGroups.includes(group) && hmvPathValid(path), 'the selected tag cannot be placed.');

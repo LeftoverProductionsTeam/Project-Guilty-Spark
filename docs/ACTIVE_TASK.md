@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Spark now edits and exports CTF, Hill, Oddball and Race markers. TypeScript, 13 unit tests, three browser flows and the independent C decoder passed. The exact Black Echo south approach also passed an offline Forerunner run through facility combat and technology pickup. Defense remained alive and extraction unarmed. See RUNTIME_INTEGRATION_20261107.
-Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players. Use the proven offline south approach for the facility. After collecting technology, confirm damage and death of the defense actor and verify extraction arms, then finish evacuation, banking, reconnect and redeployment. Verify both faction routes and distinct Elite colors. Use the reviewed first-person fallback pending CMT permission. Use a Forge-capable Chupathingy build for version-6 objective play and scoring checks.
+Latest verified revision: Spark edits and exports native HMV title, author and description while preserving original placement and objective bytes. TypeScript, 14 unit tests, browser Save/Undo/Redo/reimport, and the independent C decoder passed. Black Echo offline facility combat and technology pickup passed. Defense remained alive and extraction unarmed. See RUNTIME_INTEGRATION_20261107.
+Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players. Take the verified offline south facility route. After technology pickup, switch to the retained plasma pistol to test the defense actor and extraction gate, then finish evacuation, banking, reconnect and redeployment. Verify both faction routes and distinct Elite colors with the reviewed first-person fallback. Use a Forge-capable Chupathingy build to check HMV credits, objectives and scoring in game.
 
 ## Acceptance
 

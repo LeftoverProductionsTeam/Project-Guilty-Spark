@@ -6073,4 +6073,37 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   const target = await targetDownload;
   expect(target.suggestedFilename()).toBe('import.hmv');
   expect(await fs.readFile((await target.path())!)).toEqual(supported);
+
+  await panel.getByText('Layout details',{exact:true}).click();
+  const title = panel.getByLabel('Layout title');
+  const author = panel.getByLabel('Layout author');
+  await expect(title).toHaveValue('Test Forge');
+  await expect(author).toHaveValue('Spark');
+  await author.fill('é'.repeat(16));
+  const applyDetails = panel.getByRole('button',{name:'Apply layout details'});
+  await applyDetails.click();
+  await expect(panel).toContainText('31 UTF-8 bytes');
+  await title.fill('Canyon route');
+  await author.fill('Créateur');
+  await panel.getByLabel('Layout description').fill('Original canyon placement');
+  await applyDetails.click();
+  await expect(panel.getByText('Canyon route',{exact:true})).toBeVisible();
+  await page.keyboard.press('Control+z');
+  await expect(title).toHaveValue('Test Forge');
+  await page.keyboard.press('Control+y');
+  await expect(author).toHaveValue('Créateur');
+  await page.keyboard.press('Control+s');
+  const detailsBytes = Buffer.from('Canyon route\0Créateur\0Original canyon placement\0\0');
+  await expect.poll(async()=>Buffer.from(await page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes ?? [])).subarray(129))
+    .toEqual(detailsBytes);
+  const namedExport = page.waitForEvent('download');
+  await exportForerunner.click();
+  const namedLayout = await fs.readFile((await (await namedExport).path())!);
+  expect(namedLayout.subarray(0,54)).toEqual(supported.subarray(0,54));
+  expect(namedLayout.subarray(64,129)).toEqual(supported.subarray(64,129));
+  expect(namedLayout.subarray(129)).toEqual(detailsBytes);
+  await panel.getByRole('button',{name:'Remove layout from project'}).click();
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'import.hmv',mimeType:'application/octet-stream',buffer:namedLayout});
+  await panel.getByText('Layout details',{exact:true}).click();
+  await expect(author).toHaveValue('Créateur');
 });

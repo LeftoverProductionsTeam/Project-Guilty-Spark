@@ -1,6 +1,6 @@
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, hmvObjectiveDefinition, readHmv, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
+import { emptyHmv, HMV_NAME, hmvObjectiveDefinition, readHmv, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -140,6 +140,7 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     teleporters: layout.teleporterRecords.map(record => ({ ...record, id: prefix + recordKeys[record.index] })),
     objectives: layout.objectiveRecords.map(record => ({ ...record, id: prefix + recordKeys[record.index] })),
     writeMarker: layout.write,
+    metadata: { details: layout.details, date: layout.date },
     forerunner: {
       mapName: layout.mapName,
       issue: layout.forerunnerIssue ?? (rows.length === layout.recordsCount
@@ -150,9 +151,11 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
 }
 
 export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
-  const { rows, retained, forerunner, spawns, teleporters, objectives } = parse(sidecar, map);
+  const parsed = parse(sidecar, map);
+  const { rows, retained, forerunner, spawns, teleporters, objectives } = parsed;
   const properties = new Map(rows.flatMap(row => row.properties ? [[prefix + row.key, row.properties] as const] : []));
-  return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives };
+  return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives,
+    metadata: 'metadata' in parsed ? parsed.metadata : undefined };
 }
 
 export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {
@@ -401,6 +404,17 @@ export function removeHmvPlacement(project: Project, map: MapInspection, object:
     forgeSidecar: { ...previous, bytes: Array.from(bytes), recordKeys: keys.filter((_, record) => record !== index) },
     scene: project.scene.filter(row => row.id !== object.id),
   } satisfies Project;
+}
+
+export function updateHmvLayoutDetails(project: Project, map: MapInspection, details: HmvLayoutDetails) {
+  const previous = project.forgeSidecar;
+  if (!previous?.bytes || previous.baseSha256 !== map.sha256 || project.source?.sha256 !== map.sha256) {
+    throw Error('Open the preserved base map for this HMV layout.');
+  }
+  const layout = readHmv(previous.bytes, map);
+  if (layout.details.title === details.title && layout.details.author === details.author
+    && layout.details.description === details.description) return project;
+  return { ...project, forgeSidecar: { ...previous, bytes: Array.from(layout.writeDetails(details)) } } satisfies Project;
 }
 
 export function exportForgeSidecar(project: Project, map: MapInspection, target?: 'forerunner') {
