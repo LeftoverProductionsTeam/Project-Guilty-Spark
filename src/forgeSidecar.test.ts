@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exportForgeSidecar, importForgeSidecar, removeForgeSidecar } from './forgeSidecar';
+import { crc32 } from './sourceZip';
 import type { MapInspection, Project } from './types';
 
 describe('OpenCE Forge base-map placements', () => {
@@ -37,5 +38,55 @@ describe('OpenCE Forge base-map placements', () => {
     expect(()=>exportForgeSidecar(loaded,map)).toThrow('scale');
     edited.sourceModel=null;
     expect(()=>exportForgeSidecar(loaded,map)).toThrow('replaced');
+  });
+});
+
+describe('Chupathingy Forge binary layouts', () => {
+  const hash = 'c'.repeat(64);
+  const map = {
+    sha256: hash, header: { version: 5, name: 'test', scenarioType: 1, crc32: 0 },
+    tags: [{ id: 10, class: 'weap', path: 'weapons/test', external: false }],
+  } as MapInspection;
+  const project = { id: 'owned-xbox-source', source: { sha256: hash }, scene: [] } as unknown as Project;
+  const source = Uint8Array.from(Buffer.from('SEZSRwQAQAABAAAAdGVzdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAEwCEAAAAsn6lSXBhZXcMd2VhcG9uc1x0ZXN0AAAA/wAAgD8AAABAAABAQAAAAAAAAIA+AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAA//8C/wAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAVGVzdCBGb3JnZQBTcGFyawAAAA==', 'base64'));
+
+  it('round-trips unchanged, then patches the reviewed transform and payload checksum only', () => {
+    const imported = importForgeSidecar(project, map, 'test.hmv', source);
+    expect([imported.editable, imported.retained]).toEqual([1, 1]);
+    expect(exportForgeSidecar(imported.project, map)).toEqual(source);
+    const reopened = JSON.parse(JSON.stringify(imported.project)) as Project;
+    expect(reopened.scene[0].rotation).toEqual([0, -0.25, 0]);
+    reopened.scene[0].position[0] = -7.5;
+    reopened.scene[0].rotation[1] = 0.75;
+    const output = exportForgeSidecar(reopened, map) as Uint8Array;
+    const expected = new Uint8Array(source);
+    const view = new DataView(expected.buffer);
+    view.setFloat32(85, -7.5, true);
+    view.setFloat32(101, -0.75, true);
+    view.setUint32(60, crc32(expected.subarray(64)), true);
+    expect(output).toEqual(expected);
+    expect(importForgeSidecar(project, map, 'copy.hmv', output).project.scene[0].position).toEqual([-7.5, 2, 3]);
+  });
+
+  it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {
+    expect(() => importForgeSidecar(project, { ...map, header: { ...map.header, crc32: 1 } }, 'test.hmv', source)).toThrow('checksum must match');
+    expect(() => importForgeSidecar(project, { ...map, header: { ...map.header, version: 609 } }, 'test.hmv', source)).toThrow('Xbox');
+    expect(() => importForgeSidecar(project, map, 'nul.hmv', source)).toThrow('filename');
+    const damaged = new Uint8Array(source);
+    const view = new DataView(damaged.buffer);
+    damaged[81+36] = 1;
+    expect(() => importForgeSidecar(project, map, 'test.hmv', damaged)).toThrow('payload checksum');
+    view.setUint32(60, crc32(damaged.subarray(64)), true);
+    expect(() => importForgeSidecar(project, map, 'test.hmv', damaged)).toThrow('placement record');
+    damaged[81+36] = 0;
+    damaged[4] = 5;
+    damaged[129+2] = 7;
+    damaged[129+3] = 0;
+    damaged[129+34] = 0;
+    view.setUint32(60, crc32(damaged.subarray(64)), true);
+    expect(() => importForgeSidecar(project, map, 'test.hmv', damaged)).toThrow('teleporter pairs');
+    const { project: loaded } = importForgeSidecar(project, map, 'test.hmv', source);
+    loaded.scene[0].position[0] = 5000;
+    expect(() => exportForgeSidecar(loaded, map)).toThrow('coordinate');
   });
 });

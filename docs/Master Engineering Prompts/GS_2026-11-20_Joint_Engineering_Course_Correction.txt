@@ -1,0 +1,106 @@
+# PROJECT GUILTY SPARK + FORERUNNER
+## JOINT ENGINEERING COURSE CORRECTION
+### November 20, 2026
+**ALL THE TOOLS, AND THEN SOME.**
+
+Continue both permanent completion goals. Preserve all 475 Spark requirements and Forerunner's existing ambitions. Do not reset, rebuild completed systems, or reduce scope.
+
+### 1. COMPLETE BLACK ECHO FIRST
+
+Use Spark's latest reviewed Elite/four-start CE609 candidate:
+
+SHA-256:
+`04d9ccd199fef0bba6d30a54e7c7f3682f9766ddc0f94ee347cde6c9677c113f`
+
+Forerunner has already admitted this cache offline. Do not repeat completed verification unnecessarily.
+
+**Spark:**
+- Finish the missing compatible Elite first-person `_fp` model binding.
+- Preserve the correct Elite animations, plasma-pistol pickup compatibility, HUD, shields and audio.
+- Complete the physical Pelican/Spirit insertion and extraction workflows.
+- Fix actual flight, terminal and collision problems using native evidence.
+
+**Forerunner:**
+- Reuse existing faction armor colors, per-biped hands and landing logic.
+- Validate two authenticated players with distinct Elite colors.
+- Verify boarding, landing, disembarkation, combat, technology collection, terminal operation, extraction, banking and redeployment.
+- Test respawn, reconnect and persistent appearance.
+- Verify UNSC and Covenant mission paths independently.
+- Keep Delta account/profile requirements visible without weakening identity or storage protections.
+
+**Completion requires actual native gameplay, not simply successful compilation.**
+
+### 2. FULLY UNIFY FORGE
+
+Spark already supports OpenCE Forge `.txt` import, transform editing, Undo/Redo and lossless export of unsupported records.
+
+Forerunner already supports native Forge placements and multiplayer persistence.
+
+**Continue from these implementations.**
+
+- Complete Chupathingy's `.hmv` import/export.
+- Validate imported layouts in actual Chupathingy and compatible runtimes.
+- Reuse Mota's multiplayer Forge and tag-streaming implementations where compatible.
+- Support native object placement, scaling, rotation, welding, properties and synchronization.
+- Connect supported Forge operations to SparkLink and live editing.
+- Preserve source editing, BSP Workshop and Halo tag workflows.
+- Implement capability negotiation rather than silently accepting unsupported operations.
+
+Avoid duplicate Forge engines, competing save formats and breaking upstream compatibility.
+
+### 3. MERGE COMMUNITY INNOVATIONS
+
+Continue integration of compatible technology from:
+
+- ChupathingyCE — Milenko's Forge and engine improvements.
+- OpenCE-Forge/Faber — multiplayer Forge, tag streaming, runtime editing.
+- Halo Content Evolved — Firefight, Forge, AI, randomizers, dropships and gameplay systems.
+- FractumSeraph/OpenCE — cross-version networking, replays, spectator tools, map distribution and anticheat.
+- OpenH1 — VR, rendering, lighting and physical interactions.
+- Other independently verified Halo forks and historical modding tools.
+
+Reuse and extend implementations. Preserve original authorship, licenses and source history wherever appropriate.
+
+**Spark must expose every supported new Forerunner capability through usable creator workflows.**
+
+Keep new work modular and suitable for contributing back to the original maintainers. Respect Spark MIT and upstream GPL/AGPL licensing boundaries.
+
+### 4. KEEP BUILDING THE COMPLETE VISION
+
+After resolving the immediate dependencies, continue meaningful work on:
+
+- Full campaign and six-player co-op.
+- Firefight, Zombie Apocalypse and Extraction/PvPvE.
+- Nineteen-region MegaWorld with actual connected traversal.
+- VR gameplay and in-world creation.
+- LiveLink, SparkLink and Live Rebuild.
+- Advanced BSP, AI, shaders, lighting, audio and animation editing.
+- Machinima, replay and cinematic creation.
+- Playable custom species, factions and characters.
+- Runtime-aware Xbox, PC, MCC, Mac and Linux compatibility.
+- Stable multiplayer, performance, accessibility and releases.
+
+No feature disappears merely because another milestone takes priority.
+
+### 5. ENGINEERING DISCIPLINE
+
+- Preserve all original user maps, tags, ISOs, runtime folders and assets.
+- Use isolated staged operations and verified recovery.
+- Keep existing interfaces and ledgers authoritative.
+- Avoid repeated research, speculative infrastructure and excessive testing.
+- Validate meaningful changes with focused tests and real native operation.
+- Never represent partial support as completion.
+- Commit locally; do not push or publish without authorization.
+- Do not stop at documentation or compatibility research when implementation can proceed.
+
+### EXECUTION
+
+Finish the currently active Chupathingy Forge integration increment. Continue Black Echo integration in parallel where project ownership permits.
+
+Resolve the next real blocker, implement the correction, verify it and move forward.
+
+**Our objective is a finished universal Halo creation ecosystem whose improvements can flow back to the community.**
+
+**PROJECT GUILTY SPARK — ALL THE TOOLS, AND THEN SOME.**
+
+**FORERUNNER — ONE ENGINE. EVERY FORK.**

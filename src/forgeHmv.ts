@@ -1,0 +1,156 @@
+import { crc32 } from './sourceZip';
+import type { MapInspection, Vec3 } from './types';
+
+// Chupathingy Forge layout format, versions 1–7. See the pinned upstream
+// format reference in docs/RUNTIME_INTEGRATION_20261107.md.
+export const HMV_LIMIT = 65536;
+export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
+const headerSize = 64;
+const recordSize = 48;
+const groups = ['scen', 'vehi', 'weap', 'eqip', 'bipd', 'mach', 'ctrl', 'lifi', 'actv'];
+const groupCode = (name: string) => Array.from(name).reduce((code, c) => code * 256 + c.charCodeAt(0), 0);
+const groupNames = new Map(groups.map(group => [groupCode(group), group]));
+const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+const ascii = (bytes: Uint8Array) => String.fromCharCode(...bytes);
+const transformsValid = (values: number[]) => values.length === 6 && values.every((value, index) =>
+  Number.isFinite(value) && (index < 3 ? Math.abs(Math.fround(value)) < 5000 : Math.abs(Math.fround(value)) <= Math.fround(Math.fround(Math.PI) + 0.0001)));
+
+function requireLayout(condition: unknown, reason: string): asserts condition {
+  if (!condition) throw Error('Chupathingy Forge layout: ' + reason);
+}
+
+function paddedName(bytes: Uint8Array, pattern: RegExp, requiresZero = false) {
+  const zero = bytes.indexOf(0);
+  requireLayout((!requiresZero || zero >= 0) && (zero < 0 || bytes.subarray(zero).every(value => value === 0)), 'invalid name padding.');
+  const name = ascii(zero < 0 ? bytes : bytes.subarray(0, zero));
+  requireLayout(pattern.test(name), 'invalid map or pack name.');
+  return name;
+}
+
+export function readHmv(input: number[], map: MapInspection) {
+  requireLayout(input.length >= headerSize && input.length <= HMV_LIMIT
+    && input.every(value => Number.isInteger(value) && value >= 0 && value <= 255), 'invalid file length or bytes.');
+  const bytes = Uint8Array.from(input);
+  const view = new DataView(bytes.buffer);
+  const u16 = (offset: number) => view.getUint16(offset, true);
+  const u32 = (offset: number) => view.getUint32(offset, true);
+  requireLayout(ascii(bytes.subarray(0, 4)) === 'HFRG' && u16(6) === headerSize, 'invalid file header.');
+  const version = u16(4);
+  requireLayout(version >= 1 && version <= 7, 'choose a supported version 1–7 .hmv file.');
+  const mapName = paddedName(bytes.subarray(12, 44), /^[a-z0-9_]{1,31}$/, true);
+  requireLayout(map.header.version === 5 && map.header.scenarioType === 1
+    && mapName === map.header.name.toLowerCase() && u32(44) === (map.header.crc32 >>> 0),
+  'open the matching Xbox multiplayer base map. The map name and original cache checksum must match.');
+  const packs = u16(48), pathsCount = u16(50), recordsCount = u16(52), metaSize = u16(54);
+  requireLayout(packs <= 8 && pathsCount <= 256 && recordsCount <= 256 && metaSize >= 4 && metaSize <= 2048
+    && u32(56) === bytes.length - headerSize, 'invalid section sizes or counts.');
+  requireLayout(crc32(bytes.subarray(headerSize)) === u32(60), 'payload checksum failed.');
+  const recordsEnd = bytes.length - metaSize;
+  const recordsStart = recordsEnd - recordsCount * recordSize;
+  let offset = headerSize + packs * 32;
+  requireLayout(offset <= recordsStart, 'overlapping sections.');
+  for (let at = headerSize; at < offset; at += 32) {
+    paddedName(bytes.subarray(at + 8, at + 32), /^[a-z0-9_ -]{1,24}$/);
+  }
+  const paths = new Map<string, { group: string; path: string }>();
+  for (let i = 0; i < pathsCount; i++) {
+    requireLayout(offset + 5 <= recordsStart, 'truncated tag paths.');
+    const group = groupNames.get(u32(offset));
+    const size = bytes[offset + 4];
+    offset += 5;
+    requireLayout(group && size >= 1 && size <= 127 && offset + size <= recordsStart, 'invalid tag path group or length.');
+    const path = ascii(bytes.subarray(offset, offset + size));
+    offset += size;
+    const key = group + '|' + path;
+    requireLayout(/^[a-z0-9_ .\\-]+$/.test(path) && !path.includes('..')
+      && path.split('\\').every(part => part.length) && !paths.has(key), 'invalid or repeated tag path.');
+    paths.set(key, { group, path });
+  }
+  requireLayout(offset === recordsStart, 'unexpected bytes before placement records.');
+
+  const pathList = [...paths.values()];
+  const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3 }[] = [];
+  const features = new Set<number>();
+  let markers = false, teleporters = 0, goals = 0, senders = 0, receivers = 0;
+  const hills = new Uint8Array(16);
+  const goalLimits = new Map([[0, 2], [2, 16], [3, 32], [8, 16]]);
+  for (let index = 0; index < recordsCount; index++, offset += recordSize) {
+    const kind = bytes[offset + 2], team = view.getInt8(offset + 3);
+    const transform = Array.from({ length: 6 }, (_, field) => view.getFloat32(offset + 4 + field * 4, true));
+    const respawn = u16(offset + 28), count = bytes[offset + 30], modes = u16(offset + 31);
+    const variant = bytes[offset + 33], flags = bytes[offset + 34], aiTeam = bytes[offset + 35];
+    const pathIndex = u16(offset), ref = pathList[pathIndex];
+    const physics = flags & 0x30, actor = ref?.group === 'actv';
+    const invalid = 'invalid placement record ' + (index + 1) + '.';
+    requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
+    markers ||= kind !== 0;
+
+    if (kind === 5 || kind === 7 || kind === 8) {
+      requireLayout(pathIndex === 0xffff && team >= 0 && !respawn && !count && !modes && !flags
+        && !aiTeam && transform[4] === 0 && transform[5] === 0, invalid);
+      if (kind === 5) {
+        requireLayout(version >= 6 && team < (goalLimits.get(variant) ?? 0), invalid);
+        requireLayout(++goals <= 64 && (variant !== 8 || ++hills[team] <= 12), 'too many game type objects.');
+        features.add(6);
+      } else {
+        requireLayout(version >= 5 && team < 16 && !variant, invalid);
+        requireLayout(++teleporters <= 32, 'too many teleporters.');
+        if (kind === 7) senders |= 1 << team;
+        else receivers |= 1 << team;
+        features.add(5);
+      }
+      continue;
+    }
+
+    const spawn = kind === 2 && version >= 4;
+    requireLayout(kind === 0 ? ref : kind === 1 ? actor : kind === 2 ? pathIndex === 0xffff
+      : kind === 3 ? ref?.group === 'weap' || ref?.group === 'eqip' : kind === 4 && ref?.group === 'vehi', invalid);
+    const allowedFlags = version >= 7 ? 0x3f : version >= 4 ? 0x0f : (1 << version) - 1;
+    requireLayout(team >= -1 && team <= 7 && respawn <= 600 && count <= (kind === 0 ? 1 : 16) && variant <= 15
+      && !(flags & ~allowedFlags) && !(modes & ~(spawn ? 0x3f : 0x1f))
+      && (spawn ? team <= 1 && !respawn && !count && !variant && !aiTeam && !(flags & ~8) : !(flags & 8))
+      && aiTeam < 6 && (version >= 2 && actor || (!aiTeam && !(flags & 2)))
+      && (!(flags & 4) || actor && respawn > 0)
+      && (!physics || kind === 0 && !actor && physics !== 0x30), invalid);
+    if (physics) features.add(7);
+    if (kind === 2) features.add(4);
+    if (flags & 4) features.add(3);
+    if (kind === 0 && ref) {
+      const [x, y, z, yaw, pitch, roll] = transform;
+      objectRecords.push({ index, ...ref, position: [x, y, z], rotation: [yaw, -pitch, roll] });
+    }
+  }
+  requireLayout(u32(8) === Number(markers) && !(senders & ~receivers), 'marker flags or teleporter pairs are invalid.');
+  requireLayout(version < 3 || features.has(version), 'the declared version is missing its required record type.');
+
+  const meta = bytes.subarray(recordsEnd);
+  const fields = [];
+  let start = 0;
+  for (const limit of [32, 32, 128, 17]) {
+    const end = meta.indexOf(0, start);
+    requireLayout(end >= start && end - start < limit, 'invalid layout metadata size.');
+    let field: string;
+    try { field = decoder.decode(meta.subarray(start, end)); }
+    catch { throw Error('Chupathingy Forge layout: metadata must be UTF-8.'); }
+    requireLayout(!/[\u0000-\u001f\u007f-\u009f]/.test(field), 'invalid metadata characters.');
+    fields.push(field);
+    start = end + 1;
+  }
+  requireLayout(start === meta.length && fields[0] && (!fields[3] || /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(fields[3])),
+    'invalid layout title, date or metadata length.');
+
+  return {
+    objectRecords,
+    recordsCount,
+    write(index: number, position: Vec3, rotation: Vec3) {
+      const values = [...position, rotation[0], -rotation[1], rotation[2]];
+      requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');
+      const at = recordsStart + index * recordSize + 4;
+      for (let axis = 0; axis < 6; axis++) view.setFloat32(at + axis * 4, values[axis], true);
+    },
+    finish() {
+      view.setUint32(60, crc32(bytes.subarray(headerSize)), true);
+      return bytes;
+    },
+  };
+}

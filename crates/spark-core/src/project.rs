@@ -127,13 +127,16 @@ impl ScenarioScriptDraft {
         Ok(())
     }
 }
-/// Original OpenCE Forge layout text, retained as authoring data.
+/// Original runtime Forge layout, retained as authoring data.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForgeSidecar {
     pub name: String,
     pub base_sha256: String,
-    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bytes: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -353,12 +356,29 @@ impl Project {
             return invalid("Provenance text exceeds supported limits");
         }
         if let Some(layout) = &self.forge_sidecar {
-            if layout.name.is_empty() || layout.name.len() > 240
-                || layout.name.chars().any(|c| c.is_control() || ['/', '\\', ':'].contains(&c))
-                || layout.text.len() > 1024 * 1024 || layout.text.contains('\0')
-                || !self.source.as_ref().is_some_and(|source| source.sha256 == layout.base_sha256 && matches!(source.cache_version, 5 | 609))
-                || layout.text.trim_start_matches('\u{feff}').split(['\r','\n']).next() != Some("[OpenCE Forge Map]") {
-                return invalid("Forge layout must retain its exact supported base-map identity and bounded source text");
+            let source = self.source.as_ref().filter(|source| source.sha256 == layout.base_sha256);
+            let compatible = match (&layout.text, &layout.bytes, source) {
+                (Some(text), None, Some(source)) => matches!(source.cache_version, 5 | 609)
+                    && layout.name.to_ascii_lowercase().ends_with(".txt")
+                    && text.len() <= 1024 * 1024
+                    && !text.contains('\0')
+                    && text.trim_start_matches('\u{feff}').split(['\r', '\n']).next() == Some("[OpenCE Forge Map]"),
+                (None, Some(bytes), Some(source)) => source.cache_version == 5
+                    && layout.name.strip_suffix(".hmv").is_some_and(|stem| {
+                        (1..=28).contains(&stem.len()) && stem.bytes().all(|b| {
+                            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_')
+                        })
+                    })
+                    && (68..=65536).contains(&bytes.len())
+                    && bytes.starts_with(b"HFRG")
+                    && (1..=7).contains(&u16::from_le_bytes([bytes[4], bytes[5]]))
+                    && bytes[6..8] == [64, 0]
+                    && u32::from_le_bytes(bytes[56..60].try_into().unwrap()) as usize == bytes.len() - 64,
+                _ => false,
+            };
+            if !compatible || layout.name.is_empty() || layout.name.len() > 240
+                || layout.name.chars().any(|c| c.is_control() || ['/', '\\', ':'].contains(&c)) {
+                return invalid("Forge layout must retain one bounded payload and its exact supported base-map identity");
             }
         }
         let mut ids = std::collections::HashSet::new();
@@ -1104,13 +1124,39 @@ mod forge_sidecar_project_tests {
         });
         let text = "\u{feff}[OpenCE Forge Map]\r\nBase Map: custom_maps\\test\n[ForgeState]\rOPAQUE|1";
         project.forge_sidecar = Some(ForgeSidecar {
-            name:"saved.txt".into(),base_sha256:"a".repeat(64),text:text.into(),
+            name:"saved.txt".into(),base_sha256:"a".repeat(64),text:Some(text.into()),bytes:None,
         });
         project.validate().unwrap();
         let mut reopened: Project = serde_json::from_slice(&serde_json::to_vec(&project).unwrap()).unwrap();
         reopened.validate().unwrap();
-        assert_eq!(reopened.forge_sidecar.as_ref().unwrap().text, text);
+        assert_eq!(reopened.forge_sidecar.as_ref().unwrap().text.as_deref(), Some(text));
         reopened.source.as_mut().unwrap().sha256 = "b".repeat(64);
+        assert!(reopened.validate().is_err());
+    }
+
+    #[test]
+    fn forge_hmv_survives_project_serialization_without_mixing_layout_formats() {
+        let mut project = Project::new("Forge layout");
+        project.source = Some(Source {
+            original_path: "base.map".into(), preserved_path: "preserved/base.map".into(),
+            sha256: "a".repeat(64), cache_version: 5, engine: "Xbox".into(),
+            scenario_path: "levels/test".into(), archive: None, resource_directory: None,
+            resource_sha256: Default::default(), audio_resources: None,
+        });
+        let mut bytes = vec![0; 69];
+        bytes[..8].copy_from_slice(b"HFRG\x01\x00\x40\x00");
+        bytes[56] = 5;
+        project.forge_sidecar = Some(ForgeSidecar {
+            name: "about.hmv".into(), base_sha256: "a".repeat(64), text: None, bytes: Some(bytes.clone()),
+        });
+        project.validate().unwrap();
+        let mut reopened: Project = serde_json::from_slice(&serde_json::to_vec(&project).unwrap()).unwrap();
+        reopened.validate().unwrap();
+        assert_eq!(reopened.forge_sidecar.as_ref().unwrap().bytes.as_deref(), Some(bytes.as_slice()));
+        reopened.forge_sidecar.as_mut().unwrap().text = Some("[OpenCE Forge Map]".into());
+        assert!(reopened.validate().is_err());
+        reopened.forge_sidecar.as_mut().unwrap().text = None;
+        reopened.source.as_mut().unwrap().cache_version = 609;
         assert!(reopened.validate().is_err());
     }
 }

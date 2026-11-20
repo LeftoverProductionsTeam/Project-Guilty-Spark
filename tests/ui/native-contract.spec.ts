@@ -5861,3 +5861,45 @@ test('OpenCE Forge layout import preserves unsupported records through Undo, Sav
   const fs=await import('node:fs/promises');
   expect(await fs.readFile((await file!.path())!,'utf8')).toBe(source.replace('|1.0000|2|3|','|5|2|3|'));
 });
+
+test('Chupathingy Forge .hmv uses the shared history, Save and lossless export controls', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const open = (window as any).__sparkMock.projects.a;
+    open.project.source.cacheVersion = 5;
+    open.inspection.header.version = 5;
+    open.inspection.header.crc32 = 0;
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  const panel = page.locator('.forge-sidecar-panel');
+  const openLayout = page.getByRole('button',{name:'Forge layouts',exact:true});
+  await openLayout.click({timeout:6000});
+  const source = Buffer.from('SEZSRwQAQAABAAAAdGVzdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAEwCEAAAAsn6lSXBhZXcMd2VhcG9uc1x0ZXN0AAAA/wAAgD8AAABAAABAQAAAAAAAAIA+AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAA//8C/wAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAVGVzdCBGb3JnZQBTcGFyawAAAA==','base64');
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'test-forge.hmv',mimeType:'application/octet-stream',buffer:source});
+  await expect(panel.getByRole('status')).toContainText('1 editable placements · 1 other records preserved.');
+  await page.keyboard.press('Control+z');
+  await expect(panel.getByLabel('Import Forge layout')).toBeVisible();
+  await page.keyboard.press('Control+y');
+  await expect(panel).toContainText('test-forge.hmv');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes)).toEqual(Array.from(source));
+
+  await page.locator('.hierarchy').getByRole('button',{name:'test',exact:true}).click();
+  await page.getByRole('button',{name:'Transform',exact:true}).click();
+  const x = page.getByRole('spinbutton',{name:'Position X',exact:true});
+  await x.fill('8');
+  await x.press('Enter');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.scene.find((row:any)=>row.id.startsWith('forge-sidecar:'))?.position)).toEqual([8,2,3]);
+  await openLayout.click();
+  const downloading = page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
+  const file = await downloading;
+  expect(file.suggestedFilename()).toBe('test-forge-spark.hmv');
+  const fs = await import('node:fs/promises');
+  const output = await fs.readFile((await file.path())!);
+  expect(output.readFloatLE(85)).toBe(8);
+  expect(output.subarray(129)).toEqual(source.subarray(129));
+  expect(output.readUInt32LE(60)).not.toBe(source.readUInt32LE(60));
+});

@@ -1,5 +1,7 @@
 # Directive completion ledger
 
+20Nov joint engineering course correction 2fdac8b2 is preserved byte-for-byte as Master Engineering Prompts/GS_2026-11-20_Joint_Engineering_Course_Correction.txt (SHA-256 fce638d3aab3e45d99db9b33a19aee0166e61ae680155770d66b5e29c2b8f2fe). Finish the active Chupathingy Forge interoperability increment, prioritize native Elite hands and Black Echo peer gameplay, then continue upstream integration and all 475 requirements.
+
 20Nov full upstream feature integration directive 8b94aca2 is preserved byte-for-byte as Master Engineering Prompts/GS_2026-11-20_Full_Upstream_Feature_Integration.txt (SHA-256 04d56951fd70e7bd3fc21f0217ce22a8b41f49cd1dc30b9e2bd288372d5a1033). Forge interoperability precedes shared runtime placement/tag streaming, then gameplay/factions and replays/community/VR. Keep Operation110, all475 IDs, source protections, private and peer acceptance, licensing, and authorization for upstream publication.
 
 15Nov owner steering: “ensure it can use xbox tags for forerunner.” Existing campaign source/import/native staging now has Xbox actor selection and checked model-to-PC adaptation; original map/import hashes preserved in a real1126-tag/4-model test. Full CE candidate/Forerunner/UI restart/rendering/gameplay and loose Xbox tag-root coverage remain unaccepted. See RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT; no engine edits or push.

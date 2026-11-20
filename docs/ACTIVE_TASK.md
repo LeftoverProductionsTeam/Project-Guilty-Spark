@@ -3,8 +3,8 @@
 Task: Upstream Forge interoperability and Black Echo native acceptance
 Status: implementation incomplete
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: OpenCE Forge text import, scene transform, Undo/Redo, Save and lossless copy passed focused checks. Black Echo CE609 04d9ccd1 remains the reviewed four-start Elite candidate.
-Next action: Load the exported sidecar in a private reviewed runtime, then integrate Chupathingy’s validated .hmv format. Black Echo still needs two authenticated physical peers and flight acceptance.
+Latest verified revision: OpenCE text and Chupathingy HMV Forge authoring passed focused UI/Save checks and standalone upstream HMV decode. Black Echo CE609 04d9ccd1 remains the reviewed four-start Elite candidate.
+Next action: Bind compatible Elite first-person arms for Black Echo using the documented Forerunner native model/palette convention. Then verify both factions with two authenticated players. Load Forge exports in a Forge-capable private Chupathingy build when available.
 
 ## Acceptance
 

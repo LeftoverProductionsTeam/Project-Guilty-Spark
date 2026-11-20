@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
 import { exportForgeSidecar, FORGE_SIDECAR_LIMIT, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME } from '../forgeHmv';
 import type { MapInspection, Project } from '../types';
 import { useMapState } from '../mapSession';
 import { Notice } from './ui';
@@ -32,28 +33,37 @@ export default function ForgeSidecarPanel({ project, map, edit, openRequest }: {
     const base = map.sha256;
     setProblem('');
     try {
-      if (!/\.txt$/i.test(file.name) || file.size > FORGE_SIDECAR_LIMIT) throw Error('Choose an OpenCE Forge .txt file under 1 MiB.');
-      const text = new TextDecoder('utf-8', {fatal:true,ignoreBOM:true}).decode(await file.arrayBuffer());
+      const hmv = HMV_NAME.test(file.name);
+      if (!(hmv ? file.size <= HMV_LIMIT : /\.txt$/i.test(file.name) && file.size <= FORGE_SIDECAR_LIMIT)) {
+        throw Error('Choose an OpenCE Forge .txt (up to 1 MiB) or a Chupathingy .hmv (up to 64 KiB).');
+      }
+      const bytes = await file.arrayBuffer();
+      const input = hmv ? new Uint8Array(bytes) : new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
       if (request !== ticket.current) return;
       const latest = current.current;
       if (latest.map.sha256 !== base) throw Error('The base map changed. Choose the layout again.');
-      const result = importForgeSidecar(latest.project,latest.map,file.name,text);
-      edit(result.project,'Import OpenCE Forge layout');
+      const result = importForgeSidecar(latest.project,latest.map,file.name,input);
+      edit(result.project,'Import Forge layout');
     } catch (error) {
       if (request === ticket.current) setProblem(String(error));
     }
   }
 
   return <details className="forge-sidecar-panel" open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)}>
-    <summary>OpenCE Forge layout</summary>
+    <summary>Forge layout</summary>
     {layout ? <>
       <p>{layout.name}</p>
       {summary&&<p role="status">{summary.editable} editable placements · {summary.retained} other records preserved.</p>}
-      <p className="subtle">Move or rotate imported placements in the viewport. Export writes a separate layout and preserves its other records. Use the matching base map to load it in Forge.</p>
-      <button type="button" disabled={!compatible} onClick={()=>{
+      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map.</p>
+      {layout.bytes && <p className="subtle">For Chupathingy builds with Forge, put the copy in <code>forge/{map.header.name}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
+      <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {
-          const text=exportForgeSidecar(project,map);
-          downloadMedia(layout.name.replace(/\.txt$/i,'')+'-spark.txt',new Blob([text],{type:'text/plain;charset=utf-8'}));
+          const output = exportForgeSidecar(project,map);
+          if (typeof output === 'string') {
+            downloadMedia(layout.name.slice(0,-4)+'-spark.txt',new Blob([output],{type:'text/plain;charset=utf-8'}));
+          } else {
+            downloadMedia(layout.name.slice(0,-4).slice(0,22)+'-spark.hmv',new Blob([Uint8Array.from(output).buffer]));
+          }
           setProblem('');
         } catch (error) { setProblem(String(error)); }
       }}>Export Forge layout copy</button>
@@ -62,11 +72,12 @@ export default function ForgeSidecarPanel({ project, map, edit, openRequest }: {
         edit(removeForgeSidecar(project),'Remove imported Forge layout');
         setProblem('');
       }}>Remove layout from project</button>
-    </> : <label>Import Forge layout<input aria-label="Import Forge layout" type="file" accept=".txt,text/plain" onChange={event=>{
+    </> : <label>Import Forge layout<input aria-label="Import Forge layout" type="file" accept={map.header.version === 5 ? ".txt,.hmv" : ".txt"} onChange={event=>{
       const file=event.target.files?.[0];
       event.target.value='';
       if (file) void open(file);
     }}/></label>}
+    {layout && !summary && <Notice tone="error">Open the matching preserved map and check the layout before exporting.</Notice>}
     {problem&&<Notice tone="error">{problem}</Notice>}
   </details>;
 }
