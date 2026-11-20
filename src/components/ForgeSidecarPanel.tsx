@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvPlacement, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, supportsHmvMap } from '../forgeHmv';
+import { addHmvPlacement, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, updateHmvPlacementProperties } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, supportsHmvMap, type HmvPlacementProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
-import { Notice } from './ui';
+import { Notice, NumberField } from './ui';
 
 export default function ForgeSidecarPanel({ project, map, edit, selected, onSelect, openRequest }: {
   project: Project;
@@ -31,6 +31,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       || map.header.version === 609 && [0, 1].includes(map.header.scenarioType));
   const canAddHmv = compatible && supportsHmvMap(map) && (!layout || layout.bytes);
   const selectedTag = canAddHmv && hmvPlacementTag(project, map, selected);
+  const properties = selected && summary?.properties.get(selected.id);
   if (!compatible && !layout) return null;
 
   async function open(file: File) {
@@ -65,6 +66,15 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     } catch (error) { setProblem(String(error)); }
   }
 
+  function changeProperties(patch: Partial<HmvPlacementProperties>) {
+    if (!selected || !properties) return;
+    try {
+      const next = updateHmvPlacementProperties(project, map, selected, { ...properties, ...patch });
+      if (next !== project) edit(next, 'Change Forge placement properties');
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
   return <details className="forge-sidecar-panel" open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)}>
     <summary>Forge layout</summary>
     {canAddHmv && <>
@@ -74,10 +84,34 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       {!selectedTag && <p className="subtle">Select an unscaled scenery, vehicle, weapon or equipment object from this map.</p>}
     </>}
 
+    {compatible && selected && properties && <fieldset key={selected.id}>
+      <legend>Placement properties</legend>
+      <label className="field-label">Team
+        <select value={properties.team} onChange={event => changeProperties({ team: Number(event.target.value) })}>
+          <option value={-1}>Unassigned</option>
+          <option value={0}>Red</option>
+          <option value={1}>Blue</option>
+          {[2, 3, 4, 5, 6, 7].map(team => <option key={team} value={team}>Team {team}</option>)}
+        </select>
+      </label>
+      <label className="field-label">Respawn delay (seconds)
+        <NumberField label="Respawn delay (seconds)" value={properties.respawnSeconds} min={0} max={600} step={1}
+          onCommit={respawnSeconds => changeProperties({ respawnSeconds })} />
+      </label>
+      <label><input type="checkbox" checked={properties.placeAtStart}
+        onChange={event => changeProperties({ placeAtStart: event.target.checked })} /> Place at start</label>
+      <label className="field-label">Physics
+        <select value={properties.physics} onChange={event => changeProperties({ physics: event.target.value as HmvPlacementProperties['physics'] })}>
+          <option value="normal">Normal</option>
+          <option value="fixed">Fixed</option>
+          <option value="phased">Phased</option>
+        </select>
+      </label>
+    </fieldset>}
     {layout ? <>
       <p>{layout.name}</p>
       {summary&&<p role="status">{summary.editable} editable placements · {summary.retained} other records preserved.</p>}
-      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit ordinary placements.'}</p>
+      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit placements.'}</p>
       {summary?.forerunner && map.header.version === 5 && <p className="subtle">In Chupathingy builds with Forge, put the copy in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
       <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {

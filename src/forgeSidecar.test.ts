@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvPlacement, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement } from './forgeSidecar';
+import { addHmvPlacement, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, updateHmvPlacementProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -131,6 +131,30 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(exportForgeSidecar(loaded, map)).not.toEqual(output);
     expect(readHmv(Array.from(output), map).objectRecords[0].position).toEqual([9, 2, 3]);
     expect(removed.scene[0].id).toBe(added.selectedId);
+  });
+
+  it('preserves native properties on duplicate and retains the lowest required version after a deletion', () => {
+    const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
+    const first = loaded.scene[0];
+    const advanced = { team: 1, respawnSeconds: 20, placeAtStart: false, physics: 'phased' } as const;
+    const edited = updateHmvPlacementProperties(loaded, map, first, advanced);
+    const bytes = exportForgeSidecar(edited, map) as Uint8Array;
+    expect(new DataView(bytes.buffer).getUint16(4, true)).toBe(7);
+    expect(bytes.subarray(129)).toEqual(source.subarray(129));
+    expect(readHmv(Array.from(bytes), map).objectRecords[0].properties).toEqual(advanced);
+    expect(() => exportForgeSidecar(edited, map, 'forerunner')).toThrow('standard physics');
+    expect(() => updateHmvPlacementProperties(edited, map, first, { ...advanced, respawnSeconds: 601 })).toThrow('out of range');
+
+    const duplicated = addHmvPlacement(edited, map, first).project;
+    expect(inspectForgeSidecar(duplicated.forgeSidecar!, map).properties.get(duplicated.scene[1].id)).toEqual(advanced);
+    const reset = updateHmvPlacementProperties(duplicated, map, first, { ...advanced, physics: 'normal' });
+    expect(new DataView((exportForgeSidecar(reset, map) as Uint8Array).buffer).getUint16(4, true)).toBe(7);
+    const trimmed = removeHmvPlacement(reset, map, duplicated.scene[1]);
+    const output = exportForgeSidecar(trimmed, map) as Uint8Array;
+    expect(new DataView(output.buffer).getUint16(4, true)).toBe(4);
+    expect(output.subarray(129)).toEqual(source.subarray(129));
+    expect(inspectForgeSidecar(trimmed.forgeSidecar!, map).properties.get(first.id)).toEqual({ ...advanced, physics: 'normal' });
+    expect(exportForgeSidecar(loaded, map)).toEqual(source);
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

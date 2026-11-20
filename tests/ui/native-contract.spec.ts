@@ -5905,6 +5905,29 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   await page.keyboard.press('Control+s');
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.recordKeys.length)).toBe(1);
   await expect(page.locator('.hierarchy').getByRole('button',{name:'Base-map weapon',exact:true})).toBeVisible();
+  await page.locator('.hierarchy').getByRole('button',{name:'test',exact:true}).click();
+  await openLayout.click();
+  const placement = panel.getByRole('group',{name:'Placement properties'});
+  const target = panel.getByRole('button',{name:'Export for Forerunner'});
+  await placement.getByLabel('Team').selectOption('1');
+  await placement.getByLabel('Physics').selectOption('fixed');
+  await expect(target).toBeDisabled();
+  await placement.getByLabel('Physics').blur();
+  await page.keyboard.press('Control+z');
+  await expect(placement.getByLabel('Physics')).toHaveValue('normal');
+  await expect(target).toBeEnabled();
+  await page.keyboard.press('Control+y');
+  await expect(target).toBeDisabled();
+  await placement.getByLabel('Physics').selectOption('normal');
+  const timer = placement.getByRole('spinbutton',{name:'Respawn delay (seconds)'});
+  await timer.fill('15');
+  await timer.press('Enter');
+  await expect(target).toBeDisabled();
+  await timer.fill('0');
+  await timer.press('Enter');
+  await expect(target).toBeEnabled();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[84])).toBe(1);
   const downloaded = page.waitForEvent('download');
   await panel.getByRole('button',{name:'Export for Forerunner'}).click();
   const file = await downloaded;
@@ -5913,6 +5936,7 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   expect(file.suggestedFilename()).toBe('import.hmv');
   expect(output.readUInt32LE(44)).toBe(123456);
   expect(output.readUInt16LE(52)).toBe(1);
+  expect(output.readInt8(64 + 5 + output[68] + 3)).toBe(1);
   expect(output.readUInt32LE(60)).toBe(crc32(output.subarray(64)));
 });
 

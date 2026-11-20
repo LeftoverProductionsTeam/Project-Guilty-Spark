@@ -2,8 +2,8 @@
 
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
-Starting revision: aa640c0194593d72aabe6a9feb61fc9e9d0d32a2, canonical master.
-Latest verified revision: Spark authored an HMV directly from a Blood Gulch base-map object and native Forerunner loaded the Warthog. Browser authoring, Undo/Redo, removal, Save and export passed. Exact Black Echo 04d9ccd1 offline diagnostics also reached the Covenant survivor rally and spawned facility opposition.
+Starting revision: c3cbe3357a7ca677a8e6eab5588a0430151b92bc, canonical master.
+Latest verified revision: Spark authors and edits HMV placement properties. Browser Undo/Redo, Save and compatibility checks passed. Upstream native readback confirmed authored team, respawn, initial placement and physics. Exact Black Echo 04d9ccd1 solo replay has reached the field rally; the most recent completed combat probe reported a living facility opponent.
 Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Verify both faction routes and distinct Elite colors through the field rally, facility combat, technology collection, defense, evacuation, banking, reconnect and redeployment. Use the reviewed fallback pending CMT redistribution permission. Keep direct Chupathingy playback, HMV replication, and advanced placement editing open.
 
 ## Acceptance

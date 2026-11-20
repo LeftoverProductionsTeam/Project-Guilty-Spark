@@ -1,6 +1,6 @@
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, readHmv } from './forgeHmv';
+import { emptyHmv, HMV_NAME, readHmv, type HmvPlacementProperties } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -84,6 +84,7 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
 interface LayoutPlacement {
   index: number;
   key?: string;
+  properties?: HmvPlacementProperties;
   tag: MapInspection['tags'][number];
   position: Vec3;
   rotation: Vec3;
@@ -117,7 +118,8 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     const matches = tags.get(record.group + '|' + pathKey(record.path));
     if (matches?.length !== 1) continue;
     rows.push({
-      index: record.index, key: recordKeys[record.index], tag: matches[0], position: record.position, rotation: record.rotation, scale: 1,
+      index: record.index, key: recordKeys[record.index], properties: record.properties,
+      tag: matches[0], position: record.position, rotation: record.rotation, scale: 1,
       write: (position, rotation) => layout.write(record.index, position, rotation),
     });
   }
@@ -136,7 +138,8 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
 
 export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   const { rows, retained, forerunner } = parse(sidecar, map);
-  return { editable: rows.length, retained, forerunner };
+  const properties = new Map(rows.flatMap(row => row.properties ? [[prefix + row.key, row.properties] as const] : []));
+  return { editable: rows.length, retained, forerunner, properties };
 }
 
 export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {
@@ -174,8 +177,8 @@ export function isHmvPlacement(project: Project, object: SceneObject) {
   return !!project.forgeSidecar?.bytes && object.id.startsWith(prefix);
 }
 
-export function hmvPlacementTag(project: Project, map: MapInspection, object: SceneObject | undefined) {
-  if (!object || project.source?.sha256 !== map.sha256 || object.scale.some(value => !close(value, 1))) return;
+export function hmvPlacementTag(project: Project, map: MapInspection, object: SceneObject | undefined, requireUnitScale = true) {
+  if (!object || project.source?.sha256 !== map.sha256 || requireUnitScale && object.scale.some(value => !close(value, 1))) return;
   const source = object.sourceModel;
   if (source && (source.projectId !== project.id || source.sourceSha256 !== map.sha256)) return;
   const tag = map.tags.find(tag => tag.id === (source?.tagId ?? object.tagId));
@@ -195,10 +198,17 @@ export function addHmvPlacement(project: Project, map: MapInspection, object: Sc
   if (previous && previous.baseSha256 !== map.sha256) throw Error('Open the preserved base map for this Forge layout.');
   const layout = readHmv(previous?.bytes ?? Array.from(emptyHmv(map)), map);
   const position: Vec3 = [object.position[0] + offsetX, object.position[1], object.position[2]];
-  const bytes = layout.append(tag.class, pathKey(tag.path).replaceAll('/', '\\'), position, object.rotation);
+  const tagPath = pathKey(tag.path).replaceAll('/', '\\');
+  const recordKeys = previous ? keysForHmv(previous, layout.recordsCount) : [];
+  const index = recordKeys.findIndex(key => prefix + key === object.id);
+  const original = layout.objectRecords.find(record => record.index === index);
+  if (isHmvPlacement(project, object) && (!original || original.group !== tag.class || original.path !== tagPath)) {
+    throw Error('The selected object no longer matches its Forge record.');
+  }
+  const bytes = original ? layout.duplicate(index, position, object.rotation)
+    : layout.append(tag.class, tagPath, position, object.rotation);
   const key = crypto.randomUUID();
   const placement = placementObject(project, map, { index: layout.recordsCount, key, tag, position, rotation: [...object.rotation], scale: 1 });
-  const recordKeys = previous ? keysForHmv(previous, layout.recordsCount) : [];
   return {
     selectedId: placement.id,
     project: {
@@ -214,7 +224,7 @@ export function addHmvPlacement(project: Project, map: MapInspection, object: Sc
   };
 }
 
-export function removeHmvPlacement(project: Project, map: MapInspection, object: SceneObject) {
+function selectedHmvRecord(project: Project, map: MapInspection, object: SceneObject) {
   const previous = project.forgeSidecar;
   if (!previous?.bytes || project.source?.sha256 !== map.sha256 || previous.baseSha256 !== map.sha256) {
     throw Error('Open the preserved base map for this Forge layout.');
@@ -222,6 +232,26 @@ export function removeHmvPlacement(project: Project, map: MapInspection, object:
   const layout = readHmv(previous.bytes, map);
   const keys = keysForHmv(previous, layout.recordsCount);
   const index = keys.findIndex(key => prefix + key === object.id);
+  const record = layout.objectRecords.find(record => record.index === index);
+  const tag = hmvPlacementTag(project, map, object, false);
+  if (!record || !tag || tag.class !== record.group || pathKey(tag.path) !== pathKey(record.path)) {
+    throw Error('The selected object no longer matches its Forge record.');
+  }
+  return { previous, layout, keys, index, record };
+}
+
+export function updateHmvPlacementProperties(project: Project, map: MapInspection, object: SceneObject, properties: HmvPlacementProperties) {
+  const { previous, layout, index, record } = selectedHmvRecord(project, map, object);
+  if (record.properties.team === properties.team && record.properties.physics === properties.physics
+      && record.properties.respawnSeconds === properties.respawnSeconds
+      && record.properties.placeAtStart === properties.placeAtStart) return project;
+  const bytes = Array.from(layout.writeProperties(index, properties));
+  readHmv(bytes, map);
+  return { ...project, forgeSidecar: { ...previous, bytes } } satisfies Project;
+}
+
+export function removeHmvPlacement(project: Project, map: MapInspection, object: SceneObject) {
+  const { previous, layout, keys, index } = selectedHmvRecord(project, map, object);
   const bytes = layout.remove(index);
   return {
     ...project,
