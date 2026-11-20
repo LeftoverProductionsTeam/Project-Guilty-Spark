@@ -3,8 +3,8 @@
 Task: Operation110 - source Save integrity and the Black Echo native handoff
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Imported OBJ previews now bind asset and map source hashes. Focused frontend 25/25, a delayed browser contract and native Windows preview/readback passed. The native fixture required owned cleanup after its close timeout. Managed Save proof is at 330f56d / 2e9178a. Black Echo dfa84b95 remains at native technology pickup, and ce892c71 awaits paired play.
-Next action: Trace original Save37944 independently. When native pickup is measurable, compare both authenticated slots, defense through settlement and the UNSC route. Reuse the existing BSP spatial index for incident-lighting queries and preserve nearest-floor and overlap behavior.
+Latest verified revision: Cached BSP lighting queries matched 2,640 parity cases. 240 warmed probes on 39,200 triangles checked 3,892 candidates instead of 9,408,000. Imported OBJ proof remains at 2004013 and managed Save at 330f56d / 2e9178a.
+Next action: Replace the Black Echo technology weapon’s unsupported hp animation binding with a verified Grunt-compatible native item and update the HaloScript objective tag. Compile and independently read back CE609, preserving the Marine route. Hand off for paired play. Save37944 awaits a reproducer.
 
 ## Acceptance
 

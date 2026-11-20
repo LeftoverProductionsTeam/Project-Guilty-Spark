@@ -35,6 +35,40 @@ const overlap={...occluded,positions:[...radiosity.positions,...radiosity.positi
 assert.equal(sampleIncidentRadiosity(overlap,[.25,.25,1]),null,'Coincident BSPs require explicit source region');assert.equal(sampleIncidentRadiosity(overlap,[.25,.25,1],10,1)?.bspIndex,1);
 console.log('PASS: native incident magnitude/direction, nearest-floor occlusion, exact BSP/page identity and malformed-input refusal');
 
+const doubleLabel={...occluded,materialRanges:[
+  radiosity.materialRanges[0],
+  {...radiosity.materialRanges[0],bspIndex:1,indexStart:3},
+  {...radiosity.materialRanges[0],bspIndex:2,indexStart:2,indexCount:4},
+]};
+assert.equal(sampleIncidentRadiosity(doubleLabel,[.25,.25,1]),null,'Two ranges claiming the closest surface must block the lower floor');
+assert.equal(sampleIncidentRadiosity(doubleLabel,[.25,.25,1],10,0)?.triangle,0,'An explicit BSP can still select its unambiguous floor');
+assert.equal(sampleIncidentRadiosity({...radiosity,positions:[...radiosity.positions,10,10,Infinity],indices:[0,1,2,0,1,3]},[.25,.25,1]),null,'A corrupt remote triangle cannot authorize a local sample');
+
+const separated={...radiosity,positions:[],indices:[],normals:[],uvs:[],lightmapUvs:[],incidentRadiosity:[]};
+for(let triangle=0;triangle<2048;triangle++){
+  separated.positions.push(...radiosity.positions.map((value,axis)=>value+(axis%3===0?triangle*2:0)));
+  separated.indices.push(triangle*3,triangle*3+1,triangle*3+2);
+  separated.normals.push(...radiosity.normals);
+  separated.uvs.push(...radiosity.uvs);
+  separated.lightmapUvs.push(...radiosity.lightmapUvs);
+  separated.incidentRadiosity.push(...radiosity.incidentRadiosity);
+}
+separated.materialRanges=[{...radiosity.materialRanges[0],indexCount:separated.indices.length}];
+let indexReads=0;
+separated.indices=new Proxy(separated.indices,{get(target,key,receiver){
+  if(typeof key==='string'&&/^\d+$/.test(key))indexReads++;
+  return Reflect.get(target,key,receiver);
+}});
+assert.equal(sampleIncidentRadiosity(separated,[200.25,.25,1])?.triangle,100);
+indexReads=0;
+for(let i=0;i<24;i++){
+  const triangle=i*83;
+  assert.equal(sampleIncidentRadiosity(separated,[triangle*2+.25,.25,1])?.triangle,triangle);
+}
+assert.ok(indexReads<3000,'Repeated probes still scanned '+indexReads+' triangle indices');
+console.log('PASS: cached spatial candidates preserve source triangle identity across repeated probes');
+
+
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} differs from ${b}`);
 const nativeObject={objectLighting:{offset:[1,0,0],radius:2,brighten:false},rig:{nodes:[{parent:-1,position:[2,3,4],rotation:[0,0,Math.SQRT1_2,Math.SQRT1_2]}]}};
 const transform={position:[10,20,30],rotation:[Math.PI/2,0,0],scale:[2,3,4]};

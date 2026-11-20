@@ -4,6 +4,8 @@
  * No cache data is changed; no game texture pixels are guessed or bundled.
  */
 import type { MeshData, Vec3 } from './types';
+import { buildCollisionIndexFrom, queryCollisionBounds } from './collisionSpatial.ts';
+import type { CollisionNode } from './collisionSpatial.ts';
 
 export interface LightmapPageCoverage {
   key: string;
@@ -124,6 +126,63 @@ export interface IncidentRadiositySample {
   surfaceNormal:Vec3; surfaceUv:[number,number]; lightmapUv:[number,number];
   incident:Vec3; direction:Vec3; accuracy:number;
 }
+type LightmapRange = NonNullable<MeshData['materialRanges']>[number];
+
+interface IncidentSurfaceIndex {
+  tree: CollisionNode;
+  ranges: LightmapRange[];
+  rangeIds: Int32Array;
+}
+const incidentSurfaces = new WeakMap<MeshData, IncidentSurfaceIndex | null>();
+
+/** Build once for each immutable render mesh and preserve the source triangle
+ * order and range identity. Every triangle participates in occlusion, even
+ * when its lighting is missing or its range attribution is ambiguous. */
+function incidentSurfaceIndex(mesh:MeshData):IncidentSurfaceIndex|null {
+  const known=incidentSurfaces.get(mesh);
+  if(known!==undefined)return known;
+  const ranges=mesh.materialRanges??[], count=mesh.indices.length/3;
+  if(ranges.length>131072||!ranges.some(range=>range.hasIncidentRadiosity===true)){
+    incidentSurfaces.set(mesh,null);
+    return null;
+  }
+  const tree=buildCollisionIndexFrom(count,triangle=>{
+    const ids=mesh.indices.slice(triangle*3,triangle*3+3);
+    if(ids.some(id=>!Number.isSafeInteger(id)||id<0||id*3+2>=mesh.positions.length))return null;
+    const a=mesh.positions.slice(ids[0]*3,ids[0]*3+3) as Vec3;
+    const b=mesh.positions.slice(ids[1]*3,ids[1]*3+3) as Vec3;
+    const c=mesh.positions.slice(ids[2]*3,ids[2]*3+3) as Vec3;
+    return a.every(Number.isFinite)&&b.every(Number.isFinite)&&c.every(Number.isFinite)?{a,b,c}:null;
+  });
+  if(!tree){
+    incidentSurfaces.set(mesh,null);
+    return null;
+  }
+
+  // A coverage sweep records the sole range in linear time. XOR removes a
+  // range at its end and yields its ID only when exactly one range is active.
+  const coverageDelta=new Int32Array(count+1), rangeIds=new Int32Array(count+1);
+  ranges.forEach((range,i)=>{
+    if(!Number.isSafeInteger(range.indexStart)||!Number.isSafeInteger(range.indexCount))return;
+    const start=Math.max(0,Math.ceil(range.indexStart/3));
+    const end=Math.min(count,Math.floor((range.indexStart+range.indexCount)/3));
+    if(start>=end)return;
+    coverageDelta[start]++;
+    coverageDelta[end]--;
+    rangeIds[start]^=i+1;
+    rangeIds[end]^=i+1;
+  });
+  let coverage=0, active=0;
+  for(let id=0;id<count;id++){
+    coverage+=coverageDelta[id];
+    active^=rangeIds[id];
+    rangeIds[id]=coverage===1?active:0;
+  }
+  const index={tree,ranges,rangeIds};
+  incidentSurfaces.set(mesh,index);
+  return index;
+}
+
 /** Downward source probe. Select the nearest surface before checking lighting:
  * an unavailable floor must never leak light from another floor behind it.
  * Native incident-vector lengths are retained independently from direction.
@@ -133,22 +192,24 @@ export function sampleIncidentRadiosity(mesh:MeshData|null|undefined,point:Vec3,
   if(!mesh||point.length!==3||!point.every(Number.isFinite)||!Number.isFinite(maximumDistance)||maximumDistance<=0||maximumDistance>100||
     mesh.positions.length%3||mesh.positions.length>3_000_000||mesh.indices.length%3||mesh.indices.length>1_500_000||
     (bspIndex!==undefined&&(!Number.isInteger(bspIndex)||bspIndex<0||bspIndex>15)))return null;
-  const ranges=mesh.materialRanges??[];if(ranges.length>131072)return null;
-  if(!ranges.some(range=>range.hasIncidentRadiosity===true))return null;
-  let hit:{triangle:number;ids:number[];weights:Vec3;z:number;range:typeof ranges[number]|undefined}|undefined,ambiguous=false;
-  for(let at=0;at<mesh.indices.length;at+=3){
-    const ids=mesh.indices.slice(at,at+3);if(ids.some(id=>!Number.isSafeInteger(id)||id<0||id*3+2>=mesh.positions.length))return null;
+  const index=incidentSurfaceIndex(mesh);
+  if(!index)return null;
+  // Keep the existing hit tolerance and tie order. The index prunes only in
+  // XY, so it cannot exclude a nearly coplanar floor at the probe depth limit.
+  const [x,y]=point;
+  const candidates=queryCollisionBounds(index.tree,[x,y,-Infinity],[x,y,Infinity]).ids.sort((a,b)=>a-b);
+  let hit:{triangle:number;ids:number[];weights:Vec3;z:number;range:LightmapRange|undefined}|undefined,ambiguous=false;
+  for(const triangle of candidates){
+    const at=triangle*3, ids=mesh.indices.slice(at,at+3);
     const a=mesh.positions.slice(ids[0]*3,ids[0]*3+3),b=mesh.positions.slice(ids[1]*3,ids[1]*3+3),c=mesh.positions.slice(ids[2]*3,ids[2]*3+3);
-    if(![...a,...b,...c].every(Number.isFinite))return null;
     if(point[0]<Math.min(a[0],b[0],c[0])||point[0]>Math.max(a[0],b[0],c[0])||point[1]<Math.min(a[1],b[1],c[1])||point[1]>Math.max(a[1],b[1],c[1]))continue;
     const denominator=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);if(Math.abs(denominator)<1e-12)continue;
     const u=((b[1]-c[1])*(point[0]-c[0])+(c[0]-b[0])*(point[1]-c[1]))/denominator,v=((c[1]-a[1])*(point[0]-c[0])+(a[0]-c[0])*(point[1]-c[1]))/denominator,w=1-u-v;
     if(Math.min(u,v,w)<-1e-7)continue;const z=a[2]*u+b[2]*v+c[2]*w;if(z>point[2]+1e-7||point[2]-z>maximumDistance)continue;
-    const matches=ranges.filter(range=>Number.isSafeInteger(range.indexStart)&&Number.isSafeInteger(range.indexCount)&&range.indexStart<=at&&at+3<=range.indexStart+range.indexCount);
-    const range=matches.length===1?matches[0]:undefined;
+    const range=index.ranges[index.rangeIds[triangle]-1];
     if(bspIndex!==undefined&&range?.bspIndex!==bspIndex)continue;
     if(hit&&Math.abs(z-hit.z)<1e-7&&range?.bspIndex!==hit.range?.bspIndex){ambiguous=true;continue;}
-    if(!hit||z>hit.z+1e-7){hit={triangle:at/3,ids,weights:[u,v,w],z,range};ambiguous=false;}
+    if(!hit||z>hit.z+1e-7){hit={triangle,ids,weights:[u,v,w],z,range};ambiguous=false;}
   }
   if(!hit||ambiguous||!hit.range?.hasIncidentRadiosity||!hit.range.hasLightmapUvs)return null;
   const {ids,weights,range}=hit,radiosity=mesh.incidentRadiosity,normals=mesh.normals,uvs=mesh.uvs,lightUvs=mesh.lightmapUvs;
