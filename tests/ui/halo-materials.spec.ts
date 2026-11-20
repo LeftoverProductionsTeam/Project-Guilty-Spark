@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { MeshData, Vec3 } from '../../src/types';
 test('WebGL renders Halo exterior faces and source transparency without black occluders', async ({
   page,
 }) => {
@@ -126,4 +127,78 @@ test('native vehicle meters interpret encoded channels, flash and both framebuff
  });console.log('HALO_METER_PIXELS',JSON.stringify({actual:r.meters,expected}));
  expect(r.errors).toEqual([]);expect(r.reflectionGlError).toBe(0);
  for(const [i,pixel]of expected.entries())for(const[channel,v]of pixel.entries())expect(Math.abs(r.meters[i][channel]-v),'meter case '+i+' channel '+channel).toBeLessThanOrEqual(1);
+});
+
+test('dense BSP lighting prepares in a worker and preserves exact surface samples', async({page})=>{
+  await page.goto('/tests/ui/fixtures/haloMaterials.html');
+  const workerPaths:string[]=[];
+  page.on('worker',worker=>workerPaths.push(worker.url()));
+  const result=await page.evaluate(async()=>{
+    const {hasIncidentSurfaceIndex,sampleIncidentRadiosity}=await import('/src/haloLightmap.ts' /* @vite-ignore */);
+    const {prepareIncidentSurfaceIndex}=await import('/src/useIncidentSurfaceIndex.ts' /* @vite-ignore */);
+    const positions:number[]=[],indices:number[]=[],normals:number[]=[],uvs:number[]=[],lightmapUvs:number[]=[],incidentRadiosity:number[]=[];
+    const materialRanges:NonNullable<MeshData['materialRanges']>=[];
+    const mesh:MeshData={positions,indices,normals,uvs,lightmapUvs,incidentRadiosity,materialRanges,
+      label:'Dense lighting test',source:'synthetic'};
+    function vertex(x:number,y:number,z:number){
+      positions.push(x,y,z);normals.push(0,0,1);
+      uvs.push(x/2,y/2);lightmapUvs.push((x%2)/2,(y%2)/2);
+      incidentRadiosity.push(0.1,0.2,0.3+(x%2)*0.1);
+    }
+    // Replace four of the reference grid's triangles with stacked surfaces
+    // and a coincident second BSP so the baseline remains 39,200 triangles.
+    for(let y=0;y<=140;y++)for(let x=0;x<=140;x++)vertex(x,y,(x+y)*0.001);
+    for(let y=0;y<140;y++)for(let x=0;x<140;x++){
+      if(y===139&&x>=138)continue;
+      const a=y*141+x,b=a+1,c=a+141,d=c+1;
+      mesh.indices.push(a,b,d,a,d,c);
+    }
+    const baseCount=mesh.indices.length;
+    for(let i=0;i<2;i++){
+      const a=mesh.positions.length/3;
+      vertex(0,0,0.5+i*0.5);vertex(1,0,0.5+i*0.5);
+      vertex(1,1,0.5+i*0.5);vertex(0,1,0.5+i*0.5);
+      mesh.indices.push(a,a+1,a+2,a,a+2,a+3);
+    }
+    const coincidentStart=mesh.indices.length-3;
+    const coincident=mesh.indices.slice(0,3);
+    mesh.indices.splice(coincidentStart,3,...coincident);
+    const range={shaderTagId:42,bspIndex:0,lightmapIndex:0,lightmapPage:0,
+      lightmapBitmapTagId:12,hasLightmapUvs:true,hasIncidentRadiosity:true,indexStart:0,indexCount:baseCount};
+    materialRanges.push(range,{...range,indexStart:baseCount,indexCount:9,hasIncidentRadiosity:false},
+      {...range,bspIndex:1,indexStart:coincidentStart,indexCount:3});
+    const probes=Array.from({length:237},(_,i):{point:Vec3;bsp?:number}=>({point:[1.25+(i*7)%138,1.5+(i*11)%138,2]}));
+    probes.push({point:[0.75,0.25,2],bsp:undefined},{point:[0.75,0.25,0.1],bsp:undefined},
+      {point:[0.75,0.25,0.1],bsp:1});
+    const read=(source:typeof mesh)=>probes.map(({point,bsp})=>sampleIncidentRadiosity(source,point,10,bsp));
+    const workerMesh={...mesh},abortedMesh={...mesh};
+    const groundTruth=read(mesh);
+    const controller=new AbortController();
+    const abandoned=prepareIncidentSurfaceIndex(abortedMesh,controller.signal);
+    controller.abort();
+    await abandoned;
+    const cancelled=!hasIncidentSurfaceIndex(abortedMesh);
+    const start=performance.now();
+    const pending=prepareIncidentSurfaceIndex(workerMesh);
+    const dispatchMs=performance.now()-start;
+    const responsive=await Promise.race([
+      pending.then(()=>false),new Promise<boolean>(resolve=>setTimeout(()=>resolve(true),0)),
+    ]);
+    await pending;
+    const readyMs=performance.now()-start;
+    return {cancelled,responsive,dispatchMs,readyMs,indexReady:hasIncidentSurfaceIndex(workerMesh),
+      triangles:mesh.indices.length/3,samples:read(workerMesh),groundTruth};
+  });
+  expect(workerPaths.some(path=>path.includes('incidentSurface.worker'))).toBe(true);
+  expect(result.cancelled).toBe(true);
+  expect(result.responsive).toBe(true);
+  expect(result.indexReady).toBe(true);
+  expect(result.triangles).toBe(39200);
+  expect(result.samples).toHaveLength(240);
+  expect(result.samples.slice(0,237).every(sample=>sample?.bspIndex===0)).toBe(true);
+  expect(result.samples.slice(237,239)).toEqual([null,null]);
+  expect(result.samples[239]?.bspIndex).toBe(1);
+  expect(result.samples).toEqual(result.groundTruth);
+  console.log('DENSE_BSP_LIGHTING_WORKER',JSON.stringify({dispatchMs:result.dispatchMs,readyMs:result.readyMs,
+    triangles:result.triangles,exactSamples:result.samples.length}));
 });

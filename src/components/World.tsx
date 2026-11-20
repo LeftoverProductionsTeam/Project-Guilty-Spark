@@ -102,6 +102,7 @@ import { auditHaloBspRender } from '../bspRenderAudit';
 import { inspectLightmapPages, matchLocalLightmapPages, lightmapPageKey,objectLightingPoint,sampleIncidentRadiosity } from '../haloLightmap';
 import type {SourceObjectLighting} from '../haloLightmap';
 import {useNativeObjectLighting} from '../useNativeObjectLighting';
+import {useIncidentSurfaceIndex} from '../useIncidentSurfaceIndex';
 import type {ObjectLightProbe} from '../useNativeObjectLighting';
 import { exportMeshObj } from '../haloObj';
 import { downloadLocalText } from '../exportHelpers';
@@ -376,10 +377,9 @@ function Scene({
   const markerSize = inspection ? 0.22 : 0.15;
   const shaderMetadata=useMemo(()=>Object.fromEntries((inspection?.tags??[]).filter(t=>t.shaderPreview).map(t=>[t.id,t.shaderPreview!])),[inspection]);
   const spartan=sourceSpartan(inspection),spawnModel=spartan?inspection?.modelMeshes?.[spartan.id]:undefined;
-  const lightProbes=useMemo(()=>{
+  const lightPoints=useMemo(()=>{
     if(!inspection||![5,6,7,13,609].includes(inspection.header.version))return [];
-    const shaders=new Map(buildMaterialAudit(inspection,inspection.renderMesh).shaders.filter(s=>s.status==='resolved'&&s.bitmapTagId!==null).map(s=>[s.shaderTagId,s.bitmapTagId!]));
-    const probes:ObjectLightProbe[]=[];
+    const points:{id:string;point:Vec3;brighten:boolean}[]=[];
     for(const object of project.scene){
       if(!object.visible)continue;
       const linked=sourcePlacement(object);if(linked&&linked.sourceSha256!==inspection.sha256)continue;
@@ -388,17 +388,33 @@ function Scene({
       // bounds-averaging path and retains the existing source-sky preview.
       if(!['vehi','bipd','weap','eqip'].includes(asset?.objectLighting?.tagClass??''))continue;
       const point=objectLightingPoint(asset,object);if(!point)continue;
-      const sample=sampleIncidentRadiosity(inspection.renderMesh,point);if(!sample)continue;
-      const shader=inspection.tags.find(t=>t.id===sample.shaderTagId);if(shader?.shaderPreview?.kind!=='environment')continue;
-      const bitmapTagId=shaders.get(sample.shaderTagId);if(bitmapTagId!==undefined)probes.push({id:object.id,sample,bitmapTagId,brighten:!!asset?.objectLighting?.brighten});
+      points.push({id:object.id,point,brighten:!!asset?.objectLighting?.brighten});
+    }
+    return points;
+  },[inspection,project.scene,ownedModels,spawnModel,assetMeshes]);
+  const hasLightPoints=lightPoints.length>0;
+  const lightMesh=hasLightPoints?inspection?.renderMesh:null;
+  const lightIndexPending=useIncidentSurfaceIndex(lightMesh);
+  const lightBitmaps=useMemo(()=>{
+    if(!inspection||!hasLightPoints)return new Map<number,number>();
+    return new Map(buildMaterialAudit(inspection,inspection.renderMesh).shaders.filter(s=>s.status==='resolved'&&s.bitmapTagId!==null).map(s=>[s.shaderTagId,s.bitmapTagId!]));
+  },[inspection,hasLightPoints]);
+  const lightProbes=useMemo(()=>{
+    const probes:ObjectLightProbe[]=[];
+    if(!lightMesh||lightIndexPending)return probes;
+    for(const {id,point,brighten} of lightPoints){
+      const sample=sampleIncidentRadiosity(lightMesh,point);
+      if(!sample||shaderMetadata[sample.shaderTagId]?.kind!=='environment')continue;
+      const bitmapTagId=lightBitmaps.get(sample.shaderTagId);
+      if(bitmapTagId!==undefined)probes.push({id,sample,bitmapTagId,brighten});
     }
     return probes;
-  },[inspection,project.scene,ownedModels,spawnModel,assetMeshes]);
+  },[lightMesh,lightIndexPending,lightPoints,lightBitmaps,shaderMetadata]);
   const localLightState=useNativeObjectLighting(project.id,project.source?.sha256===inspection?.sha256?inspection?.sha256:undefined,bitmapResourceSha256(project.source),inspection?.header.version,lightProbes);
   const nativeLights=localLightState.lights;
   useEffect(()=>{gl.domElement.dataset.gsOriginalMips=JSON.stringify(Object.entries(shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps})));},[gl,shaderTextures]);
   useEffect(()=>{gl.domElement.dataset.gsOriginalCubeMips=JSON.stringify(Object.entries(extraTextures).filter(([,texture])=>texture instanceof THREE.CubeTexture).map(([key,texture])=>({key,bitmapTagId:texture.userData.sourceTagId,levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps,rgbaBytes:texture.userData.rgbaBytes})));},[gl,extraTextures]);
-  useEffect(()=>{gl.domElement.dataset.gsObjectLighting=JSON.stringify({probed:lightProbes.length,applied:nativeLights?.size??0,sourceSha256:inspection?.sha256??null,method:'native-default-pose-centre',runtimeCornerSampling:false,pending:localLightState.pending,reason:localLightState.reason,milliseconds:localLightState.milliseconds,lights:[...(nativeLights??[])].map(([id,value])=>({id,...value}))});},[gl,lightProbes,nativeLights,inspection?.sha256,localLightState.pending,localLightState.reason,localLightState.milliseconds]);
+  useEffect(()=>{gl.domElement.dataset.gsObjectLighting=JSON.stringify({probed:lightProbes.length,applied:nativeLights?.size??0,sourceSha256:inspection?.sha256??null,method:'native-default-pose-centre',runtimeCornerSampling:false,pending:lightIndexPending||localLightState.pending,reason:localLightState.reason,milliseconds:localLightState.milliseconds,lights:[...(nativeLights??[])].map(([id,value])=>({id,...value}))});},[gl,lightProbes,nativeLights,inspection?.sha256,lightIndexPending,localLightState.pending,localLightState.reason,localLightState.milliseconds]);
   const dropBody=(object:SceneObject):DropBody=>{
     const linked=sourcePlacement(object),view=linked?ownedModels[forgeModelKey(linked)]:undefined;
     const preview=object.assetId?assetMeshes[object.assetId]:view?.mesh??(object.tagId!==null?inspection?.modelMeshes?.[object.tagId]:undefined);

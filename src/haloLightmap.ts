@@ -135,38 +135,52 @@ interface IncidentSurfaceIndex {
 }
 const incidentSurfaces = new WeakMap<MeshData, IncidentSurfaceIndex | null>();
 
-/** Build once for each immutable render mesh and preserve the source triangle
- * order and range identity. Every triangle participates in occlusion, even
- * when its lighting is missing or its range attribution is ambiguous. */
-function incidentSurfaceIndex(mesh:MeshData):IncidentSurfaceIndex|null {
-  const known=incidentSurfaces.get(mesh);
-  if(known!==undefined)return known;
-  const ranges=mesh.materialRanges??[], count=mesh.indices.length/3;
-  if(ranges.length>131072||!ranges.some(range=>range.hasIncidentRadiosity===true)){
-    incidentSurfaces.set(mesh,null);
-    return null;
-  }
+const hasIncidentRanges = (mesh: MeshData) => !!mesh.materialRanges && mesh.materialRanges.length <= 131072
+  && mesh.materialRanges.some(range => range.hasIncidentRadiosity === true);
+
+function validIncidentGeometry(positions: ArrayLike<number>, indices: ArrayLike<number>) {
+  return positions.length % 3 === 0 && positions.length <= 3_000_000
+    && indices.length % 3 === 0 && indices.length <= 1_500_000;
+}
+
+export function shouldDeferIncidentSurface(mesh: MeshData) {
+  return mesh.indices.length >= 32_768 * 3 && validIncidentGeometry(mesh.positions, mesh.indices) && hasIncidentRanges(mesh);
+}
+
+export function hasIncidentSurfaceIndex(mesh: MeshData) {
+  return incidentSurfaces.has(mesh);
+}
+
+/** The worker and synchronous fallback share the same source-order tree. */
+export function buildIncidentSurfaceTree(positions: ArrayLike<number>, indices: ArrayLike<number>) {
+  if (!validIncidentGeometry(positions, indices)) return null;
   // The builder reads the coordinates synchronously and retains only bounds.
   // Reuse three vectors so opening a dense BSP does not allocate per triangle.
   const triangle={a:[0,0,0] as Vec3,b:[0,0,0] as Vec3,c:[0,0,0] as Vec3};
   const vertices=[triangle.a,triangle.b,triangle.c];
-  const tree=buildCollisionIndexFrom(count,id=>{
+  return buildCollisionIndexFrom(indices.length / 3, id => {
     for(let vertex=0;vertex<3;vertex++){
-      const index=mesh.indices[id*3+vertex];
+      const index=indices[id*3+vertex];
       const offset=index*3;
-      if(!Number.isSafeInteger(index)||index<0||offset+2>=mesh.positions.length)return null;
-      const x=mesh.positions[offset],y=mesh.positions[offset+1],z=mesh.positions[offset+2];
+      if(!Number.isSafeInteger(index)||index<0||offset+2>=positions.length)return null;
+      const x=positions[offset],y=positions[offset+1],z=positions[offset+2];
       if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return null;
       const position=vertices[vertex];
       position[0]=x;position[1]=y;position[2]=z;
     }
     return triangle;
   });
-  if(!tree){
+}
+
+export function installIncidentSurfaceTree(mesh: MeshData, tree: CollisionNode | null) {
+  const existing = incidentSurfaces.get(mesh);
+  if (existing !== undefined) return existing;
+  if (!tree || !hasIncidentRanges(mesh)) {
     incidentSurfaces.set(mesh,null);
     return null;
   }
 
+  const ranges = mesh.materialRanges!, count = mesh.indices.length / 3;
   // A coverage sweep records the sole range in linear time. XOR removes a
   // range at its end and yields its ID only when exactly one range is active.
   const coverageDelta=new Int32Array(count+1), rangeIds=new Int32Array(count+1);
@@ -191,6 +205,14 @@ function incidentSurfaceIndex(mesh:MeshData):IncidentSurfaceIndex|null {
   return index;
 }
 
+/** Every triangle participates in occlusion, including surfaces without light. */
+function incidentSurfaceIndex(mesh: MeshData) {
+  const existing = incidentSurfaces.get(mesh);
+  if (existing !== undefined) return existing;
+  return installIncidentSurfaceTree(mesh, hasIncidentRanges(mesh)
+    ? buildIncidentSurfaceTree(mesh.positions, mesh.indices) : null);
+}
+
 /** Downward source probe. Select the nearest surface before checking lighting:
  * an unavailable floor must never leak light from another floor behind it.
  * Native incident-vector lengths are retained independently from direction.
@@ -198,7 +220,7 @@ function incidentSurfaceIndex(mesh:MeshData):IncidentSurfaceIndex|null {
  */
 export function sampleIncidentRadiosity(mesh:MeshData|null|undefined,point:Vec3,maximumDistance=10,bspIndex?:number):IncidentRadiositySample|null {
   if(!mesh||point.length!==3||!point.every(Number.isFinite)||!Number.isFinite(maximumDistance)||maximumDistance<=0||maximumDistance>100||
-    mesh.positions.length%3||mesh.positions.length>3_000_000||mesh.indices.length%3||mesh.indices.length>1_500_000||
+    !validIncidentGeometry(mesh.positions,mesh.indices)||
     (bspIndex!==undefined&&(!Number.isInteger(bspIndex)||bspIndex<0||bspIndex>15)))return null;
   const index=incidentSurfaceIndex(mesh);
   if(!index)return null;
