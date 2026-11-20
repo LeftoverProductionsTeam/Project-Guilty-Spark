@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — Community attribution
+
+- Add a Community Contributors section under About. Contributor records and applicable notices travel with Spark builds. [Contributors](CONTRIBUTORS.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+
 ## 0.4.1 Preview 5 — Windows, 10 November 2026
 
 - Publish the verified fresh d832af3 Windows installer, portable ZIP, matching source, manifest and checksums as actual GitHub Release downloads; independent anonymous size/hash verification passes. Earlier tags and accepted candidates are preserved.

@@ -3,7 +3,7 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Spark authors and edits linked HMV teleporters, including endpoint transforms and channel changes. Browser Save/export and upstream version-5 file readback passed. Black Echo two-player acceptance remains open.
+Latest verified revision: Spark’s About, map export and portable release packaging preserve community attribution. Two browser checks, four Rust map-export tests, Windows Cargo check, TypeScript, 14 packaging tests and six draft workflow tests passed. Installer and native UI acceptance remain open. The previous linked-HMV teleporter authoring, browser Save/export and upstream version-5 readback remain verified. Black Echo two-player acceptance remains open.
 Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Verify both faction routes and distinct Elite colors through the field rally, facility combat, technology collection, defense, evacuation, banking, reconnect and redeployment. Use the reviewed fallback pending CMT redistribution permission. Keep direct Chupathingy playback, HMV replication, and advanced placement editing open.
 
 ## Acceptance

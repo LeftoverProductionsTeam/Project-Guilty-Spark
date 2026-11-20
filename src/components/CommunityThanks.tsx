@@ -21,14 +21,19 @@ export default function CommunityThanks(){
     finally{setTimeout(()=>URL.revokeObjectURL(href),3000);}
   }
   return <div className="analysis-page gs-community">
-    <PageTitle eyebrow="COMMUNITY / THE GREAT RECLAMATION" title="To everyone who kept Halo modding alive"
-      description="Thank you to the map makers, reversers, educators, preservationists, tool authors, beta testers, server hosts, and forum members who shared what they learned." />
+    <PageTitle eyebrow="PROJECT" title="About Project Guilty Spark" description="A Halo creation and preservation workbench." />
     <section className="analysis-card gs-thanks-intro">
-      <Heart size={29} aria-hidden="true"/><h2>We built on a community, not in isolation.</h2>
+      <Heart size={29} aria-hidden="true"/><h2>Community Contributors</h2>
       <p>From the Halo Demo and MacGamingMods experiments to Halo Maps, HaloMods, Custom Edition, Invader, the MEK, c20 and MCC's Editing Kits: countless people documented the hard parts. Every unnamed tutorial writer, bug reporter, map creator and fellow player deserves thanks too.</p>
       <p><strong>This register is not exhaustive.</strong> It credits verifiable projects and contributors without guessing historical identities. The nomination list is private to your machine until you choose to export it; it is not publicly submitted or automatically treated as verified.</p>
     </section>
-    <p><a href="https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/blob/master/COMMUNITY_CREDITS.md" target="_blank" rel="noopener noreferrer">Full community credits and provenance</a></p>
+    <nav className="analysis-actions" aria-label="Project sources and licenses">
+      <a href="https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark" target="_blank" rel="noopener noreferrer">Guilty Spark on GitHub</a>
+      <a href="https://github.com/LeftoverProductionsTeam/Project-Forerunner" target="_blank" rel="noopener noreferrer">Forerunner on GitHub</a>
+      <a href="https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/blob/master/CONTRIBUTORS.md" target="_blank" rel="noopener noreferrer">Contributor and source credits</a>
+      <a href="https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">Spark MIT license</a>
+      <a href="https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/blob/master/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener noreferrer">Third-party licenses and notices</a>
+    </nav>
     <section className="analysis-card"><div className="section-heading"><h2>Documented foundations</h2><Pill tone="green"><ShieldCheck size={12}/> Reference-linked</Pill></div>
       <label>Search credits and research <input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Tool, creator or contribution" aria-label="Search community credits" /></label>
       <div className="gs-credits-grid">{verified.map(entry=><article className="gs-credit" key={entry.id}>

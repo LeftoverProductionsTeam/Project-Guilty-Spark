@@ -50,10 +50,72 @@ fn export_runtime_key(runtime: runtime::RuntimeId) -> Reply<String> {
     serde_json::to_value(runtime).map_err(error)?.as_str().map(str::to_owned)
         .ok_or("Runtime identifier could not be saved".into())
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct CreditedMapExport {
+    #[serde(flatten)]
+    map: build::MapExport,
+    credits: PathBuf,
+}
+
+fn append_provenance(lines: &mut Vec<String>, provenance: &core::project::Provenance) {
+    let label = |title: &str, value: &str| format!("{title}: {}", if value.trim().is_empty() { "Not recorded" } else { value.trim() });
+    lines.push(label("Creator", &provenance.creator));
+    if !provenance.community.trim().is_empty() {
+        lines.push(label("Community", &provenance.community));
+    }
+    if let Some(year) = provenance.release_year {
+        lines.push(format!("Release year: {year}"));
+    }
+    let source = reqwest::Url::parse(provenance.source_url.trim()).ok().filter(|url| {
+        matches!(url.scheme(), "http" | "https") && url.username().is_empty() && url.password().is_none()
+    });
+    lines.push(label("Source", source.as_ref().map_or("", reqwest::Url::as_str)));
+    lines.push(label("Recorded permissions", &provenance.permissions));
+}
+
+fn map_export_credits(library: &Library, project: &Project, export: &build::MapExport) -> String {
+    let mut lines = vec![
+        format!("Credits for {}", export.output.file_name().unwrap_or_default().to_string_lossy()),
+        format!("Map SHA-256: {}", export.sha256),
+        "Use the original authors’ terms when sharing. Credit and local export do not grant redistribution rights.".into(),
+        String::new(),
+        format!("Project: {}", project.title),
+    ];
+    append_provenance(&mut lines, &project.provenance);
+    if let Some(source) = &project.source {
+        lines.push(format!("Source map SHA-256: {}", source.sha256));
+    }
+    let mut donors = std::collections::BTreeMap::<_, Vec<_>>::new();
+    for asset in &project.native_asset_imports {
+        donors.entry((&asset.source_project_id, &asset.source_sha256)).or_default().push(asset);
+    }
+    for ((source_id, sha256), assets) in donors {
+        lines.push(String::new());
+        lines.push(format!("Imported source SHA-256: {sha256}"));
+        match library.get(source_id).ok().filter(|donor| donor.source.as_ref().is_some_and(|source| source.sha256 == *sha256)) {
+            Some(donor) => append_provenance(&mut lines, &donor.provenance),
+            None => lines.push("Creator and permissions: No matching source record available".into()),
+        }
+        for asset in assets {
+            lines.push(format!("Tag: {}.{}", asset.tag_path, asset.tag_class));
+        }
+    }
+    if !project.assets.is_empty() {
+        lines.push(String::new());
+        lines.push("Project assets (see the project’s recorded permissions and the original asset notices)".into());
+        for asset in &project.assets {
+            lines.push(format!("{} — SHA-256 {}", asset.name, asset.sha256));
+        }
+    }
+    lines.push(String::new());
+    lines.join("\n")
+}
+
 #[tauri::command]
 pub(super) async fn storage_export_map(
     app: tauri::AppHandle, project_id: String, build_id: String, runtime_id: runtime::RuntimeId,
-) -> Reply<build::MapExport> {
+) -> Reply<CreditedMapExport> {
     let key = export_runtime_key(runtime_id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
@@ -98,11 +160,18 @@ pub(super) async fn storage_export_map(
         let result = build::export_map_copy(&store(&state)?, &project_id, &record, runtime_id, &base).map_err(error)?;
         // An edit in another window cannot make a completed export appear to
         // describe a newer revision. Its receipt retains the exact old hash.
-        let current = lock(&state.library)?.get(&project_id).map_err(error)?;
-        if current.fingerprint().map_err(error)?!=record.project_fingerprint {
-            return Err(format!("The map changed during export. The verified earlier revision is retained at {}; rebuild before exporting the current edits.",result.output.display()));
-        }
-        Ok(result)
+        let credit_text = {
+            let library = lock(&state.library)?;
+            let current = library.get(&project_id).map_err(error)?;
+            if current.fingerprint().map_err(error)? != record.project_fingerprint {
+                return Err(format!("The map changed during export. The verified earlier revision is retained at {}; rebuild before exporting the current edits.", result.output.display()));
+            }
+            map_export_credits(&library, &current, &result)
+        };
+        let credits = build::write_map_export_credits(&result, &credit_text).map_err(|reason| {
+            format!("Map exported to {}. Its credit file could not be saved: {reason}", result.output.display())
+        })?;
+        Ok(CreditedMapExport { map: result, credits })
     }).await.map_err(error)?
 }
 #[tauri::command]

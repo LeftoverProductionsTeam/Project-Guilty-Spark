@@ -150,7 +150,7 @@ Got a favorite tool? Some cursed old Halo build? A map you always wanted to make
 
 I don't want to bury the old Halo modding community. I was part of it. I love this shit. I'm trying to make one place where all those tools, engines and ideas can come together.
 
-**[REPORT A BUG OR IDEA](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose) | [CONTRIBUTE](CONTRIBUTING.md) | [ROADMAP](ROADMAP.md) | [COMMUNITY CREDITS](COMMUNITY_CREDITS.md)**
+**[REPORT A BUG OR IDEA](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose) | [CONTRIBUTE](CONTRIBUTING.md) | [ROADMAP](ROADMAP.md) | [COMMUNITY CREDITS](CONTRIBUTORS.md) | [THIRD-PARTY NOTICES](THIRD_PARTY_NOTICES.md)**
 
 Independent, open-source community software under the [MIT License](LICENSE). Halo and its assets belong to their respective owners.
 

@@ -16,6 +16,17 @@ WebView2 and OS/native prerequisites retain Microsoft/platform terms. System GTK
 
 The separately built Spacewar test helper uses [steamworks-rs 0.13.0](https://github.com/Noxime/steamworks-rs), steamworks-sys 0.13.0 and paste 1.0.15 under their MIT/Apache-2.0 terms; their collected notices are included in the dependency inventory. The optional `steam_api64.dll` is Valve's Steamworks SDK 1.64 runtime and retains Valve's terms. It is not covered by Spark's MIT license. See Valve's [Spacewar SDK example and redistributable runtime instructions](https://partner.steamgames.com/doc/sdk/api/example). The main Spark executable does not embed or load this DLL; it starts the explicitly selected, separately verified helper only for a requested Steam operation. App ID 480 is a development/test identity, not a registered production Spark identity.
 
+## Community runtime and asset attribution
+
+[Contributors](CONTRIBUTORS.md) identifies individual work, original projects and pinned sources. [Community credits](COMMUNITY_CREDITS.md) retains historical research and tutorial attribution.
+
+- **ChupathingyCE Forge HMV.** Spark implements the documented file format independently. The upstream engine and codec are GPL-3.0-or-later. Forerunner retains the upstream codec and its original notices. [Pinned format and code](https://github.com/ChupathingyCE/chupathingyce/tree/1b732f52d73f214d4f0068178d45753cca56dcf3/port/linux/game)
+- **OpenCE, OpenCE Forge/Faber, and OpenH1.** Optional runtimes retain their own notices and license terms. The currently pinned Spark packages identify AGPLv3 in their bundled notices. Spark uses native tools, format compatibility and separately installed runtime packages. [Runtime compatibility and packages](docs/COMPATIBLE_TOOLS.md)
+- **Forerunner.** The companion repository contains its own applicable AGPL/GPL notices and inherited history. Spark connects through its documented companion contract. [Forerunner licensing](https://github.com/LeftoverProductionsTeam/Project-Forerunner/blob/main/LICENSE), [upstream provenance](https://github.com/LeftoverProductionsTeam/Project-Forerunner/blob/main/UPSTREAM_FEATURE_MATRIX.md)
+- **CMT Elite FP Arms.** The archive readme names MMAMONSTERRR-D92209 and credits Teh lag. It asks for attribution and lacks an explicit redistribution grant. The model, shaders, bitmaps and disposable test cache are excluded from Spark distributions. [Original package](https://www.halomaps.org/hce/detail.cfm?fid=5764)
+
+Record an imported asset’s creator, source and applicable permission in the Preservation record. Attribution and local use do not establish a redistribution license. Include the original notice required by the creator when sharing approved work.
+
 ## Optional tools and research
 
 Invader is an optional separate GPL-3.0 tool installation; no Invader binary or source is embedded in this release. H1A/HEK, Guerilla, Sapien, Standalone, OpenSauce, MEK/Reclaimer and other companions retain their own licenses and are not bundled. Decompiled SAMPLE CODE and historical archive executables were not incorporated or executed.

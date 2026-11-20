@@ -1193,6 +1193,25 @@ test('one compact header contains map tabs and lowered reachable window actions'
  await page.keyboard.press('Escape');await expect(view).toBeFocused();await expect(header.getByRole('button',{name:'Fullscreen editing',exact:true})).toBeHidden();
 });
 
+test('About shows Community Contributors and licenses', async ({page}) => {
+  await mockDesktop(page);
+  await openStudioMenu(page);
+  const about = page.getByRole('button', {name: 'About Project Guilty Spark', exact: true});
+  await revealPagedControl(about);
+  await about.click();
+  await expect(page.getByRole('heading', {name: 'Community Contributors', exact: true})).toBeVisible();
+  await expect(page.getByRole('link', {name: 'Guilty Spark on GitHub'})).toBeVisible();
+  await expect(page.getByRole('link', {name: 'Forerunner on GitHub'})).toBeVisible();
+  await expect(page.getByRole('link', {name: 'Third-party licenses and notices'})).toBeVisible();
+  const search = page.getByRole('textbox', {name: 'Search community credits'});
+  await search.fill('MMAMONSTERRR-D92209');
+  const result = page.locator('.gs-credit');
+  await expect(result).toHaveCount(1);
+  await expect(result).toContainText('Teh lag');
+  await expect(result).toContainText('redistribution permission is unconfirmed');
+  await expect(result.getByRole('link', {name: 'Reference'})).toHaveAttribute('href', /fid=5764$/);
+});
+
 test('Studio runtime options follow every saved theme with opaque native popup colors',async({page})=>{
  await mockDesktop(page);await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
  for(const theme of ['halo-ce','unsc','covenant','forerunner','dark-glow']){
@@ -5620,7 +5639,7 @@ test('unchanged CE cache uses native validation then the existing export control
    }
    if(command==='storage_export_map'){
     w.__sparkMock.calls.push({command,args:structuredClone(args)});
-    return {output:'Synthetic/Mods/test.map',sha256:p.source.sha256,bytes:128,cacheVersion:609,runtimeId:args.runtimeId,reused:false};
+    return {output:'Synthetic/Mods/test.map',credits:'Synthetic/Mods/CREDITS-5d61b56259c59eed.txt',sha256:p.source.sha256,bytes:128,cacheVersion:609,runtimeId:args.runtimeId,reused:false};
    }
    return original(command,args);
   };
@@ -5633,6 +5652,8 @@ test('unchanged CE cache uses native validation then the existing export control
  await expect(history).toContainText('ce-existing');await expect(history).toContainText('no compilation or game acceptance');
  await history.getByText(/^Export map/,{exact:true}).click();const select=history.getByRole('combobox',{name:'Map export runtime',exact:true});await revealPagedControl(select);await expect(select).toHaveValue('haloCustomEdition');await select.selectOption('openCe');await history.getByRole('button',{name:'Export to mods folder',exact:true}).click();
  await expect(history.getByRole('status')).toContainText('Native map exported and hash-verified');
+ await expect(history.getByRole('status')).toContainText('Map attribution and permissions');
+ await expect(history.getByRole('status')).toContainText('Synthetic/Mods/CREDITS-5d61b56259c59eed.txt');
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='storage_export_map').map((c:any)=>c.args))).toEqual([{projectId:'a',buildId:'ce-check',runtimeId:'openCe'}]);
 });
 

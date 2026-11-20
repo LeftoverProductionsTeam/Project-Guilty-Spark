@@ -36,6 +36,12 @@
     ],
     "shortDescription": "A source-safe Halo 1 modding workbench",
     "category": "DeveloperTool",
+    "resources": {
+      "../CONTRIBUTORS.md": "CONTRIBUTORS.md",
+      "../COMMUNITY_CREDITS.md": "COMMUNITY_CREDITS.md",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
+      "../LICENSE": "LICENSE"
+    },
     "icon": [
       "icons/icon.ico",
       "icons/32x32.png",

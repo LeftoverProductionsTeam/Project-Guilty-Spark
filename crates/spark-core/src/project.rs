@@ -528,10 +528,14 @@ fn atomic_write_before_publish(
     #[cfg(windows)]
     let create_only = destination_guard.is_none();
     #[cfg(not(windows))]
-    let create_only = match fs::symlink_metadata(path) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
-        Err(error) => return Err(error.into()),
-        Ok(_) => false,
+    let create_only = if expected.is_some_and(|prior| prior.identity.is_none()) {
+        true
+    } else {
+        match fs::symlink_metadata(path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+            Err(error) => return Err(error.into()),
+            Ok(_) => false,
+        }
     };
     let parent = path
         .parent()

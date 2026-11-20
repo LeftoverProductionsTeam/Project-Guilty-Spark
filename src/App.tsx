@@ -1653,6 +1653,7 @@ export default function App() {
                 Find tools <kbd>Ctrl K</kbd>
               </button>
               <button onClick={() => setHelp(true)} aria-keyshortcuts="F1"><CircleHelp size={16}/><span>Help & shortcuts</span></button>
+              <button onClick={() => setWorkspace('community')}>About Project Guilty Spark</button>
             </div>
             </details>
             <div id="gs-window-actions" className="gs-window-actions" />

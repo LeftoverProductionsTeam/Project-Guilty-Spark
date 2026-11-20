@@ -106,6 +106,27 @@ pub fn export_map_copy(
     Ok(result)
 }
 
+/// Append a credit record beside the verified export. A changed attribution
+/// gets its own file and cannot replace earlier credits or the map.
+pub fn write_map_export_credits(export: &MapExport, text: &str) -> Result<PathBuf> {
+    if text.len() > 4 * 1024 * 1024 {
+        return invalid("Map export attribution exceeds its supported size");
+    }
+    let hash = crate::hex_bytes(Sha256::digest(text.as_bytes()));
+    let name = format!("CREDITS-{}.txt", &hash[..16]);
+    let directory = export.output.parent()
+        .ok_or_else(|| SparkError::Invalid("Map export has no folder".into()))?;
+    let path = directory.join(name);
+    let prior = project::FileRevision::capture(&path)?;
+    if prior.sha256.is_none() {
+        project::atomic_write_checked(&path, text.as_bytes(), false, Some(&prior))?;
+    }
+    if project::FileRevision::capture(&path)?.sha256.as_deref() != Some(hash.as_str()) {
+        return invalid("An existing credit record differs; it was preserved");
+    }
+    Ok(path)
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Toolchain {

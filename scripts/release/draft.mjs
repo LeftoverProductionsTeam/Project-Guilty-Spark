@@ -163,6 +163,7 @@ export async function createDraft(set, api, { runId, linuxStatus = 'not requeste
     'Download the Windows x64 `_Setup.exe` installer or `_Portable.zip`. The portable app requires Microsoft Edge WebView2 Runtime. This preview is unsigned.',
     'Automated regression gates, a real extracted portable launch, NSIS installation/payload verification and an installed-app launch passed. Check the platform manifest and SHA-256 file for exact identities.',
     'No Halo maps, original game resources, SDKs, optional Steam bridge or credentials are included. Connect your owned Halo and matching tools separately.',
+    ...(m.creditHashes ? [`[Community contributors](https://github.com/${repository}/blob/${m.sourceCommit}/CONTRIBUTORS.md) and [third-party notices](https://github.com/${repository}/blob/${m.sourceCommit}/THIRD_PARTY_NOTICES.md) are included with the distribution.`] : []),
     '',
     linux
       ? `Linux: AppImage and Debian package both compiled and launched under Xvfb/WebKitGTK. ${linux.compatibility}`

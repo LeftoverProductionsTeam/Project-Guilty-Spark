@@ -21,6 +21,25 @@ fn repeated_export_verifies_one_independent_native_copy_and_refuses_tampering(){
     assert_eq!(maps::hash_file(build.output.as_ref().unwrap()).unwrap(),build.sha256.unwrap());
 }
 #[test]
+fn credit_export_reuses_exact_content_and_preserves_changed_files() {
+    let root = tempfile::tempdir().unwrap();
+    let (store, id, build, base) = fixture(root.path());
+    let export = build::export_map_copy(&store, &id, &build, RuntimeId::MccSteam, &base).unwrap();
+    let original = "Creator: first author\n";
+    let revised = "Creator: first author and contributor\n";
+    let credits = build::write_map_export_credits(&export, original).unwrap();
+    assert_eq!(build::write_map_export_credits(&export, original).unwrap(), credits);
+    let updated = build::write_map_export_credits(&export, revised).unwrap();
+    assert_ne!(credits, updated);
+    assert_eq!(fs::read_to_string(&credits).unwrap(), original);
+    assert_eq!(fs::read_to_string(updated).unwrap(), revised);
+    fs::write(&credits, "External edit").unwrap();
+    assert!(build::write_map_export_credits(&export, original).is_err());
+    assert_eq!(fs::read_to_string(credits).unwrap(), "External edit");
+    assert_eq!(maps::hash_file(&export.output).unwrap(), export.sha256);
+    assert!(build::export_map_copy(&store, &id, &build, RuntimeId::MccSteam, &base).unwrap().reused);
+}
+#[test]
 fn unsupported_target_changed_source_foreign_export_and_budget_refuse_allocation(){
     let root=tempfile::tempdir().unwrap();let(store,id,mut build,base)=fixture(root.path());
     assert!(build::export_map_copy(&store,&id,&build,RuntimeId::HaloCustomEdition,&base).is_err());assert_eq!(fs::read_dir(&base).unwrap().count(),0);

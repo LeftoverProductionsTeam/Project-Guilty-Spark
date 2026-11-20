@@ -292,7 +292,11 @@ def stage(repo, commit, preview, platform, output, build_root=None):
         need(pe_machine(setup_bytes) in {0x14c, 0x8664} and b"NullsoftInst" in setup_bytes[:1024**2],
              "Not a genuine NSIS installer")
         attach(setup, prefix + "_Setup.exe", "nsis-installer")
+        contributors = (repo / "CONTRIBUTORS.md").read_bytes()
+        community_credits = (repo / "COMMUNITY_CREDITS.md").read_bytes()
+        credit_hashes = {"CONTRIBUTORS.md": sha(contributors), "COMMUNITY_CREDITS.md": sha(community_credits)}
         build_info = {**info, "platform": platform, "executableSha256": sha(app),
+                      "creditHashes": credit_hashes,
                       "requires": ["Windows 10/11 x64", "Microsoft Edge WebView2 Runtime"],
                       "bundledHaloContent": False}
         readme = (f"Project Guilty Spark {info['applicationVersion']} preview\n"
@@ -301,11 +305,13 @@ def stage(repo, commit, preview, platform, output, build_root=None):
                   "https://developer.microsoft.com/microsoft-edge/webview2/\n\n"
                   "Connect your own Halo installations and matching tools in Settings. No Halo game,\n"
                   "map, SDK, Steamworks SDK or optional Steam bridge is bundled.\n"
+                  "See CONTRIBUTORS.md, COMMUNITY_CREDITS.md and THIRD_PARTY_NOTICES.md for attribution.\n"
                   "See https://github.com/" + REPOSITORY + "/releases for notes and checksums.\n"
                   "Unsigned preview: Windows may show an unknown-publisher warning.\n")
         with zipfile.ZipFile(output / (prefix + "_Portable.zip"), "x", zipfile.ZIP_DEFLATED) as archive:
             for name, data in [("GuiltySpark.exe", app), ("LICENSE", (repo / "LICENSE").read_bytes()),
                                ("THIRD_PARTY_NOTICES.md", (repo / "THIRD_PARTY_NOTICES.md").read_bytes()),
+                               ("CONTRIBUTORS.md", contributors), ("COMMUNITY_CREDITS.md", community_credits),
                                ("README.txt", readme.encode()),
                                ("BUILD_INFO.json", (json.dumps(build_info, indent=2) + "\n").encode())]:
                 archive.writestr(name, data)
@@ -342,6 +348,7 @@ def stage(repo, commit, preview, platform, output, build_root=None):
                              "runAttempt": os.getenv("GITHUB_RUN_ATTEMPT")}}
     if platform == "windows-x64":
         manifest["installedExecutableSha256"] = sha(nsis_payload(app))
+        manifest["creditHashes"] = credit_hashes
     else:
         manifest["debianExecutableSha256"] = sha(bundle_payload(app, b"DEB"))
         manifest["appImageExecutableSha256"] = sha(bundle_payload(app, b"APP"))
@@ -369,8 +376,16 @@ def verify_artifacts(directory, manifest):
              f"Release bytes/checksum mismatch: {name}")
         if item["kind"] == "portable-zip":
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                need(set(archive.namelist()) == {"GuiltySpark.exe", "LICENSE", "THIRD_PARTY_NOTICES.md", "README.txt", "BUILD_INFO.json"}
-                     and len(archive.infolist()) == 5 and archive.testzip() is None, "Portable contents differ")
+                expected = {"GuiltySpark.exe", "LICENSE", "THIRD_PARTY_NOTICES.md", "README.txt", "BUILD_INFO.json"}
+                credits = manifest.get("creditHashes")
+                if credits is not None:
+                    need(set(credits) == {"CONTRIBUTORS.md", "COMMUNITY_CREDITS.md"}, "Portable credit index differs")
+                    expected.update(credits)
+                need(set(archive.namelist()) == expected and len(archive.infolist()) == len(expected)
+                     and archive.testzip() is None, "Portable contents differ")
+                if credits is not None:
+                    need(all(sha(archive.read(name)) == digest for name, digest in credits.items()),
+                         "Portable attribution files differ")
                 app = archive.read("GuiltySpark.exe")
                 need(pe_machine(app) == 0x8664 and sha(app) == manifest["executableSha256"], "Portable app differs")
                 need(sha(nsis_payload(app)) == manifest["installedExecutableSha256"],
@@ -378,7 +393,8 @@ def verify_artifacts(directory, manifest):
                 build = json.loads(archive.read("BUILD_INFO.json"))
                 need(build["sourceCommit"] == manifest["sourceCommit"] and
                      build["applicationVersion"] == manifest["applicationVersion"] and
-                     build["executableSha256"] == sha(app), "Portable build identity differs")
+                     build["executableSha256"] == sha(app) and build.get("creditHashes") == credits,
+                     "Portable build identity differs")
         elif item["kind"] == "nsis-installer":
             need(pe_machine(data) in {0x14c, 0x8664} and b"NullsoftInst" in data[:1024**2], "Invalid NSIS asset")
         elif item["kind"] == "appimage":

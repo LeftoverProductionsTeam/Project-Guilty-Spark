@@ -43,6 +43,8 @@ class PackageAcceptance(unittest.TestCase):
                                      ['guilty-spark', 'spark-core', 'spark-steam-bridge']),
             'LICENSE': 'Synthetic packaging test license',
             'THIRD_PARTY_NOTICES.md': 'Synthetic packaging test notices',
+            'CONTRIBUTORS.md': 'Synthetic contributor record',
+            'COMMUNITY_CREDITS.md': 'Synthetic historical credits',
             'src/app.txt': 'Original source stays available',
         }.items():
             destination = self.repo / file
@@ -85,6 +87,10 @@ class PackageAcceptance(unittest.TestCase):
     def test_staging_is_not_acceptance_and_portable_keeps_exact_app(self):
         manifest = self.stage()
         self.assertFalse(manifest['verification']['complete'])
+        self.assertEqual(
+            manifest['creditHashes']['CONTRIBUTORS.md'],
+            package.sha((self.repo / 'CONTRIBUTORS.md').read_bytes()),
+        )
         self.assertEqual(manifest['executableSha256'], package.sha(self.binary.read_bytes()))
         package.verify_artifacts(self.output, manifest)
         with self.assertRaises(ValueError):
