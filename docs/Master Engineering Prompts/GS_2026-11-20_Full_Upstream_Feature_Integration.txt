@@ -1,0 +1,175 @@
+# PROJECT GUILTY SPARK + FORERUNNER
+## FULL UPSTREAM FEATURE INTEGRATION DIRECTIVE
+### All the tools, and then some.
+
+**MISSION: Integrate the best compatible innovations across the Halo 1 ecosystem, extend them, and make the improvements available for upstream contribution.**
+
+This is an implementation directive, not another research exercise.
+
+Use the existing Spark and Forerunner repositories, master ledgers, integration contracts and prior acceptance evidence. Preserve working systems. Do not rebuild already functioning capabilities.
+
+## 1. Merge the Forge ecosystems
+
+**Sources:**
+- ChupathingyCE/chupathingyce — Milenko's Forge
+- SutlabSol/OpenCE-Forge — Mota's Forge
+- Watanoge/halo-content-evolved — Forge/Firefight
+- Existing Spark QuickForge, BSP Workshop, SparkLink
+- Existing Forerunner native Forge
+
+Implement:
+
+- Shared object placement, manipulation, scaling, rotation, snapping, welding, physics and Undo/Redo.
+- Multiplayer Forge with server-authoritative edits, ownership, synchronization, late joining and recovery.
+- Import/export of Chupathingy's validated `.hmv` layouts and OpenCE-Forge's existing `.txt` sidecars without discarding unsupported fields.
+- Cross-map tag browsing, 3D previews, dependency resolution and RAM-based tag streaming.
+- Custom player spawns, vehicles, teleporters, AI, objectives, lights and gameplay properties.
+- Live Spark-to-Forerunner editing, inspection and synchronized preview.
+- Source-backed conversion into editable maps when the necessary source assets and runtime are available.
+
+**Do not invent another incompatible Forge file format or replace Spark's advanced geometry editor with a simpler layout editor.**
+
+## 2. Integrate advanced gameplay features
+
+**Halo Content Evolved is a priority source.**
+
+Integrate compatible implementations of:
+
+- Multiplayer and cooperative Firefight.
+- Configurable AI waves and generator defense.
+- Campaign AI spawning inside multiplayer maps.
+- Custom weapon, enemy and equipment profiles.
+- Dropship flight paths, insertions and extractions.
+- Randomizers, optional skulls, scoring and medals.
+- Custom gametypes, player customization, ranks and emblems where suitable.
+
+Build on these for Spark's existing ambitions:
+
+- Zombie Survival and Firefight.
+- Extraction with persistent loot, stash, objectives and evacuation.
+- Black Echo's Silent Cartographer-style UNSC and Covenant introductions.
+- MegaWorld's connected regions.
+- Custom factions, species, encounters and missions.
+
+Reuse existing behavior before implementing extensions.
+
+## 3. Complete playable Elite integration
+
+Reuse proven engine-side player-color systems and investigate DarkZealot's Elite MP Tags 2.0.
+
+Implement:
+
+- Playable Covenant Elites with selected armor colors.
+- Faction-dependent spawning and character selection.
+- Appropriate weapons, vehicles, animations and HUD.
+- Correct multiplayer color and character replication.
+- Persistent selections after death, reconnect and mission transitions.
+- Modder-defined playable species, character models and factions.
+
+Spark must expose these through visual character, faction, spawning and mission editors.
+
+**Do not redistribute historical Halo tag assets until their permissions are verified.**
+
+## 4. Integrate FractumSeraph's innovations
+
+Source: FractumSeraph/OpenCE
+
+Evaluate and implement compatible:
+
+- Multiplayer replay recording and playback.
+- Free-camera spectating and machinima.
+- Timeline inspection, frame stepping and kill heatmaps.
+- Host-authoritative anticheat and diagnostic recordings.
+- Approved, integrity-checked community map distribution.
+- Cross-version multiplayer adapters with explicit capability negotiation.
+
+Spark should expose replay inspection, camera controls, scene capture, diagnostics and export.
+
+Preserve privacy and security. Never weaken client verification or claim cross-version compatibility without native testing.
+
+## 5. Advance OpenH1 and VR
+
+Reuse relevant OpenH1 and existing Forerunner OpenXR work.
+
+Deliver:
+
+- Stereo VR gameplay with accurate input and rendering.
+- Physical weapon handling, manual reloading and holsters where supported.
+- In-VR object placement, manipulation and live editing.
+- Interactive lighting, materials and environmental controls.
+- VR camera paths, cinematics and machinima authoring.
+
+Spark must support creating and editing VR experiences, not merely launching them.
+
+## 6. Shared architecture and upstream contributions
+
+**Forerunner owns runtime execution. Spark owns authoring and user workflows.**
+
+Use versioned capability discovery, explicit runtime targets and stable integration contracts.
+
+- Avoid duplicated engine implementations.
+- Preserve original Halo formats and runtime compatibility.
+- Keep unsupported features available as editable source where practical, with honest export limitations.
+- Implement capabilities behind negotiated compatibility boundaries when necessary.
+- Keep new systems modular and reusable by their original upstream maintainers.
+- Preserve authorship, commit history where practical, notices and licensing.
+- Respect Spark's MIT license, Forerunner's AGPL license and upstream GPL/AGPL obligations. Do not silently incorporate copyleft code into MIT-only distributions.
+- Prepare clean, focused upstream contributions for maintainer review. Do not push or open external PRs without authorization.
+
+No proprietary Halo assets may be bundled without proper permission.
+
+## 7. Preservation and validation
+
+All original game files, maps, ISOs, modding assets and user directories are sacred.
+
+Use staged operations, independent backups, revision checks and explicit approval before touching external source assets.
+
+Validate functionality through:
+
+1. Native builds and focused automated tests.
+2. Actual in-game feature execution.
+3. Two-client multiplayer and late-join tests where relevant.
+4. Save, reload, Undo/Redo, restart and crash recovery.
+5. Verified Spark-to-Forerunner handoffs.
+6. Cross-runtime and backwards-compatibility tests.
+7. Original-file hash verification.
+
+Do not treat a compiling implementation as a completed gameplay feature.
+
+## 8. Execution order
+
+Prioritize work by dependencies:
+
+**First:** Reconcile existing Forge implementations, formats and native placement paths.
+
+**Second:** Complete multiplayer Forge, tag streaming and Spark live-edit integration.
+
+**Third:** Integrate Firefight, campaign AI, faction customization, playable Elites and mission systems.
+
+**Fourth:** Add replays, cross-version compatibility, community map sharing and additional VR interactions.
+
+Continue existing high-priority project work without unnecessary regressions.
+
+For each increment:
+
+- Implement actual functionality.
+- Verify it at the appropriate native acceptance level.
+- Commit locally with meaningful attribution.
+- Update existing integration contracts and ledgers.
+- Identify genuinely incomplete functionality.
+- Proceed to the next dependency-ready increment.
+
+**No endless planning, duplicate frameworks, unverified completion claims or unrelated repository restructuring.**
+
+## FINAL ACCEPTANCE REQUIREMENT
+
+Every integrated feature must have:
+
+**A working engine implementation + a usable Spark authoring workflow + compatibility and safety validation + a documented upstream contribution path.**
+
+The entire project must remain suitable for open-source collaboration.
+
+**We are not competing with Milenko, Mota, bnunu, Watanoge, FractumSeraph or the rest of the community. We are building something together that everyone can benefit from.**
+
+### PROJECT GUILTY SPARK
+**ALL THE TOOLS, AND THEN SOME.**

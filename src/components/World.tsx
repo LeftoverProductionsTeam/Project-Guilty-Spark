@@ -110,6 +110,7 @@ import type { ViewMode } from '../renderView';
 import RightMouseFly from './RightMouseFly';
 import EnvironmentControls from './EnvironmentControls';
 import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
+import ForgeSidecarPanel from './ForgeSidecarPanel';
 import ViewportTags from './ViewportTags';
 import ViewportAssetLibrary from './ViewportAssetLibrary';
 import type {ViewportLibraryControls} from './ViewportAssetLibrary';
@@ -596,6 +597,7 @@ export default function World({
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',project.id);
   const [tagRevision,setTagRevision]=useState(0);
   const revealPanel=useRevealWorkspacePanel();
+  const [forgeLayoutRequest,setForgeLayoutRequest]=useState(0);
   const openObjectTag=(tagId:number,sourceId=project.id)=>{
     const source=sourceId===project.id?inspection:library?.documents.find(document=>document.id===sourceId)?.inspection;
     if(source&&!source.tags.some(tag=>tag.id===tagId))return;
@@ -1346,6 +1348,7 @@ export default function World({
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
+          {inspection&&!cinematic&&<ForgeSidecarPanel key={project.id} project={project} map={inspection} edit={edit} openRequest={forgeLayoutRequest}/>}
           <div className="hierarchy-group">
             <Box size={14} />
             {inspection?.header.name ?? 'Workshop scene'}
@@ -1458,6 +1461,7 @@ export default function World({
       </WorkspacePanel>
       <section className="viewport-shell">
         <div className="viewport-toolbar">
+          {!cinematic&&inspection&&project.source?.sha256===inspection.sha256&&inspection.header.scenarioType===1&&[5,609].includes(inspection.header.version)&&<button type="button" className="small-button" onClick={()=>{revealPanel("objects");setForgeLayoutRequest(value=>value+1);}}>Forge layouts</button>}
           <div className="button-group">
             <IconButton
               label="Translate (W)"

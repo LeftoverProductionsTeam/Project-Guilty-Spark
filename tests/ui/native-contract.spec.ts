@@ -5821,3 +5821,43 @@ for(const missing of [false,true])test('projectile choices distinguish tank shel
  }
  await picker.selectOption('13');await expect(picker).toHaveValue('13');await expect(page.locator('.property-diff')).toContainText('vehicles/scorpion/tank shell');await page.keyboard.press('Control+z');await expect(picker).toHaveValue(missing?'999':'10');await page.keyboard.press('Control+y');await expect(picker).toHaveValue('13');await picker.selectOption('12');await picker.press('Tab');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits)).toEqual([{tagId:1,fieldKey:'projectile',value:12}]);
 });
+
+test('OpenCE Forge layout import preserves unsupported records through Undo, Save and export', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const open=(window as any).__sparkMock.projects.a;
+    open.project.source.cacheVersion=609;
+    open.inspection.header.version=609;
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  const panel=page.locator('.forge-sidecar-panel');
+  await page.getByRole('button',{name:'Forge layouts',exact:true}).click({timeout:6000});
+  await expect(panel.getByLabel('Import Forge layout')).toBeVisible();
+  const source='[OpenCE Forge Map]\r\nBase Map: custom_maps\\test\r\n[ForgeState]\r\n'
+    +'OBJECT|2003132784|0|0|1.0000|2|3|0|0.25|0|-1|weapons\\test\r\nOBJECT_PROPS|0|1|5|3|0|0|0\nSPAWN|0|0|1|0|0|0';
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'test-forge.txt',mimeType:'text/plain',buffer:Buffer.from(source)});
+  await expect(panel).toContainText('test-forge.txt');
+  await expect(panel.getByRole('status')).toContainText('1 editable placements · 2 other records preserved.');
+  await page.keyboard.press('Control+z');
+  await expect(panel.getByLabel('Import Forge layout')).toBeVisible();
+  await page.keyboard.press('Control+y');
+  await expect(panel.getByRole('button',{name:'Export Forge layout copy'})).toBeEnabled();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.text)).toBe(source);
+  await page.locator('.hierarchy').getByRole('button',{name:'test',exact:true}).click();
+  await page.getByRole('button',{name:'Transform',exact:true}).click();
+  const x=page.getByRole('spinbutton',{name:'Position X',exact:true});
+  await x.fill('5');
+  await x.press('Enter');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.scene.find((row:any)=>row.id.startsWith('forge-sidecar:'))?.position)).toEqual([5,2,3]);
+  await page.getByRole('button',{name:'Forge layouts',exact:true}).click();
+  const downloading=page.waitForEvent('download',{timeout:8000}).catch(()=>null);
+  await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
+  const file=await downloading;
+  expect(file,await panel.innerText()).not.toBeNull();
+  expect(file!.suggestedFilename()).toBe('test-forge-spark.txt');
+  const fs=await import('node:fs/promises');
+  expect(await fs.readFile((await file!.path())!,'utf8')).toBe(source.replace('|1.0000|2|3|','|5|2|3|'));
+});

@@ -127,9 +127,20 @@ impl ScenarioScriptDraft {
         Ok(())
     }
 }
+/// Original OpenCE Forge layout text, retained as authoring data.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ForgeSidecar {
+    pub name: String,
+    pub base_sha256: String,
+    pub text: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forge_sidecar: Option<ForgeSidecar>,
     /// Optional Spark authoring preference, never exported as a native tag field.
     /// Absent older projects retain their existing application preference.
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -228,6 +239,7 @@ impl Project {
             firefight: None,
             studio: None,
             scenario_script_draft:None,
+            forge_sidecar:None,
             build_targets:vec![],active_build_target:None,
             world_environment:None,
             native_lighting:None,
@@ -339,6 +351,15 @@ impl Project {
             || self.provenance.permissions.len() > 10000
         {
             return invalid("Provenance text exceeds supported limits");
+        }
+        if let Some(layout) = &self.forge_sidecar {
+            if layout.name.is_empty() || layout.name.len() > 240
+                || layout.name.chars().any(|c| c.is_control() || ['/', '\\', ':'].contains(&c))
+                || layout.text.len() > 1024 * 1024 || layout.text.contains('\0')
+                || !self.source.as_ref().is_some_and(|source| source.sha256 == layout.base_sha256 && matches!(source.cache_version, 5 | 609))
+                || layout.text.trim_start_matches('\u{feff}').split(['\r','\n']).next() != Some("[OpenCE Forge Map]") {
+                return invalid("Forge layout must retain its exact supported base-map identity and bounded source text");
+            }
         }
         let mut ids = std::collections::HashSet::new();
         for object in &self.scene {
@@ -1067,6 +1088,31 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
         return invalid("Removing Halo scenario instances requires rebuilding reflexive arrays; this operation is editor-only until that adapter is implemented");
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod forge_sidecar_project_tests {
+    use super::*;
+    #[test]
+    fn forge_sidecar_survives_project_serialization_and_rejects_changed_base_identity() {
+        let mut project = Project::new("Forge layout");
+        project.source = Some(Source {
+            original_path:"base.map".into(), preserved_path:"preserved/base.map".into(),
+            sha256:"a".repeat(64),cache_version:609,engine:"Halo Custom Edition".into(),
+            scenario_path:"levels/test".into(),archive:None,resource_directory:None,
+            resource_sha256:Default::default(),audio_resources:None,
+        });
+        let text = "\u{feff}[OpenCE Forge Map]\r\nBase Map: custom_maps\\test\n[ForgeState]\rOPAQUE|1";
+        project.forge_sidecar = Some(ForgeSidecar {
+            name:"saved.txt".into(),base_sha256:"a".repeat(64),text:text.into(),
+        });
+        project.validate().unwrap();
+        let mut reopened: Project = serde_json::from_slice(&serde_json::to_vec(&project).unwrap()).unwrap();
+        reopened.validate().unwrap();
+        assert_eq!(reopened.forge_sidecar.as_ref().unwrap().text, text);
+        reopened.source.as_mut().unwrap().sha256 = "b".repeat(64);
+        assert!(reopened.validate().is_err());
+    }
 }
 
 #[cfg(test)]

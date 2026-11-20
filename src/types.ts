@@ -248,6 +248,7 @@ export interface NativeAssetImport {
   fileCount: number;
 }
 export interface Project {
+  forgeSidecar?: import("./forgeSidecar").ForgeSidecar | null;
   /** Spark metadata only: 0 disables automatic backups; absent inherits the saved legacy preference. */
   automaticBackupRetention?: number | null;
   nativeAssetImports?: NativeAssetImport[];

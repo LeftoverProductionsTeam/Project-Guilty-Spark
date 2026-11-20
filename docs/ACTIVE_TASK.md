@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Playable Black Echo Extraction across two authenticated Forerunner players
+Task: Upstream Forge interoperability and Black Echo native acceptance
 Status: implementation incomplete
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Spark’s recovered-scenario start duplication recreated Black Echo CE609 04d9ccd1 byte-for-byte. Four floor-supported starts, existing Elite bindings and terminal geometry are recorded in the runtime evidence.
-Next action: With exact 04d9ccd1, verify two authenticated clients’ Elite appearance, respawn separation, terminal Use, Spirit flight, pickup, extraction, banking, redeployment and reconnect. Review existing air-route compiler warnings against native waypoint and flight behavior.
+Latest verified revision: OpenCE Forge text import, scene transform, Undo/Redo, Save and lossless copy passed focused checks. Black Echo CE609 04d9ccd1 remains the reviewed four-start Elite candidate.
+Next action: Load the exported sidecar in a private reviewed runtime, then integrate Chupathingy’s validated .hmv format. Black Echo still needs two authenticated physical peers and flight acceptance.
 
 ## Acceptance
 
