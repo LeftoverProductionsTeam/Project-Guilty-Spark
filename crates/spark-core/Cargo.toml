@@ -12,7 +12,7 @@ uuid.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
 flate2 = "1"
-zip = { version = "=9.1.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "=9.4.2", default-features = false, features = ["deflate-flate2"] }
 rusqlite = { version = "0.41", features = ["bundled"] }
 manifold-rust = "=0.19.1"
 rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
