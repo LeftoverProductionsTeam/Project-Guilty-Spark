@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Added switch-to-machine wiring in Logic / Events. Browser history and Save passed. Actual Invader source write and a separate CE609 compile confirmed both linked devices share the expected native group. Forerunner host-side move/rotation, Undo/Redo and late-join replication remain verified over loopback.
-Next action: Finish exact Black Echo 04d9ccd1 with two authenticated human players through defense, evacuation, banking and redeployment on both faction routes. While waiting, reproduce the Danger Canyon/Wizard CE609 switch fixture in an isolated runtime and compare control and machine state before and after ordinary interaction. Continue Phased direct collision, advanced physics replication and client-initiated Forge editing.
+Latest verified revision: Native switch interaction lock reviewed, restored and independently verified in CE609. Forerunner confirmed Use targeting for the unlocked fixture and separate native Fixed/Phased collision. Three browser workflows, six focused Rust checks, opt-in native compile and Windows desktop Cargo check passed.
+Next action: Confirm an actual gameplay Use action reaches the native touch-device handler in the isolated CE609 fixture and measure the linked machine transition. If native input is unavailable, advance peer Fixed/Phased replication and client-initiated Forge editing using the existing HMV capability contract. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
 
 ## Acceptance
 

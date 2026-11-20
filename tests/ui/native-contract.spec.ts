@@ -4814,8 +4814,9 @@ test('recovered native switches link to a machine group through source review an
  await mockRecoveredMissionAreas(page,true);
  await page.evaluate(()=>{
   const mock=(window as any).__sparkMock;
-  Object.assign(mock.nativeDevices[0],{powerGroup:-1,positionGroup:-1});
+  Object.assign(mock.nativeDevices[0],{powerGroup:-1,positionGroup:-1,interactionDisabled:true,usableFromBothSides:false});
   mock.nativeDevices.push({...mock.nativeDevices[0],class:'mach',name:'door',tagPath:'devices/door',
+    interactionDisabled:undefined,usableFromBothSides:undefined,
     powerGroup:0,positionGroup:1});
   mock.nativeDeviceGroups=[
     {index:0,name:'Door power',initialValue:1,changeOnce:false,reserved:false},
@@ -4829,12 +4830,18 @@ test('recovered native switches link to a machine group through source review an
  const form=operations.locator('.native-device-placements');
  await form.locator(':scope > summary').click();
  const power=form.getByLabel('Power group',{exact:true}), position=form.getByLabel('Position group',{exact:true});
+ const lock=form.getByLabel('Disable player interaction',{exact:true});
+ const sides=form.getByLabel('Allow use from both sides',{exact:true});
+ await expect(lock).toBeChecked();
+ await expect(sides).toBeDisabled();
+ await lock.uncheck();
+ await sides.check();
  await expect(position.locator('option[value="2"]')).toHaveAttribute('disabled','');
  await power.selectOption('0');
  await position.selectOption('1');
  await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
  const proposal=await page.evaluate(()=>(window as any).__sparkMock.placementPreviews.at(-1));
- expect(proposal.device).toMatchObject({name:'terminal',powerGroup:0,positionGroup:1,position:[1,2,3]});
+ expect(proposal.device).toMatchObject({name:'terminal',powerGroup:0,positionGroup:1,position:[1,2,3],interactionDisabled:false,usableFromBothSides:true});
  const preview=page.getByRole('region',{name:'Native edit preview',exact:true});
  await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].positionGroup)).toBe(1);
@@ -4843,6 +4850,8 @@ test('recovered native switches link to a machine group through source review an
  await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
  await page.keyboard.press('Control+s');
  await expect(position).toHaveValue('1');
+ await expect(lock).not.toBeChecked();
+ await expect(sides).toBeChecked();
  await form.getByRole('combobox',{name:'Native source placement',exact:true}).selectOption('mach:0');
  await expect(position).toHaveValue('1');
 });

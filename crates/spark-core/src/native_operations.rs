@@ -581,8 +581,10 @@ impl Operation {
             let rows = native_device_fields(before)?;
             let (original, _) = rows.iter().find(|(row, _)| row.class == device.class && row.index == device.index)
                 .ok_or_else(|| crate::SparkError::Invalid("Native device index missing".into()))?;
-            if !original.same_identity(device) || (device.usable_from_both_sides.is_some() && original.usable_from_both_sides.is_none()) {
-                return invalid("Native device identity or control-side setting is unavailable");
+            if !original.same_identity(device)
+                || (device.usable_from_both_sides.is_some() && original.usable_from_both_sides.is_none())
+                || (device.interaction_disabled.is_some() && original.interaction_disabled.is_none()) {
+                return invalid("Native device identity or control interaction setting is unavailable");
             }
             let prefix = format!("{}[{}]", device.array(), device.index);
             let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
@@ -594,6 +596,9 @@ impl Operation {
             }
             if let Some(sides) = device.usable_from_both_sides.filter(|sides| Some(*sides) != original.usable_from_both_sides) {
                 args.extend(["-S".into(), format!("{prefix}.control_flags.usable_from_both_sides"), u8::from(sides).to_string()]);
+            }
+            if let Some(disabled) = device.interaction_disabled.filter(|disabled| Some(*disabled) != original.interaction_disabled) {
+                args.extend(["-S".into(), format!("{prefix}.device_flags.not_usable_from_any_side"), u8::from(disabled).to_string()]);
             }
             for (field, value) in changed_device_groups(before, original, device)? {
                 args.extend(["-S".into(), format!("{prefix}.{field}"), value.to_string()]);
@@ -2321,13 +2326,15 @@ pub struct NativeDevicePlacement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usable_from_both_sides: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interaction_disabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub power_group: Option<i16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position_group: Option<i16>,
 }
 impl NativeDevicePlacement {
     fn array(&self)->&str{match self.class.as_str(){"ctrl"=>"controls","vehi"=>"vehicles",_=>"machines"}}
-    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&(self.class=="ctrl"||self.usable_from_both_sides.is_none())
+    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&(self.class=="ctrl"||(self.usable_from_both_sides.is_none()&&self.interaction_disabled.is_none()))
         && [self.power_group, self.position_group].into_iter().flatten().all(|group| self.class != "vehi" && (-1..128).contains(&group))&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
     fn same_identity(&self,b:&Self)->bool{self.class==b.class&&self.index==b.index&&self.name_index==b.name_index&&self.name==b.name&&self.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))}
     fn same_rotation(&self, other: &Self) -> bool {
@@ -2440,7 +2447,7 @@ fn device_group_field(root: &str, key: &str, first_line: usize) -> Result<(Optio
 }
 
 pub fn scenario_device_choices(fields:&str)->Result<Vec<NativeDevicePlacement>>{Ok(native_device_fields(fields)?.into_iter().map(|row|row.0).collect())}
-fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;5])>>{
+fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;6])>>{
     let names=array_listing(fields,"object_names")?;if names.count>512{return invalid("Native object name table exceeds512entries");}let names=array_items(&names,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
     let mut result=vec![];
     for(array,palette,class,extension)in [("machines","machine_palette","mach","device_machine"),("controls","control_palette","ctrl","device_control"),("vehicles","vehicle_palette","vehi","vehicle")]{
@@ -2461,14 +2468,35 @@ fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<
             } else {
                 (None, None)
             };
+            let mut interaction_disabled = None;
+            let mut interaction_line = None;
+            if class == "ctrl" {
+                let flags = root.lines().enumerate().filter_map(|(index, row)| {
+                    let mut columns = row.split_whitespace();
+                    (columns.next() == Some("not_usable_from_any_side")).then_some((index, columns))
+                }).collect::<Vec<_>>();
+                match flags.as_slice() {
+                    [] => (),
+                    [(index, columns)] => {
+                        let mut columns = columns.clone();
+                        interaction_disabled = Some(match (columns.next(), columns.next(), columns.next()) {
+                            (Some("(0)"), Some("bitfield"), None) => false,
+                            (Some("(1)"), Some("bitfield"), None) => true,
+                            _ => return invalid("Invalid native player interaction flag"),
+                        });
+                        interaction_line = Some(line + 1 + index);
+                    }
+                    _ => return invalid("Ambiguous native player interaction flag"),
+                }
+            }
             let ((power_group, power_line), (position_group, position_line)) = if class == "vehi" {
                 ((None, None), (None, None))
             } else {
                 (device_group_field(&root, "power_group", line + 1)?, device_group_field(&root, "position_group", line + 1)?)
             };
-            let row = NativeDevicePlacement { class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides, power_group, position_group };
+            let row = NativeDevicePlacement { class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides, interaction_disabled, power_group, position_group };
             if !row.valid() { return invalid("Native device identity/pose is invalid"); }
-            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line, power_line, position_line]));
+            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line, power_line, position_line, interaction_line]));
             line += item.len();
         }
     }Ok(result)
@@ -2485,10 +2513,11 @@ fn reviewed_device(before:&str,after:&str,desired:&NativeDevicePlacement)->Resul
     if !original.same_identity(desired) || !revised.same_identity(desired)
         || !positions_close(revised.position, desired.position) || !revised.same_rotation(desired)
         || revised.usable_from_both_sides != desired.usable_from_both_sides.or(original.usable_from_both_sides)
+        || revised.interaction_disabled != desired.interaction_disabled.or(original.interaction_disabled)
         || revised.power_group != desired.power_group.or(original.power_group)
         || revised.position_group != desired.position_group.or(original.position_group)
         || lines != new_lines {
-        return invalid("Device readback differs from the reviewed identity, pose, control sides or group bindings");
+        return invalid("Device readback differs from the reviewed identity, pose, control interaction or group bindings");
     }
     let before = before.lines().collect::<Vec<_>>();
     let after = after.lines().collect::<Vec<_>>();
@@ -2510,7 +2539,7 @@ fn verify_devices_cache(expected:&[NativeDevicePlacement],path:&Path,map:&crate:
     let actual=if vehicles{crate::maps::scenario_placement_readback(path,map)?}else{crate::maps::scenario_logic_readback(path,map)?};
     let rows=actual.devices.iter().chain(actual.vehicles.iter().filter(|_|vehicles)).collect::<Vec<_>>();
     if rows.len()!=expected.len(){return invalid("Compiled native placement inventory differs from source");}
-    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, control sides or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
+    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.interaction_disabled.is_some_and(|disabled|Some(disabled)!=b.interaction_disabled)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, control interaction or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
     Ok(())
 }
 
@@ -2647,11 +2676,13 @@ mod device_placement_tests {
         assert_eq!((control.power_group, control.position_group), (Some(-1), Some(-1)));
         control.power_group = Some(0);
         control.position_group = Some(1);
+        let previous_interaction_lock = control.interaction_disabled.expect("Native control interaction flag");
+        control.interaction_disabled = Some(!previous_interaction_lock);
         let operation = Operation::DevicePlacement { device: control, source_sha256: source_sha256.clone() };
         let write = operation.arguments_with_fields(&tags, "scnr", tag, &before).unwrap();
         run("invader-edit", &write.iter().map(String::as_str).collect::<Vec<_>>());
         let after = fields();
-        assert_eq!(reviewed_difference(&before, &after, &operation).unwrap().len(), 2);
+        assert_eq!(reviewed_difference(&before, &after, &operation).unwrap().len(), 3);
         let read = operation.readback_arguments(&tags, "scnr", tag, &before).unwrap().unwrap();
         let readback = run("invader-edit", &read.iter().map(String::as_str).collect::<Vec<_>>());
         operation.verify_readback(&tags, "scnr", tag, &before, &readback).unwrap();
@@ -2660,12 +2691,16 @@ mod device_placement_tests {
             "-o", output.to_str().unwrap(), tag.strip_suffix(".scenario").unwrap()]);
         let cache = crate::maps::inspect_map(&output, Some(original.parent().unwrap())).unwrap();
         assert_eq!(cache.header.version, 609);
-        verify_devices_cache(&scenario_device_choices(&after).unwrap(), &output, &cache).unwrap();
+        let mut devices = scenario_device_choices(&after).unwrap();
+        verify_devices_cache(&devices, &output, &cache).unwrap();
+        devices.iter_mut().find(|device| device.class == "ctrl" && device.index == 1)
+            .unwrap().interaction_disabled = Some(previous_interaction_lock);
+        assert!(verify_devices_cache(&devices, &output, &cache).is_err());
         let mut groups = scenario_device_group_choices(&after).unwrap();
         verify_device_groups_cache(&groups, &output, &cache).unwrap();
         groups[1].change_once = false;
         assert!(verify_device_groups_cache(&groups, &output, &cache).is_err());
-        println!("Native group authoring: original={original_hash} sourceBeforeGroups={unmodified_sha} sourceAfterGroups={source_sha256} revisedSource={revised_source} compiled={} power=0 position=1", hash(&output));
+        println!("Native group authoring: original={original_hash} sourceBeforeGroups={unmodified_sha} sourceAfterGroups={source_sha256} revisedSource={revised_source} compiled={} power=0 position=1 interactionDisabled={}", hash(&output), !previous_interaction_lock);
         std::fs::write(&tag_path, unmodified_source).unwrap();
         assert_eq!(hash(&tag_path), unmodified_sha);
         assert_eq!(hash(&original), original_hash);
@@ -2673,9 +2708,10 @@ mod device_placement_tests {
 
     #[test]
     fn control_sides_use_only_the_selected_native_flag_and_preserve_legacy_pose_edits() {
-        let before = fields().replace("scripts[0] array", "        control_flags bitmask\n            usable_from_both_sides (0) bitfield\nscripts[0] array");
+        let before = fields().replace("scripts[0] array", "            not_usable_from_any_side (1) bitfield\n        control_flags bitmask\n            usable_from_both_sides (0) bitfield\nscripts[0] array");
         let mut device = scenario_device_choices(&before).unwrap().remove(0);
         assert_eq!(device.usable_from_both_sides, Some(false));
+        assert_eq!(device.interaction_disabled, Some(true));
         device.usable_from_both_sides = Some(true);
         let tags = Path::new("tags");
         let op = Operation::DevicePlacement {device:device.clone(),source_sha256:"a".repeat(64)};
@@ -2690,6 +2726,18 @@ mod device_placement_tests {
         assert!(op.arguments_with_fields(tags, "scnr", "level.scenario", &fields()).is_err());
 
         device.usable_from_both_sides = None;
+        device.interaction_disabled = Some(false);
+        let unlock = Operation::DevicePlacement {device:device.clone(),source_sha256:"a".repeat(64)};
+        let args = unlock.arguments_with_fields(tags, "scnr", "level.scenario", &before).unwrap();
+        assert_eq!(&args[2..5], ["-S", "controls[0].device_flags.not_usable_from_any_side", "0"]);
+        let unlocked = before.replace("not_usable_from_any_side (1)", "not_usable_from_any_side (0)");
+        assert_eq!(reviewed_difference(&before, &unlocked, &unlock).unwrap().len(), 1);
+        assert!(reviewed_difference(&before, &unlocked.replace("initially_off (0)", "initially_off (1)"), &unlock).is_err());
+        assert!(reviewed_difference(&before, &unlocked.replace("usable_from_both_sides (0)", "usable_from_both_sides (1)"), &unlock).is_err());
+        unlock.verify_readback(tags, "scnr", "level.scenario", &before, "0\n").unwrap();
+        assert!(unlock.arguments_with_fields(tags, "scnr", "level.scenario", &fields()).is_err());
+
+        device.interaction_disabled = None;
         device.position[0] = 4.;
         let legacy = Operation::DevicePlacement {device,source_sha256:"a".repeat(64)};
         let local_move = before.replace("position (1,2,3)", "position (4,2,3)");

@@ -63,7 +63,7 @@ fn linked_switch_shares_one_native_group_with_its_machine() {
         devices: d.placements.iter().enumerate().map(|(index,p)| ScenarioLogicDevice {
             class: p.tag_class.clone(), index: 0, name_index: index as i16,
             tag_path: p.tag_path.clone(), position: p.position, rotation_radians: [0.;3],
-            power_group: Some(-1), position_group: Some(0), usable_from_both_sides: None,
+            power_group: Some(-1), position_group: Some(0), interaction_disabled:None, usable_from_both_sides: None,
         }).collect(),
         vehicles: vec![],
         volumes: vec![ScenarioLogicVolume {
@@ -389,7 +389,7 @@ fn compiled_extraction_markers_require_exact_names_devices_and_rotated_volumes()
     logic.triggers[0].native_name=Some("extraction_return".into());logic.triggers[0].rotation[2]=std::f32::consts::FRAC_PI_2;
     let expected=ScenarioLogicReadback{groups:vec![],vehicles:vec![],
         names:vec![ScenarioLogicName{name:"extraction_deploy".into(),object_type:8,object_index:0}],
-        devices:vec![ScenarioLogicDevice{power_group:Some(-1),position_group:Some(-1),usable_from_both_sides:Some(false),class:"ctrl".into(),index:0,name_index:0,tag_path:doc.placements[0].tag_path.clone(),position:[14.,0.,0.],rotation_radians:[0.;3]}],
+        devices:vec![ScenarioLogicDevice{power_group:Some(-1),position_group:Some(-1),interaction_disabled:None, usable_from_both_sides:Some(false),class:"ctrl".into(),index:0,name_index:0,tag_path:doc.placements[0].tag_path.clone(),position:[14.,0.,0.],rotation_radians:[0.;3]}],
         volumes:vec![ScenarioLogicVolume{name:"extraction_return".into(),kind:1,geometry:Some(ScenarioLogicVolumeGeometry{forward:[0.,1.,0.],up:[0.,0.,1.],corner:[13.,-1.5,0.],dimensions:[3.,4.,3.]})}],
     };
     l::verify_marker_readback(&doc,&expected).unwrap();
@@ -452,8 +452,8 @@ fn solo_vehicle_names_share_native_names_and_keep_exact_pose_and_reverse_links()
     assert!(names[1].args.windows(3).any(|a|a==["-S","vehicles[1].name","1"]));assert!(names[1].args.iter().any(|a|a=="extraction_pelican"));
     let device=&doc.placements[0];let trigger=&doc.logic.as_ref().unwrap().triggers[0];
     let read=ScenarioLogicReadback{groups:vec![],names:vec![ScenarioLogicName{name:l::native_name("obj",&device.id),object_type:7,object_index:0},ScenarioLogicName{name:"extraction_pelican".into(),object_type:1,object_index:1}],
-      devices:vec![ScenarioLogicDevice{power_group:Some(-1),position_group:Some(-1),usable_from_both_sides:None,class:"mach".into(),index:0,name_index:0,tag_path:device.tag_path.clone(),position:device.position,rotation_radians:[0.;3]}],
-      vehicles:vec![ScenarioLogicDevice{power_group:None,position_group:None,usable_from_both_sides:None,class:"vehi".into(),index:1,name_index:1,tag_path:ship.tag_path.clone(),position:ship.position,rotation_radians:[std::f32::consts::FRAC_PI_2,0.,0.]}],
+      devices:vec![ScenarioLogicDevice{power_group:Some(-1),position_group:Some(-1),interaction_disabled:None, usable_from_both_sides:None,class:"mach".into(),index:0,name_index:0,tag_path:device.tag_path.clone(),position:device.position,rotation_radians:[0.;3]}],
+      vehicles:vec![ScenarioLogicDevice{power_group:None,position_group:None,interaction_disabled:None, usable_from_both_sides:None,class:"vehi".into(),index:1,name_index:1,tag_path:ship.tag_path.clone(),position:ship.position,rotation_radians:[std::f32::consts::FRAC_PI_2,0.,0.]}],
       volumes:vec![ScenarioLogicVolume{name:l::native_name("tv",&trigger.id),kind:1,geometry:Some(ScenarioLogicVolumeGeometry{forward:[1.,0.,0.],up:[0.,0.,1.],corner:[9.5,-2.,0.],dimensions:[3.,4.,3.]})}]};
     l::verify_marker_readback(&doc,&read).unwrap();
     for fault in 0..7{let mut wrong=read.clone();match fault{0=>wrong.names[1].name="other".into(),1=>wrong.names[1].object_type=0,2=>wrong.names[1].object_index=0,3=>wrong.vehicles[0].name_index=0,4=>wrong.vehicles[0].tag_path="vehicles/warthog/warthog".into(),5=>wrong.vehicles[0].position[0]+=1.,_=>wrong.vehicles[0].rotation_radians[0]=0.};assert!(l::verify_marker_readback(&doc,&wrong).is_err(),"fault {fault}");}
