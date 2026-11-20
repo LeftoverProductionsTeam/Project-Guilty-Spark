@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exportForgeSidecar, importForgeSidecar, removeForgeSidecar } from './forgeSidecar';
+import { exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import type { MapInspection, Project } from './types';
 
@@ -68,9 +68,34 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(importForgeSidecar(project, map, 'copy.hmv', output).project.scene[0].position).toEqual([-7.5, 2, 3]);
   });
 
+  it('exports Forerunner base placements for the matching CE scenario without discarding unsupported records', () => {
+    const ce = { ...map, scenarioPath: 'levels/test/test', header: { ...map.header, version: 609, scenarioType: 0, name: 'another_header_name' } };
+    const markerLayout = importForgeSidecar(project, ce, 'test.hmv', source).project;
+    expect(() => exportForgeSidecar(markerLayout, ce, 'forerunner')).toThrow('record 1');
+    expect(exportForgeSidecar(markerLayout, ce)).toEqual(source);
+
+    const base = new Uint8Array(source.length - 48);
+    base.set(source.subarray(0, 129));
+    base.set(source.subarray(177), 129);
+    const view = new DataView(base.buffer);
+    view.setUint8(111, 1);
+    view.setUint16(4, 1, true);
+    view.setUint32(8, 0, true);
+    view.setUint16(52, 1, true);
+    view.setUint32(56, base.length - 64, true);
+    view.setUint32(60, crc32(base.subarray(64)), true);
+    const imported = importForgeSidecar(project, ce, 'forerunner.hmv', base).project;
+    expect(inspectForgeSidecar(imported.forgeSidecar!, ce).forerunner).toEqual({
+      mapName: 'test', issue: null, hasScenery: false,
+    });
+    const exported = exportForgeSidecar(imported, ce, 'forerunner');
+    expect(exported).toEqual(base);
+    expect(exportForgeSidecar(imported, map, 'forerunner')).toEqual(base);
+  });
+
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {
     expect(() => importForgeSidecar(project, { ...map, header: { ...map.header, crc32: 1 } }, 'test.hmv', source)).toThrow('checksum must match');
-    expect(() => importForgeSidecar(project, { ...map, header: { ...map.header, version: 609 } }, 'test.hmv', source)).toThrow('Xbox');
+    expect(() => importForgeSidecar(project, { ...map, header: { ...map.header, version: 7 } }, 'test.hmv', source)).toThrow('Xbox');
     expect(() => importForgeSidecar(project, map, 'nul.hmv', source)).toThrow('filename');
     const damaged = new Uint8Array(source);
     const view = new DataView(damaged.buffer);

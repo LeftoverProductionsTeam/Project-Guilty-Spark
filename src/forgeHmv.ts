@@ -7,7 +7,8 @@ export const HMV_LIMIT = 65536;
 export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
 const headerSize = 64;
 const recordSize = 48;
-const groups = ['scen', 'vehi', 'weap', 'eqip', 'bipd', 'mach', 'ctrl', 'lifi', 'actv'];
+const forerunnerGroups = ['scen', 'vehi', 'weap', 'eqip'];
+const groups = [...forerunnerGroups, 'bipd', 'mach', 'ctrl', 'lifi', 'actv'];
 const groupCode = (name: string) => Array.from(name).reduce((code, c) => code * 256 + c.charCodeAt(0), 0);
 const groupNames = new Map(groups.map(group => [groupCode(group), group]));
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -38,9 +39,11 @@ export function readHmv(input: number[], map: MapInspection) {
   const version = u16(4);
   requireLayout(version >= 1 && version <= 7, 'choose a supported version 1–7 .hmv file.');
   const mapName = paddedName(bytes.subarray(12, 44), /^[a-z0-9_]{1,31}$/, true);
-  requireLayout(map.header.version === 5 && map.header.scenarioType === 1
-    && mapName === map.header.name.toLowerCase() && u32(44) === (map.header.crc32 >>> 0),
-  'open the matching Xbox multiplayer base map. The map name and original cache checksum must match.');
+  const xbox = map.header.version === 5 && map.header.scenarioType === 1;
+  const ce = map.header.version === 609 && [0, 1].includes(map.header.scenarioType);
+  const scenarioName = map.scenarioPath?.split(/[\\/]/).at(-1) || map.header.name;
+  requireLayout((xbox || ce) && mapName === scenarioName.toLowerCase() && u32(44) === (map.header.crc32 >>> 0),
+    'open the matching Xbox multiplayer or Halo Custom Edition base map. The scenario name and original cache checksum must match.');
   const packs = u16(48), pathsCount = u16(50), recordsCount = u16(52), metaSize = u16(54);
   requireLayout(packs <= 8 && pathsCount <= 256 && recordsCount <= 256 && metaSize >= 4 && metaSize <= 2048
     && u32(56) === bytes.length - headerSize, 'invalid section sizes or counts.');
@@ -71,6 +74,8 @@ export function readHmv(input: number[], map: MapInspection) {
   const pathList = [...paths.values()];
   const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3 }[] = [];
   const features = new Set<number>();
+  let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
+    : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
   let markers = false, teleporters = 0, goals = 0, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
   const goalLimits = new Map([[0, 2], [2, 16], [3, 32], [8, 16]]);
@@ -84,6 +89,10 @@ export function readHmv(input: number[], map: MapInspection) {
     const invalid = 'invalid placement record ' + (index + 1) + '.';
     requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
     markers ||= kind !== 0;
+    if (!forerunnerIssue && (kind !== 0 || !ref || !forerunnerGroups.includes(ref.group)
+        || respawn || count !== 1 || modes || variant || flags !== 1 || aiTeam)) {
+      forerunnerIssue = `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
+    }
 
     if (kind === 5 || kind === 7 || kind === 8) {
       requireLayout(pathIndex === 0xffff && team >= 0 && !respawn && !count && !modes && !flags
@@ -142,6 +151,8 @@ export function readHmv(input: number[], map: MapInspection) {
   return {
     objectRecords,
     recordsCount,
+    mapName,
+    forerunnerIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
       const values = [...position, rotation[0], -rotation[1], rotation[2]];
       requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');

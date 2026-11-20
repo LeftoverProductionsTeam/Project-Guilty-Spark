@@ -1461,7 +1461,7 @@ export default function World({
       </WorkspacePanel>
       <section className="viewport-shell">
         <div className="viewport-toolbar">
-          {!cinematic&&inspection&&project.source?.sha256===inspection.sha256&&inspection.header.scenarioType===1&&[5,609].includes(inspection.header.version)&&<button type="button" className="small-button" onClick={()=>{revealPanel("objects");setForgeLayoutRequest(value=>value+1);}}>Forge layouts</button>}
+          {!cinematic&&inspection&&project.source?.sha256===inspection.sha256&&(inspection.header.version===5&&inspection.header.scenarioType===1||inspection.header.version===609&&[0,1].includes(inspection.header.scenarioType))&&<button type="button" className="small-button" onClick={()=>{revealPanel("objects");setForgeLayoutRequest(value=>value+1);}}>Forge layouts</button>}
           <div className="button-group">
             <IconButton
               label="Translate (W)"

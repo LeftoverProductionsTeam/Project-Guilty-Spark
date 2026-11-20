@@ -363,7 +363,7 @@ impl Project {
                     && text.len() <= 1024 * 1024
                     && !text.contains('\0')
                     && text.trim_start_matches('\u{feff}').split(['\r', '\n']).next() == Some("[OpenCE Forge Map]"),
-                (None, Some(bytes), Some(source)) => source.cache_version == 5
+                (None, Some(bytes), Some(source)) => matches!(source.cache_version, 5 | 609)
                     && layout.name.strip_suffix(".hmv").is_some_and(|stem| {
                         (1..=28).contains(&stem.len()) && stem.bytes().all(|b| {
                             b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_')
@@ -1156,7 +1156,7 @@ mod forge_sidecar_project_tests {
         reopened.forge_sidecar.as_mut().unwrap().text = Some("[OpenCE Forge Map]".into());
         assert!(reopened.validate().is_err());
         reopened.forge_sidecar.as_mut().unwrap().text = None;
-        reopened.source.as_mut().unwrap().cache_version = 609;
+        reopened.source.as_mut().unwrap().cache_version = 7;
         assert!(reopened.validate().is_err());
     }
 }

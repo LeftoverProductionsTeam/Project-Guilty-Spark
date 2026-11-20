@@ -2,9 +2,9 @@
 
 Task: Upstream Forge interoperability and Black Echo native acceptance
 Status: implementation incomplete
-Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Forge HMV upstream decode and faction first-person arms source/Windows compile and browser review checks passed. Original Black Echo CE609 04d9ccd1 remains the reviewed four-start candidate.
-Next action: Import the authorized compatible Elite hands model and scenery carrier, apply through Forerunner faction player bodies, rebuild the exact namespaced binding, and verify both factions with two authenticated players. Live Forge loading also needs a Forge-capable Chupathingy build.
+Starting revision: 8fc1914930e3d8787b906df5aac2a3a943fe5db4, canonical master.
+Latest verified revision: Spark exported a Forerunner-compatible HMV and preserved the lossless Chupathingy export. Focused UI, persistence and build checks passed. CMT Elite hands compiled, read back and rendered with the plasma pistol in an isolated Forerunner run.
+Next action: Load the Spark-exported placement on the exact Blood Gulch map in native Forerunner Forge and in a Forge-capable Chupathingy build. Then play exact Elite/four-start CE609 04d9ccd1 with two authenticated players. Verify physical terminals, aircraft, extraction, banking, reconnect and redeployment. Preserve the shared hands fallback pending redistribution permission.
 
 ## Acceptance
 
@@ -115,11 +115,13 @@ Older detailed source/check summaries were consolidated here to keep the existin
 
 ## Failures and blockers
 
+The exact 04d9ccd1 candidate loaded in Forerunner. Fixed-aim diagnostic input changed aim but did not reach a terminal. Two-client physical gameplay, fallbacks and persistence remain open. The isolated CMT art fixture established local rendering with the stock plasma pistol. Spark HMV exact-map gameplay remains open in both runtimes. See RUNTIME_INTEGRATION_20261107 for source references and artifact hashes.
+
 17Nov current candidate dee2d9a7 compiled and passed independent Invader checks with the compatible Spirit pilot, revised touchdown pose/return route, Pelican seat and both Marine flags. Prior entries below are historical. Runtime startup in the private profile did not confirm a map load. Full physics/AI and two-player mission acceptance stay open. Exact native identities in RUNTIME_INTEGRATION_20261107.
 
-Latest Forerunner gameplay evidence remains7ec2: Spirit up.k .918 needs>=.95 and old Grunt lacks c_dropship driver. New retained fdc6 candidate independently verifies both be_marines migration flags1 and13P-riderLM/0LF script references, preserving13scripts/17globals; it has not been launched. Compatible pilot import Preview/Accept/Restore passes after complete scenario-review repair, but the appended group remains recipe-owned and its exact-variant upgrade policy must be authored/reconciled before adoption. Retained source/pilot-unverified.scenario is a draft, not a compiled/gameplay fix. Actual pathfinding, seats, landing and complete mission acceptance remain OPEN.
+Historical Forerunner gameplay evidence for 7ec2: Spirit up.k .918 needs>=.95 and old Grunt lacks c_dropship driver. New retained fdc6 candidate independently verifies both be_marines migration flags1 and13P-riderLM/0LF script references, preserving13scripts/17globals; it has not been launched. Compatible pilot import Preview/Accept/Restore passes after complete scenario-review repair, but the appended group remains recipe-owned and its exact-variant upgrade policy must be authored/reconciled before adoption. Retained source/pilot-unverified.scenario is a draft, not a compiled/gameplay fix. Actual pathfinding, seats, landing and complete mission acceptance remain OPEN.
 
-Current: releases/black-echo-native-crew-20261117 retains partial native candidatefdc6, matching sourceSCNR6d711c28, reviewed HSCd0765076 and explicitly uncompiled pilot draft5e4b41e7. Old7ec2/source71e6 remain protected. No game launched in this slice; five-terminal use, flight/boarding, objectives/audio/combat/extraction/settlement/two clients, reflection and broader37944 remain OPEN. Embedded CDP controls are distinct from physical desktop acceptance.
+Historical: releases/black-echo-native-crew-20261117 retains partial native candidatefdc6, matching sourceSCNR6d711c28, reviewed HSCd0765076 and explicitly uncompiled pilot draft5e4b41e7. Old7ec2/source71e6 remain protected. No game launched in this slice; five-terminal use, flight/boarding, objectives/audio/combat/extraction/settlement/two clients, reflection and broader37944 remain OPEN. Embedded CDP controls are distinct from physical desktop acceptance.
 
 - Campaign native counts/individual poses now pass scoped source/browser/actual Windows history/Save/restart/MCC compilation/independent readback. Actual runtime difficulty mapping, actor spawning/health/damage/tactics, AI navigation, human/all-axis/CE/peer gameplay remain unaccepted. Recipe-owned Firefight overrides still refuse.
 

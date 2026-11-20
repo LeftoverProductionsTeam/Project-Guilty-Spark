@@ -3,6 +3,7 @@ import {workshopExample} from '../../src/bspWorkshop';
 import {exportHaloCeTransport,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations} from '../../src/haloScript';
 import {emptyCreatorStudio,blackEchoMission} from '../../src/creatorStudio';
 import {defaultNativePlayerProfile} from '../../src/firefight';
+import {crc32} from '../../src/sourceZip';
 import {auditPagedSurface,samePagedLayout} from './helpers/compactSurfaces';
 import {chooseTool,openMissionBeats,openDrawer,openViewMenu,openStudioMenu,revealPagedControl} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
@@ -5880,6 +5881,8 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   const source = Buffer.from('SEZSRwQAQAABAAAAdGVzdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAEwCEAAAAsn6lSXBhZXcMd2VhcG9uc1x0ZXN0AAAA/wAAgD8AAABAAABAQAAAAAAAAIA+AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAA//8C/wAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAVGVzdCBGb3JnZQBTcGFyawAAAA==','base64');
   await panel.getByLabel('Import Forge layout').setInputFiles({name:'test-forge.hmv',mimeType:'application/octet-stream',buffer:source});
   await expect(panel.getByRole('status')).toContainText('1 editable placements · 1 other records preserved.');
+  await expect(panel.getByRole('button',{name:'Export for Forerunner'})).toBeDisabled();
+  await expect(panel).toContainText('Forerunner cannot import record 1.');
   await page.keyboard.press('Control+z');
   await expect(panel.getByLabel('Import Forge layout')).toBeVisible();
   await page.keyboard.press('Control+y');
@@ -5904,4 +5907,21 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   expect(output.readFloatLE(85)).toBe(8);
   expect(output.subarray(129)).toEqual(source.subarray(129));
   expect(output.readUInt32LE(60)).not.toBe(source.readUInt32LE(60));
+
+  await panel.getByRole('button',{name:'Remove layout from project'}).click();
+  const supported = Buffer.concat([source.subarray(0,129),source.subarray(177)]);
+  supported.writeUInt8(1,111);
+  supported.writeUInt16LE(1,4);
+  supported.writeUInt32LE(0,8);
+  supported.writeUInt16LE(1,52);
+  supported.writeUInt32LE(supported.length-64,56);
+  supported.writeUInt32LE(crc32(supported.subarray(64)),60);
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'forerunner.hmv',mimeType:'application/octet-stream',buffer:supported});
+  const exportForerunner = panel.getByRole('button',{name:'Export for Forerunner'});
+  await expect(exportForerunner).toBeEnabled();
+  const targetDownload = page.waitForEvent('download');
+  await exportForerunner.click();
+  const target = await targetDownload;
+  expect(target.suggestedFilename()).toBe('import.hmv');
+  expect(await fs.readFile((await target.path())!)).toEqual(supported);
 });

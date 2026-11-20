@@ -78,7 +78,7 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
       },
     });
   }
-  return { rows, retained, finish: () => lines.join('') };
+  return { rows, retained, finish: () => lines.join(''), forerunner: undefined };
 }
 
 interface LayoutPlacement {
@@ -119,12 +119,22 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
       write: (position, rotation) => layout.write(record.index, position, rotation),
     });
   }
-  return { rows, retained: layout.recordsCount - rows.length, finish: layout.finish };
+  return {
+    rows,
+    retained: layout.recordsCount - rows.length,
+    finish: layout.finish,
+    forerunner: {
+      mapName: layout.mapName,
+      issue: layout.forerunnerIssue ?? (rows.length === layout.recordsCount
+        ? null : 'Forerunner needs every placement to use a uniquely identified object from this base map.'),
+      hasScenery: rows.some(row => row.tag.class === 'scen'),
+    },
+  };
 }
 
 export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
-  const {rows,retained}=parse(sidecar,map);
-  return {editable:rows.length,retained};
+  const { rows, retained, forerunner } = parse(sidecar, map);
+  return { editable: rows.length, retained, forerunner };
 }
 
 export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {
@@ -146,10 +156,13 @@ export function importForgeSidecar(project: Project, map: MapInspection, name: s
   return { project:{...project, forgeSidecar, scene:[...project.scene,...objects]}, editable:objects.length, retained };
 }
 
-export function exportForgeSidecar(project: Project, map: MapInspection) {
+export function exportForgeSidecar(project: Project, map: MapInspection, target?: 'forerunner') {
   const sidecar = project.forgeSidecar;
   if (!sidecar || project.source?.sha256 !== map.sha256) throw Error('Open the preserved Forge base map to export this layout.');
-  const { rows, finish } = parse(sidecar, map);
+  const { rows, finish, forerunner } = parse(sidecar, map);
+  if (target === 'forerunner' && (!forerunner || forerunner.issue)) {
+    throw Error(forerunner?.issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
+  }
   for (const row of rows) {
     const object = project.scene.find(candidate => candidate.id === prefix + row.index);
     if (!object || object.sourceModel?.tagId !== row.tag.id || object.sourceModel.sourceSha256 !== map.sha256
