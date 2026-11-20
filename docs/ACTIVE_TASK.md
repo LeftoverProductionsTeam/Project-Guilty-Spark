@@ -2,9 +2,9 @@
 
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
-Starting revision: 7c319194b7f654370028e863301227240665fed8, canonical master.
-Latest verified revision: Spark HMV import/edit/export materialized the moved Warthog in native Forerunner on exact Xbox Blood Gulch. Independent Windows runtime exchange verified one base placement between Chupathingy nightly and Forerunner. Black Echo 04d9ccd1 reached Covenant selection, deployment, Spirit boarding, landing and living field exit in Forerunner’s offline diagnostics.
-Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Continue from the verified offline Spirit insertion to field combat, technology, defense, evacuation, banking, reconnect and redeployment. Verify both factions, distinct Elite colors and respawns. Use the shared fallback pending CMT redistribution permission. Keep direct Spark-to-Chupathingy playback, HMV replication and advanced records open independently.
+Starting revision: aa640c0194593d72aabe6a9feb61fc9e9d0d32a2, canonical master.
+Latest verified revision: Spark authored an HMV directly from a Blood Gulch base-map object and native Forerunner loaded the Warthog. Browser authoring, Undo/Redo, removal, Save and export passed. Exact Black Echo 04d9ccd1 offline diagnostics also reached the Covenant survivor rally and spawned facility opposition.
+Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Verify both faction routes and distinct Elite colors through the field rally, facility combat, technology collection, defense, evacuation, banking, reconnect and redeployment. Use the reviewed fallback pending CMT redistribution permission. Keep direct Chupathingy playback, HMV replication, and advanced placement editing open.
 
 ## Acceptance
 

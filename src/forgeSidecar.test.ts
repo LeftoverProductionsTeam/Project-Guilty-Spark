@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar } from './forgeSidecar';
+import { addHmvPlacement, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement } from './forgeSidecar';
 import { crc32 } from './sourceZip';
+import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
 
 describe('OpenCE Forge base-map placements', () => {
@@ -91,6 +92,45 @@ describe('Chupathingy Forge binary layouts', () => {
     const exported = exportForgeSidecar(imported, ce, 'forerunner');
     expect(exported).toEqual(base);
     expect(exportForgeSidecar(imported, map, 'forerunner')).toEqual(base);
+  });
+
+  it('creates a native HMV from a base-map object and keeps scene IDs stable when placements are removed', () => {
+    const native = {
+      id: 'native-placement', name: 'Test', tagId: 10, kind: 'Weapon',
+      position: [5, 6, 7], rotation: [0, 0.25, 0], scale: [1, 1, 1], visible: true,
+      sourceOffset: 0, rotationOffset: 0, assetId: null,
+    } as Project['scene'][number];
+    const withNative = { ...project, scene: [native] };
+    const created = addHmvPlacement(withNative, map, native);
+    const first = created.project.scene[1];
+    const second = addHmvPlacement(created.project, map, first);
+    second.project.scene[2].position[2] = 9;
+    const reopened = JSON.parse(JSON.stringify(removeHmvPlacement(second.project, map, first))) as Project;
+    expect(reopened.scene.map(row => row.id)).toEqual([native.id, second.selectedId]);
+    expect(reopened.forgeSidecar?.recordKeys).toEqual([second.selectedId.slice('forge-sidecar:'.length)]);
+    const bytes = exportForgeSidecar(reopened, map, 'forerunner') as Uint8Array;
+    const decoded = readHmv(Array.from(bytes), map);
+    expect(decoded.objectRecords).toMatchObject([{ path: 'weapons\\test', position: [7, 6, 9], rotation: [0, 0.25, 0] }]);
+    expect(withNative.scene).toEqual([native]);
+    expect(withNative.forgeSidecar).toBeUndefined();
+    const longName = { ...map, scenarioPath: 'levels/test/' + 'x'.repeat(31) };
+    const longLayout = addHmvPlacement(withNative, longName, native);
+    expect(exportForgeSidecar(longLayout.project, longName, 'forerunner')).toBeInstanceOf(Uint8Array);
+    expect(() => addHmvPlacement(withNative, map, { ...native, scale: [2, 2, 2] })).toThrow('unscaled');
+  });
+
+  it('retains opaque HMV records and preserves current poses across structural changes', () => {
+    const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
+    const first = loaded.scene[0];
+    first.position[0] = 8;
+    const added = addHmvPlacement(loaded, map, first);
+    const removed = removeHmvPlacement(added.project, map, first);
+    const output = exportForgeSidecar(removed, map) as Uint8Array;
+    expect(output.subarray(81, 129)).toEqual(source.subarray(129, 177));
+    expect(output.subarray(177)).toEqual(source.subarray(177));
+    expect(exportForgeSidecar(loaded, map)).not.toEqual(output);
+    expect(readHmv(Array.from(output), map).objectRecords[0].position).toEqual([9, 2, 3]);
+    expect(removed.scene[0].id).toBe(added.selectedId);
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

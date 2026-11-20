@@ -1,10 +1,10 @@
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { HMV_NAME, readHmv } from './forgeHmv';
+import { emptyHmv, HMV_NAME, readHmv } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
-  { text: string; bytes?: never } | { bytes: number[]; text?: never }
+  { text: string; bytes?: never; recordKeys?: never } | { bytes: number[]; text?: never; recordKeys?: string[] }
 );
 
 export const FORGE_SIDECAR_LIMIT = 1024 * 1024;
@@ -83,6 +83,7 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
 
 interface LayoutPlacement {
   index: number;
+  key?: string;
   tag: MapInspection['tags'][number];
   position: Vec3;
   rotation: Vec3;
@@ -109,13 +110,14 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     throw Error('Choose a valid Chupathingy .hmv layout filename.');
   }
   const layout = readHmv(sidecar.bytes, map);
+  const recordKeys = keysForHmv(sidecar, layout.recordsCount);
   const tags = placementTags(map);
   const rows: LayoutPlacement[] = [];
   for (const record of layout.objectRecords) {
     const matches = tags.get(record.group + '|' + pathKey(record.path));
     if (matches?.length !== 1) continue;
     rows.push({
-      index: record.index, tag: matches[0], position: record.position, rotation: record.rotation, scale: 1,
+      index: record.index, key: recordKeys[record.index], tag: matches[0], position: record.position, rotation: record.rotation, scale: 1,
       write: (position, rotation) => layout.write(record.index, position, rotation),
     });
   }
@@ -147,13 +149,85 @@ export function importForgeSidecar(project: Project, map: MapInspection, name: s
     : { name, bytes: Array.from(input), baseSha256: map.sha256 };
   const { rows, retained } = parse(forgeSidecar, map);
   if (project.scene.length + rows.length > 20000) throw Error('This layout exceeds the scene object limit.');
-  const objects: SceneObject[] = rows.map(row => ({
-    id:prefix + row.index, name:row.tag.path.split(/[\\/]/).at(-1) || row.tag.path, kind:'Source model',
+  const objects = rows.map(row => placementObject(project, map, row));
+  return { project:{...project, forgeSidecar, scene:[...project.scene,...objects]}, editable:objects.length, retained };
+}
+
+function placementObject(project: Project, map: MapInspection, row: Omit<LayoutPlacement, 'write'>): SceneObject {
+  return {
+    id:prefix + (row.key ?? row.index), name:row.tag.path.split(/[\\/]/).at(-1) || row.tag.path, kind:'Source model',
     tagId:null, position:row.position, rotation:row.rotation, scale:[row.scale,row.scale,row.scale],
     visible:true, sourceOffset:null, rotationOffset:null, assetId:null,
     sourceModel:{projectId:project.id,sourceSha256:map.sha256,tagId:row.tag.id,path:row.tag.path,class:row.tag.class as PlacementClass},
-  }));
-  return { project:{...project, forgeSidecar, scene:[...project.scene,...objects]}, editable:objects.length, retained };
+  };
+}
+
+function keysForHmv(layout: ForgeSidecar, count: number) {
+  const keys = layout.recordKeys ?? Array.from({ length: count }, (_, index) => String(index));
+  if (keys.length !== count || new Set(keys).size !== count || keys.some(key => !/^[a-z0-9-]{1,36}$/.test(key))) {
+    throw Error('The saved Forge placement identities are invalid.');
+  }
+  return keys;
+}
+
+export function isHmvPlacement(project: Project, object: SceneObject) {
+  return !!project.forgeSidecar?.bytes && object.id.startsWith(prefix);
+}
+
+export function hmvPlacementTag(project: Project, map: MapInspection, object: SceneObject | undefined) {
+  if (!object || project.source?.sha256 !== map.sha256 || object.scale.some(value => !close(value, 1))) return;
+  const source = object.sourceModel;
+  if (source && (source.projectId !== project.id || source.sourceSha256 !== map.sha256)) return;
+  const tag = map.tags.find(tag => tag.id === (source?.tagId ?? object.tagId));
+  if (!tag || tag.external || !classes.includes(tag.class as PlacementClass)
+      || source && (source.class !== tag.class || pathKey(source.path) !== pathKey(tag.path))) return;
+  return tag;
+}
+
+export function addHmvPlacement(project: Project, map: MapInspection, object: SceneObject, offsetX = 1) {
+  const tag = hmvPlacementTag(project, map, object);
+  if (!tag) throw Error('Select an unscaled scenery, vehicle, weapon or equipment object from the current base map.');
+  if (project.forgeSidecar?.text !== undefined) throw Error('Export or remove the OpenCE text layout before creating an HMV.');
+  if (project.scene.length >= 20000) throw Error('This layout exceeds the scene object limit.');
+  const candidates = placementTags(map).get(tag.class + '|' + pathKey(tag.path));
+  if (candidates?.length !== 1) throw Error('This base-map tag path is ambiguous.');
+  const previous = project.forgeSidecar;
+  if (previous && previous.baseSha256 !== map.sha256) throw Error('Open the preserved base map for this Forge layout.');
+  const layout = readHmv(previous?.bytes ?? Array.from(emptyHmv(map)), map);
+  const position: Vec3 = [object.position[0] + offsetX, object.position[1], object.position[2]];
+  const bytes = layout.append(tag.class, pathKey(tag.path).replaceAll('/', '\\'), position, object.rotation);
+  const key = crypto.randomUUID();
+  const placement = placementObject(project, map, { index: layout.recordsCount, key, tag, position, rotation: [...object.rotation], scale: 1 });
+  const recordKeys = previous ? keysForHmv(previous, layout.recordsCount) : [];
+  return {
+    selectedId: placement.id,
+    project: {
+      ...project,
+      forgeSidecar: {
+        name: previous?.name ?? layout.mapName.slice(0, 21) + '-layout.hmv',
+        baseSha256: map.sha256,
+        bytes: Array.from(bytes),
+        recordKeys: [...recordKeys, key],
+      },
+      scene: [...project.scene, placement],
+    } satisfies Project,
+  };
+}
+
+export function removeHmvPlacement(project: Project, map: MapInspection, object: SceneObject) {
+  const previous = project.forgeSidecar;
+  if (!previous?.bytes || project.source?.sha256 !== map.sha256 || previous.baseSha256 !== map.sha256) {
+    throw Error('Open the preserved base map for this Forge layout.');
+  }
+  const layout = readHmv(previous.bytes, map);
+  const keys = keysForHmv(previous, layout.recordsCount);
+  const index = keys.findIndex(key => prefix + key === object.id);
+  const bytes = layout.remove(index);
+  return {
+    ...project,
+    forgeSidecar: { ...previous, bytes: Array.from(bytes), recordKeys: keys.filter((_, record) => record !== index) },
+    scene: project.scene.filter(row => row.id !== object.id),
+  } satisfies Project;
 }
 
 export function exportForgeSidecar(project: Project, map: MapInspection, target?: 'forerunner') {
@@ -164,7 +238,7 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
     throw Error(forerunner?.issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
   }
   for (const row of rows) {
-    const object = project.scene.find(candidate => candidate.id === prefix + row.index);
+    const object = project.scene.find(candidate => candidate.id === prefix + (row.key ?? row.index));
     if (!object || object.sourceModel?.tagId !== row.tag.id || object.sourceModel.sourceSha256 !== map.sha256
         || object.sourceModel.projectId !== project.id || object.sourceModel.class !== row.tag.class
         || pathKey(object.sourceModel.path) !== pathKey(row.tag.path)) {

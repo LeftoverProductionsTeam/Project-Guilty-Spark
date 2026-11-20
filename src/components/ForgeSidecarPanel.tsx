@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { exportForgeSidecar, FORGE_SIDECAR_LIMIT, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME } from '../forgeHmv';
-import type { MapInspection, Project } from '../types';
+import { addHmvPlacement, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, supportsHmvMap } from '../forgeHmv';
+import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { Notice } from './ui';
 
-export default function ForgeSidecarPanel({ project, map, edit, openRequest }: {
+export default function ForgeSidecarPanel({ project, map, edit, selected, onSelect, openRequest }: {
   project: Project;
   map: MapInspection;
   edit: (next: Project, description: string) => void;
+  selected?: SceneObject;
+  onSelect: (id: string) => void;
   openRequest: number;
 }) {
   const current = useRef({project,map});
@@ -27,6 +29,8 @@ export default function ForgeSidecarPanel({ project, map, edit, openRequest }: {
   const compatible = project.source?.sha256 === map.sha256 && !project.quickForge
     && (map.header.version === 5 && map.header.scenarioType === 1
       || map.header.version === 609 && [0, 1].includes(map.header.scenarioType));
+  const canAddHmv = compatible && supportsHmvMap(map) && (!layout || layout.bytes);
+  const selectedTag = canAddHmv && hmvPlacementTag(project, map, selected);
   if (!compatible && !layout) return null;
 
   async function open(file: File) {
@@ -50,12 +54,30 @@ export default function ForgeSidecarPanel({ project, map, edit, openRequest }: {
     }
   }
 
+  function addPlacement() {
+    if (!selected) return;
+    try {
+      ticket.current++;
+      const result = addHmvPlacement(project, map, selected);
+      edit(result.project, layout ? 'Add Forge placement' : 'Create Forge layout');
+      onSelect(result.selectedId);
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
   return <details className="forge-sidecar-panel" open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)}>
     <summary>Forge layout</summary>
+    {canAddHmv && <>
+      <button type="button" disabled={!selectedTag} onClick={addPlacement}>
+        {layout ? 'Add selected object to HMV' : 'Create HMV from selected object'}
+      </button>
+      {!selectedTag && <p className="subtle">Select an unscaled scenery, vehicle, weapon or equipment object from this map.</p>}
+    </>}
+
     {layout ? <>
       <p>{layout.name}</p>
       {summary&&<p role="status">{summary.editable} editable placements · {summary.retained} other records preserved.</p>}
-      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map.</p>
+      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit ordinary placements.'}</p>
       {summary?.forerunner && map.header.version === 5 && <p className="subtle">In Chupathingy builds with Forge, put the copy in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
       <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {

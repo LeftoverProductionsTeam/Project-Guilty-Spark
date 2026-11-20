@@ -5865,6 +5865,57 @@ test('OpenCE Forge layout import preserves unsupported records through Undo, Sav
   expect(await fs.readFile((await file!.path())!,'utf8')).toBe(source.replace('|1.0000|2|3|','|5|2|3|'));
 });
 
+test('Spark creates and authors HMV placements from a selected base-map object', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const open = (window as any).__sparkMock.projects.a;
+    open.project.source.cacheVersion = 5;
+    open.inspection.header.version = 5;
+    open.inspection.header.crc32 = 123456;
+    open.project.scene = [{id:'native-weapon',name:'Base-map weapon',kind:'Weapon',tagId:1,
+      position:[4,2,3],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:8,rotationOffset:20,assetId:null}];
+    open.inspection.objects = structuredClone(open.project.scene);
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  const panel = page.locator('.forge-sidecar-panel');
+  const openLayout = page.getByRole('button',{name:'Forge layouts',exact:true});
+  await openLayout.click({timeout:6000});
+  const create = panel.getByRole('button',{name:'Create HMV from selected object'});
+  await expect(create).toBeDisabled();
+  await page.locator('.hierarchy').getByRole('button',{name:'Base-map weapon',exact:true}).click();
+  await openLayout.click();
+  await expect(create).toBeEnabled();
+  await create.click();
+  await openLayout.click();
+  await expect(panel.getByRole('status')).toContainText('1 editable placements');
+  await panel.getByRole('button',{name:'Add selected object to HMV'}).click();
+  await openLayout.click();
+  await expect(panel.getByRole('status')).toContainText('2 editable placements');
+  await page.keyboard.press('Control+z');
+  await expect(panel.getByRole('status')).toContainText('1 editable placements');
+  await page.keyboard.press('Control+y');
+  await expect(panel.getByRole('status')).toContainText('2 editable placements');
+  await page.locator('.hierarchy').getByRole('button',{name:'test',exact:true}).last().click();
+  await page.getByRole('button',{name:'Transform',exact:true}).click();
+  await expect(page.getByRole('spinbutton',{name:'Scale X',exact:true})).toBeDisabled();
+  await page.locator('.inspector-actions').getByRole('button',{name:'Remove',exact:true}).click();
+  await openLayout.click();
+  await expect(panel.getByRole('status')).toContainText('1 editable placements');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.recordKeys.length)).toBe(1);
+  await expect(page.locator('.hierarchy').getByRole('button',{name:'Base-map weapon',exact:true})).toBeVisible();
+  const downloaded = page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Export for Forerunner'}).click();
+  const file = await downloaded;
+  const fs=await import('node:fs/promises');
+  const output = await fs.readFile((await file.path())!);
+  expect(file.suggestedFilename()).toBe('import.hmv');
+  expect(output.readUInt32LE(44)).toBe(123456);
+  expect(output.readUInt16LE(52)).toBe(1);
+  expect(output.readUInt32LE(60)).toBe(crc32(output.subarray(64)));
+});
+
 test('Chupathingy Forge .hmv uses the shared history, Save and lossless export controls', async ({page}) => {
   await mockDesktop(page);
   await page.evaluate(() => {

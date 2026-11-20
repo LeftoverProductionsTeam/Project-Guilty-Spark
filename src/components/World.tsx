@@ -111,6 +111,7 @@ import RightMouseFly from './RightMouseFly';
 import EnvironmentControls from './EnvironmentControls';
 import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
 import ForgeSidecarPanel from './ForgeSidecarPanel';
+import { addHmvPlacement, isHmvPlacement, removeHmvPlacement } from '../forgeSidecar';
 import ViewportTags from './ViewportTags';
 import ViewportAssetLibrary from './ViewportAssetLibrary';
 import type {ViewportLibraryControls} from './ViewportAssetLibrary';
@@ -686,6 +687,7 @@ export default function World({
   const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
   const ortho=!cinematic&&savedOrtho;
   function setMode(next:'translate'|'rotate'|'scale') {
+    if (next === 'scale' && hmvSelected) { notify('HMV placements use the base map’s object scale.'); return; }
     if(!cinematic&&nativeCommand?.active&&next!=='translate'){notify('Native command route points support XYZ movement only. Review action parameters separately in Native source controls.');return;}
     if(!cinematic&&nativeDevice?.active&&next==='scale'){notify('Native device source supports position/rotation; scale and structural edits need their own source workflow.');return;}
     if(nativeAiStart?.active&&(next==='scale'||next==='rotate'&&!Number.isFinite(nativeAiStart.originalFacingRadians))){notify(nativeAiStart.kind==='firing'?'Native firing positions support XYZ only; rotation and Scale are unavailable.':'Native AI points support position and available Z-facing only. Scale and unavailable heading telemetry cannot be edited.');return;}
@@ -1146,6 +1148,7 @@ export default function World({
   const currentTextureScopeRef=useRef(textureScope);
   currentTextureScopeRef.current=textureScope;
   const chosen = renderProject.scene.find((o) => o.id === selected);
+  const hmvSelected = !!chosen && isHmvPlacement(project, chosen);
   async function reviewObjectPlacement(object:SceneObject){
     if(!native||openingPlacement||!onReviewDevice)return;
     setOpeningPlacement(true);
@@ -1238,13 +1241,26 @@ export default function World({
     if(sourceScope||(!cinematic&&nativeDeviceLatest.current?.active&&o.id===deviceObjectId(nativeDeviceLatest.current.original))){const current=nativeDeviceLatest.current,proof=sourceScope??nativeSourceScope;const next=!asCopy&&proof&&nativeDeviceReady&&!fly&&!cameraLocked&&!externalCameraAuthority?deviceTransform(current,proof,o):null;if(next)setNativeDevice(next);else notify('Native device proposal retained: source/selection changed, handles are locked, or scale/duplicate is unsupported.');return;}
     try {
       validateSceneTransform(o);
+      if (isHmvPlacement(project, o) && o.scale.some(value => Math.fround(value) !== 1)) {
+        throw Error('HMV placements use the base map’s object scale.');
+      }
+      if (asCopy && inspection && isHmvPlacement(project, o)) { duplicateHmv(o, 0); return; }
       if(asCopy){const duplicate=cloneSceneObject(o);edit({...project,scene:[...project.scene,duplicate]},`Duplicate and move ${o.name}`);setSelected(duplicate.id);return;}
       edit({ ...project, scene: project.scene.map((s) => (s.id === o.id ? o : s)) }, `Transform ${o.name}`);
     } catch (error) { notify(`Scene transform was not saved: ${String(error)}`); }
   }
+  function duplicateHmv(object: SceneObject, offsetX: number) {
+    if (!inspection) return;
+    try {
+      const result = addHmvPlacement(project, inspection, object, offsetX);
+      edit(result.project, `Duplicate ${object.name} in Forge layout`);
+      setSelected(result.selectedId);
+    } catch (error) { notify(String(error)); }
+  }
   function duplicate() {
     if(!cinematic&&nativeDevice?.active){notify('Native placement proposals do not duplicate source rows. Hide source handles before ordinary asset authoring.');return;}
     if (!chosen) return;
+    if (inspection && isHmvPlacement(project, chosen)) { duplicateHmv(chosen, 1); return; }
     const o = {
       ...structuredClone(chosen),
       id: crypto.randomUUID(),
@@ -1348,7 +1364,7 @@ export default function World({
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          {inspection&&!cinematic&&<ForgeSidecarPanel key={project.id} project={project} map={inspection} edit={edit} openRequest={forgeLayoutRequest}/>}
+          {inspection&&!cinematic&&<ForgeSidecarPanel key={project.id} project={project} map={inspection} edit={edit} selected={chosen} onSelect={id => { setLocalSelected(id); onSelectObject?.(id); }} openRequest={forgeLayoutRequest}/>}
           <div className="hierarchy-group">
             <Box size={14} />
             {inspection?.header.name ?? 'Workshop scene'}
@@ -1473,7 +1489,7 @@ export default function World({
             <IconButton label="Rotate (E)" active={mode === 'rotate'} disabled={!cinematic&&!!nativeCommand?.active||!!nativeAiStart?.active&&!Number.isFinite(nativeAiStart.originalFacingRadians)} onClick={() => setMode('rotate')}>
               <Rotate3D size={17} />
             </IconButton>
-            <IconButton label="Scale (R)" active={mode === 'scale'} disabled={!!nativeAiStart?.active||!cinematic&&(!!nativeDevice?.active||!!nativeCommand?.active)} onClick={() => setMode('scale')}>
+            <IconButton label="Scale (R)" active={mode === 'scale' && !hmvSelected} disabled={hmvSelected || !!nativeAiStart?.active||!cinematic&&(!!nativeDevice?.active||!!nativeCommand?.active)} onClick={() => setMode('scale')}>
               <Scaling size={17} />
             </IconButton>
           </div>
@@ -1579,7 +1595,7 @@ export default function World({
                     assetMeshes,
                     selected,
                     setSelected,
-                    mode,
+                    mode: hmvSelected && mode === 'scale' ? 'translate' : mode,
                     snap,
                     grid,
                     viewMode,
@@ -1863,7 +1879,9 @@ export default function World({
               {chosen.sourceModel && (
                 <>
                   <p className="subtle">
-                    Native import from a pinned source revision. Save a native copy of source tag edits, replace the affected placements, then build this map.
+                    {hmvSelected
+                      ? 'Forge placement from this base map. Export the HMV to use the placement in Forge.'
+                      : 'Native import from a pinned source revision. Save a native copy of source tag edits, replace the affected placements, then build this map.'}
                   </p>
                   {modelIssues[forgeModelKey(sourcePlacement(chosen)!)] && (
                     <Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>
@@ -1908,7 +1926,7 @@ export default function World({
                             }
                             label={property === 'rotation' ? `Rotation ${['Yaw', 'Pitch', 'Roll'][i]}` : `${property === 'position' ? 'Position' : 'Scale'} ${['X', 'Y', 'Z'][i]}`}
                             disabled={
-                              !!nativeSourceScope&&(property==='scale'||!!nativeDevice?.locked||!nativeDeviceReady) || property === 'rotation' &&
+                              hmvSelected && property === 'scale' || !!nativeSourceScope&&(property==='scale'||!!nativeDevice?.locked||!nativeDeviceReady) || property === 'rotation' &&
                               i > 0 &&
                               ['Player spawn', 'Netgame item'].includes(chosen.kind)
                             }
@@ -1948,6 +1966,13 @@ export default function World({
                 <button
                   onClick={() => {
                     if(nativeSourceScope){notify('Native source row deletion is unavailable in pose preview.');return;}
+                    if (inspection && isHmvPlacement(project, chosen)) {
+                      try {
+                        edit(removeHmvPlacement(project, inspection, chosen), `Remove ${chosen.name} from Forge layout`);
+                        setSelected(null);
+                      } catch (error) { notify(String(error)); }
+                      return;
+                    }
                     edit(
                       { ...project, scene: project.scene.filter((o) => o.id !== chosen.id) },
                       `Remove ${chosen.name} from editor`,

@@ -11,6 +11,7 @@ const forerunnerGroups = ['scen', 'vehi', 'weap', 'eqip'];
 const groups = [...forerunnerGroups, 'bipd', 'mach', 'ctrl', 'lifi', 'actv'];
 const groupCode = (name: string) => Array.from(name).reduce((code, c) => code * 256 + c.charCodeAt(0), 0);
 const groupNames = new Map(groups.map(group => [groupCode(group), group]));
+const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const ascii = (bytes: Uint8Array) => String.fromCharCode(...bytes);
 const transformsValid = (values: number[]) => values.length === 6 && values.every((value, index) =>
@@ -18,6 +19,48 @@ const transformsValid = (values: number[]) => values.length === 6 && values.ever
 
 function requireLayout(condition: unknown, reason: string): asserts condition {
   if (!condition) throw Error('Chupathingy Forge layout: ' + reason);
+}
+
+function hmvPathValid(path: string) {
+  return path.length >= 1 && path.length <= 127 && /^[a-z0-9_ .\\-]+$/.test(path)
+    && !path.includes('..') && path.split('\\').every(part => part.length);
+}
+
+export function supportsHmvMap(map: MapInspection) {
+  return (map.header.version === 5 && map.header.scenarioType === 1
+      || map.header.version === 609 && [0, 1].includes(map.header.scenarioType))
+    && /^[a-z0-9_]{1,31}$/.test(scenarioShortName(map));
+}
+
+function scenarioShortName(map: MapInspection) {
+  return (map.scenarioPath?.split(/[\\/]/).at(-1) || map.header.name).toLowerCase();
+}
+
+function writeChecksum(bytes: Uint8Array, view: DataView) {
+  view.setUint32(56, bytes.length - headerSize, true);
+  view.setUint32(60, crc32(bytes.subarray(headerSize)), true);
+}
+
+function writePose(view: DataView, offset: number, position: Vec3, rotation: Vec3) {
+  const values = [...position, rotation[0], -rotation[1], rotation[2]];
+  requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');
+  values.forEach((value, index) => view.setFloat32(offset + index * 4, value, true));
+}
+
+export function emptyHmv(map: MapInspection) {
+  requireLayout(supportsHmvMap(map), 'choose a supported base map with a valid scenario name.');
+  const meta = encoder.encode('Spark Forge layout\0\0\0\0');
+  const bytes = new Uint8Array(headerSize + meta.length);
+  const view = new DataView(bytes.buffer);
+  bytes.set(encoder.encode('HFRG'));
+  view.setUint16(4, 1, true);
+  view.setUint16(6, headerSize, true);
+  bytes.set(encoder.encode(scenarioShortName(map)), 12);
+  view.setUint32(44, map.header.crc32, true);
+  view.setUint16(54, meta.length, true);
+  bytes.set(meta, headerSize);
+  writeChecksum(bytes, view);
+  return bytes;
 }
 
 function paddedName(bytes: Uint8Array, pattern: RegExp, requiresZero = false) {
@@ -39,10 +82,7 @@ export function readHmv(input: number[], map: MapInspection) {
   const version = u16(4);
   requireLayout(version >= 1 && version <= 7, 'choose a supported version 1–7 .hmv file.');
   const mapName = paddedName(bytes.subarray(12, 44), /^[a-z0-9_]{1,31}$/, true);
-  const xbox = map.header.version === 5 && map.header.scenarioType === 1;
-  const ce = map.header.version === 609 && [0, 1].includes(map.header.scenarioType);
-  const scenarioName = map.scenarioPath?.split(/[\\/]/).at(-1) || map.header.name;
-  requireLayout((xbox || ce) && mapName === scenarioName.toLowerCase() && u32(44) === (map.header.crc32 >>> 0),
+  requireLayout(supportsHmvMap(map) && mapName === scenarioShortName(map) && u32(44) === (map.header.crc32 >>> 0),
     'open the matching Xbox multiplayer or Halo Custom Edition base map. The scenario name and original cache checksum must match.');
   const packs = u16(48), pathsCount = u16(50), recordsCount = u16(52), metaSize = u16(54);
   requireLayout(packs <= 8 && pathsCount <= 256 && recordsCount <= 256 && metaSize >= 4 && metaSize <= 2048
@@ -65,14 +105,13 @@ export function readHmv(input: number[], map: MapInspection) {
     const path = ascii(bytes.subarray(offset, offset + size));
     offset += size;
     const key = group + '|' + path;
-    requireLayout(/^[a-z0-9_ .\\-]+$/.test(path) && !path.includes('..')
-      && path.split('\\').every(part => part.length) && !paths.has(key), 'invalid or repeated tag path.');
+    requireLayout(hmvPathValid(path) && !paths.has(key), 'invalid or repeated tag path.');
     paths.set(key, { group, path });
   }
   requireLayout(offset === recordsStart, 'unexpected bytes before placement records.');
 
   const pathList = [...paths.values()];
-  const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3 }[] = [];
+  const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3; ordinary: boolean }[] = [];
   const features = new Set<number>();
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
@@ -89,8 +128,9 @@ export function readHmv(input: number[], map: MapInspection) {
     const invalid = 'invalid placement record ' + (index + 1) + '.';
     requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
     markers ||= kind !== 0;
-    if (!forerunnerIssue && (kind !== 0 || !ref || !forerunnerGroups.includes(ref.group)
-        || respawn || count !== 1 || modes || variant || flags !== 1 || aiTeam)) {
+    const ordinary = kind === 0 && !!ref && forerunnerGroups.includes(ref.group)
+      && !respawn && !modes && !variant && flags <= 1 && !aiTeam;
+    if (!forerunnerIssue && (!ordinary || count !== 1 || flags !== 1)) {
       forerunnerIssue = `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
     }
 
@@ -126,7 +166,7 @@ export function readHmv(input: number[], map: MapInspection) {
     if (flags & 4) features.add(3);
     if (kind === 0 && ref) {
       const [x, y, z, yaw, pitch, roll] = transform;
-      objectRecords.push({ index, ...ref, position: [x, y, z], rotation: [yaw, -pitch, roll] });
+      objectRecords.push({ index, ...ref, position: [x, y, z], rotation: [yaw, -pitch, roll], ordinary });
     }
   }
   requireLayout(u32(8) === Number(markers) && !(senders & ~receivers), 'marker flags or teleporter pairs are invalid.');
@@ -148,19 +188,62 @@ export function readHmv(input: number[], map: MapInspection) {
   requireLayout(start === meta.length && fields[0] && (!fields[3] || /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(fields[3])),
     'invalid layout title, date or metadata length.');
 
+  function rebuild(records: Uint8Array[], newPath?: Uint8Array) {
+    const recordsLength = records.reduce((sum, record) => sum + record.length, 0);
+    const length = recordsStart + (newPath?.length ?? 0) + recordsLength + metaSize;
+    requireLayout(length <= HMV_LIMIT, 'the new placement would exceed 64 KiB.');
+    const output = new Uint8Array(length);
+    const next = new DataView(output.buffer);
+    let cursor = 0;
+    const sections = [bytes.subarray(0, recordsStart), ...(newPath ? [newPath] : []), ...records, meta];
+    for (const section of sections) {
+      output.set(section, cursor);
+      cursor += section.length;
+    }
+    next.setUint16(50, pathsCount + (newPath ? 1 : 0), true);
+    next.setUint16(52, recordsLength / recordSize, true);
+    writeChecksum(output, next);
+    return output;
+  }
+
   return {
     objectRecords,
     recordsCount,
     mapName,
     forerunnerIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
-      const values = [...position, rotation[0], -rotation[1], rotation[2]];
-      requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');
-      const at = recordsStart + index * recordSize + 4;
-      for (let axis = 0; axis < 6; axis++) view.setFloat32(at + axis * 4, values[axis], true);
+      writePose(view, recordsStart + index * recordSize + 4, position, rotation);
+    },
+    append(group: string, path: string, position: Vec3, rotation: Vec3) {
+      requireLayout(forerunnerGroups.includes(group) && hmvPathValid(path), 'the selected tag cannot be placed.');
+      requireLayout(recordsCount < 256, 'this layout has reached its 256-record limit.');
+      let pathIndex = pathList.findIndex(item => item.group === group && item.path === path);
+      let entry: Uint8Array | undefined;
+      if (pathIndex < 0) {
+        requireLayout(pathsCount < 256, 'this layout has reached its 256-tag limit.');
+        pathIndex = pathsCount;
+        entry = new Uint8Array(5 + path.length);
+        new DataView(entry.buffer).setUint32(0, groupCode(group), true);
+        entry[4] = path.length;
+        entry.set(encoder.encode(path), 5);
+      }
+      const record = new Uint8Array(recordSize);
+      const recordView = new DataView(record.buffer);
+      recordView.setUint16(0, pathIndex, true);
+      recordView.setInt8(3, -1);
+      writePose(recordView, 4, position, rotation);
+      record[30] = 1;
+      record[34] = 1;
+      return rebuild([bytes.subarray(recordsStart, recordsEnd), record], entry);
+    },
+    remove(index: number) {
+      requireLayout(objectRecords.some(record => record.index === index && record.ordinary),
+        'only ordinary base-map placements can be removed in Spark.');
+      const start = recordsStart + index * recordSize;
+      return rebuild([bytes.subarray(recordsStart, start), bytes.subarray(start + recordSize, recordsEnd)]);
     },
     finish() {
-      view.setUint32(60, crc32(bytes.subarray(headerSize)), true);
+      writeChecksum(bytes, view);
       return bytes;
     },
   };

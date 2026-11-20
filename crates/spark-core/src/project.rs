@@ -137,6 +137,8 @@ pub struct ForgeSidecar {
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bytes: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_keys: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -359,6 +361,7 @@ impl Project {
             let source = self.source.as_ref().filter(|source| source.sha256 == layout.base_sha256);
             let compatible = match (&layout.text, &layout.bytes, source) {
                 (Some(text), None, Some(source)) => matches!(source.cache_version, 5 | 609)
+                    && layout.record_keys.is_none()
                     && layout.name.to_ascii_lowercase().ends_with(".txt")
                     && text.len() <= 1024 * 1024
                     && !text.contains('\0')
@@ -373,6 +376,14 @@ impl Project {
                     && bytes.starts_with(b"HFRG")
                     && (1..=7).contains(&u16::from_le_bytes([bytes[4], bytes[5]]))
                     && bytes[6..8] == [64, 0]
+                    && layout.record_keys.as_ref().is_none_or(|keys| {
+                        let count = u16::from_le_bytes([bytes[52], bytes[53]]) as usize;
+                        let unique: std::collections::HashSet<_> = keys.iter().collect();
+                        count <= 256 && keys.len() == count && unique.len() == count
+                            && keys.iter().all(|key| (1..=36).contains(&key.len())
+                                && key.bytes().all(|byte| byte.is_ascii_lowercase()
+                                    || byte.is_ascii_digit() || byte == b'-'))
+                    })
                     && u32::from_le_bytes(bytes[56..60].try_into().unwrap()) as usize == bytes.len() - 64,
                 _ => false,
             };
@@ -1124,7 +1135,7 @@ mod forge_sidecar_project_tests {
         });
         let text = "\u{feff}[OpenCE Forge Map]\r\nBase Map: custom_maps\\test\n[ForgeState]\rOPAQUE|1";
         project.forge_sidecar = Some(ForgeSidecar {
-            name:"saved.txt".into(),base_sha256:"a".repeat(64),text:Some(text.into()),bytes:None,
+            name:"saved.txt".into(),base_sha256:"a".repeat(64),text:Some(text.into()),bytes:None,record_keys:None,
         });
         project.validate().unwrap();
         let mut reopened: Project = serde_json::from_slice(&serde_json::to_vec(&project).unwrap()).unwrap();
@@ -1145,14 +1156,20 @@ mod forge_sidecar_project_tests {
         });
         let mut bytes = vec![0; 69];
         bytes[..8].copy_from_slice(b"HFRG\x01\x00\x40\x00");
+        bytes[52] = 1;
         bytes[56] = 5;
         project.forge_sidecar = Some(ForgeSidecar {
-            name: "about.hmv".into(), base_sha256: "a".repeat(64), text: None, bytes: Some(bytes.clone()),
+            name: "about.hmv".into(), base_sha256: "a".repeat(64), text: None, bytes: Some(bytes.clone()), record_keys: Some(vec!["sample-placement".into()]),
         });
         project.validate().unwrap();
         let mut reopened: Project = serde_json::from_slice(&serde_json::to_vec(&project).unwrap()).unwrap();
         reopened.validate().unwrap();
         assert_eq!(reopened.forge_sidecar.as_ref().unwrap().bytes.as_deref(), Some(bytes.as_slice()));
+        assert_eq!(reopened.forge_sidecar.as_ref().unwrap().record_keys, Some(vec!["sample-placement".into()]));
+        reopened.forge_sidecar.as_mut().unwrap().record_keys = Some(vec![]);
+        assert!(reopened.validate().is_err());
+        reopened.forge_sidecar.as_mut().unwrap().record_keys = None;
+        reopened.validate().unwrap();
         reopened.forge_sidecar.as_mut().unwrap().text = Some("[OpenCE Forge Map]".into());
         assert!(reopened.validate().is_err());
         reopened.forge_sidecar.as_mut().unwrap().text = None;
