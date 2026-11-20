@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgePlacementSnapshot, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
+import type { ForgePlacement } from './forge';
 
 describe('OpenCE Forge base-map placements', () => {
   const hash='a'.repeat(64);
@@ -333,6 +334,36 @@ describe('Chupathingy Forge binary layouts', () => {
     const unresolved = importForgeSidecar(starting, ambiguous, 'devices.hmv', output);
     expect([unresolved.editable, unresolved.retained]).toEqual([1, 1]);
     expect(exportForgeSidecar(unresolved.project, ambiguous)).toEqual(output);
+  });
+
+  it('exports one acknowledged set of placements with exact base-map identity and native values', () => {
+    const first: ForgePlacement = {
+      id: 'pistol', name: 'Pistol', tagClass: 'weap', tagPath: 'weapons/test', tagId: 10,
+      sourceSha256: hash, sourceProjectId: null, position: [4, 2, 3], rotation: [0.5, 0.25, 0],
+      team: 1, respawnSeconds: 15, visible: true, locked: false,
+    };
+    const second: ForgePlacement = { ...first, id: 'other', position: [6, 2, 3], team: -1, respawnSeconds: 0 };
+    const exportFile = exportForgePlacementSnapshot([first, second], map, 21);
+    expect(exportFile.name).toBe('test-sparklink.hmv');
+    const layout = readHmv(Array.from(exportFile.bytes), map);
+    expect(layout.details.title).toBe('SparkLink revision 21');
+    expect(layout.objectRecords).toMatchObject([
+      { position: [4, 2, 3], rotation: [0.5, 0.25, 0], path: 'weapons\\test',
+        properties: { team: 1, respawnSeconds: 15 } },
+      { position: [6, 2, 3], properties: { team: -1, respawnSeconds: 0 } },
+    ]);
+    expect(() => exportForgePlacementSnapshot([first, second], map, 21, 'forerunner')).toThrow('record 1');
+    const forerunner = exportForgePlacementSnapshot([second], map, 22, 'forerunner', 'Équipe Forge');
+    expect(forerunner.name).toBe('import.hmv');
+    const compatible = readHmv(Array.from(forerunner.bytes), map);
+    expect(compatible.forerunnerIssue).toBe(null);
+    expect(compatible.details.author).toBe('Équipe Forge');
+    expect(() => exportForgePlacementSnapshot([second], map, 22, undefined, 'é'.repeat(16))).toThrow('Author');
+    for (const edit of [{ tagId: 11 }, { publishedAssetId: 'custom' }, { nativeName: 'transport' },
+      { transportSignals: true }, { sourceSha256: 'c'.repeat(63) + 'd' }]) {
+      expect(() => exportForgePlacementSnapshot([first, { ...second, ...edit }], map, 21)).toThrow();
+    }
+    expect(() => exportForgePlacementSnapshot([first, { ...second, respawnSeconds: 601 }], map, 21)).toThrow('out of range');
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

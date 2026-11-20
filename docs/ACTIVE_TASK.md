@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: HMV doors and controls pass authoring, history and independent readback. The exact Black Echo Elite candidate is unchanged. Forerunner’s outer-flank run ended with one defender alive. See RUNTIME_INTEGRATION_20261107.
-Next action: Finish defense on exact CE609 04d9ccd1 from the outer Spirit flank, then verify unlock, evacuation, banking and redeployment in both factions with two authenticated players. Keep HUD A/B separate. Test a Spark layout in a Forge-capable Chupathingy build.
+Latest verified revision: SparkLink exports credited placements from an acknowledged revision to a verified HMV base. Browser, Windows compile and native readback passed. Black Echo 04d9ccd1 remains the peer-test candidate. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish defense on exact CE609 04d9ccd1, then verify both factions’ evacuation, banking and redeployment with two authenticated players. Keep HUD A/B separate. Load a credited SparkLink export in Forge-capable Forerunner and Chupathingy.
 
 ## Acceptance
 

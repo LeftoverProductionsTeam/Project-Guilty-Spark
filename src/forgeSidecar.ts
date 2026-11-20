@@ -1,6 +1,7 @@
+import type { ForgePlacement } from './forge';
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
+import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, type HmvBaseIdentity, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -101,8 +102,11 @@ function layoutSpawns(layout: ReturnType<typeof readHmv>, keys: string[]): Layou
   return layout.spawnRecords.map(record => ({ ...record, id: prefix + keys[record.index] }));
 }
 
-function placementTags(map: MapInspection, admitted: readonly string[]) {
-  const tags = new Map<string, MapInspection['tags']>();
+type PlacementTagIdentity = Pick<MapInspection['tags'][number], 'id' | 'class' | 'path' | 'external'>;
+export type ForgeLayoutBase = HmvBaseIdentity & { sha256: string; tags: PlacementTagIdentity[] };
+
+function placementTags<T extends PlacementTagIdentity>(map: { tags: readonly T[] }, admitted: readonly string[]) {
+  const tags = new Map<string, T[]>();
   for (const tag of map.tags) {
     if (!admitted.includes(tag.class) || tag.external) continue;
     const key = tag.class + '|' + pathKey(tag.path);
@@ -463,6 +467,41 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
     layout.writeMarker(marker.index, object.position, object.rotation);
   }
   return finish();
+}
+
+export function exportForgePlacementSnapshot(
+  placements: readonly ForgePlacement[], map: ForgeLayoutBase, revision: number,
+  target?: 'forerunner', author = '',
+) {
+  if (!placements.length || placements.length > 256) {
+    throw Error('A Forge layout needs 1–256 shared placements.');
+  }
+  const tags = placementTags(map, HMV_PLACEMENT_GROUPS);
+  let layout = readHmv(Array.from(emptyHmv(map)), map);
+  for (const placement of placements) {
+    const label = placement.name || placement.id;
+    if (placement.sourceSha256 !== map.sha256 || placement.publishedAssetId || placement.nativeName || placement.transportSignals) {
+      throw Error(`“${label}” needs the matching base map and an ordinary placement without published assets or scripted names.`);
+    }
+    const key = pathKey(placement.tagPath);
+    const matches = tags.get(placement.tagClass + '|' + key);
+    if (matches?.length !== 1 || matches[0].id !== placement.tagId) {
+      throw Error(`“${label}” does not resolve to one exact base-map tag.`);
+    }
+    layout = readHmv(Array.from(layout.append(placement.tagClass, key.replaceAll('/', '\\'),
+      placement.position, placement.rotation)), map);
+    if (placement.team !== -1 || placement.respawnSeconds !== 0) {
+      layout = readHmv(Array.from(layout.writeProperties(layout.recordsCount - 1, {
+        team: placement.team, respawnSeconds: placement.respawnSeconds, placeAtStart: true, physics: 'normal',
+      })), map);
+    }
+  }
+  if (target === 'forerunner' && layout.forerunnerIssue) throw Error(layout.forerunnerIssue);
+  const bytes = layout.writeDetails({ title: 'SparkLink revision ' + revision, author, description: '' });
+  return {
+    bytes,
+    name: target === 'forerunner' ? 'import.hmv' : layout.mapName.slice(0, 16) + '-sparklink.hmv',
+  };
 }
 
 export function removeForgeSidecar(project: Project): Project {

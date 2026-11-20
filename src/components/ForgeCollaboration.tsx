@@ -3,6 +3,8 @@ import { call, native } from '../api';
 import { useMapState, readMapSession } from '../mapSession';
 import type { QuickForgeDocument } from '../forge';
 import type { LibraryEntry } from '../types';
+import { exportForgePlacementSnapshot, type ForgeLayoutBase } from '../forgeSidecar';
+import { downloadMedia } from '../machinimaCapture';
 import { localForge, mergeForge, portableForge } from '../forgeSession';
 import {
   announceStudio,
@@ -54,6 +56,7 @@ export default function ForgeCollaboration({
   const [transport, setTransport] = useMapState<Transport>(projectId, 'share.transport', 'lan'),
     [lan, setLan] = useMapState(projectId, 'share.lan', true),
     [address, setAddress] = useMapState(projectId, 'share.address', '127.0.0.1');
+  const [forgeCredit, setForgeCredit] = useMapState(projectId, 'studio.forgeCredit', '');
   const [displayName, setDisplayName] = useMapState(projectId, 'studio.name', 'Creator'),
     [legacy, setLegacy] = useState(false),
     [viewerInvite, setViewerInvite] = useState(false),
@@ -483,6 +486,26 @@ export default function ForgeCollaboration({
     a.download = 'sparklink-local-draft.json';
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function exportSharedPlacements(target?: 'forerunner') {
+    const snapshot = shared.current;
+    if (!snapshot || sessionRef.current?.sessionId !== snapshot.sessionId)
+      throw Error('Join a session with an acknowledged revision to export its placements.');
+    const placements = snapshot.document.placements;
+    const [first] = placements;
+    if (!first?.sourceSha256 || placements.some(row => row.sourceSha256 !== first.sourceSha256))
+      throw Error('Use placements from one matching Xbox multiplayer or Halo Custom Edition base map.');
+    const base = latest.current.entries.find(entry => entry.sha256 === first.sourceSha256 && !entry.sessionOnly);
+    if (!base) throw Error('Import the exact base map used by this revision, then export again.');
+    const inspection = await call<ForgeLayoutBase>('inspect_forge_layout_base', {
+      projectId: base.id, sourceSha256: first.sourceSha256,
+    });
+    if (!active.current || sessionRef.current?.sessionId !== snapshot.sessionId) return;
+    if (inspection.sha256 !== first.sourceSha256)
+      throw Error('Spark could not verify the exact preserved base map for this revision.');
+    const { bytes, name } = exportForgePlacementSnapshot(placements, inspection, snapshot.revision, target, forgeCredit.trim());
+    downloadMedia(name, new Blob([Uint8Array.from(bytes).buffer]));
+    setMessage(`Exported ${placements.length} placements from shared revision ${snapshot.revision}.`);
   }
   async function copyInvite() {
     if (!session) return;
@@ -1021,6 +1044,16 @@ export default function ForgeCollaboration({
                 Leave session
               </button>
             </div>
+            {!!view?.document.placements.length && <details>
+              <summary>Export shared Forge placements</summary>
+              <p className="subtle">Export the placements from the last acknowledged revision for their exact base map. Geometry, scripts, lighting, player starts and objectives stay in the shared source.</p>
+              <label>Creator credit (optional)<input value={forgeCredit} maxLength={31}
+                onChange={event => setForgeCredit(event.target.value)} /></label>
+              <div className="analysis-actions">
+                <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements())}>Export shared HMV</button>
+                <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements('forerunner'))}>Export shared HMV for Forerunner</button>
+              </div>
+            </details>}
             {view?.game && (
               <p className="subtle">
                 Linked map identity: {view.game.scenario}. Source synchronization does not certify in-game

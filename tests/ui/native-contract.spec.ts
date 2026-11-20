@@ -2295,6 +2295,63 @@ test('shared source stays synchronized across tools with one game connection dra
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave'));expect(calls).toHaveLength(1);expect(calls[0].args).toEqual({projectId:'a',sessionId:'11111111-1111-4111-8111-111111111111'});
 });
 
+test('SparkLink exports an acknowledged peer move for its exact Forge base', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('spark-test-forge', JSON.stringify({
+    schemaVersion:1,name:'Shared placements',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',
+    skyPath:null,buildQuality:'draft',geometry:[],materials:[],spawns:[],objectives:[],
+    placements:[{id:'shared-pistol',name:'Pistol',tagClass:'weap',tagPath:'weapons/test',tagId:1,
+      sourceProjectId:'b',sourceSha256:'b'.repeat(64),position:[4,2,3],rotation:[0,0,0],
+      visible:true,locked:false,team:-1,respawnSeconds:0}],
+  })));
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, mock = w.__sparkMock, invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command !== 'inspect_forge_layout_base') return invoke(command,args);
+      mock.calls.push({command,args});
+      const source = mock.projects.b.inspection;
+      return { header: {...source.header,version:5,crc32:123456}, tags:source.tags,
+        sha256: mock.wrongForgeBase ? 'e'.repeat(64) : source.sha256 };
+    };
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  await openDrawer(page,'SparkLink');
+  const session = page.getByRole('region',{name:'SparkLink panel',exact:true});
+  const sharing = session.locator('details.forge-live-panel');
+  if (await sharing.getAttribute('open') === null) await sharing.locator('summary').first().click();
+  await (await pagedControl(page,'button','Host editing session',session)).click();
+  await expect((await pagedControl(page,'button','Leave session',session))).toBeVisible();
+  await page.evaluate(() => {
+    const shared = (window as any).__sparkMock.session.view;
+    shared.revision = 6;
+    shared.lastAuthor = 'Peer';
+    shared.document.placements[0].position = [12,2,3];
+  });
+  await expect(session.getByText(/shared revision 6/)).toBeAttached();
+  const disclosure = session.locator('summary').filter({hasText:'Export shared Forge placements'});
+  await revealPagedControl(disclosure);
+  await disclosure.click();
+  await (await pagedControl(page,'textbox','Creator credit (optional)',session)).fill('Équipe Spark');
+  const exportButton = await pagedControl(page,'button','Export shared HMV for Forerunner',session);
+  const pending = page.waitForEvent('download');
+  await exportButton.click();
+  const file = await pending;
+  const {readFile} = await import('node:fs/promises');
+  const output = await readFile((await file.path())!);
+  expect(file.suggestedFilename()).toBe('import.hmv');
+  expect(output.readUInt32LE(44)).toBe(123456);
+  expect(output.readFloatLE(64+5+output[68]+4)).toBe(12);
+  expect(output.includes(Buffer.from('SparkLink revision 6'))).toBe(true);
+  expect(output.includes(Buffer.from('Équipe Spark'))).toBe(true);
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls
+    .filter((call:any)=>call.command==='inspect_forge_layout_base').at(-1).args))
+    .toEqual({projectId:'b',sourceSha256:'b'.repeat(64)});
+  await page.evaluate(() => { (window as any).__sparkMock.wrongForgeBase = true; });
+  await (await pagedControl(page,'button','Export shared HMV',session)).click();
+  await expect(session.getByText('Spark could not verify the exact preserved base map for this revision.',{exact:false})).toBeAttached();
+});
+
 test('shared keyboard history waits for a poll and unfinished undo without losing order', async ({page}) => {
   await page.addInitScript(() => localStorage.setItem('spark-test-forge', JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
   await mockDesktop(page);

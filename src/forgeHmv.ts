@@ -1,6 +1,11 @@
 import { crc32 } from './sourceZip';
 import type { MapInspection, Vec3 } from './types';
 
+export type HmvBaseIdentity = {
+  header: Pick<MapInspection['header'], 'version' | 'scenarioType' | 'name' | 'crc32'>;
+  scenarioPath?: string;
+};
+
 // Chupathingy Forge layout format, versions 1–7. See the pinned upstream
 // format reference in docs/RUNTIME_INTEGRATION_20261107.md.
 export const HMV_LIMIT = 65536;
@@ -75,13 +80,13 @@ function hmvPathValid(path: string) {
     && !path.includes('..') && path.split('\\').every(part => part.length);
 }
 
-export function supportsHmvMap(map: MapInspection) {
+export function supportsHmvMap(map: HmvBaseIdentity) {
   return (map.header.version === 5 && map.header.scenarioType === 1
       || map.header.version === 609 && [0, 1].includes(map.header.scenarioType))
     && /^[a-z0-9_]{1,31}$/.test(scenarioShortName(map));
 }
 
-function scenarioShortName(map: MapInspection) {
+function scenarioShortName(map: HmvBaseIdentity) {
   return (map.scenarioPath?.split(/[\\/]/).at(-1) || map.header.name).toLowerCase();
 }
 
@@ -98,7 +103,7 @@ function writePose(view: DataView, offset: number, position: Vec3, rotation: Vec
   for (let index = 0; index < count; index++) view.setFloat32(offset + index * 4, values[index], true);
 }
 
-export function emptyHmv(map: MapInspection) {
+export function emptyHmv(map: HmvBaseIdentity) {
   requireLayout(supportsHmvMap(map), 'choose a supported base map with a valid scenario name.');
   const meta = encoder.encode('Spark Forge layout\0\0\0\0');
   const bytes = new Uint8Array(headerSize + meta.length);
@@ -122,7 +127,7 @@ function paddedName(bytes: Uint8Array, pattern: RegExp, requiresZero = false) {
   return name;
 }
 
-export function readHmv(input: number[], map: MapInspection) {
+export function readHmv(input: number[], map: HmvBaseIdentity) {
   requireLayout(input.length >= headerSize && input.length <= HMV_LIMIT
     && input.every(value => Number.isInteger(value) && value >= 0 && value <= 255), 'invalid file length or bytes.');
   const bytes = Uint8Array.from(input);

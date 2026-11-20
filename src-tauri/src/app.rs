@@ -736,6 +736,61 @@ async fn open_project(app: tauri::AppHandle, id: String) -> Reply<OpenProject> {
     .await
     .map_err(error)?
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ForgeLayoutTag {
+    id: u32,
+    class: String,
+    path: String,
+    external: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ForgeLayoutBase {
+    sha256: String,
+    header: maps::MapHeader,
+    scenario_path: String,
+    tags: Vec<ForgeLayoutTag>,
+}
+
+/// Read the exact owned tag inventory without upgrading a project or sending
+/// its scene/meshes to a different editor window.
+#[tauri::command]
+async fn inspect_forge_layout_base(
+    app: tauri::AppHandle,
+    project_id: String,
+    source_sha256: String,
+) -> Reply<ForgeLayoutBase> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.as_ref().ok_or("Missing preserved Forge base map")?;
+        if source.sha256 != source_sha256 {
+            return Err("The preserved Forge base map identity differs from the shared placement source.".into());
+        }
+        let inspection = inspect(&state, &project)?;
+        if maps::hash_file(&source.preserved_path).map_err(error)? != source_sha256 {
+            return Err("The preserved Forge base map changed before export.".into());
+        }
+        let tags = inspection.tags.iter()
+            .filter(|tag| !tag.external && matches!(tag.class.as_str(), "scen" | "vehi" | "weap" | "eqip" | "mach" | "ctrl"))
+            .map(|tag| ForgeLayoutTag {
+                id: tag.id,
+                class: tag.class.clone(),
+                path: tag.path.clone(),
+                external: tag.external,
+            })
+            .collect();
+        Ok(ForgeLayoutBase {
+            sha256: inspection.sha256.clone(),
+            header: inspection.header.clone(),
+            scenario_path: inspection.scenario_path.clone(),
+            tags,
+        })
+    }).await.map_err(error)?
+}
+
 fn project_build_history_state(state:&AppState,id:&str)->Reply<ProjectBuildHistory> {
     let p=lock(&state.library)?.get(id).map_err(error)?;
     // Keep exactly the preserved-source admission used by open_project. Borrow
@@ -3514,6 +3569,7 @@ pub fn run() {
             default_materials_native::inspect_map_source,
             default_materials_native::compatible_bitmap_targets,
             open_project,
+            inspect_forge_layout_base,
             project_build_history,
             connect_mcc_texture_resources,
             create_project,
