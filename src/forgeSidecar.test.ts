@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvPlacement, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvSpawns, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvPlacement, addHmvTeleporterPair, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -160,7 +160,7 @@ describe('Chupathingy Forge binary layouts', () => {
   it('exposes retained player spawns on demand, keeps the untouched bytes, and saves marker edits', () => {
     const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
     expect(loaded.scene).toHaveLength(1);
-    const shown = showHmvSpawns(loaded, map);
+    const shown = showHmvMarkers(loaded, map, 'spawns');
     const marker = shown.scene[1];
     expect(marker).toMatchObject({ kind: 'Player spawn', position: [4, 0, 0], sourceOffset: null });
     expect(exportForgeSidecar(shown, map)).toEqual(source);
@@ -195,6 +195,28 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(readHmv(Array.from(output), map).spawnRecords[0]).toMatchObject({
       position: [1, 1, 2], rotation: [1, 0, 0], properties: { team: -1, initial: false, modes: 0 },
     });
+  });
+
+  it('authors paired teleporters and protects links through channel changes and deletion', () => {
+    const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
+    const added = addHmvTeleporterPair(loaded, map, loaded.scene[0]).project;
+    const [sender, receiver] = added.scene.slice(1);
+    expect(() => removeHmvPlacement(added, map, receiver)).toThrow('last receiver');
+    const changed = changeHmvTeleporterChannel(added, map, sender, 7);
+    expect(() => changeHmvTeleporterChannel(addHmvTeleporterPair(changed, map, sender).project, map, sender, 0))
+      .toThrow('already uses that channel');
+    changed.scene[2] = { ...receiver, position: [9, 12, 3], rotation: [0.5, 0, 0] };
+    const bytes = exportForgeSidecar(changed, map) as Uint8Array;
+    const decoded = readHmv(Array.from(bytes), map);
+    expect(decoded.teleporterRecords).toMatchObject([
+      { role: 'sender', channel: 7 }, { role: 'receiver', channel: 7, position: [9, 12, 3], rotation: [0.5, 0, 0] },
+    ]);
+    expect(bytes.subarray(64, 177)).toEqual(source.subarray(64, 177));
+    const reopened = importForgeSidecar(project, map, 'teleporters.hmv', bytes).project;
+    expect(exportForgeSidecar(showHmvMarkers(reopened, map, 'teleporters'), map)).toEqual(bytes);
+    const noSender = removeHmvPlacement(changed, map, sender);
+    const noPair = removeHmvPlacement(noSender, map, changed.scene[2]);
+    expect(exportForgeSidecar(noPair, map)).toEqual(source);
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

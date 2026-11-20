@@ -7,6 +7,8 @@ export const HMV_LIMIT = 65536;
 export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
 const headerSize = 64;
 const recordSize = 48;
+export const HMV_TELEPORTER_CHANNELS = 16;
+const teleporterLimit = 32;
 const physicsBits = { normal: 0, fixed: 0x10, phased: 0x20 } as const;
 const physicsMask = physicsBits.fixed | physicsBits.phased;
 
@@ -17,6 +19,8 @@ export interface HmvSpawnProperties {
 }
 
 export const HMV_SPAWN_MODES = ['Capture the Flag', 'Slayer', 'Oddball', 'King of the Hill', 'Race', 'Infection'];
+
+export type HmvTeleporterRole = 'sender' | 'receiver';
 
 export interface HmvPlacementProperties {
   team: number;
@@ -61,7 +65,7 @@ function writeChecksum(bytes: Uint8Array, view: DataView) {
 function writePose(view: DataView, offset: number, position: Vec3, rotation: Vec3, yawOnly = false) {
   const values = [...position, rotation[0], -rotation[1], rotation[2]];
   requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');
-  requireLayout(!yawOnly || rotation[1] === 0 && rotation[2] === 0, 'player spawn points only support yaw.');
+  requireLayout(!yawOnly || rotation[1] === 0 && rotation[2] === 0, 'layout markers only support yaw.');
   const count = yawOnly ? 4 : 6;
   for (let index = 0; index < count; index++) view.setFloat32(offset + index * 4, values[index], true);
 }
@@ -132,10 +136,11 @@ export function readHmv(input: number[], map: MapInspection) {
   const pathList = [...paths.values()];
   const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3; properties: HmvPlacementProperties }[] = [];
   const spawnRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvSpawnProperties }[] = [];
+  const teleporterRecords: { index: number; position: Vec3; rotation: Vec3; channel: number; role: HmvTeleporterRole }[] = [];
   const recordVersions = new Uint8Array(recordsCount).fill(1);
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
-  let markers = false, teleporters = 0, goals = 0, senders = 0, receivers = 0;
+  let markers = false, goals = 0, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
   const goalLimits = new Map([[0, 2], [2, 16], [3, 32], [8, 16]]);
   for (let index = 0; index < recordsCount; index++, offset += recordSize) {
@@ -162,8 +167,10 @@ export function readHmv(input: number[], map: MapInspection) {
         requireLayout(++goals <= 64 && (variant !== 8 || ++hills[team] <= 12), 'too many game type objects.');
         recordVersions[index] = 6;
       } else {
-        requireLayout(version >= 5 && team < 16 && !variant, invalid);
-        requireLayout(++teleporters <= 32, 'too many teleporters.');
+        requireLayout(version >= 5 && team < HMV_TELEPORTER_CHANNELS && !variant, invalid);
+        requireLayout(teleporterRecords.length < teleporterLimit, 'too many teleporters.');
+        const [x, y, z, yaw] = transform;
+        teleporterRecords.push({ index, position: [x, y, z], rotation: [yaw, 0, 0], channel: team, role: kind === 7 ? 'sender' : 'receiver' });
         if (kind === 7) senders |= 1 << team;
         else receivers |= 1 << team;
         recordVersions[index] = 5;
@@ -261,7 +268,7 @@ export function readHmv(input: number[], map: MapInspection) {
   }
 
   function requireEditablePlacement(index: number) {
-    if (spawnRecords.some(record => record.index === index)) return;
+    if (spawnRecords.some(record => record.index === index) || teleporterRecords.some(record => record.index === index)) return;
     editableRecord(index);
   }
 
@@ -273,11 +280,12 @@ export function readHmv(input: number[], map: MapInspection) {
   return {
     objectRecords,
     spawnRecords,
+    teleporterRecords,
     recordsCount,
     mapName,
     forerunnerIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
-      const yawOnly = spawnRecords.some(record => record.index === index);
+      const yawOnly = spawnRecords.some(record => record.index === index) || teleporterRecords.some(record => record.index === index);
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, yawOnly);
     },
     append(group: string, path: string, position: Vec3, rotation: Vec3) {
@@ -310,11 +318,31 @@ export function readHmv(input: number[], map: MapInspection) {
       writePose(recordView, 4, position, [yaw, 0, 0], true);
       return appendRecord(record, undefined, Math.max(version, 4));
     },
+    appendTeleporterPair(sender: Vec3, receiver: Vec3, yaw: number) {
+      requireLayout(recordsCount <= 254 && teleporterRecords.length <= teleporterLimit - 2,
+        'the layout has no room for another two teleporter endpoints.');
+      const used = senders | receivers;
+      const channel = Array.from({ length: HMV_TELEPORTER_CHANNELS }, (_, index) => index)
+        .find(index => !(used & (1 << index)));
+      requireLayout(channel !== undefined, 'all teleporter channels are in use.');
+      const endpoints = [sender, receiver].map((position, index) => {
+        const record = new Uint8Array(recordSize);
+        const view = new DataView(record.buffer);
+        view.setUint16(0, 0xffff, true);
+        record[2] = 7 + index;
+        record[3] = channel;
+        writePose(view, 4, position, [yaw, 0, 0], true);
+        return record;
+      });
+      return rebuild([bytes.subarray(recordsStart, recordsEnd), ...endpoints], undefined, Math.max(version, 5));
+    },
     duplicate(index: number, position: Vec3, rotation: Vec3) {
       requireEditablePlacement(index);
       const start = recordsStart + index * recordSize;
       const record = bytes.slice(start, start + recordSize);
-      writePose(new DataView(record.buffer), 4, position, rotation, record[2] === 2);
+      const teleporter = record[2] === 7 || record[2] === 8;
+      requireLayout(!teleporter || teleporterRecords.length < teleporterLimit, 'too many teleporters.');
+      writePose(new DataView(record.buffer), 4, position, rotation, record[2] === 2 || teleporter);
       return appendRecord(record);
     },
     writeProperties(index: number, properties: HmvPlacementProperties) {
@@ -337,8 +365,26 @@ export function readHmv(input: number[], map: MapInspection) {
       writeChecksum(bytes, view);
       return bytes;
     },
+    moveTeleporterChannel(index: number, channel: number) {
+      const endpoint = teleporterRecords.find(record => record.index === index);
+      requireLayout(endpoint, 'select a Forge teleporter endpoint.');
+      requireLayout(Number.isInteger(channel) && channel >= 0 && channel < HMV_TELEPORTER_CHANNELS, 'choose a valid teleporter channel.');
+      requireLayout(channel === endpoint.channel || !( (senders | receivers) & (1 << channel)),
+        'another group of teleporters already uses that channel.');
+      for (const record of teleporterRecords) {
+        if (record.channel === endpoint.channel) bytes[recordsStart + record.index * recordSize + 3] = channel;
+      }
+      writeChecksum(bytes, view);
+      return bytes;
+    },
     remove(index: number) {
       requireEditablePlacement(index);
+      const endpoint = teleporterRecords.find(record => record.index === index);
+      if (endpoint?.role === 'receiver') {
+        const others = teleporterRecords.filter(record => record.index !== index && record.channel === endpoint.channel);
+        requireLayout(!others.some(record => record.role === 'sender') || others.some(record => record.role === 'receiver'),
+          'remove the linked senders before removing their last receiver.');
+      }
       const start = recordsStart + index * recordSize;
       const records = [bytes.subarray(recordsStart, start), bytes.subarray(start + recordSize, recordsEnd)];
       return rebuild(records, undefined, versionWithoutFeatureAt(index));

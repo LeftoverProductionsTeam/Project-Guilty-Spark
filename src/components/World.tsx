@@ -186,6 +186,7 @@ export const colors: Record<string, string> = {
   Equipment: '#ba9eda',
   'Workshop mesh': '#62b9c8',
 };
+const yawOnlyKinds = ['Player spawn', 'Netgame item', 'Forge teleporter'];
 function ObjectVisual({
   object,
   asset,
@@ -206,6 +207,13 @@ function ObjectVisual({
   shaderMetadata?:Record<number,ShaderPreview>;extraTextures?:Record<string,THREE.Texture>;
 }) {
   if (asset) return <Mesh data={asset} sourceObject localLighting={localLighting} greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
+  if (object.kind === 'Forge teleporter' && !greenScreen) {
+    const tint = selected ? '#c9fff8' : '#81b5e8';
+    return <group>
+      <mesh position={[0, 0, 0.04]}><torusGeometry args={[0.42, 0.035, 8, 24]} /><meshBasicMaterial color={tint} /></mesh>
+      <mesh position={[0.38, 0, 0.08]} rotation={[0, 0, -Math.PI / 2]}><coneGeometry args={[0.13, 0.33, 8]} /><meshBasicMaterial color={tint} /></mesh>
+    </group>;
+  }
   return null;
 }
 function ViewportDropPoint({point,onReady}:{point:MutableRefObject<((x:number,y:number)=>Vec3|null)|null>;onReady:(ready:boolean)=>void}){
@@ -493,7 +501,7 @@ function Scene({
           object={group as MutableRefObject<THREE.Group>}
           mode={mode}
           enabled={!fly&&!transformLocked}
-          showX={mode!=='rotate'||!['Player spawn','Netgame item'].includes(chosen.kind)} showY={mode!=='rotate'||!['Player spawn','Netgame item'].includes(chosen.kind)} showZ
+          showX={mode!=='rotate'||!yawOnlyKinds.includes(chosen.kind)} showY={mode!=='rotate'||!yawOnlyKinds.includes(chosen.kind)} showZ
           space={mode === 'translate' ? 'world' : 'local'}
           translationSnap={snap ? 0.5 : null}
           rotationSnap={snap ? Math.PI / 12 : null}
@@ -1928,7 +1936,7 @@ export default function World({
                             disabled={
                               hmvSelected && property === 'scale' || !!nativeSourceScope&&(property==='scale'||!!nativeDevice?.locked||!nativeDeviceReady) || property === 'rotation' &&
                               i > 0 &&
-                              ['Player spawn', 'Netgame item'].includes(chosen.kind)
+                              yawOnlyKinds.includes(chosen.kind)
                             }
                             min={property === 'scale' ? 0.001 : -1e6}
                             step={property === 'rotation' ? 1 : property === 'scale' ? 0.01 : 0.1}

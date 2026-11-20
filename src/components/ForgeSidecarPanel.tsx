@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvPlacement, canPlaceHmvSpawn, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvSpawns, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, HMV_SPAWN_MODES, supportsHmvMap, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
+import { addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, supportsHmvMap, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { Notice, NumberField } from './ui';
@@ -36,7 +36,10 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   const spawn = summary?.spawns.find(row => row.id === selected?.id);
   const sceneIds = new Set(project.scene.map(object => object.id));
   const hiddenSpawns = summary?.spawns.filter(record => !sceneIds.has(record.id)) ?? [];
-  const visibleSpawns = (summary?.spawns.length ?? 0) - hiddenSpawns.length;
+  const teleporters = summary?.teleporters ?? [];
+  const endpoint = teleporters.find(record => record.id === selected?.id);
+  const hiddenTeleporters = teleporters.filter(record => !sceneIds.has(record.id));
+  const visibleMarkers = (summary?.spawns.length ?? 0) - hiddenSpawns.length + teleporters.length - hiddenTeleporters.length;
   if (!compatible && !layout) return null;
 
   async function open(file: File) {
@@ -89,12 +92,33 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     } catch (error) { setProblem(String(error)); }
   }
 
-  function showSpawns() {
+  function addTeleporters() {
+    if (!selected) return;
     try {
-      const next = showHmvSpawns(project, map);
-      if (next !== project && hiddenSpawns.length) {
-        edit(next, 'Show Forge player spawns');
-        onSelect(hiddenSpawns[0].id);
+      ticket.current++;
+      const result = addHmvTeleporterPair(project, map, selected);
+      edit(result.project, 'Add Forge teleporter pair');
+      onSelect(result.selectedId);
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
+  function changeTeleportChannel(channel: number) {
+    if (!selected || !endpoint) return;
+    try {
+      const next = changeHmvTeleporterChannel(project, map, selected, channel);
+      if (next !== project) edit(next, 'Move linked teleporters to another channel');
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
+  function showMarkers(kind: 'spawns' | 'teleporters') {
+    try {
+      const missing = kind === 'spawns' ? hiddenSpawns : hiddenTeleporters;
+      const next = showHmvMarkers(project, map, kind);
+      if (next !== project && missing.length) {
+        edit(next, kind === 'spawns' ? 'Show Forge player spawns' : 'Show Forge teleporters');
+        onSelect(missing[0].id);
       }
       setProblem('');
     } catch (error) { setProblem(String(error)); }
@@ -110,6 +134,9 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       {!selectedTag && !selectedSpawn && <p className="subtle">Select a player spawn or unscaled object from this map.</p>}
     </>}
 
+    {canAddHmv && map.header.scenarioType === 1 && <button type="button" disabled={!selected} onClick={addTeleporters}>
+      Add teleporter pair near selection
+    </button>}
     {compatible && selected && properties && <fieldset key={selected.id}>
       <legend>Placement properties</legend>
       <label className="field-label">Team
@@ -154,11 +181,27 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
         </label>)}
       </div>
     </fieldset>}
+    {compatible && endpoint && <fieldset key={endpoint.id}>
+      <legend>Teleporter properties</legend>
+      <p>{endpoint.role === 'sender' ? 'Sender' : 'Receiver'}</p>
+      <label className="field-label">Channel for linked endpoints
+        <select value={endpoint.channel} onChange={event => changeTeleportChannel(Number(event.target.value))}>
+          {Array.from({ length: HMV_TELEPORTER_CHANNELS }, (_, channel) => (
+            <option key={channel} value={channel}
+              disabled={channel !== endpoint.channel && teleporters.some(record => record.channel === channel)}>
+              Channel {channel + 1}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="subtle">Move the sender and receiver into place separately. Changing the channel moves their entire linked group.</p>
+    </fieldset>}
     {layout ? <>
       <p>{layout.name}</p>
-      {summary&&<p role="status">{summary.editable + visibleSpawns} editable placements · {summary.retained - visibleSpawns} other records preserved.</p>}
-      {!!hiddenSpawns.length && <button type="button" onClick={showSpawns}>Show layout spawns</button>}
-      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit placements. Move player spawns and adjust yaw.'}</p>
+      {summary&&<p role="status">{summary.editable + visibleMarkers} editable placements · {summary.retained - visibleMarkers} other records preserved.</p>}
+      {!!hiddenSpawns.length && <button type="button" onClick={() => showMarkers('spawns')}>Show layout spawns</button>}
+      {!!hiddenTeleporters.length && <button type="button" onClick={() => showMarkers('teleporters')}>Show layout teleporters</button>}
+      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit placements. Move spawn or teleporter markers and adjust yaw.'}</p>
       {summary?.forerunner && map.header.version === 5 && <p className="subtle">In Chupathingy builds with Forge, put the copy in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
       <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {

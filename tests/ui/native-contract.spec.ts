@@ -5997,6 +5997,19 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   expect(spawnOutput.readUInt16LE(160)).toBe(32);
   expect(spawnOutput.subarray(81,129)).toEqual(output.subarray(81,129));
 
+  await panel.getByRole('button',{name:'Add teleporter pair near selection'}).click();
+  await expect(panel.getByRole('status')).toContainText('4 editable placements');
+  const teleporterFields = panel.getByRole('group',{name:'Teleporter properties'});
+  await teleporterFields.getByLabel('Channel for linked endpoints').selectOption('7');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[180])).toBe(7);
+  const teleporterExport = page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
+  const teleporterOutput = await fs.readFile((await (await teleporterExport).path())!);
+  expect(teleporterOutput.readUInt16LE(4)).toBe(5);
+  expect(teleporterOutput.subarray(177,181)).toEqual(Buffer.from([255,255,7,7]));
+  expect(teleporterOutput.subarray(225,229)).toEqual(Buffer.from([255,255,8,7]));
+
   await panel.getByRole('button',{name:'Remove layout from project'}).click();
   const supported = Buffer.concat([source.subarray(0,129),source.subarray(177)]);
   supported.writeUInt8(1,111);
