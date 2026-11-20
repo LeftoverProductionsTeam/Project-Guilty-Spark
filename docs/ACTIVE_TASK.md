@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Upstream Forge interoperability and Black Echo native acceptance
-Status: implementation incomplete
-Starting revision: 8fc1914930e3d8787b906df5aac2a3a943fe5db4, canonical master.
-Latest verified revision: Spark exported a Forerunner-compatible HMV and preserved the lossless Chupathingy export. Focused UI, persistence and build checks passed. CMT Elite hands compiled, read back and rendered with the plasma pistol in an isolated Forerunner run.
-Next action: Load the Spark-exported placement on the exact Blood Gulch map in native Forerunner Forge and in a Forge-capable Chupathingy build. Then play exact Elite/four-start CE609 04d9ccd1 with two authenticated players. Verify physical terminals, aircraft, extraction, banking, reconnect and redeployment. Preserve the shared hands fallback pending redistribution permission.
+Task: Black Echo two-player native acceptance
+Status: awaiting human verification
+Starting revision: 7c319194b7f654370028e863301227240665fed8, canonical master.
+Latest verified revision: Spark HMV import/edit/export materialized the moved Warthog in native Forerunner on exact Xbox Blood Gulch. Independent Windows runtime exchange verified one base placement between Chupathingy nightly and Forerunner. Black Echo 04d9ccd1 reached Covenant selection, deployment, Spirit boarding, landing and living field exit in Forerunner’s offline diagnostics.
+Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Continue from the verified offline Spirit insertion to field combat, technology, defense, evacuation, banking, reconnect and redeployment. Verify both factions, distinct Elite colors and respawns. Use the shared fallback pending CMT redistribution permission. Keep direct Spark-to-Chupathingy playback, HMV replication and advanced records open independently.
 
 ## Acceptance
 
@@ -115,7 +115,7 @@ Older detailed source/check summaries were consolidated here to keep the existin
 
 ## Failures and blockers
 
-The exact 04d9ccd1 candidate loaded in Forerunner. Fixed-aim diagnostic input changed aim but did not reach a terminal. Two-client physical gameplay, fallbacks and persistence remain open. The isolated CMT art fixture established local rendering with the stock plasma pistol. Spark HMV exact-map gameplay remains open in both runtimes. See RUNTIME_INTEGRATION_20261107 for source references and artifact hashes.
+One offline Windows Forerunner player followed normal movement, aim and Use through the exact Black Echo Covenant and deployment controls, Spirit seat 5, field landing and safe disembarkation. Two-player physical gameplay and persistence remain open. Spark’s edited Blood Gulch HMV passed native Forerunner load. The reviewed Chupathingy nightly successfully applied a Forerunner-authored HMV on the same map. Direct Spark-file playback in Chupathingy and shared HMV replication are open. See RUNTIME_INTEGRATION_20261107 for exact evidence.
 
 17Nov current candidate dee2d9a7 compiled and passed independent Invader checks with the compatible Spirit pilot, revised touchdown pose/return route, Pelican seat and both Marine flags. Prior entries below are historical. Runtime startup in the private profile did not confirm a map load. Full physics/AI and two-player mission acceptance stay open. Exact native identities in RUNTIME_INTEGRATION_20261107.
 

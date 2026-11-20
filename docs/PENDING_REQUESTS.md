@@ -1,6 +1,6 @@
 # Pending engineering requests
 
-Current priority: verify the cross-runtime HMV handoff, then run the two-player Black Echo acceptance on exact Elite/four-start CE609 cache 04d9ccd1. The earlier Grunt technology cache is historical. The CMT model rendered in a disposable Forerunner test. Keep the shared candidate on its stock hands fallback until redistribution permission is established.
+Current priority: two-player Black Echo acceptance on exact Elite/four-start CE609 cache 04d9ccd1. Forerunner verified the offline Covenant terminal, deployment, Spirit flight, landing and exit. Spark’s edited base placement loaded in Forerunner Forge, and companion runtime exchange succeeded with a Chupathingy nightly. Direct Spark-file playback in Chupathingy and HMV replication remain open. The earlier Grunt technology cache is historical. The CMT model rendered in a disposable Forerunner test. Keep the shared candidate on its stock hands fallback until redistribution permission is established.
 
 Permanent Covenant player requirement: standard playable Elites with individually selected native armor colors and faction identity distinct from match teams. Keep custom species and models as explicit modder choices in the existing faction tools. Require correct body, animation graph, first-person setup, collision, gear, HUD and Spirit seating. Verify two authenticated differently colored Elites through full Extraction, deaths, reconnects and persistence, then scale to six players.
 
