@@ -63,7 +63,7 @@ fn linked_switch_shares_one_native_group_with_its_machine() {
         devices: d.placements.iter().enumerate().map(|(index,p)| ScenarioLogicDevice {
             class: p.tag_class.clone(), index: 0, name_index: index as i16,
             tag_path: p.tag_path.clone(), position: p.position, rotation_radians: [0.;3],
-            power_group: Some(-1), position_group: Some(0), interaction_disabled:None, usable_from_both_sides: None,
+            power_group: Some(-1), position_group: Some(0), interaction_disabled: (p.tag_class == "ctrl").then_some(false), usable_from_both_sides: None,
         }).collect(),
         vehicles: vec![],
         volumes: vec![ScenarioLogicVolume {
@@ -74,6 +74,9 @@ fn linked_switch_shares_one_native_group_with_its_machine() {
         }],
     };
     l::verify_marker_readback(&d, &read).unwrap();
+    read.devices[1].interaction_disabled = Some(true);
+    assert!(l::verify_marker_readback(&d, &read).unwrap_err().to_string().contains("blocks player interaction"));
+    read.devices[1].interaction_disabled = Some(false);
     read.devices[0].position_group = Some(-1);
     assert!(l::verify_marker_readback(&d, &read).is_err());
     let mut dangling = d.clone();
@@ -101,14 +104,16 @@ fn linked_switch_wiring_is_written_by_invader() {
     for array in ["machines", "controls"] {
         run(&["-I".into(), array.into(), "1".into(), "end".into(), tag.into()]);
     }
+    run(&["-S", "controls[0].device_flags.not_usable_from_any_side", "1", tag].map(str::to_owned));
     for command in l::scenario_commands(&switch_level(), "test").unwrap() {
         if ["logic-groups", "logic-names"].contains(&command.phase.as_str()) {
             run(&command.args);
         }
     }
     let read = run(&["-G", "machines[0].position_group", "-G", "controls[0].position_group", "-G",
-        "device_groups[0].initial_value", "-G", "device_groups[0].name", tag].map(str::to_owned));
-    assert_eq!(read.lines().collect::<Vec<_>>(), ["0", "0", "0.250000", &l::native_name("dg", "switch")]);
+        "device_groups[0].initial_value", "-G", "device_groups[0].name", "-G",
+        "controls[0].device_flags.not_usable_from_any_side", tag].map(str::to_owned));
+    assert_eq!(read.lines().collect::<Vec<_>>(), ["0", "0", "0.250000", &l::native_name("dg", "switch"), "0"]);
 }
 
 #[test]
@@ -416,7 +421,7 @@ fn installed_compiled_extraction_checks_all_hub_starts_and_native_bindings() {
     assert!(creative::compiled_extraction_mode(&path,&map).unwrap());
     let markers=maps::scenario_logic_readback(&path,&map).unwrap();
     l::validate_compiled_extraction_layout(&map,&markers).unwrap();
-    for fault in 0..8 {
+    for fault in 0..9 {
         let mut wrong=markers.clone();
         match fault {
             0=>{wrong.volumes.retain(|v|v.name!="extraction_return");},
@@ -426,7 +431,12 @@ fn installed_compiled_extraction_checks_all_hub_starts_and_native_bindings() {
             4=>wrong.names.iter_mut().find(|n|n.name=="extraction_deploy").unwrap().object_type=7,
             5=>wrong.names.iter_mut().find(|n|n.name=="extraction_activate").unwrap().object_index=-1,
             6=>{let row=wrong.names.iter().find(|n|n.name=="extraction_deploy").unwrap().clone();wrong.names.push(row);},
-            _=>{for row in &mut wrong.devices {row.position=[f32::NAN,0.,0.];}},
+            7=>{for row in &mut wrong.devices {row.position=[f32::NAN,0.,0.];}},
+            _=>{
+                let index=wrong.names.iter().position(|n|n.name=="extraction_activate").unwrap();
+                let control=wrong.devices.iter_mut().find(|d|d.class=="ctrl"&&d.name_index==index as i16).unwrap();
+                control.interaction_disabled=Some(true);
+            },
         }
         assert!(l::validate_compiled_extraction_layout(&map,&wrong).is_err(),"native marker fault {fault}");
     }

@@ -4,7 +4,7 @@ import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpaw
 import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsChupathingyForge, supportsHmvMap, type ForgeLayoutTarget, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
-import { verifyForerunnerLocalForge } from '../runtimeWorkbench';
+import { verifyForerunnerHostPhysics, verifyForerunnerLocalForge } from '../runtimeWorkbench';
 import { Notice, NumberField } from './ui';
 
 export default function ForgeSidecarPanel({ project, map, edit, selected, onSelect, openRequest }: {
@@ -22,7 +22,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   useEffect(() => { if (openRequest) setExpanded(true); }, [openRequest]);
   useEffect(() => () => { ticket.current++; }, []);
   const [problem,setProblem] = useState('');
-  const [checkingLocalForge,setCheckingLocalForge] = useState(false);
+  const [checkingForge,setCheckingForge] = useState<ForgeLayoutTarget | null>(null);
   const [objectiveType, setObjectiveType] = useState<HmvObjectiveType>(0);
   const layout = project.forgeSidecar;
   const summary = useMemo(() => {
@@ -95,9 +95,10 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     const request = ticket.current;
     setProblem('');
     try {
-      if (target === 'forerunner-local') {
-        setCheckingLocalForge(true);
-        await verifyForerunnerLocalForge(summary?.forerunnerLocalNeedsPhysics);
+      if (target !== 'forerunner') {
+        setCheckingForge(target);
+        if (target === 'forerunner-host-physics') await verifyForerunnerHostPhysics();
+        else await verifyForerunnerLocalForge(summary?.forerunnerLocalNeedsPhysics);
       }
       if (request !== ticket.current) return;
       if (snapshot.project !== current.current.project || snapshot.map !== current.current.map) {
@@ -108,7 +109,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     } catch (error) {
       if (request === ticket.current) setProblem(String(error));
     } finally {
-      if (target === 'forerunner-local') setCheckingLocalForge(false);
+      if (target !== 'forerunner') setCheckingForge(null);
     }
   }
 
@@ -348,12 +349,18 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
           : 'Use this HMV with the exact base map in an HMV-capable runtime. Forerunner’s Forge Tools expects the file as import.hmv.')}</p>
       </div>}
       {summary?.forerunner && <div>
-        <button type="button" disabled={!compatible || checkingLocalForge || !!summary.forerunner.issue}
+        <button type="button" disabled={!compatible || !!checkingForge || !!summary.forerunner.issue}
           onClick={() => void exportForerunner('forerunner')}>Export for Forerunner</button>
         {(summary.devices.length > 0 || summary.forerunnerLocalNeedsPhysics) && summary.forerunnerLocalIssue === null && <>
-          <button type="button" disabled={!compatible || checkingLocalForge}
-            onClick={() => void exportForerunner('forerunner-local')}>{checkingLocalForge ? 'Checking Local Forge…' : 'Export for Forerunner Local Forge'}</button>
+          <button type="button" disabled={!compatible || !!checkingForge}
+            onClick={() => void exportForerunner('forerunner-local')}>{checkingForge === 'forerunner-local' ? 'Checking Local Forge…' : 'Export for Forerunner Local Forge'}</button>
           <p className="subtle">Put <code>import.hmv</code> in <code>forge/{summary.forerunner.mapName}/</code> under the reviewed runtime’s save folder. Open <strong>Forge → Local Forge</strong> on the exact map, then choose <strong>Forge Tools → Load Layout (.HMV)</strong>.{summary.forerunnerLocalNeedsPhysics && ' Fixed and Phased physics require a reviewed runtime with local physics support.'}</p>
+        </>}
+        {summary.forerunnerHostPhysicsIssue === null && <>
+          <button type="button" disabled={!compatible || !!checkingForge} onClick={() => void exportForerunner('forerunner-host-physics')}>
+            {checkingForge === 'forerunner-host-physics' ? 'Checking hosted Forge…' : 'Export for Forerunner hosted physics'}
+          </button>
+          <p className="subtle">Put <code>import.hmv</code> in <code>forge/{summary.forerunner.mapName}/</code> under the host’s save folder. Load it from <strong>Forge Tools → Load Layout (.HMV)</strong> on the matching map. Each guest needs a build that supports hosted Forge physics.</p>
         </>}
         <p className="subtle">{summary.forerunner.issue ?? <>Copy <code>import.hmv</code> to <code>forge/{summary.forerunner.mapName}/</code> in the save folder of a Forerunner build with HMV support. In an empty Forge session on this map, choose <strong>Forge Tools → Load Layout (.HMV)</strong>.{summary.forerunner.hasScenery && ' A network host cannot load layouts with scenery.'}</>}</p>
       </div>}

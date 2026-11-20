@@ -5,16 +5,22 @@ import type { NativeOperation } from './nativeOperations';
 const localForgeFeature = 'forge.hmv_local_devices.v1';
 const localForgePhysicsFeature = 'forge.hmv_local_physics.v1';
 
-export async function verifyForerunnerLocalForge(requiresPhysics = false) {
+export function verifyForerunnerLocalForge(requiresPhysics = false) {
+  const required = requiresPhysics ? [localForgeFeature, localForgePhysicsFeature] : [localForgeFeature];
+  return verifyForerunnerForge(required, 'Local Forge', requiresPhysics ? 'Local Forge Fixed and Phased physics' : 'Local Forge support');
+}
+
+export function verifyForerunnerHostPhysics() {
+  return verifyForerunnerForge(['forge.hmv_base_placements.v1', 'forge.hmv_host_physics.v1'],
+    'Hosted Forge', 'hosted Forge Fixed and Phased physics');
+}
+
+async function verifyForerunnerForge(required: string[], mode: string, support: string) {
   const { call } = await import('./api');
   const profiles = await call<RuntimeRegistration[]>('list_runtime_registrations');
-  const required = requiresPhysics ? [localForgeFeature, localForgePhysicsFeature] : [localForgeFeature];
   const candidates = profiles.filter(profile => profile.runtimeId === 'openCe'
     && required.every(feature => profile.reviewedCompanion?.capabilities.native_features?.includes(feature)));
-  if (!candidates.length) {
-    const support = requiresPhysics ? 'Local Forge Fixed and Phased physics' : 'Local Forge support';
-    throw Error(`Review a Forerunner build with ${support} in Games & Tools.`);
-  }
+  if (!candidates.length) throw Error(`Review a Forerunner build with ${support} in Games & Tools.`);
   for (const registration of candidates) {
     try {
       const result = await call<import('./types').RuntimeInstallation>('inspect_runtime_registration', { registration });
@@ -24,7 +30,7 @@ export async function verifyForerunnerLocalForge(requiresPhysics = false) {
       // A stale profile must not prevent a second intact reviewed profile from being used.
     }
   }
-  throw Error('The reviewed Local Forge runtime changed or is unavailable. Inspect it again in Games & Tools.');
+  throw Error(`The reviewed ${mode} runtime changed or is unavailable. Inspect it again in Games & Tools.`);
 }
 
 export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';

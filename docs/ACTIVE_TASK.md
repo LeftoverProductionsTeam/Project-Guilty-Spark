@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Native switch interaction lock reviewed, restored and independently verified in CE609. Forerunner confirmed Use targeting for the unlocked fixture and separate native Fixed/Phased collision. Three browser workflows, six focused Rust checks, opt-in native compile and Windows desktop Cargo check passed. Forge now replaces a returned layout in one undoable edit. Verified invalid-file recovery, Undo/Redo, Save, close, reopen and exact re-export in the browser.
-Next action: Confirm an actual gameplay Use action reaches the native touch-device handler in the isolated CE609 fixture and measure the linked machine transition. If native input is unavailable, advance peer Fixed/Phased replication and client-initiated Forge editing using the existing HMV capability contract. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
+Latest verified revision: Spark exports HMV v7 hosted physics through a reviewed Forerunner capability. Native Logic rejects locked player controls and validates switch targets. Forerunner separately verified E-key switch motion on host and guest and hosted Fixed/Phased replication to existing and late guests. Spark’s rebuilt variant independently compiled and received the targeted keyboard inputs in a matching two-client session.
+Next action: Carry advanced placement settings through the existing SparkLink authoring and export workflow. Add guest-initiated workflows when Forerunner exposes host-authorized editing in its versioned contract. Native switch collision and guest interaction still need direct acceptance. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
 
 ## Acceptance
 

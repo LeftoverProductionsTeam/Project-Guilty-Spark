@@ -184,7 +184,7 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(() => addHmvPlacement(withNative, map, { ...native, scale: [2, 2, 2] })).toThrow('unscaled');
   });
 
-  it('allows Fixed and Phased ordinary placements through Local Forge only', () => {
+  it('preserves Fixed and Phased in Local and compatible hosted Forge exports', () => {
     const native = {
       id: 'native-pistol', name: 'Pistol', tagId: 10, kind: 'Weapon',
       position: [1, 2, 3], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true,
@@ -199,10 +199,13 @@ describe('Chupathingy Forge binary layouts', () => {
     const layout = readHmv(Array.from(output), map);
     expect(layout.forerunnerLocalNeedsPhysics).toBe(true);
     expect(layout.objectRecords.map(row => row.properties.physics)).toEqual(['fixed','phased']);
+    expect(exportForgeSidecar(authored, map, 'forerunner-host-physics')).toEqual(output);
+    expect(inspectForgeSidecar(authored.forgeSidecar!, map).forerunnerHostPhysicsIssue).toBe(null);
     expect(() => exportForgeSidecar(authored, map, 'forerunner')).toThrow('standard physics');
     for (const unsupported of [{ respawnSeconds: 10 }, { placeAtStart: false }]) {
       const blocked = updateHmvPlacementProperties(authored, map, authored.scene[1], { ...fixed, ...unsupported });
       expect(() => exportForgeSidecar(blocked, map, 'forerunner-local')).toThrow('placed at start');
+      expect(() => exportForgeSidecar(blocked, map, 'forerunner-host-physics')).toThrow('placed at start');
       expect(exportForgeSidecar(blocked, map)).toBeInstanceOf(Uint8Array);
     }
   });
@@ -403,6 +406,7 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner')).toThrow('does not place devices');
     const output = exportForgeSidecar(moved, deviceMap) as Uint8Array;
     expect(exportForgeSidecar(moved, deviceMap, 'forerunner-local')).toEqual(output);
+    expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner-host-physics')).toThrow('vehicles, weapons or equipment');
     expect(inspectForgeSidecar(moved.forgeSidecar!, deviceMap).forerunnerLocalNeedsPhysics).toBe(true);
     expect(new DataView(output.buffer).getUint16(4, true)).toBe(7);
     const reopened = importForgeSidecar(starting, deviceMap, 'devices.hmv', output).project;

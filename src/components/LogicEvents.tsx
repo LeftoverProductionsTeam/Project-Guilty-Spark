@@ -236,7 +236,7 @@ export default function LogicEvents({
                 <option value="">No shared switch</option>
                 {eligibleSwitches.map(control=><option key={control.id} value={control.id}>{control.name}</option>)}
               </select>
-              <span className="forge-hint">Use a player-operated control. Its initial position applies to every connected machine.</span>
+              <span className="forge-hint">Use a player-operated control with a native door or platform. The control’s initial position applies to every connected machine.</span>
             </label>}
           {!controlSelected&&!vehicleSelected&&<>
           {!doors.length && (

@@ -163,6 +163,7 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     writeMarker: layout.write,
     metadata: { details: layout.details, date: layout.date },
     forerunnerLocalIssue: layout.forerunnerLocalIssue ?? unresolved,
+    forerunnerHostPhysicsIssue: layout.forerunnerHostPhysicsIssue ?? unresolved,
     forerunnerLocalNeedsPhysics: layout.forerunnerLocalNeedsPhysics,
     forerunner: {
       mapName: layout.mapName,
@@ -181,6 +182,7 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
     metadata: 'metadata' in parsed ? parsed.metadata : undefined,
     hmvConversionIssue: 'hmvConversionIssue' in parsed ? parsed.hmvConversionIssue : undefined,
     forerunnerLocalIssue: 'forerunnerLocalIssue' in parsed ? parsed.forerunnerLocalIssue : undefined,
+    forerunnerHostPhysicsIssue: 'forerunnerHostPhysicsIssue' in parsed ? parsed.forerunnerHostPhysicsIssue : undefined,
     forerunnerLocalNeedsPhysics: 'forerunnerLocalNeedsPhysics' in parsed && parsed.forerunnerLocalNeedsPhysics };
 }
 
@@ -463,8 +465,8 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
   const layout = parse(sidecar, map);
   const { rows, finish, forerunner } = layout;
   if (target) {
-    const issue = target === 'forerunner-local' && 'forerunnerLocalIssue' in layout
-      ? layout.forerunnerLocalIssue : forerunner?.issue;
+    const issue = target === 'forerunner-host-physics' && 'forerunnerHostPhysicsIssue' in layout ? layout.forerunnerHostPhysicsIssue
+      : target === 'forerunner-local' && 'forerunnerLocalIssue' in layout ? layout.forerunnerLocalIssue : forerunner?.issue;
     if (!forerunner || issue) throw Error(issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
   }
   for (const row of rows) {
@@ -551,7 +553,8 @@ export function exportForgePlacementSnapshot(
     }
     layout = appendBaseHmvPlacement(layout, map, placement);
   }
-  const issue = target === 'forerunner-local' ? layout.forerunnerLocalIssue : target ? layout.forerunnerIssue : null;
+  const issue = target === 'forerunner-host-physics' ? layout.forerunnerHostPhysicsIssue
+    : target === 'forerunner-local' ? layout.forerunnerLocalIssue : target ? layout.forerunnerIssue : null;
   if (issue) throw Error(issue);
   const bytes = layout.writeDetails({ title: 'SparkLink revision ' + revision, author, description: '' });
   return {

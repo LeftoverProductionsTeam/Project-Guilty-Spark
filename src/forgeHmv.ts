@@ -9,7 +9,7 @@ export type HmvBaseIdentity = {
 // Chupathingy Forge layout format, versions 1–7. See the pinned upstream
 // format reference in docs/RUNTIME_INTEGRATION_20261107.md.
 export const HMV_LIMIT = 65536;
-export type ForgeLayoutTarget = 'forerunner' | 'forerunner-local';
+export type ForgeLayoutTarget = 'forerunner' | 'forerunner-local' | 'forerunner-host-physics';
 export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
 const headerSize = 64;
 const recordSize = 48;
@@ -186,6 +186,8 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
   let forerunnerLocalIssue = map.header.scenarioType === 1 ? forerunnerIssue : 'Local Forge needs a multiplayer base map.';
+  let forerunnerHostPhysicsIssue = map.header.scenarioType !== 1 ? 'Hosted Forge needs a multiplayer base map.'
+    : version !== 7 ? 'Hosted Forge physics needs a version 7 HMV.' : forerunnerIssue;
   let forerunnerLocalNeedsPhysics = false;
   const objectiveRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvObjectiveProperties }[] = [];
   let markers = false, senders = 0, receivers = 0;
@@ -210,6 +212,9 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     }
     if (!forerunnerLocalIssue && (!ordinary || !isHmvPlacementGroup(group))) {
       forerunnerLocalIssue = placementIssue('Local Forge', 'supported physics');
+    }
+    if (!forerunnerHostPhysicsIssue && (!ordinary || !basePlacementGroups.has(group) || group === 'scen')) {
+      forerunnerHostPhysicsIssue = `Hosted Forge physics needs base-map vehicles, weapons or equipment. ${placementIssue('Hosted Forge', 'supported physics')}`;
     }
     forerunnerLocalNeedsPhysics ||= !!physics;
 
@@ -365,6 +370,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     mapName,
     forerunnerIssue,
     forerunnerLocalIssue,
+    forerunnerHostPhysicsIssue: forerunnerHostPhysicsIssue ?? (forerunnerLocalNeedsPhysics ? null : 'Select Fixed or Phased physics for at least one placement.'),
     forerunnerLocalNeedsPhysics,
     write(index: number, position: Vec3, rotation: Vec3) {
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));

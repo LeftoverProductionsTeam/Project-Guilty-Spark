@@ -551,6 +551,11 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
                 || compiled.position_group != Some(linked_position_group(binding, &controls, signals.len())))) {
             return invalid(format!("Compiled Logic device {} name/index/tag/position or wiring differs from source",source.name));
         }
+        if controls.iter().any(|control| control.placement_id == binding.placement_id)
+            && compiled.interaction_disabled != Some(false)
+        {
+            return invalid(format!("Compiled position switch {} blocks player interaction or its placement flag is unreadable", source.name));
+        }
     }
     for (offset,source) in doc.placements.iter().filter(|p|p.native_name.is_some()).enumerate(){
         let index=logic.devices.len()+offset;
@@ -608,6 +613,9 @@ pub fn validate_compiled_extraction_layout(map:&crate::maps::MapInspection,read:
         if rows.len()!=1||rows[0].1.object_type!=8||rows[0].1.object_index<0{return invalid(format!("Compiled Extraction control {name} is missing, ambiguous or has the wrong native type"));}
         let (name_index,binding)=rows[0];let devices=read.devices.iter().filter(|d|d.class=="ctrl"&&d.index==binding.object_index as usize&&d.name_index==name_index as i16).collect::<Vec<_>>();
         if devices.len()!=1{return invalid("Compiled Extraction control reverse binding is invalid");}
+        if devices[0].interaction_disabled != Some(false) {
+            return invalid(format!("Compiled Extraction control {name} blocks player interaction or its placement flag is unreadable"));
+        }
         let point=devices[0].position;
         if name=="extraction_deploy"&&(!hub.contains(point)||field.contains(point))||name=="extraction_activate"&&!field.contains(point){return invalid("Compiled Extraction controls are outside their hub/activation areas");}
     }
@@ -677,6 +685,8 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         );
         if placement.tag_class == "mach" {
             set(&mut args, format!("{array}[{device_index}].machine_flags.does_not_operate_automatically"), "1");
+        } else if controls.iter().any(|control| control.placement_id == device.placement_id) {
+            set(&mut args, format!("{array}[{device_index}].device_flags.not_usable_from_any_side"), "0");
         }
         args.push(tag.clone());
         let mut names = command(args);
@@ -873,6 +883,18 @@ pub(crate) fn compile(
                 format!("{}.device_control", placement.tag_path)], workspace, "logic-control-readback", 72)?;
             if actual.trim().replace('_', " ") != "touched by player" {
                 return invalid("The linked switch or Extraction terminal must use a native touched-by-player control tag. Choose a compatible control.");
+            }
+        }
+        if binding.position_control_id.is_some() {
+            let machine_tag = format!("{}.device_machine", placement.tag_path);
+            let machine_type = runner.run(edit,
+                &["-t".into(), tags.clone(), "-G".into(), "machine_type".into(), machine_tag],
+                workspace, "logic-machine-readback", 72)?;
+            if !matches!(machine_type.trim(), "door" | "platform") {
+                return invalid(format!(
+                    "Position switch target {} uses native machine type {}. Choose a door or platform for a shared position switch.",
+                    placement.name, machine_type.trim(),
+                ));
             }
         }
         for (key, expected) in [

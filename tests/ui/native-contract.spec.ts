@@ -6162,10 +6162,42 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   await placement.getByLabel('Team').selectOption('1');
   await placement.getByLabel('Physics').selectOption('fixed');
   await expect(target).toBeDisabled();
+  const hosted = panel.getByRole('button',{name:'Export for Forerunner hosted physics',exact:true});
+  await hosted.click();
+  await expect(panel).toContainText('Review a Forerunner build with hosted Forge Fixed and Phased physics');
+  await page.evaluate(() => {
+    const w = window as any, previous = w.__TAURI_INTERNALS__.invoke;
+    const sha = 'f'.repeat(64);
+    const registration = {id:'hosted-forge',runtimeId:'openCe',root:'D:/Native',executable:'D:/Native/halo.exe',
+      reviewedCompanion:{executableSha256:sha,dependencySha256:'c'.repeat(64),
+        capabilities:{native_features:['forge.hmv_base_placements.v1', 'forge.hmv_host_physics.v1']}}};
+    w.__sparkMock.staleHostedForge = true;
+    w.__TAURI_INTERNALS__.invoke = async (command:string,args:any) => {
+      if (command === 'list_runtime_registrations') return [registration];
+      if (command === 'inspect_runtime_registration' && args.registration.id === registration.id) {
+        if (w.__sparkMock.staleHostedForge) throw Error('SDL changed');
+        return {registrationId:registration.id,validation:'pass',executableSha256:sha};
+      }
+      return previous(command,args);
+    };
+  });
+  await hosted.click();
+  await expect(panel).toContainText('The reviewed Hosted Forge runtime changed or is unavailable.');
+  await page.evaluate(() => { (window as any).__sparkMock.staleHostedForge = false; });
+  const hostedDownload = page.waitForEvent('download');
+  await hosted.click();
+  const hostedFile = await hostedDownload;
+  const { readFile } = await import('node:fs/promises');
+  const hostedBytes = await readFile((await hostedFile.path())!);
+  expect(hostedFile.suggestedFilename()).toBe('import.hmv');
+  expect(hostedBytes.readUInt16LE(4)).toBe(7);
+  expect(hostedBytes[64 + 5 + hostedBytes[68] + 34]).toBe(0x11);
+  expect(hostedBytes.readUInt32LE(60)).toBe(crc32(hostedBytes.subarray(64)));
   await placement.getByLabel('Physics').blur();
   await page.keyboard.press('Control+z');
   await expect(placement.getByLabel('Physics')).toHaveValue('normal');
   await expect(target).toBeEnabled();
+  await expect(hosted).toHaveCount(0);
   await page.keyboard.press('Control+y');
   await expect(target).toBeDisabled();
   await placement.getByLabel('Physics').selectOption('normal');
