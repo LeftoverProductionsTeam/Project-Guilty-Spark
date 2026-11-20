@@ -3,8 +3,8 @@
 Task: Playable Black Echo Extraction across two authenticated Forerunner players
 Status: implementation incomplete
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Black Echo CE609 04d9ccd1 combines the reviewed Elite binding and four separated, floor-supported hub starts. Independent Invader and Spark readback agree. All five terminal models meet or nearly meet the BSP and their collision already crosses the surface.
-Next action: Use exact 04d9ccd1 with two authenticated physical Forerunner clients. Check appearance and hub respawn separation, then faction terminal Use, Spirit flight, pickup, extraction, banking, redeployment and reconnect. Verify the terminal appearance and HUD in game.
+Latest verified revision: Spark’s recovered-scenario start duplication recreated Black Echo CE609 04d9ccd1 byte-for-byte. Four floor-supported starts, existing Elite bindings and terminal geometry are recorded in the runtime evidence.
+Next action: With exact 04d9ccd1, verify two authenticated clients’ Elite appearance, respawn separation, terminal Use, Spirit flight, pickup, extraction, banking, redeployment and reconnect. Review existing air-route compiler warnings against native waypoint and flight behavior.
 
 ## Acceptance
 

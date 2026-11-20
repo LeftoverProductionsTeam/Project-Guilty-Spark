@@ -30,6 +30,9 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
   const positionChanged=!!point&&!!position&&point.position.some((value,index)=>Math.abs(value-position[index])>Math.max(1e-6,Math.abs(value)*2**-22));
   const facingChanged=hasFacing&&facing!==null&&!nativeAiFacingClose(point!.facingRadians!,facing);
   const changed=valid&&(positionChanged||facingChanged||commandChanged||firing&&group!==point?.group);
+  const playerStarts=player ? context.scenarioPlayerStarts??[] : [];
+  const canCopy=player&&valid&&hasFacing&&playerStarts.length<256&&!!position
+    &&playerStarts.every(start=>start.position.some((value,index)=>Math.abs(value-position[index])>Math.max(1e-6,Math.abs(value)*2**-22)));
   const protectedGroup=!player&&!!squad&&context.protectedSquadEncounters?.includes(squad.encounterName.replace(/[A-Z]/g,char=>char.toLowerCase()));
   const issue=(player?context.playerStartEditIssue:firing?context.combatEditIssue:context.startEditIssue)??(protectedGroup?'This group has a preserved source recipe. Edit it in its original authoring workflow; direct overrides require source reconciliation.':null);
   // Busy belongs to this inspector, not every retained inspector of the map.
@@ -56,16 +59,19 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
       originalCommandList:!player&&!firing&&typeof point.commandList==='number'?point.commandList:undefined,commandList:!player&&!firing?pose.commandList??commandList??undefined:undefined,
       original:point.position,values:next,originalFacingRadians:hasFacing?point.facingRadians:null,facingDegrees:hasFacing?(pose.facingDegrees??facingText):undefined,mode:pose.mode??(draft?.key===key?draft.mode:undefined)??'translate',active,focus,locked:sourceLocked,reviewRequest:draft?.key===key?draft.reviewRequest:undefined});onDraftChange();
   }
-  function preview() {
-    if(disabled||!changed||!squad||!point||!position||!context.tagSha256)return;
-    if(player){if(facing!==null)onPreview({kind:'playerStartPosition',index:point.index,position,facingRadians:facing,sourceSha256:context.tagSha256});return;}
+  function preview(copy=false) {
+    if(disabled||!(copy?canCopy:changed)||!squad||!point||!position||!context.tagSha256)return;
+    if(player){
+      if(facing!==null)onPreview({kind:'playerStartPosition',index:copy?playerStarts.length:point.index,position,facingRadians:facing,sourceSha256:context.tagSha256,...(copy?{copyFrom:point.index}:{})});
+      return;
+    }
     if(firing){onPreview({kind:'encounterFiringPosition',encounter:squad.encounter,point:point.index,encounterName:squad.encounterName,position,group:group!,sourceSha256:context.tagSha256});return;}
     onPreview({kind:'encounterStartPosition',encounter:squad.encounter,squad:squad.squad,start:point.index,
       encounterName:squad.encounterName,squadName:squad.name,position,sourceSha256:context.tagSha256,...(commandChanged?{commandList:commandList!}:{}),...(hasFacing&&facing!==null&&(facingChanged||Math.abs(point.facingRadians!)<=Math.PI*2+1e-6)?{facingRadians:facingChanged?facing:point.facingRadians!}:{})});
   }
   return <details className={player?'native-player-starts':firing?'native-ai-firing':'native-ai-starts'} ref={detail}>
     <summary>{player?'Player starting positions':firing?'AI firing positions':'AI starting positions'}</summary>
-    <p className="subtle">{player?'Move an existing native player spawn and its facing. Team, BSP, gametype filters, indices and all other source stay unchanged. Clear both spawn and walking/boarding approaches; the point check does not prove aircraft clearance.':firing?'Edit this encounter firing point’s XYZ and group A–Z. Actor starts, tactical masks and navigation stay unchanged.':'Edit this native start’s XYZ, facing and existing command-list binding. Command-list contents, squad behavior, firing positions and navigation stay unchanged.'} {firing?'Rebuild and validate AI firing-position use and reachability afterward.':'Rebuild and validate actual spawning and reachability afterward.'}</p>
+    <p className="subtle">{player?'Move an existing spawn or use it as the template for a new one. Duplicates inherit the selected start’s team, BSP and gametype filters. Give the copy a different position and check it against the compiled BSP.':firing?'Edit this encounter firing point’s XYZ and group A–Z. Actor starts, tactical masks and navigation stay unchanged.':'Edit this native start’s XYZ, facing and existing command-list binding. Command-list contents, squad behavior, firing positions and navigation stay unchanged.'} {firing?'Rebuild and validate AI firing-position use and reachability afterward.':'Rebuild and validate actual spawning and reachability afterward.'}</p>
     {issue&&<Notice tone="info">{issue}</Notice>}
     {squad?<>{!player&&<label>{firing?'Encounter':'Encounter / squad'}<select aria-label={firing?'AI firing-position encounter':'AI starting-position squad'} value={`${squad.encounter}:${squad.squad}`} disabled={busy||dirty}
       onChange={event=>{setSquadKey(event.target.value);setStartIndex('0');setDraft(null);onDraftChange();}}>
@@ -102,13 +108,14 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
         {!valid&&<Notice tone="info">Enter three finite coordinates between −1,000,000 and1,000,000 and, when available, facing between −360° and360°.</Notice>}
         <div className="button-row">
           <button disabled={disabled||!valid||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>{for(const key of ['world.device-placement','world.command-list','world.cutscene-camera','world.trigger-volume']){const other=readMapSession<Record<string,unknown>|null>(context.projectId,key,null);if(other?.active)writeMapSession(context.projectId,key,{...other,active:false});}writeMapSession(context.projectId,'world.selection',null);coordinateDraft(values,true,Date.now());onLevelEditor?.();}}>Show handles in Level Editor</button>
-          <button disabled={disabled||!changed||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={preview}>{player?'Preview player starting pose':firing?'Preview AI firing position':commandChanged?'Preview AI start command binding':facingChanged?(positionChanged?'Preview AI starting pose':'Preview AI facing'):'Preview AI starting position'}</button>
+          <button disabled={disabled||!changed||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>preview()}>{player?'Preview player starting pose':firing?'Preview AI firing position':commandChanged?'Preview AI start command binding':facingChanged?(positionChanged?'Preview AI starting pose':'Preview AI facing'):'Preview AI starting position'}</button>
+          {player&&<button disabled={disabled||!canCopy||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>preview(true)}>Preview duplicated player start</button>}
           <button disabled={busy||!draft||draft.key!==key} onClick={()=>{setDraft(null);onDraftChange();}}>{firing?'Reset firing draft':'Reset coordinate draft'}</button>
         </div>
         <NativeBspPointCheck context={context} selectionKey={key} onGround={disabled?undefined:(_,point)=>{coordinateDraft(point.map(String) as [string,string,string]);requestAnimationFrame(()=>detail.current?.querySelector<HTMLInputElement>(`[aria-label="${label} Z"]`)?.focus());}} points={position?[position]:[]} disabled={busy||dirty||!valid} label={'Check '+label+' against compiled BSP'}/>
         <p className="subtle">Review below → Accept as new source revision → build working tag edits → inspect compiled coordinates and {player?'facing':firing?'group':'facing and command binding'}.  Restore before-edit tag selects the complete source from before that edit. Unaccepted drafts are temporary; no running game is changed here.</p>
       </>}
-      {!squad.starts?.length&&!issue&&<p className="subtle">{firing?'This encounter has no firing positions. Adding native positions needs the encounter authoring workflow.':'This squad has no authored starting locations. Adding native locations needs the encounter authoring workflow.'}</p>}
+      {!squad.starts?.length&&!issue&&<p className="subtle">{player?'No native player starts are available to duplicate.':firing?'This encounter has no firing positions. Adding native positions needs the encounter authoring workflow.':'This squad has no authored starting locations. Adding native locations needs the encounter authoring workflow.'}</p>}
     </>:!issue&&<p className="subtle">{firing?'Native firing-position inventory is unavailable.':'No native squad starting-location inventory is available.'}</p>}
   </details>;
 }

@@ -101,7 +101,7 @@ pub enum Operation {
     AppendEncounters { encounters:Vec<EncounterAppend>, #[serde(rename="sourceRules",default,skip_serializing_if="Option::is_none")] source_rules:Option<crate::firefight::FirefightConfig> },
     EncounterSquadCounts { encounter:u16,squad:u16,#[serde(rename="encounterName")] encounter_name:String,#[serde(rename="squadName")] squad_name:String,#[serde(rename="normalCount")] normal_count:u16,#[serde(rename="insaneCount")] insane_count:u16,#[serde(rename="sourceSha256")] source_sha256:String },
     EncounterSquadCountsBatch { edits:Vec<SquadCountEdit>,#[serde(rename="sourceSha256")] source_sha256:String },
-    PlayerStartPosition {index:u16,position:[f32;3],#[serde(rename="facingRadians")] facing_radians:f32,#[serde(rename="sourceSha256")] source_sha256:String},
+    PlayerStartPosition {index:u16,#[serde(rename="copyFrom",default,skip_serializing_if="Option::is_none")] copy_from:Option<u16>,position:[f32;3],#[serde(rename="facingRadians")] facing_radians:f32,#[serde(rename="sourceSha256")] source_sha256:String},
     EncounterStartPosition {encounter:u16,squad:u16,start:u16,#[serde(rename="encounterName")] encounter_name:String,
         #[serde(rename="squadName")] squad_name:String,position:[f32;3],#[serde(rename="sourceSha256")] source_sha256:String,
         #[serde(rename="facingRadians",default,skip_serializing_if="Option::is_none")] facing_radians:Option<f32>,
@@ -334,7 +334,7 @@ impl Operation {
             Self::EncounterSquadFiringGroups{encounter,squad,encounter_name,squad_name,groups,source_sha256}=>{
                 if class!="scnr"||*encounter>=128||*squad>=4096||[encounter_name,squad_name].iter().any(|n|n.len()>32||n.chars().any(char::is_control))||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Tactical-group editing needs exact native squad/source identities");}groups.masks()?;
             }
-            Self::PlayerStartPosition{index,position,facing_radians,source_sha256}=>{if class!="scnr"||*index>=4096||position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!facing_radians.is_finite()||facing_radians.abs()>std::f32::consts::TAU+1e-6||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Player start editing needs an exact scenario/source identity, native index and finite XYZ/yaw");}}
+            Self::PlayerStartPosition{index,copy_from,position,facing_radians,source_sha256}=>{if class!="scnr"||*index>=4096||copy_from.is_some_and(|source|source>=*index||usize::from(*index)>=MAX_NATIVE_PLAYER_STARTS)||position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!facing_radians.is_finite()||facing_radians.abs()>std::f32::consts::TAU+1e-6||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Player start editing needs an exact scenario/source identity, native index and finite XYZ/yaw");}}
             Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,source_sha256,facing_radians,command_list}=>{
                 if class!="scnr"||*encounter>=128||*squad>=4096||*start>=4096||
                     [encounter_name,squad_name].iter().any(|name|name.len()>32||name.chars().any(char::is_control))||
@@ -703,7 +703,7 @@ impl Operation {
         let written=self.arguments_with_fields(tags,class,tag,before)?;
         let mut expected=vec![];let mut i=2;
         if let Self::EncounterSquadPatrol{encounter,squad,route,..}=self{expected.push((format!("encounters[{encounter}].squads[{squad}].move_positions"),route.points.len().to_string()));expected.extend(patrol_scalar_fields(*encounter,*squad,route));}
-        else{while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-S"=>{expected.push((written[i+1].clone(),written[i+2].clone()));i+=3;},_=>return invalid("Unexpected native append recipe")}}}
+        else{while i+1<written.len(){match written[i].as_str(){"-I"=>i+=4,"-c" if self.is_player_start_edit()=>i+=3,"-S"=>{expected.push((written[i+1].clone(),written[i+2].clone()));i+=3;},_=>return invalid("Unexpected native append recipe")}}}
         let actual=output.lines().collect::<Vec<_>>();if actual.len()!=expected.len(){return invalid("Native encounter scalar readback count differs from the append recipe");}
         for ((key,value),actual) in expected.into_iter().zip(actual) {
             let same=if key.ends_with(".facing")&&!self.is_flag_edit(){
@@ -1089,8 +1089,45 @@ pub fn scenario_player_start_choices(fields:&str)->Result<Vec<ScenarioStartChoic
  let array=array_listing(fields,"player_starting_locations")?;if array.count>4096{return invalid("Native player start inventory exceeds4096");}let mut line=array.start+1;let mut result=vec![];
  for(index,item)in array_items(&array,"player_starting_locations")?.iter().enumerate(){let root=direct_struct_fields(item)?;let(position,position_line)=native_vector(&root,"position")?;let facing=number(&root,"facing")? as f32;let facing_line=root.lines().position(|l|l.starts_with("facing (")).ok_or_else(||crate::SparkError::Invalid("Native player facing is unavailable".into()))?;if position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!facing.is_finite(){return invalid("Native player start pose is invalid");}result.push(ScenarioStartChoice{index:index as u16,position,facing_radians:Some(facing.to_radians()),command_list:None,command_line:None,position_line:line+1+position_line,facing_line:Some(line+1+facing_line)});line+=item.len();}Ok(result)
 }
+// The standard Halo 1 scenario block admits 256 starts.
+const MAX_NATIVE_PLAYER_STARTS: usize = 256;
+
+fn check_player_start_copy(fields: &str, index: u16, source: u16, position: [f32; 3]) -> Result<()> {
+    let starts = scenario_player_start_choices(fields)?;
+    if starts.len() >= MAX_NATIVE_PLAYER_STARTS || usize::from(index) != starts.len() || source >= index {
+        return invalid("Choose an existing start and refresh the native start inventory before appending a copy");
+    }
+    if starts.iter().any(|start| positions_close(start.position, position)) {
+        return invalid("Place the new start at a different position from every existing start");
+    }
+    Ok(())
+}
+
+fn reviewed_player_start_copy(before: &str, after: &str, index: u16, source: u16, position: [f32; 3], facing: f32) -> Result<Vec<FieldDifference>> {
+    check_player_start_copy(before, index, source, position)?;
+    let array = "player_starting_locations";
+    transport::preserved_arrays(before, after, &[(array, 1)])?;
+    let old = array_listing(before, array)?;
+    let new = array_listing(after, array)?;
+    let old_rows = array_items(&old, array)?;
+    let new_rows = array_items(&new, array)?;
+    let without_pose = |row: &[String]| row.iter().skip(1)
+        .filter(|line| !line.starts_with("        position (") && !line.starts_with("        facing ("))
+        .cloned().collect::<Vec<_>>();
+    let copy = &scenario_player_start_choices(after)?[usize::from(index)];
+    if without_pose(old_rows[usize::from(source)]) != without_pose(new_rows[usize::from(index)])
+        || !positions_close(copy.position, position)
+        || !copy.facing_radians.is_some_and(|value| facings_close(value, facing)) {
+        return invalid("The appended start differs from the reviewed pose or its copied team, BSP, filters, or flags");
+    }
+    Ok(vec![FieldDifference {
+        before: format!("{index} existing starts · template {source}"),
+        after: format!("Start {index} · {:?} · {:.3}° · copied team, BSP, and gametype settings", position, facing.to_degrees()),
+    }])
+}
+
 fn reviewed_player_start(before:&str,after:&str,op:&Operation)->Result<Vec<FieldDifference>>{
- let Operation::PlayerStartPosition{index,position,facing_radians,..}=op else{return invalid("Not a player start edit");};op.validate("scnr","readback.scenario")?;let old=scenario_player_start_choices(before)?;let new=scenario_player_start_choices(after)?;if old.len()!=new.len(){return invalid("Player start edit changed native inventory");}let a=old.get(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Selected player start is missing".into()))?;let b=&new[usize::from(*index)];if a.position_line!=b.position_line||a.facing_line!=b.facing_line||!positions_close(*position,b.position)||!facings_close(*facing_radians,b.facing_radians.unwrap()){return invalid("Player start readback differs from reviewed pose");}let a_lines=before.lines().collect::<Vec<_>>();let b_lines=after.lines().collect::<Vec<_>>();if a_lines.len()!=b_lines.len(){return invalid("Player start edit changed native field structure");}let allowed=[a.position_line,a.facing_line.unwrap()];let mut changes=vec![];for(i,(a,b))in a_lines.iter().zip(b_lines).enumerate(){if *a!=b{if !allowed.contains(&i){return invalid("Player start edit changed other starts, BSP/team, gametype, flags, scripts or unrelated source");}changes.push(FieldDifference{before:(*a).into(),after:b.into()});}}if changes.is_empty(){return invalid("Player start pose already matches");}Ok(changes)
+ let Operation::PlayerStartPosition{index,copy_from,position,facing_radians,..}=op else{return invalid("Not a player start edit");};op.validate("scnr","readback.scenario")?;if let Some(source)=copy_from{return reviewed_player_start_copy(before,after,*index,*source,*position,*facing_radians);}let old=scenario_player_start_choices(before)?;let new=scenario_player_start_choices(after)?;if old.len()!=new.len(){return invalid("Player start edit changed native inventory");}let a=old.get(usize::from(*index)).ok_or_else(||crate::SparkError::Invalid("Selected player start is missing".into()))?;let b=&new[usize::from(*index)];if a.position_line!=b.position_line||a.facing_line!=b.facing_line||!positions_close(*position,b.position)||!facings_close(*facing_radians,b.facing_radians.unwrap()){return invalid("Player start readback differs from reviewed pose");}let a_lines=before.lines().collect::<Vec<_>>();let b_lines=after.lines().collect::<Vec<_>>();if a_lines.len()!=b_lines.len(){return invalid("Player start edit changed native field structure");}let allowed=[a.position_line,a.facing_line.unwrap()];let mut changes=vec![];for(i,(a,b))in a_lines.iter().zip(b_lines).enumerate(){if *a!=b{if !allowed.contains(&i){return invalid("Player start edit changed other starts, BSP/team, gametype, flags, scripts or unrelated source");}changes.push(FieldDifference{before:(*a).into(),after:b.into()});}}if changes.is_empty(){return invalid("Player start pose already matches");}Ok(changes)
 }
 /// Native yaw is periodic. Invader's text angle is degrees; tag/cache values are radians.
 pub(crate) fn facings_close(a:f32,b:f32)->bool {
@@ -1457,12 +1494,42 @@ pub fn scenario_combat_choices(fields:&str)->Result<Vec<ScenarioCombatChoice>>{
         result.push(ScenarioCombatChoice{encounter:e as u16,name:native_name(&root)?,points,squads});encounter_line+=item.len();
     }Ok(result)
 }
+fn current_player_start(point: &ScenarioStartChoice, source_sha: &str) -> Result<Operation> {
+    Ok(Operation::PlayerStartPosition {
+        index: point.index, copy_from: None, position: point.position,
+        facing_radians: point.facing_radians.ok_or_else(|| crate::SparkError::Invalid("Native player facing unavailable".into()))?,
+        source_sha256: source_sha.into(),
+    })
+}
+
 /// Refresh selected readback targets from current source after Accept or Restore.
 /// Historical receipts select scope only; their old values are never replayed.
 pub fn current_combat_targets(fields:&str,source_sha:&str,targets:&[Operation])->Result<Vec<Operation>>{
-    if targets.is_empty(){return Ok(vec![]);}let rows=if targets.iter().any(|op|!op.is_player_start_edit()){scenario_combat_choices(fields)?}else{vec![]};let mut result=vec![];let mut seen=std::collections::BTreeSet::new();for old in targets{let key=old.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unknown combat readback target".into()))?;if !seen.insert(key){continue;}if let Operation::PlayerStartPosition{index,..}=old{let p=scenario_player_start_choices(fields)?.into_iter().find(|p|p.index==*index).ok_or_else(||crate::SparkError::Invalid("Selected player start no longer exists".into()))?;result.push(Operation::PlayerStartPosition{index:*index,position:p.position,facing_radians:p.facing_radians.ok_or_else(||crate::SparkError::Invalid("Native player facing unavailable".into()))?,source_sha256:source_sha.into()});continue;}let row=rows.iter().find(|r|r.encounter==key.1).ok_or_else(||crate::SparkError::Invalid("Combat source encounter is unavailable".into()))?;if Some(row.name.as_str())!=old.combat_encounter_name(){return invalid("Combat source encounter identity changed");}let op=match old{Operation::EncounterSquadPatrol{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad&&r.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native patrol squad identity changed".into()))?;let route=member.patrol.clone().ok_or_else(||crate::SparkError::Invalid(member.patrol_issue.clone().unwrap_or_else(||"Native patrol unavailable".into())))?;Operation::EncounterSquadPatrol{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),route,source_sha256:source_sha.into()}},Operation::EncounterFiringPosition{point,..}=>{let p=row.points.iter().find(|p|p.index==*point).ok_or_else(||crate::SparkError::Invalid("Combat source firing point is unavailable".into()))?;Operation::EncounterFiringPosition{encounter:row.encounter,point:*point,encounter_name:row.name.clone(),position:p.position,group:p.group.clone(),source_sha256:source_sha.into()}},Operation::EncounterSquadBehavior{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native behavior squad identity changed".into()))?;let behavior=member.behavior.clone().ok_or_else(||crate::SparkError::Invalid(member.behavior_issue.clone().unwrap_or_else(||"Native behavior unavailable".into())))?;Operation::EncounterSquadBehavior{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),behavior,source_sha256:source_sha.into()}},Operation::EncounterSquadFiringGroups{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Combat source squad identity changed".into()))?;Operation::EncounterSquadFiringGroups{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),groups:member.groups.clone(),source_sha256:source_sha.into()}},_=>unreachable!()};result.push(op);}Ok(result)
+    // History retains previews after Restore. For a structural edit, read the
+    // entire current array so undone copies never become stale readback targets.
+    if targets.iter().any(|op| matches!(op, Operation::PlayerStartPosition{copy_from:Some(_),..})) {
+        let remaining = targets.iter().filter(|op| !op.is_player_start_edit()).cloned().collect::<Vec<_>>();
+        let mut result = current_combat_targets(fields, source_sha, &remaining)?;
+        for point in scenario_player_start_choices(fields)? {
+            result.push(current_player_start(&point, source_sha)?);
+        }
+        return Ok(result);
+    }
+
+    if targets.is_empty(){return Ok(vec![]);}let rows=if targets.iter().any(|op|!op.is_player_start_edit()){scenario_combat_choices(fields)?}else{vec![]};let mut result=vec![];let mut seen=std::collections::BTreeSet::new();for old in targets{let key=old.combat_target_key().ok_or_else(||crate::SparkError::Invalid("Unknown combat readback target".into()))?;if !seen.insert(key){continue;}if let Operation::PlayerStartPosition{index,..}=old{let p=scenario_player_start_choices(fields)?.into_iter().find(|p|p.index==*index).ok_or_else(||crate::SparkError::Invalid("Selected player start no longer exists".into()))?;result.push(current_player_start(&p,source_sha)?);continue;}let row=rows.iter().find(|r|r.encounter==key.1).ok_or_else(||crate::SparkError::Invalid("Combat source encounter is unavailable".into()))?;if Some(row.name.as_str())!=old.combat_encounter_name(){return invalid("Combat source encounter identity changed");}let op=match old{Operation::EncounterSquadPatrol{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad&&r.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native patrol squad identity changed".into()))?;let route=member.patrol.clone().ok_or_else(||crate::SparkError::Invalid(member.patrol_issue.clone().unwrap_or_else(||"Native patrol unavailable".into())))?;Operation::EncounterSquadPatrol{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),route,source_sha256:source_sha.into()}},Operation::EncounterFiringPosition{point,..}=>{let p=row.points.iter().find(|p|p.index==*point).ok_or_else(||crate::SparkError::Invalid("Combat source firing point is unavailable".into()))?;Operation::EncounterFiringPosition{encounter:row.encounter,point:*point,encounter_name:row.name.clone(),position:p.position,group:p.group.clone(),source_sha256:source_sha.into()}},Operation::EncounterSquadBehavior{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Native behavior squad identity changed".into()))?;let behavior=member.behavior.clone().ok_or_else(||crate::SparkError::Invalid(member.behavior_issue.clone().unwrap_or_else(||"Native behavior unavailable".into())))?;Operation::EncounterSquadBehavior{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),behavior,source_sha256:source_sha.into()}},Operation::EncounterSquadFiringGroups{squad,squad_name,..}=>{let member=row.squads.iter().find(|r|r.index==*squad).filter(|m|m.name==*squad_name).ok_or_else(||crate::SparkError::Invalid("Combat source squad identity changed".into()))?;Operation::EncounterSquadFiringGroups{encounter:row.encounter,squad:*squad,encounter_name:row.name.clone(),squad_name:member.name.clone(),groups:member.groups.clone(),source_sha256:source_sha.into()}},_=>unreachable!()};result.push(op);}Ok(result)
 }
 fn combat_arguments(op:&Operation,tags:&Path,tag:&str,before:&str)->Result<Vec<String>>{
+    if let Operation::PlayerStartPosition {index, copy_from: Some(source), position, facing_radians, ..} = op {
+        check_player_start_copy(before, *index, *source, *position)?;
+        let array = "player_starting_locations";
+        return Ok(vec![
+            "-t".into(), tags.to_string_lossy().into_owned(),
+            "-c".into(), format!("{array}[{source}]"), "end".into(),
+            "-S".into(), format!("{array}[{index}].position"), position.map(|value| value.to_string()).join(","),
+            "-S".into(), format!("{array}[{index}].facing"), facing_radians.to_string(),
+            tag.into(),
+        ]);
+    }
     let current=current_combat_targets(before,"",std::slice::from_ref(op))?.remove(0);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];match(op,&current){
         (Operation::PlayerStartPosition{index,position,facing_radians,..},Operation::PlayerStartPosition{position:old,facing_radians:old_facing,..})=>{let prefix=format!("player_starting_locations[{index}]");if !positions_close(*position,*old){args.extend(["-S".into(),format!("{prefix}.position"),position.map(|v|v.to_string()).join(",")]);}if !facings_close(*facing_radians,*old_facing){args.extend(["-S".into(),format!("{prefix}.facing"),facing_radians.to_string()]);}},
         (Operation::EncounterSquadPatrol{encounter,squad,route,..},Operation::EncounterSquadPatrol{route:old,..})=>{let rows=scenario_combat_choices(before)?;let behavior=rows.iter().find(|r|r.encounter==*encounter).and_then(|r|r.squads.iter().find(|r|r.index==*squad)).and_then(|s|s.behavior.as_ref());args.extend(patrol_arguments(*encounter,*squad,route,old,behavior)?);},
@@ -2413,7 +2480,31 @@ pub fn scenario_transport_choices(fields:&str)->Result<NativeTransportChoices>{
 mod player_start_tests {
  use super::*;
  fn fields()->String {"player_starting_locations[2] array\n    player_starting_locations[0] struct\n        position (1,2,3) point3d (float32)\n        facing (90) angle (float32)\n        team_index (0) int16\n        bsp_index (0) int16\n        type_0 (0) enum\n    player_starting_locations[1] struct\n        position (7,8,9) point3d (float32)\n        facing (0) angle (float32)\n        team_index (1) int16\n        bsp_index (0) int16\n        type_0 (0) enum\nscripts[0] array\n".into()}
- fn proposal()->Operation {Operation::PlayerStartPosition{index:0,position:[4.,5.,6.],facing_radians:std::f32::consts::PI,source_sha256:"a".repeat(64)}}
+ #[test]
+ fn player_start_copy_appends_only_distinct_pose_and_restores_readback_scope() {
+     let before=fields();
+     let copy="    player_starting_locations[2] struct\n        position (4,5,6) point3d (float32)\n        facing (180) angle (float32)\n        team_index (1) int16\n        bsp_index (0) int16\n        type_0 (0) enum\n";
+     let after=before.replacen("[2] array","[3] array",1).replace("scripts[0]",&format!("{copy}scripts[0]"));
+     let op=Operation::PlayerStartPosition{index:2,copy_from:Some(1),position:[4.,5.,6.],
+         facing_radians:std::f32::consts::PI,source_sha256:"a".repeat(64)};
+     let tags=Path::new("tags");
+     let args=op.arguments_with_fields(tags,"scnr","level.scenario",&before).unwrap();
+     assert_eq!(&args[2..5],&["-c","player_starting_locations[1]","end"]);
+     assert!(reviewed_difference(&before,&after,&op).is_ok());
+     assert!(reviewed_difference(&before,&after.replace(copy,&copy.replace("team_index (1)","team_index (0)")),&op).is_err());
+     assert!(reviewed_difference(&before,&after.replace("(1,2,3)","(2,2,3)"),&op).is_err());
+     assert!(reviewed_difference(&before,&after.replace("scripts[0]","scripts[1]"),&op).is_err());
+     op.verify_readback(tags,"scnr","level.scenario",&before,"4,5,6\n180\n").unwrap();
+     let targets=[op.clone()];
+     assert_eq!(current_combat_targets(&after,&"b".repeat(64),&targets).unwrap().len(),3);
+     assert_eq!(current_combat_targets(&before,&"a".repeat(64),&targets).unwrap().len(),2);
+     assert!(op.arguments_with_fields(tags,"scnr","level.scenario",&after).is_err());
+     let mut overlap=op;
+     if let Operation::PlayerStartPosition{position,..}=&mut overlap{*position=[1.,2.,3.];}
+     assert!(overlap.arguments_with_fields(tags,"scnr","level.scenario",&before).is_err());
+ }
+
+ fn proposal()->Operation {Operation::PlayerStartPosition{index:0,copy_from:None,position:[4.,5.,6.],facing_radians:std::f32::consts::PI,source_sha256:"a".repeat(64)}}
  #[test]
  fn player_start_preserves_other_spawns_team_bsp_gametype_and_script_fields(){
   let before=fields();let rows=scenario_player_start_choices(&before).unwrap();assert_eq!(rows.len(),2);assert!(facings_close(rows[0].facing_radians.unwrap(),std::f32::consts::FRAC_PI_2));let op=proposal();let after=before.replace("position (1,2,3)","position (4,5,6)").replace("facing (90)","facing (180)");assert_eq!(reviewed_difference(&before,&after,&op).unwrap().len(),2);let args=op.arguments_with_fields(Path::new("tags"),"scnr","level.scenario",&before).unwrap();assert!(args.windows(3).any(|a|a==["-S","player_starting_locations[0].position","4,5,6"]));op.verify_readback(Path::new("tags"),"scnr","level.scenario",&before,"4,5,6\n180\n").unwrap();assert!(op.verify_readback(Path::new("tags"),"scnr","level.scenario",&before,"4,5,6\n3.141593\n").is_err());
@@ -2421,7 +2512,7 @@ mod player_start_tests {
  }
  #[test]
  fn player_readback_scope_follows_current_source_after_restore_without_replaying_old_values(){
-  let targets=[proposal(),proposal()];let current=current_combat_targets(&fields(),&"b".repeat(64),&targets).unwrap();assert_eq!(current.len(),1);assert!(matches!(&current[0],Operation::PlayerStartPosition{index:0,position,facing_radians,source_sha256}if *position==[1.,2.,3.]&&facings_close(*facing_radians,std::f32::consts::FRAC_PI_2)&&source_sha256==&"b".repeat(64)));let snapshot:ScenarioSquadReadback=serde_json::from_value(serde_json::json!({"sourceSha256":"b".repeat(64),"squads":[],"combat":current})).unwrap();snapshot.validate().unwrap();let mut stale=snapshot.clone();stale.source_sha256="a".repeat(64);assert!(stale.validate().is_err());
+  let targets=[proposal(),proposal()];let current=current_combat_targets(&fields(),&"b".repeat(64),&targets).unwrap();assert_eq!(current.len(),1);assert!(matches!(&current[0],Operation::PlayerStartPosition{index:0,position,facing_radians,source_sha256,..}if *position==[1.,2.,3.]&&facings_close(*facing_radians,std::f32::consts::FRAC_PI_2)&&source_sha256==&"b".repeat(64)));let snapshot:ScenarioSquadReadback=serde_json::from_value(serde_json::json!({"sourceSha256":"b".repeat(64),"squads":[],"combat":current})).unwrap();snapshot.validate().unwrap();let mut stale=snapshot.clone();stale.source_sha256="a".repeat(64);assert!(stale.validate().is_err());
  }
  #[test]
  fn player_start_refuses_missing_indices_invalid_poses_and_noop_source(){
