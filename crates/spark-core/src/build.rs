@@ -494,12 +494,17 @@ impl Runner<'_> {
             .spawn()?;
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
+        // Retain the complete scenario listing for comparison without sending
+        // hundreds of thousands of field lines to the build UI.
+        let scenario_review = phase == "squad-readback"
+            && executable.file_stem().is_some_and(|name| name == "invader-edit")
+            && args.iter().any(|arg| arg == "-L");
         let (tx, rx) = std::sync::mpsc::channel();
         let incomplete_output = Arc::new(AtomicBool::new(false));
         let reader = |pipe: Box<dyn std::io::Read + Send>,
                       tx: std::sync::mpsc::Sender<(bool, String)>,
                       incomplete: Arc<AtomicBool>,
-                      err| {
+                      err: bool| {
             std::thread::spawn(move || {
                 let mut reader = BufReader::new(pipe);
                 let mut data = vec![];
@@ -516,12 +521,12 @@ impl Runner<'_> {
                         }
                         Ok(_) => {
                             total += data.len();
-                            if total > 16 * 1024 * 1024 {
+                            let limit = if !err && scenario_review { crate::native_operations::MAX_SCENARIO_REVIEW_BYTES } else { 16 * 1024 * 1024 };
+                            if total > limit {
                                 incomplete.store(true, Ordering::Relaxed);
                                 let _ = tx.send((
                                     true,
-                                    "Tool output exceeded 16 MiB; remaining output was discarded"
-                                        .into(),
+                                    format!("Tool output exceeded {} MiB; remaining output was discarded", limit / (1024 * 1024)),
                                 ));
                                 std::io::copy(&mut reader, &mut std::io::sink()).ok();
                                 break;
@@ -583,7 +588,7 @@ impl Runner<'_> {
                     compile_errors.extend(native_compile_errors(&line));
                 }
                 let display = line.trim();
-                if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())){
+                if (!scenario_review||err)&&(phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())){
                     self.emit(phase, display, progress, if err { "tool" } else { "info" });
                 }
             }
@@ -648,7 +653,7 @@ impl Runner<'_> {
                 compile_errors.extend(native_compile_errors(&line));
             }
             let display = line.trim();
-            if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())) {
+            if (!scenario_review||err)&&(phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())) {
                 self.emit(phase, display, progress, if err { "tool" } else { "info" });
             }
         }

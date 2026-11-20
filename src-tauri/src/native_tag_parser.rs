@@ -12,7 +12,7 @@ pub(super) struct Cache {
     results: BTreeMap<String, (String, Finding)>,
 }
 const MAX_FIELD_STREAM:u64=64*1024*1024;
-const MAX_REVIEW_FIELDS:usize=4*1024*1024;
+const MAX_REVIEW_FIELDS:usize=core::native_operations::MAX_SCENARIO_REVIEW_BYTES;
 fn output<R: Read + Send + 'static>(reader:R,identity:bool)->std::thread::JoinHandle<(String,bool)> {
     output_bounded(reader,identity,512*1024)
 }

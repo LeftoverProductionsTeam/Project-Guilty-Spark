@@ -1572,7 +1572,7 @@ fn run_with(
             recheck_tools(input,&prepared.tools)?;
             let fields=invoke(&runner,&edit,&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),native_scenario],&workspace,"squad-readback",49)?;
             recheck_tools(input,&prepared.tools)?;
-            if fields.len()>1024*1024||maps::hash_file(&source)?!=source_sha256{return invalid("Staged native squad source changed or exceeded its review bound");}
+            if fields.len()>crate::native_operations::MAX_SCENARIO_REVIEW_BYTES||maps::hash_file(&source)?!=source_sha256{return invalid("Staged native squad source changed or exceeded its review bound");}
             let include_starts=prepared.scenario_squad_readback.as_ref().is_some_and(|snapshot|snapshot.include_starts);
             let squads=if include_starts{crate::native_operations::scenario_squad_start_choices(&fields)?}else{crate::native_operations::scenario_squad_choices(&fields)?};
             let combat=crate::native_operations::current_combat_targets(&fields,&source_sha256,&prepared.scenario_squad_readback.as_ref().unwrap().combat)?;

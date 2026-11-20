@@ -2353,6 +2353,9 @@ impl NativeDeviceGroupChoice {
     }
 }
 
+/// Internal full Invader source listings, never displayed verbatim in the UI.
+pub const MAX_SCENARIO_REVIEW_BYTES: usize = 32 * 1024 * 1024;
+
 fn extraction_device_binding(name: &str) -> bool {
     name.to_ascii_lowercase().starts_with("extraction_")
 }

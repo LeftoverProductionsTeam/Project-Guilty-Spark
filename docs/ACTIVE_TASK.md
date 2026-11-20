@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Create native groups on an empty recovered scenario, then bind the control. Browser, Windows Cargo and native CE609 source/cache readback passed. Forerunner independently replicated host Forge import and Undo to a loopback guest and a late joiner. See RUNTIME_INTEGRATION_20261107.
-Next action: Finish exact Black Echo 04d9ccd1 with two authenticated human players. Close defense and evacuation, then banking and redeployment for both factions. While waiting, inspect stock Silent Cartographer group bindings as a candidate for a disposable switch-to-machine gameplay trial. Continue Phased direct collision, advanced physics replication and client-initiated Forge editing on a reviewed build.
+Latest verified revision: Stock Silent Cartographer’s large scenario passed exact Invader source review, one binding change and byte-identical restoration. Xbox compilation is blocked by the stock falling-box enum after the reviewed Warthog repair. Forerunner host-side move and rotation, Undo/Redo and late-join replication passed over loopback. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish exact Black Echo 04d9ccd1 with two authenticated human players. Close defense and evacuation, then banking and redeployment for both factions. While waiting, combine a reviewed CE control and animated machine via the existing native asset workflow in a disposable gameplay fixture, then prove switch actuation. Continue Phased direct collision, advanced physics replication and client-initiated Forge editing on a reviewed build.
 
 ## Acceptance
 

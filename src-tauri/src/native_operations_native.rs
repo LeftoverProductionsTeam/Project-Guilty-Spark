@@ -32,6 +32,27 @@ fn history_key(project: &str) -> String {
     format!("native-operation-history-{project}")
 }
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum ReviewedFields {
+    // Existing receipts stored the entire listing as a string.
+    Inline(String),
+    Digest { sha256: String },
+}
+
+impl ReviewedFields {
+    fn digest(fields: &str) -> Self {
+        Self::Digest { sha256: hash_bytes(fields.as_bytes()) }
+    }
+
+    fn matches(&self, fields: &str) -> bool {
+        match self {
+            Self::Inline(saved) => saved == fields,
+            Self::Digest { sha256 } => *sha256 == hash_bytes(fields.as_bytes()),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Receipt {
     schema_version: u32,
@@ -53,8 +74,8 @@ struct Receipt {
     executable_sha256: String,
     before_sha256: String,
     after_sha256: String,
-    before_fields: String,
-    after_fields: String,
+    before_fields: ReviewedFields,
+    after_fields: ReviewedFields,
     field_changes: Vec<recipes::FieldDifference>,
     changed_bytes: usize,
     output: String,
@@ -953,7 +974,7 @@ pub(super) async fn native_operation_preview(
     let mut expected_candidate=imported_dependencies.clone();expected_candidate.insert(source.tag.replace('\\',"/"),after_sha256.clone());
     if transaction::inventory(&candidate).map_err(error)?!=expected_candidate{return Err("The native operation changed unexpected candidate files; no revision was selected".into());}
     let changed_bytes=before.iter().zip(&after).filter(|(a,b)|a!=b).count()+before.len().abs_diff(after.len());
-    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,actor_import,imported_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields,after_fields,field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
+    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,actor_import,imported_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields:ReviewedFields::digest(&before_fields),after_fields:ReviewedFields::digest(&after_fields),field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
     let receipt_bytes=serde_json::to_vec_pretty(&receipt).map_err(error)?;
     if receipt_bytes.len()>4*1024*1024{return Err("Native preview exceeds its existing recovery receipt limit; no source was selected".into());}
     project::atomic_write(&directory.join("operation.json"),&receipt_bytes,false).map_err(error)?;
@@ -993,12 +1014,19 @@ pub(super) async fn native_operation_accept(
     if !restore{check_dependency_pins(&current,&receipt.source_dependencies)?;}
     let current_hash=maps::hash_file(&current.join(&relative)).map_err(error)?;
     let wanted_current=if restore{&receipt.after_sha256}else{&receipt.before_sha256};if &current_hash!=wanted_current{return Err("This native tag changed after preview/acceptance. Overlapping edits need review; both sources are retained.".into());}
-    if !restore&&fields(&state,&project,&current,&receipt.tag)?!=receipt.before_fields{return Err("The current native fields no longer match the reviewed starting source".into());}
-    if !restore{verify_firefight_plan(&project,&build,&receipt.before_fields,&receipt.operation)?;}
     let directory=root(&state,&operation_id)?;let candidate=directory.join("candidate/tags");let before=bounded_read(&directory.join("before.tag"),MAX_TAG)?;
     if hash_bytes(&before)!=receipt.before_sha256||maps::hash_file(&candidate.join(&relative)).map_err(error)?!=receipt.after_sha256{return Err("The retained native preview or recovery bytes changed; no revision was selected".into());}
-    let actual_fields=fields(&state,&project,&candidate,&receipt.tag)?;if actual_fields!=receipt.after_fields{return Err("Candidate native fields no longer match the reviewed result".into());}
-    recipes::reviewed_difference(&receipt.before_fields,&actual_fields,&receipt.operation).map_err(error)?;verify_bytes(&candidate,&receipt.tag,&receipt.after_sha256)?;
+    let actual_fields=fields(&state,&project,&candidate,&receipt.tag)?;
+    if !receipt.after_fields.matches(&actual_fields) { return Err("Candidate native fields no longer match the reviewed result".into()); }
+    if !restore {
+        let current_fields = fields(&state, &project, &current, &receipt.tag)?;
+        if !receipt.before_fields.matches(&current_fields) {
+            return Err("The current native fields no longer match the reviewed starting source".into());
+        }
+        verify_firefight_plan(&project, &build, &current_fields, &receipt.operation)?;
+        recipes::reviewed_difference(&current_fields, &actual_fields, &receipt.operation).map_err(error)?;
+    }
+    verify_bytes(&candidate,&receipt.tag,&receipt.after_sha256)?;
     let revision_id=uuid::Uuid::new_v4().to_string();let revision=native_source_revisions::directory(&state,&operation_id,&revision_id)?;
     fs::create_dir_all(revision.parent().unwrap()).map_err(error)?;
     if fs::read_dir(revision.parent().unwrap()).map_err(error)?.count()>=100{return Err("This native operation retains 100 revisions. Start a fresh preview; previous revisions remain preserved.".into());}
@@ -1014,7 +1042,14 @@ pub(super) async fn native_operation_accept(
     let bytes=if restore{before}else{bounded_read(&candidate.join(&relative),MAX_TAG)?};project::atomic_write(&tags.join(&relative),&bytes,false).map_err(error)?;
     let expected_hash=if restore{&receipt.before_sha256}else{&receipt.after_sha256};let mut wanted=baseline.clone();wanted.extend(imported);wanted.insert(receipt.tag.replace('\\',"/"),expected_hash.clone());
     if transaction::inventory(&tags).map_err(error)?!=wanted||transaction::inventory(&current).map_err(error)?!=baseline{return Err("Native source changed while staging. The staged copy is retained but was not selected.".into());}
-    let restored_fields=fields(&state,&project,&tags,&receipt.tag)?;if restored_fields!=if restore{receipt.before_fields.clone()}else{receipt.after_fields.clone()}{return Err("Staged native field readback differs; no source was selected".into());}
+    let staged_fields = fields(&state, &project, &tags, &receipt.tag)?;
+    let expected_fields = if restore { &receipt.before_fields } else { &receipt.after_fields };
+    if !expected_fields.matches(&staged_fields) {
+        return Err("Staged native field readback differs; no source was selected".into());
+    }
+    if restore {
+        recipes::reviewed_difference(&staged_fields, &actual_fields, &receipt.operation).map_err(error)?;
+    }
     if runtime_workbench::native_operation_source(&state,&project)?.1!=current{return Err("The selected native source changed while staging; refresh before accepting".into());}
     if !restore{check_dependency_pins(&tags,&receipt.source_dependencies)?;check_dependency_pins(&tags,&receipt.imported_dependencies)?;check_dependency_pins(&current,&receipt.source_dependencies)?;}
     if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("Native writer changed while selecting the revision; no source was selected".into());}
@@ -1028,6 +1063,79 @@ pub(super) async fn native_operation_accept(
 #[cfg(test)]
 mod ownership_tests {
     use super::*;
+
+    #[test]
+    fn reviewed_fields_match_legacy_receipts_and_verify_every_byte() {
+        let source = "first field\nlast field\n";
+        let legacy: ReviewedFields = serde_json::from_value(serde_json::json!(source)).unwrap();
+        assert!(legacy.matches(source));
+        let digest = ReviewedFields::digest(source);
+        let encoded = serde_json::to_string(&digest).unwrap();
+        let readback: ReviewedFields = serde_json::from_str(&encoded).unwrap();
+        assert!(readback.matches(source));
+        for changed in ["first field\n", "first field\nlast field\r\n", "first field\nchanged field\n"] {
+            assert!(!legacy.matches(changed));
+            assert!(!readback.matches(changed));
+        }
+    }
+
+    #[test]
+    #[ignore = "Requires the reviewed stock Silent Cartographer cache, pinned Invader and disposable storage"]
+    fn native_b30_review_rewires_large_stock_source_without_rewriting_other_fields() {
+        let env_path = |key| PathBuf::from(std::env::var_os(key).expect(key));
+        let invader = env_path("SPARK_NATIVE_TEST_INVADER_DIRECTORY");
+        let executable = invader.join("invader-edit.exe");
+        let map = env_path("SPARK_NATIVE_TEST_B30_CACHE");
+        let map_hash = maps::hash_file(&map).unwrap();
+        assert_eq!(map_hash, "a6e2ae628f96b666922d6429541068c3e117e8aa5031d00d187b3c853630be0f");
+        let root = tempfile::tempdir_in(env_path("SPARK_GENERATED_ROOT")).unwrap();
+        let tags = root.path().join("tags");
+        fs::create_dir(&tags).unwrap();
+        let tag = "levels/b30/b30.scenario";
+        let path = tags.join(tag);
+        let (ok, stdout, stderr) = run(&invader.join("invader-extract.exe"), &[
+            "-t".into(), tags.to_string_lossy().into_owned(),
+            "-m".into(), map.parent().unwrap().to_string_lossy().into_owned(),
+            "-s".into(), tag.into(), map.to_string_lossy().into_owned(),
+        ]).unwrap();
+        assert!(ok, "{stdout}\n{stderr}");
+        let original = fs::read(&path).unwrap();
+        let original_hash = hash_bytes(&original);
+        let (valid, _, cut) = native_tag_parser::fields(&executable, &tags, tag).unwrap();
+        assert!(valid && cut, "public field display remains bounded");
+        let listing = || {
+            let (valid, fields, cut) = native_tag_parser::review_fields(&executable, &tags, tag).unwrap();
+            assert!(valid && !cut);
+            fields
+        };
+        let before = listing();
+        assert!(before.len() > 16 * 1024 * 1024);
+        let inventory = recipes::scenario_device_choices(&before).unwrap();
+        assert_eq!(inventory.iter().filter(|device| device.class == "ctrl").count(), 6);
+        assert_eq!(inventory.iter().filter(|device| device.class == "mach").count(), 129);
+        assert_eq!(recipes::scenario_device_group_choices(&before).unwrap().len(), 7);
+        let original_review = ReviewedFields::digest(&before);
+        let mut control = inventory.into_iter().find(|device| device.class == "ctrl" && device.index == 1).unwrap();
+        assert_eq!(control.position_group, Some(1));
+        control.position_group = Some(3);
+        let operation = recipes::Operation::DevicePlacement { device: control, source_sha256: original_hash.clone() };
+        let args = operation.arguments_with_fields(&tags, "scnr", tag, &before).unwrap();
+        let (ok, stdout, stderr) = run(&executable, &args).unwrap();
+        assert!(ok, "{stdout}\n{stderr}");
+        let after = listing();
+        let diff = recipes::reviewed_difference(&before, &after, &operation).unwrap();
+        assert_eq!(diff.len(), 1);
+        let verified = ReviewedFields::digest(&after);
+        let encoded = serde_json::to_string(&verified).unwrap();
+        assert!(encoded.len() < 100 && verified.matches(&after) && !verified.matches(&before));
+        let revised = maps::hash_file(&path).unwrap();
+        verify_bytes(&tags, tag, &revised).unwrap();
+        fs::write(&path, original).unwrap();
+        assert!(original_review.matches(&listing()));
+        assert_eq!(maps::hash_file(&path).unwrap(), original_hash);
+        assert_eq!(maps::hash_file(&map).unwrap(), map_hash);
+        println!("Stock b30 native review: fields={} source={original_hash} candidate={revised} cache={map_hash}", before.len());
+    }
     #[test]
     fn controller_binding_distinguishes_reviewed_appends_from_generated_owners() {
         let(_temp,state,p,build)=super::super::readiness_tests::fixture();
