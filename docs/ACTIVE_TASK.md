@@ -3,8 +3,8 @@
 Task: Operation110 - source Save integrity and the Black Echo native handoff
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: 330f56d protects external file arrivals and restores the exact descriptor after Windows process interruption. Focused 43/43 and the desktop 42-edit Save, Undo/Redo and restart passed. Black Echo dfa84b95 / 0350d66a cleared the paired facility fight, then stalled at technology pickup. Alternate ce892c71 passed compile/readback and awaits peers.
-Next action: Trace original Save37944 independently. When the runtime exposes measurable native pickup, compare both authenticated slots and verify defense through settlement and the UNSC route. In parallel, bind imported OBJ previews to the active asset/source hashes and move parsing off the desktop command thread.
+Latest verified revision: Imported OBJ previews now bind asset and map source hashes. Focused frontend 25/25, a delayed browser contract and native Windows preview/readback passed. The native fixture required owned cleanup after its close timeout. Managed Save proof is at 330f56d / 2e9178a. Black Echo dfa84b95 remains at native technology pickup, and ce892c71 awaits paired play.
+Next action: Trace original Save37944 independently. When native pickup is measurable, compare both authenticated slots, defense through settlement and the UNSC route. Reuse the existing BSP spatial index for incident-lighting queries and preserve nearest-floor and overlap behavior.
 
 ## Acceptance
 

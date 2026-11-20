@@ -1,9 +1,14 @@
 import {describe,it,expect} from 'vitest';
 import {documentReducer,emptyMapDocuments,activeDocument} from './mapDocuments';
 import type {MapDocuments} from './mapDocuments';
-import type {Project} from './types';
+import type {Asset, MeshData, Project} from './types';
 const project=(id:string):Project=>({schemaVersion:1,id,title:id,createdAt:'',modifiedAt:'',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[]});
 const open=(state:MapDocuments,p:Project)=>documentReducer(state,{type:'open',open:{project:p,inspection:null}});
+const obj: Asset = { id:'asset-a', name:'test.obj', kind:'obj', sha256:'a'.repeat(64), path:'owned/test.obj', vertices:3, triangles:1, hasUvs:false, materials:[] };
+const importedMesh: MeshData = { label:'Imported model', source:'OBJ', positions:[0,0,0,1,0,0,0,1,0], indices:[0,1,2] };
+const meshReply = (p: Project, asset = p.assets[0], mesh = importedMesh) => ({
+  type:'mesh' as const, id:p.id, assetId:asset.id, assetSha256:asset.sha256, sourceSha256:p.source?.sha256??null, mesh,
+});
 describe('Independent open map documents',()=>{
   it('background panel returns update their map without restoring an earlier active tab',()=>{
     const a=project('a'),b=project('b'),openMaps=open(open(emptyMapDocuments(100),a),b);
@@ -95,12 +100,42 @@ describe('Independent open map documents',()=>{
     expect(s.documents[0].history.current?.source?.audioResources).toEqual(audio);
   });
   it('routes late asset loads and save acknowledgements to their own document',()=>{
-    const a=project('a');let s=open(open(emptyMapDocuments(100),a),project('b'));
-    s=documentReducer(s,{type:'mesh',id:'a',assetId:'asset-a',mesh:{positions:[0,0,0],indices:[],normals:[],uvs:[]}as never});
+    const a={...project('a'),assets:[obj]};let s=open(open(emptyMapDocuments(100),a),project('b'));
+    s=documentReducer(s,meshReply(a));
     expect(s.documents[0].meshes['asset-a']).toBeDefined();expect(s.documents[1].meshes).toEqual({});
     s=documentReducer(s,{type:'history',action:{type:'edit',project:{...a,title:'new'},description:'edit while saving'}});
     s=documentReducer(s,{type:'saved',id:'a',project:a});expect(s.documents[0].history.dirty).toBe(true);
     const edited=s.documents[0].history.current!;s=documentReducer(s,{type:'saved',id:'a',project:edited});expect(s.documents[0].history.dirty).toBe(false);expect(s.activeId).toBe('b');
+  });
+  it('drops cached and delayed OBJ geometry when the same asset id gets a different hash',()=>{
+    const starting = {...project('a'),assets:[obj]};
+    const replacement = {...starting,assets:[{...obj,sha256:'b'.repeat(64)}]};
+    let state = documentReducer(open(emptyMapDocuments(100),starting),meshReply(starting));
+    const adjusted = {...starting,title:'Unrelated edit'};
+    state = documentReducer(state,{type:'history',action:{type:'edit',project:adjusted,description:'Rename project'}});
+    expect(state.documents[0].meshes[obj.id]).toBe(importedMesh);
+    state = documentReducer(state,{type:'history',action:{type:'assets',project:replacement}});
+    expect(state.documents[0].meshes[obj.id]).toBeUndefined();
+    const currentMesh = {...importedMesh,positions:[0,0,0,2,0,0,0,2,0]};
+    state = documentReducer(state,meshReply(replacement,replacement.assets[0],currentMesh));
+    state = documentReducer(state,meshReply(starting));
+    expect(state.documents[0].meshes[obj.id]).toBe(currentMesh);
+  });
+  it('binds OBJ geometry to the map source and rejects replies for removed assets',()=>{
+    const base = {...project('a'),assets:[obj],source:{sha256:'c'.repeat(64)}} as Project;
+    const changed = {...base,source:{...base.source!,sha256:'d'.repeat(64)}};
+    let state = documentReducer(open(emptyMapDocuments(100),base),meshReply(base));
+    state = open(state,{...base,assets:[{...obj}]});
+    expect(state.documents[0].meshes[obj.id]).toBe(importedMesh);
+    state = open(state,changed);
+    expect(state.documents[0].meshes[obj.id]).toBeUndefined();
+    expect(documentReducer(state,meshReply(base)).documents[0].meshes[obj.id]).toBeUndefined();
+    state = documentReducer(state,meshReply(changed));
+    const history = state.documents[0].history;
+    const withoutAsset = {...changed,assets:[]};
+    state = documentReducer(state,{type:'window-history',id:base.id,history:{...history,current:withoutAsset}});
+    expect(state.documents[0].meshes[obj.id]).toBeUndefined();
+    expect(documentReducer(state,meshReply(changed)).documents[0].meshes[obj.id]).toBeUndefined();
   });
   it('updates all limits and closes only the requested tab',()=>{
     let s=open(open(emptyMapDocuments(100),project('a')),project('b'));s=documentReducer(s,{type:'history',action:{type:'history-limit',limit:50}});expect(s.documents.every(d=>d.history.limit===50)).toBe(true);

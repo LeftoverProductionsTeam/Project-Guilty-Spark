@@ -1873,26 +1873,104 @@ async fn preview_animation_clip(app:tauri::AppHandle,project_id:String,asset:cor
         if data.parent()!=Some(folder.as_path()){return Err("Animation preview must belong to this project's imported library".into());}core::animations::verified_clip(&asset).map_err(error)
     }).await.map_err(error)?
 }
-#[tauri::command]
-fn asset_mesh(state: State<AppState>, id: String, asset_id: String) -> Reply<MeshData> {
-    uuid::Uuid::parse_str(&asset_id).map_err(error)?;
-    let lib = lock(&state.library)?;
-    let p = lib.get(&id).map_err(error)?;
-    let asset=p.assets.iter().find(|a|a.id==asset_id&&a.kind=="obj").ok_or("OBJ asset does not belong to this project")?;
-    if lib.is_memory_first(){
-        core::library::validate_local_input_path(&asset.path).map_err(error)?;core::reject_links(&asset.path).map_err(error)?;
-        let bytes=bounded_read(&asset.path,64*1024*1024)?;
-        if core::hex_bytes(sha2::Sha256::digest(&bytes))!=asset.sha256{return Err("Model source changed outside Spark; review and reimport it before previewing".into());}
-        return assets::parse_obj(std::str::from_utf8(&bytes).map_err(error)?).map(|value|value.mesh).map_err(error);
+fn owned_obj_preview_path(
+    library: &Library,
+    project_id: &str,
+    asset_id: &str,
+    asset_sha256: &str,
+    source_sha256: Option<&str>,
+) -> Reply<PathBuf> {
+    uuid::Uuid::parse_str(asset_id).map_err(error)?;
+    let project = library.get(project_id).map_err(error)?;
+    if project.source.as_ref().map(|source| source.sha256.as_str()) != source_sha256 {
+        return Err("Map source changed before the model preview could load".into());
     }
-    let file = lib
-        .project_dir(&id)
-        .map_err(error)?
-        .join("assets")
-        .join(format!("{asset_id}.mesh.json"));
-    let bytes = fs::read(file).map_err(error)?;
-    serde_json::from_slice(&bytes).map_err(error)
+    let asset = project.assets.iter().find(|asset| asset.id == asset_id && asset.kind == "obj")
+        .ok_or("OBJ asset does not belong to this project")?;
+    if asset.sha256 != asset_sha256 {
+        return Err("Model revision changed before its preview could load".into());
+    }
+    if library.is_memory_first() {
+        core::library::validate_local_input_path(&asset.path).map_err(error)?;
+        Ok(asset.path.clone())
+    } else {
+        Ok(library.project_dir(project_id).map_err(error)?.join("assets").join(format!("{asset_id}.obj")))
+    }
 }
+
+fn read_owned_obj_preview(path: &Path, asset_sha256: &str) -> Reply<MeshData> {
+    // Legacy mesh JSON has no identity binding. Decode the admitted raw OBJ
+    // and let the document reuse that exact geometry for its current revision.
+    let bytes = bounded_read(path, 64 * 1024 * 1024)?;
+    if core::hex_bytes(sha2::Sha256::digest(&bytes)) != asset_sha256 {
+        return Err("Model source changed outside Spark; review and reimport it before previewing".into());
+    }
+    assets::parse_obj(std::str::from_utf8(&bytes).map_err(error)?)
+        .map(|imported| imported.mesh)
+        .map_err(error)
+}
+
+#[tauri::command]
+async fn asset_mesh(
+    app: tauri::AppHandle,
+    id: String,
+    asset_id: String,
+    asset_sha256: String,
+    source_sha256: Option<String>,
+) -> Reply<MeshData> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let path = {
+            let library = lock(&state.library)?;
+            owned_obj_preview_path(&library, &id, &asset_id, &asset_sha256, source_sha256.as_deref())?
+        };
+        read_owned_obj_preview(&path, &asset_sha256)
+    }).await.map_err(error)?
+}
+
+#[cfg(test)]
+mod obj_preview_tests {
+    use super::*;
+
+    #[test]
+    fn preview_rejects_changed_registration_and_bytes_even_with_legacy_mesh_cache() {
+        let root = tempfile::tempdir().unwrap();
+        let library = Library::open(root.path()).unwrap();
+        let mut project = library.create("OBJ preview").unwrap();
+        let id = uuid::Uuid::new_v4().to_string();
+        let folder = library.project_dir(&project.id).unwrap().join("assets");
+        fs::create_dir_all(&folder).unwrap();
+        let path = folder.join(format!("{id}.obj"));
+        let original = b"v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
+        fs::write(&path, original).unwrap();
+        fs::write(folder.join(format!("{id}.mesh.json")), "stale derived cache bytes").unwrap();
+        let hash = core::hex_bytes(sha2::Sha256::digest(original));
+        project.assets.push(Asset {
+            id: id.clone(),
+            name: "preview.obj".into(),
+            kind: "obj".into(),
+            sha256: hash.clone(),
+            path: path.clone(),
+            vertices: 3,
+            triangles: 1,
+            has_uvs: false,
+            materials: vec![],
+        });
+        library.save(&project, None).unwrap();
+        assert!(owned_obj_preview_path(&library, &project.id, &id, "stale", None).is_err());
+        assert!(owned_obj_preview_path(&library, &project.id, &id, &hash, Some(&hash)).is_err());
+        let admitted = owned_obj_preview_path(&library, &project.id, &id, &hash, None).unwrap();
+        assert_eq!(admitted, path);
+        let mesh = read_owned_obj_preview(&admitted, &hash).unwrap();
+        assert_eq!(mesh.indices, [0, 1, 2]);
+
+        let replacement = b"v 0 0 0\nv 2 0 0\nv 0 1 0\nf 1 2 3\n";
+        assert_eq!(replacement.len(), original.len());
+        fs::write(&path, replacement).unwrap();
+        assert!(read_owned_obj_preview(&admitted, &hash).unwrap_err().contains("changed outside Spark"));
+    }
+}
+
 #[tauri::command]
 async fn preview_imported_collision(app:tauri::AppHandle,project_id:String,asset_id:String,source_sha256:String,scale:[f32;3],rotation:[f32;3])->Reply<core::model_build::SourceCollision>{
     uuid::Uuid::parse_str(&asset_id).map_err(error)?;

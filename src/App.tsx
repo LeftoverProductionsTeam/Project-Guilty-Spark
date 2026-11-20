@@ -88,7 +88,7 @@ import { pinOwnedInterfaceBitmap, matchesOwnedInterfaceBitmap, decodeBoundedInte
 import type { OwnedBitmapPreview } from './ownedBitmapPreview';
 import { initialHistory, thumbnail } from './editor';
 import type {HistoryAction} from './editor';
-import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
+import { assetMeshScope, matchesAssetMesh,activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
 import {applyLibraryReceipt,checkedSaveReceipt,applyBuildHistory} from './libraryReceipts';
 import {createLatestRefresh} from './latestRefresh';
 import {WindowHistories,queuedWindowRefresh} from './windowHistory';
@@ -578,18 +578,43 @@ export default function App() {
           /* Geometry preview caching must not block imports. */
         }
       }
-      for (const asset of open.project.assets) {
-        if(asset.kind!=='obj')continue;
-        try {
-          const mesh = await call<MeshData>('asset_mesh', { id: open.project.id, assetId: asset.id });
-          dispatchDocument({type:'mesh',id:open.project.id,assetId:asset.id,mesh});
-        } catch (e) {
-          notice(`Asset ${asset.name}: ${String(e)}`, 'error');
-        }
-      }
     },
     [notice],
   );
+  // Preview loading follows the accepted documents, including Undo and
+  // observer updates. Ordinary edits keep this list of input identities stable.
+  const meshInputs = JSON.stringify(documents.documents.flatMap(({history})=>{
+    const project = history.current;
+    return project ? project.assets.filter(asset=>asset.kind==='obj').map(asset=>[project.id,project.source?.sha256??null,asset.id,asset.sha256]) : [];
+  }).sort());
+  useEffect(()=>{
+    if (!native) return;
+    let living = true;
+    const read = async()=>{
+      for (const {history} of documentsRef.current.documents) {
+        const project = history.current;
+        if (!project) continue;
+        for (const asset of project.assets) {
+          if (!living) return;
+          if (asset.kind!=='obj') continue;
+          const scope = assetMeshScope(project,asset);
+          const latest = ()=>documentsRef.current.documents.find(document=>document.id===project.id);
+          const document = latest();
+          if (!document || Object.hasOwn(document.meshes,asset.id) || !matchesAssetMesh(document.history.current,scope)) continue;
+          try {
+            const mesh = await call<MeshData>('asset_mesh',{id:project.id,...scope});
+            if (living) dispatchDocument({type:'mesh',id:project.id,...scope,mesh});
+          } catch (error) {
+            if (living && matchesAssetMesh(latest()?.history.current,scope))
+              notice(`Asset ${asset.name}: ${String(error)}`,'error');
+          }
+        }
+      }
+    };
+    void read();
+    return ()=>{living=false;};
+  },[meshInputs,notice]);
+
   async function restoreSnapshot(id:string,snapshotId:string,sha256:string){
     const currentHistory=()=>documentsRef.current.documents.find(document=>document.id===id)?.history;
     const before=await afterProjectMutation(id,currentHistory);
@@ -1175,7 +1200,7 @@ export default function App() {
           { ...next, audioPreview: { ...scene, emitters: [...scene.emitters, ...emitters] } },
           'Place transferred sound ' + selection.item.name,
         );
-      } else {await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:selection.sourceId,assetId:selection.assetId,targetId:target.id});dispatch({type:'assets',project:result.project});dispatchDocument({type:'mesh',id:target.id,assetId:result.asset.id,mesh:result.mesh});const latest=documentsRef.current.documents.find(d=>d.id===target.id)?.history.current??target;edit({...latest,assets:result.project.assets,scene:[...latest.scene,{id:crypto.randomUUID(),name:result.asset.name,kind:'Workshop mesh',tagId:null,assetId:result.asset.id,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:null,rotationOffset:null}]},'Place transferred OBJ '+result.asset.name);await refresh();notice('Verified OBJ copied and placed. Ctrl+Z removes the placement.','success');}
+      } else {await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:selection.sourceId,assetId:selection.assetId,targetId:target.id});dispatch({type:'assets',project:result.project});dispatchDocument({type:'mesh',id:target.id,...assetMeshScope(result.project,result.asset),mesh:result.mesh});const latest=documentsRef.current.documents.find(d=>d.id===target.id)?.history.current??target;edit({...latest,assets:result.project.assets,scene:[...latest.scene,{id:crypto.randomUUID(),name:result.asset.name,kind:'Workshop mesh',tagId:null,assetId:result.asset.id,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:null,rotationOffset:null}]},'Place transferred OBJ '+result.asset.name);await refresh();notice('Verified OBJ copied and placed. Ctrl+Z removes the placement.','success');}
     } finally {
       setBusy(false);
     }
@@ -1284,7 +1309,7 @@ export default function App() {
       const result = await call<AssetResult | null>('import_asset', { id: target.id,...(path?{path}:{}),...(expectedSha256?{expectedSha256}:{}) });
       if (result) {
         dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});
-        dispatchDocument({type:'mesh',id:result.project.id,assetId:result.asset.id,mesh:result.mesh});
+        dispatchDocument({type:'mesh',id:result.project.id,...assetMeshScope(result.project,result.asset),mesh:result.mesh});
         const latest=documentsRef.current.documents.find(document=>document.id===target.id)?.history.current;
         if(latest){const imported=result.project.scene.find(object=>object.assetId===result.asset.id);if(imported)edit({...latest,assets:result.project.assets,scene:[...latest.scene,{...imported,position:position??imported.position}]},'Place imported OBJ '+result.asset.name);}
         notice(result.warnings.join(' ')||'Model imported into this map. Its source preview can be moved and replaced.','info');
@@ -1315,7 +1340,7 @@ export default function App() {
     const target=historyRef.current.current;if(!target)return;setBusy(true);
     try{
       let asset=item.asset;
-      if(item.sourceId!==target.id){await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:item.sourceId,assetId:item.asset.id,targetId:target.id});asset=result.asset;dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});dispatchDocument({type:'mesh',id:target.id,assetId:asset.id,mesh:result.mesh});}
+      if(item.sourceId!==target.id){await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:item.sourceId,assetId:item.asset.id,targetId:target.id});asset=result.asset;dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});dispatchDocument({type:'mesh',id:target.id,...assetMeshScope(result.project,asset),mesh:result.mesh});}
       const latest=documentsRef.current.documents.find(document=>document.id===target.id)?.history.current;if(!latest)return;
       const old=replaceId?latest.scene.find(object=>object.id===replaceId):undefined;if(replaceId&&!old)throw Error('The selected object is no longer available.');
       const object={...(old??{id:crypto.randomUUID(),position,rotation:[0,0,0] as Vec3,scale:[1,1,1] as Vec3,visible:true,sourceOffset:null,rotationOffset:null}),name:asset.name,kind:'Workshop mesh',tagId:null,assetId:asset.id,sourceModel:null};

@@ -1,6 +1,6 @@
 import { historyReducer, initialHistory } from './editor';
 import type { HistoryAction, HistoryState } from './editor';
-import type { MapInspection, MeshData, OpenProject, Project } from './types';
+import type { Asset, MapInspection, MeshData, OpenProject, Project } from './types';
 import { hasSourceBoundEdits } from './externalMapSync';
 export interface MapDocument {
   id: string;
@@ -24,8 +24,35 @@ export type DocumentAction =
   | { type:'reorder';ids:string[] }
   | { type: 'close'; id: string }
   | { type: 'history'; action: HistoryAction; id?: string }
-  | { type: 'mesh'; id: string; assetId: string; mesh: MeshData }
+  | ({ type: 'mesh'; id: string; mesh: MeshData } & AssetMeshScope)
   | { type: 'saved'; id: string; project: Project };
+type AssetMeshScope = { assetId: string; assetSha256: string; sourceSha256: string | null };
+
+export function assetMeshScope(project: Project, asset: Asset): AssetMeshScope {
+  return {assetId:asset.id, assetSha256:asset.sha256, sourceSha256:project.source?.sha256??null};
+}
+
+export function matchesAssetMesh(project: Project | null | undefined, scope: AssetMeshScope): boolean {
+  return !!project && (project.source?.sha256??null) === scope.sourceSha256 &&
+    project.assets.some(asset=>asset.kind==='obj' && asset.id===scope.assetId && asset.sha256===scope.assetSha256);
+}
+
+function retainedMeshes(document: MapDocument, project: Project | null): MapDocument['meshes'] {
+  const previous = document.history.current;
+  if (previous === project) return document.meshes;
+  if (!previous || !project || (previous.source?.sha256??null) !== (project.source?.sha256??null)) return {};
+  if (previous.assets === project.assets) return document.meshes;
+  const assets = new Map(project.assets.filter(asset=>asset.kind==='obj').map(asset=>[asset.id, asset.sha256]));
+  const meshes = Object.fromEntries(previous.assets
+    .filter(asset=>asset.kind==='obj' && asset.sha256===assets.get(asset.id) && Object.hasOwn(document.meshes,asset.id))
+    .map(asset=>[asset.id, document.meshes[asset.id]]));
+  return Object.keys(meshes).length === Object.keys(document.meshes).length ? document.meshes : meshes;
+}
+
+function withHistory(document: MapDocument, history: HistoryState): MapDocument {
+  return {...document, history, meshes:retainedMeshes(document, history.current)};
+}
+
 export function emptyMapDocuments(limit: number): MapDocuments {
   return { activeId: null, documents: [], limit };
 }
@@ -44,7 +71,7 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     if(action.ids.every((id,index)=>state.documents[index].id===id))return state;
     return {...state,documents:action.ids.map(id=>state.documents.find(d=>d.id===id)!)};
   }
-  if(action.type==='window-history')return {...state,documents:state.documents.map(d=>d.id===action.id&&action.history.current?.id===d.id?{...d,history:action.history}:d)};
+  if(action.type==='window-history')return {...state,documents:state.documents.map(d=>d.id===action.id&&action.history.current?.id===d.id?withHistory(d,action.history):d)};
   if (action.type === 'external-revision') {
     const previous = state.documents.find(document => document.id === action.previousId);
     if (!previous || !previous.history.current) return state;
@@ -74,7 +101,7 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
       // immutable decoded buffers only when source AND resource identities
       // agree, so retained editors do not decode/reupload them on tab return.
       inspection: sameSource ? old!.inspection : action.open.inspection,
-      meshes: old?.meshes ?? {},
+      meshes: old ? retainedMeshes(old, action.open.project) : {},
       history: historyReducer(
         { ...initialHistory, limit: state.limit },
         { type: 'load', project: action.open.project },
@@ -122,11 +149,15 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     ...state,
     documents: state.documents.map((d) => {
       if (d.id !== id) return d;
-      if (action.type === 'mesh') return { ...d, meshes: { ...d.meshes, [action.assetId]: action.mesh } };
+      if (action.type === 'mesh') return matchesAssetMesh(d.history.current, action)
+        ? { ...d, meshes: { ...d.meshes, [action.assetId]: action.mesh } }
+        : d;
       if (action.type === 'saved')
-        return { ...d, savedRevision: (d.savedRevision ?? 0) + 1,
-          history: historyReducer(d.history, { type: 'saved', project: action.project }) };
-      return { ...d, history: historyReducer(d.history, action.action) };
+        return { ...withHistory(d, historyReducer(d.history, { type: 'saved', project: action.project })),
+          savedRevision: (d.savedRevision ?? 0) + 1 };
+      if (action.action.type === 'assets' &&
+          (action.action.project.source?.sha256??null) !== (d.history.current?.source?.sha256??null)) return d;
+      return withHistory(d, historyReducer(d.history, action.action));
     }),
   };
 }

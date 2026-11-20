@@ -1915,8 +1915,13 @@ test('external geometry review requested during polling is not silently dropped'
     const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
     w.__sparkMock.projects.a.project.assets=[{id:'geometry-fixture',name:'Synthetic triangle',kind:'obj',path:'C:/synthetic/triangle.obj',sha256:'c'.repeat(64),vertices:3,triangles:1,hasUvs:true,materials:['default']}];
     w.__geometryReviews=0;
+    w.__meshRequests=[];
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
-      if(command==='asset_mesh')return {positions:[0,0,0,1,0,0,0,1,0],normals:[0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,0,1],indices:[0,1,2],parts:[]};
+      if(command==='asset_mesh'){
+        w.__meshRequests.push(args);
+        await new Promise<void>(resolve=>{w.__finishMeshPreview=resolve;});
+        return {label:'Synthetic triangle',source:'OBJ',positions:[0,0,0,1,0,0,0,1,0],normals:[0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,0,1],indices:[0,1,2],parts:[]};
+      }
       if(command==='prepare_geometry_handoff')return {handoff:{id:'synthetic-handoff',assetId:args.assetId,baselineSha256:'c'.repeat(64)},workingPath:'C:/synthetic/working.obj'};
       if(command==='geometry_handoff_status')return new Promise(resolve=>{w.__finishGeometryStatus=()=>resolve({bytes:80,modifiedNanos:'1'});});
       if(command==='review_geometry_handoff'){
@@ -1927,12 +1932,16 @@ test('external geometry review requested during polling is not silently dropped'
     };
   });
   await openFixture(page);await chooseTool(page,'Asset workshop');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__meshRequests)).toEqual([
+    {id:'a',assetId:'geometry-fixture',assetSha256:'c'.repeat(64),sourceSha256:'a'.repeat(64)},
+  ]);
   await page.getByRole('button',{name:'Prepare Blender edit',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>typeof (window as any).__finishGeometryStatus)).toBe('function');
   await page.getByRole('button',{name:'Review geometry save',exact:true}).click();
   await page.evaluate(()=>(window as any).__finishGeometryStatus());
   await expect(page.getByRole('button',{name:'Import reviewed geometry copy',exact:true})).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__geometryReviews)).toBe(1);
+  await page.evaluate(()=>(window as any).__finishMeshPreview());
 });
 
 test('compact library keeps its search and layout when leaving and returning', async ({ page }, testInfo) => {
