@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -286,6 +286,53 @@ describe('Chupathingy Forge binary layouts', () => {
     while (full.scene.length < 65) full = addHmvObjective(full, map, loaded.scene[0], 2).project;
     expect(() => addHmvObjective(full, map, loaded.scene[0], 0)).toThrow('64-objective limit');
     expect(() => addHmvPlacement(full, map, full.scene.at(-1)!)).toThrow('64-objective limit');
+  });
+
+  it('round-trips native device tags, transforms and properties without promoting them to Forerunner', () => {
+    const deviceMap = {
+      ...map,
+      tags: [...map.tags,
+        { id: 21, class: 'mach', path: 'devices/door', external: false },
+        { id: 22, class: 'ctrl', path: 'devices/door', external: false }],
+    } as MapInspection;
+    const makeDevice = (tagId: number) => ({
+      ...importForgeSidecar(project, map, 'test.hmv', source).project.scene[0],
+      id: 'native-' + tagId, sourceModel: null, tagId,
+    });
+    const door = makeDevice(21);
+    const control = makeDevice(22);
+    const starting = { ...project, scene: [door, control] };
+    const { project: withDoor } = addHmvPlacement(starting, deviceMap, door);
+    const { project: withControl } = addHmvPlacement(withDoor, deviceMap, control, 2);
+    const placed = withControl.scene[3];
+    const edited = updateHmvPlacementProperties(withControl, deviceMap, placed,
+      { team: 1, respawnSeconds: 0, placeAtStart: true, physics: 'fixed' });
+    const moved = { ...edited, scene: edited.scene.map(row =>
+      row.id === placed.id ? { ...row, position: [10, 2, 3] as [number, number, number] } : row) };
+    expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner')).toThrow('does not place devices');
+    const output = exportForgeSidecar(moved, deviceMap) as Uint8Array;
+    expect(new DataView(output.buffer).getUint16(4, true)).toBe(7);
+    const reopened = importForgeSidecar(starting, deviceMap, 'devices.hmv', output).project;
+    expect(reopened.scene.slice(-2).map(row => row.sourceModel?.class)).toEqual(['mach', 'ctrl']);
+    expect(reopened.scene.at(-1)?.position).toEqual([10, 2, 3]);
+    expect(exportForgeSidecar(reopened, deviceMap)).toEqual(output);
+    const olderSaved = { ...reopened, scene: starting.scene };
+    expect(exportForgeSidecar(olderSaved, deviceMap)).toEqual(output);
+    const revealed = showHmvDevices(olderSaved, deviceMap);
+    expect(revealed.scene).toEqual(reopened.scene);
+    expect(exportForgeSidecar(revealed, deviceMap)).toEqual(output);
+    expect(showHmvDevices(revealed, deviceMap)).toBe(revealed);
+    const { project: duplicate } = addHmvPlacement(reopened, deviceMap, reopened.scene.at(-1)!);
+    const copied = inspectForgeSidecar(duplicate.forgeSidecar!, deviceMap);
+    expect(copied.properties.get(duplicate.scene.at(-1)!.id)).toMatchObject({ team: 1, physics: 'fixed' });
+    const withoutCopy = removeHmvPlacement(duplicate, deviceMap, duplicate.scene.at(-1)!);
+    expect(exportForgeSidecar(withoutCopy, deviceMap)).toEqual(output);
+
+    const ambiguous = { ...deviceMap, tags: [...deviceMap.tags, { ...deviceMap.tags[1], id: 23 }] };
+    expect(() => addHmvPlacement(starting, ambiguous, door)).toThrow('ambiguous');
+    const unresolved = importForgeSidecar(starting, ambiguous, 'devices.hmv', output);
+    expect([unresolved.editable, unresolved.retained]).toEqual([1, 1]);
+    expect(exportForgeSidecar(unresolved.project, ambiguous)).toEqual(output);
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Spark previews CE HUD bitmap scale. Black Echo radar 0.5 correction compiled and passed independent readback for 22 edits; the exact retained candidate and resource banks were preserved. Forerunner render and paired gameplay remain open. See RUNTIME_INTEGRATION_20261107.
-Next action: On exact CE609 04d9ccd1, use the south facility route and confirm the equipped weapon before defense. Verify evacuation, banking and redeployment with two authenticated players for both factions. Compare the radar correction in a separate Forerunner A/B.
+Latest verified revision: HMV doors and controls pass authoring, history and independent readback. The exact Black Echo Elite candidate is unchanged. Forerunner’s outer-flank run ended with one defender alive. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish defense on exact CE609 04d9ccd1 from the outer Spirit flank, then verify unlock, evacuation, banking and redeployment in both factions with two authenticated players. Keep HUD A/B separate. Test a Spark layout in a Forge-capable Chupathingy build.
 
 ## Acceptance
 

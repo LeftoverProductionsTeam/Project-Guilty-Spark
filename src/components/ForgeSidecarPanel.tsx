@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, supportsHmvMap, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsHmvMap, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { Notice, NumberField } from './ui';
@@ -35,8 +35,10 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   const selectedSpawn = canAddHmv && canPlaceHmvSpawn(project, map, selected);
   const metadata = summary?.metadata;
   const properties = selected && summary?.properties.get(selected.id);
+  const selectedDevice = selectedTag && isHmvDeviceGroup(selectedTag.class);
   const spawn = summary?.spawns.find(row => row.id === selected?.id);
   const sceneIds = new Set(project.scene.map(object => object.id));
+  const hiddenDevices = summary?.devices.filter(id => !sceneIds.has(id)) ?? [];
   const hiddenSpawns = summary?.spawns.filter(record => !sceneIds.has(record.id)) ?? [];
   const teleporters = summary?.teleporters ?? [];
   const endpoint = teleporters.find(record => record.id === selected?.id);
@@ -159,6 +161,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
           : (layout ? 'Add selected object to HMV' : 'Create HMV from selected object')}
       </button>
       {!selectedTag && !selectedSpawn && <p className="subtle">Select a player spawn or unscaled object from this map.</p>}
+      {selectedDevice && <p className="subtle">Forge places this device with its tag defaults. For linked switches, power groups or scripts, edit the scenario’s native device placements.</p>}
     </>}
 
     {canAddHmv && map.header.scenarioType === 1 && <>
@@ -276,7 +279,17 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
           <button type="submit">Apply layout details</button>
         </form>
       </details>}
-      {summary&&<p role="status">{summary.editable + visibleMarkers} editable placements · {summary.retained - visibleMarkers} other records preserved.</p>}
+      {summary&&<p role="status">{summary.editable + visibleMarkers - hiddenDevices.length} editable placements · {summary.retained - visibleMarkers + hiddenDevices.length} other records preserved.</p>}
+      {!!hiddenDevices.length && <button type="button" onClick={() => {
+        try {
+          const next = showHmvDevices(project, map);
+          if (next !== project) {
+            edit(next, 'Show Forge devices');
+            onSelect(hiddenDevices[0]);
+          }
+          setProblem('');
+        } catch (error) { setProblem(String(error)); }
+      }}>Show layout devices</button>}
       {!!hiddenSpawns.length && <button type="button" onClick={() => showMarkers('spawns')}>Show layout spawns</button>}
       {!!hiddenTeleporters.length && <button type="button" onClick={() => showMarkers('teleporters')}>Show layout teleporters</button>}
       {!!hiddenObjectives.length && <button type="button" onClick={() => showMarkers('objectives')}>Show layout objectives</button>}

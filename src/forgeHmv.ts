@@ -47,8 +47,17 @@ export interface HmvPlacementProperties {
   placeAtStart: boolean;
   physics: keyof typeof physicsBits;
 }
-const forerunnerGroups = ['scen', 'vehi', 'weap', 'eqip'];
-const groups = [...forerunnerGroups, 'bipd', 'mach', 'ctrl', 'lifi', 'actv'];
+const forerunnerGroups = ['scen', 'vehi', 'weap', 'eqip'] as const;
+const deviceGroups = ['mach', 'ctrl'] as const;
+export const HMV_PLACEMENT_GROUPS = [...forerunnerGroups, ...deviceGroups] as const;
+const groups = [...HMV_PLACEMENT_GROUPS, 'bipd', 'lifi', 'actv'];
+const basePlacementGroups: ReadonlySet<string> = new Set(forerunnerGroups);
+export function isHmvDeviceGroup(group: string) {
+  return deviceGroups.some(candidate => candidate === group);
+}
+export function isHmvPlacementGroup(group: string): group is typeof HMV_PLACEMENT_GROUPS[number] {
+  return HMV_PLACEMENT_GROUPS.some(candidate => candidate === group);
+}
 const groupCode = (name: string) => Array.from(name).reduce((code, c) => code * 256 + c.charCodeAt(0), 0);
 const groupNames = new Map(groups.map(group => [groupCode(group), group]));
 const encoder = new TextEncoder();
@@ -172,10 +181,12 @@ export function readHmv(input: number[], map: MapInspection) {
     const invalid = 'invalid placement record ' + (index + 1) + '.';
     requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
     markers ||= kind !== 0;
-    const ordinary = kind === 0 && !!ref && forerunnerGroups.includes(ref.group)
+    const ordinary = kind === 0 && !!ref && basePlacementGroups.has(ref.group)
       && !respawn && !modes && !variant && flags <= 1 && !aiTeam;
     if (!forerunnerIssue && (!ordinary || count !== 1 || flags !== 1)) {
-      forerunnerIssue = `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
+      forerunnerIssue = ref && isHmvDeviceGroup(ref.group)
+        ? `Forerunner’s HMV import does not place devices. Record ${index + 1} remains available in the Forge layout copy.`
+        : `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
     }
 
     if (kind === 5 || kind === 7 || kind === 8) {
@@ -278,7 +289,7 @@ export function readHmv(input: number[], map: MapInspection) {
 
   function editableRecord(index: number) {
     const record = objectRecords.find(record => record.index === index);
-    requireLayout(record && forerunnerGroups.includes(record.group), 'select a base-map scenery, vehicle, weapon or equipment placement.');
+    requireLayout(record && isHmvPlacementGroup(record.group), 'select a supported object from the base map.');
     return record;
   }
 
@@ -345,7 +356,7 @@ export function readHmv(input: number[], map: MapInspection) {
       return rebuild([bytes.subarray(recordsStart, recordsEnd)], undefined, version, replacement);
     },
     append(group: string, path: string, position: Vec3, rotation: Vec3) {
-      requireLayout(forerunnerGroups.includes(group) && hmvPathValid(path), 'the selected tag cannot be placed.');
+      requireLayout(isHmvPlacementGroup(group) && hmvPathValid(path), 'the selected tag cannot be placed.');
       let pathIndex = pathList.findIndex(item => item.group === group && item.path === path);
       let entry: Uint8Array | undefined;
       if (pathIndex < 0) {

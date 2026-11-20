@@ -5961,6 +5961,58 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   expect(output.readUInt32LE(60)).toBe(crc32(output.subarray(64)));
 });
 
+test('Chupathingy Forge places and reopens a base-map control', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const open = (window as any).__sparkMock.projects.a;
+    open.project.source.cacheVersion = 5;
+    open.inspection.header.version = 5;
+    open.inspection.header.crc32 = 123456;
+    open.inspection.tags.push({id:42,index:1,class:'ctrl',path:'devices/power_switch',
+      external:false,dataOffset:100,fields:[],references:[]});
+    open.project.scene = [{id:'native-control',name:'Base-map control',kind:'Control',tagId:42,
+      position:[4,2,3],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:8,rotationOffset:20,assetId:null}];
+    open.inspection.objects = structuredClone(open.project.scene);
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  const openLayout = page.getByRole('button',{name:'Forge layouts',exact:true});
+  const panel = page.locator('.forge-sidecar-panel');
+  await openLayout.click();
+  await page.locator('.hierarchy').getByRole('button',{name:'Base-map control',exact:true}).click();
+  await openLayout.click();
+  await expect(panel.getByText('Forge places this device with its tag defaults.',{exact:false})).toBeVisible();
+  await panel.getByRole('button',{name:'Create HMV from selected object'}).click();
+  await openLayout.click();
+  const physics = panel.getByRole('group',{name:'Placement properties'}).getByLabel('Physics');
+  await physics.selectOption('fixed');
+  await physics.blur();
+  await page.keyboard.press('Control+z');
+  await expect(physics).toHaveValue('normal');
+  await page.keyboard.press('Control+y');
+  await expect(physics).toHaveValue('fixed');
+  await expect(panel.getByRole('button',{name:'Export for Forerunner'})).toBeDisabled();
+  await expect(panel.getByText('Forerunner’s HMV import does not place devices.',{exact:false})).toBeVisible();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[4])).toBe(7);
+  const pending = page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
+  const file = await pending;
+  const { readFile } = await import('node:fs/promises');
+  const output = await readFile((await file.path())!);
+  expect(output.readUInt32LE(64)).toBe(0x6374726c);
+  expect(output.readFloatLE(64+5+output[68]+4)).toBe(5);
+  expect(output.readUInt32LE(60)).toBe(crc32(output.subarray(64)));
+  await panel.getByRole('button',{name:'Remove layout from project'}).click();
+  await panel.getByLabel('Import Forge layout').setInputFiles({
+    name:'control.hmv', mimeType:'application/octet-stream', buffer:output,
+  });
+  await expect(panel.getByRole('status')).toContainText('1 editable placements');
+  await page.locator('.hierarchy').getByRole('button',{name:'power_switch',exact:true}).click();
+  await openLayout.click();
+  await expect(physics).toHaveValue('fixed');
+});
+
 test('Chupathingy Forge .hmv uses the shared history, Save and lossless export controls', async ({page}) => {
   await mockDesktop(page);
   await page.evaluate(() => {

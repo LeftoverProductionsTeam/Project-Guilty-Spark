@@ -1,6 +1,6 @@
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, hmvObjectiveDefinition, readHmv, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
+import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -13,7 +13,7 @@ const header = '[OpenCE Forge Map]';
 const stateHeader = '[ForgeState]';
 const classes = ['scen', 'vehi', 'weap', 'eqip'] as const;
 
-type PlacementClass = typeof classes[number];
+type PlacementClass = typeof HMV_PLACEMENT_GROUPS[number];
 const fourcc = (s: string) => Array.from(s).reduce((id, c) => id * 256 + c.charCodeAt(0), 0);
 const pathKey = (s: string) => s.replaceAll('\\', '/').toLowerCase();
 const validPath = (s: string) => s.length > 0 && s.length <= 255
@@ -43,7 +43,7 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
       || sidecar.baseSha256 !== map.sha256) {
     throw Error('Open the matching Xbox or Halo Custom Edition multiplayer base map first.');
   }
-  const tags = placementTags(map);
+  const tags = placementTags(map, classes);
   const rows: LayoutPlacement[] = [];
 
   let retained = 0;
@@ -101,10 +101,10 @@ function layoutSpawns(layout: ReturnType<typeof readHmv>, keys: string[]): Layou
   return layout.spawnRecords.map(record => ({ ...record, id: prefix + keys[record.index] }));
 }
 
-function placementTags(map: MapInspection) {
+function placementTags(map: MapInspection, admitted: readonly string[]) {
   const tags = new Map<string, MapInspection['tags']>();
   for (const tag of map.tags) {
-    if (!classes.includes(tag.class as PlacementClass) || tag.external) continue;
+    if (!admitted.includes(tag.class) || tag.external) continue;
     const key = tag.class + '|' + pathKey(tag.path);
     const same = tags.get(key) ?? [];
     same.push(tag);
@@ -121,7 +121,7 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
   }
   const layout = readHmv(sidecar.bytes, map);
   const recordKeys = keysForHmv(sidecar, layout.recordsCount);
-  const tags = placementTags(map);
+  const tags = placementTags(map, HMV_PLACEMENT_GROUPS);
   const rows: LayoutPlacement[] = [];
   for (const record of layout.objectRecords) {
     const matches = tags.get(record.group + '|' + pathKey(record.path));
@@ -154,7 +154,8 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   const parsed = parse(sidecar, map);
   const { rows, retained, forerunner, spawns, teleporters, objectives } = parsed;
   const properties = new Map(rows.flatMap(row => row.properties ? [[prefix + row.key, row.properties] as const] : []));
-  return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives,
+  const devices = rows.filter(row => isHmvDeviceGroup(row.tag.class)).map(row => prefix + row.key);
+  return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives, devices,
     metadata: 'metadata' in parsed ? parsed.metadata : undefined };
 }
 
@@ -181,6 +182,18 @@ function placementObject(project: Project, map: MapInspection, row: Omit<LayoutP
   };
 }
 
+export function showHmvDevices(project: Project, map: MapInspection) {
+  if (!project.forgeSidecar?.bytes || project.source?.sha256 !== map.sha256) {
+    throw Error('Open the preserved base map for this Forge layout.');
+  }
+  const present = new Set(project.scene.map(object => object.id));
+  const { rows } = parse(project.forgeSidecar, map);
+  const added = rows.filter(row => isHmvDeviceGroup(row.tag.class) && !present.has(prefix + row.key))
+    .map(row => placementObject(project, map, row));
+  if (project.scene.length + added.length > 20000) throw Error('This layout exceeds the scene object limit.');
+  return added.length ? { ...project, scene: [...project.scene, ...added] } : project;
+}
+
 function keysForHmv(layout: ForgeSidecar, count: number) {
   const keys = layout.recordKeys ?? Array.from({ length: count }, (_, index) => String(index));
   if (keys.length !== count || new Set(keys).size !== count || keys.some(key => !/^[a-z0-9-]{1,36}$/.test(key))) {
@@ -198,7 +211,7 @@ export function hmvPlacementTag(project: Project, map: MapInspection, object: Sc
   const source = object.sourceModel;
   if (source && (source.projectId !== project.id || source.sourceSha256 !== map.sha256)) return;
   const tag = map.tags.find(tag => tag.id === (source?.tagId ?? object.tagId));
-  if (!tag || tag.external || !classes.includes(tag.class as PlacementClass)
+  if (!tag || tag.external || !isHmvPlacementGroup(tag.class)
       || source && (source.class !== tag.class || pathKey(source.path) !== pathKey(tag.path))) return;
   return tag;
 }
@@ -248,7 +261,7 @@ export function addHmvPlacement(project: Project, map: MapInspection, object: Sc
   if (!tag && !spawn && !teleporter && !objective) throw Error('Select an HMV marker or an unscaled object from the current base map.');
   if (project.forgeSidecar?.text !== undefined) throw Error('Export or remove the OpenCE text layout before creating an HMV.');
   if (project.scene.length >= 20000) throw Error('This layout exceeds the scene object limit.');
-  if (tag && placementTags(map).get(tag.class + '|' + pathKey(tag.path))?.length !== 1) throw Error('This base-map tag path is ambiguous.');
+  if (tag && placementTags(map, HMV_PLACEMENT_GROUPS).get(tag.class + '|' + pathKey(tag.path))?.length !== 1) throw Error('This base-map tag path is ambiguous.');
   const previous = project.forgeSidecar;
   if (previous && previous.baseSha256 !== map.sha256) throw Error('Open the preserved base map for this Forge layout.');
   const layout = readHmv(previous?.bytes ?? Array.from(emptyHmv(map)), map);
@@ -265,7 +278,7 @@ export function addHmvPlacement(project: Project, map: MapInspection, object: Sc
     : tag ? layout.append(tag.class, pathKey(tag.path).replaceAll('/', '\\'), position, rotation)
     : layout.appendSpawn(position, rotation[0]);
   const savedBytes = Array.from(bytes);
-  if (spawn) readHmv(savedBytes, map);
+  readHmv(savedBytes, map);
   return {
     selectedId: placement.id,
     project: {
@@ -427,6 +440,8 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
   }
   for (const row of rows) {
     const object = project.scene.find(candidate => candidate.id === prefix + (row.key ?? row.index));
+    // Earlier Spark versions kept device records in the file without putting them in the scene.
+    if (!object && isHmvDeviceGroup(row.tag.class)) continue;
     if (!object || object.sourceModel?.tagId !== row.tag.id || object.sourceModel.sourceSha256 !== map.sha256
         || object.sourceModel.projectId !== project.id || object.sourceModel.class !== row.tag.class
         || pathKey(object.sourceModel.path) !== pathKey(row.tag.path)) {
