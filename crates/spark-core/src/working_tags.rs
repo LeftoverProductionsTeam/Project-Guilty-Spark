@@ -1580,6 +1580,13 @@ fn run_with(
             let cutscene_flags=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cutscene_flags.is_some()){Some(crate::native_operations::scenario_flag_choices(&fields)?)}else{None};
             let cameras=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.cameras.is_some()){Some(crate::native_operations::scenario_camera_choices(&fields)?)}else{None};
             let volumes=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.volumes.is_some()){Some(crate::native_operations::scenario_volume_choices(&fields)?)}else{None};
+            let device_groups = if let Some(expected) = prepared.scenario_squad_readback.as_ref().and_then(|s| s.device_groups.as_ref()) {
+                let groups = crate::native_operations::scenario_device_group_choices(&fields)?;
+                if !groups.starts_with(expected) {
+                    return invalid("Staged native device groups changed after source review; no compiler ran");
+                }
+                Some(groups)
+            } else { None };
             let devices=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.devices.is_some()){Some(crate::native_operations::scenario_device_choices(&fields)?)}else{None};
             let command_lists=if prepared.scenario_squad_readback.as_ref().is_some_and(|s|s.command_lists.is_some()){Some(crate::native_operations::native_command_source(&fields)?.lists)}else{None};
             let transports=if let Some(selected)=prepared.scenario_squad_readback.as_ref().and_then(|s|s.transports.as_ref()) {Some({let mut rows=crate::native_operations::scenario_transport_snapshots(&fields,&selected.iter().map(|row|row.transport.name.clone()).collect::<Vec<_>>())?;for row in &mut rows{let before=selected.iter().find(|old|old.transport.name==row.transport.name&&old.transport.tag_path.replace('\\',"/").eq_ignore_ascii_case(&row.transport.tag_path.replace('\\',"/"))).ok_or_else(||SparkError::Invalid("Staged transport flight binding changed".into()))?;row.flight=before.flight.clone();}rows})}else{None};
@@ -1590,7 +1597,7 @@ fn run_with(
                 let actual=crate::native_operations::native_faction_snapshots(&fields)?;
                 if serde_json::to_value(expected)?!=serde_json::to_value(&actual)?{return invalid("Staged faction controls/profiles changed after source review; no compiler ran");}Some(actual)
             }else{None};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{named_objects,cutscene_flags,extraction_squads,faction_kits,transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices};
+            let snapshot=crate::native_operations::ScenarioSquadReadback{named_objects,cutscene_flags,extraction_squads,faction_kits,transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices,device_groups};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
