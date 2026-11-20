@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Spark’s About, map export and portable release packaging preserve community attribution. Two browser checks, four Rust map-export tests, Windows Cargo check, TypeScript, 14 packaging tests and six draft workflow tests passed. Installer and native UI acceptance remain open. The previous linked-HMV teleporter authoring, browser Save/export and upstream version-5 readback remain verified. Black Echo two-player acceptance remains open.
-Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. Verify both faction routes and distinct Elite colors through the field rally, facility combat, technology collection, defense, evacuation, banking, reconnect and redeployment. Use the reviewed fallback pending CMT redistribution permission. Keep direct Chupathingy playback, HMV replication, and advanced placement editing open.
+Latest verified revision: Exact Black Echo CE609 collision readback reproduced a rock blocking the facility shot and found a supported south approach with a clear standing-eye trace to the guard. See RUNTIME_INTEGRATION_20261107. Paired gameplay remains unverified. Spark’s community credits and Forge HMV checks remain verified at their recorded scope.
+Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players using regular controls. After the Covenant field rally, follow the south approach in HUMAN_TEST_PLAN before testing damage, the facility clear and technology pickup. Verify both faction routes and distinct Elite colors through defense, evacuation, banking, reconnect and redeployment. Use the reviewed first-person fallback pending CMT redistribution permission. Keep direct Chupathingy playback, HMV replication and advanced placement editing open.
 
 ## Acceptance
 
