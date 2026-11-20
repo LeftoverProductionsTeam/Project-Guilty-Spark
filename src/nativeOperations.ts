@@ -88,7 +88,7 @@ export interface NativeTriggerVolume {name:string;kind:number;geometry:NativeVol
 export interface NativeDevicePlacement {class:'ctrl'|'mach'|'vehi';index:number;nameIndex:number;name:string;tagPath:string;position:[number,number,number];rotationRadians:[number,number,number];usableFromBothSides?:boolean}
 export interface NativeVehicleFlight {throttle:number;avoidanceDistance:number;pathfindingRadius:number}
 export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_spirit';tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
-export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number}
+export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number;includeFirstPersonArms?:boolean}
 export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];profile:import('./firefight').NativePlayerProfile}
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
 export interface NativeControlSettings {controlType:string;trigger:string;callValue:number;automaticActivationRadius:number;delaySeconds:number}
@@ -123,7 +123,7 @@ export interface NativeTagContext {
   canAppendEncounter?:boolean;
   canAppendTransport?:boolean;vehicleSources?:string[];
   canAppendFactionKits?:boolean;controlSources?:string[];weaponSources?:string[];bipedSources?:string[];
-  factionKits?:{kit:NativeFactionKit;body?:{bipedTagPath:string;permutation:number}|null}[];factionBodyIssue?:string|null;
+  factionKits?:{kit:NativeFactionKit;body?:{bipedTagPath:string;permutation:number;firstPersonArms?:boolean}|null}[];factionBodyIssue?:string|null;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
   scenarioPlayerStarts?:{index:number;position:[number,number,number];facingRadians?:number|null}[];

@@ -10,6 +10,8 @@ use std::path::Path;
 pub use factions::{NativeFactionBody,NativeFactionBodyBinding,NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
 pub fn native_squad_terminal_snapshots(fields:&str)->Result<Vec<NativeSquadTerminalSnapshot>>{factions::squad_snapshots(fields)}
 pub fn verify_native_squad_terminals(expected:&[NativeSquadTerminalSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_squad_cache(expected,cache,map)}
+pub fn verify_faction_arms_source(body:&NativeFactionBody,profile:&crate::firefight::NativePlayerProfile,read:impl FnMut(&str)->Result<String>)->Result<Vec<String>>{factions::verify_arms_source(body,profile,read)}
+pub(crate) use factions::arms_path as faction_arms_path;
 pub fn validate_faction_control_source(fields:&str)->Result<()>{factions::validate_control_source(fields)}
 pub fn native_faction_snapshots(fields:&str)->Result<Vec<NativeFactionSnapshot>>{factions::snapshots(fields)}
 pub fn verify_native_faction_control_values(trigger:&str,initially_off:&str)->Result<()>{factions::verify_control_values(trigger,initially_off)}

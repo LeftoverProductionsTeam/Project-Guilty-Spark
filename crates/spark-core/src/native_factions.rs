@@ -296,16 +296,23 @@ pub struct NativeFactionBody {
     pub faction: String,
     pub biped_tag_path: String,
     pub permutation: i16,
+    #[serde(default, skip_serializing_if = "command_append_is_false")]
+    pub include_first_person_arms: bool,
 }
 
 impl NativeFactionBody {
     fn name(&self) -> String { format!("extraction_{}_body", self.faction) }
+
+    pub fn arms_path(&self) -> String { arms_path(&self.biped_tag_path) }
 
     pub fn validate(&self) -> Result<()> {
         if !["unsc", "covenant"].contains(&self.faction.as_str()) || self.permutation < -1
             || self.biped_tag_path.to_ascii_lowercase().ends_with(".biped")
         {
             return invalid("Choose a faction, native biped tag without its extension and a valid permutation");
+        }
+        if self.include_first_person_arms {
+            validate_hub_pose(&self.arms_path(), [0.; 3], [0.; 3])?;
         }
         validate_hub_pose(&self.biped_tag_path, [0.; 3], [0.; 3])
     }
@@ -319,6 +326,8 @@ pub struct NativeFactionBodyBinding {
     pub index: u16,
     pub name_index: u16,
     pub position: [f32; 3],
+    #[serde(default, skip_serializing_if = "command_append_is_false")]
+    pub first_person_arms: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -332,6 +341,58 @@ pub struct NativeFactionSnapshot {
     pub position_group: i16,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<NativeFactionBodyBinding>,
+}
+
+pub(crate) fn arms_path(biped: &str) -> String {
+    format!("{}_fp", biped.replace(char::from(92), "/"))
+}
+
+fn arms_palette_index(fields: &str, biped: &str) -> Result<(usize, bool)> {
+    let palette = array_listing(fields, "scenery_palette")?;
+    let path = arms_path(biped);
+    let mut index = None;
+    for (i, item) in array_items(&palette, "scenery_palette")?.iter().enumerate() {
+        let tag = native_dependency_path(&direct_struct_fields(item)?, "name", "scenery")?;
+        if tag.as_deref().is_some_and(|tag| tag.eq_ignore_ascii_case(&path)) && index.replace(i).is_some() {
+            return invalid("The faction arms scenery carrier appears twice in the native palette");
+        }
+    }
+    Ok((index.unwrap_or(palette.count), index.is_some()))
+}
+
+pub fn verify_arms_source(
+    body: &NativeFactionBody, profile: &crate::firefight::NativePlayerProfile,
+    mut read: impl FnMut(&str) -> Result<String>,
+) -> Result<Vec<String>> {
+    let path = body.arms_path();
+    let carrier = format!("{path}.scenery");
+    let model = format!("{path}.gbxmodel");
+    let scenery = read(&carrier)?;
+    if native_dependency_path(&scenery, "model", "gbxmodel")?.as_deref() != Some(&path) {
+        return invalid(format!("{carrier} must point to {model}"));
+    }
+    let nodes = |fields: &str| -> Result<std::collections::BTreeSet<String>> {
+        let list = array_listing(fields, "nodes")?;
+        if !(1..=64).contains(&list.count) { return invalid("First-person arms and weapon graphs need 1–64 named nodes"); }
+        let values = array_items(&list, "nodes")?.iter()
+            .map(|item| native_name(&direct_struct_fields(item)?)).collect::<Result<std::collections::BTreeSet<_>>>()?;
+        if values.len() != list.count || values.contains("") { return invalid("First-person model or animation graph has missing or duplicate nodes"); }
+        Ok(values)
+    };
+    let model_nodes = nodes(&read(&model)?)?;
+    let mut weapons = Vec::new();
+    for path in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {
+        let weapon = format!("{path}.weapon");
+        let fields = read(&weapon)?;
+        let graph = native_dependency_path(&fields, "first_person_animations", "model_animations")?
+            .ok_or_else(|| crate::SparkError::Invalid(format!("{weapon} has no first-person animation graph")))?;
+        let graph_nodes = nodes(&read(&format!("{graph}.model_animations"))?)?;
+        if let Some(node) = model_nodes.difference(&graph_nodes).next() {
+            return invalid(format!("{weapon} cannot animate the selected arms. The graph has no node {node}"));
+        }
+        weapons.push(weapon);
+    }
+    Ok(weapons)
 }
 
 fn existing_body(fields: &str, names: &[String], faction: &str) -> Result<Option<NativeFactionBodyBinding>> {
@@ -357,12 +418,13 @@ fn existing_body(fields: &str, names: &[String], faction: &str) -> Result<Option
         let biped_tag_path = native_dependency_path(&direct_struct_fields(entry)?, "name", "biped")?
             .ok_or_else(|| crate::SparkError::Invalid("Faction biped palette reference is null".into()))?;
         let permutation = native_index(row, "desired_permutation")?;
-        let request = NativeFactionBody { faction: faction.into(), biped_tag_path, permutation };
+        let (_, first_person_arms) = arms_palette_index(fields, &biped_tag_path)?;
+        let request = NativeFactionBody { faction: faction.into(), biped_tag_path, permutation, include_first_person_arms: first_person_arms };
         request.validate()?;
         let (position, _) = native_vector(row, "position")?;
         validate_hub_pose(&request.biped_tag_path, position, [0.; 3])?;
         found = Some(NativeFactionBodyBinding { biped_tag_path: request.biped_tag_path, permutation: request.permutation,
-            index: index as u16, name_index: name_index as u16, position });
+            index: index as u16, name_index: name_index as u16, position, first_person_arms });
     }
     found.map(Some).ok_or_else(|| crate::SparkError::Invalid("Faction body name does not bind to a native biped".into()))
 }
@@ -372,6 +434,7 @@ struct BodyLayout {
     binding: NativeFactionBodyBinding,
     palette: usize,
     append_palette: bool,
+    arms_palette: Option<usize>,
 }
 
 fn body_layout(fields: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<BodyLayout> {
@@ -405,11 +468,17 @@ fn body_layout(fields: &str, body: &NativeFactionBody, replace_existing: bool) -
         None => (palette.len(), requested_path),
     };
 
+    let (arms_index, arms_present) = arms_palette_index(fields, &path)?;
+    let append_arms = body.include_first_person_arms && !arms_present;
+    if append_arms && arms_index >= 100 {
+        return invalid("Faction arms exceed the native scenery palette capacity");
+    }
+    let first_person_arms = arms_present || append_arms;
     let binding = if let Some(original) = &kit.body {
-        if original.biped_tag_path.eq_ignore_ascii_case(&path) && original.permutation == body.permutation {
-            return invalid("The faction body already uses this biped and permutation");
+        if original.biped_tag_path.eq_ignore_ascii_case(&path) && original.permutation == body.permutation && !append_arms {
+            return invalid("The faction body already uses this biped, permutation and arms binding");
         }
-        NativeFactionBodyBinding { biped_tag_path: path, permutation: body.permutation, ..original.clone() }
+        NativeFactionBodyBinding { biped_tag_path: path, permutation: body.permutation, first_person_arms, ..original.clone() }
     } else {
         let names = array_listing(fields, "object_names")?.count;
         let bipeds = array_listing(fields, "bipeds")?.count;
@@ -422,9 +491,10 @@ fn body_layout(fields: &str, body: &NativeFactionBody, replace_existing: bool) -
             index: bipeds as u16,
             name_index: names as u16,
             position: kit.kit.position,
+            first_person_arms,
         }
     };
-    Ok(BodyLayout { snapshots, binding, palette: palette_index, append_palette: matches.is_empty() })
+    Ok(BodyLayout { snapshots, binding, palette: palette_index, append_palette: matches.is_empty(), arms_palette: append_arms.then_some(arms_index) })
 }
 
 pub fn body_arguments(tags: &Path, tag: &str, before: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<Vec<String>> {
@@ -441,7 +511,13 @@ pub fn body_arguments(tags: &Path, tag: &str, before: &str, body: &NativeFaction
     if layout.append_palette {
         args.extend(["-I".into(), "biped_palette".into(), "1".into(), "end".into()]);
     }
+    if layout.arms_palette.is_some() {
+        args.extend(["-I".into(), "scenery_palette".into(), "1".into(), "end".into()]);
+    }
     let mut set = |key: String, value: String| args.extend(["-S".into(), key, value]);
+    if let Some(index) = layout.arms_palette {
+        set(format!("scenery_palette[{index}].name"), format!("{}.scenery", arms_path(&binding.biped_tag_path)));
+    }
     if layout.append_palette {
         set(format!("biped_palette[{}].name", layout.palette), format!("{}.biped", binding.biped_tag_path));
     }
@@ -485,13 +561,14 @@ fn without_body_binding(fields: &str, index: usize) -> Result<String> {
 pub fn review_body(before: &str, after: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<Vec<FieldDifference>> {
     let layout = body_layout(before, body, replace_existing)?;
     let palette_change = ("biped_palette", usize::from(layout.append_palette));
+    let arms_change = ("scenery_palette", usize::from(layout.arms_palette.is_some()));
     let mut expected = layout.snapshots;
     let binding = layout.binding;
     let index = usize::from(binding.index);
     if replace_existing {
-        transport::preserved_arrays(&without_body_binding(before, index)?, &without_body_binding(after, index)?, &[palette_change])?;
+        transport::preserved_arrays(&without_body_binding(before, index)?, &without_body_binding(after, index)?, &[palette_change, arms_change])?;
     } else {
-        transport::preserved_arrays(before, after, &[("object_names", 1), ("bipeds", 1), palette_change])?;
+        transport::preserved_arrays(before, after, &[("object_names", 1), ("bipeds", 1), palette_change, arms_change])?;
     }
     let kit = expected.iter_mut().find(|row| row.kit.faction == body.faction).unwrap();
     let previous = kit.body.replace(binding.clone());
@@ -499,8 +576,9 @@ pub fn review_body(before: &str, after: &str, body: &NativeFactionBody, replace_
         return invalid("Native body and matching profiles differ from the reviewed binding");
     }
     let describe = |binding: &NativeFactionBodyBinding| format!(
-        "{} uses {} · permutation {} · biped index {} · dormant",
+        "{} uses {} · permutation {} · biped index {} · dormant{}",
         body.name(), binding.biped_tag_path, binding.permutation, binding.index,
+        if binding.first_person_arms { " · includes first-person arms" } else { "" },
     );
     Ok(vec![FieldDifference {
         before: previous.as_ref().map_or_else(|| format!("No {}", body.name()), describe),
@@ -827,7 +905,7 @@ mod tests {
     }
     #[test]
     fn faction_body_uses_signed_native_selection_and_requires_a_matching_kit() {
-        let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1 };
+        let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1, include_first_person_arms: false };
         let operation = Operation::FactionBody { body: body.clone(), replace_existing: false, source_sha256: "a".repeat(64) };
         let serialized = serde_json::to_value(&operation).unwrap();
         assert_eq!(serialized["body"]["permutation"], -1);
@@ -836,6 +914,32 @@ mod tests {
         assert!(body_arguments(Path::new("owned"), "test.scenario", &before(), &body, false).is_err());
         assert!(NativeFactionBody { permutation: -2, ..body.clone() }.validate().is_err());
         assert!(NativeFactionBody { biped_tag_path: "../grunt".into(), ..body }.validate().is_err());
+    }
+
+    #[test]
+    fn faction_arms_require_the_exact_carrier_model_and_each_weapon_graph_node() {
+        let body = NativeFactionBody {
+            faction: "covenant".into(), biped_tag_path: "owned/characters/elite".into(),
+            permutation: -1, include_first_person_arms: true,
+        };
+        let profile = kit().profile;
+        let review = |weapon_node: &str, carrier_model: &str| verify_arms_source(&body, &profile, |tag| {
+            Ok(match tag {
+                "owned/characters/elite_fp.scenery" => format!("model ({carrier_model}.gbxmodel) dependency"),
+                "owned/characters/elite_fp.gbxmodel" => "nodes[1] array\n    nodes[0] struct\n        name (bip01 r hand) string".into(),
+                "weapons/rifle.weapon" => "first_person_animations (weapons/rifle/fp.model_animations) dependency".into(),
+                "weapons/rifle/fp.model_animations" => format!(
+                    "nodes[1] array\n    nodes[0] struct\n        name ({weapon_node}) string"
+                ),
+                _ => return invalid("Unexpected native field lookup"),
+            })
+        });
+        assert_eq!(review("bip01 r hand", "owned/characters/elite_fp").unwrap(), ["weapons/rifle.weapon"]);
+        assert!(review("bip01 left hand", "owned/characters/elite_fp").unwrap_err().to_string().contains("bip01 r hand"));
+        assert!(review("bip01 r hand", "owned/characters/other").unwrap_err().to_string().contains("must point"));
+        let palette = "scenery_palette[1] array\n    scenery_palette[0] struct\n        name (owned/characters/elite_fp.scenery) dependency";
+        assert_eq!(arms_palette_index(palette, &body.biped_tag_path).unwrap(), (0, true));
+        assert_eq!(arms_palette_index(palette, "owned/characters/other").unwrap(), (1, false));
     }
     #[test]
     #[ignore = "Requires a disposable Black Echo tag tree and legally sourced Elite dependencies"]
@@ -880,6 +984,7 @@ mod tests {
             faction: "covenant".into(),
             biped_tag_path: elite.clone(),
             permutation: old_body.permutation,
+            include_first_person_arms: false,
         };
         assert!(body_arguments(&tags, &scenario, &before, &body, false).is_err());
         run("invader-edit", &body_arguments(&tags, &scenario, &before, &body, true).unwrap());

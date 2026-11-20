@@ -159,8 +159,29 @@ pub fn scenario_faction_body_readback(
         let object = &placed[index];
         let sources = map.tags.iter().filter(|tag| Some(tag.id) == object.tag_id && tag.class == "bipd" && !tag.external).collect::<Vec<_>>();
         let [tag] = sources.as_slice() else { return invalid("Compiled faction biped tag is missing or ambiguous"); };
+        let arms_path = crate::native_operations::faction_arms_path(&tag.path);
+        let (_, _, _, _, _, _, scenery_palette, _, _) = NAMED_OBJECT_BLOCKS[0];
+        let (palette_at, palette_count) = space.block(r, sc + scenery_palette, 48, 4096)?;
+        let carriers: Vec<_> = map.tags.iter().filter(|tag|
+            tag.class == "scen" && tag.path.replace('\\', "/").eq_ignore_ascii_case(&arms_path)
+        ).collect();
+        let mut first_person_arms = false;
+        if let [carrier] = carriers.as_slice() {
+            for index in 0..palette_count {
+                if r.u32(palette_at + index * 48 + 12)? != carrier.id { continue; }
+                if first_person_arms || carrier.external || !carrier.references.iter().any(|reference|
+                    reference.label == "Model" && map.tags.iter().any(|model| model.id == reference.target_id
+                        && model.class == "mod2" && !model.external && model.path.replace('\\', "/") == arms_path)
+                ) {
+                    return invalid("Compiled faction arms carrier or its exact native model is invalid");
+                }
+                first_person_arms = true;
+            }
+        } else if carriers.len() > 1 {
+            return invalid("Compiled faction arms carrier is ambiguous");
+        }
         Ok(Some(crate::native_operations::NativeFactionBodyBinding {biped_tag_path: tag.path.replace('\\', "/"),
-            permutation, index: index as u16, name_index: *name_index as u16, position: object.position}))
+            permutation, index: index as u16, name_index: *name_index as u16, position: object.position, first_person_arms}))
     })
 }
 fn parse_names(r:&Reader,space:&Space,sc:usize)->Result<Vec<ScenarioLogicName>>{
