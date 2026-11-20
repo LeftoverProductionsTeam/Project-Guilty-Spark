@@ -11,7 +11,7 @@ sha2.workspace = true
 spark-core = { path = "../spark-core" }
 
 [target.'cfg(windows)'.dependencies]
-steamworks = {version="=0.13.0",features=["raw-bindings"]}
+steamworks = {version="=0.13.1",features=["raw-bindings"]}
 
 [[bin]]
 name = "SparkSteamBridge"
