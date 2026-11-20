@@ -184,18 +184,20 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
     forerunnerLocalNeedsPhysics: 'forerunnerLocalNeedsPhysics' in parsed && parsed.forerunnerLocalNeedsPhysics };
 }
 
-export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {
+export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array, replaceCurrent = false) {
   if (project.source?.sha256 !== map.sha256) throw Error('Use the preserved base map for this Forge layout.');
-  if (project.forgeSidecar) throw Error('Export or remove the current Forge layout before importing another.');
+  if (replaceCurrent && !project.forgeSidecar) throw Error('The current Forge layout is no longer open.');
+  if (!replaceCurrent && project.forgeSidecar) throw Error('Use Replace current Forge layout to import an updated file.');
   if (typeof input === 'string' && (!/^[^\x00-\x1f\x7f/:\\]+\.txt$/i.test(name)
     || new TextEncoder().encode(name).length > 240)) throw Error('Choose a valid Forge layout filename.');
   const forgeSidecar: ForgeSidecar = typeof input === 'string'
     ? { name, text: input, baseSha256: map.sha256 }
     : { name, bytes: Array.from(input), baseSha256: map.sha256 };
   const { rows, retained } = parse(forgeSidecar, map);
-  if (project.scene.length + rows.length > 20000) throw Error('This layout exceeds the scene object limit.');
+  const scene = replaceCurrent ? removeForgeSidecar(project).scene : project.scene;
+  if (scene.length + rows.length > 20000) throw Error('This layout exceeds the scene object limit.');
   const objects = rows.map(row => placementObject(project, map, row));
-  return { project:{...project, forgeSidecar, scene:[...project.scene,...objects]}, editable:objects.length, retained };
+  return { project:{...project, forgeSidecar, scene:[...scene,...objects]}, editable:objects.length, retained };
 }
 
 function placementObject(project: Project, map: MapInspection, row: Omit<LayoutPlacement, 'write'>): SceneObject {

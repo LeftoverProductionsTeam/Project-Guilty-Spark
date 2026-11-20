@@ -12,11 +12,11 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   map: MapInspection;
   edit: (next: Project, description: string) => void;
   selected?: SceneObject;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
   openRequest: number;
 }) {
-  const current = useRef({project,map});
-  current.current = {project,map};
+  const current = useRef({project,map,selected});
+  current.current = {project,map,selected};
   const ticket = useRef(0);
   const [expanded,setExpanded] = useMapState(project.id,'world.forge-sidecar',false);
   useEffect(() => { if (openRequest) setExpanded(true); }, [openRequest]);
@@ -53,9 +53,9 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     + objectives.length - hiddenObjectives.length;
   if (!compatible && !layout) return null;
 
-  async function open(file: File) {
+  async function open(file: File, replaceCurrent: boolean) {
     const request = ++ticket.current;
-    const base = map.sha256;
+    const snapshot = current.current;
     setProblem('');
     try {
       const hmv = HMV_NAME.test(file.name);
@@ -66,9 +66,14 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       const input = hmv ? new Uint8Array(bytes) : new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
       if (request !== ticket.current) return;
       const latest = current.current;
-      if (latest.map.sha256 !== base) throw Error('The base map changed. Choose the layout again.');
-      const result = importForgeSidecar(latest.project,latest.map,file.name,input);
-      edit(result.project,'Import Forge layout');
+      if (latest.map.sha256 !== snapshot.map.sha256) throw Error('The base map changed. Choose the layout again.');
+      if (replaceCurrent && latest.project !== snapshot.project) {
+        throw Error('The project changed while reading this file. Choose the replacement again.');
+      }
+      const result = importForgeSidecar(latest.project, latest.map, file.name, input, replaceCurrent);
+      const priorSelection = latest.project.scene.find(row => row.id === latest.selected?.id);
+      edit(result.project, replaceCurrent ? 'Replace Forge layout' : 'Import Forge layout');
+      if (replaceCurrent && priorSelection && !result.project.scene.includes(priorSelection)) onSelect(null);
     } catch (error) {
       if (request === ticket.current) setProblem(String(error));
     }
@@ -357,11 +362,16 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
         edit(removeForgeSidecar(project),'Remove imported Forge layout');
         setProblem('');
       }}>Remove layout from project</button>
-    </> : <label>Import Forge layout<input aria-label="Import Forge layout" type="file" accept={map.header.scenarioType === 1 ? ".txt,.hmv" : ".hmv"} onChange={event=>{
-      const file=event.target.files?.[0];
-      event.target.value='';
-      if (file) void open(file);
-    }}/></label>}
+    </> : null}
+    {compatible && <label key={layout ? 'replace-layout' : 'import-layout'}>
+      {layout ? 'Replace current Forge layout' : 'Import Forge layout'}
+      <input type="file" accept={map.header.scenarioType === 1 ? '.txt,.hmv' : '.hmv'} onChange={event => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (file) void open(file, !!layout);
+      }}/>
+    </label>}
+    {compatible && layout && <p className="subtle">Choose an updated layout for this base map. Undo restores the previous layout and its edits.</p>}
     {layout && !summary && <Notice tone="error">Open the matching preserved map and check the layout before exporting.</Notice>}
     {problem&&<Notice tone="error">{problem}</Notice>}
   </details>;

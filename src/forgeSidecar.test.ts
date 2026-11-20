@@ -80,6 +80,21 @@ describe('OpenCE Forge base-map placements', () => {
     expect(() => exportForerunnerTextHmv(loaded,{...xbox,sha256:'b'.repeat(64)})).toThrow('preserved base map');
   });
 
+  it('replaces the current layout in one project revision and keeps unrelated placements', () => {
+    const { project: before } = importForgeSidecar(project, map, 'layout.txt', text);
+    const baseObject = { ...before.scene[0], id: 'base-map-object' };
+    before.scene.unshift(baseObject);
+    before.scene[1].position[0] = 17;
+    const updated = text.replace('|1.000|2|3|', '|23|2|3|');
+    const next = importForgeSidecar(before, map, 'returned.txt', updated, true).project;
+    expect(next.scene[0]).toBe(baseObject);
+    expect(next.scene[1].position).toEqual([23, 2, 3]);
+    expect(exportForgeSidecar(next, map)).toBe(updated);
+    expect(before.scene[1].position).toEqual([17, 2, 3]);
+    expect(() => importForgeSidecar(before, map, 'wrong.txt', updated.replace('bloodgulch', 'sidewinder'), true)).toThrow('matching');
+    expect(() => importForgeSidecar(project, map, 'returned.txt', updated, true)).toThrow('no longer open');
+  });
+
   it('refuses mismatched maps, missing objects, changed scale and replacement assets', () => {
     expect(()=>importForgeSidecar(project,{...map,header:{...map.header,name:'sidewinder'}},'layout.txt',text)).toThrow('matching');
     const {project:loaded}=importForgeSidecar(project,map,'layout.txt',text);

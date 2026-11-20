@@ -3,7 +3,7 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Native switch interaction lock reviewed, restored and independently verified in CE609. Forerunner confirmed Use targeting for the unlocked fixture and separate native Fixed/Phased collision. Three browser workflows, six focused Rust checks, opt-in native compile and Windows desktop Cargo check passed.
+Latest verified revision: Native switch interaction lock reviewed, restored and independently verified in CE609. Forerunner confirmed Use targeting for the unlocked fixture and separate native Fixed/Phased collision. Three browser workflows, six focused Rust checks, opt-in native compile and Windows desktop Cargo check passed. Forge now replaces a returned layout in one undoable edit. Verified invalid-file recovery, Undo/Redo, Save, close, reopen and exact re-export in the browser.
 Next action: Confirm an actual gameplay Use action reaches the native touch-device handler in the isolated CE609 fixture and measure the linked machine transition. If native input is unavailable, advance peer Fixed/Phased replication and client-initiated Forge editing using the existing HMV capability contract. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
 
 ## Acceptance
