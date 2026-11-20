@@ -151,7 +151,23 @@ impl Library {
     }
     pub fn saved_project(&self,id:&str)->Result<Project>{
         if !self.is_saved(id)?{return invalid("This document has not been explicitly saved");}
-        project::load_project(&self.project_dir(id)?.join("project.gsproject"))
+        self.load_saved_descriptor(id).map(|(project, _)| project)
+    }
+    fn load_saved_descriptor(&self, id: &str) -> Result<(Project, project::FileRevision)> {
+        let directory = self.project_dir(id)?;
+        let file = directory.join("project.gsproject");
+        #[cfg(windows)]
+        if matches!(fs::symlink_metadata(&file), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+            && project::project_recovery_path(&file)?.is_file()
+        {
+            let _owner = crate::storage::lock(&directory.join("save.lock"))?;
+            project::recover_managed_previous(&file, id)?;
+        }
+        let (project, revision) = project::load_project_revision(&file)?;
+        if project.id != id {
+            return invalid("Saved descriptor belongs to a different project; file retained");
+        }
+        Ok((project, revision))
     }
     /// Drop only an editable RAM document. An explicitly saved descriptor,
     /// previous-good recovery and all source assets remain untouched.
@@ -214,9 +230,7 @@ impl Library {
             let text:String=self.db.query_row("SELECT value FROM documents WHERE id=?1",[id],|row|row.get(0))?;
             return Ok(serde_json::from_str(&text)?);
         }
-        let dir = self.project_dir(id)?;
-        let file=dir.join("project.gsproject");
-        let mut project=project::load_project(&file)?;
+        let (mut project, revision) = self.load_saved_descriptor(id)?;
         if let Some(session)=&self.session{
             // Compiler completion owns metadata, not an implicit authored Save.
             // Its existing persistent receipt can restore the current build on
@@ -241,8 +255,12 @@ impl Library {
             self.restore_build_history(&mut project)?;
             // Actual native operations still validate the owned job/output,
             // source fingerprint and byte hashes through verified_build.
-            session.save(&project,None)?;
-            session.set_setting(&format!("savedBaseline.{id}"),&project::FileRevision::capture(&file)?)?;
+            #[cfg(test)]
+            save_session_tests::run_before_reopen_baseline();
+            let transaction = session.db.unchecked_transaction()?;
+            session.save(&project, None)?;
+            session.set_setting(&format!("savedBaseline.{id}"), &revision)?;
+            transaction.commit()?;
         }
         Ok(project)
     }
@@ -1016,6 +1034,42 @@ mod import_retention_report_tests {
 mod save_session_tests {
     use super::*;
     use crate::workspace_history::{Head, Session, Snapshot};
+
+    thread_local! {
+        static BEFORE_REOPEN_BASELINE: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+            std::cell::RefCell::new(None);
+    }
+
+    pub(super) fn run_before_reopen_baseline() {
+        let hook = BEFORE_REOPEN_BASELINE.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+
+    #[test]
+    fn reopened_draft_cannot_adopt_an_external_replacement_as_its_baseline() {
+        let root = tempfile::tempdir().unwrap();
+        let library = Library::workspace(root.path()).unwrap();
+        let original = library.create("Spark saved source").unwrap();
+        library.save_explicit(&original, None).unwrap();
+        let descriptor = library.project_dir(&original.id).unwrap().join("project.gsproject");
+        let mut other_editor = original.clone();
+        other_editor.title = "External edit during reopen".into();
+        let destination = descriptor.clone();
+        drop(library);
+
+        let reopened = Library::workspace(root.path()).unwrap();
+        BEFORE_REOPEN_BASELINE.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            project::save_project(&destination, &other_editor).unwrap();
+        })));
+        let mut draft = reopened.get(&original.id).unwrap();
+        assert_eq!(draft.title, original.title);
+        let external = project::FileRevision::capture(&descriptor).unwrap();
+        draft.title = "Edit based on the old source".into();
+        let error = reopened.save_explicit(&draft, None).unwrap_err();
+        assert!(error.to_string().contains("changed outside this session"));
+        assert_eq!(project::FileRevision::capture(&descriptor).unwrap(), external);
+        assert_eq!(reopened.saved_project(&original.id).unwrap().title, "External edit during reopen");
+    }
 
     #[test]
     fn repeat_save_preserves_the_prior_good_descriptor() {

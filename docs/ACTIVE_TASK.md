@@ -3,8 +3,8 @@
 Task: Operation110 - source Save integrity and the Black Echo native handoff
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: paired dfa84b95 / 0350d66a cleared the native facility fight at full health on both clients. Tech spawned but native interaction did not assign ownership. Alternate ce892c71 passed compile/readback for the covered guard pose and has no exact paired result.
-Next action: Close the final external-writer race in managed Save with the existing previous-good backup and a native no-replace handoff. Test interruptions and external arrivals. Trace Save37944 independently. Compare native technology pickup for both authenticated slots, then verify defense, recall, extraction, settlement and the independent UNSC itinerary.
+Latest verified revision: Windows managed Save protects external arrivals and restores the exact descriptor after process interruption. 43 focused checks passed. Black Echo dfa84b95 / 0350d66a cleared the facility fight with both clients at full health, then stalled at technology pickup. Alternate ce892c71 passed compile/readback and has no paired result.
+Next action: Trace original Save37944 independently. Compare native technology pickup for both authenticated slots, then verify defense, recall, extraction, settlement and the independent UNSC itinerary. The portable and generic history-writer races remain separate.
 
 ## Acceptance
 

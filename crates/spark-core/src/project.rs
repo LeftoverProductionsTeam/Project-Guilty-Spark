@@ -456,7 +456,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
     atomic_write_checked(path,bytes,backup,None)
 }
 pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:Option<&FileRevision>)->Result<Option<PathBuf>> {
-    atomic_write_before_publish(path, bytes, backup, expected, |_| Ok(()))
+    atomic_write_before_publish(path, bytes, backup, expected, false, |_| Ok(()))
 }
 
 fn atomic_write_before_publish(
@@ -464,12 +464,15 @@ fn atomic_write_before_publish(
     bytes: &[u8],
     backup: bool,
     expected: Option<&FileRevision>,
+    managed: bool,
     prepare: impl FnOnce(&FileRevision) -> Result<()>,
 ) -> Result<Option<PathBuf>> {
     reject_links(path)?;
     if let Some(expected)=expected{expected.verify(path)?;}
     #[cfg(windows)]
-    let destination_guard = hold_saved_destination(path, expected)?;
+    let destination_guard = hold_saved_destination(path, expected, managed)?;
+    #[cfg(not(windows))]
+    let _ = managed;
     #[cfg(windows)]
     let create_only = destination_guard.is_none();
     #[cfg(not(windows))]
@@ -526,7 +529,14 @@ fn atomic_write_before_publish(
                 return invalid("Saved file was replaced outside Spark during Save; external revision retained");
             }
         }
-        publish_staged_file(&temp, path, create_only, staged_revision.as_ref().unwrap())?;
+        let revision = staged_revision.as_ref().unwrap();
+        #[cfg(windows)]
+        if let Some(guard) = destination_guard.as_ref().filter(|_| managed) {
+            let prior = expected.ok_or_else(|| crate::SparkError::Invalid("Managed Save has no reviewed previous revision".into()))?;
+            publish_managed_staged_file(&temp, path, revision, guard, prior)?;
+            return Ok(bak);
+        }
+        publish_staged_file(&temp, path, create_only, revision)?;
         Ok(bak)
     })();
     if let Some(revision) = &staged_revision {
@@ -535,17 +545,29 @@ fn atomic_write_before_publish(
     }
     result
 }
-// Retain the reviewed destination's file object throughout staging/publication.
-// Readers and rename-based editors remain compatible; in-place writers do not.
-// A final pathname substitution race still needs an independent conditional
-// replacement protocol; this guard does not claim to make rename a CAS.
+// Managed descriptors deny both write and rename sharing until Spark
+// moves the reviewed object by handle. Other metadata retains its basic guard.
 #[cfg(windows)]
-fn hold_saved_destination(path: &Path, expected: Option<&FileRevision>) -> Result<Option<fs::File>> {
+fn hold_saved_destination(path: &Path, expected: Option<&FileRevision>, hold_name: bool) -> Result<Option<fs::File>> {
     use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
-    let file = match OpenOptions::new().read(true).share_mode(1 | 4).custom_flags(0x00200000).open(path) {
+    let mut options = OpenOptions::new();
+    options.read(true).custom_flags(0x00200000);
+    if hold_name {
+        options.access_mode(0x80000000 | 0x00010000).share_mode(1);
+    } else {
+        options.share_mode(1 | 4);
+    }
+    let file = match options.open(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) if error.raw_os_error() == Some(32) => return invalid("This saved file is open for writing in another program. Finish that edit and retry Save; the current file was retained"),
+        Err(error) if error.raw_os_error() == Some(32) => {
+            let detail = if hold_name {
+                "This saved file is open in another program. Finish there and retry Save; the current file was retained"
+            } else {
+                "This saved file is open for writing in another program. Finish that edit and retry Save; the current file was retained"
+            };
+            return invalid(detail);
+        }
         Err(error) => return Err(error.into()),
     };
     let metadata = file.metadata()?;
@@ -634,35 +656,124 @@ pub(crate) fn dispose_verified_handle(file: &fs::File) -> Result<()> {
     let delete_file = 1u8;
     set_staged_information(file, 4, (&delete_file as *const u8).cast(), 1)
 }
+#[cfg(windows)]
+fn rename_saved_handle(file: &fs::File, path: &Path, create_only: bool) -> Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    #[repr(C)]
+    struct RenameInformation { flags: u32, root: *mut std::ffi::c_void, length: u32, name: [u16; 1] }
+    let destination = crate::native_staging::canonical_destination(path)?;
+    let name = destination.as_os_str().encode_wide().collect::<Vec<_>>();
+    if name.contains(&0) { return invalid("Output path contains a null character"); }
+    let offset = std::mem::offset_of!(RenameInformation, name);
+    let size = (offset + (name.len() + 1) * 2).max(std::mem::size_of::<RenameInformation>());
+    let mut aligned = vec![0u64; size.div_ceil(8)];
+    let information = aligned.as_mut_ptr().cast::<RenameInformation>();
+    // First publication uses FileRenameInfo with no replacement. Updates
+    // use FileRenameInfoEx/POSIX_SEMANTICS to retain our read-only target
+    // guard during atomic replacement. No IGNORE_READONLY/security flags.
+    // Unsupported filesystems fail; never drop the guard and retry unsafely.
+    // The source is the exact verified handle, not its mutable pathname.
+    unsafe {
+        (*information).flags = if create_only { 0 } else { 1 | 2 };
+        (*information).root = std::ptr::null_mut();
+        (*information).length = u32::try_from(name.len() * 2).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?;
+        std::ptr::copy_nonoverlapping(name.as_ptr(), aligned.as_mut_ptr().cast::<u8>().add(offset).cast::<u16>(), name.len());
+    }
+    set_staged_information(file, if create_only { 3 } else { 22 }, aligned.as_ptr().cast(), u32::try_from(size).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+const MANAGED_PREVIOUS_PREFIX: &str = ".spark-save-previous-";
+
+#[cfg(windows)]
+fn parked_managed_path(path: &Path, previous: &FileRevision) -> Result<PathBuf> {
+    let ((volume, identity), sha256) = previous.identity.zip(previous.sha256.as_deref()).ok_or_else(||
+        crate::SparkError::Invalid("Managed Save has no previous file identity".into()))?;
+    Ok(path.with_file_name(format!("{MANAGED_PREVIOUS_PREFIX}{volume:016x}-{identity:016x}-{sha256}")))
+}
+
+#[cfg(windows)]
+fn publish_managed_staged_file(
+    temp: &Path,
+    path: &Path,
+    revision: &StagedRevision,
+    current: &fs::File,
+    previous: &FileRevision,
+) -> Result<()> {
+    let staged = open_staged_file(temp, revision)?;
+    #[cfg(test)]
+    atomic_publication_tests::run_staged_handle_hook();
+    previous.verify(path)?;
+
+    let backup = project_recovery_path(path)?;
+    let backup_revision = FileRevision::capture(&backup)?;
+    if backup_revision.sha256 != previous.sha256 {
+        return invalid("Previous-good project bytes could not be verified before Save; files retained");
+    }
+    let _backup = hold_saved_destination(&backup, Some(&backup_revision), true)?.ok_or_else(||
+        crate::SparkError::Invalid("Previous-good project backup disappeared before Save".into()))?;
+
+    // Keep both file objects by handle. The old name is vacant only between
+    // two no-replace moves. A competing arrival always wins its own name.
+    let parked = parked_managed_path(path, previous)?;
+    rename_saved_handle(current, &parked, true)?;
+    #[cfg(test)]
+    atomic_publication_tests::run_managed_gap_hook();
+    if let Err(publish_error) = rename_saved_handle(&staged, path, true) {
+        if rename_saved_handle(current, path, true).is_err() {
+            return invalid(format!("The project name changed externally during Save. Spark retained the current destination and parked its verified previous revision at {}", parked.display()));
+        }
+        return Err(publish_error);
+    }
+    // The locked backup holds the exact previous-good bytes. If the OS
+    // refuses retirement, the parked revision can safely remain for review.
+    if let Err(error) = dispose_verified_handle(current) {
+        eprintln!("Verified previous project revision retained at {}: {error}", parked.display());
+    }
+    Ok(())
+}
+
+/// Restore only an interrupted handoff's exact previous file and only into
+/// an empty managed descriptor name. The caller holds the project's Save lock.
+#[cfg(windows)]
+pub(crate) fn recover_managed_previous(path: &Path, project_id: &str) -> Result<()> {
+    if FileRevision::capture(path)?.sha256.is_some() { return Ok(()); }
+    let backup = project_recovery_path(path)?;
+    let backup_revision = FileRevision::capture(&backup)?;
+    if backup_revision.sha256.is_none() { return Ok(()); }
+    let parent = path.parent().ok_or_else(|| crate::SparkError::Invalid("Managed project has no parent".into()))?;
+    let mut parked = None;
+    for (index, entry) in fs::read_dir(parent)?.enumerate() {
+        if index >= 4096 { return invalid("Managed Save recovery exceeded its directory limit; files retained"); }
+        let entry = entry?;
+        if !entry.file_name().to_string_lossy().starts_with(MANAGED_PREVIOUS_PREFIX) { continue; }
+        let candidate = entry.path();
+        let revision = FileRevision::capture(&candidate)?;
+        if revision.sha256 != backup_revision.sha256 || parked_managed_path(path, &revision)? != candidate { continue; }
+        if parked.replace((candidate, revision)).is_some() {
+            return invalid("Multiple previous-good project revisions match an interrupted Save; files retained for review");
+        }
+    }
+    let Some((parked, previous)) = parked else { return Ok(()); };
+    let _backup = hold_saved_destination(&backup, Some(&backup_revision), true)?.ok_or_else(||
+        crate::SparkError::Invalid("Managed Save recovery backup is unavailable; files retained".into()))?;
+    let original = hold_saved_destination(&parked, Some(&previous), true)?.ok_or_else(||
+        crate::SparkError::Invalid("Parked project revision disappeared; files retained".into()))?;
+    if load_project(&parked)?.id != project_id {
+        return invalid("Interrupted Save belongs to a different project; files retained");
+    }
+    rename_saved_handle(&original, path, true)?;
+    Ok(())
+}
+
 // Part of the existing sibling-temp writer: publish a previously absent name
 // without any replacing fallback. Only our completed temporary bytes are moved.
 fn publish_staged_file(temp: &Path, path: &Path, create_only: bool, revision: &StagedRevision) -> Result<()> {
     let file = open_staged_file(temp, revision)?;
     #[cfg(test)] atomic_publication_tests::run_staged_handle_hook();
-    #[cfg(windows)] {
-        use std::os::windows::ffi::OsStrExt;
-        #[repr(C)]
-        struct RenameInformation { flags: u32, root: *mut std::ffi::c_void, length: u32, name: [u16; 1] }
-        let destination = crate::native_staging::canonical_destination(path)?;
-        let name = destination.as_os_str().encode_wide().collect::<Vec<_>>();
-        if name.contains(&0) { return invalid("Output path contains a null character"); }
-        let offset = std::mem::offset_of!(RenameInformation, name);
-        let size = (offset + (name.len() + 1) * 2).max(std::mem::size_of::<RenameInformation>());
-        let mut aligned = vec![0u64; size.div_ceil(8)];
-        let information = aligned.as_mut_ptr().cast::<RenameInformation>();
-        // First publication uses FileRenameInfo with no replacement. Updates
-        // use FileRenameInfoEx/POSIX_SEMANTICS to retain our read-only target
-        // guard during atomic replacement. No IGNORE_READONLY/security flags.
-        // Unsupported filesystems fail; never drop the guard and retry unsafely.
-        // The source is the exact verified handle, not its mutable pathname.
-        unsafe {
-            (*information).flags = if create_only { 0 } else { 1 | 2 };
-            (*information).root = std::ptr::null_mut();
-            (*information).length = u32::try_from(name.len() * 2).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?;
-            std::ptr::copy_nonoverlapping(name.as_ptr(), aligned.as_mut_ptr().cast::<u8>().add(offset).cast::<u16>(), name.len());
-        }
-        set_staged_information(&file, if create_only { 3 } else { 22 }, aligned.as_ptr().cast(), u32::try_from(size).map_err(|_| crate::SparkError::Invalid("Output path too long".into()))?)?;
-    }
+    #[cfg(windows)]
+    rename_saved_handle(&file, path, create_only)?;
     #[cfg(not(windows))] {
         // This target still requires separate descriptor-relative publication
         // acceptance. No replacing fallback is allowed for a new filename.
@@ -733,7 +844,7 @@ pub(crate) fn save_managed_project_prepared(
     } else {
         None
     };
-    atomic_write_before_publish(path, &bytes, false, Some(expected), |revision| {
+    atomic_write_before_publish(path, &bytes, false, Some(expected), true, |revision| {
         prepare(revision)?;
         if let Some((recovery, recovery_revision)) = recovery {
             // Keep one independently written previous-good copy. A refused
@@ -756,9 +867,55 @@ pub fn load_project(path: &Path) -> Result<Project> {
     if fs::metadata(path)?.len() > 32 * 1024 * 1024 {
         return invalid("Project exceeds 32 MiB");
     }
-    let p: Project = serde_json::from_slice(&fs::read(path)?)?;
-    p.validate()?;
-    Ok(p)
+    decode_project(&fs::read(path)?)
+}
+
+/// The baseline identifies the exact opened descriptor and the bytes used
+/// to construct the editable session, even if preparation waits elsewhere.
+pub(crate) fn load_project_revision(path: &Path) -> Result<(Project, FileRevision)> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    const MAX_BYTES: u64 = 32 * 1024 * 1024;
+    reject_links(path)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(0x00200000).share_mode(1 | 4);
+    }
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes() & 0x400 != 0 {
+            return invalid("Saved project is a linked file; retained");
+        }
+    }
+    if !metadata.is_file() || metadata.len() > MAX_BYTES {
+        return invalid("Saved project is not a bounded regular file; retained");
+    }
+    let identity = crate::storage::unique_file_handle_identity(&file)
+        .ok_or_else(|| crate::SparkError::Invalid("Saved project has aliases or unavailable ownership; retained".into()))?;
+    let mut bytes = Vec::new();
+    (&file).take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
+    reject_links(path)?;
+    if bytes.len() as u64 != metadata.len() || crate::storage::unique_file_identity(path) != Some(identity) {
+        return invalid("Saved project changed while being opened; review the external revision");
+    }
+    let project = decode_project(&bytes)?;
+    Ok((project, FileRevision {
+        identity: Some(identity),
+        sha256: Some(crate::hex_bytes(Sha256::digest(&bytes))),
+    }))
+}
+
+fn decode_project(bytes: &[u8]) -> Result<Project> {
+    let project: Project = serde_json::from_slice(bytes)?;
+    project.validate()?;
+    Ok(project)
 }
 
 /// A renderer supplies semantic edits, never arbitrary offsets. Re-resolve every field from the cache.
@@ -1012,6 +1169,8 @@ mod atomic_publication_tests {
     std::thread_local! {
         static PUBLICATION_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
         static STAGED_HANDLE_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
+        #[cfg(windows)]
+        static MANAGED_GAP_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = std::cell::RefCell::new(None);
     }
     pub(super) fn run_publication_hook() {
         let hook = PUBLICATION_HOOK.with(|slot| slot.borrow_mut().take());
@@ -1019,6 +1178,11 @@ mod atomic_publication_tests {
     }
     pub(super) fn run_staged_handle_hook() {
         let hook = STAGED_HANDLE_HOOK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook { hook(); }
+    }
+    #[cfg(windows)]
+    pub(super) fn run_managed_gap_hook() {
+        let hook = MANAGED_GAP_HOOK.with(|slot| slot.borrow_mut().take());
         if let Some(hook) = hook { hook(); }
     }
     #[cfg(windows)]
@@ -1084,6 +1248,111 @@ mod atomic_publication_tests {
         assert_eq!(fs::read(&target).unwrap(), b"external editor's atomic revision");
         assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
     }
+    #[cfg(windows)]
+    #[test]
+    fn managed_save_cannot_overwrite_a_replacement_after_its_final_identity_check() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        let mut project = Project::new("Previously saved");
+        save_managed_project(&target, &project).unwrap();
+        let mut external = project.clone();
+        external.title = "External editor".into();
+        let incoming = root.path().join("external-save.gsproject");
+        fs::write(&incoming, encoded_project(&incoming, &external).unwrap()).unwrap();
+        let foreign_target = target.clone();
+        let accepted = std::rc::Rc::new(std::cell::Cell::new(false));
+        let observed = accepted.clone();
+        // The first staged handle belongs to the previous-good backup. Arm
+        // the competing Save only at the final descriptor publication.
+        STAGED_HANDLE_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            STAGED_HANDLE_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+                observed.set(fs::rename(&incoming, &foreign_target).is_ok());
+            })));
+        })));
+        project.title = "Spark edit".into();
+        let saved = save_managed_project(&target, &project);
+        if accepted.get() {
+            assert!(saved.is_err(), "Spark must refuse a later external replacement");
+            assert_eq!(load_project(&target).unwrap().title, "External editor");
+        } else {
+            saved.unwrap();
+            assert_eq!(load_project(&target).unwrap().title, "Spark edit");
+        }
+        assert_eq!(load_project(&project_recovery_path(&target).unwrap()).unwrap().title, "Previously saved");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn managed_save_protects_an_external_arrival_during_the_no_replace_handoff() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("project.gsproject");
+        let mut project = Project::new("Previously saved");
+        save_managed_project(&target, &project).unwrap();
+        let previous = FileRevision::capture(&target).unwrap();
+        let parked = parked_managed_path(&target, &previous).unwrap();
+        let mut external = project.clone();
+        external.title = "External editor".into();
+        let incoming = encoded_project(&target, &external).unwrap();
+        let foreign_target = target.clone();
+        MANAGED_GAP_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(move || {
+            let mut arrived = OpenOptions::new().create_new(true).write(true).open(&foreign_target).unwrap();
+            arrived.write_all(&incoming).unwrap();
+            arrived.sync_all().unwrap();
+        })));
+        project.title = "Spark edit".into();
+        let error = save_managed_project(&target, &project).unwrap_err();
+        assert!(error.to_string().contains("project name changed externally"));
+        let after = FileRevision::capture(&target).unwrap();
+        assert_eq!(load_project(&target).unwrap().title, "External editor");
+        assert_eq!(FileRevision::capture(&parked).unwrap(), previous);
+        assert_eq!(FileRevision::capture(&project_recovery_path(&target).unwrap()).unwrap().sha256, previous.sha256);
+        recover_managed_previous(&target, &project.id).unwrap();
+        assert_eq!(FileRevision::capture(&target).unwrap(), after);
+        assert_eq!(FileRevision::capture(&parked).unwrap(), previous);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn interrupted_managed_handoff_restores_exact_previous_descriptor_on_library_reopen() {
+        const CHILD_ROOT: &str = "SPARK_TEST_INTERRUPTED_MANAGED_SAVE_ROOT";
+        const CHILD_ID: &str = "SPARK_TEST_INTERRUPTED_MANAGED_SAVE_ID";
+        if let Some(root) = std::env::var_os(CHILD_ROOT) {
+            let library = crate::library::Library::workspace(Path::new(&root)).unwrap();
+            let mut project = library.get(&std::env::var(CHILD_ID).unwrap()).unwrap();
+            project.title = "Unpublished edit".into();
+            MANAGED_GAP_HOOK.with(|slot| *slot.borrow_mut() = Some(Box::new(|| std::process::exit(71))));
+            library.save_explicit(&project, None).unwrap();
+            panic!("Child never reached the interrupted Save boundary");
+        }
+
+        let root = tempfile::tempdir().unwrap();
+        let library = crate::library::Library::workspace(root.path()).unwrap();
+        let project = Project::new("Previously saved");
+        library.save_explicit(&project, None).unwrap();
+        let target = library.project_dir(&project.id).unwrap().join("project.gsproject");
+        let previous = FileRevision::capture(&target).unwrap();
+        let mut reader = fs::File::open(&target).unwrap();
+        let parked = parked_managed_path(&target, &previous).unwrap();
+        drop(library);
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "project::atomic_publication_tests::interrupted_managed_handoff_restores_exact_previous_descriptor_on_library_reopen"])
+            .env(CHILD_ROOT, root.path()).env(CHILD_ID, &project.id).output().unwrap();
+        assert_eq!(child.status.code(), Some(71), "{}", String::from_utf8_lossy(&child.stdout));
+        assert!(!target.exists());
+        assert_eq!(FileRevision::capture(&parked).unwrap(), previous);
+        let library = crate::library::Library::workspace(root.path()).unwrap();
+        let mut restored = library.get(&project.id).unwrap();
+        assert_eq!(restored.title, "Previously saved");
+        assert_eq!(FileRevision::capture(&target).unwrap(), previous);
+        assert!(!parked.exists());
+        restored.title = "Retried Save".into();
+        library.save_explicit(&restored, None).unwrap();
+        assert_eq!(load_project(&target).unwrap().title, "Retried Save");
+        use std::io::Read;
+        let mut original = Vec::new();
+        reader.read_to_end(&mut original).unwrap();
+        assert_eq!(serde_json::from_slice::<Project>(&original).unwrap().title, "Previously saved");
+    }
+
     #[cfg(windows)]
     #[test]
     fn an_already_open_external_writer_prevents_save_without_closing_that_writer() {
