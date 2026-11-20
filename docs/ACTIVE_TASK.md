@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Spark edits and exports native HMV title, author and description while preserving original placement and objective bytes. TypeScript, 14 unit tests, browser Save/Undo/Redo/reimport, and the independent C decoder passed. Black Echo offline facility combat and technology pickup passed. Defense remained alive and extraction unarmed. See RUNTIME_INTEGRATION_20261107.
-Next action: Play exact Elite/four-start CE609 04d9ccd1 with two authenticated players. Take the verified offline south facility route. After technology pickup, switch to the retained plasma pistol to test the defense actor and extraction gate, then finish evacuation, banking, reconnect and redeployment. Verify both faction routes and distinct Elite colors with the reviewed first-person fallback. Use a Forge-capable Chupathingy build to check HMV credits, objectives and scoring in game.
+Latest verified revision: Black Echo CE609 HUD readback passed for 18 edits. Radar artwork sizing and visual acceptance remain open. The offline defense retest left extraction unarmed. The checkout cleanup preserved source and map hashes. See RUNTIME_INTEGRATION_20261107.
+Next action: Run exact CE609 04d9ccd1 with two authenticated players. Use the south facility route, confirm the equipped weapon after pickup, then test defense, evacuation, banking and redeployment for both factions. Compare actual radar sprite sizes before an in-game HUD A/B.
 
 ## Acceptance
 
