@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
 import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsHmvMap, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
+import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsHmvMap, type ForgeLayoutTarget, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
+import { verifyForerunnerLocalForge } from '../runtimeWorkbench';
 import { Notice, NumberField } from './ui';
 
 export default function ForgeSidecarPanel({ project, map, edit, selected, onSelect, openRequest }: {
@@ -21,6 +22,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   useEffect(() => { if (openRequest) setExpanded(true); }, [openRequest]);
   useEffect(() => () => { ticket.current++; }, []);
   const [problem,setProblem] = useState('');
+  const [checkingLocalForge,setCheckingLocalForge] = useState(false);
   const [objectiveType, setObjectiveType] = useState<HmvObjectiveType>(0);
   const layout = project.forgeSidecar;
   const summary = useMemo(() => {
@@ -81,6 +83,28 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       onSelect(result.selectedId);
       setProblem('');
     } catch (error) { setProblem(String(error)); }
+  }
+
+  async function exportForerunner(target: ForgeLayoutTarget) {
+    const snapshot = current.current;
+    const request = ticket.current;
+    setProblem('');
+    try {
+      if (target === 'forerunner-local') {
+        setCheckingLocalForge(true);
+        await verifyForerunnerLocalForge();
+      }
+      if (request !== ticket.current) return;
+      if (snapshot.project !== current.current.project || snapshot.map !== current.current.map) {
+        throw Error('The Forge layout changed during the runtime check. Export the current layout again.');
+      }
+      const output = exportForgeSidecar(snapshot.project, snapshot.map, target);
+      if (typeof output !== 'string') downloadMedia('import.hmv', new Blob([Uint8Array.from(output).buffer]));
+    } catch (error) {
+      if (request === ticket.current) setProblem(String(error));
+    } finally {
+      if (target === 'forerunner-local') setCheckingLocalForge(false);
+    }
   }
 
   function changeProperties(patch: Partial<HmvPlacementProperties>) {
@@ -307,13 +331,13 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
         } catch (error) { setProblem(String(error)); }
       }}>Export Forge layout copy</button>
       {summary?.forerunner && <div>
-        <button type="button" disabled={!compatible || !!summary.forerunner.issue} onClick={()=>{
-          try {
-            const output = exportForgeSidecar(project, map, 'forerunner');
-            if (typeof output !== 'string') downloadMedia('import.hmv', new Blob([Uint8Array.from(output).buffer]));
-            setProblem('');
-          } catch (error) { setProblem(String(error)); }
-        }}>Export for Forerunner</button>
+        <button type="button" disabled={!compatible || checkingLocalForge || !!summary.forerunner.issue}
+          onClick={() => void exportForerunner('forerunner')}>Export for Forerunner</button>
+        {!!summary.devices.length && summary.forerunnerLocalIssue === null && <>
+          <button type="button" disabled={!compatible || checkingLocalForge}
+            onClick={() => void exportForerunner('forerunner-local')}>{checkingLocalForge ? 'Checking Local Forge…' : 'Export for Forerunner Local Forge'}</button>
+          <p className="subtle">Put <code>import.hmv</code> in <code>forge/{summary.forerunner.mapName}/</code> under the reviewed runtime’s save folder. Open <strong>Forge → Local Forge</strong> on the exact map, then choose <strong>Forge Tools → Load Layout (.HMV)</strong>.</p>
+        </>}
         <p className="subtle">{summary.forerunner.issue ?? <>Copy <code>import.hmv</code> to <code>forge/{summary.forerunner.mapName}/</code> in the save folder of a Forerunner build with HMV support. In an empty Forge session on this map, choose <strong>Forge Tools → Load Layout (.HMV)</strong>.{summary.forerunner.hasScenery && ' A network host cannot load layouts with scenery.'}</>}</p>
       </div>}
       <button type="button" onClick={()=>{

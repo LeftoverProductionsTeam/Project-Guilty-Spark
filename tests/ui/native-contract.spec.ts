@@ -6041,15 +6041,46 @@ test('Chupathingy Forge places and reopens a base-map control', async ({page}) =
   await expect(panel.getByText('Forge places this device with its tag defaults.',{exact:false})).toBeVisible();
   await panel.getByRole('button',{name:'Create HMV from selected object'}).click();
   await openLayout.click();
+  const localExport = panel.getByRole('button',{name:'Export for Forerunner Local Forge',exact:true});
+  await localExport.click();
+  await expect(panel.getByText('Review a Forerunner build with Local Forge support',{exact:false})).toBeVisible();
+  await page.evaluate(() => {
+    const w = window as any, previous = w.__TAURI_INTERNALS__.invoke;
+    const sha = 'f'.repeat(64);
+    const profile = {id:'local-forge',runtimeId:'openCe',root:'D:/Native',executable:'D:/Native/halo.exe',
+      reviewedCompanion:{executableSha256:sha,dependencySha256:'c'.repeat(64),
+        capabilities:{native_features:['forge.hmv_local_devices.v1']}}};
+    w.__sparkMock.staleLocalForge = true;
+    w.__TAURI_INTERNALS__.invoke = async (command:string,args:any) => {
+      if (command === 'list_runtime_registrations') return [profile];
+      if (command === 'inspect_runtime_registration') {
+        if (w.__sparkMock.staleLocalForge) throw Error('SDL changed');
+        return {registrationId:profile.id,validation:'pass',executableSha256:sha};
+      }
+      return previous(command,args);
+    };
+  });
+  await localExport.click();
+  await expect(panel.getByText('The reviewed Local Forge runtime changed or is unavailable.',{exact:false})).toBeVisible();
+  await page.evaluate(() => { (window as any).__sparkMock.staleLocalForge = false; });
+  const localPending = page.waitForEvent('download');
+  await localExport.click();
+  const localFile = await localPending;
+  expect(localFile.suggestedFilename()).toBe('import.hmv');
+  const { readFile: readLocal } = await import('node:fs/promises');
+  const localBytes = await readLocal((await localFile.path())!);
+  expect(localBytes.readUInt32LE(64)).toBe(0x6374726c);
+  expect(localBytes.readUInt16LE(4)).toBe(1);
   const physics = panel.getByRole('group',{name:'Placement properties'}).getByLabel('Physics');
   await physics.selectOption('fixed');
+  await expect(localExport).toHaveCount(0);
   await physics.blur();
   await page.keyboard.press('Control+z');
   await expect(physics).toHaveValue('normal');
   await page.keyboard.press('Control+y');
   await expect(physics).toHaveValue('fixed');
   await expect(panel.getByRole('button',{name:'Export for Forerunner'})).toBeDisabled();
-  await expect(panel.getByText('Forerunner’s HMV import does not place devices.',{exact:false})).toBeVisible();
+  await expect(panel.getByText('Forerunner’s standard HMV import does not place devices.',{exact:false})).toBeVisible();
   await page.keyboard.press('Control+s');
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[4])).toBe(7);
   const pending = page.waitForEvent('download');

@@ -9,6 +9,7 @@ export type HmvBaseIdentity = {
 // Chupathingy Forge layout format, versions 1–7. See the pinned upstream
 // format reference in docs/RUNTIME_INTEGRATION_20261107.md.
 export const HMV_LIMIT = 65536;
+export type ForgeLayoutTarget = 'forerunner' | 'forerunner-local';
 export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
 const headerSize = 64;
 const recordSize = 48;
@@ -173,6 +174,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   const recordVersions = new Uint8Array(recordsCount).fill(1);
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
+  let forerunnerLocalIssue = map.header.scenarioType === 1 ? forerunnerIssue : 'Local Forge needs a multiplayer base map.';
   const objectiveRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvObjectiveProperties }[] = [];
   let markers = false, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
@@ -186,12 +188,16 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     const invalid = 'invalid placement record ' + (index + 1) + '.';
     requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
     markers ||= kind !== 0;
-    const ordinary = kind === 0 && !!ref && basePlacementGroups.has(ref.group)
-      && !respawn && !modes && !variant && flags <= 1 && !aiTeam;
-    if (!forerunnerIssue && (!ordinary || count !== 1 || flags !== 1)) {
-      forerunnerIssue = ref && isHmvDeviceGroup(ref.group)
-        ? `Forerunner’s HMV import does not place devices. Record ${index + 1} remains available in the Forge layout copy.`
-        : `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
+    const group = ref?.group ?? '';
+    const plain = kind === 0 && count === 1 && flags === 1 && !respawn && !modes && !variant && !aiTeam;
+    const placementIssue = () => `Forerunner cannot import record ${index + 1}. It must be one base-map object placed at start with standard physics and no respawn timer, AI or game-mode settings.`;
+    if (!forerunnerIssue && (!plain || !basePlacementGroups.has(group))) {
+      forerunnerIssue = isHmvDeviceGroup(group)
+        ? `Forerunner’s standard HMV import does not place devices. Record ${index + 1} needs Local Forge or a Forge layout copy.`
+        : placementIssue();
+    }
+    if (!forerunnerLocalIssue && (!plain || !isHmvPlacementGroup(group))) {
+      forerunnerLocalIssue = placementIssue();
     }
 
     if (kind === 5 || kind === 7 || kind === 8) {
@@ -345,6 +351,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     recordsCount,
     mapName,
     forerunnerIssue,
+    forerunnerLocalIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));
     },

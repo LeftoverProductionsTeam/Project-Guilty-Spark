@@ -2,6 +2,26 @@ import type { RuntimeId, RuntimeRegistration } from './types';
 import type { NativePlayerProfile } from './firefight';
 import type { NativeOperation } from './nativeOperations';
 
+const localForgeFeature = 'forge.hmv_local_devices.v1';
+
+export async function verifyForerunnerLocalForge() {
+  const { call } = await import('./api');
+  const profiles = await call<RuntimeRegistration[]>('list_runtime_registrations');
+  const candidates = profiles.filter(profile => profile.runtimeId === 'openCe'
+    && profile.reviewedCompanion?.capabilities.native_features?.includes(localForgeFeature));
+  if (!candidates.length) throw Error('Review a Forerunner build with Local Forge support in Games & Tools.');
+  for (const registration of candidates) {
+    try {
+      const result = await call<import('./types').RuntimeInstallation>('inspect_runtime_registration', { registration });
+      if (result.validation === 'pass' && result.registrationId === registration.id
+        && result.executableSha256 === registration.reviewedCompanion?.executableSha256) return;
+    } catch {
+      // A stale profile must not prevent a second intact reviewed profile from being used.
+    }
+  }
+  throw Error('The reviewed Local Forge runtime changed or is unavailable. Inspect it again in Games & Tools.');
+}
+
 export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';
 export type OpenCeFlavor = 'opence' | 'faber' | 'openh1' | 'forerunner';
 

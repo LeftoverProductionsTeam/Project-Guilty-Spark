@@ -305,12 +305,16 @@ describe('Chupathingy Forge binary layouts', () => {
     const starting = { ...project, scene: [door, control] };
     const { project: withDoor } = addHmvPlacement(starting, deviceMap, door);
     const { project: withControl } = addHmvPlacement(withDoor, deviceMap, control, 2);
+    expect(exportForgeSidecar(withControl, deviceMap, 'forerunner-local')).toEqual(exportForgeSidecar(withControl, deviceMap));
+    expect(() => exportForgeSidecar(withControl, {...deviceMap,
+      header:{...deviceMap.header,version:609,scenarioType:0}}, 'forerunner-local')).toThrow('multiplayer base');
     const placed = withControl.scene[3];
     const edited = updateHmvPlacementProperties(withControl, deviceMap, placed,
       { team: 1, respawnSeconds: 0, placeAtStart: true, physics: 'fixed' });
     const moved = { ...edited, scene: edited.scene.map(row =>
       row.id === placed.id ? { ...row, position: [10, 2, 3] as [number, number, number] } : row) };
     expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner')).toThrow('does not place devices');
+    expect(() => exportForgeSidecar(moved, deviceMap, 'forerunner-local')).toThrow('standard physics');
     const output = exportForgeSidecar(moved, deviceMap) as Uint8Array;
     expect(new DataView(output.buffer).getUint16(4, true)).toBe(7);
     const reopened = importForgeSidecar(starting, deviceMap, 'devices.hmv', output).project;
@@ -358,6 +362,13 @@ describe('Chupathingy Forge binary layouts', () => {
     const compatible = readHmv(Array.from(forerunner.bytes), map);
     expect(compatible.forerunnerIssue).toBe(null);
     expect(compatible.details.author).toBe('Équipe Forge');
+    const devMap = {...map, tags:[...map.tags,
+      {...map.tags[0],id:11,class:'ctrl',path:'devices/terminal'}]};
+    const device: ForgePlacement = {...second,tagId:11,tagClass:'ctrl',tagPath:'devices/terminal'};
+    const local = exportForgePlacementSnapshot([device],devMap,22,'forerunner-local');
+    expect(local.name).toBe('import.hmv');
+    expect(readHmv(Array.from(local.bytes),devMap).objectRecords[0].group).toBe('ctrl');
+    expect(() => exportForgePlacementSnapshot([device],devMap,22,'forerunner')).toThrow('needs Local Forge');
     expect(() => exportForgePlacementSnapshot([second], map, 22, undefined, 'é'.repeat(16))).toThrow('Author');
     for (const edit of [{ tagId: 11 }, { publishedAssetId: 'custom' }, { nativeName: 'transport' },
       { transportSignals: true }, { sourceSha256: 'c'.repeat(63) + 'd' }]) {

@@ -1,7 +1,7 @@
 import type { ForgePlacement } from './forge';
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, type HmvBaseIdentity, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
+import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, type ForgeLayoutTarget, type HmvBaseIdentity, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -136,6 +136,8 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
       write: (position, rotation) => layout.write(record.index, position, rotation),
     });
   }
+  const unresolved = rows.length === layout.recordsCount ? null
+    : 'Forerunner needs every placement to use a uniquely identified object from this base map.';
   return {
     rows,
     retained: layout.recordsCount - rows.length,
@@ -145,10 +147,10 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     objectives: layout.objectiveRecords.map(record => ({ ...record, id: prefix + recordKeys[record.index] })),
     writeMarker: layout.write,
     metadata: { details: layout.details, date: layout.date },
+    forerunnerLocalIssue: layout.forerunnerLocalIssue ?? unresolved,
     forerunner: {
       mapName: layout.mapName,
-      issue: layout.forerunnerIssue ?? (rows.length === layout.recordsCount
-        ? null : 'Forerunner needs every placement to use a uniquely identified object from this base map.'),
+      issue: layout.forerunnerIssue ?? unresolved,
       hasScenery: rows.some(row => row.tag.class === 'scen'),
     },
   };
@@ -160,7 +162,8 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   const properties = new Map(rows.flatMap(row => row.properties ? [[prefix + row.key, row.properties] as const] : []));
   const devices = rows.filter(row => isHmvDeviceGroup(row.tag.class)).map(row => prefix + row.key);
   return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives, devices,
-    metadata: 'metadata' in parsed ? parsed.metadata : undefined };
+    metadata: 'metadata' in parsed ? parsed.metadata : undefined,
+    forerunnerLocalIssue: 'forerunnerLocalIssue' in parsed ? parsed.forerunnerLocalIssue : undefined };
 }
 
 export function importForgeSidecar(project: Project, map: MapInspection, name: string, input: string | Uint8Array) {
@@ -434,13 +437,15 @@ export function updateHmvLayoutDetails(project: Project, map: MapInspection, det
   return { ...project, forgeSidecar: { ...previous, bytes: Array.from(layout.writeDetails(details)) } } satisfies Project;
 }
 
-export function exportForgeSidecar(project: Project, map: MapInspection, target?: 'forerunner') {
+export function exportForgeSidecar(project: Project, map: MapInspection, target?: ForgeLayoutTarget) {
   const sidecar = project.forgeSidecar;
   if (!sidecar || project.source?.sha256 !== map.sha256) throw Error('Open the preserved Forge base map to export this layout.');
   const layout = parse(sidecar, map);
   const { rows, finish, forerunner } = layout;
-  if (target === 'forerunner' && (!forerunner || forerunner.issue)) {
-    throw Error(forerunner?.issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
+  if (target) {
+    const issue = target === 'forerunner-local' && 'forerunnerLocalIssue' in layout
+      ? layout.forerunnerLocalIssue : forerunner?.issue;
+    if (!forerunner || issue) throw Error(issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
   }
   for (const row of rows) {
     const object = project.scene.find(candidate => candidate.id === prefix + (row.key ?? row.index));
@@ -471,7 +476,7 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
 
 export function exportForgePlacementSnapshot(
   placements: readonly ForgePlacement[], map: ForgeLayoutBase, revision: number,
-  target?: 'forerunner', author = '',
+  target?: ForgeLayoutTarget, author = '',
 ) {
   if (!placements.length || placements.length > 256) {
     throw Error('A Forge layout needs 1–256 shared placements.');
@@ -496,11 +501,12 @@ export function exportForgePlacementSnapshot(
       })), map);
     }
   }
-  if (target === 'forerunner' && layout.forerunnerIssue) throw Error(layout.forerunnerIssue);
+  const issue = target === 'forerunner-local' ? layout.forerunnerLocalIssue : target ? layout.forerunnerIssue : null;
+  if (issue) throw Error(issue);
   const bytes = layout.writeDetails({ title: 'SparkLink revision ' + revision, author, description: '' });
   return {
     bytes,
-    name: target === 'forerunner' ? 'import.hmv' : layout.mapName.slice(0, 16) + '-sparklink.hmv',
+    name: target ? 'import.hmv' : layout.mapName.slice(0, 16) + '-sparklink.hmv',
   };
 }
 

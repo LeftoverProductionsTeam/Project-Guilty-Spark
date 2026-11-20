@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: SparkLink exports credited placements from an acknowledged revision to a verified HMV base. Browser, Windows compile and native readback passed. Black Echo 04d9ccd1 remains the peer-test candidate. See RUNTIME_INTEGRATION_20261107.
-Next action: Finish defense on exact CE609 04d9ccd1, then verify both factions’ evacuation, banking and redeployment with two authenticated players. Keep HUD A/B separate. Load a credited SparkLink export in Forge-capable Forerunner and Chupathingy.
+Latest verified revision: Spark Local Forge export checks the exact reviewed Forerunner profile. Browser and Danger Canyon native HMV readback passed. The separate exact SparkLink game run stopped before Forge. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish both factions on Black Echo 04d9ccd1 with two authenticated players. Keep HUD A/B separate. For HMV, repeat only after identifying why the isolated profile falls back to stock menus or using the matching working Forerunner setup.
 
 ## Acceptance
 
