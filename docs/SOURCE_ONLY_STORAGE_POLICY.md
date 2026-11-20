@@ -46,7 +46,7 @@ Fresh profiles watch only their own local Inbox by default. Watching the existin
 The existing QA owner now resolves uncreated output through its nearest existing, non-linked ancestor. Real Windows short names, drive case and verbatim prefixes share one owner; real junctions, source overlap and altered content still refuse admission/deletion. Rust reservations reuse the native staging resolver. A source-checkout output no longer creates `artifacts/storage-v1`: choose the existing external disposable operation or a user library. Standalone tool preflight validates the executable before allocating folders. Local Windows workspace/native compiler results and exact remaining default-writer/hosted-CI gates are recorded in `fixtures/windows-storage-repair.json`. This path repair is independent of the memory-first desktop acceptance above and does not certify external-tool close cleanup.
 
 
-## Accepted-output cleanup handoff ï¿½14November2026
+## Accepted-output cleanup handoff —14November2026
 
 R658 reproduced a real catalog race: cleanup's last preview released catalog.lock before the deletion phase reacquired it. An ordinary catalog update in that interval could mark the same generated output as accepted/protected, but deletion still used its earlier eligible clone. The adversarial test failed because the newly accepted fixture was deleted. No user asset was used in the reproduction.
 
@@ -59,7 +59,7 @@ This closes the catalog-acceptance window only. Filesystem path replacement duri
 R663 completes43/43 storage/repository regressions, including atomic-manifest EIO preservation, exact owned-preview descendant shutdown, interrupted recovery and read-only source scans. No assertion was relaxed. The earlier interrupted R660 is not substituted for this completed run.
 
 
-## New-filename publication ï¿½14November2026
+## New-filename publication —14November2026
 
 R664 demonstrates two real filesystem failures in project::atomic_write_checked: an independent file created after the final check is overwritten by the replacing rename, with either an absent FileRevision or the ordinary writer. Both adversarial tests fail on the old implementation. Their temporary fixtures are disposable; no user descriptor is touched.
 
@@ -151,3 +151,5 @@ On parent d0c2ba6, a Windows regression reproduced the final race in the managed
 Windows focused checks passed 43/43 (25 project, 7 library, 11 Undo history). Tests reproduced an external replacement attempt before publication, inserted an external file in the vacant-name interval, and terminated a real Rust test child inside that interval. Reopening restored the identical old file, preserved an earlier readerâ€™s snapshot and allowed another Save. A separate reopen regression confirms the old draft cannot save over a later external edit. Disposable run entc8r was removed after verification (391,392,566 logical bytes).
 
 This acceptance covers Windows managed project descriptors. Portable exports, generic history and backup replacement, non-Windows publication and parent-directory races have separate acceptance gates. Spark keeps a parked revision if the active name is occupied or verified cleanup cannot complete. The original intermittent Save37944 cause remains open. No desktop or game workflow ran in this slice.
+
+The embedded Windows app built from 330f56d passed the existing Mission Director and BSP Workshop save-only test. It applied 42 rapid edits across seven objectives, saved using Ctrl+S, repainted in 15.5 ms during Save, closed twice normally, reopened the saved project and restored Undo/Redo. The three concurrent readiness replies took 17, 2 and 1 ms. The unchanged second Save kept the descriptor SHA-256 b560f1a90da898e19631804694e4e6e66571631d7fffbf05f15c674b803b61f0 and previous-good SHA-256 4e846a6679e0288daca35cab0ceb7472374e6977fa6c6862c3681add05e5d646 and both file identities. App SHA-256 was 21dddb073a7ede0878367c2597111aad1640f2b71184c1eae4eb964938a04b1b. Zero page errors. Run iZKUti disposed 2,016,779,395 logical bytes. Earlier attempts stopped before Save because of incorrect harness paths and a build that opened the development URL. The completed run used the existing embedded-frontend feature. This was an isolated desktop workflow without SDK or game launches, and it did not reproduce original Save37944.

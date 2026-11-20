@@ -3,8 +3,8 @@
 Task: Operation110 - source Save integrity and the Black Echo native handoff
 Status: awaiting human verification
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Windows managed Save protects external arrivals and restores the exact descriptor after process interruption. 43 focused checks passed. Black Echo dfa84b95 / 0350d66a cleared the facility fight with both clients at full health, then stalled at technology pickup. Alternate ce892c71 passed compile/readback and has no paired result.
-Next action: Trace original Save37944 independently. Compare native technology pickup for both authenticated slots, then verify defense, recall, extraction, settlement and the independent UNSC itinerary. The portable and generic history-writer races remain separate.
+Latest verified revision: 330f56d protects external file arrivals and restores the exact descriptor after Windows process interruption. Focused 43/43 and the desktop 42-edit Save, Undo/Redo and restart passed. Black Echo dfa84b95 / 0350d66a cleared the paired facility fight, then stalled at technology pickup. Alternate ce892c71 passed compile/readback and awaits peers.
+Next action: Trace original Save37944 independently. When the runtime exposes measurable native pickup, compare both authenticated slots and verify defense through settlement and the UNSC route. In parallel, bind imported OBJ previews to the active asset/source hashes and move parsing off the desktop command thread.
 
 ## Acceptance
 
