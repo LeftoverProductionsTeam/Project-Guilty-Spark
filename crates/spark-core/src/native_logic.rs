@@ -49,6 +49,8 @@ pub struct Device {
     pub placement_id: String,
     pub initial_position: f32,
     pub powered: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position_control_id: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -138,6 +140,17 @@ fn device_name(logic: &Document, id: &str) -> String {
     logic.devices.iter().find(|d| d.placement_id == id).and_then(|d| d.native_name.clone())
         .unwrap_or_else(|| native_name("obj", id))
 }
+fn position_group_controls(logic: &Document) -> Vec<&Device> {
+    let linked = logic.devices.iter().filter_map(|device| device.position_control_id.as_deref())
+        .collect::<BTreeSet<_>>();
+    logic.devices.iter().filter(|device| linked.contains(device.placement_id.as_str())).collect()
+}
+
+fn linked_position_group(binding: &Device, controls: &[&Device], offset: usize) -> i16 {
+    let owner = binding.position_control_id.as_deref().unwrap_or(&binding.placement_id);
+    controls.iter().position(|control| control.placement_id == owner).map_or(-1, |index| (offset + index) as i16)
+}
+
 fn text(value: &str, max: usize) -> bool {
     !value.is_empty() && value.len() <= max && !value.chars().any(char::is_control)
 }
@@ -279,6 +292,17 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
             return invalid("A logic device must reference one existing device_machine or device_control placement with position 0–1");
         }
     }
+    for binding in logic.devices.iter().filter(|device| device.position_control_id.is_some()) {
+        let target = binding.position_control_id.as_deref().unwrap();
+        let control = logic.devices.iter().find(|device| device.placement_id == target);
+        if doc.native.is_some() ||
+            !doc.placements.iter().any(|p| p.id == binding.placement_id && p.tag_class == "mach") ||
+            !doc.placements.iter().any(|p| p.id == target && p.tag_class == "ctrl") ||
+            !control.is_some_and(|c| !c.native_name.as_deref().unwrap_or_default().starts_with("extraction_"))
+        {
+            return invalid("Native switch wiring needs an editable machine and a bound, non-Extraction control.");
+        }
+    }
     let mut crew_owners=BTreeSet::new();
     for rule in &logic.rules {
         if !text(&rule.id, 72)
@@ -383,16 +407,14 @@ pub fn generate(doc: &QuickForgeDocument) -> Result<Option<Source>> {
         if doc.placements.iter().any(|p| p.id == device.placement_id && p.tag_class == "mach") {
             lines.push(format!("  (device_operates_automatically_set {name} false)"));
         }
-        lines.extend([
-            format!(
-                "  (device_set_power {name} {})",
-                if device.powered { "1.0" } else { "0.0" }
-            ),
-            format!(
-                "  (device_set_position_immediate {name} {})",
-                real(device.initial_position)
-            ),
-        ]);
+        lines.push(format!(
+            "  (device_set_power {name} {})",
+            if device.powered { "1.0" } else { "0.0" }
+        ));
+        // The linked control owns the starting position of every machine on its group.
+        if device.position_control_id.is_none() {
+            lines.push(format!("  (device_set_position_immediate {name} {})", real(device.initial_position)));
+        }
     }
     if crate::quickforge::campaign_profile(doc).is_some() {
         lines.extend([
@@ -498,14 +520,23 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
     validate(doc)?;
     let Some(logic)=effective_logic(doc) else{return Ok(());};
     if read.names.len()!=logic.devices.len()+doc.placements.iter().filter(|p|p.native_name.is_some()).count()||read.volumes.len()!=logic.triggers.len(){return invalid("Compiled Logic marker inventory differs from authored source");}
-    let groups=transport_signal_groups(doc);
-    if doc.placements.iter().any(|p|p.transport_signals.is_some()){
-        if read.groups.len()!=groups.len()||read.groups.iter().zip(&groups).any(|(actual,name)|actual.name!=*name||actual.initial_value!=0.||actual.flags!=0){
-            return invalid("Compiled native transport groups differ from their unique zero-initialized source definitions");
-        }
-        if !groups.is_empty()&&read.devices.iter().any(|device|device.power_group!=Some(-1)||device.position_group!=Some(-1)){
-            return invalid("Transport boarding/recall/landing groups must not drive any device power or position");
-        }
+    let signals = transport_signal_groups(doc);
+    let controls = position_group_controls(&logic);
+    let groups = signals.iter().map(|name| (name.clone(), 0.))
+        .chain(controls.iter().map(|control| (native_name("dg", &control.placement_id), control.initial_position)));
+    if (doc.placements.iter().any(|p| p.transport_signals.is_some()) || !controls.is_empty()) &&
+        (read.groups.len() != signals.len() + controls.len() ||
+        read.groups.iter().zip(groups).any(|(actual, (name, value))| actual.name != name ||
+            (actual.initial_value - value).abs() > 0.000001 || !actual.initial_value.is_finite() || actual.flags != 0))
+    {
+        return invalid("Compiled native device groups differ from the reviewed transport or switch wiring definitions");
+    }
+    if !signals.is_empty() && read.devices.iter().any(|device|
+        [device.power_group, device.position_group].into_iter().any(|group| match group {
+            None => true, Some(index) => index >= 0 && (index as usize) < signals.len(),
+        })
+    ) {
+        return invalid("Transport boarding/recall/landing groups must not drive any device power or position");
     }
     for (index,binding) in logic.devices.iter().enumerate(){
         let source=doc.placements.iter().find(|value|value.id==binding.placement_id).ok_or_else(||crate::SparkError::Invalid("Authored Logic device disappeared".into()))?;
@@ -515,8 +546,10 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
             .ok_or_else(||crate::SparkError::Invalid("Compiled named device is unavailable".into()))?;
         if name.name!=device_name(&logic,&binding.placement_id)||name.object_type!=native_type||name.object_index<0||name.object_index as usize!=array_index||
             compiled.name_index<0||compiled.name_index as usize!=index||!compiled.tag_path.replace('\\',"/").eq_ignore_ascii_case(&source.tag_path.replace('\\',"/"))||
-            !crate::native_operations::positions_close(source.position,compiled.position) {
-            return invalid(format!("Compiled Logic device {} name/index/tag/position differs from source",source.name));
+            !crate::native_operations::positions_close(source.position,compiled.position)
+            || (!controls.is_empty() && (compiled.power_group != Some(-1)
+                || compiled.position_group != Some(linked_position_group(binding, &controls, signals.len())))) {
+            return invalid(format!("Compiled Logic device {} name/index/tag/position or wiring differs from source",source.name));
         }
     }
     for (offset,source) in doc.placements.iter().filter(|p|p.native_name.is_some()).enumerate(){
@@ -595,10 +628,14 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         args,
         expected_outputs: vec![format!("tags/{}", tag.replace('\\', "/"))],
     };
-    for(index,name)in transport_signal_groups(doc).into_iter().enumerate(){
+    let signals = transport_signal_groups(doc);
+    let controls = position_group_controls(logic);
+    let groups = signals.iter().map(|name| (name.clone(), 0.))
+        .chain(controls.iter().map(|control| (native_name("dg", &control.placement_id), control.initial_position)));
+    for (index, (name, initial_value)) in groups.enumerate() {
         let mut args=vec!["-I".into(),"device_groups".into(),"1".into(),"end".into()];
         set(&mut args,format!("device_groups[{index}].name"),name);
-        set(&mut args,format!("device_groups[{index}].initial_value"),"0");
+        set(&mut args,format!("device_groups[{index}].initial_value"),initial_value.to_string());
         set(&mut args,format!("device_groups[{index}].flags.can_change_only_once"),"0");
         args.push(tag.clone());let mut group=command(args);group.phase="logic-groups".into();commands.push(group);
     }
@@ -636,7 +673,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec
         set(
             &mut args,
             format!("{array}[{device_index}].position_group"),
-            "-1",
+            linked_position_group(device, &controls, signals.len()).to_string(),
         );
         if placement.tag_class == "mach" {
             set(&mut args, format!("{array}[{device_index}].machine_flags.does_not_operate_automatically"), "1");
@@ -822,16 +859,20 @@ pub(crate) fn compile(
             verify_vehicle_crew_seats(doc,target_id,&seat_labels[&vehicle.tag_path])?;
         }}}
     }
+    let controls = position_group_controls(logic);
+    let signal_count = transport_signal_groups(doc).len();
     for (i, binding) in logic.devices.iter().enumerate() {
         let placement = doc.placements.iter().find(|p| p.id == binding.placement_id).unwrap();
         let array = if placement.tag_class == "ctrl" { "controls" } else { "machines" };
         let index = doc.placements.iter().filter(|p| p.tag_class == placement.tag_class)
             .position(|p| p.id == binding.placement_id).unwrap();
-        if placement.tag_class == "ctrl" && matches!(binding.native_name.as_deref(), Some("extraction_deploy" | "extraction_activate")) {
+        let position_group = linked_position_group(binding, &controls, signal_count);
+        if placement.tag_class == "ctrl" && (position_group >= 0 ||
+            matches!(binding.native_name.as_deref(), Some("extraction_deploy" | "extraction_activate"))) {
             let actual = runner.run(edit, &["-t".into(), tags.clone(), "-G".into(), "triggers_when".into(),
                 format!("{}.device_control", placement.tag_path)], workspace, "logic-control-readback", 72)?;
             if actual.trim().replace('_', " ") != "touched by player" {
-                return invalid("Extraction terminal must use a native touched-by-player control tag. Its source was not modified; choose a compatible terminal.");
+                return invalid("The linked switch or Extraction terminal must use a native touched-by-player control tag. Choose a compatible control.");
             }
         }
         for (key, expected) in [
@@ -840,6 +881,7 @@ pub(crate) fn compile(
                 device_name(logic, &binding.placement_id),
             ),
             (format!("{array}[{index}].name"), i.to_string()),
+            (format!("{array}[{index}].position_group"), if position_group < 0 {"65535".into()} else {position_group.to_string()}),
         ] {
             let actual = runner.run(
                 edit,
@@ -848,8 +890,9 @@ pub(crate) fn compile(
                 "logic-readback",
                 72,
             )?;
-            if actual.trim() != expected {
-                return invalid("Native logic object-name linkage failed independent readback");
+            let is_null_index = expected == "65535" && actual.trim() == "-1";
+            if actual.trim() != expected && !is_null_index {
+                return invalid("Native logic object-name or position group linkage failed independent readback");
             }
         }
     }

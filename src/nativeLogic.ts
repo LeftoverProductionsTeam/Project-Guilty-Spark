@@ -29,7 +29,7 @@ export interface LogicRule {
 export interface NativeLogicDocument {
   schemaVersion: 1;
   triggers: LogicTrigger[];
-  devices: { placementId: string; initialPosition: number; powered: boolean; nativeName?: string }[];
+  devices: { placementId: string; initialPosition: number; powered: boolean; nativeName?: string; positionControlId?: string }[];
   rules: LogicRule[];
   manualSource?: string | null;
   handwrittenSources?: { filename: string; content: string }[];
@@ -60,6 +60,8 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
   if((trigger??device??vehicle)!.locked)throw Error('Unlock this object before changing its native name.');
   const existing=vehicle?.nativeName??trigger?.nativeName??logic.devices.find(d=>d.placementId===device?.id)?.nativeName;
   if(value===(existing??''))return doc;
+  if(value.startsWith('extraction_')&&device?.tagClass==='ctrl'&&logic.devices.some(d=>d.positionControlId===device.id))
+    throw Error('Disconnect this switch from its machines before giving it an Extraction role.');
   if(vehicle?.transportSignals)throw Error('Disable transport groups before changing this vehicle name; handwritten references are never rewritten.');
   if(vehicle&&!value&&logic.rules.some(rule=>rule.actions.some(a=>a.kind==='aiVehicleLoad'&&a.targetId===vehicle.id)))throw Error('Remove the vehicle’s AI seating connections before clearing its native name.');
   if(value&&[...logic.triggers.filter(t=>t.id!==trigger?.id).map(t=>t.nativeName),
@@ -82,6 +84,28 @@ export function setNativeLogicName(doc:QuickForgeDocument,node:ForgeNode,name:st
     }
     if(value)binding.nativeName=value;else delete binding.nativeName;
   }
+  return {...doc,logic};
+}
+
+export function setDevicePositionControl(doc:QuickForgeDocument,machineId:string,controlId:string):QuickForgeDocument {
+  const logic=logicDocument(doc);
+  if(doc.native||logic.manualSource!=null)throw Error('Switch wiring requires generated Logic / Events in editable source.');
+  const machine=doc.placements.find(p=>p.id===machineId&&p.tagClass==='mach');
+  if(!machine||machine.locked)throw Error('Select an unlocked native machine.');
+  const binding=logic.devices.find(device=>device.placementId===machineId);
+  if((binding?.positionControlId??'')===controlId)return doc;
+  if(!controlId){
+    if(binding)delete binding.positionControlId;
+    return {...doc,logic};
+  }
+  const control=doc.placements.find(p=>p.id===controlId&&p.tagClass==='ctrl');
+  const controlBinding=logic.devices.find(device=>device.placementId===controlId);
+  if(!control||(controlBinding?.nativeName??'').startsWith('extraction_'))throw Error('Choose a placed non-Extraction control.');
+  if(control.locked&&!controlBinding)throw Error('Unlock the control so Spark can add its native binding.');
+  if(logic.devices.length+Number(!binding)+Number(!controlBinding)>64)throw Error('The native device binding budget is full.');
+  if(!controlBinding)logic.devices.push({placementId:controlId,initialPosition:0,powered:true});
+  if(binding)binding.positionControlId=controlId;
+  else logic.devices.push({placementId:machineId,initialPosition:0,powered:true,positionControlId:controlId});
   return {...doc,logic};
 }
 
@@ -270,6 +294,8 @@ export function copyDeviceBehavior(
   if (!from || !to || fromId === toId || !binding)
     throw Error('Choose two different placed devices and a source with configured behavior.');
   if (to.locked) throw Error('Unlock the destination device before copying its behavior.');
+  if(binding.positionControlId||logic.devices.some(device=>device.placementId===toId&&device.positionControlId))
+    throw Error('Disconnect shared switch wiring before copying the machine’s scripted behavior.');
   if ([from, to].some((p) => Math.abs(p.rotation[0]) > 0.00001 || Math.abs(p.rotation[1]) > 0.00001))
     throw Error(
       'Automatic trigger copying currently supports yaw-only devices. Rebind tilted devices manually.',
@@ -399,7 +425,12 @@ export function removeLogicReferences(
   return {
     ...doc.logic,
     triggers: doc.logic.triggers.filter((t) => !removed.has(t.id)),
-    devices: doc.logic.devices.filter((d) => !removed.has(d.placementId)),
+    devices: doc.logic.devices.filter((d) => !removed.has(d.placementId)).map(device=>{
+      if(!device.positionControlId||!removed.has(device.positionControlId))return device;
+      const detached={...device};
+      delete detached.positionControlId;
+      return detached;
+    }),
     rules: doc.logic.rules.filter(
       (r) =>
         !(r.event.kind !== 'timer' && removed.has(r.event.triggerId)) &&

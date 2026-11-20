@@ -56,7 +56,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     'Drop an actual Halo door and an adjustable trigger, then connect a repeatable native event.',
     'Halo tools required','quickforge',true,
     ['Open the rooms-and-corridor source in Level editor → Objects & gameplay. Open Asset library and choose a compatible owned campaign source, then Show → Doors & devices.',
-     'Drag a door preview into the corridor. Resize and rotate it to fit. Drag Trigger volume from the same drawer, then select its box and open Inspector → Properties → Logic / Events.',
+     'Drag a door preview into the corridor. Resize and rotate it to fit. To wire a switch, place a player-operated control, select the door and choose it in Inspector → Properties → Logic / Events → Position switch. For a trigger-driven door, drag Trigger volume from the same drawer and select its box.',
      'Choose From trigger and To door / device. Select Cover both sides, then Enter → Open. Leave Once off so the event can re-arm. Native HaloScript exposes the generated script for advanced edits.',
      'For a second door, select that placed instance and use Reuse a device setup → Copy behavior. It receives its own trigger and rule names. Existing destination behavior is preserved; adjust the copied volume to fit.',
      'Expand Handwritten scripts to import original .hsc modules alongside generated events. Comments and line endings are kept; native compilation checks the complete scenario. Manual override of generated source pauses visual connections.',

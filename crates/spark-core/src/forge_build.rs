@@ -580,7 +580,7 @@ pub fn run_prepared_job(
             args.extend(native_args);
             if command.phase=="logic-groups"&&!reviewed_new_logic_groups {
                 let count=runner.run(&invader(tools,"invader-edit").unwrap(),&["-t".into(),stage.to_string_lossy().into_owned(),"-C".into(),"device_groups".into(),format!("{}.scenario",sources.scenario_path)],workspace,"logic-groups-review",45)?;
-                if count.trim()!="0"{return invalid("Transport signals require an empty new device-group table; existing groups and references are protected");}
+                if count.trim()!="0"{return invalid("Generated switch and transport groups require an empty new device-group table; existing groups and references are protected");}
                 reviewed_new_logic_groups=true;
             }
             if command.phase=="logic-names"&&!reviewed_new_logic_names {

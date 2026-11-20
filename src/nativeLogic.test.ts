@@ -2,6 +2,7 @@ import {defaultNativePlayerProfile} from './firefight';
 import { expect, it } from 'vitest';
 import {
   setNativeLogicName,
+  setDevicePositionControl,
   setNativeTransportSignals,
   transportSignalNames,
   addLogicTrigger,
@@ -58,6 +59,26 @@ function level() {
   const added = addLogicTrigger(base, [11, 0, 1.5]);
   return connectDoor(added.document, added.id, 'door');
 }
+it('links a native switch to a machine without mutating the prior project',()=>{
+  const initial:QuickForgeDocument={...base,placements:[{...base.placements[0]},
+    {...base.placements[0],id:'switch',tagClass:'ctrl',name:'Hall switch'}]};
+  const linked=setDevicePositionControl(initial,'door','switch');
+  expect(initial.logic).toBeUndefined();
+  expect(linked.logic?.devices).toMatchObject([
+    {placementId:'switch',initialPosition:0,powered:true},
+    {placementId:'door',positionControlId:'switch',initialPosition:0,powered:true},
+  ]);
+  expect(setDevicePositionControl(linked,'door','switch')).toBe(linked);
+  const reopened=JSON.parse(JSON.stringify(linked)) as QuickForgeDocument;
+  expect(reopened.logic?.devices.find(device=>device.placementId==='door')?.positionControlId).toBe('switch');
+  const disconnected=setDevicePositionControl(reopened,'door','');
+  expect(disconnected.logic?.devices.find(device=>device.placementId==='door')?.positionControlId).toBeUndefined();
+  const removed=removeForgeNodes(linked,['switch']);
+  expect(removed.logic?.devices).toMatchObject([{placementId:'door'}]);
+  expect(removed.logic?.devices[0].positionControlId).toBeUndefined();
+  expect(()=>setDevicePositionControl(initial,'door','door')).toThrow(/non-Extraction control/);
+});
+
 it('makes simple door entry repeatable and explicitly centers a return-accessible trigger', () => {
   const d = level(),
     id = d.logic!.triggers[0].id;

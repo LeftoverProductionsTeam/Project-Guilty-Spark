@@ -10,6 +10,7 @@ import {
   isLogicTarget,
   logicDocument,
   setNativeLogicName,
+  setDevicePositionControl,
   setNativeTransportSignals,
   transportSignalNames,
   extractionLayout,
@@ -59,6 +60,11 @@ export default function LogicEvents({
   const vehicleNamingUnavailable=vehicleSelected&&(!!doc.native||!['campaign','firefight','zombie'].includes(doc.gameMode));
   const hasTransportSignals=vehicleSelected&&node.value.transportSignals===true;
   const controlSelected=node?.type==='placement'&&node.value.tagClass==='ctrl';
+  const machineSelected=node?.type==='placement'&&node.value.tagClass==='mach';
+  const ownDevice=logic?.devices.find(device=>device.placementId===node?.value.id);
+  const positionControl=logic?.devices.find(device=>device.placementId===ownDevice?.positionControlId);
+  const eligibleSwitches=doc.placements.filter(placement=>placement.tagClass==='ctrl'&&
+    !(logic?.devices.find(device=>device.placementId===placement.id)?.nativeName??'').startsWith('extraction_'));
   const namingNeedsDoorBinding=node?.type==='placement'&&node.value.tagClass==='mach'&&
     !logic?.devices.some(d=>d.placementId===node.value.id);
   const nativeBindingName=node?.type==='trigger'?node.value.nativeName??'':
@@ -90,6 +96,15 @@ export default function LogicEvents({
       if(next!==latestDocument.current)commit(next,'Set native scenario name');
       setError('');return true;
     } catch(error){setError(String(error));return false;}
+  };
+  const applyDevicePositionControl=(controlId:string)=>{
+    if(!machineSelected)return;
+    try{
+      const current=latestDocument.current;
+      const next=setDevicePositionControl(current,node.value.id,controlId);
+      if(next!==current)commit(next,controlId?'Link native switch to machine':'Disconnect native switch');
+      setError('');
+    }catch(problem){setError(String(problem));}
   };
   const changeTransportSignals=(enabled:boolean)=>{
     if(!node)return;
@@ -213,7 +228,16 @@ export default function LogicEvents({
             <button onClick={add}>Add trigger volume</button>
           </div>
           {controlSelected&&<p className="forge-hint">Control terminal: use its native binding and power settings here.
-            Choose a touched-by-player control tag for Extraction. Runtime mode activation remains separate.</p>}
+            To wire a regular switch, select the machine and choose this control under Position switch.</p>}
+          {machineSelected&&!doc.native&&(eligibleSwitches.length>0||ownDevice?.positionControlId)&&
+            <label>Position switch
+              <select aria-label="Machine position switch" value={ownDevice?.positionControlId??''} disabled={node.value.locked}
+                onChange={e=>applyDevicePositionControl(e.target.value)}>
+                <option value="">No shared switch</option>
+                {eligibleSwitches.map(control=><option key={control.id} value={control.id}>{control.name}</option>)}
+              </select>
+              <span className="forge-hint">Use a player-operated control. Its initial position applies to every connected machine.</span>
+            </label>}
           {!controlSelected&&!vehicleSelected&&<>
           {!doors.length && (
             <p className="forge-hint">
@@ -580,7 +604,8 @@ export default function LogicEvents({
                     Initial position
                     <NumberField
                       label="Initial logic device position"
-                      value={device.initialPosition}
+                      value={positionControl?.initialPosition??device.initialPosition}
+                      disabled={!!positionControl||node.value.locked}
                       min={0}
                       max={1}
                       step={0.1}

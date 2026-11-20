@@ -20,6 +20,97 @@ fn level() -> q::QuickForgeDocument {
     d.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[{"id":"volume","name":"Entry","position":[11.,0.,1.5],"rotation":[0.,0.,0.],"dimensions":[3.,4.,3.],"visible":true,"locked":false}],"devices":[{"placementId":"door","initialPosition":0.,"powered":true}],"rules":[{"id":"enter","name":"Entry opens door","enabled":true,"once":true,"event":{"kind":"enter","triggerId":"volume"},"actions":[{"kind":"devicePosition","targetId":"door","value":1.}]}]})).unwrap());
     d
 }
+fn switch_level() -> q::QuickForgeDocument {
+    let mut d = level();
+    let mut control = d.placements[0].clone();
+    control.id = "switch".into();
+    control.name = "Switch".into();
+    control.tag_class = "ctrl".into();
+    control.tag_path = "levels/b30/devices/interior tech objects/holo control/holo control".into();
+    d.placements.push(control);
+    let logic = d.logic.as_mut().unwrap();
+    let mut binding = logic.devices[0].clone();
+    logic.devices[0].position_control_id = Some("switch".into());
+    binding.placement_id = "switch".into();
+    binding.initial_position = 0.25;
+    logic.devices.push(binding);
+    d
+}
+
+#[test]
+fn linked_switch_shares_one_native_group_with_its_machine() {
+    use spark_core::maps::{ScenarioLogicReadback, ScenarioLogicDevice, ScenarioLogicGroup, ScenarioLogicName, ScenarioLogicVolume, ScenarioLogicVolumeGeometry};
+    let d = switch_level();
+    let group = l::native_name("dg", "switch");
+    let commands = q::scenario_commands(&d).unwrap();
+    let groups = commands.iter().filter(|command| command.phase == "logic-groups").collect::<Vec<_>>();
+    assert_eq!(groups.len(), 1);
+    assert!(groups[0].args.windows(2).any(|args| args == ["device_groups[0].name", group.as_str()]));
+    assert!(groups[0].args.windows(2).any(|args| args == ["device_groups[0].initial_value", "0.25"]));
+    for array in ["machines", "controls"] {
+        assert!(commands.iter().any(|command| command.args.windows(2).any(|args| args == [format!("{array}[0].position_group"), "0".into()])));
+    }
+    let source = l::generate(&d).unwrap().unwrap().content;
+    assert!(source.contains(&format!("(device_set_position_immediate {} 0.250000)", l::native_name("obj", "switch"))));
+    assert!(!source.contains(&format!("(device_set_position_immediate {}", l::native_name("obj", "door"))));
+    assert!(source.contains(&format!("(device_set_position {} 1.000000)", l::native_name("obj", "door"))));
+    let trigger = d.logic.as_ref().unwrap().triggers.first().unwrap();
+    let mut read = ScenarioLogicReadback {
+        groups: vec![ScenarioLogicGroup { name: group, initial_value: 0.25, flags: 0 }],
+        names: d.placements.iter().map(|p| ScenarioLogicName {
+            name: l::native_name("obj", &p.id), object_index: 0, object_type: if p.tag_class == "ctrl" {8} else {7},
+        }).collect(),
+        devices: d.placements.iter().enumerate().map(|(index,p)| ScenarioLogicDevice {
+            class: p.tag_class.clone(), index: 0, name_index: index as i16,
+            tag_path: p.tag_path.clone(), position: p.position, rotation_radians: [0.;3],
+            power_group: Some(-1), position_group: Some(0), usable_from_both_sides: None,
+        }).collect(),
+        vehicles: vec![],
+        volumes: vec![ScenarioLogicVolume {
+            name: l::native_name("tv", &trigger.id), kind: 1,
+            geometry: Some(ScenarioLogicVolumeGeometry {
+                forward: [1.,0.,0.], up: [0.,0.,1.], corner: [9.5,-2.,0.], dimensions: trigger.dimensions,
+            }),
+        }],
+    };
+    l::verify_marker_readback(&d, &read).unwrap();
+    read.devices[0].position_group = Some(-1);
+    assert!(l::verify_marker_readback(&d, &read).is_err());
+    let mut dangling = d.clone();
+    dangling.logic.as_mut().unwrap().devices[0].position_control_id = Some("missing".into());
+    assert!(l::validate(&dangling).is_err());
+    let mut reserved = d;
+    reserved.logic.as_mut().unwrap().devices[1].native_name = Some("extraction_activate".into());
+    assert!(l::validate(&reserved).is_err());
+}
+
+#[test]
+#[ignore = "Requires explicitly installed Invader and Spark-owned disposable storage"]
+fn linked_switch_wiring_is_written_by_invader() {
+    let executable = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_INVADER_EDIT").unwrap());
+    let workspace = tempfile::tempdir_in(std::env::var_os("SPARK_GENERATED_ROOT").unwrap()).unwrap();
+    let tags = workspace.path().join("tags");
+    std::fs::create_dir(&tags).unwrap();
+    let tag = "test.scenario";
+    let run = |args: &[String]| {
+        let output = std::process::Command::new(&executable).arg("-t").arg(&tags).args(args).output().unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        String::from_utf8(output.stdout).unwrap()
+    };
+    run(&["-N".into(), tag.into()]);
+    for array in ["machines", "controls"] {
+        run(&["-I".into(), array.into(), "1".into(), "end".into(), tag.into()]);
+    }
+    for command in l::scenario_commands(&switch_level(), "test").unwrap() {
+        if ["logic-groups", "logic-names"].contains(&command.phase.as_str()) {
+            run(&command.args);
+        }
+    }
+    let read = run(&["-G", "machines[0].position_group", "-G", "controls[0].position_group", "-G",
+        "device_groups[0].initial_value", "-G", "device_groups[0].name", tag].map(str::to_owned));
+    assert_eq!(read.lines().collect::<Vec<_>>(), ["0", "0", "0.250000", &l::native_name("dg", "switch")]);
+}
+
 #[test]
 fn foreign_round_lifecycle_events_cannot_be_reinterpreted_as_halo1_triggers() {
     let original=serde_json::to_value(level()).unwrap();

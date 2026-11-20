@@ -4962,6 +4962,39 @@ for(const startup of [true,false])test('Forerunner '+(startup?'startup request':
 });
 
 
+test('native Logic links a placed switch to a machine and saves the undoable selection',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{
+  const opened=(window as any).__sparkMock.projects.a;
+  opened.inspection.tags.push({id:710,index:1,class:'mach',path:'devices/linked_door',dataOffset:100,external:false,fields:[],references:[]});
+  const common={sourceProjectId:'a',sourceSha256:'a'.repeat(64),position:[4,0,0],rotation:[0,0,0],team:0,respawnSeconds:0,visible:true,locked:false};
+  opened.project.quickForge={schemaVersion:1,name:'Native switch source',template:'customBlank',runtimeId:'chupathingyCe',gameMode:'campaign',
+   skyPath:null,buildQuality:'draft',geometry:[],materials:[],spawns:[],objectives:[],
+   placements:[{...common,id:'door',name:'Hall door',tagClass:'mach',tagPath:'devices/linked_door',tagId:710},
+    {...common,id:'switch',name:'Hall switch',tagClass:'ctrl',tagPath:'devices/linked_switch',tagId:711}]};
+ });
+ await openFixture(page);
+ await page.getByRole('textbox',{name:'Search tags',exact:true}).fill('linked_door');
+ await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('mach');
+ await page.locator('.tag-row').click();
+ await page.getByRole('tab',{name:'Logic',exact:true}).click();
+ const logic=page.getByRole('tabpanel',{name:'Logic',exact:true});
+ await expect(logic.getByRole('combobox',{name:'Logic asset instance',exact:true})).toHaveValue('door');
+ const switchField=logic.getByRole('combobox',{name:'Machine position switch',exact:true});
+ await switchField.selectOption('switch');
+ await expect(logic.getByRole('spinbutton',{name:'Initial logic device position',exact:true})).toBeDisabled();
+ await page.keyboard.press('Control+s');
+ const saved=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.logic?.devices.find((device:any)=>device.placementId==='door')?.positionControlId??null);
+ await expect.poll(saved).toBe('switch');
+ await page.keyboard.press('Control+z');
+ await expect(switchField).toHaveValue('');
+ await page.keyboard.press('Control+y');
+ await expect(switchField).toHaveValue('switch');
+ await switchField.selectOption('');
+ await page.keyboard.press('Control+s');
+ await expect.poll(saved).toBe(null);
+});
+
 test('solo transport native names use actual asset instances, Save and Undo without claiming a flight controller',async({page})=>{
  await mockDesktop(page);await page.evaluate(()=>{const open=(window as any).__sparkMock.projects.a;open.inspection.tags.push({id:705,index:1,class:'vehi',path:'vehicles/test_transport',dataOffset:100,external:false,fields:[],references:[]});open.project.quickForge={schemaVersion:1,name:'Transport source',template:'customBlank',runtimeId:'chupathingyCe',gameMode:'campaign',skyPath:null,buildQuality:'draft',geometry:[],materials:[],spawns:[],objectives:[],placements:[{id:'ship',name:'Authored aircraft',tagClass:'vehi',tagPath:'vehicles/test_transport',tagId:705,sourceProjectId:'a',sourceSha256:'a'.repeat(64),position:[4,0,0],rotation:[0,0,Math.PI/2],team:0,respawnSeconds:0,visible:true,locked:false}]};});
  await openFixture(page);await page.getByRole('textbox',{name:'Search tags',exact:true}).fill('test_transport');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('vehi');await page.locator('.tag-row').click();await page.getByRole('tab',{name:'Logic',exact:true}).click();
