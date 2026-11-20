@@ -9,6 +9,22 @@ const headerSize = 64;
 const recordSize = 48;
 export const HMV_TELEPORTER_CHANNELS = 16;
 const teleporterLimit = 32;
+const objectiveLimit = 64;
+const hillPointLimit = 12;
+
+export const HMV_OBJECTIVES = [
+  { type: 0, name: 'CTF flag', slotLabel: 'Flag team', slots: 2 },
+  { type: 8, name: 'Hill point', slotLabel: 'Hill number', slots: 16 },
+  { type: 2, name: 'Oddball spawn', slotLabel: 'Ball number', slots: 16 },
+  { type: 3, name: 'Race checkpoint', slotLabel: 'Checkpoint order', slots: 32 },
+] as const;
+
+export type HmvObjectiveType = typeof HMV_OBJECTIVES[number]['type'];
+export type HmvObjectiveProperties = { type: HmvObjectiveType; slot: number };
+
+export function hmvObjectiveDefinition(type: number) {
+  return HMV_OBJECTIVES.find(definition => definition.type === type);
+}
 const physicsBits = { normal: 0, fixed: 0x10, phased: 0x20 } as const;
 const physicsMask = physicsBits.fixed | physicsBits.phased;
 
@@ -140,9 +156,9 @@ export function readHmv(input: number[], map: MapInspection) {
   const recordVersions = new Uint8Array(recordsCount).fill(1);
   let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
-  let markers = false, goals = 0, senders = 0, receivers = 0;
+  const objectiveRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvObjectiveProperties }[] = [];
+  let markers = false, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
-  const goalLimits = new Map([[0, 2], [2, 16], [3, 32], [8, 16]]);
   for (let index = 0; index < recordsCount; index++, offset += recordSize) {
     const kind = bytes[offset + 2], team = view.getInt8(offset + 3);
     const transform = Array.from({ length: 6 }, (_, field) => view.getFloat32(offset + 4 + field * 4, true));
@@ -163,8 +179,14 @@ export function readHmv(input: number[], map: MapInspection) {
       requireLayout(pathIndex === 0xffff && team >= 0 && !respawn && !count && !modes && !flags
         && !aiTeam && transform[4] === 0 && transform[5] === 0, invalid);
       if (kind === 5) {
-        requireLayout(version >= 6 && team < (goalLimits.get(variant) ?? 0), invalid);
-        requireLayout(++goals <= 64 && (variant !== 8 || ++hills[team] <= 12), 'too many game type objects.');
+        const definition = hmvObjectiveDefinition(variant);
+        requireLayout(version >= 6 && definition && team < definition.slots, invalid);
+        requireLayout(objectiveRecords.length < objectiveLimit
+          && (variant !== 8 || ++hills[team] <= hillPointLimit), 'too many game type objects.');
+        const [x, y, z, yaw] = transform;
+        objectiveRecords.push({
+          index, position: [x, y, z], rotation: [yaw, 0, 0], properties: { type: definition.type, slot: team },
+        });
         recordVersions[index] = 6;
       } else {
         requireLayout(version >= 5 && team < HMV_TELEPORTER_CHANNELS && !variant, invalid);
@@ -267,8 +289,21 @@ export function readHmv(input: number[], map: MapInspection) {
     view.setUint8(offset + 34, initial ? 8 : 0);
   }
 
+  function isMarker(index: number) {
+    return [spawnRecords, teleporterRecords, objectiveRecords].some(records => records.some(record => record.index === index));
+  }
+
+  function requireObjectiveSlot(type: HmvObjectiveType, slot: number, index?: number) {
+    const definition = hmvObjectiveDefinition(type);
+    requireLayout(definition && Number.isInteger(slot) && slot >= 0 && slot < definition.slots,
+      'choose a valid objective index.');
+    requireLayout(type !== 8 || objectiveRecords.filter(record => record.index !== index
+      && record.properties.type === 8 && record.properties.slot === slot).length < hillPointLimit,
+      'that hill already has 12 points.');
+  }
+
   function requireEditablePlacement(index: number) {
-    if (spawnRecords.some(record => record.index === index) || teleporterRecords.some(record => record.index === index)) return;
+    if (isMarker(index)) return;
     editableRecord(index);
   }
 
@@ -281,12 +316,12 @@ export function readHmv(input: number[], map: MapInspection) {
     objectRecords,
     spawnRecords,
     teleporterRecords,
+    objectiveRecords,
     recordsCount,
     mapName,
     forerunnerIssue,
     write(index: number, position: Vec3, rotation: Vec3) {
-      const yawOnly = spawnRecords.some(record => record.index === index) || teleporterRecords.some(record => record.index === index);
-      writePose(view, recordsStart + index * recordSize + 4, position, rotation, yawOnly);
+      writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));
     },
     append(group: string, path: string, position: Vec3, rotation: Vec3) {
       requireLayout(forerunnerGroups.includes(group) && hmvPathValid(path), 'the selected tag cannot be placed.');
@@ -336,13 +371,47 @@ export function readHmv(input: number[], map: MapInspection) {
       });
       return rebuild([bytes.subarray(recordsStart, recordsEnd), ...endpoints], undefined, Math.max(version, 5));
     },
+    appendObjective(position: Vec3, yaw: number, type: HmvObjectiveType) {
+      requireLayout(objectiveRecords.length < objectiveLimit, 'this layout has reached its 64-objective limit.');
+      const sameType = objectiveRecords.filter(record => record.properties.type === type);
+      const usedSlots = new Set(sameType.map(record => record.properties.slot));
+      let slot = 0;
+      if (type === 0 && usedSlots.has(0) && !usedSlots.has(1)) slot = 1;
+      if (type === 3) slot = Math.min(sameType.length, 31);
+      if (type === 8) {
+        slot = sameType.at(-1)?.properties.slot ?? 0;
+        if (hills[slot] >= hillPointLimit) slot = hills.findIndex(count => count < hillPointLimit);
+      }
+      requireObjectiveSlot(type, slot);
+      const record = new Uint8Array(recordSize);
+      const recordView = new DataView(record.buffer);
+      recordView.setUint16(0, 0xffff, true);
+      record[2] = 5;
+      record[3] = slot;
+      record[33] = type;
+      writePose(recordView, 4, position, [yaw, 0, 0], true);
+      return appendRecord(record, undefined, Math.max(version, 6));
+    },
+    writeObjectiveSlot(index: number, slot: number) {
+      const objective = objectiveRecords.find(record => record.index === index);
+      requireLayout(objective, 'select a Forge objective.');
+      requireObjectiveSlot(objective.properties.type, slot, index);
+      bytes[recordsStart + index * recordSize + 3] = slot;
+      writeChecksum(bytes, view);
+      return bytes;
+    },
     duplicate(index: number, position: Vec3, rotation: Vec3) {
       requireEditablePlacement(index);
       const start = recordsStart + index * recordSize;
       const record = bytes.slice(start, start + recordSize);
       const teleporter = record[2] === 7 || record[2] === 8;
       requireLayout(!teleporter || teleporterRecords.length < teleporterLimit, 'too many teleporters.');
-      writePose(new DataView(record.buffer), 4, position, rotation, record[2] === 2 || teleporter);
+      const objective = objectiveRecords.find(record => record.index === index);
+      if (objective) {
+        requireLayout(objectiveRecords.length < objectiveLimit, 'this layout has reached its 64-objective limit.');
+        requireObjectiveSlot(objective.properties.type, objective.properties.slot);
+      }
+      writePose(new DataView(record.buffer), 4, position, rotation, isMarker(index));
       return appendRecord(record);
     },
     writeProperties(index: number, properties: HmvPlacementProperties) {

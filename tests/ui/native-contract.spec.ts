@@ -6031,6 +6031,32 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   expect(teleporterOutput.subarray(177,181)).toEqual(Buffer.from([255,255,7,7]));
   expect(teleporterOutput.subarray(225,229)).toEqual(Buffer.from([255,255,8,7]));
 
+  await panel.getByLabel('Forge objective type').selectOption('3');
+  await panel.getByRole('button',{name:'Add objective near selection'}).click();
+  await expect(panel.getByRole('status')).toContainText('5 editable placements');
+  const checkpoint = panel.getByRole('group',{name:'Race checkpoint'});
+  await checkpoint.getByLabel('Checkpoint order').selectOption({value:'6'});
+  await expect(checkpoint.getByLabel('Checkpoint order')).toHaveValue('6');
+  await page.locator('.hierarchy').getByRole('button',{name:'Race checkpoint',exact:true}).click();
+  await page.keyboard.press('Control+z');
+  await openLayout.click();
+  await expect(checkpoint.getByLabel('Checkpoint order')).toHaveValue('0');
+  await page.keyboard.press('Control+y');
+  await expect(checkpoint.getByLabel('Checkpoint order')).toHaveValue('6');
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes[276])).toBe(6);
+  const objectiveExport = page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
+  const objectiveOutput = await fs.readFile((await (await objectiveExport).path())!);
+  expect(objectiveOutput.readUInt16LE(4)).toBe(6);
+  expect(objectiveOutput.subarray(273,277)).toEqual(Buffer.from([255,255,5,6]));
+  expect(objectiveOutput[306]).toBe(3);
+  expect(objectiveOutput.subarray(64,273)).toEqual(teleporterOutput.subarray(64,273));
+  await panel.getByRole('button',{name:'Remove layout from project'}).click();
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'objectives.hmv',mimeType:'application/octet-stream',buffer:objectiveOutput});
+  await panel.getByRole('button',{name:'Show layout objectives'}).click();
+  await expect(checkpoint.getByLabel('Checkpoint order')).toHaveValue('6');
+
   await panel.getByRole('button',{name:'Remove layout from project'}).click();
   const supported = Buffer.concat([source.subarray(0,129),source.subarray(177)]);
   supported.writeUInt8(1,111);

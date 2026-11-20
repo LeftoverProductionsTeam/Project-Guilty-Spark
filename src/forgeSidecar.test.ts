@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvPlacement, addHmvTeleporterPair, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -217,6 +217,51 @@ describe('Chupathingy Forge binary layouts', () => {
     const noSender = removeHmvPlacement(changed, map, sender);
     const noPair = removeHmvPlacement(noSender, map, changed.scene[2]);
     expect(exportForgeSidecar(noPair, map)).toEqual(source);
+  });
+
+  it('round-trips all four game type objective kinds without changing existing records', () => {
+    const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
+    let withObjectives = loaded;
+    for (const type of [0, 8, 2, 3] as const) {
+      withObjectives = addHmvObjective(withObjectives, map, loaded.scene[0], type).project;
+    }
+    const last = withObjectives.scene.at(-1)!;
+    const changed = changeHmvObjectiveSlot(withObjectives, map, last, 31);
+    changed.scene[4] = { ...last, position: [9, 12, 3], rotation: [0.5, 0, 0] };
+    const bytes = exportForgeSidecar(changed, map) as Uint8Array;
+    expect(new DataView(bytes.buffer).getUint16(4, true)).toBe(6);
+    expect(bytes.subarray(64, 177)).toEqual(source.subarray(64, 177));
+    expect(readHmv(Array.from(bytes), map).objectiveRecords).toMatchObject([
+      { properties: { type: 0, slot: 0 } },
+      { properties: { type: 8, slot: 0 } },
+      { properties: { type: 2, slot: 0 } },
+      { properties: { type: 3, slot: 31 }, position: [9, 12, 3], rotation: [0.5, 0, 0] },
+    ]);
+    const reopened = importForgeSidecar(project, map, 'objectives.hmv', bytes).project;
+    const revealed = showHmvMarkers(reopened, map, 'objectives');
+    expect(exportForgeSidecar(revealed, map)).toEqual(bytes);
+    expect(revealed.scene.map(row => row.name)).toEqual(['test', 'CTF flag', 'Hill point', 'Oddball spawn', 'Race checkpoint']);
+    expect(() => exportForgeSidecar(revealed, map, 'forerunner')).toThrow('Forerunner cannot import');
+    const duplicated = addHmvPlacement(revealed, map, revealed.scene[4]).project;
+    expect(inspectForgeSidecar(duplicated.forgeSidecar!, map).objectives.at(-1)).toMatchObject({
+      properties: { type: 3, slot: 31 }, position: [10, 12, 3],
+    });
+    const removed = duplicated.scene.slice(1).reduce((state, marker) => removeHmvPlacement(state, map, marker), duplicated);
+    expect(exportForgeSidecar(removed, map)).toEqual(source);
+  });
+
+  it('enforces per-hill and total objective limits during edit and duplication', () => {
+    const loaded = importForgeSidecar(project, map, 'test.hmv', source).project;
+    let full = loaded;
+    for (let index = 0; index < 13; index++) full = addHmvObjective(full, map, loaded.scene[0], 8).project;
+    expect(inspectForgeSidecar(full.forgeSidecar!, map).objectives.map(record => record.properties.slot))
+      .toEqual([...Array(12).fill(0), 1]);
+    expect(() => changeHmvObjectiveSlot(full, map, full.scene[13], 0)).toThrow('already has 12 points');
+    expect(() => addHmvPlacement(full, map, full.scene[1])).toThrow('already has 12 points');
+    expect(() => changeHmvObjectiveSlot(full, map, full.scene[13], 16)).toThrow('valid objective index');
+    while (full.scene.length < 65) full = addHmvObjective(full, map, loaded.scene[0], 2).project;
+    expect(() => addHmvObjective(full, map, loaded.scene[0], 0)).toThrow('64-objective limit');
+    expect(() => addHmvPlacement(full, map, full.scene.at(-1)!)).toThrow('64-objective limit');
   });
 
   it('rejects wrong map identity and malformed or unpaired records even with a fresh CRC', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, supportsHmvMap, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvMarkers, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, supportsHmvMap, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { Notice, NumberField } from './ui';
@@ -21,6 +21,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   useEffect(() => { if (openRequest) setExpanded(true); }, [openRequest]);
   useEffect(() => () => { ticket.current++; }, []);
   const [problem,setProblem] = useState('');
+  const [objectiveType, setObjectiveType] = useState<HmvObjectiveType>(0);
   const layout = project.forgeSidecar;
   const summary = useMemo(() => {
     if (!layout) return null;
@@ -39,7 +40,12 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   const teleporters = summary?.teleporters ?? [];
   const endpoint = teleporters.find(record => record.id === selected?.id);
   const hiddenTeleporters = teleporters.filter(record => !sceneIds.has(record.id));
-  const visibleMarkers = (summary?.spawns.length ?? 0) - hiddenSpawns.length + teleporters.length - hiddenTeleporters.length;
+  const objectives = summary?.objectives ?? [];
+  const objective = objectives.find(record => record.id === selected?.id);
+  const objectiveDefinition = objective && hmvObjectiveDefinition(objective.properties.type);
+  const hiddenObjectives = objectives.filter(record => !sceneIds.has(record.id));
+  const visibleMarkers = (summary?.spawns.length ?? 0) - hiddenSpawns.length + teleporters.length - hiddenTeleporters.length
+    + objectives.length - hiddenObjectives.length;
   if (!compatible && !layout) return null;
 
   async function open(file: File) {
@@ -112,12 +118,32 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
     } catch (error) { setProblem(String(error)); }
   }
 
-  function showMarkers(kind: 'spawns' | 'teleporters') {
+  function addObjective() {
+    if (!selected) return;
     try {
-      const missing = kind === 'spawns' ? hiddenSpawns : hiddenTeleporters;
+      ticket.current++;
+      const result = addHmvObjective(project, map, selected, objectiveType);
+      edit(result.project, 'Add Forge objective');
+      onSelect(result.selectedId);
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
+  function changeObjectiveSlot(slot: number) {
+    if (!selected || !objective) return;
+    try {
+      const next = changeHmvObjectiveSlot(project, map, selected, slot);
+      if (next !== project) edit(next, 'Change Forge objective index');
+      setProblem('');
+    } catch (error) { setProblem(String(error)); }
+  }
+
+  function showMarkers(kind: 'spawns' | 'teleporters' | 'objectives') {
+    const missing = { spawns: hiddenSpawns, teleporters: hiddenTeleporters, objectives: hiddenObjectives }[kind];
+    try {
       const next = showHmvMarkers(project, map, kind);
       if (next !== project && missing.length) {
-        edit(next, kind === 'spawns' ? 'Show Forge player spawns' : 'Show Forge teleporters');
+        edit(next, 'Show Forge ' + kind);
         onSelect(missing[0].id);
       }
       setProblem('');
@@ -134,9 +160,20 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       {!selectedTag && !selectedSpawn && <p className="subtle">Select a player spawn or unscaled object from this map.</p>}
     </>}
 
-    {canAddHmv && map.header.scenarioType === 1 && <button type="button" disabled={!selected} onClick={addTeleporters}>
-      Add teleporter pair near selection
-    </button>}
+    {canAddHmv && map.header.scenarioType === 1 && <>
+      <button type="button" disabled={!selected} onClick={addTeleporters}>
+        Add teleporter pair near selection
+      </button>
+      <div className="button-row">
+        <select aria-label="Forge objective type" value={objectiveType} onChange={event => {
+          const definition = hmvObjectiveDefinition(Number(event.target.value));
+          if (definition) setObjectiveType(definition.type);
+        }}>
+          {HMV_OBJECTIVES.map(definition => <option key={definition.type} value={definition.type}>{definition.name}</option>)}
+        </select>
+        <button type="button" disabled={!selected} onClick={addObjective}>Add objective near selection</button>
+      </div>
+    </>}
     {compatible && selected && properties && <fieldset key={selected.id}>
       <legend>Placement properties</legend>
       <label className="field-label">Team
@@ -196,12 +233,24 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       </label>
       <p className="subtle">Move the sender and receiver into place separately. Changing the channel moves their entire linked group.</p>
     </fieldset>}
+    {compatible && objective && objectiveDefinition && <fieldset key={objective.id}>
+      <legend>{objectiveDefinition.name}</legend>
+      <label className="field-label">{objectiveDefinition.slotLabel}
+        <select value={objective.properties.slot} onChange={event => changeObjectiveSlot(Number(event.target.value))}>
+          {Array.from({ length: objectiveDefinition.slots }, (_, slot) => (
+            <option key={slot} value={slot}>{objectiveDefinition.type === 0 ? (slot === 0 ? 'Red' : 'Blue') : slot + 1}</option>
+          ))}
+        </select>
+      </label>
+      {objectiveDefinition.type === 8 && <p className="subtle">Give the points around one hill the same hill number.</p>}
+    </fieldset>}
     {layout ? <>
       <p>{layout.name}</p>
       {summary&&<p role="status">{summary.editable + visibleMarkers} editable placements · {summary.retained - visibleMarkers} other records preserved.</p>}
       {!!hiddenSpawns.length && <button type="button" onClick={() => showMarkers('spawns')}>Show layout spawns</button>}
       {!!hiddenTeleporters.length && <button type="button" onClick={() => showMarkers('teleporters')}>Show layout teleporters</button>}
-      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform to edit placements. Move spawn or teleporter markers and adjust yaw.'}</p>
+      {!!hiddenObjectives.length && <button type="button" onClick={() => showMarkers('objectives')}>Show layout objectives</button>}
+      <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform. Position markers and adjust yaw.'}</p>
       {summary?.forerunner && map.header.version === 5 && <p className="subtle">In Chupathingy builds with Forge, put the copy in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
       <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {

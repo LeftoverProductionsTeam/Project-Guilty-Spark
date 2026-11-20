@@ -186,7 +186,7 @@ export const colors: Record<string, string> = {
   Equipment: '#ba9eda',
   'Workshop mesh': '#62b9c8',
 };
-const yawOnlyKinds = ['Player spawn', 'Netgame item', 'Forge teleporter'];
+const yawOnlyKinds = ['Player spawn', 'Netgame item', 'Forge teleporter', 'Forge objective'];
 function ObjectVisual({
   object,
   asset,
@@ -207,6 +207,13 @@ function ObjectVisual({
   shaderMetadata?:Record<number,ShaderPreview>;extraTextures?:Record<string,THREE.Texture>;
 }) {
   if (asset) return <Mesh data={asset} sourceObject localLighting={localLighting} greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
+  if (object.kind === 'Forge objective' && !greenScreen) {
+    const tint = selected ? '#fff5da' : '#f3bc67';
+    return <group>
+      <mesh position={[0, 0, 0.06]} rotation={[0, 0, Math.PI / 4]}><boxGeometry args={[0.55, 0.55, 0.06]} /><meshBasicMaterial color={tint} /></mesh>
+      <mesh position={[0.30, 0, 0.13]} rotation={[0, 0, -Math.PI / 2]}><coneGeometry args={[0.12, 0.29, 8]} /><meshBasicMaterial color={tint} /></mesh>
+    </group>;
+  }
   if (object.kind === 'Forge teleporter' && !greenScreen) {
     const tint = selected ? '#c9fff8' : '#81b5e8';
     return <group>
