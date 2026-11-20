@@ -1,7 +1,7 @@
 import type { ForgePlacement } from './forge';
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, type ForgeLayoutTarget, type HmvBaseIdentity, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
+import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, supportsHmvMap, type ForgeLayoutTarget, type HmvBaseIdentity, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -45,7 +45,12 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
     throw Error('Open the matching Xbox or Halo Custom Edition multiplayer base map first.');
   }
   const tags = placementTags(map, classes);
-  const rows: LayoutPlacement[] = [];
+  const rows: TextPlacement[] = [];
+  const headerRows = lines.slice(2, state).filter((line, i) => i % 2 === 0 && line.trim());
+  const forerunnerHeader = headerRows.length === 4
+    && headerRows.includes('Author: Forerunner') && headerRows.includes('ForgeSource=UserCreated')
+    && headerRows.includes(maps[0])
+    && headerRows.includes('Map Name: ' + (map.header.version === 609 ? name + '@ce' : name));
 
   let retained = 0;
   for (let i = state + 2; i < lines.length; i += 2) {
@@ -69,7 +74,7 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
     }
     if (rows.length >= 1024) throw Error('This Forge file exceeds Spark’s 1024 editable placement limit.');
     rows.push({
-      index: i, tag: matches[0], position, rotation: [yaw, -pitch, roll], scale,
+      index: i, tag: matches[0], position, rotation: [yaw, -pitch, roll], scale, team: Number(fields[10]),
       write(position, rotation) {
         if (!position.every(isCoordinate) || !rotation.every(isAngle)) throw Error('A Forge placement has a transform outside supported bounds.');
         const values = [...position, rotation[0], -rotation[1], rotation[2]];
@@ -79,7 +84,15 @@ function parseText(sidecar: LayoutIdentity & { text: string }, map: MapInspectio
       },
     });
   }
-  return { rows, retained, finish: () => lines.join(''), forerunner: undefined, spawns: [] as LayoutSpawn[], teleporters: [] as LayoutTeleporter[], objectives: [] as LayoutObjective[] };
+  const hmvConversionIssue = !forerunnerHeader ? 'HMV conversion requires a text layout saved by Forerunner.'
+    : !supportsHmvMap(map) || !Number.isInteger(map.header.crc32) || map.header.crc32 < 0 || map.header.crc32 > 0xffffffff
+      ? 'HMV conversion needs the matching base map’s native checksum.'
+    : retained ? 'This layout contains scale, unresolved tags or other text records that need the original format.'
+    : rows.length < 1 || rows.length > 128 ? 'Convert 1–128 base-map placements at a time.'
+    : rows.some(row => row.team < -1 || row.team > 7) ? 'An object team is outside the HMV range.'
+    : null;
+  return { rows, retained, hmvConversionIssue, finish: () => lines.join(''), forerunner: undefined,
+    spawns: [] as LayoutSpawn[], teleporters: [] as LayoutTeleporter[], objectives: [] as LayoutObjective[] };
 }
 
 interface LayoutPlacement {
@@ -92,6 +105,8 @@ interface LayoutPlacement {
   scale: number;
   write(position: Vec3, rotation: Vec3): void;
 }
+
+type TextPlacement = LayoutPlacement & { team: number };
 
 type LayoutMarker = { id: string; index: number; position: Vec3; rotation: Vec3 };
 type LayoutSpawn = LayoutMarker & { properties: HmvSpawnProperties };
@@ -163,6 +178,7 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   const devices = rows.filter(row => isHmvDeviceGroup(row.tag.class)).map(row => prefix + row.key);
   return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives, devices,
     metadata: 'metadata' in parsed ? parsed.metadata : undefined,
+    hmvConversionIssue: 'hmvConversionIssue' in parsed ? parsed.hmvConversionIssue : undefined,
     forerunnerLocalIssue: 'forerunnerLocalIssue' in parsed ? parsed.forerunnerLocalIssue : undefined };
 }
 
@@ -448,18 +464,8 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
     if (!forerunner || issue) throw Error(issue ?? 'Forerunner’s HMV import needs a compatible binary layout.');
   }
   for (const row of rows) {
-    const object = project.scene.find(candidate => candidate.id === prefix + (row.key ?? row.index));
-    // Earlier Spark versions kept device records in the file without putting them in the scene.
-    if (!object && isHmvDeviceGroup(row.tag.class)) continue;
-    if (!object || object.sourceModel?.tagId !== row.tag.id || object.sourceModel.sourceSha256 !== map.sha256
-        || object.sourceModel.projectId !== project.id || object.sourceModel.class !== row.tag.class
-        || pathKey(object.sourceModel.path) !== pathKey(row.tag.path)) {
-      throw Error('A Forge placement was removed or replaced. Restore it with Undo before exporting.');
-    }
-    if (object.scale.some(value => !close(value,row.scale))) {
-      throw Error('This layout preserves its original scale. Restore the scale before exporting.');
-    }
-    row.write(object.position, object.rotation);
+    const object = exportableLayoutObject(project, map, row);
+    if (object) row.write(object.position, object.rotation);
   }
   if ('writeMarker' in layout && layout.writeMarker) for (const marker of [...layout.spawns, ...layout.teleporters, ...layout.objectives]) {
     const object = project.scene.find(candidate => candidate.id === marker.id);
@@ -472,6 +478,52 @@ export function exportForgeSidecar(project: Project, map: MapInspection, target?
     layout.writeMarker(marker.index, object.position, object.rotation);
   }
   return finish();
+}
+
+function exportableLayoutObject(project: Project, map: MapInspection, row: LayoutPlacement) {
+  const object = project.scene.find(candidate => candidate.id === prefix + (row.key ?? row.index));
+  // Earlier Spark versions kept device records in the file without putting them in the scene.
+  if (!object && isHmvDeviceGroup(row.tag.class)) return undefined;
+  if (!object || object.sourceModel?.tagId !== row.tag.id || object.sourceModel.sourceSha256 !== map.sha256
+      || object.sourceModel.projectId !== project.id || object.sourceModel.class !== row.tag.class
+      || pathKey(object.sourceModel.path) !== pathKey(row.tag.path)) {
+    throw Error('A Forge placement was removed or replaced. Restore it with Undo before exporting.');
+  }
+  if (object.scale.some(value => !close(value, row.scale))) {
+    throw Error('This layout preserves its original scale. Restore the scale before exporting.');
+  }
+  return object;
+}
+
+function appendBaseHmvPlacement(layout: ReturnType<typeof readHmv>, map: HmvBaseIdentity, placement: {
+  tagClass: string; tagPath: string; position: Vec3; rotation: Vec3; team: number; respawnSeconds: number;
+}) {
+  const next = readHmv(Array.from(layout.append(placement.tagClass, pathKey(placement.tagPath).replaceAll('/', '\\'),
+    placement.position, placement.rotation)), map);
+  if (placement.team === -1 && !placement.respawnSeconds) return next;
+  return readHmv(Array.from(next.writeProperties(next.recordsCount - 1, {
+    team: placement.team, respawnSeconds: placement.respawnSeconds, placeAtStart: true, physics: 'normal',
+  })), map);
+}
+
+export function exportForerunnerTextHmv(project: Project, map: MapInspection) {
+  const sidecar = project.forgeSidecar;
+  if (!sidecar || typeof sidecar.text !== 'string' || sidecar.baseSha256 !== map.sha256 || project.source?.sha256 !== map.sha256) {
+    throw Error('Open the preserved base map and its Forerunner text layout.');
+  }
+  const textLayout = parseText({ ...sidecar, text: sidecar.text }, map);
+  if (textLayout.hmvConversionIssue) throw Error(textLayout.hmvConversionIssue);
+  let layout = readHmv(Array.from(emptyHmv(map)), map);
+  for (const row of textLayout.rows) {
+    const object = exportableLayoutObject(project, map, row);
+    if (!object) throw Error('A text layout placement is missing. Restore it before converting.');
+    layout = appendBaseHmvPlacement(layout, map, {
+      tagClass: row.tag.class, tagPath: row.tag.path, position: object.position, rotation: object.rotation,
+      team: row.team, respawnSeconds: 0,
+    });
+  }
+  return { bytes: layout.writeDetails({ title: 'Converted Forge layout', author: '', description: '' }),
+    name: layout.mapName.slice(0, 18) + '-converted.hmv' };
 }
 
 export function exportForgePlacementSnapshot(
@@ -493,13 +545,7 @@ export function exportForgePlacementSnapshot(
     if (matches?.length !== 1 || matches[0].id !== placement.tagId) {
       throw Error(`“${label}” does not resolve to one exact base-map tag.`);
     }
-    layout = readHmv(Array.from(layout.append(placement.tagClass, key.replaceAll('/', '\\'),
-      placement.position, placement.rotation)), map);
-    if (placement.team !== -1 || placement.respawnSeconds !== 0) {
-      layout = readHmv(Array.from(layout.writeProperties(layout.recordsCount - 1, {
-        team: placement.team, respawnSeconds: placement.respawnSeconds, placeAtStart: true, physics: 'normal',
-      })), map);
-    }
+    layout = appendBaseHmvPlacement(layout, map, placement);
   }
   const issue = target === 'forerunner-local' ? layout.forerunnerLocalIssue : target ? layout.forerunnerIssue : null;
   if (issue) throw Error(issue);

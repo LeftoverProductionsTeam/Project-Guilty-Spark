@@ -5919,6 +5919,7 @@ test('OpenCE Forge layout import preserves unsupported records through Undo, Sav
     +'OBJECT|2003132784|0|0|1.0000|2|3|0|0.25|0|-1|weapons\\test\r\nOBJECT_PROPS|0|1|5|3|0|0|0\nSPAWN|0|0|1|0|0|0';
   await panel.getByLabel('Import Forge layout').setInputFiles({name:'test-forge.txt',mimeType:'text/plain',buffer:Buffer.from(source)});
   await expect(panel).toContainText('test-forge.txt');
+  await expect(panel.getByRole('button',{name:'Export text layout as HMV'})).toBeDisabled();
   await expect(panel.getByRole('status')).toContainText('1 editable placements · 2 other records preserved.');
   await page.keyboard.press('Control+z');
   await expect(panel.getByLabel('Import Forge layout')).toBeVisible();
@@ -5941,6 +5942,39 @@ test('OpenCE Forge layout import preserves unsupported records through Undo, Sav
   expect(file!.suggestedFilename()).toBe('test-forge-spark.txt');
   const fs=await import('node:fs/promises');
   expect(await fs.readFile((await file!.path())!,'utf8')).toBe(source.replace('|1.0000|2|3|','|5|2|3|'));
+});
+
+test('Forge converts a Forerunner text layout on the exact Xbox base by keyboard', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const open=(window as any).__sparkMock.projects.a;
+    open.project.source.cacheVersion=5;
+    open.inspection.header.version=5;
+    open.inspection.header.scenarioType=1;
+    open.inspection.header.name='bloodgulch';
+    open.inspection.header.crc32=56503715;
+    open.inspection.scenarioPath='levels\\test\\bloodgulch\\bloodgulch';
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  const panel=page.locator('.forge-sidecar-panel');
+  await page.getByRole('button',{name:'Forge layouts',exact:true}).click();
+  const source='[OpenCE Forge Map]\r\nForgeSource=UserCreated\r\nMap Name: bloodgulch\r\nBase Map: bloodgulch\r\nAuthor: Forerunner\r\n[ForgeState]\r\n'
+    +'OBJECT|2003132784|0|0|1|2|3|0.25|0.5|-0.125|1|weapons\\test\r\n';
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'forge-bloodgulch.txt',mimeType:'text/plain',buffer:Buffer.from(source)});
+  await expect(panel.getByText('Use the HMV in Chupathingy’s local Forge',{exact:false})).toBeVisible();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.text)).toBe(source);
+  const [download]=await Promise.all([page.waitForEvent('download'),panel.getByRole('button',{name:'Export text layout as HMV'}).press('Enter')]);
+  expect(download.suggestedFilename()).toBe('bloodgulch-converted.hmv');
+  const fs=await import('node:fs/promises');
+  const bytes=await fs.readFile((await download.path())!);
+  const {readHmv}=await import('../../src/forgeHmv');
+  const read=readHmv(Array.from(bytes),{header:{version:5,scenarioType:1,name:'bloodgulch',crc32:56503715}});
+  expect(read.objectRecords).toMatchObject([{
+    path:'weapons\\test',position:[1,2,3],rotation:[0.25,-0.5,-0.125],
+    properties:{team:1,respawnSeconds:0,placeAtStart:true,physics:'normal'},
+  }]);
 });
 
 test('Spark creates and authors HMV placements from a selected base-map object', async ({page}) => {

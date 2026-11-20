@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Exact credited SparkLink HMV played in Forerunner and Chupathingy. Dense BSP lighting moves first index construction off the viewport thread. Eight browser tests, 240 exact comparisons, focused source checks and production build pass. See RUNTIME_INTEGRATION_20261107 and UI_INTERACTION_AUDIT.
-Next action: Finish both factions on Black Echo 04d9ccd1 with two authenticated players. Keep HUD A/B separate. For HMV, use the companion’s working setup to load Spark’s reviewed Danger Canyon Local Forge device export. Multiplayer replication and supported live edits remain separate gates.
+Latest verified revision: Forerunner loaded, saved, undid and reloaded Spark’s exact Danger Canyon control. Spark now converts compatible Forerunner text layouts to HMV. TypeScript, production web build, 18 unit tests, three browser workflows and independent Windows decoder pass. See RUNTIME_INTEGRATION_20261107.
+Next action: Finish both factions on Black Echo 04d9ccd1 with two authenticated players. Keep HUD A/B separate. For Forge, play a converted text layout and test advanced placements with a Forge-capable Chupathingy build. Use one exact reviewed map and runtime for remote-host replication.
 
 ## Acceptance
 

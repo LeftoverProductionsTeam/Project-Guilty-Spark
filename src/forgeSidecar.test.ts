@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgePlacementSnapshot, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgePlacementSnapshot, exportForerunnerTextHmv, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
-import { readHmv } from './forgeHmv';
+import { readHmv, supportsChupathingyForge } from './forgeHmv';
 import type { MapInspection, Project } from './types';
 import type { ForgePlacement } from './forge';
 
@@ -29,6 +29,55 @@ describe('OpenCE Forge base-map placements', () => {
     placed.rotation[1]=-0.5;
     expect(exportForgeSidecar(imported.project,map)).toBe(text.replace(first,first.replace('|2|3|0|0.25|','|7|3|0|0.5|')));
     expect(removeForgeSidecar(imported.project).scene).toEqual([]);
+  });
+
+  it('converts a matching Forerunner text layout with its edited poses and native teams', () => {
+    const xbox = { ...map, header: { ...map.header, version: 5, crc32: 56503715 } };
+    const forerunner = '[OpenCE Forge Map]\r\nForgeSource=UserCreated\r\nMap Name: bloodgulch\r\nBase Map: bloodgulch\r\nAuthor: Forerunner\r\n[ForgeState]\r\n';
+    const row = 'OBJECT|2003132784|0|0|1|2|3|0.125|0.25|-0.5|1|weapons\\pistol\\pistol\r\n';
+    const loaded = importForgeSidecar(project, xbox, 'forge-bloodgulch.txt', forerunner + row).project;
+    loaded.scene[0].position[0] = 5;
+    const saved = JSON.parse(JSON.stringify(loaded)) as Project;
+    const {bytes, name} = exportForerunnerTextHmv(saved, xbox);
+    expect(name).toBe('bloodgulch-converted.hmv');
+    const hmv = readHmv(Array.from(bytes), xbox);
+    expect(hmv.recordsCount).toBe(1);
+    expect(hmv.details).toEqual({title:'Converted Forge layout',author:'',description:''});
+    expect(hmv.objectRecords[0]).toMatchObject({
+      path: 'weapons\\pistol\\pistol', position: [5, 2, 3], rotation: [0.125, -0.25, -0.5],
+      properties: {team: 1, respawnSeconds: 0, placeAtStart: true, physics: 'normal'},
+    });
+    expect(saved.forgeSidecar!.text).toBe(forerunner + row);
+    expect(exportForgeSidecar(saved, xbox)).toBe((forerunner + row).replace('|1|2|3|','|5|2|3|'));
+    expect(supportsChupathingyForge(xbox)).toBe(true);
+    expect(supportsChupathingyForge({...xbox,scenarioPath:'levels\\custom\\dangercanyon'})).toBe(false);
+    const ce = { ...map, header: { ...map.header, crc32: 123456 } };
+    const ceText = forerunner.replace('Map Name: bloodgulch','Map Name: bloodgulch@ce')
+      .replace('Base Map: bloodgulch','Base Map: custom_maps\\bloodgulch') + row;
+    const ceLayout = importForgeSidecar(project,ce,'forge-bloodgulch@ce.txt',ceText).project;
+    expect(readHmv(Array.from(exportForerunnerTextHmv(ceLayout,ce).bytes),ce).forerunnerIssue).toBeNull();
+    expect(supportsChupathingyForge(ce)).toBe(false);
+  });
+
+  it('blocks conversion of unsupported text and edited identity without changing the original export', () => {
+    const xbox = { ...map, header: { ...map.header, version: 5, crc32: 56503715 } };
+    const forerunner = '[OpenCE Forge Map]\nForgeSource=UserCreated\nMap Name: bloodgulch\nBase Map: bloodgulch\nAuthor: Forerunner\n[ForgeState]\n';
+    const row = 'OBJECT|2003132784|0|0|1|2|3|0|0|0|0|weapons\\pistol\\pistol\n';
+    for (const [source, reason] of [
+      [forerunner + row + 'OBJECT_SCALE|1.5\n', 'scale, unresolved tags'],
+      [forerunner + row + 'SPAWN|1|2|3\n', 'other text records'],
+      [forerunner + row.replace('pistol\\pistol','pistol\\missing'), 'unresolved tags'],
+      [forerunner + row.replace('|0|weapons', '|12|weapons'), 'team'],
+      [forerunner.replace('Author: Forerunner', 'Author: Modder') + row, 'saved by Forerunner'],
+    ]) {
+      const {project:loaded} = importForgeSidecar(project,xbox,'forge-bloodgulch.txt',source);
+      expect(inspectForgeSidecar(loaded.forgeSidecar!,xbox).hmvConversionIssue).toContain(reason);
+      expect(() => exportForerunnerTextHmv(loaded,xbox)).toThrow(reason);
+      expect(exportForgeSidecar(loaded,xbox)).toBe(source);
+    }
+    const {project:loaded} = importForgeSidecar(project,xbox,'forge-bloodgulch.txt',forerunner + row);
+    expect(() => exportForerunnerTextHmv({...loaded,scene:[]},xbox)).toThrow('removed');
+    expect(() => exportForerunnerTextHmv(loaded,{...xbox,sha256:'b'.repeat(64)})).toThrow('preserved base map');
   });
 
   it('refuses mismatched maps, missing objects, changed scale and replacement assets', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
-import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsHmvMap, type ForgeLayoutTarget, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForerunnerTextHmv, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsChupathingyForge, supportsHmvMap, type ForgeLayoutTarget, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { verifyForerunnerLocalForge } from '../runtimeWorkbench';
@@ -318,7 +318,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
       {!!hiddenTeleporters.length && <button type="button" onClick={() => showMarkers('teleporters')}>Show layout teleporters</button>}
       {!!hiddenObjectives.length && <button type="button" onClick={() => showMarkers('objectives')}>Show layout objectives</button>}
       <p className="subtle">Move or rotate placements, then export a separate layout copy for the matching base map. {layout.bytes && 'Use Duplicate or Remove in Transform. Position markers and adjust yaw.'}</p>
-      {summary?.forerunner && map.header.version === 5 && <p className="subtle">In Chupathingy builds with Forge, put the copy in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge.</p>}
+      {summary?.forerunner && supportsChupathingyForge(map) && <p className="subtle">In Chupathingy’s local Forge, put the HMV in <code>forge/{summary.forerunner.mapName}/</code> under the game’s save folder, then select it in Multiplayer → Forge. Use the matching Xbox map.</p>}
       <button type="button" disabled={!compatible || !summary} onClick={()=>{
         try {
           const output = exportForgeSidecar(project,map);
@@ -330,6 +330,18 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
           setProblem('');
         } catch (error) { setProblem(String(error)); }
       }}>Export Forge layout copy</button>
+      {summary?.hmvConversionIssue !== undefined && <div>
+        <button type="button" disabled={!compatible || summary.hmvConversionIssue !== null} onClick={() => {
+          try {
+            const { bytes, name } = exportForerunnerTextHmv(project, map);
+            downloadMedia(name, new Blob([Uint8Array.from(bytes).buffer]));
+            setProblem('');
+          } catch (error) { setProblem(String(error)); }
+        }}>Export text layout as HMV</button>
+        <p className="subtle">{summary.hmvConversionIssue ?? (supportsChupathingyForge(map)
+          ? 'Use the HMV in Chupathingy’s local Forge on the exact Xbox map. Put it in the map’s folder under forge in the game’s save directory.'
+          : 'Use this HMV with the exact base map in an HMV-capable runtime. Forerunner’s Forge Tools expects the file as import.hmv.')}</p>
+      </div>}
       {summary?.forerunner && <div>
         <button type="button" disabled={!compatible || checkingLocalForge || !!summary.forerunner.issue}
           onClick={() => void exportForerunner('forerunner')}>Export for Forerunner</button>

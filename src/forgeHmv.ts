@@ -87,6 +87,17 @@ export function supportsHmvMap(map: HmvBaseIdentity) {
     && /^[a-z0-9_]{1,31}$/.test(scenarioShortName(map));
 }
 
+export function supportsChupathingyForge(map: HmvBaseIdentity) {
+  return map.header.version === 5 && map.header.scenarioType === 1
+    && chupathingyMaps.has(scenarioShortName(map));
+}
+
+// Stock Xbox maps in Chupathingy nightly 7e2024d2's Forge launcher.
+const chupathingyMaps = new Set([
+  'beavercreek', 'sidewinder', 'damnation', 'ratrace', 'prisoner', 'hangemhigh',
+  'chillout', 'carousel', 'boardingaction', 'bloodgulch', 'wizard', 'putput', 'longest',
+]);
+
 function scenarioShortName(map: HmvBaseIdentity) {
   return (map.scenarioPath?.split(/[\\/]/).at(-1) || map.header.name).toLowerCase();
 }
