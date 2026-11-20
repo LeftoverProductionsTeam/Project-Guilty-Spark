@@ -7,12 +7,12 @@ interface Draft {included:boolean;control:string;position:[string,string,string]
 const initial=(faction:Role):Draft=>({included:faction==='unsc',control:'',position:['','',''],rotation:['0','0','0'],profile:{...defaultNativePlayerProfile(),primaryWeapon:faction==='unsc'?'weapons/assault rifle/assault rifle':'weapons/plasma pistol/plasma pistol',primaryLoaded:faction==='unsc'?60:0,primaryReserved:faction==='unsc'?180:0,secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0,health:0,shields:0,fragmentationGrenades:faction==='unsc'?1:0,plasmaGrenades:faction==='covenant'?1:0}});
 /** The existing protected native Preview/Accept owns writes and restoration. */
 export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftChange}:{context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void}){
- const [body,setBody]=useState({faction:'covenant' as Role,bipedTagPath:'',permutation:'0'});
+ const [body,setBody]=useState({faction:'covenant' as Role,bipedTagPath:null as string|null,permutation:null as string|null});
  const [squad,setSquad]=useState({number:1,control:'',position:['','',''] as [string,string,string],rotation:['0','0','0'] as [string,string,string],readiness:false});
  const [role,setRole]=useState<Role>('unsc'),[drafts,setDrafts]=useState<Record<Role,Draft>>({unsc:initial('unsc'),covenant:initial('covenant')});const id=useId(),draft=drafts[role];
  useEffect(()=>{setDrafts({unsc:{...initial('unsc'),control:context.controlSources?.[0]??''},covenant:{...initial('covenant'),control:context.controlSources?.[0]??''}});},[context.projectId,context.buildId,context.tag]);
  useEffect(()=>{setSquad({number:1,control:context.controlSources?.[0]??"",position:["","",""],rotation:["0","0","0"],readiness:false});},[context.projectId,context.buildId,context.tag]);
- useEffect(()=>{setBody({faction:'covenant',bipedTagPath:'',permutation:'0'});},[context.projectId,context.buildId,context.tag]);
+ useEffect(()=>{setBody(current=>({...current,bipedTagPath:null,permutation:null}));},[context.projectId,context.buildId,context.tag,context.tagSha256]);
  useEffect(()=>onDraftChange(),[drafts,squad,body,context.tagSha256]);
  const update=(patch:Partial<Draft>)=>setDrafts(current=>({...current,[role]:{...current[role],...patch}}));
  const profile=(patch:Partial<Draft['profile']>)=>update({profile:{...draft.profile,...patch,health:0,shields:0}});
@@ -21,8 +21,16 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const included=(['unsc','covenant'] as Role[]).filter(faction=>drafts[faction].included),blocked=busy||dirty||!context.canAppendFactionKits;
  const kits=context.factionKits??[],selectedKit=kits.find(row=>row.kit.faction===body.faction)??kits[0];
  const bipedSources=context.bipedSources??[];
- const permutation=Number(body.permutation);
- const bodyBlocked=blocked||!!context.factionBodyIssue||!selectedKit||!!selectedKit.body;
+ const currentBody=selectedKit?.body;
+ const elitePath='characters/elite/elite';
+ const importedElites=bipedSources.filter(path=>/^gs_assets_[0-9a-f]{32}$/i.test(path.split('/')[0])&&path.toLowerCase().slice(43)===elitePath);
+ const stockElite=bipedSources.find(path=>path.toLowerCase()===elitePath);
+ const defaultElite=selectedKit?.kit.faction==='covenant'?(stockElite??(importedElites.length===1?importedElites[0]:undefined)):undefined;
+ const bipedPath=body.bipedTagPath??currentBody?.bipedTagPath??defaultElite??'';
+ const permutationInput=body.permutation??String(currentBody?.permutation??0);
+ const permutation=Number(permutationInput);
+ const bodyBlocked=blocked||!!context.factionBodyIssue||!selectedKit;
+ const unchangedBody=!!currentBody&&currentBody.bipedTagPath===bipedPath&&currentBody.permutation===permutation;
  const squadName="extraction_squad_"+String(squad.number).padStart(2,"0"),squadExists=!!context.scenarioDevices?.some(row=>row.name.toLowerCase()===squadName);
  return <><details className="native-faction-kits"><summary>Forerunner faction terminals &amp; kits</summary>
   <p className="subtle">Append faction terminals and matching equipment profiles together. Originals, player starts and existing source stay. Forerunner owns selection, gear reservation, deployment and persistence; these are not gear-grant scripts.</p>
@@ -45,14 +53,15 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
   <p className="subtle">Bind a native character to an existing faction terminal and kit. The placement stays dormant. Forerunner changes the player character when the faction is selected.</p>
   {context.factionBodyIssue&&<Notice tone="info">{context.factionBodyIssue}</Notice>}
   {!context.canAppendFactionKits?<Notice tone="info">Requires saved CE609 solo working source and ownership of this editor window.</Notice>:kits.length===0&&<p className="subtle">Review and accept a faction terminal and kit first.</p>}
-  {kits.length>0&&<label>Faction body kit<select aria-label="Faction body kit" disabled={busy||dirty} value={selectedKit?.kit.faction??''} onChange={event=>setBody({...body,faction:event.target.value as Role})}>{kits.map(row=><option key={row.kit.faction} value={row.kit.faction}>{row.kit.faction==='unsc'?'UNSC':'Covenant'}{row.body?' · bound':''}</option>)}</select></label>}
-  {selectedKit?.body?<p>{selectedKit.body.bipedTagPath} · permutation {selectedKit.body.permutation}</p>:<fieldset disabled={bodyBlocked}>
-   <label>Native biped tag<select aria-label="Faction native biped" value={body.bipedTagPath} onChange={event=>setBody({...body,bipedTagPath:event.target.value})}><option value="">Choose an existing native biped…</option>{bipedSources.map(path=><option key={path} value={path}>{path}</option>)}</select></label>
-   <label>Native permutation index<input aria-label="Faction body permutation" type="number" min={-1} max={32767} step={1} value={body.permutation} onChange={event=>setBody({...body,permutation:event.target.value})}/><small>Use −1 for native random selection.</small></label>
-   <button type="button" disabled={!bipedSources.includes(body.bipedTagPath)||body.permutation.trim()===''||!Number.isInteger(permutation)||permutation< -1||permutation>32767||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
-     onClick={()=>selectedKit&&onPreview({kind:'factionBody',sourceSha256:context.tagSha256!,body:{faction:selectedKit.kit.faction,bipedTagPath:body.bipedTagPath,permutation}})}>Preview faction player body</button>
-  </fieldset>}
-  <p className="subtle">Preview → Accept → Save → Build working tag edits. Test the selected body, its equipment and the intended aircraft seats in the game.</p>
+  {kits.length>0&&<label>Faction body kit<select aria-label="Faction body kit" disabled={busy||dirty} value={selectedKit?.kit.faction??''} onChange={event=>setBody({faction:event.target.value as Role,bipedTagPath:null,permutation:null})}>{kits.map(row=><option key={row.kit.faction} value={row.kit.faction}>{row.kit.faction==='unsc'?'UNSC':'Covenant'}{row.body?' · bound':''}</option>)}</select></label>}
+  {currentBody&&<p>Current body · {currentBody.bipedTagPath} · permutation {currentBody.permutation}</p>}
+  <fieldset disabled={bodyBlocked}>
+   <label>Native biped tag<select aria-label="Faction native biped" value={bipedPath} onChange={event=>setBody({...body,bipedTagPath:event.target.value})}><option value="">Choose an existing native biped…</option>{currentBody&&!bipedSources.includes(currentBody.bipedTagPath)&&<option value={currentBody.bipedTagPath} disabled>{currentBody.bipedTagPath} · source unavailable</option>}{bipedSources.map(path=><option key={path} value={path}>{path}</option>)}</select></label>
+   <label>Native permutation index<input aria-label="Faction body permutation" type="number" min={-1} max={32767} step={1} value={permutationInput} onChange={event=>setBody({...body,permutation:event.target.value})}/><small>Use −1 for native random selection.</small></label>
+   <button type="button" disabled={unchangedBody||!bipedSources.includes(bipedPath)||permutationInput.trim()===''||!Number.isInteger(permutation)||permutation< -1||permutation>32767||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')}
+     onClick={()=>selectedKit&&onPreview({kind:'factionBody',sourceSha256:context.tagSha256!,...(currentBody?{replaceExisting:true}:{}),body:{faction:selectedKit.kit.faction,bipedTagPath:bipedPath,permutation}})}>{currentBody?'Preview faction body rebind':'Preview faction player body'}</button>
+  </fieldset>
+  <p className="subtle">Preview → Accept → Save → Build working tag edits. New Covenant bindings suggest an available Elite. Use any compatible biped from working source. Players choose their personal armor color in Forerunner Player Setup. Test the body, equipment and intended aircraft seats in the game.</p>
  </details>
  <details className="native-squad-terminals"><summary>Forerunner squad terminals &amp; objective gates</summary>
   <p className="subtle">Append one native squad-selection control inside the return hub. Forerunner owns membership, six-member limits, faction compatibility and durable banking. No loadout profile or inventory writer is added.</p>

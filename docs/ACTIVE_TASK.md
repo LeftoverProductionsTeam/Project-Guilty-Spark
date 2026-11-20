@@ -3,8 +3,8 @@
 Task: Playable Black Echo Extraction across two authenticated Forerunner players
 Status: implementation incomplete
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Exact d4ca73c8 reproduces the deployment identity message and wipe launch. Forerunner’s trial fix kept bodies grounded. Four separated hub starts passed native readback and private two-client respawn geometry. Recovered UNSC source now requires physical Pelican arrival.
-Next action: Prepare a reviewed playable Elite faction body and native Spirit bindings. Validate armor color identity with Forerunner, ground the terminals, and render the separate HUD correction. Use two authenticated players with physical input for both faction extraction paths and persistence.
+Latest verified revision: Black Echo’s Elite-bound CE609 941f629a compiled and passed independent binding, CRC, script and global readback. Spark’s Covenant body preview, accept and restore controls passed focused browser coverage. Existing private respawn geometry and Pelican trigger evidence remain recorded in the runtime integration log.
+Next action: Review the exact Elite cache in Forerunner with two authenticated physical players using distinct colors. Check the Elite’s first-person interface, Spirit seating and terminal use before progressing through extraction, banking, redeployment and reconnect. Terminal mounts, the separated-start candidate and visual HUD gate remain separate.
 
 ## Acceptance
 

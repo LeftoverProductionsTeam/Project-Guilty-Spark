@@ -367,54 +367,145 @@ fn existing_body(fields: &str, names: &[String], faction: &str) -> Result<Option
     found.map(Some).ok_or_else(|| crate::SparkError::Invalid("Faction body name does not bind to a native biped".into()))
 }
 
-fn body_layout(fields: &str, body: &NativeFactionBody) -> Result<(Vec<NativeFactionSnapshot>, usize, usize, usize, bool)> {
-    body.validate()?;
-    let existing = snapshots(fields)?;
-    let kit = existing.iter().find(|row| row.kit.faction == body.faction)
-        .ok_or_else(|| crate::SparkError::Invalid("Author the matching faction terminal and equipment profile first".into()))?;
-    if kit.body.is_some() { return invalid("This faction already has a named player body"); }
-    let names = array_listing(fields, "object_names")?.count;
-    let bipeds = array_listing(fields, "bipeds")?.count;
-    let palette = named(fields, "biped_palette")?;
-    let reference = format!("{}.biped", body.biped_tag_path.replace('\\', "/"));
-    let matches = palette.iter().enumerate().filter(|(_, tag)| tag.replace('\\', "/").eq_ignore_ascii_case(&reference)).collect::<Vec<_>>();
-    // Native CE scenario limits: 128 biped placements and 100 palette entries.
-    if names >= 512 || bipeds >= 128 || palette.len() + usize::from(matches.is_empty()) > 100 || matches.len() > 1 {
-        return invalid("Faction biped append exceeds supported scenario capacity or has an ambiguous palette reference");
-    }
-    Ok((existing, names, bipeds, matches.first().map_or(palette.len(), |row| row.0), matches.is_empty()))
+struct BodyLayout {
+    snapshots: Vec<NativeFactionSnapshot>,
+    binding: NativeFactionBodyBinding,
+    palette: usize,
+    append_palette: bool,
 }
 
-pub fn body_arguments(tags: &Path, tag: &str, before: &str, body: &NativeFactionBody) -> Result<Vec<String>> {
-    let (existing, name, index, palette, new_palette) = body_layout(before, body)?;
-    let kit = existing.iter().find(|row| row.kit.faction == body.faction).unwrap();
-    // Like the guarded hub-control append, the owned candidate needs the
-    // native name table unlocked. Review pins the unchanged indices and rows.
-    let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned(), "-n".into()];
-    for array in ["object_names", "bipeds"].into_iter().chain(new_palette.then_some("biped_palette")) {
-        args.extend(["-I".into(), array.into(), "1".into(), "end".into()]);
+fn body_layout(fields: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<BodyLayout> {
+    body.validate()?;
+    let snapshots = snapshots(fields)?;
+    let kit = snapshots.iter().find(|row| row.kit.faction == body.faction)
+        .ok_or_else(|| crate::SparkError::Invalid("Author the matching faction terminal and equipment profile first".into()))?;
+    if kit.body.is_some() != replace_existing {
+        return invalid(if replace_existing {
+            "There is no faction body to rebind. Refresh the source review"
+        } else {
+            "This faction already has a named player body. Preview a rebind explicitly"
+        });
+    }
+
+    let palette = named(fields, "biped_palette")?;
+    let requested_path = body.biped_tag_path.replace('\\', "/");
+    let reference = format!("{requested_path}.biped");
+    let matches = palette.iter().enumerate().filter_map(|(index, entry)| {
+        let path = entry.replace('\\', "/");
+        path.eq_ignore_ascii_case(&reference).then_some((index, path))
+    }).collect::<Vec<_>>();
+    // Native CE scenario limits: 128 biped placements and 100 palette entries.
+    if palette.len() + usize::from(matches.is_empty()) > 100 || matches.len() > 1 {
+        return invalid("Faction biped exceeds native palette capacity or the reference is ambiguous");
+    }
+    let (palette_index, path) = match matches.first() {
+        Some((index, path)) => (*index, path.strip_suffix(".biped").ok_or_else(|| {
+            crate::SparkError::Invalid("Faction biped palette tag class is invalid".into())
+        })?.to_owned()),
+        None => (palette.len(), requested_path),
+    };
+
+    let binding = if let Some(original) = &kit.body {
+        if original.biped_tag_path.eq_ignore_ascii_case(&path) && original.permutation == body.permutation {
+            return invalid("The faction body already uses this biped and permutation");
+        }
+        NativeFactionBodyBinding { biped_tag_path: path, permutation: body.permutation, ..original.clone() }
+    } else {
+        let names = array_listing(fields, "object_names")?.count;
+        let bipeds = array_listing(fields, "bipeds")?.count;
+        if names >= 512 || bipeds >= 128 {
+            return invalid("Faction biped append exceeds native name or placement capacity");
+        }
+        NativeFactionBodyBinding {
+            biped_tag_path: path,
+            permutation: body.permutation,
+            index: bipeds as u16,
+            name_index: names as u16,
+            position: kit.kit.position,
+        }
+    };
+    Ok(BodyLayout { snapshots, binding, palette: palette_index, append_palette: matches.is_empty() })
+}
+
+pub fn body_arguments(tags: &Path, tag: &str, before: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<Vec<String>> {
+    let layout = body_layout(before, body, replace_existing)?;
+    let binding = layout.binding;
+    let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+    if !replace_existing {
+        // Initial binding needs the guarded native name table unlock.
+        args.push("-n".into());
+        for array in ["object_names", "bipeds"] {
+            args.extend(["-I".into(), array.into(), "1".into(), "end".into()]);
+        }
+    }
+    if layout.append_palette {
+        args.extend(["-I".into(), "biped_palette".into(), "1".into(), "end".into()]);
     }
     let mut set = |key: String, value: String| args.extend(["-S".into(), key, value]);
-    if new_palette { set(format!("biped_palette[{palette}].name"), format!("{}.biped", body.biped_tag_path.replace('\\', "/"))); }
-    set(format!("object_names[{name}].name"), body.name());
-    for (key, value) in [("type", palette.to_string()), ("name", name.to_string()),
-        ("not_placed.automatically", "1".into()), ("desired_permutation", body.permutation.to_string()),
-        ("position", kit.kit.position.map(|n| n.to_string()).join(","))] {
-        set(format!("bipeds[{index}].{key}"), value);
+    if layout.append_palette {
+        set(format!("biped_palette[{}].name", layout.palette), format!("{}.biped", binding.biped_tag_path));
+    }
+    let row = format!("bipeds[{}]", binding.index);
+    set(format!("{row}.type"), layout.palette.to_string());
+    set(format!("{row}.desired_permutation"), binding.permutation.to_string());
+    if !replace_existing {
+        set(format!("object_names[{}].name", binding.name_index), body.name());
+        set(format!("{row}.name"), binding.name_index.to_string());
+        set(format!("{row}.not_placed.automatically"), "1".into());
+        set(format!("{row}.position"), binding.position.map(|n| n.to_string()).join(","));
     }
     args.push(tag.into());
     Ok(args)
 }
 
-pub fn review_body(before: &str, after: &str, body: &NativeFactionBody) -> Result<Vec<FieldDifference>> {
-    let (mut expected, name_index, index, _, new_palette) = body_layout(before, body)?;
-    transport::preserved_arrays(before, after, &[("object_names", 1), ("bipeds", 1), ("biped_palette", usize::from(new_palette))])?;
+// Compare every exposed source cell except the two admitted scalar fields on
+// this one existing biped. The compiled snapshot separately checks their values.
+fn without_body_binding(fields: &str, index: usize) -> Result<String> {
+    let array = array_listing(fields, "bipeds")?;
+    let rows = array_items(&array, "bipeds")?;
+    let target = rows.get(index)
+        .ok_or_else(|| crate::SparkError::Invalid("Reviewed faction biped placement is missing".into()))?;
+    let start = array.start + 1 + rows[..index].iter().map(|row| row.len()).sum::<usize>();
+    let mut lines: Vec<_> = fields.lines().collect();
+    for (prefix, masked) in [
+        ("        type (", "        type (reviewed)"),
+        ("        desired_permutation (", "        desired_permutation (reviewed)"),
+    ] {
+        let offsets: Vec<_> = target.iter().enumerate().filter_map(|(offset, line)| {
+            line.starts_with(prefix).then_some(offset)
+        }).collect();
+        if offsets.len() != 1 {
+            return invalid("Native faction biped binding field is missing or ambiguous");
+        }
+        lines[start + offsets[0]] = masked;
+    }
+    Ok(lines.join("\n"))
+}
+
+pub fn review_body(before: &str, after: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<Vec<FieldDifference>> {
+    let layout = body_layout(before, body, replace_existing)?;
+    let palette_change = ("biped_palette", usize::from(layout.append_palette));
+    let mut expected = layout.snapshots;
+    let binding = layout.binding;
+    let index = usize::from(binding.index);
+    if replace_existing {
+        transport::preserved_arrays(&without_body_binding(before, index)?, &without_body_binding(after, index)?, &[palette_change])?;
+    } else {
+        transport::preserved_arrays(before, after, &[("object_names", 1), ("bipeds", 1), palette_change])?;
+    }
     let kit = expected.iter_mut().find(|row| row.kit.faction == body.faction).unwrap();
-    kit.body = Some(NativeFactionBodyBinding { biped_tag_path: body.biped_tag_path.replace('\\', "/"),
-        permutation: body.permutation, index: index as u16, name_index: name_index as u16, position: kit.kit.position });
-    if expected != snapshots(after)? { return invalid("Native body and matching profiles differ from the reviewed additions"); }
-    Ok(vec![FieldDifference { before: format!("No {}", body.name()),
-        after: format!("{} uses {} · permutation {} · biped index {} · nonautomatic", body.name(),body.biped_tag_path,body.permutation,index) }])
+    let previous = kit.body.replace(binding.clone());
+    if expected != snapshots(after)? {
+        return invalid("Native body and matching profiles differ from the reviewed binding");
+    }
+    let describe = |binding: &NativeFactionBodyBinding| format!(
+        "{} uses {} · permutation {} · biped index {} · dormant",
+        body.name(), binding.biped_tag_path, binding.permutation, binding.index,
+    );
+    Ok(vec![FieldDifference {
+        before: previous.as_ref().map_or_else(|| format!("No {}", body.name()), describe),
+        after: describe(&binding),
+    }])
 }
 fn profile_from_fields(root: &str) -> Result<crate::firefight::NativePlayerProfile> {
     let count = |key: &str| -> Result<u16> {
@@ -737,14 +828,91 @@ mod tests {
     #[test]
     fn faction_body_uses_signed_native_selection_and_requires_a_matching_kit() {
         let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1 };
-        let operation = Operation::FactionBody { body: body.clone(), source_sha256: "a".repeat(64) };
+        let operation = Operation::FactionBody { body: body.clone(), replace_existing: false, source_sha256: "a".repeat(64) };
         let serialized = serde_json::to_value(&operation).unwrap();
         assert_eq!(serialized["body"]["permutation"], -1);
         assert_eq!(serde_json::from_value::<Operation>(serialized).unwrap(), operation);
         operation.validate("scnr", "test.scenario").unwrap();
-        assert!(body_arguments(Path::new("owned"), "test.scenario", &before(), &body).is_err());
+        assert!(body_arguments(Path::new("owned"), "test.scenario", &before(), &body, false).is_err());
         assert!(NativeFactionBody { permutation: -2, ..body.clone() }.validate().is_err());
         assert!(NativeFactionBody { biped_tag_path: "../grunt".into(), ..body }.validate().is_err());
+    }
+    #[test]
+    #[ignore = "Requires a disposable Black Echo tag tree and legally sourced Elite dependencies"]
+    fn replace_faction_body_and_read_back_native_cache() {
+        use std::path::PathBuf;
+        use std::process::Command;
+
+        let root = PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let tags = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_TAGS").unwrap());
+        assert!(tags.canonicalize().unwrap().starts_with(root.canonicalize().unwrap()));
+        let invader = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_INVADER").unwrap());
+        let cache = tags.parent().unwrap().join("elite.map");
+        assert!(!cache.exists(), "The native test must write fresh output");
+        let scenario = std::env::var("SPARK_FACTION_QA_SCENARIO").unwrap();
+        let run = |tool: &str, args: &[String]| {
+            let result = Command::new(invader.join(format!("{tool}.exe")))
+                .args(args).output().unwrap();
+            assert!(result.status.success(), "{tool}: {}", String::from_utf8_lossy(&result.stderr));
+            String::from_utf8(result.stdout).unwrap()
+        };
+
+        let donor = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_DONOR").unwrap());
+        let elite = format!("{}/characters/elite/elite", std::env::var("SPARK_FACTION_QA_NAMESPACE").unwrap());
+        assert!(donor.canonicalize().unwrap().starts_with(root.canonicalize().unwrap()));
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let runner = crate::build::Runner { id: "elite-body", project: "native-faction-qa",
+            cancel: &cancel, event: &|_| {} };
+        let inventory = crate::tool_transaction::inventory(&donor).unwrap().into_iter()
+            .map(|(path, hash)| (path.replace(char::from(92), "/"), hash)).collect();
+        let converted = crate::native_staging::convert_imported_pc_models(&donor, &inventory,
+            &invader.join("invader-convert.exe"), &invader.join("invader-refactor.exe"),
+            &invader.join("invader-edit.exe"), &runner, tags.parent().unwrap()).unwrap();
+        assert!(converted.iter().any(|model| model.output == format!("{elite}.gbxmodel")));
+        let tags_arg = tags.to_str().unwrap();
+        let read = || run("invader-edit", &["-t".into(), tags_arg.into(), "-L".into(), scenario.clone()]);
+        let before = read();
+        let snapshots = super::snapshots(&before).unwrap();
+        let old_body = snapshots.iter().find(|row| row.kit.faction == "covenant")
+            .unwrap().body.as_ref().unwrap();
+        assert!(old_body.biped_tag_path.contains("grunt"));
+        let body = NativeFactionBody {
+            faction: "covenant".into(),
+            biped_tag_path: elite.clone(),
+            permutation: old_body.permutation,
+        };
+        assert!(body_arguments(&tags, &scenario, &before, &body, false).is_err());
+        run("invader-edit", &body_arguments(&tags, &scenario, &before, &body, true).unwrap());
+        let after = read();
+        review_body(&before, &after, &body, true).unwrap();
+        assert!(body_arguments(&tags, &scenario, &after, &body, true).is_err());
+        let expected = super::snapshots(&after).unwrap();
+
+        let banks = std::env::var("SPARK_FACTION_QA_BANKS").unwrap();
+        run("invader-build", &[
+            "-g".into(), "gbx-custom".into(), "-t".into(), tags_arg.into(), "-m".into(), banks,
+            "-t".into(), donor.to_str().unwrap().into(), "-o".into(), cache.to_str().unwrap().into(),
+            scenario.strip_suffix(".scenario").unwrap().into(),
+        ]);
+        let map = crate::maps::inspect_map(&cache, None).unwrap();
+        verify_cache(&expected, &cache, &map).unwrap();
+        let input = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_PARENT").unwrap());
+        let original = crate::maps::inspect_map(&input, None).unwrap();
+        assert!(!original.scripts.is_empty(), "The baseline needs real HaloScript");
+        let scripts = |readback: &crate::maps::MapInspection| readback.scripts.iter()
+            .map(|script| (script.name.clone(), script.script_type, script.return_type)).collect::<Vec<_>>();
+        assert_eq!(scripts(&original), scripts(&map), "Preserve original native script indices");
+        let recovered = tags.parent().unwrap().join("independent");
+        std::fs::create_dir(&recovered).unwrap();
+        run("invader-extract", &["-t".into(), recovered.to_str().unwrap().into(), "-s".into(),
+            scenario.clone(), cache.to_str().unwrap().into()]);
+        let names = |root: &Path| run("invader-edit", &["-t".into(), root.to_str().unwrap().into(),
+            "-G".into(), "scripts[*].name".into(), "-G".into(), "globals[*].name".into(), scenario.clone()]);
+        assert_eq!(names(&tags), names(&recovered), "Independent script/global name and order readback");
+        assert!(map.tags.iter().any(|tag| tag.path.replace(char::from(92), "/") == elite
+            && tag.class == "bipd"));
+        println!("Elite CE609 {} {}", std::fs::metadata(&cache).unwrap().len(),
+            map.sha256);
     }
     fn before() -> String {
         let mut fields="object_names[1] array\n    object_names[0] struct\n        name (original) string\ncontrols[0] array\ncontrol_palette[0] array\ndevice_groups[0] array\nplayer_starting_profile[0] array\nmachines[0] array\ntrigger_volumes[2] array\n".replace("\\n","\n");

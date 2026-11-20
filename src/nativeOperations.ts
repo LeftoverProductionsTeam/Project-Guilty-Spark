@@ -96,7 +96,7 @@ export type NativeOperation =
   | {kind:'controlSettings';settings:NativeControlSettings;sourceSha256:string}
   | {kind:'playerStartPosition';index:number;position:[number,number,number];facingRadians:number;sourceSha256:string}
   | {kind:'squadTerminals';terminals:NativeSquadTerminal[];sourceSha256:string}
-  | {kind:'factionBody';body:NativeFactionBody;sourceSha256:string}
+  | {kind:'factionBody';body:NativeFactionBody;sourceSha256:string;replaceExisting?:boolean}
   | {kind:'factionKits';kits:NativeFactionKit[];sourceSha256:string} | {kind:'vehicleFlight';tuning:NativeVehicleFlight;sourceSha256:string} | {kind:'appendTransport';transport:NativeTransportAppend;sourceSha256:string} | {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string;append?:boolean}|{kind:'cutsceneFlag';point:NativeCutsceneFlag;sourceSha256:string;append?:boolean}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string;append?:boolean}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
   | {kind:'encounterSquadCountsBatch';sourceSha256:string;edits:NativeSquadCountEdit[]}
