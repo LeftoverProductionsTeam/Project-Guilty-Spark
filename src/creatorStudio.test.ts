@@ -328,6 +328,17 @@ it('authors and connects the complete recovered Black Echo blueprint without rep
  const source={projectId:project.id,buildId:'source',class:'scnr',sourceTarget:'gbx-custom',canAppendEncounter:true,tagSha256:'a'.repeat(64),protectedSquadEncounters:[],scenarioVolumes:['be_insert','be_survivors','be_artifact','be_containment','be_extract','extraction_return','extraction_zone'].map(name=>({name,kind:1,geometry:box})),scenarioDevices:['extraction_deploy','extraction_activate'].map(name=>({name,class:'ctrl'})),scenarioSquads:names.map((encounterName,encounter)=>({encounter,encounterName,name:'squad'})),missionSource:{encounters:names.map(name=>({name,initiallyCreated:false})),weapons:[]}} as unknown as NativeTagContext;
  const before=JSON.stringify(project),native=JSON.stringify(source);let id=0;const draft=addBlackEchoDraft(project,()=>`recovered_${++id}`,source);expect(draft.studio!.missions).toHaveLength(7);expect(draft.quickForge).toBeNull();expect(JSON.stringify(project)).toBe(before);expect(JSON.stringify(source)).toBe(native);
  const connected=connectBlackEchoObjectives(draft,()=>`unused_${++id}`,source);expect(connected.studio!.missions.map(beat=>beat.id)).toEqual(draft.studio!.missions.map(beat=>beat.id));expect(connected.studio!.missions[3].trigger).toBe('weaponOwned');expect(connected.studio!.missions[6].trigger).toBe('forerunnerExtractionSettled');expect(connected.source).toBe(project.source);expect(connected.builds).toBe(project.builds);
+ const withPelican={...source,scenarioDevices:[...source.scenarioDevices!,{name:'extraction_pelican',class:'vehi'} as NonNullable<NativeTagContext['scenarioDevices']>[number]]};
+ const unsc=connectBlackEchoObjectives(draft,()=>'',withPelican);
+ expect(unsc.studio!.missions[0]).toMatchObject({id:draft.studio!.missions[0].id,trigger:'triggerVolume',triggerRef:'extraction_zone',transportInsertion:'pelican'});
+ expect(connectBlackEchoObjectives(unsc,()=>'',withPelican)).toBe(unsc);
+ const nativeMission=structuredClone(unsc.studio!);nativeMission.missions[3].weaponPath='weapons/technology';
+ const script=exportHaloCeMission(nativeMission,{forerunner:true});
+ expect(script.content).toContain('(sleep_until gs_pelican_player_arrived 1)');
+ expect(script.dependencies).toContain('transport_arrival:pelican:extraction_zone');
+ expect(connectBlackEchoObjectives(connected,()=>'',withPelican).studio!.missions[0].transportInsertion).toBe('pelican');
+ const custom=structuredClone(connected);custom.studio!.missions[0].objective='Custom arrival instruction';
+ expect(connectBlackEchoObjectives(custom,()=>'',withPelican).studio!.missions[0]).toEqual(custom.studio!.missions[0]);
  const broken=structuredClone(source);broken.scenarioVolumes!.pop();expect(()=>connectBlackEchoObjectives(draft,()=>'',broken)).toThrow(/extraction pad/);
  const covenantDraft=addBlackEchoDraft(project,()=> 'spirit_'+(++id),source,defaultBlackEchoOptions('covenant'));
  expect(()=>connectBlackEchoObjectives(covenantDraft,()=>'',source)).toThrow(/native arrival pad: spirit_zone/);

@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+Permanent Covenant player requirement: standard playable Elites with individually selected native armor colors and faction identity distinct from match teams. Keep custom species and models as explicit modder choices in the existing faction tools. Require correct body, animation graph, first-person setup, collision, gear, HUD and Spirit seating. Verify two authenticated differently colored Elites through full Extraction, deaths, reconnects and persistence, then scale to six players.
+
+Black Echo gameplay correction takes immediate priority. The existing native transport editor should support seated flight introductions, optional creator audio and safe grounded disembarkation for Pelican and Spirit. Genuine authenticated physical multiplayer remains required, first two players then six. Optional currency and purchasing Warthog/tank drops are deferred.
+
 Xbox source/cache proof8f577e2 is scoped in RUNTIME_INTEGRATION_20261107/UI_INTERACTION_AUDIT. CE609 compilation/readback passes; warnings, UI/rendering/gameplay, Forerunner and loose-tag coverage remain open. No engine access or push.
 
 94e66e4b remains active: Master Engineering Prompts/GS_2026-11-14_MegaWorld_Operations_Creator.txt. Black Echo still needs native/game branch/failure/reward acceptance, deployment/AI/loot/extraction, radio/HUD, squads and runtime handoff. Source/script evidence is in ACTIVE_TASK/UI_INTERACTION_AUDIT; 6/squad,128players,19regions and full gameplay remain unproven.

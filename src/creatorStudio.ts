@@ -196,10 +196,18 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
  if(beats.length!==7||!(starterArea||terminal||authoredArrival)||beats[1].trigger!=='escort'||beats[1].triggerRef!=='be_survivors'||beats[2].trigger!=='encounterCleared'||beats[4].trigger!=='encounterCleared'||beats[4].encounterName!=='be_flood'||beats[5].trigger!=='encounterCleared'||!['manual','weaponOwned'].includes(beats[3].trigger)||!['manual','forerunnerExtractionSettled'].includes(beats[6].trigger))throw Error('Open the seven-step Black Echo blueprint; preserve other authored missions.');
  const terminalObjective='Activate the native deployment terminal to begin the operation. Runtime insertion and physical flight remain separate gameplay checks.';
  // Only upgrade the old generated terminal objective. A creator's own terminal or pad binding stays intact.
- const connectSpirit=beats[1].encounterTeam==='covenant'&&insertion.squadNumber==null&&
-  (starterArea||(terminal&&insertion.objective===terminalObjective));
- const arrivalPad=connectSpirit?'spirit_zone':authoredArrival?insertion.triggerRef:null;
- if(!base.quickForge||base.quickForge.native){
+ const generatedStart=insertion.squadNumber==null&&(starterArea||(terminal&&insertion.objective===terminalObjective));
+ const forge=base.quickForge;
+ const covenant=beats[1].encounterTeam==='covenant';
+ let arrival:{transport:'pelican'|'spirit';pad:string;aircraft:string}|null=null;
+ if(generatedStart&&covenant)arrival={transport:'spirit',pad:'spirit_zone',aircraft:'Spirit'};
+ if(generatedStart&&!covenant&&(!forge||forge.native)){
+  const pelicans=nativeSource?.scenarioDevices?.filter(row=>row.name?.toLowerCase()==='extraction_pelican')??[];
+  if(pelicans.length>1||pelicans.some(row=>row.name!=='extraction_pelican'||row.class!=='vehi'))throw Error('Use one named native Pelican vehicle: extraction_pelican. Review the current scenario names before connecting.');
+  if(pelicans.length===1)arrival={transport:'pelican',pad:'extraction_zone',aircraft:'Pelican'};
+ }
+ const arrivalPad=arrival?.pad??(authoredArrival?insertion.triggerRef:null);
+ if(!forge||forge.native){
   requireNativeBlackEcho(base,nativeSource,{rescue:beats[1].encounterName,facility:beats[2].encounterName,defense:beats[5].encounterName});if(nativeSource!.sourceTarget!=='gbx-custom')throw Error('Forerunner settlement requires reviewed standard CE609 solo source; other engines do not provide its callback.');
   for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
   if(arrivalPad){
@@ -207,7 +215,7 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
    if(pads.length!==1||pads[0].name!==arrivalPad||pads[0].kind!==1||!pads[0].geometry)throw Error('Author a unique readable native arrival pad: '+arrivalPad+'. Accept, build and read native source again.');
   }
   for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
- }else if(base.quickForge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(base.quickForge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
+ }else if(forge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(forge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
  const pickup=beats[3],containment=beats[4];
  const useContainmentVisit=containment.conditionVolume==='be_containment'&&
    containment.conditionGroup==null&&containment.conditionVisitDuring==null&&
@@ -215,9 +223,10 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
    containment.objective.startsWith('Optional containment branch: when this step begins,')&&
    (pickup.squadNumber??0)===(containment.squadNumber??0)&&pickup.conditionVolume==null&&pickup.conditionResult==null;
  const missions=beats.map((beat,index):MissionBeat=>{
-  if(index===0&&connectSpirit)return {...beat,trigger:'triggerVolume',triggerRef:'spirit_zone',transportInsertion:'spirit',
-   objective:beat.objective===terminalObjective||beat.objective==='Reach the insertion area and review the operation briefing.'?'Board the Spirit at the hub. Disembark alive after it lands at the field pad to begin the rescue.':beat.objective,
-   hudText:beat.hudText==='Squad insertion'?'Ride the Spirit to the field and disembark.':beat.hudText};
+  if(index===0&&arrival)return {...beat,trigger:'triggerVolume',triggerRef:arrival.pad,transportInsertion:arrival.transport,
+   objective:beat.objective===terminalObjective||beat.objective==='Reach the insertion area and review the operation briefing.'
+     ?'Ride the '+arrival.aircraft+' to the field. Disembark after it lands to begin the rescue.':beat.objective,
+   hudText:beat.hudText==='Squad insertion'?'Ride the '+arrival.aircraft+' to the field and disembark.':beat.hudText};
   if(index===0&&starterArea)return {...beat,trigger:'deviceActivated',triggerRef:'extraction_deploy',objective:terminalObjective};
   if(index===3&&(beat.trigger==='manual'||useContainmentVisit))return {...beat,trigger:'weaponOwned',weaponPath:beat.weaponPath??'',
    objective:useContainmentVisit?'Collect the selected native technology weapon. Visit the separate containment area while this objective is active to opt into the Flood encounter.':'Collect the selected native technology weapon. Actual player inventory ownership completes this objective.',

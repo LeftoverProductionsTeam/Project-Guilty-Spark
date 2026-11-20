@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Operation110 - source Save integrity and the Black Echo native handoff
-Status: awaiting human verification
+Task: Playable Black Echo Extraction across two authenticated Forerunner players
+Status: implementation incomplete
 Starting revision: 8eaffb29b03c2d8812f06e26d590e289240d4014, canonical master.
-Latest verified revision: Exact Black Echo d4ca73c8 repeated paired Forerunner 9a4aed01 admission, map hash match and normal movement to the Covenant terminal. Native aiming and use are open. CE609 readback and the unchanged Marine path are at c64f214. Indexed lighting at 568f067 now avoids per-triangle build allocations.
-Next action: Use relative mouse or real controller input in the isolated native Windows clients at the Covenant terminal. Confirm control 7 action, both Covenant bodies and normal technology_grunt ownership, then progress through defense and settlement. Keep Save37944 open pending a reproducer.
+Latest verified revision: Exact d4ca73c8 reproduces the deployment identity message and wipe launch. Forerunner’s trial fix kept bodies grounded. Four separated hub starts passed native readback and private two-client respawn geometry. Recovered UNSC source now requires physical Pelican arrival.
+Next action: Prepare a reviewed playable Elite faction body and native Spirit bindings. Validate armor color identity with Forerunner, ground the terminals, and render the separate HUD correction. Use two authenticated players with physical input for both faction extraction paths and persistence.
 
 ## Acceptance
 
