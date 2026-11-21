@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Black Echo native Extraction gameplay
-Status: awaiting human verification
-Starting revision: c066bd30301127ce052f6667b0395addb559d132, canonical master.
-Latest verified revision: 20 Nov: exact Elite 04d9ccd1 passes Windows stage/readback on reviewed Forerunner b18889ff. The new native guard checks the Spirit pad and faction landing capability. The current test did not run the game. See RUNTIME_INTEGRATION_20261107 for hashes, refusals, and boundaries. Unverified device-group edits remain parked.
-Next action: From the outer Spirit flank, defeat the defender, verify gs_extraction_armed, call the craft, board, bank and redeploy. Repeat for UNSC with two authenticated human players. Advance original Zombie carrier release and Timberland–Sidewinder traversal independently.
+Task: Black Echo, Live Link and immersive map editing
+Status: active
+Starting revision: 56a421578a04bca3afbf3240da49cecde6cf9b45, canonical master.
+Latest verified revision: Black Echo 04d9ccd1 solo UNSC deploy, Pelican boarding and rested field landing verified. Live Link history recovery and VR entry/refusal pass browser checks. RUNTIME_INTEGRATION_20261107 has exact evidence.
+Next action: Continue from the landed Pelican with native disembarkation, then test objectives and extraction. Finish Covenant defense and both authenticated faction loops. Validate live edits in MCC and Warthog placement, Save/rebuild and OpenH1 play in a supported headset. Continue original Zombie and MegaWorld.
 
 ## Acceptance
 

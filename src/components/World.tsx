@@ -24,6 +24,8 @@ import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImportGuard } from '../nativeAssetImport';
 import Mesh from './HaloMesh';
+import ImmersiveMapEditor from './ImmersiveMapEditor';
+import type {ImmersiveControl} from './ImmersiveMapEditor';
 import {isChromaSubject} from '../chromaKey';
 import TransformControls from './HaloTransformControls';
 import useEndToFloor from '../useEndToFloor';
@@ -492,7 +494,7 @@ function Scene({
         .map((o) => (
           <group
             key={o.id}
-            userData={{assetSurface:true}}
+            userData={{assetSurface:true,sceneObjectId:o.id}}
             position={o.position}
             rotation={[o.rotation[2], o.rotation[1], o.rotation[0], 'ZYX']}
             scale={o.scale}
@@ -516,14 +518,14 @@ function Scene({
         ))}
       {chosen?.visible && (
         <>
-          <group userData={{assetSurface:true}} ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale} onClick={event=>{if(event.button!==0||event.delta>5)return;event.stopPropagation();setSelected(chosen.id);}}>
+          <group userData={{assetSurface:true,sceneObjectId:chosen.id}} ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale} onClick={event=>{if(event.button!==0||event.delta>5)return;event.stopPropagation();setSelected(chosen.id);}}>
             <SceneObjectVisual greenScreen={greenScreen} inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel} shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen} localLighting={nativeLights?.get(chosen.id)}
               selected size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?shaderTextures:EMPTY_SHADER_TEXTURES}/>
           </group>
         <TransformControls
           object={group as MutableRefObject<THREE.Group>}
           mode={mode}
-          enabled={!fly&&!transformLocked}
+          enabled={!fly&&!cameraLocked&&!transformLocked}
           showX={mode!=='rotate'||!yawOnlyKinds.includes(chosen.kind)} showY={mode!=='rotate'||!yawOnlyKinds.includes(chosen.kind)} showZ
           space={mode === 'translate' ? 'world' : 'local'}
           translationSnap={snap ? 0.5 : null}
@@ -549,12 +551,12 @@ function Scene({
         />
         </>
       )}
-      {cinematic ? (!cameraLocked&&<RightMouseFly speed={15}/>) : fly ? (
+      {cameraLocked ? null : cinematic ? <RightMouseFly speed={15}/> : fly ? (
         <RightMouseFly speed={15} />
       ) : (
         <OrbitControls makeDefault enablePan mouseButtons={{LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:undefined}} enableDamping dampingFactor={0.1} />
       )}
-      {!cinematic&&!fly && <RightMouseFly speed={15} />}
+      {!cameraLocked&&!cinematic&&!fly && <RightMouseFly speed={15} />}
       {!externalCameraAuthority&&<FrameCamera
         mesh={previewMesh ?? Object.values(assetMeshes)[0] ?? null}
         objects={project.scene}
@@ -591,6 +593,8 @@ export default function World({
   greenScreen = false,
   cameraLocked = false,
   externalCameraAuthority = false,
+  immersiveWritable = false,
+  onImmersiveHistory,
   library,
 }: {
   project: Project;
@@ -618,6 +622,8 @@ export default function World({
   greenScreen?: boolean;
   cameraLocked?: boolean;
   externalCameraAuthority?: boolean;
+  immersiveWritable?: boolean;
+  onImmersiveHistory?: (kind:'undo'|'redo')=>void;
   library?: ViewportLibraryControls;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
@@ -636,6 +642,18 @@ export default function World({
     setTagSource(sourceId);
     setTagRequest(tagId);setTagRevision(value=>value+1);revealPanel('object-tags');
   };
+  const [xrControl,setXrControl]=useState<ImmersiveControl|null>(null);
+  const [xrAvailable,setXrAvailable]=useState(false);
+  const [xrActive,setXrActive]=useState(false);
+  const scopedXr=!!library&&!!onImmersiveHistory&&!cinematic&&!onSelectObject;
+  useEffect(()=>{
+    const xr=navigator.xr;
+    if(!scopedXr||!xr)return;
+    let active=true;
+    const check=()=>void xr.isSessionSupported('immersive-vr').then(value=>{if(active)setXrAvailable(value);},()=>{if(active)setXrAvailable(false);});
+    check();xr.addEventListener('devicechange',check);
+    return()=>{active=false;xr.removeEventListener('devicechange',check);};
+  },[scopedXr]);
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
   const [nativeDevice,setNativeDevice]=useMapState<NativeDeviceView|null>(project.id,NATIVE_DEVICE_VIEW,()=>null);
@@ -657,6 +675,11 @@ export default function World({
   const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
   const librarySources = useAssetLibrarySources(library?.documents ?? []);
   const catalog = useMemo(() => viewportAssetCatalog(librarySources), [librarySources]);
+  const [xrLibraryQuery]=useMapState(project.id,'viewport.library.query','');
+  const [xrLibrarySource]=useMapState(project.id,'viewport.library.source','all');
+  const xrAssets=useMemo(()=>catalog.filter(item=>(item.kind==='model'||item.kind==='mesh')&&
+    (xrLibrarySource==='all'||item.sourceId===xrLibrarySource)&&`${item.name} ${item.path}`.toLowerCase().includes(xrLibraryQuery.toLowerCase())),[catalog,xrLibraryQuery,xrLibrarySource]);
+  useEffect(()=>{if(xrActive&&(!activity.active||!immersiveWritable))void xrControl?.stop().catch(error=>notify(String(error)));},[xrActive,activity.active,immersiveWritable,xrControl,notify]);
   const viewportElement=useRef<HTMLDivElement|null>(null),dropPoint=useRef<((x:number,y:number)=>Vec3|null)|null>(null),projectValue=useRef(project),alive=useRef(true);
   projectValue.current=project;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[project.id]);
@@ -670,16 +693,16 @@ export default function World({
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
   const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes,assembly?.surfaces);
   const assemblyTerrainKey=assembly?forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId}):'';
-  async function dropAsset(key: string, position: Vec3, replaceId?: string | null) {
-    if(!activity.active||!library||library.busy||assetBusy)return;
+  async function dropAsset(key: string, position: Vec3, replaceId?: string | null):Promise<boolean> {
+    if(!activity.active||!library||library.busy||assetBusy)return false;
     const item=catalog.find(candidate=>candidate.key===key)??draggedAsset(key);
-    if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
+    if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return false;}
     const valid=beginAssetImport();
     setAssetBusy(true);
     try {
       if (item.kind === 'model') {
         const binding = await prepareAssetImport(projectValue.current, item.asset);
-        if(!valid())return;
+        if(!valid())return false;
         const placed = placeLibraryModel(
           attachAssetImport(projectValue.current, binding),
           item.asset,
@@ -691,9 +714,9 @@ export default function World({
       } else if (item.kind === 'mesh') await library.onPlaceMesh(item,position,replaceId);
       else {
         const binding = await prepareSoundImport(projectValue.current, item);
-        if(!valid())return;
+        if(!valid())return false;
         const emitters=await librarySoundEmitters(item,position);
-        if(!valid())return;
+        if(!valid())return false;
         const latest = binding ? attachAssetImport(projectValue.current, binding) : projectValue.current,
           scene = latest.audioPreview ?? emptySoundScene();
         if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
@@ -701,8 +724,10 @@ export default function World({
         writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);
         revealPanel('map-sounds');
       }
+      return valid();
     } catch (reason) {
       if(valid())notify(String(reason));
+      return false;
     } finally {
       if(valid())setAssetBusy(false);
     }
@@ -1508,6 +1533,10 @@ export default function World({
       </WorkspacePanel>
       <section className="viewport-shell">
         <div className="viewport-toolbar">
+          {scopedXr&&<button type="button" className="small-button" aria-pressed={xrActive}
+            disabled={!xrActive&&(!xrAvailable||!xrControl||ortho||!immersiveWritable)}
+            title={xrAvailable?'Use a headset and tracked controllers to edit this source map. Select Perspective and close native placement review before entering.':'This renderer has no immersive WebXR session available. You can keep working in the desktop viewport.'}
+            onClick={()=>{if(!xrActive&&(nativeSourceScope||nativeAiStart?.active||nativeVolume?.active||nativeCommand?.active||nativeCamera?.active||pickTarget)){notify('Close the native placement or BSP review before entering VR.');return;}void xrControl?.toggle().catch(error=>notify(String(error)));}}>{xrActive?'Exit VR editing':'Enter VR editing'}</button>}
           {!cinematic&&inspection&&project.source?.sha256===inspection.sha256&&(inspection.header.version===5&&inspection.header.scenarioType===1||inspection.header.version===609&&[0,1].includes(inspection.header.scenarioType))&&<button type="button" className="small-button" onClick={()=>{revealPanel("objects");setForgeLayoutRequest(value=>value+1);}}>Forge layouts</button>}
           <div className="button-group">
             <IconButton
@@ -1617,7 +1646,13 @@ export default function World({
                   if (event.button === 0 && event.type === 'click') {setSelected(null);setZoneSelection(null);}
                 }}
               >
-                <ViewportActivity continuous={cinematic} />
+                <ViewportActivity continuous={cinematic||xrActive} />
+                {scopedXr&&xrAvailable&&library&&onImmersiveHistory&&<ImmersiveMapEditor connect={setXrControl} onActive={setXrActive}
+                  onStatus={notify} selected={selected} objects={project.scene} assets={xrAssets}
+                  onSelect={setSelected} onTransform={object=>{if(immersiveWritable)update(object);}}
+                  onPlace={(key,position)=>immersiveWritable?dropAsset(key,position):Promise.reject(Error('This window no longer owns the map.'))}
+                  onHistory={onImmersiveHistory} onSave={()=>library.onSaveMap(project.id)}/>}
+
                 <GpuLightmapRenderer onRenderer={setGpuDraftRenderer}/>
                 <Scene
                   {...{
@@ -1642,8 +1677,8 @@ export default function World({
                     onSceneDragStart,
                     onSceneDragEnd,
                     cinematic,greenScreen,
-                    cameraLocked,
-                    externalCameraAuthority,
+                    cameraLocked:cameraLocked||xrActive,
+                    externalCameraAuthority:externalCameraAuthority||xrActive,
                     ownedModels,assembly,joinedPreview:pickTarget?undefined:assemblyDonor.preview,additionalBounds:donorBounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
@@ -1657,10 +1692,10 @@ export default function World({
                 <ViewportSession
                   id={project.id}
                   channel={cinematic ? 'machinima' : 'world'}
-                  paused={cameraLocked || externalCameraAuthority}
+                  paused={cameraLocked || externalCameraAuthority || xrActive}
                   requiresControls={!cinematic && !fly}
                 />
-                {!cinematic&&!cameraLocked&&!externalCameraAuthority&&<SourceCutsceneView view={nativeCamera}/>}
+                {!cinematic&&!cameraLocked&&!externalCameraAuthority&&!xrActive&&<SourceCutsceneView view={nativeCamera}/>}
                 {library && <ViewportDropPoint point={dropPoint} onReady={setDropReady} />}
                 {!cinematic &&
                   project.audioPreview?.emitters

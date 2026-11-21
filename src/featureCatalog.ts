@@ -220,6 +220,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
       'Open a map or create a QuickForge project.',
       'Leave Editing target on Automatic to follow the matching context.',
       'Choose Source document to inspect saved source while a game is running.',
+      'If your renderer offers immersive WebXR, open a source map in Perspective, filter models in Asset Library, then choose Enter VR editing. The left stick flies and the right stick changes height. Squeeze either grip to bring the palette into view. Point and press the trigger to select, use Move to choose a surface, or pick Place asset with the floating controls. Turn 15°, Undo, Redo and Save use the same map history. Exit VR returns to the viewport and its existing native build tools. Headset and OpenH1 handoff still require end-to-end verification.',
     ],
   ),
   f(
@@ -443,6 +444,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
       'Launch MCC with Anti-Cheat Disabled and load a Halo 1 map.',
       'In the Level Editor select Running Halo session and connect.',
       'Preserve and open the matching source map, then select an actual live object.',
+      'If the game read pauses, wait for the same session to return or choose Refresh game connection. Disconnect remains available while edits are paused.',
     ],
     'Supported executable identity is checked. Spawning, deletion, rotation and runtime BSP replacement are not enabled.',
   ),

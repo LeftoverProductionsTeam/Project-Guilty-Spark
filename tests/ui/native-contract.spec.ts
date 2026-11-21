@@ -2474,11 +2474,11 @@ test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',as
   await page.evaluate(()=>{
     const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
     const object={datum:12,tagDatum:7,kind:0,scale:1,tagPath:'synthetic/biped',position:[1,2,3],velocity:[0,0,0],forward:[1,0,0],up:[0,0,1],parentDatum:4294967295,player:true};
-    let connected=false;w.__liveReceipt={pending:false,object,calls:0,token:'first-synthetic-connection'};
+    let connected=false;w.__liveReceipt={pending:false,sampleUnavailable:false,object,calls:0,token:'first-synthetic-connection'};
     const status=()=>structuredClone({pid:3,sessionToken:w.__liveReceipt.token,activeVehiclePhysics:false,activeSharedScales:false,scaleKeeperError:null,snapshot:{profile:'synthetic',identity:{scenario:'test/map',checksum:123,tagCount:1,scenarioDatum:7},objects:[object]},detail:'Synthetic receipt timing test'});
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
       if(command==='live_mcc_connect'){connected=true;return status();}
-      if(command==='live_mcc_sample'){if(!connected)throw new Error('No test session');return status();}
+      if(command==='live_mcc_sample'){if(!connected)throw new Error('No test session');if(w.__liveReceipt.sampleUnavailable)throw Error('Game is changing scenes');return status();}
       if(command==='live_mcc_move_object'){w.__liveReceipt.pending=true;w.__liveReceipt.calls++;object.position=[...args.operation.position];await new Promise(resolve=>setTimeout(resolve,250));w.__liveReceipt.pending=false;return [{datum:12,applied:true,observedPosition:[...object.position],message:'Synthetic acknowledged move'}];}
       return original(command,args);
     };
@@ -2486,9 +2486,41 @@ test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',as
   await chooseTool(page,"Level editor");await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await openDrawer(page,'Game connection');await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');
   const x=page.getByRole('spinbutton',{name:'Live position X',exact:true});await x.fill('4');await x.press('Tab');await page.getByRole('button',{name:'Apply live object position',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.pending)).toBe(true);await page.keyboard.press('Control+z');
   await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(1);await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeEnabled();await page.keyboard.press('Control+y');await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(4);await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.calls)).toBe(3);
+  await expect(page.getByRole('button',{name:'Undo live edit (Ctrl+Z)',exact:true})).toBeEnabled();
+  await page.evaluate(()=>{(window as any).__liveReceipt.sampleUnavailable=true;});
+  await expect(page.getByText(/Game read paused/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Disconnect live session',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Undo live edit (Ctrl+Z)',exact:true})).toBeDisabled();
+  await page.keyboard.press('Control+z');
+  expect(await page.evaluate(()=>(window as any).__liveReceipt.calls)).toBe(3);
+  await page.evaluate(()=>{(window as any).__liveReceipt.sampleUnavailable=false;});
+  await expect(page.getByRole('button',{name:'Undo live edit (Ctrl+Z)',exact:true})).toBeEnabled();
   await page.evaluate(()=>{(window as any).__liveReceipt.token='reconnected-same-pid-and-map';});
   await expect(page.getByRole('button',{name:'Undo live edit (Ctrl+Z)',exact:true})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeDisabled();
+});
+
+
+test('VR map editing checks headset availability and returns to the source viewport on refused entry',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const xr=Object.assign(new EventTarget(),{
+      available:false,requests:0,
+      async isSessionSupported(mode:string){return mode==='immersive-vr'&&this.available;},
+      async requestSession(){this.requests++;throw Error('Synthetic headset session refused');},
+    });
+    Object.defineProperty(navigator,'xr',{configurable:true,value:xr});
+  });
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  const enter=page.getByRole('button',{name:'Enter VR editing',exact:true});
+  await expect(enter).toBeDisabled();
+  await page.evaluate(()=>{const xr=navigator.xr as unknown as EventTarget&{available:boolean};xr.available=true;xr.dispatchEvent(new Event('devicechange'));});
+  await expect(enter).toBeEnabled();
+  await enter.click();
+  await expect(page.getByText('Error: Synthetic headset session refused',{exact:true})).toBeVisible();
+  await expect(enter).toHaveAttribute('aria-pressed','false');
+  await expect(page.getByTestId('viewport').locator('canvas')).toBeVisible();
 });
 
 test('numeric-field Ctrl+Z and both redo shortcuts survive RAM synchronization; history limit persists',async({page})=>{
