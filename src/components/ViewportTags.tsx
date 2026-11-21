@@ -83,6 +83,7 @@ export default function ViewportTags({
       {tag.class==='bitm'&&<BitmapPreview key={`${project.id}:${tag.id}`} project={project} tagId={tag.id}/>}
       <TagFields project={project} tag={tag} tags={inspection.tags} advanced={advanced} change={change} />
       {tag.class==='ctrl'&&<NativeTagOperations key={'native-control:'+tag.id} label="Edit native terminal behavior" project={project} tagId={tag.id} dirty={dirty}/>}
+      {tag.class==='mach'&&<NativeTagOperations key={'native-machine:'+tag.id} label="Edit native machine behavior" project={project} tagId={tag.id} dirty={dirty}/>}
       <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
       {tag.external && (
         <Notice>

@@ -698,9 +698,9 @@ fn prepare(
         if fs::metadata(&edit)?.len()>256*1024*1024{return invalid("Native squad reader exceeds its identity limit");}
         tools.insert("invaderEdit".into(),maps::hash_file(&edit)?);
     }
-    if scenario_squad_readback.as_ref().is_some_and(|s|s.faction_kits.as_ref().is_some_and(|s|!s.is_empty())||s.extraction_squads.as_ref().is_some_and(|s|!s.is_empty())) {
+    if scenario_squad_readback.as_ref().is_some_and(|s|s.faction_kits.as_ref().is_some_and(|s|!s.is_empty())||s.extraction_squads.as_ref().is_some_and(|s|!s.is_empty())||!s.machine_settings.is_empty()) {
         let extract=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-extract.exe"}else{"invader-extract"}))?;
-        if fs::metadata(&extract)?.len()>256*1024*1024{return invalid("Native faction extractor exceeds its identity limit");}
+        if fs::metadata(&extract)?.len()>256*1024*1024{return invalid("Native device extractor exceeds its identity limit");}
         tools.insert("invaderExtract".into(),maps::hash_file(&extract)?);
     }
     if let Some(expected)=&input.expected_encounter{retain_reviewed_encounter_revision(&mut encounter_expectations,expected.clone(),parent_generated_firefight.as_ref())?;}
@@ -1103,25 +1103,28 @@ fn verify_hud_native_output(input:&WorkingTagsInput,prepared:&Prepared,snapshots
 
 // Reuse exact-selector Invader extraction and the existing bounded runner. No
 // recursive dependency copy; a cache with wrong interaction flags is not adopted.
-fn verify_faction_native_output(input:&WorkingTagsInput,prepared:&Prepared,snapshot:&crate::native_operations::ScenarioSquadReadback,
+fn verify_device_native_output(input:&WorkingTagsInput,prepared:&Prepared,snapshot:&crate::native_operations::ScenarioSquadReadback,
     output:&Path,inspection:&maps::MapInspection,workspace:&Path,runner:&Runner<'_>,
-    invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)->Result<Vec<serde_json::Value>> {
+    invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)
+    -> Result<(Vec<serde_json::Value>,Vec<serde_json::Value>)> {
     let kits=snapshot.faction_kits.as_deref().unwrap_or(&[]);let squads=snapshot.extraction_squads.as_deref().unwrap_or(&[]);
-    if kits.is_empty()&&squads.is_empty(){return Ok(vec![]);}
+    if kits.is_empty()&&squads.is_empty()&&snapshot.machine_settings.is_empty(){return Ok((vec![],vec![]));}
     let controls=kits.iter().map(|row|(row.kit.name(),row.kit.control_tag_path.clone(),row.control_index)).chain(squads.iter().map(|row|(row.terminal.name(),row.terminal.control_tag_path.clone(),row.control_index))).collect::<Vec<_>>();
     snapshot.validate()?;recheck_tools(input,&prepared.tools)?;
     let recovered=workspace.join("faction-readback-tags");crate::reject_links(&recovered)?;
     if recovered.try_exists()?{return invalid("Faction readback output is occupied; no files were replaced");}fs::create_dir(&recovered)?;
     let scenario=format!("{}.scenario",normalize_scenario(&inspection.scenario_path)?);
-    let mut selected=std::collections::BTreeSet::from([scenario.clone()]);
+    let mut selected=std::collections::BTreeSet::new();
+    if !controls.is_empty() { selected.insert(scenario.clone()); }
+    selected.extend(snapshot.machine_settings.keys().map(|tag| tag.replace('\\', "/")));
     for (_,path,_) in &controls{selected.insert(format!("{}.device_control",path.replace('\\',"/")));}
     let mut args=vec!["-t".into(),recovered.to_string_lossy().into_owned()];
     for tag in &selected{args.extend(["-s".into(),tag.clone()]);}args.push(output.to_string_lossy().into_owned());
     let extractor=input.invader_info.with_file_name(if cfg!(windows){"invader-extract.exe"}else{"invader-extract"});
     let log=invoke(runner,&extractor,&args,workspace,"extract",81)?;
-    if log.lines().any(|s|s.trim_start().to_ascii_lowercase().starts_with("error:")){return invalid("Compiled faction extraction reported incomplete output");}
+    if log.lines().any(|s|s.trim_start().to_ascii_lowercase().starts_with("error:")){return invalid("Compiled device extraction reported incomplete output");}
     let inventory=crate::tool_transaction::inventory(&recovered)?;
-    if inventory.len()!=selected.len()||inventory.keys().any(|key|!selected.iter().any(|tag|key.replace('\\',"/").eq_ignore_ascii_case(tag))){return invalid("Compiled faction extraction emitted an unexpected tag set");}
+    if inventory.len()!=selected.len()||inventory.keys().any(|key|!selected.iter().any(|tag|key.replace('\\',"/").eq_ignore_ascii_case(tag))){return invalid("Compiled device extraction emitted an unexpected tag set");}
     let edit=input.invader_info.with_file_name(if cfg!(windows){"invader-edit.exe"}else{"invader-edit"});let mut evidence=vec![];
     for (name,path,index) in controls {
         let tag=format!("{}.device_control",path.replace('\\',"/"));
@@ -1130,9 +1133,22 @@ fn verify_faction_native_output(input:&WorkingTagsInput,prepared:&Prepared,snaps
         crate::native_operations::verify_native_faction_control_values(&trigger,&off)?;
         evidence.push(serde_json::json!({"name":name,"controlIndex":index,"controlTag":tag,"triggersWhen":trigger.trim(),"initiallyOff":off.trim()}));
     }
+    let mut machines = vec![];
+    for (tag, expected) in &snapshot.machine_settings {
+        let tag = tag.replace('\\', "/");
+        let actual_tag = inventory.keys().find(|name| name.replace('\\', "/").eq_ignore_ascii_case(&tag))
+            .ok_or_else(|| SparkError::Invalid(format!("Compiled machine {tag} is missing")))?;
+        let listing = invoke(runner, &edit, &["-t".into(), recovered.to_string_lossy().into_owned(),
+            "-L".into(), actual_tag.clone()], workspace, "asset-native-readback", 82)?;
+        let actual = crate::native_operations::native_machine_settings(&listing)?;
+        if !expected.close(&actual) {
+            return invalid(format!("Compiled machine {tag} differs from reviewed type or timings"));
+        }
+        machines.push(serde_json::json!({"tag": tag, "compiledSettings": actual}));
+    }
     recheck_tools(input,&prepared.tools)?;
-    if crate::tool_transaction::inventory(&recovered)?!=inventory||maps::hash_file(output)?!=inspection.sha256{return invalid("Compiled faction data changed during independent readback");}
-    Ok(evidence)
+    if crate::tool_transaction::inventory(&recovered)?!=inventory||maps::hash_file(output)?!=inspection.sha256{return invalid("Compiled device data changed during independent readback");}
+    Ok((evidence,machines))
 }
 
 fn recheck_tools(input: &WorkingTagsInput, expected: &BTreeMap<String, String>) -> Result<()> {
@@ -1597,7 +1613,16 @@ fn run_with(
                 let actual=crate::native_operations::native_faction_snapshots(&fields)?;
                 if serde_json::to_value(expected)?!=serde_json::to_value(&actual)?{return invalid("Staged faction controls/profiles changed after source review; no compiler ran");}Some(actual)
             }else{None};
-            let snapshot=crate::native_operations::ScenarioSquadReadback{named_objects,cutscene_flags,extraction_squads,faction_kits,transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices,device_groups};
+            let machine_settings = prepared.scenario_squad_readback.as_ref().unwrap().machine_settings.clone();
+            for (tag, expected) in &machine_settings {
+                let listing = invoke(&runner, &edit, &["-t".into(), tags.to_string_lossy().into_owned(),
+                    "-L".into(), tag.clone()], &workspace, "asset-native-readback", 49)?;
+                if !expected.close(&crate::native_operations::native_machine_settings(&listing)?) {
+                    return invalid(format!("Staged machine {tag} changed after source review; no compiler ran"));
+                }
+            }
+            recheck_tools(input,&prepared.tools)?;
+            let snapshot=crate::native_operations::ScenarioSquadReadback{machine_settings,named_objects,cutscene_flags,extraction_squads,faction_kits,transports,command_lists,source_sha256,squads,include_starts,combat,cameras,volumes,devices,device_groups};
             snapshot.validate()?;
             receipt.scenario_squad_readback=Some(snapshot);
         }
@@ -1653,10 +1678,10 @@ fn run_with(
         for expected in &receipt.encounter_expectations{expected.verify_compiled_encounter(&inspected)?;}
         if let Some(snapshot)=&receipt.scenario_squad_readback{
             snapshot.verify_cache(&output,&inspected)?;
-            let faction_controls=verify_faction_native_output(input,&prepared,snapshot,&output,&inspected,&workspace,&runner,&invoke)?;
+            let (faction_controls,machines)=verify_device_native_output(input,&prepared,snapshot,&output,&inspected,&workspace,&runner,&invoke)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
                 "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,"volumes":snapshot.volumes,"devices":snapshot.devices,"commandLists":snapshot.command_lists,
-                "extractionSquads":snapshot.extraction_squads,"factionKits":snapshot.faction_kits,"factionControls":faction_controls,
+                "extractionSquads":snapshot.extraction_squads,"factionKits":snapshot.faction_kits,"factionControls":faction_controls,"machines":machines,
                 "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional native command lists/actions/parameters/references/points, device identity/pose, trigger bounds and camera inventory/pose/lens are read from the compiled cache. This is not AI/cinematic/gameplay acceptance."
             }))?,false)?;
         }

@@ -22,6 +22,7 @@ import {
   nativeMajorUpgrades,
   type NativeEncounterAppend,
   type NativeTagContext,
+  type NativeMachineSettings,
   type NativePreview,
   type NativeAccepted,
   type NativeDependencies,
@@ -39,6 +40,72 @@ import NativeStartingPositions from './NativeStartingPositions';
 import {useMapState} from '../mapSession';
 import {NATIVE_AI_START_VIEW,nativeAiStartMatches} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
+
+
+const machineTimes = [
+  ['powerTransitionTime', 'Power transition'],
+  ['powerAccelerationTime', 'Power acceleration'],
+  ['positionTransitionTime', 'Powered position transition'],
+  ['positionAccelerationTime', 'Powered position acceleration'],
+  ['depoweredPositionTransitionTime', 'Unpowered position transition'],
+  ['depoweredPositionAccelerationTime', 'Unpowered position acceleration'],
+] as const;
+
+function NativeMachineBehavior({ context, busy, dirty, onPreview, onDraftChange }: {
+  context: NativeTagContext;
+  busy: boolean;
+  dirty: boolean;
+  onPreview: (operation: NativeOperation) => void;
+  onDraftChange: () => void;
+}) {
+  const source = context.machineSettings;
+  const [type, setType] = useState<NativeMachineSettings['machineType']>(source?.machineType ?? 'door');
+  const [times, setTimes] = useState(() => machineTimes.map(([key]) => String(source?.[key] ?? '')));
+  const parsed = times.map(value => value.trim() === '' ? NaN : Number(value));
+  const valid = parsed.every(value => value >= 0 && Number.isFinite(Math.fround(value)));
+  const changed = source && (type !== source.machineType || machineTimes.some(([key], index) => {
+    const previous = source[key];
+    return Math.abs(parsed[index] - previous) > Math.max(0.000001, Math.abs(previous) * 2 ** -22);
+  }));
+  const blocked = busy || dirty || !source || !!context.machineSettingsIssue || !/^[a-f0-9]{64}$/i.test(context.tagSha256 ?? '');
+  return <details className="native-control-settings" open>
+    <summary>Native machine behavior</summary>
+    <p className="subtle">These settings affect every placement using this tag. A shared Position switch needs a Door or Platform. Timing values are in seconds.</p>
+    {context.machineSettingsIssue && <Notice>{context.machineSettingsIssue}</Notice>}
+    {source && <fieldset disabled={blocked}>
+      <legend>Machine type and timing</legend>
+      <label>Machine type
+        <select value={type} onChange={event => {
+          setType(event.target.value as NativeMachineSettings['machineType']);
+          onDraftChange();
+        }}>
+          <option value="door">Door</option>
+          <option value="platform">Platform</option>
+          <option value="gear">Gear</option>
+        </select>
+      </label>
+      <div className="studio-fields">
+        {machineTimes.map(([key, label], index) => <label key={key}>{label}
+          <input type="number" min={0} step="any" value={times[index]} onChange={event => {
+            setTimes(times.map((value, slot) => slot === index ? event.target.value : value));
+            onDraftChange();
+          }} />
+        </label>)}
+      </div>
+      <button type="button" disabled={!valid || !changed} onClick={() => onPreview({
+        kind: 'machineSettings',
+        sourceSha256: context.tagSha256!,
+        settings: {
+          machineType: type,
+          powerTransitionTime: parsed[0], powerAccelerationTime: parsed[1],
+          positionTransitionTime: parsed[2], positionAccelerationTime: parsed[3],
+          depoweredPositionTransitionTime: parsed[4], depoweredPositionAccelerationTime: parsed[5],
+        },
+      })}>Preview native machine behavior</button>
+    </fieldset>}
+    <p className="subtle">Review and accept the source revision, then Save and Build working tag edits. Restore recovers the preceding tag.</p>
+  </details>;
+}
 
 /** Lazy, map-bound native operations. Reading a compiled tag does not grant
  * editing access to its native source; the desktop checks that separately. */
@@ -368,6 +435,8 @@ export default function NativeTagOperations({
           {context.class==='scnr'&&<NativeFactionKits context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='scnr'&&<NativeTransportAppend context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='scnr'&&<NativeCommandLists context={context} busy={busy} dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal} onLevelEditor={project.quickForge?undefined:onLevelEditor}/>}
+          {context.class==='mach'&&<NativeMachineBehavior key={context.tagSha256} context={context} busy={busy}
+            dirty={dirty} onPreview={makePreview} onDraftChange={invalidateProposal}/>}
           {context.class==='ctrl'&&<details className="native-control-settings" open><summary>Native terminal behavior</summary>
             <p className="subtle">Shared device-control tag: these settings affect every copy. Mission roles and scenario power/position groups are separate. Preview → Accept → Save → Build working tag edits; Restore recovers the preceding tag.</p>
             {context.controlSettingsIssue&&<Notice>{context.controlSettingsIssue}</Notice>}

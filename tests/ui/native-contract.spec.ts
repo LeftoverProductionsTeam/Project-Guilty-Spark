@@ -5992,6 +5992,59 @@ test('Object Tags edits native terminal behavior through reviewed source without
 });
 
 
+test('machine type and transition timing use the reviewed native source workflow', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, mock = w.__sparkMock, invoke = w.__TAURI_INTERNALS__.invoke;
+    const original = {machineType:'gear',powerTransitionTime:3,powerAccelerationTime:0,positionTransitionTime:1,
+      positionAccelerationTime:0,depoweredPositionTransitionTime:0,depoweredPositionAccelerationTime:0};
+    let settings = structuredClone(original), sha = 'a'.repeat(64), history: any[] = [], proposal: any, receipt: any;
+    const tag = mock.projects.a.inspection.tags[0];
+    tag.class = 'mach';
+    tag.path = 'devices/test';
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any = {}) => {
+      if (command === 'native_tag_context') return {projectId:args.projectId,buildId:'owned-machine',
+        tag:'devices/test.device_machine',class:'mach',sourceTarget:'gbx-custom',tagSha256:sha,
+        machineSettings:structuredClone(settings),history:structuredClone(history),canEdit:false,canRepair:false};
+      if (command === 'native_operation_preview' && args.operation.kind === 'machineSettings') {
+        if (args.operation.sourceSha256 !== sha) throw Error('Stale machine source');
+        proposal = structuredClone(args.operation.settings);
+        return receipt = {id:'machine-review',tag:'devices/test.device_machine',toolId:'synthetic-invader',
+          beforeSha256:sha,afterSha256:'b'.repeat(64),changedBytes:6,
+          fieldChanges:[{before:settings.machineType,after:proposal.machineType}],currentState:'before',
+          detail:'Reviewed machine type and transition fields'};
+      }
+      if (command === 'native_operation_accept' && args.operationId === 'machine-review') {
+        settings = structuredClone(args.restore ? original : proposal);
+        sha = (args.restore ? 'a' : 'b').repeat(64);
+        receipt.currentState = args.restore ? 'before' : 'after';
+        history = [structuredClone(receipt)];
+        return {operationId:'machine-review',revisionId:'machine-revision',tagsDirectory:'owned/tags',files:1,
+          restored:args.restore,detail:'Selected native machine revision'};
+      }
+      return invoke(command,args);
+    };
+  });
+  await openFixture(page);
+  await page.getByRole('tab',{name:'Native Output',exact:true}).click();
+  const panel = page.getByRole('tabpanel',{name:'Native Output',exact:true}).locator('.native-tag-operations');
+  await panel.locator(':scope > summary').click();
+  const type = panel.getByRole('combobox',{name:'Machine type',exact:true});
+  await revealPagedControl(type);
+  await expect(type).toHaveValue('gear');
+  await type.selectOption('platform');
+  const ramp = panel.getByRole('spinbutton',{name:'Powered position acceleration',exact:true});
+  await ramp.fill('0.125');
+  await panel.getByRole('button',{name:'Preview native machine behavior'}).click();
+  const review = panel.getByRole('region',{name:'Native edit preview',exact:true});
+  await expect(review).toContainText('platform');
+  await review.getByRole('button',{name:'Accept as new source revision'}).click();
+  await expect(ramp).toHaveValue('0.125');
+  await panel.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();
+  await expect(type).toHaveValue('gear');
+  await expect(ramp).toHaveValue('0');
+});
+
 for(const missing of [false,true])test('projectile choices distinguish tank shell, rocket and duplicate bullets'+(missing?' with an unresolved current reference':''),async({page})=>{
  await mockDesktop(page);await page.evaluate(missing=>{
   const w=window as any,open=w.__sparkMock.projects.a,template=open.inspection.tags[0];

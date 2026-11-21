@@ -92,8 +92,18 @@ export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_sp
 export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number;includeFirstPersonArms?:boolean}
 export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];profile:import('./firefight').NativePlayerProfile}
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
+export interface NativeMachineSettings {
+  machineType: 'door' | 'platform' | 'gear';
+  powerTransitionTime: number;
+  powerAccelerationTime: number;
+  positionTransitionTime: number;
+  positionAccelerationTime: number;
+  depoweredPositionTransitionTime: number;
+  depoweredPositionAccelerationTime: number;
+}
 export interface NativeControlSettings {controlType:string;trigger:string;callValue:number;automaticActivationRadius:number;delaySeconds:number}
 export type NativeOperation =
+  | {kind:'machineSettings';settings:NativeMachineSettings;sourceSha256:string}
   | {kind:'controlSettings';settings:NativeControlSettings;sourceSha256:string}
   | {kind:'playerStartPosition';index:number;copyFrom?:number;position:[number,number,number];facingRadians:number;sourceSha256:string}
   | {kind:'squadTerminals';terminals:NativeSquadTerminal[];sourceSha256:string}
@@ -117,6 +127,7 @@ export interface NativeTagContext {
   class: string;
   tagsDirectory: string;
   tagSha256?:string;
+  machineSettings?:NativeMachineSettings|null;machineSettingsIssue?:string|null;
   controlSettings?:NativeControlSettings|null;controlSettingsIssue?:string|null;controlRequiresPlayerActivation?:boolean;
   boundingRadius: number | null;
   lensFlareScale: number | null;

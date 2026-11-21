@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: QuickForge HMV physics survives SparkLink guest edits, a concurrent owner move, late join, and author Undo/Redo. Verified browser authoring and Save, journal recovery, and a Phased HMV v7 export from an acknowledged revision. The prior native Forerunner loopback receipts verify game-side physics on their own fixture.
-Next action: Add reviewed native machine type and position-transition fields to Spark’s existing native controls so creators can build a ramped platform through the editor. Verify Use, animation, and collision on the rebuilt platform. Forerunner guest-directed in-game editing still awaits a validated runtime contract. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
+Latest verified revision: Reviewed native machine type and timing passed browser Preview/Accept/Restore, focused Rust, Windows compilation and independent CE609 tag readback. See RUNTIME_INTEGRATION_20261107 for the exact hashes. The prior SparkLink placement physics milestone remains verified.
+Next action: Expose newly supported Forerunner guest edits in the existing Spark Forge workflow. Verify the Spark-authored native platform with E, collision and client state on the proven fixture when available. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
 
 ## Acceptance
 
