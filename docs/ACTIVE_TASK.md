@@ -3,8 +3,8 @@
 Task: Black Echo, Live Link and immersive map editing
 Status: active
 Starting revision: 56a421578a04bca3afbf3240da49cecde6cf9b45, canonical master.
-Latest verified revision: Separate UNSC CE609 7026f5fa compiled and read back. Private Forerunner gameplay defeated the facility guard, picked up the moved technology and started defense. Covenant cover 88a13c27 still awaits defense play. See RUNTIME_INTEGRATION_20261107.
-Next action: Retain the empty objective item, use the native weapon-switch binding (default 1) to equip the rifle, defeat the UNSC route defense guard from the proven east approach, then test field control at (71, -129, 0.78), Pelican pickup and banking. Covenant defense, human peers and physical VR remain open.
+Latest verified revision: 7026f5fa passed UNSC defense, field Use and ten-second extraction readiness. The Pelican circled the hub. Diagnostic 3564bca8 stopped the orbit, then failed native landed at up.k 0.939. See RUNTIME_INTEGRATION_20261107.
+Next action: Author an aligned airborne final approach to the original hub pad near (53.34, -102.54), facing east-southeast before descent. Keep native landed checks. Verify hub return, field recall/boarding and banking. Covenant defense, human peers and physical VR stay open.
 
 ## Acceptance
 

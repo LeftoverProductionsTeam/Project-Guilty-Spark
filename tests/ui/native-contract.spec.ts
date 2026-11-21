@@ -5163,7 +5163,7 @@ async function mockNativeCommandRoutes(page:Page){
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
    const mock=w.__sparkMock;
    if(command==='native_tag_inventory')return [{id:0,class:'scnr',path:'levels/test'}];
-   if(command==='native_tag_context')return {projectId:args.projectId,buildId:'command-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[],tagSha256:mock.commandSha,commandSource:{lists:structuredClone(mock.commandLists),atoms:['go_to','go_to_and_face','pause'],referenceCounts:[0,0,0,0,1]},protectedCommandLists:mock.commandProtected};
+   if(command==='native_tag_context')return {projectId:args.projectId,buildId:'command-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:[],tagSha256:mock.commandSha,commandSource:{lists:structuredClone(mock.commandLists),atoms:['go_to','go_to_and_face','pause','set_radius'],referenceCounts:[0,0,0,0,1]},protectedCommandLists:mock.commandProtected};
    if(command==='native_operation_preview'){
     if(args.operation.sourceSha256!==mock.commandSha)throw Error('Source changed');mock.commandPreviews.push(structuredClone(args.operation));mock.commandBeforePreview=structuredClone(mock.commandLists);mock.commandBeforeSha=mock.commandSha;mock.commandAfterSha=(mock.commandSha==='b'.repeat(64)?'c':'b').repeat(64);
     return {id:'command-preview',tag:'levels/test.scenario',toolId:'synthetic-source-writer',beforeSha256:mock.commandSha,afterSha256:mock.commandAfterSha,changedBytes:4,fieldChanges:[{before:'point1 = 4,5,3',after:'reviewed coordinate proposal'}],detail:'Synthetic native review contract only',currentState:'before'};
@@ -5180,6 +5180,22 @@ async function mockNativeCommandRoutes(page:Page){
  const native=page.locator('.native-tag-operations:visible');if(await native.getAttribute('open')===null)await native.locator(':scope > summary').click();
  const form=page.locator('.native-command-lists:visible');await form.locator(':scope > summary').click();return form;
 }
+
+test('native command arrival radius uses world units and refuses nonpositive authored values',async({page})=>{
+ const form=await mockNativeCommandRoutes(page);
+ await form.getByRole('combobox',{name:'Native command action',exact:true}).selectOption('set_radius');
+ const radius=form.getByRole('spinbutton',{name:'Command Arrival radius',exact:true});
+ const preview=form.getByRole('button',{name:'Preview command list',exact:true});
+ await expect(radius).toHaveValue('0');
+ await expect(preview).toBeDisabled();
+ await expect(form.getByText('Action 0 needs an arrival radius greater than zero.',{exact:true})).toBeVisible();
+ await radius.fill('-1');
+ await expect(preview).toBeDisabled();
+ await radius.fill('3.5');
+ await preview.click();
+ const proposed=await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1));
+ expect(proposed.list.commands[0]).toMatchObject({atom:'set_radius',parameters:[3.5,0]});
+});
 
 test('native command route points move visually and return to exact reviewed source and point',async({page},testInfo)=>{
  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));const form=await mockNativeCommandRoutes(page);

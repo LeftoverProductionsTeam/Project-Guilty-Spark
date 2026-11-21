@@ -66,9 +66,22 @@ fn inventory(fields:&str)->Result<Vec<(NativeCommandList,Vec<usize>)>>{
   let row=NativeCommandList{index:index as u16,name,flags,bsp,commands:actions,points:positions};row.validate()?;result.push((row,allowed));at+=item.len();
  }Ok(result)
 }
+fn validate_radius_edits(commands: &[NativeCommand], original: &[NativeCommand]) -> Result<()> {
+    for (index, command) in commands.iter().enumerate() {
+        let unchanged = original.get(index).is_some_and(|previous| {
+            previous.atom == command.atom && previous.parameters[0] == command.parameters[0]
+        });
+        if command.atom == "set_radius" && command.parameters[0] <= 0.0 && !unchanged {
+            return invalid(format!("Command action {index} needs an arrival radius greater than zero"));
+        }
+    }
+    Ok(())
+}
+
 pub fn arguments(tags:&Path,tag:&str,before:&str,list:&NativeCommandList)->Result<Vec<String>>{
  list.validate()?;let current=source(before)?;let old=current.lists.get(list.index as usize).ok_or_else(||crate::SparkError::Invalid("Native command-list index missing".into()))?;
  if old.name!=list.name||old.commands.len()>list.commands.len()||old.points.len()>list.points.len(){return invalid("Preserve command-list name and every existing command/point index; only tail additions are supported");}if old.close(list){return invalid("Native command list already matches");}
+ validate_radius_edits(&list.commands,&old.commands)?;
  for c in &list.commands{for(v,n)in [c.animation,c.script,c.recording,c.object_name].into_iter().zip(current.reference_counts){if v>=0&&v as usize>=n{return invalid("Native command references a missing scenario binding");}}}
  if list.flags[5]&&(list.bsp<0||list.bsp as usize>=current.reference_counts[4]){return invalid("Manual command BSP needs an existing scenario BSP");}
  let prefix=format!("command_lists[{}]",list.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];
@@ -85,6 +98,7 @@ pub fn append_arguments(tags:&Path,tag:&str,before:&str,list:&NativeCommandList)
  if usize::from(list.index)!=current.lists.len()||current.lists.len()>=256{return invalid("New command route must append at the current native inventory end; refresh changed source");}
  if list.name.is_empty()||list.name.len()>31||!list.name.bytes().enumerate().all(|(i,b)|b.is_ascii_alphanumeric()||b==b'_'&&i>0)||!list.name.as_bytes()[0].is_ascii_alphabetic()||current.lists.iter().any(|row|row.name.eq_ignore_ascii_case(&list.name)){return invalid("New route needs a unique1–31character native identifier, starting with a letter");}
  if list.points.is_empty()||list.commands.is_empty(){return invalid("New route needs at least one world point and command");}
+ validate_radius_edits(&list.commands,&[])?;
  for c in &list.commands{for(v,n)in [c.animation,c.script,c.recording,c.object_name].into_iter().zip(current.reference_counts){if v>=0&&v as usize>=n{return invalid("New route references missing native scenario data");}}}
  if list.flags[5]&&(list.bsp<0||list.bsp as usize>=current.reference_counts[4]){return invalid("Manual route BSP must exist; it does not establish physical clearance");}
  let prefix=format!("command_lists[{}]",list.index);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-I".into(),"command_lists".into(),"1".into(),"end".into(),"-I".into(),format!("{prefix}.commands"),list.commands.len().to_string(),"end".into(),"-I".into(),format!("{prefix}.points"),list.points.len().to_string(),"end".into()];
@@ -145,6 +159,25 @@ mod tests{
   let mut text=String::from("command_lists[1] array\n    command_lists[0] struct\n        name (route) string\n        flags bitmask\n");for f in FLAGS{text+=&format!("            {f} (0) bitfield\n");}text+="        manual_bsp_index (65535) index\n        commands[1] array\n            commands[0] struct\n                atom_type enum\n";for(i,a)in COMMAND_ATOMS.iter().enumerate(){text+=&format!("                    {a}{} enum value\n",if i==0{" (*)"}else{""});}for(k,v)in [("atom_modifier","0"),("parameter1","0"),("parameter2","0"),("point_1","65535"),("point_2","65535"),("animation","65535"),("script","65535"),("recording","65535"),("command","65535"),("object_name","65535")]{text+=&format!("                {k} ({v}) number\n");}text+="        points[1] array\n            points[0] struct\n                position (1,2,3) point3d\nai_animation_references[0] array\nai_script_references[0] array\nai_recording_references[0] array\nobject_names[0] array\nstructure_bsps[0] array\n";text
  }
  #[test]fn existing_commands_preserve_structure_and_reject_missing_references_or_unrelated_edits(){let before=fixture();let original=source(&before).unwrap().lists[0].clone();let mut list=original.clone();list.commands[0].parameters[0]=1.25;list.points[0]=[4.,5.,6.];let args=arguments(Path::new("tags"),"level.scenario",&before,&list).unwrap();assert_eq!(args.iter().filter(|a|a.as_str()=="-S").count(),2);let after=before.replace("parameter1 (0)","parameter1 (1.25)").replace("position (1,2,3)","position (4,5,6)");assert_eq!(reviewed(&before,&after,&list).unwrap().len(),2);assert!(reviewed(&before,&after.replace("name (route)","name (other)"),&list).is_err());let mut bad=list.clone();bad.commands[0].script=0;assert!(arguments(Path::new("tags"),"level.scenario",&before,&bad).is_err());bad=list.clone();bad.commands[0].point1=1;assert!(bad.validate().is_err());bad=list.clone();bad.commands.clear();assert!(arguments(Path::new("tags"),"level.scenario",&before,&bad).is_err());bad=list;bad.points[0][0]=f32::NAN;assert!(bad.validate().is_err());assert!(arguments(Path::new("tags"),"level.scenario",&before,&original).is_err());}
+
+ #[test]
+ fn rejects_new_invalid_radius_but_preserves_legacy_rows() {
+  let before = fixture();
+  let mut edited = source(&before).unwrap().lists.remove(0);
+  edited.commands[0].atom = "set_radius".into();
+  assert!(arguments(Path::new("tags"), "level.scenario", &before, &edited).is_err());
+  edited.commands[0].parameters[0] = 3.5;
+  assert!(arguments(Path::new("tags"), "level.scenario", &before, &edited).is_ok());
+  edited.index = 1;
+  edited.name = "landing".into();
+  edited.commands[0].parameters[0] = -1.0;
+  assert!(append_arguments(Path::new("tags"), "level.scenario", &before, &edited).is_err());
+
+  let legacy = before.replace("pause (*)", "pause").replace("set_radius enum", "set_radius (*) enum");
+  let mut move_point = source(&legacy).unwrap().lists.remove(0);
+  move_point.points[0][2] = 4.0;
+  assert!(arguments(Path::new("tags"), "level.scenario", &legacy, &move_point).is_ok());
+ }
 
  #[test]fn route_extensions_keep_old_indices_and_reject_unrelated_or_unknown_field_changes(){
   let before=fixture().replace("                position (1,2,3) point3d","                position (1,2,3) point3d\n                surface_index (65535) index");
