@@ -86,7 +86,7 @@ export function mergeForge(
           if (forceRemote) out.push(structuredClone(value));
           else throw new Error(`Entity was removed: ${key}/${id}`);
         } else
-          for (const field of Object.keys(value)) {
+          for (const field of new Set([...Object.keys(before), ...Object.keys(value)])) {
             if (same(before[field], value[field])) continue;
             const v = value[field],
               b = before[field],
@@ -110,7 +110,8 @@ export function mergeForge(
             } else {
               if (!forceRemote && !same(c, b) && !same(c, v))
                 throw new Error(`Concurrent edit conflict: ${key}/${id}/${field}`);
-              out[index][field] = structuredClone(v);
+              if (Object.hasOwn(value, field)) out[index][field] = structuredClone(v);
+              else delete out[index][field];
             }
           }
       }

@@ -2,6 +2,7 @@ import {campaignEncounterStarts,campaignStartId,campaignPatrolPoints,campaignPat
 import { pointInsideWorkshop } from './bspWorkshop';
 import type { BuildRecord, OpenProject, RuntimeId, Vec3 } from './types';
 import type { EditorEnvironment } from './environment';
+import type { HmvPlacementProperties } from './forgeHmv';
 import { removeLogicReferences } from './nativeLogic';
 import type { LogicTrigger, NativeLogicDocument, NativeLogicSource } from './nativeLogic';
 
@@ -43,6 +44,8 @@ export interface ForgePlacement extends ForgeEntity {
   rotation: Vec3;
   team: number;
   respawnSeconds: number;
+  /** Placement physics for HMV export only. */
+  hmvPhysics?: HmvPlacementProperties['physics'];
 }
 export interface ForgeSpawn extends ForgeEntity {
   facing: number;

@@ -6,6 +6,7 @@ import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
 import {beginProjectMutation} from '../projectMutation';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
+import { isHmvPlacementGroup, type HmvPlacementProperties } from '../forgeHmv';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import {openMapPreviewSource} from '../mapPreviewSource';
 import { publishTextureResources, useTextureResourceScope } from '../textureResourceScope';
@@ -2700,6 +2701,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   )}
                   {tab === 'properties' && (
                     <ForgeProperties
+                      readOnly={studioRole === 'viewer'}
                       missionGatedExtraction={project.studio?.missions.some(beat=>beat.trigger==='forerunnerExtractionSettled')}
                       document={doc}
                       weaponPaths={project.nativeAssetImports?.filter(binding=>binding.tagClass==='weap').map(binding=>binding.nativePath)}
@@ -3364,8 +3366,10 @@ function ForgeProperties({
   logicSource,
   onSelectLogic,
   missionGatedExtraction=false,
+  readOnly,
 }: {
   document: QuickForgeDocument;
+  readOnly: boolean;
   weaponPaths?: string[];
   onBakeNative:(quality:"draft"|"final")=>Promise<void>;
   chosen: ForgeNode[];
@@ -3653,6 +3657,24 @@ function ForgeProperties({
                   }
                 />
               </label>
+              {isHmvPlacementGroup(node.value.tagClass) && node.value.tagId != null && node.value.sourceSha256
+                && !node.value.publishedAssetId && !node.value.nativeName && !node.value.transportSignals && <>
+                <label className="forge-field">HMV physics
+                  <select value={node.value.hmvPhysics ?? 'normal'} disabled={readOnly}
+                    onChange={event => {
+                      const physics = event.target.value as HmvPlacementProperties['physics'];
+                      changeNode(current => current.type === 'placement' && current.value.id === node.value.id
+                        ? { ...current, value: { ...current.value, hmvPhysics: physics } } : current, 'Set HMV placement physics');
+                    }}>
+                    <option value="normal">Normal</option>
+                    <option value="fixed">Fixed</option>
+                    <option value="phased">Phased</option>
+                  </select>
+                </label>
+                {node.value.hmvPhysics && node.value.hmvPhysics !== 'normal' && <p className="forge-hint">
+                  Applies to shared HMV exports. Forerunner layouts require a zero respawn delay.
+                </p>}
+              </>}
               <p className="forge-hint">
                 Reference marker only. The actual source tag and target placement support must pass
                 dependency/build validation.

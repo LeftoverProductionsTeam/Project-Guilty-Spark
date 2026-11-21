@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn portable_native_asset_reference_never_grants_local_build_provenance() {
         let mut document = quickforge::create_arena("assets", "emptyArena").unwrap();
-        document.placements.push(quickforge::ForgePlacement { transport_signals:None, native_name: None,
+        document.placements.push(quickforge::ForgePlacement { hmv_physics:None, transport_signals:None, native_name: None,
             published_asset_id: None,
             id: id(),
             name: "Owned Warthog".into(),
@@ -503,6 +503,23 @@ mod tests {
         let mut no_tag = accepted.document.clone();
         no_tag.placements[0].tag_id = None;
         assert!(accepted.propose(&id(), &id(), 1, no_tag).is_err());
+
+        let author = id();
+        let mut fixed = accepted.document.clone();
+        fixed.placements[0].hmv_physics = Some(quickforge::HmvPhysics::Fixed);
+        let physics = accepted.propose(&id(), &author, 1, fixed).unwrap();
+        let mut moved = accepted.document.clone();
+        moved.placements[0].position[1] = 3.;
+        let moved = physics.propose(&id(), &id(), 1, moved).unwrap();
+        let restored: Journal = serde_json::from_slice(&serde_json::to_vec(&moved).unwrap()).unwrap();
+        restored.validate().unwrap();
+        let undone = restored.reverse(&id(), &author, false).unwrap();
+        assert_eq!(undone.document.placements[0].hmv_physics, None);
+        assert_eq!(undone.document.placements[0].position, [5., 3., 1.]);
+        assert_eq!(undone.reverse(&id(), &author, true).unwrap().document, moved.document);
+        let mut unbound = restored.document.clone();
+        unbound.placements[0].source_sha256 = None;
+        assert!(restored.propose(&id(), &author, restored.revision, unbound).is_err());
     }
     #[test]
     fn disconnected_transaction_history_is_not_recovered_as_valid_source() {

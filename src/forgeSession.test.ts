@@ -42,6 +42,24 @@ describe('shared QuickForge concurrent edits',()=>{
   it('never uses another machine\'s source-project ID for asset access',()=>{const d=structuredClone(base);d.placements=[{id:'p',name:'Crate',tagId:1,tagClass:'scen',tagPath:'scenery/crate',sourceProjectId:'remote-private-id',sourceSha256:'abc',position:[0,0,0],rotation:[0,0,0],visible:true,locked:false,team:0,respawnSeconds:30}];expect(portableForge(d).placements[0].sourceProjectId).toBeNull();expect(localForge(portableForge(d),[]).placements[0].sourceProjectId).toBeNull();});
 });
 
+it('merges HMV physics undo with a peer move and rejects a competing physics change', () => {
+  const normal = portableForge({...base, placements:[{
+    id:'shared', name:'Warthog', tagId:9, tagClass:'vehi', tagPath:'vehicles/warthog/warthog',
+    sourceSha256:'a'.repeat(64), sourceProjectId:null, position:[0,0,0], rotation:[0,0,0],
+    team:-1, respawnSeconds:0, visible:true, locked:false,
+  }]});
+  const fixed = structuredClone(normal);
+  fixed.placements[0].hmvPhysics = 'fixed';
+  const peer = structuredClone(fixed);
+  peer.placements[0].position = [0, 3, 0];
+  const undone = mergeForge(fixed, normal, peer);
+  expect(undone.placements[0]).not.toHaveProperty('hmvPhysics');
+  expect(undone.placements[0].position).toEqual([0, 3, 0]);
+  expect(mergeForge(normal, fixed, undone)).toEqual(peer);
+  peer.placements[0].hmvPhysics = 'phased';
+  expect(() => mergeForge(fixed, normal, peer)).toThrow('placements/shared/hmvPhysics');
+});
+
 it('keeps local X undo when the other editor changes Y on the same object',()=>{let h=historyReducer(initialHistory,{type:'load',project:project(base)});const own=structuredClone(base);own.geometry[0].position=[2,0,0];h=historyReducer(h,{type:'edit',project:project(own),description:'Move X'});const remote=structuredClone(own);remote.geometry[0].position[1]=5;h=historyReducer(h,{type:'forge-remote',projectId:'shared-project',document:remote});h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.geometry[0].position).toEqual([0,5,0]);});
 it('retains local non-shared undo when remote source changes arrive',()=>{let h=historyReducer(initialHistory,{type:'load',project:project(base)});const local=project(base);local.title='My local title';h=historyReducer(h,{type:'edit',project:local,description:'Rename local project'});const remote=structuredClone(base);remote.geometry[0].position[1]=3;h=historyReducer(h,{type:'forge-remote',projectId:'shared-project',document:remote});h=historyReducer(h,{type:'undo'});expect(h.current?.title).toBe('shared');expect(h.current?.quickForge?.geometry[0].position[1]).toBe(3);});
 

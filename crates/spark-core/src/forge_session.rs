@@ -94,13 +94,44 @@ pub fn merge(
                     (None,Some(a),Some(i))if result[i]==*a=>{},
                     (Some(b),None,Some(i))if result[i]==*b=>{result.remove(i);},
                     (Some(_),None,None)=>{},
-                    (Some(b),Some(a),Some(i))=>{for(k,v)in a.as_object().unwrap(){if b.get(k)==Some(v){continue;}
-                        if let (Some(before),Some(after),Some(current))=(b.get(k).and_then(|v|v.as_array()),v.as_array(),result[i].get(k).and_then(|v|v.as_array())){
-                            if ["position","rotation","dimensions","color"].contains(&k.as_str())&&before.len()==3&&after.len()==3&&current.len()==3&&before.iter().chain(after).chain(current).all(|v|v.is_number()){
-                                let mut merged=current.clone();for axis in 0..3{if before[axis]==after[axis]{continue;}if current[axis]!=before[axis]&&current[axis]!=after[axis]{return invalid(format!("Concurrent edit conflict: {key}/{id}/{k}/{axis}. Your local draft was retained."));}merged[axis]=after[axis].clone();}result[i][k]=serde_json::Value::Array(merged);continue;
+                    (Some(b), Some(a), Some(i)) => {
+                        let fields = b.as_object().unwrap().keys()
+                            .chain(a.as_object().unwrap().keys()).collect::<BTreeSet<_>>();
+                        for k in fields {
+                            let old = b.get(k);
+                            let new = a.get(k);
+                            if old == new { continue; }
+                            let live = result[i].get(k);
+                            if let (Some(before), Some(after), Some(current)) = (
+                                old.and_then(|v| v.as_array()), new.and_then(|v| v.as_array()),
+                                live.and_then(|v| v.as_array()),
+                            ) {
+                                if ["position", "rotation", "dimensions", "color"].contains(&k.as_str())
+                                    && before.len() == 3 && after.len() == 3 && current.len() == 3
+                                    && before.iter().chain(after).chain(current).all(|v| v.is_number())
+                                {
+                                    let mut merged = current.clone();
+                                    for axis in 0..3 {
+                                        if before[axis] == after[axis] { continue; }
+                                        if current[axis] != before[axis] && current[axis] != after[axis] {
+                                            return invalid(format!("Concurrent edit conflict: {key}/{id}/{k}/{axis}. Your local draft was retained."));
+                                        }
+                                        merged[axis] = after[axis].clone();
+                                    }
+                                    result[i][k] = serde_json::Value::Array(merged);
+                                    continue;
+                                }
+                            }
+                            if live != old && live != new {
+                                return invalid(format!("Concurrent edit conflict: {key}/{id}/{k}. Your local draft was retained."));
+                            }
+                            if let Some(value) = new {
+                                result[i][k] = value.clone();
+                            } else {
+                                result[i].as_object_mut().unwrap().remove(k);
                             }
                         }
-                        if result[i].get(k)!=b.get(k)&&result[i].get(k)!=Some(v){return invalid(format!("Concurrent edit conflict: {key}/{id}/{k}. Your local draft was retained."));}result[i][k]=v.clone();}},
+                    },
                     _=>return invalid(format!("Concurrent edit/delete conflict: {key}/{id}. Your local draft was retained.")),
                 }
             }

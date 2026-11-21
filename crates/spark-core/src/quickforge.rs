@@ -214,6 +214,8 @@ pub struct ForgeMaterial {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForgePlacement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hmv_physics: Option<HmvPhysics>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transport_signals: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_name: Option<String>,
@@ -238,6 +240,14 @@ pub struct ForgePlacement {
     #[serde(default)]
     pub locked: bool,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HmvPhysics {
+    Normal,
+    Fixed,
+    Phased,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForgeSpawn {
@@ -616,6 +626,16 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
             || p.respawn_seconds > 32767
         {
             return invalid("Invalid asset placement class, transform or scenario values");
+        }
+        if matches!(p.hmv_physics, Some(HmvPhysics::Fixed | HmvPhysics::Phased))
+            && (!["scen", "weap", "eqip", "vehi", "mach", "ctrl"].contains(&p.tag_class.as_str())
+                || p.tag_id.is_none()
+                || p.source_sha256.is_none()
+                || p.published_asset_id.is_some()
+                || p.native_name.is_some()
+                || p.transport_signals == Some(true))
+        {
+            return invalid("Fixed and Phased HMV placements need an ordinary object from an exact base map");
         }
         if portable && p.source_project_id.is_some() {
             return invalid("Portable source must not contain a local library identity");

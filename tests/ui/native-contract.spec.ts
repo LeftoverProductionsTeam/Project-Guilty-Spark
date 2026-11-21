@@ -2316,6 +2316,25 @@ test('SparkLink exports an acknowledged peer move for its exact Forge base', asy
   });
   await openFixture(page);
   await chooseTool(page,'Level editor');
+  await openDrawer(page,'Build tools');
+  const pistol = page.locator('.forge-tree-select').filter({hasText:'Pistol'});
+  await revealPagedControl(pistol);
+  await pistol.click();
+  await openDrawer(page,'Inspector');
+  const inspector = page.getByRole('region',{name:'Inspector panel',exact:true});
+  await (await pagedControl(page,'button','Properties',inspector)).click();
+  const physics = await pagedControl(page,'combobox','HMV physics',inspector);
+  await expect(physics).toHaveValue('normal');
+  await physics.selectOption('fixed');
+  await physics.blur();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge?.placements[0]?.hmvPhysics)).toBe('fixed');
+  await page.keyboard.press('Control+z');
+  await expect(physics).toHaveValue('normal');
+  await page.keyboard.press('Control+y');
+  await expect(physics).toHaveValue('fixed');
+  await page.keyboard.press('Control+z');
+  await expect(physics).toHaveValue('normal');
   await openDrawer(page,'SparkLink');
   const session = page.getByRole('region',{name:'SparkLink panel',exact:true});
   const sharing = session.locator('details.forge-live-panel');
@@ -2347,6 +2366,36 @@ test('SparkLink exports an acknowledged peer move for its exact Forge base', asy
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls
     .filter((call:any)=>call.command==='inspect_forge_layout_base').at(-1).args))
     .toEqual({projectId:'b',sourceSha256:'b'.repeat(64)});
+  await page.evaluate(() => {
+    const shared = (window as any).__sparkMock.session.view;
+    shared.revision = 7;
+    shared.document.placements[0].hmvPhysics = 'phased';
+  });
+  await expect(session.getByText(/shared revision 7/)).toBeAttached();
+  const hostedExport = await pagedControl(page,'button','Export shared HMV for hosted Forge',session);
+  await hostedExport.click();
+  await expect(session.getByText('Review a Forerunner build with hosted Forge Fixed and Phased physics',{exact:false})).toBeAttached();
+  await page.evaluate(() => {
+    const w = window as any, previous = w.__TAURI_INTERNALS__.invoke, sha = 'f'.repeat(64);
+    const profile = {id:'hosted-forge',runtimeId:'openCe',root:'D:/Native',executable:'D:/Native/halo.exe',
+      reviewedCompanion:{executableSha256:sha,dependencySha256:'c'.repeat(64),
+        capabilities:{native_features:['forge.hmv_base_placements.v1', 'forge.hmv_host_physics.v1']}}};
+    w.__TAURI_INTERNALS__.invoke = (command:string,args:any) => {
+      if (command === 'list_runtime_registrations') return Promise.resolve([profile]);
+      if (command === 'inspect_runtime_registration' && args.registration.id === profile.id)
+        return Promise.resolve({registrationId:profile.id,validation:'pass',executableSha256:sha});
+      return previous(command,args);
+    };
+  });
+  const hostedDownload = page.waitForEvent('download');
+  await hostedExport.click();
+  const hostedFile = await hostedDownload;
+  const bytes = await readFile((await hostedFile.path())!);
+  expect(hostedFile.suggestedFilename()).toBe('import.hmv');
+  expect(bytes.readUInt16LE(4)).toBe(7);
+  expect(bytes[64+5+bytes[68]+34]).toBe(0x21);
+  expect(bytes.includes(Buffer.from('SparkLink revision 7'))).toBe(true);
+  expect(bytes.includes(Buffer.from('Équipe Spark'))).toBe(true);
   await page.evaluate(() => { (window as any).__sparkMock.wrongForgeBase = true; });
   await (await pagedControl(page,'button','Export shared HMV',session)).click();
   await expect(session.getByText('Spark could not verify the exact preserved base map for this revision.',{exact:false})).toBeAttached();

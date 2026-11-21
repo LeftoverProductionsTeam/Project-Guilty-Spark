@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Spark exports HMV v7 hosted physics through a reviewed Forerunner capability. Native Logic rejects locked player controls and validates switch targets. Forerunner separately verified E-key switch motion on host and guest and hosted Fixed/Phased replication to existing and late guests. Spark’s rebuilt variant independently compiled and received the targeted keyboard inputs in a matching two-client session.
-Next action: Carry advanced placement settings through the existing SparkLink authoring and export workflow. Add guest-initiated workflows when Forerunner exposes host-authorized editing in its versioned contract. Native switch collision and guest interaction still need direct acceptance. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
+Latest verified revision: QuickForge HMV physics survives SparkLink guest edits, a concurrent owner move, late join, and author Undo/Redo. Verified browser authoring and Save, journal recovery, and a Phased HMV v7 export from an acknowledged revision. The prior native Forerunner loopback receipts verify game-side physics on their own fixture.
+Next action: Add reviewed native machine type and position-transition fields to Spark’s existing native controls so creators can build a ramped platform through the editor. Verify Use, animation, and collision on the rebuilt platform. Forerunner guest-directed in-game editing still awaits a validated runtime contract. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
 
 ## Acceptance
 

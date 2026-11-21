@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for (i,start) in d.spawns.iter_mut().enumerate(){start.position=[4.+i as f32,0.,0.1];start.facing=0.;}
         // Owned stock SDK reference, not a synthetic native asset. All compiler
         // inputs are copied and hashed by the existing isolated build pipeline.
-        d.placements.push(q::ForgePlacement { transport_signals:None, native_name: None,
+        d.placements.push(q::ForgePlacement { hmv_physics:None, transport_signals:None, native_name: None,
             id:"benchmark-door".into(),name:"Corridor door".into(),
             tag_path:"levels/a10/devices/doors/door small/door small".into(),tag_class:"mach".into(),
             position:[14.,0.,0.],rotation:[0.,0.,0.],

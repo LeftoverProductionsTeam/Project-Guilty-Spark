@@ -2,6 +2,7 @@ import type { MapDocument } from './mapDocuments';
 import type { Asset, Project, SceneObject, Vec3, MapInspection } from './types';
 import { catalogAssets, placeAsset, pointInsideForgeRoom } from './forge';
 import type { ForgeAsset, ForgePlacement } from './forge';
+import { isHmvPlacementGroup } from './forgeHmv';
 import { call } from './api';
 import { profileStart, profileEnd } from './profiling.ts';
 import { createEmitter } from './spatialAudio';
@@ -143,6 +144,9 @@ export function placeLibraryModel(
       throw Error('The placement library is full (1024 objects).');
     if(asset.class==='ctrl'&&project.quickForge.placements.filter(p=>p.tagClass==='ctrl'&&p.id!==old?.id).length>=100)
       throw Error('The native control-terminal limit is full (100).');
+    if (old?.hmvPhysics && old.hmvPhysics !== 'normal' && !isHmvPlacementGroup(asset.class)) {
+      throw Error('Set HMV physics to Normal before replacing this placement with a class unsupported by HMV.');
+    }
     const placement = {
       ...placeAsset(asset, old?.position ?? point),
       ...(old
@@ -151,6 +155,7 @@ export function placeLibraryModel(
             rotation: [...old.rotation] as Vec3,
             team: old.team,
             respawnSeconds: old.respawnSeconds,
+            ...(old.hmvPhysics ? { hmvPhysics: old.hmvPhysics } : {}),
             visible: old.visible,
             locked: old.locked,
           }

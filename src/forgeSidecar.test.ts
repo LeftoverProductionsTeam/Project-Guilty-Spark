@@ -454,6 +454,15 @@ describe('Chupathingy Forge binary layouts', () => {
     const compatible = readHmv(Array.from(forerunner.bytes), map);
     expect(compatible.forerunnerIssue).toBe(null);
     expect(compatible.details.author).toBe('Équipe Forge');
+    const fixed: ForgePlacement = { ...second, hmvPhysics:'fixed' };
+    const phased: ForgePlacement = { ...second, id:'phased', position:[4,5,6], hmvPhysics:'phased' };
+    const hosted = exportForgePlacementSnapshot([fixed, phased], map, 23, 'forerunner-host-physics', 'Équipe Forge');
+    expect(hosted.name).toBe('import.hmv');
+    const hostedLayout = readHmv(Array.from(hosted.bytes), map);
+    expect(hostedLayout.objectRecords.map(row => row.properties.physics)).toEqual(['fixed', 'phased']);
+    expect(hostedLayout.details.author).toBe('Équipe Forge');
+    expect(new DataView(hosted.bytes.buffer).getUint16(4, true)).toBe(7);
+    expect(() => exportForgePlacementSnapshot([fixed], map, 23, 'forerunner')).toThrow('standard physics');
     const devMap = {...map, tags:[...map.tags,
       {...map.tags[0],id:11,class:'ctrl',path:'devices/terminal'}]};
     const device: ForgePlacement = {...second,tagId:11,tagClass:'ctrl',tagPath:'devices/terminal'};

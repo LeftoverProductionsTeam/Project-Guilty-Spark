@@ -1519,6 +1519,38 @@ mod legacy_regressions {
         hp.leave();
     }
     #[test]
+    fn shared_hmv_physics_survives_late_join_and_guest_undo() {
+        let id = || uuid::Uuid::new_v4().to_string();
+        let mut doc = quickforge::create_arena("Shared Forge physics", "emptyArena").unwrap();
+        doc.placements.push(quickforge::ForgePlacement {
+            id: id(), name: "Warthog".into(), tag_path: "vehicles/warthog/warthog".into(), tag_class: "vehi".into(),
+            position: [0., 0., 1.], rotation: [0.; 3], team: -1, respawn_seconds: 0, tag_id: Some(9),
+            source_project_id: None, source_sha256: Some("a".repeat(64)), visible: true, locked: false,
+            hmv_physics: None, transport_signals: None, native_name: None, published_asset_id: None,
+        });
+        let host = Host::start(doc.clone(), false).unwrap();
+        let owner = Peer::Host(host.clone());
+        let (guest, _) = Guest::join(&host.endpoint.to_string(), &host.key()).unwrap();
+        let editor = Peer::Guest(guest);
+        let mut fixed = doc.clone();
+        fixed.placements[0].hmv_physics = Some(quickforge::HmvPhysics::Fixed);
+        editor.propose(0, fixed).unwrap();
+        doc.placements[0].position[1] = 5.;
+        owner.propose(0, doc).unwrap();
+        let (late, accepted) = Guest::join(&host.endpoint.to_string(), &host.key()).unwrap();
+        assert_eq!(accepted.document.placements[0].hmv_physics, Some(quickforge::HmvPhysics::Fixed));
+        assert_eq!(accepted.document.placements[0].position, [0., 5., 1.]);
+
+        let undo = editor.reverse(&id(), false).unwrap();
+        assert_eq!(undo.document.placements[0].hmv_physics, None);
+        assert_eq!(undo.document.placements[0].position, [0., 5., 1.]);
+        assert_eq!(owner.poll().unwrap().document, undo.document);
+        assert_eq!(editor.reverse(&id(), true).unwrap().document, accepted.document);
+        Peer::Guest(late).leave();
+        editor.leave();
+        owner.leave();
+    }
+    #[test]
     fn invalid_key_and_public_endpoint_cannot_join() {
         let h = Host::start(
             quickforge::create_arena("shared", "emptyArena").unwrap(),

@@ -1,7 +1,7 @@
 use spark_core::{bsp_workshop, forge_session, native_logic as l, quickforge as q};
 fn level() -> q::QuickForgeDocument {
     let mut d = bsp_workshop::example().unwrap();
-    d.placements.push(q::ForgePlacement { transport_signals:None, native_name: None,
+    d.placements.push(q::ForgePlacement { hmv_physics:None, transport_signals:None, native_name: None,
         id: "door".into(),
         name: "Door".into(),
         tag_path: "levels/a10/devices/doors/door small/door small".into(),
@@ -520,7 +520,7 @@ fn installed_invader_writes_transport_names_to_fresh_native_source(){
     let temp=tempfile::tempdir_in(std::env::var_os("SPARK_NATIVE_TEST_ROOT").expect("Explicit owned test root")).unwrap();let tags=temp.path().join("tags");std::fs::create_dir(&tags).unwrap();
     let invoke=|args:&[String]|{let output=Command::new(&tool).arg("-t").arg(&tags).args(args).output().unwrap();assert!(output.status.success(),"{:?}: {}",args,String::from_utf8_lossy(&output.stderr));String::from_utf8(output.stdout).unwrap()};
     let mut doc=level();doc.game_mode="campaign".into();doc.logic=None;doc.spawns.clear();doc.placements.clear();
-    for(index,name)in[None,Some("extraction_pelican")].iter().enumerate(){doc.placements.push(q::ForgePlacement{ transport_signals:None,native_name:name.map(str::to_owned),id:format!("ship-{index}"),name:format!("Ship {index}"),tag_path:"vehicles/pelican/pelican".into(),tag_class:"vehi".into(),position:[index as f32,0.,0.],rotation:[0.;3],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});}
+    for(index,name)in[None,Some("extraction_pelican")].iter().enumerate(){doc.placements.push(q::ForgePlacement{ hmv_physics:None,transport_signals:None,native_name:name.map(str::to_owned),id:format!("ship-{index}"),name:format!("Ship {index}"),tag_path:"vehicles/pelican/pelican".into(),tag_class:"vehi".into(),position:[index as f32,0.,0.],rotation:[0.;3],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});}
     for pair in [false,true]{
         doc.placements[0].native_name=pair.then(||"extraction_spirit".into());for p in &mut doc.placements{p.transport_signals=Some(pair);}let scenario=if pair{"pair"}else{"single"};let tag=format!("{scenario}.scenario");
         invoke(&["-N".into(),tag.clone()]);invoke(&["-I".into(),"vehicles".into(),"2".into(),"end".into(),tag.clone()]);
@@ -575,10 +575,10 @@ fn installed_transport_scenario_writer_compiles_and_reads_back_native_vehicle_na
     for name in ["extraction_pelican","extraction_spirit"]{
         let row=markers.names.iter().enumerate().find(|(_,row)|row.name==name).unwrap();let vehicle=markers.vehicles.iter().find(|v|v.name_index==row.0 as i16).unwrap();assert!(vehicle.rotation_radians.iter().all(|v|v.is_finite()));
         protected.push(fixture.join(spark_core::safe_relative(&format!("{}.vehicle",vehicle.tag_path.replace('\\',"/"))).unwrap()));
-        base.placements.push(q::ForgePlacement{transport_signals:None,native_name:Some(name.into()),id:name.into(),name:name.into(),tag_path:vehicle.tag_path.clone(),tag_class:"vehi".into(),position:vehicle.position,rotation:[0.,0.,0.25],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
+        base.placements.push(q::ForgePlacement{hmv_physics:None,transport_signals:None,native_name:Some(name.into()),id:name.into(),name:name.into(),tag_path:vehicle.tag_path.clone(),tag_class:"vehi".into(),position:vehicle.position,rotation:[0.,0.,0.25],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
     }
     let control=markers.devices.iter().find(|device|device.class=="ctrl").expect("Real source control");protected.push(fixture.join(spark_core::safe_relative(&format!("{}.device_control",control.tag_path.replace('\\',"/"))).unwrap()));
-    base.placements.push(q::ForgePlacement{transport_signals:None,native_name:None,id:"probe-control".into(),name:"Source control".into(),tag_path:control.tag_path.clone(),tag_class:"ctrl".into(),position:control.position,rotation:[0.;3],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
+    base.placements.push(q::ForgePlacement{hmv_physics:None,transport_signals:None,native_name:None,id:"probe-control".into(),name:"Source control".into(),tag_path:control.tag_path.clone(),tag_class:"ctrl".into(),position:control.position,rotation:[0.;3],team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,visible:true,locked:false,published_asset_id:None});
     base.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[{"placementId":"probe-control","nativeName":"probe_control","initialPosition":0,"powered":true}],"rules":[]})).unwrap());
     let before=protected.iter().map(|file|maps::hash_file(file).unwrap()).collect::<Vec<_>>();let source_start=original.objects.iter().find(|o|o.kind=="Player spawn").unwrap();base.spawns.truncate(1);base.spawns[0].position=source_start.position;
     let mut hashes=vec![];

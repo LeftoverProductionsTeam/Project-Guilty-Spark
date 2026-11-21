@@ -6,7 +6,7 @@ import type { LibraryEntry } from '../types';
 import { exportForgePlacementSnapshot, type ForgeLayoutBase } from '../forgeSidecar';
 import { downloadMedia } from '../machinimaCapture';
 import { isHmvDeviceGroup, type ForgeLayoutTarget } from '../forgeHmv';
-import { verifyForerunnerLocalForge } from '../runtimeWorkbench';
+import { verifyForerunnerHostPhysics, verifyForerunnerLocalForge } from '../runtimeWorkbench';
 import { localForge, mergeForge, portableForge } from '../forgeSession';
 import {
   announceStudio,
@@ -502,7 +502,9 @@ export default function ForgeCollaboration({
     const inspection = await call<ForgeLayoutBase>('inspect_forge_layout_base', {
       projectId: base.id, sourceSha256: first.sourceSha256,
     });
-    if (target === 'forerunner-local') await verifyForerunnerLocalForge();
+    const advanced = placements.some(row => row.hmvPhysics === 'fixed' || row.hmvPhysics === 'phased');
+    if (target === 'forerunner-local') await verifyForerunnerLocalForge(advanced);
+    if (target === 'forerunner-host-physics') await verifyForerunnerHostPhysics();
     if (!active.current || sessionRef.current?.sessionId !== snapshot.sessionId) return;
     if (inspection.sha256 !== first.sourceSha256)
       throw Error('Spark could not verify the exact preserved base map for this revision.');
@@ -1055,8 +1057,11 @@ export default function ForgeCollaboration({
               <div className="analysis-actions">
                 <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements())}>Export shared HMV</button>
                 <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements('forerunner'))}>Export shared HMV for Forerunner</button>
-                {view.document.placements.some(placement => isHmvDeviceGroup(placement.tagClass)) &&
+                {view.document.placements.some(placement => isHmvDeviceGroup(placement.tagClass) ||
+                  placement.hmvPhysics === 'fixed' || placement.hmvPhysics === 'phased') &&
                   <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements('forerunner-local'))}>Export shared HMV for Local Forge</button>}
+                {view.document.placements.some(placement => placement.hmvPhysics === 'fixed' || placement.hmvPhysics === 'phased') &&
+                  <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements('forerunner-host-physics'))}>Export shared HMV for hosted Forge</button>}
               </div>
             </details>}
             {view?.game && (

@@ -503,12 +503,14 @@ function exportableLayoutObject(project: Project, map: MapInspection, row: Layou
 
 function appendBaseHmvPlacement(layout: ReturnType<typeof readHmv>, map: HmvBaseIdentity, placement: {
   tagClass: string; tagPath: string; position: Vec3; rotation: Vec3; team: number; respawnSeconds: number;
+  hmvPhysics?: HmvPlacementProperties['physics'];
 }) {
   const next = readHmv(Array.from(layout.append(placement.tagClass, pathKey(placement.tagPath).replaceAll('/', '\\'),
     placement.position, placement.rotation)), map);
-  if (placement.team === -1 && !placement.respawnSeconds) return next;
+  const physics = placement.hmvPhysics ?? 'normal';
+  if (placement.team === -1 && !placement.respawnSeconds && physics === 'normal') return next;
   return readHmv(Array.from(next.writeProperties(next.recordsCount - 1, {
-    team: placement.team, respawnSeconds: placement.respawnSeconds, placeAtStart: true, physics: 'normal',
+    team: placement.team, respawnSeconds: placement.respawnSeconds, placeAtStart: true, physics,
   })), map);
 }
 
