@@ -3,8 +3,8 @@
 Task: Black Echo, Live Link and immersive map editing
 Status: active
 Starting revision: 56a421578a04bca3afbf3240da49cecde6cf9b45, canonical master.
-Latest verified revision: Black Echo 04d9ccd1 solo UNSC deploy, Pelican boarding and rested field landing verified. Live Link history recovery and VR entry/refusal pass browser checks. RUNTIME_INTEGRATION_20261107 has exact evidence.
-Next action: Continue from the landed Pelican with native disembarkation, then test objectives and extraction. Finish Covenant defense and both authenticated faction loops. Validate live edits in MCC and Warthog placement, Save/rebuild and OpenH1 play in a supported headset. Continue original Zombie and MegaWorld.
+Latest verified revision: 04d9ccd1 solo UNSC boarding, touchdown, live exit and foot advance. Exact script is Covenant-only. Covenant cover candidate 88a13c27 compiles, reads back and loads. See RUNTIME_INTEGRATION_20261107.
+Next action: Play the revised Covenant defense through bank/redeploy. Build the separate UNSC mission with confirmed Pelican arrival and delivered Marine escort. Keep human peers, headset, Live Link, Zombie and MegaWorld gates active.
 
 ## Acceptance
 
