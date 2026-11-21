@@ -4,6 +4,7 @@ import type { NativeOperation } from './nativeOperations';
 
 const localForgeFeature = 'forge.hmv_local_devices.v1';
 const localForgePhysicsFeature = 'forge.hmv_local_physics.v1';
+const hostForgePhysicsFeature = 'forge.hmv_host_physics.v1';
 
 export function verifyForerunnerLocalForge(requiresPhysics = false) {
   const required = requiresPhysics ? [localForgeFeature, localForgePhysicsFeature] : [localForgeFeature];
@@ -11,30 +12,36 @@ export function verifyForerunnerLocalForge(requiresPhysics = false) {
 }
 
 export function verifyForerunnerHostPhysics() {
-  return verifyForerunnerForge(['forge.hmv_base_placements.v1', 'forge.hmv_host_physics.v1'],
+  return verifyForerunnerForge(['forge.hmv_base_placements.v1', hostForgePhysicsFeature],
     'Hosted Forge', 'hosted Forge Fixed and Phased physics');
 }
 
 export async function verifyForerunnerGuestForge(requiresPhysics: boolean) {
   const placements = 'forge.guest_placements.v1';
+  const livePhysics = 'forge.live_physics.v1';
   const required = ['forge.hmv_base_placements.v1', 'forge.guest_rotate.v1'];
-  if (requiresPhysics) required.push('forge.hmv_host_physics.v1');
+  if (requiresPhysics) required.push(hostForgePhysicsFeature);
   const profile = await verifyForerunnerForge(required, 'guest Forge',
-    requiresPhysics ? 'guest Forge editing and hosted Fixed and Phased physics' : 'guest Forge editing', placements);
+    requiresPhysics ? 'guest Forge editing and hosted Fixed and Phased physics' : 'guest Forge editing', [placements, livePhysics]);
+  const features = profile.reviewedCompanion?.capabilities.native_features ?? [];
   return {
     profile: runtimeProfileLabel(profile),
-    placements: profile.reviewedCompanion?.capabilities.native_features?.includes(placements) ?? false,
+    placements: features.includes(placements),
+    livePhysics: features.includes(livePhysics) && features.includes(hostForgePhysicsFeature),
   };
 }
 
-async function verifyForerunnerForge(required: string[], mode: string, support: string, prefer?: string) {
+async function verifyForerunnerForge(required: string[], mode: string, support: string, preferred: string[] = []) {
   const { call } = await import('./api');
   const profiles = await call<RuntimeRegistration[]>('list_runtime_registrations');
   const candidates = profiles.filter(profile => profile.runtimeId === 'openCe'
     && required.every(feature => profile.reviewedCompanion?.capabilities.native_features?.includes(feature)));
   if (!candidates.length) throw Error(`Review a Forerunner build with ${support} in Games & Tools.`);
-  if (prefer) candidates.sort((a, b) => Number(b.reviewedCompanion?.capabilities.native_features?.includes(prefer) ?? false)
-    - Number(a.reviewedCompanion?.capabilities.native_features?.includes(prefer) ?? false));
+  if (preferred.length) {
+    const supported = (profile: RuntimeRegistration) =>
+      preferred.filter(feature => profile.reviewedCompanion?.capabilities.native_features?.includes(feature)).length;
+    candidates.sort((a, b) => supported(b) - supported(a));
+  }
   for (const registration of candidates) {
     try {
       const result = await call<import('./types').RuntimeInstallation>('inspect_runtime_registration', { registration });

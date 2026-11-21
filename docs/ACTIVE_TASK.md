@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Recovered native machine placements now support manual operation with reviewed source and independent CE609 cache readback. Spark Forge and SparkLink can check Forerunner guest editing capability. Evidence and exact cache hashes are in RUNTIME_INTEGRATION_20261107.
-Next action: After Save and full desktop reopening, verify both E-key positions, animation, collision and connected guest state on the Spark-authored switch fixture. Guest-authored physics changes and the exact Black Echo 04d9ccd1 two-human gameplay loop remain open.
+Latest verified revision: Recovered controls and machines now support reviewed startup state through independent CE609 readback. Spark checks Forerunner live Forge physics. The exact Spark switch fixture loaded in both Forerunner clients with separate living spawns and a native Use offer, but scripted E did not change position.
+Next action: Exercise the exact reopened Spark-authored switch build with physical or independently verified E input and observe both peers and collision without using the guest console. Preserve the companion’s accepted guest switch, collision and live Forge physics evidence. Exact Black Echo 04d9ccd1 still awaits two authenticated human players.
 
 ## Acceptance
 

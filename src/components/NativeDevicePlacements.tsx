@@ -42,6 +42,20 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  })}
  <p className="subtle">{wiringLocked?'Extraction owns this connection. Edit it in the mission workflow.':groups.length?'Set the control and machine to the same Position group to link them. The Power group controls whether a device can operate.':'This scenario has no existing device groups.'}</p>
  </fieldset>}
+ {(original.initiallyOff!==undefined||original.initiallyOpen!==undefined)&&<fieldset disabled={!!blocked||wiringLocked}>
+  <legend>Startup state</legend>
+  {original.initiallyOff!==undefined&&<label className="checkbox-label">
+    <input type="checkbox" checked={draft.initiallyOff??original.initiallyOff}
+      disabled={(draft.powerGroup??original.powerGroup??-1)>=0}
+      onChange={event=>update({initiallyOff:event.target.checked})}/>Start powered off
+  </label>}
+  {original.initiallyOpen!==undefined&&<label className="checkbox-label">
+    <input type="checkbox" checked={draft.initiallyOpen??original.initiallyOpen}
+      disabled={(draft.positionGroup??original.positionGroup??-1)>=0}
+      onChange={event=>update({initiallyOpen:event.target.checked})}/>Start open
+  </label>}
+  <p className="subtle">{wiringLocked?'Extraction owns this device’s startup state.':'Each option applies when its Power or Position group is Unbound. A linked group supplies its initial value.'}</p>
+ </fieldset>}
  {!pose&&<Notice>Use finite XYZ within ±1,000,000 and angles within ±360°.</Notice>}
  <div className="button-row"><button disabled={!!blocked||!pose||!onLevelEditor} onClick={()=>{writeMapSession(context.projectId,'world.ai-start',null);writeMapSession(context.projectId,'world.cutscene-camera',null);writeMapSession(context.projectId,'world.trigger-volume',null);writeMapSession(context.projectId,'world.selection',deviceObjectId(original));update({active:true,focus:Date.now()});onLevelEditor?.();}}>{vehicle?'Show vehicle in Level Editor':'Show device in Level Editor'}</button><button disabled={!!blocked||!pose||!changed} onClick={()=>pose&&onPreview({kind:'devicePlacement',device:pose,sourceSha256:context.tagSha256!})}>{vehicle?'Preview vehicle placement':'Preview device placement'}</button><button disabled={busy||!owns} onClick={()=>{setView(null);onDraftChange();}}>Reset placement draft</button></div>
  {!onLevelEditor&&<p className="subtle">Viewport manipulation needs an opened compiled native map. Generated source placements use Logic / Events in the BSP Workshop.</p>}</>}

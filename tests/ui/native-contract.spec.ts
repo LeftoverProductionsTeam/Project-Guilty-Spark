@@ -2409,13 +2409,15 @@ test('SparkLink exports an acknowledged peer move for its exact Forge base', asy
     w.__TAURI_INTERNALS__.invoke = async (command:string,args:any) => {
       if (command !== 'list_runtime_registrations') return invoke(command,args);
       const profiles = await invoke(command,args);
-      profiles[0].reviewedCompanion.capabilities.native_features.push('forge.guest_rotate.v1','forge.guest_placements.v1');
+      profiles[0].reviewedCompanion.capabilities.native_features.push('forge.guest_rotate.v1','forge.guest_placements.v1','forge.live_physics.v1');
       return profiles;
     };
   });
   await checkGuest.press('Enter');
   await expect(guestSetup.getByRole('status')).toContainText('Rotation and placement');
   await expect(guestSetup).toContainText('Move Selected Copy');
+  await expect(guestSetup.getByRole('status')).toContainText('Live physics');
+  await expect(guestSetup).toContainText('Forge Tools → Change Physics');
   await expect(guestSetup).toContainText('Export shared HMV for hosted Forge');
   await page.evaluate(() => { (window as any).__sparkMock.wrongForgeBase = true; });
   await (await pagedControl(page,'button','Export shared HMV',session)).click();
@@ -4884,7 +4886,7 @@ test('recovered native switches link to a machine group through source review an
  await mockRecoveredMissionAreas(page,true);
  await page.evaluate(()=>{
   const mock=(window as any).__sparkMock;
-  Object.assign(mock.nativeDevices[0],{powerGroup:-1,positionGroup:-1,interactionDisabled:true,usableFromBothSides:false});
+  Object.assign(mock.nativeDevices[0],{powerGroup:-1,positionGroup:-1,interactionDisabled:true,usableFromBothSides:false,initiallyOff:true,initiallyOpen:false});
   mock.nativeDevices.push({...mock.nativeDevices[0],class:'mach',name:'door',tagPath:'devices/door',
     interactionDisabled:undefined,usableFromBothSides:undefined,manualActivation:false,
     powerGroup:0,positionGroup:1});
@@ -4906,12 +4908,18 @@ test('recovered native switches link to a machine group through source review an
  await expect(sides).toBeDisabled();
  await lock.uncheck();
  await sides.check();
+ const initiallyOff=form.getByRole('checkbox',{name:'Start powered off',exact:true});
+ const initiallyOpen=form.getByRole('checkbox',{name:'Start open',exact:true});
+ await initiallyOff.uncheck();
+ await initiallyOpen.check();
  await expect(position.locator('option[value="2"]')).toHaveAttribute('disabled','');
  await power.selectOption('0');
  await position.selectOption('1');
+ await expect(initiallyOff).toBeDisabled();
+ await expect(initiallyOpen).toBeDisabled();
  await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
  const proposal=await page.evaluate(()=>(window as any).__sparkMock.placementPreviews.at(-1));
- expect(proposal.device).toMatchObject({name:'terminal',powerGroup:0,positionGroup:1,position:[1,2,3],interactionDisabled:false,usableFromBothSides:true});
+ expect(proposal.device).toMatchObject({name:'terminal',powerGroup:0,positionGroup:1,position:[1,2,3],interactionDisabled:false,usableFromBothSides:true,initiallyOff:false,initiallyOpen:true});
  const preview=page.getByRole('region',{name:'Native edit preview',exact:true});
  await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].positionGroup)).toBe(1);
@@ -4944,7 +4952,7 @@ test('recovered native switches link to a machine group through source review an
  await select.selectOption('mach:0');
  await expect(manual).toBeChecked();
  const devices=await page.evaluate(()=>(window as any).__sparkMock.nativeDevices);
- expect(devices.find((device:any)=>device.class==='ctrl')).toMatchObject({positionGroup:1,interactionDisabled:false});
+ expect(devices.find((device:any)=>device.class==='ctrl')).toMatchObject({positionGroup:1,interactionDisabled:false,initiallyOff:false,initiallyOpen:true});
  expect(devices.find((device:any)=>device.class==='mach')).toMatchObject({positionGroup:1,manualActivation:true});
 });
 
@@ -6359,6 +6367,7 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   await expect(guestSetup).toContainText('network.forge_guest_edits = true');
   await expect(guestSetup).toContainText('Rotate Aimed Copy');
   await expect(guestSetup).not.toContainText('Move Selected Copy');
+  await expect(guestSetup).not.toContainText('Change Physics');
   await placement.getByLabel('Physics').blur();
   await page.keyboard.press('Control+z');
   await expect(placement.getByLabel('Physics')).toHaveValue('normal');
