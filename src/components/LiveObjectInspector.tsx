@@ -61,7 +61,16 @@ export default function LiveObjectInspector({viewport,presentation='sidebar',con
     if(staleSample.current)throw Error('Refresh the game connection before editing live objects.');
     const sessionToken=status?.sessionToken;
     if(!sessionToken)throw new Error('Refresh the live connection before editing.');
-    const confirmSession=async()=>{const sample=await refresh();if(sample.sessionToken!==sessionToken){pendingHistory.current=[];setHistory({past:[],future:[]});setMessage('');throw new Error('Live connection changed after the edit. Its history was not carried into the new session.');}};
+    const confirmSession=async()=>{
+      // The adapter already verified the applied write. A failed follow-up
+      // sample pauses new edits but must leave the receipt available to undo.
+      const sample=await refresh().catch(()=>null);
+      if(!sample)return;
+      const identity=sample.snapshot.identity;
+      if(sample.sessionToken===sessionToken&&identity.scenario===status.snapshot.identity.scenario&&identity.checksum===status.snapshot.identity.checksum)return;
+      pendingHistory.current=[];setHistory({past:[],future:[]});setMessage('');
+      throw new Error('Live connection changed after the edit. Its history was not carried into the new session.');
+    };
     if(record.kind==='scale'){
       const result=await call<ScaleReceipt>('live_mcc_scale_object',{expectedSession:sessionToken,operation:{datum:record.datum,tagDatum:record.tagDatum,expectedScale:reverse?record.after:record.before,scale:reverse?record.before:record.after,includeSharedPhysics:record.shared}});
       if(!result.applied)throw new Error(result.message);setMessage(result.message);await confirmSession();return;
@@ -92,7 +101,7 @@ export default function LiveObjectInspector({viewport,presentation='sidebar',con
         <button disabled={busy||blocked} onClick={()=>void perform(async()=>{const current=(await refresh()).snapshot.objects.find(o=>o.datum===object.datum&&o.tagDatum===object.tagDatum);if(!current)throw new Error('Object respawned or disappeared. Select its new instance.');const op={datum:current.datum,tagDatum:current.tagDatum,before:[...current.position]as Vec3,after:[...draft]as Vec3};await move(op);setHistory(h=>({past:[...h.past,op].slice(-readHistoryLimit()),future:[]}));})}>Apply live object position</button><button onClick={()=>setDraft([...object.position])}>Use observed position</button></>}
       {object&&<LiveScaleControls object={object} count={status.snapshot.objects.length} busy={busy||!!status.cleanupPending} blocked={!!status.scaleKeeperError||blocked} perform={perform} apply={op=>move(op)} remember={remember} sharedValue={shared} onSharedChange={setShared}/>}
       <div className="analysis-actions"><button disabled={busy||blocked||!history.past.length} onClick={()=>void undo()}>Undo live edit (Ctrl+Z)</button><button disabled={busy||blocked||!history.future.length} onClick={()=>void redo()}>Redo live edit (Ctrl+Y)</button><button disabled={busy} onClick={()=>void perform(async()=>{const report=await disconnectLiveSession(status.sessionToken);sampleEpoch.current++;markSampleIssue('');setStatus(null);pendingHistory.current=[];setHistory({past:[],future:[]});setMessage(report.detail);})}>{status.threadRelease?.pendingThreads ? 'Retry thread release & disconnect' : 'Disconnect live session'}</button></div>
-    </>}{message&&<p role="status">{message}</p>}{error&&<Notice tone="error">{error}</Notice>}<p className="subtle">Moves affect this running session. They do not rewrite a source map. Rotation, spawning, BSP replacement and free-camera hooks are not enabled. Reloading or respawning can invalidate a binding; failed readback never becomes a successful undo entry.</p>
+    </>}{message&&<p role="status">{message}</p>}{error&&<Notice tone="error">{error}</Notice>}<p className="subtle">Moves affect this running session. They do not rewrite a source map. Rotation, spawning, BSP replacement and free-camera hooks are not enabled. Reloading or respawning can invalidate a binding. Undo entries require a confirmed game write.</p>
   </section>;
   return <div className={presentation==='drawer'?'level-connected-view':viewport?'live-editor-layout':'live-inspector-layout'}>
     {presentation==='drawer'?<WorkspacePanel id="connection" label="Game connection"><details className="level-session-controls" open={controlsOpen||!!rebuildControls||undefined}><summary>Connect to your Halo game · {status?'connected':'offline'}</summary>{inspector}</details></WorkspacePanel>:inspector}
