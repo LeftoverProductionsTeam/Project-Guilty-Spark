@@ -551,6 +551,9 @@ pub fn verify_marker_readback(doc:&QuickForgeDocument,read:&crate::maps::Scenari
                 || compiled.position_group != Some(linked_position_group(binding, &controls, signals.len())))) {
             return invalid(format!("Compiled Logic device {} name/index/tag/position or wiring differs from source",source.name));
         }
+        if binding.position_control_id.is_some() && compiled.manual_activation != Some(true) {
+            return invalid(format!("Compiled position switch target {} can operate automatically or its machine flag is unreadable", source.name));
+        }
         if controls.iter().any(|control| control.placement_id == binding.placement_id)
             && compiled.interaction_disabled != Some(false)
         {

@@ -4844,8 +4844,8 @@ async function mockRecoveredMissionAreas(page:Page,withDevice:boolean|'vehicle'=
     mock.placementHistory=[structuredClone(mock.groupPreview)];
     return {operationId:'device-group-review',revisionId:'device-group-revision',tagsDirectory:'owned/tags',files:1,restored:!!args.restore,detail:'Synthetic device group revision'};
    }
-   if(command==='native_operation_preview'&&args.operation.kind==='devicePlacement'){const mock=w.__sparkMock;mock.placementPreviews.push(structuredClone(args.operation));mock.placementBefore=structuredClone(mock.nativeDevices[0]);return mock.placementPreview={id:'placement-review',tag:'levels/test.scenario',toolId:'synthetic-invader',beforeSha256:mock.nativeAreaSha,afterSha256:'b'.repeat(64),changedBytes:12,fieldChanges:[{before:JSON.stringify(mock.placementBefore),after:JSON.stringify(args.operation.device)}],detail:'Synthetic reviewed placement',currentState:'before'};}
-   if(command==='native_operation_accept'){const mock=w.__sparkMock;mock.nativeDevices[0]=structuredClone(args.restore?mock.placementBefore:mock.placementPreviews.at(-1).device);mock.nativeAreaSha=args.restore?'a'.repeat(64):'b'.repeat(64);mock.placementPreview.currentState=args.restore?'before':'after';mock.placementHistory=[structuredClone(mock.placementPreview)];return {operationId:'placement-review',revisionId:'placement-revision',tagsDirectory:'owned/tags',files:1,restored:!!args.restore,detail:'Synthetic source revision'};}
+   if(command==='native_operation_preview'&&args.operation.kind==='devicePlacement'){const mock=w.__sparkMock;mock.placementPreviews.push(structuredClone(args.operation));mock.placementIndex=mock.nativeDevices.findIndex((row:any)=>row.class===args.operation.device.class&&row.index===args.operation.device.index);mock.placementBefore=structuredClone(mock.nativeDevices[mock.placementIndex]);return mock.placementPreview={id:'placement-review',tag:'levels/test.scenario',toolId:'synthetic-invader',beforeSha256:mock.nativeAreaSha,afterSha256:(mock.nativeAreaSha==='a'.repeat(64)?'b':'c').repeat(64),changedBytes:12,fieldChanges:[{before:JSON.stringify(mock.placementBefore),after:JSON.stringify(args.operation.device)}],detail:'Synthetic reviewed placement',currentState:'before'};}
+   if(command==='native_operation_accept'){const mock=w.__sparkMock;mock.nativeDevices[mock.placementIndex]=structuredClone(args.restore?mock.placementBefore:mock.placementPreviews.at(-1).device);mock.nativeAreaSha=args.restore?mock.placementPreview.beforeSha256:mock.placementPreview.afterSha256;mock.placementPreview.currentState=args.restore?'before':'after';mock.placementHistory=[structuredClone(mock.placementPreview)];return {operationId:'placement-review',revisionId:'placement-revision',tagsDirectory:'owned/tags',files:1,restored:!!args.restore,detail:'Synthetic source revision'};}
    return invoke(command,args);
   };
  },withDevice);
@@ -4886,7 +4886,7 @@ test('recovered native switches link to a machine group through source review an
   const mock=(window as any).__sparkMock;
   Object.assign(mock.nativeDevices[0],{powerGroup:-1,positionGroup:-1,interactionDisabled:true,usableFromBothSides:false});
   mock.nativeDevices.push({...mock.nativeDevices[0],class:'mach',name:'door',tagPath:'devices/door',
-    interactionDisabled:undefined,usableFromBothSides:undefined,
+    interactionDisabled:undefined,usableFromBothSides:undefined,manualActivation:false,
     powerGroup:0,positionGroup:1});
   mock.nativeDeviceGroups=[
     {index:0,name:'Door power',initialValue:1,changeOnce:false,reserved:false},
@@ -4922,8 +4922,30 @@ test('recovered native switches link to a machine group through source review an
  await expect(position).toHaveValue('1');
  await expect(lock).not.toBeChecked();
  await expect(sides).toBeChecked();
- await form.getByRole('combobox',{name:'Native source placement',exact:true}).selectOption('mach:0');
+ const select=form.getByRole('combobox',{name:'Native source placement',exact:true});
+ await select.selectOption('mach:0');
  await expect(position).toHaveValue('1');
+ const manual=form.getByRole('checkbox',{name:'Require switch or script',exact:true});
+ await expect(manual).not.toBeChecked();
+ await manual.press('Space');
+ await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.placementPreviews.at(-1).device))
+  .toMatchObject({class:'mach',positionGroup:1,manualActivation:true});
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await expect(manual).toBeChecked();
+ await preview.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();
+ await expect(manual).not.toBeChecked();
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await page.keyboard.press('Control+s');
+ await chooseTool(page,'Tag editor');
+ await chooseTool(page,'AI & scenario');
+ if(await operations.getAttribute('open')===null)await operations.locator(':scope > summary').click();
+ if(await form.getAttribute('open')===null)await form.locator(':scope > summary').click();
+ await select.selectOption('mach:0');
+ await expect(manual).toBeChecked();
+ const devices=await page.evaluate(()=>(window as any).__sparkMock.nativeDevices);
+ expect(devices.find((device:any)=>device.class==='ctrl')).toMatchObject({positionGroup:1,interactionDisabled:false});
+ expect(devices.find((device:any)=>device.class==='mach')).toMatchObject({positionGroup:1,manualActivation:true});
 });
 
 test('a recovered scenario with no groups can create and bind a group through review and restore',async({page})=>{

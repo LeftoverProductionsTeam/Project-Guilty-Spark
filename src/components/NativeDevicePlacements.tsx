@@ -21,6 +21,12 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  {original.usableFromBothSides!==undefined&&<label className="checkbox-label"><input type="checkbox" checked={draft.usableFromBothSides??original.usableFromBothSides} disabled={draft.interactionDisabled??original.interactionDisabled} onChange={e=>update({usableFromBothSides:e.target.checked})}/>Allow use from both sides</label>}
  <p className="subtle">{(draft.interactionDisabled??original.interactionDisabled)?'This placement blocks Use from every side.':'Players must be in range, aim at the control and meet its power and device requirements.'}</p>
  </fieldset>}
+ {original.manualActivation!==undefined&&<fieldset disabled={!!blocked||wiringLocked}>
+  <legend>Machine activation</legend>
+  <label className="checkbox-label"><input type="checkbox" checked={draft.manualActivation??original.manualActivation}
+    onChange={event=>update({manualActivation:event.target.checked})}/>Require switch or script</label>
+  <p className="subtle">{wiringLocked?'Extraction owns this machine’s activation.':'Disables automatic operation for this placement. Assign its Position group below to share it with a switch.'}</p>
+ </fieldset>}
  {!groups&&original.powerGroup!==undefined&&<p className="subtle">This source does not expose its device group inventory.</p>}
  {groups&&original.class!=='vehi'&&(original.powerGroup!==undefined||original.positionGroup!==undefined)&&<fieldset disabled={!!blocked||wiringLocked}>
  <legend>Device wiring</legend>

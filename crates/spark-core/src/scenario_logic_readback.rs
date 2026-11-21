@@ -11,6 +11,7 @@ pub struct ScenarioLogicDevice {
     #[serde(skip_serializing_if="Option::is_none")] pub position_group:Option<i16>,
     #[serde(skip_serializing_if="Option::is_none")] pub usable_from_both_sides:Option<bool>,
     #[serde(skip_serializing_if="Option::is_none")] pub interaction_disabled:Option<bool>,
+    #[serde(skip_serializing_if="Option::is_none")] pub manual_activation:Option<bool>,
     pub class:String,pub index:usize,pub name_index:i16,pub tag_path:String,pub position:[f32;3],pub rotation_radians:[f32;3]}
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -225,10 +226,11 @@ fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:boo
             let targets=tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class==class).collect::<Vec<_>>();
             if targets.len()!=1{return invalid("Compiled Logic device tag identity/class is missing or ambiguous");}
             let placement_at = at + index * stride;
-            // In the 64-byte control placement, control_flags follows the common device flags.
+            // Both 64-byte placements keep their class-specific flags after the common device flags.
             let usable_from_both_sides = if class == "ctrl" { Some(r.u32(placement_at + 48)? & 1 != 0) } else { None };
+            let manual_activation = if class == "mach" { Some(r.u32(placement_at + 48)? & 1 != 0) } else { None };
             let interaction_disabled = if class == "ctrl" { Some(r.u32(placement_at + 44)? & (1 << 4) != 0) } else { None };
-            let placement=ScenarioLogicDevice{interaction_disabled,power_group:if class=="vehi"{None}else{Some(r.u16(placement_at+40)? as i16)},position_group:if class=="vehi"{None}else{Some(r.u16(placement_at+42)? as i16)},usable_from_both_sides,class:class.into(),index,name_index:r.u16(placement_at+2)? as i16,
+            let placement=ScenarioLogicDevice{interaction_disabled,manual_activation,power_group:if class=="vehi"{None}else{Some(r.u16(placement_at+40)? as i16)},position_group:if class=="vehi"{None}else{Some(r.u16(placement_at+42)? as i16)},usable_from_both_sides,class:class.into(),index,name_index:r.u16(placement_at+2)? as i16,
                 tag_path:targets[0].path.clone(),position:object.position,rotation_radians:object.rotation};
             if class=="vehi"{vehicles.push(placement);}else{devices.push(placement);}
         }
