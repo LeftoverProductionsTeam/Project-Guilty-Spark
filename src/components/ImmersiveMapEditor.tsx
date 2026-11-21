@@ -19,7 +19,7 @@ type Props = {
   objects:SceneObject[];
   assets:Item[];
   onSelect:(id:string|null)=>void;
-  onTransform:(object:SceneObject)=>void;
+  onTransform:(object:SceneObject)=>boolean;
   onPlace:(key:string,position:Vec3)=>Promise<boolean>;
   onHistory:(kind:'undo'|'redo')=>void;
   onSave:()=>Promise<void>;
@@ -142,9 +142,13 @@ export default function ImmersiveMapEditor(props:Props){
               item=(item+(command==='prev'?-1:1)+latest.assets.length)%latest.assets.length;
               tool='place';
             }
-            if(command==='turn'&&latest.selected){
-              const object=pose(latest.selected);
-              if(object){const [yaw,pitch,roll]=object.rotation;latest.onTransform({...object,rotation:[yaw+Math.PI/12,pitch,roll]});}
+            if(command==='turn'){
+              const object=latest.selected?pose(latest.selected):undefined;
+              if(!object){info.draw('Select an object first');return;}
+              const [yaw,pitch,roll]=object.rotation;
+              const turned=latest.onTransform({...object,rotation:[yaw+Math.PI/12,pitch,roll]});
+              info.draw(turned?'Turned '+object.name:'Turn was rejected. Check Spark for details.');
+              return;
             }
             if(command==='undo'||command==='redo')latest.onHistory(command);
             if(command==='save'){
@@ -164,8 +168,11 @@ export default function ImmersiveMapEditor(props:Props){
           if(tool==='move'){
             const chosen=latest.selected ? pose(latest.selected):undefined;
             if(!chosen){info.draw('Select an object first');return;}
-            latest.onTransform({...chosen,position});
-            tool='select';info.draw('Moved '+chosen.name);return;
+            if(!latest.onTransform({...chosen,position})){
+              info.draw('Move was rejected. Check Spark for details.');
+              return;
+            }
+            tool='select';refresh();info.draw('Moved '+chosen.name);return;
           }
           const asset=latest.assets[item];
           if(!asset){info.draw('Open the Asset Library to choose assets');return;}

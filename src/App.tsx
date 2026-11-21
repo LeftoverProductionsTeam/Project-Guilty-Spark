@@ -861,10 +861,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', key);
   }, [save,help,createModal,applyHistory,busy]);
   function edit(project: Project, description: string) {
-    if(native&&!windowHistories.current.writable(project.id)){notice('This view follows the editing window. Choose Edit here in Changes to take over safely.');return;}
+    if(native&&!windowHistories.current.writable(project.id)){notice('This view follows the editing window. Choose Edit here in Changes to take over safely.');return false;}
     const commit=()=>dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
     // A validated source transaction must commit before its lease releases.
     if(projectMutationPending(project.id))flushSync(commit);else commit();
+    return true;
   }
   function materialDefaults(projectId:string,materials:ForgeMaterial[]){
     if(native&&!windowHistories.current.writable(projectId))return;

@@ -600,7 +600,7 @@ export default function World({
   project: Project;
   inspection: MapInspection | null;
   assetMeshes: Record<string, MeshData>;
-  edit: (p: Project, description: string) => void;
+  edit: (p: Project, description: string) => boolean | void;
   notify: (m: string) => void;
   onOpenTag?: (tagId: number, sourceProjectId?: string) => void;
   onDetachTags?: (sourceProjectId:string,tagId:number)=>Promise<boolean>;
@@ -1293,7 +1293,7 @@ export default function World({
       notify(`Exported ${exported.triangles} real source triangles as OBJ (read-only). Material IDs are diagnostic; compiled BSP/collision and game textures are not included.`);
     } catch (error) { notify(`OBJ export rejected: ${String(error)}`); }
   }
-  function update(o: SceneObject,asCopy=false,sourceScope?:string) {
+  function update(o: SceneObject,asCopy=false,sourceScope?:string): boolean | void {
     if(sourceScope||(!cinematic&&nativeDeviceLatest.current?.active&&o.id===deviceObjectId(nativeDeviceLatest.current.original))){const current=nativeDeviceLatest.current,proof=sourceScope??nativeSourceScope;const next=!asCopy&&proof&&nativeDeviceReady&&!fly&&!cameraLocked&&!externalCameraAuthority?deviceTransform(current,proof,o):null;if(next)setNativeDevice(next);else notify('Native device proposal retained: source/selection changed, handles are locked, or scale/duplicate is unsupported.');return;}
     try {
       validateSceneTransform(o);
@@ -1302,8 +1302,9 @@ export default function World({
       }
       if (asCopy && inspection && isHmvPlacement(project, o)) { duplicateHmv(o, 0); return; }
       if(asCopy){const duplicate=cloneSceneObject(o);edit({...project,scene:[...project.scene,duplicate]},`Duplicate and move ${o.name}`);setSelected(duplicate.id);return;}
-      edit({ ...project, scene: project.scene.map((s) => (s.id === o.id ? o : s)) }, `Transform ${o.name}`);
-    } catch (error) { notify(`Scene transform was not saved: ${String(error)}`); }
+      if(!project.scene.some(sceneObject=>sceneObject.id===o.id))return false;
+      return edit({ ...project, scene: project.scene.map((s) => (s.id === o.id ? o : s)) }, `Transform ${o.name}`)!==false;
+    } catch (error) { notify(`Scene transform was not saved: ${String(error)}`);return false; }
   }
   function duplicateHmv(object: SceneObject, offsetX: number) {
     if (!inspection) return;
@@ -1649,7 +1650,7 @@ export default function World({
                 <ViewportActivity continuous={cinematic||xrActive} />
                 {scopedXr&&xrAvailable&&library&&onImmersiveHistory&&<ImmersiveMapEditor connect={setXrControl} onActive={setXrActive}
                   onStatus={notify} selected={selected} objects={project.scene} assets={xrAssets}
-                  onSelect={setSelected} onTransform={object=>{if(immersiveWritable)update(object);}}
+                  onSelect={setSelected} onTransform={object=>activity.active&&immersiveWritable&&update(object)===true}
                   onPlace={(key,position)=>immersiveWritable?dropAsset(key,position):Promise.reject(Error('This window no longer owns the map.'))}
                   onHistory={onImmersiveHistory} onSave={()=>library.onSaveMap(project.id)}/>}
 
