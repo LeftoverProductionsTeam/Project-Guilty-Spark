@@ -3,8 +3,8 @@
 Task: Black Echo two-player native acceptance
 Status: awaiting human verification
 Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Reviewed native machine type and timing passed browser Preview/Accept/Restore, focused Rust, Windows compilation and independent CE609 tag readback. See RUNTIME_INTEGRATION_20261107 for the exact hashes. The prior SparkLink placement physics milestone remains verified.
-Next action: Expose newly supported Forerunner guest edits in the existing Spark Forge workflow. Verify the Spark-authored native platform with E, collision and client state on the proven fixture when available. Exact Black Echo 04d9ccd1 awaits two authenticated human players.
+Latest verified revision: Guest Forge support is discoverable and checked in Forge layouts and SparkLink. Two browser flows passed. Forerunner’s separate Windows receipts verify guest rotation, placement, move, removal and recovery. The reviewed native machine editor passed browser, Rust, Windows build checks and CE609 independent readback. See RUNTIME_INTEGRATION_20261107.
+Next action: Verify the Spark-authored native platform after Save/reopen with E, collision and guest state. Forerunner guest physics changes still need explicit engine support. Exact Black Echo 04d9ccd1 awaits two authenticated human players. Continue independent creator workflows while these gates are open.
 
 ## Acceptance
 

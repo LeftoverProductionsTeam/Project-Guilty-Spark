@@ -7,6 +7,7 @@ import { exportForgePlacementSnapshot, type ForgeLayoutBase } from '../forgeSide
 import { downloadMedia } from '../machinimaCapture';
 import { isHmvDeviceGroup, type ForgeLayoutTarget } from '../forgeHmv';
 import { verifyForerunnerHostPhysics, verifyForerunnerLocalForge } from '../runtimeWorkbench';
+import ForerunnerGuestForge from './ForerunnerGuestForge';
 import { localForge, mergeForge, portableForge } from '../forgeSession';
 import {
   announceStudio,
@@ -570,6 +571,9 @@ export default function ForgeCollaboration({
   const people = view?.participants ?? [],
     differences = remoteConflict ? studioDifferences(latest.current.doc, remoteConflict.document) : [];
   if (hidden) return null;
+  const sharedPlacements = view?.document.placements ?? [];
+  const sharedPhysics = sharedPlacements.some(placement => placement.hmvPhysics === 'fixed' || placement.hmvPhysics === 'phased');
+
   return (
     <WorkspacePanel id="sparklink" label="SparkLink">
       <details
@@ -1060,9 +1064,11 @@ export default function ForgeCollaboration({
                 {view.document.placements.some(placement => isHmvDeviceGroup(placement.tagClass) ||
                   placement.hmvPhysics === 'fixed' || placement.hmvPhysics === 'phased') &&
                   <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements('forerunner-local'))}>Export shared HMV for Local Forge</button>}
-                {view.document.placements.some(placement => placement.hmvPhysics === 'fixed' || placement.hmvPhysics === 'phased') &&
+                {sharedPhysics &&
                   <button disabled={busy} onClick={() => void perform(() => exportSharedPlacements('forerunner-host-physics'))}>Export shared HMV for hosted Forge</button>}
               </div>
+              {sharedPlacements.every(placement => ['vehi', 'weap', 'eqip'].includes(placement.tagClass)) &&
+                <ForerunnerGuestForge key={`${session.sessionId}:${sharedPhysics}`} requiresPhysics={sharedPhysics} shared />}
             </details>}
             {view?.game && (
               <p className="subtle">

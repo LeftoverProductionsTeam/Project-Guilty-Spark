@@ -5,6 +5,7 @@ import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CH
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
 import { verifyForerunnerHostPhysics, verifyForerunnerLocalForge } from '../runtimeWorkbench';
+import ForerunnerGuestForge from './ForerunnerGuestForge';
 import { Notice, NumberField } from './ui';
 
 export default function ForgeSidecarPanel({ project, map, edit, selected, onSelect, openRequest }: {
@@ -362,6 +363,10 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
           </button>
           <p className="subtle">Put <code>import.hmv</code> in <code>forge/{summary.forerunner.mapName}/</code> under the host’s save folder. Load it from <strong>Forge Tools → Load Layout (.HMV)</strong> on the matching map. Each guest needs a build that supports hosted Forge physics.</p>
         </>}
+        {compatible && map.header.scenarioType === 1 && !summary.forerunner.hasScenery
+          && (!summary.forerunner.issue || summary.forerunnerHostPhysicsIssue === null) &&
+          <ForerunnerGuestForge key={`${map.sha256}:${summary.forerunnerLocalNeedsPhysics}`}
+            requiresPhysics={summary.forerunnerLocalNeedsPhysics} />}
         <p className="subtle">{summary.forerunner.issue ?? <>Copy <code>import.hmv</code> to <code>forge/{summary.forerunner.mapName}/</code> in the save folder of a Forerunner build with HMV support. In an empty Forge session on this map, choose <strong>Forge Tools → Load Layout (.HMV)</strong>.{summary.forerunner.hasScenery && ' A network host cannot load layouts with scenery.'}</>}</p>
       </div>}
       <button type="button" onClick={()=>{

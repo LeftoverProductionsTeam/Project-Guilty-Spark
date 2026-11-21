@@ -2396,6 +2396,27 @@ test('SparkLink exports an acknowledged peer move for its exact Forge base', asy
   expect(bytes[64+5+bytes[68]+34]).toBe(0x21);
   expect(bytes.includes(Buffer.from('SparkLink revision 7'))).toBe(true);
   expect(bytes.includes(Buffer.from('Équipe Spark'))).toBe(true);
+  const guestSetup = session.locator('.forerunner-guest-forge');
+  const guestDetails = guestSetup.locator(':scope > summary');
+  await revealPagedControl(guestDetails);
+  await guestDetails.click();
+  await expect(guestSetup).toHaveAttribute('open', '');
+  const checkGuest = await pagedControl(page,'button','Check reviewed runtime',guestSetup);
+  await checkGuest.click();
+  await expect(guestSetup).toContainText('guest Forge editing and hosted Fixed and Phased physics');
+  await page.evaluate(() => {
+    const w = window as any, invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command:string,args:any) => {
+      if (command !== 'list_runtime_registrations') return invoke(command,args);
+      const profiles = await invoke(command,args);
+      profiles[0].reviewedCompanion.capabilities.native_features.push('forge.guest_rotate.v1','forge.guest_placements.v1');
+      return profiles;
+    };
+  });
+  await checkGuest.press('Enter');
+  await expect(guestSetup.getByRole('status')).toContainText('Rotation and placement');
+  await expect(guestSetup).toContainText('Move Selected Copy');
+  await expect(guestSetup).toContainText('Export shared HMV for hosted Forge');
   await page.evaluate(() => { (window as any).__sparkMock.wrongForgeBase = true; });
   await (await pagedControl(page,'button','Export shared HMV',session)).click();
   await expect(session.getByText('Spark could not verify the exact preserved base map for this revision.',{exact:false})).toBeAttached();
@@ -6295,6 +6316,27 @@ test('Spark creates and authors HMV placements from a selected base-map object',
   expect(hostedBytes.readUInt16LE(4)).toBe(7);
   expect(hostedBytes[64 + 5 + hostedBytes[68] + 34]).toBe(0x11);
   expect(hostedBytes.readUInt32LE(60)).toBe(crc32(hostedBytes.subarray(64)));
+  const guestSetup = panel.locator('.forerunner-guest-forge');
+  await guestSetup.locator(':scope > summary').click();
+  await page.evaluate(() => {
+    const w = window as any, invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command:string,args:any) => {
+      if (command !== 'list_runtime_registrations') return invoke(command,args);
+      const profiles = await invoke(command,args);
+      profiles[0].reviewedCompanion.capabilities.native_features.push('forge.guest_rotate.v1');
+      return profiles;
+    };
+  });
+  const checkGuest = guestSetup.getByRole('button',{name:'Check reviewed runtime',exact:true});
+  await page.evaluate(() => { (window as any).__sparkMock.staleHostedForge = true; });
+  await checkGuest.click();
+  await expect(guestSetup).toContainText('The reviewed guest Forge runtime changed or is unavailable');
+  await page.evaluate(() => { (window as any).__sparkMock.staleHostedForge = false; });
+  await checkGuest.click();
+  await expect(guestSetup.getByRole('status')).toHaveText(/ · Rotation$/);
+  await expect(guestSetup).toContainText('network.forge_guest_edits = true');
+  await expect(guestSetup).toContainText('Rotate Aimed Copy');
+  await expect(guestSetup).not.toContainText('Move Selected Copy');
   await placement.getByLabel('Physics').blur();
   await page.keyboard.press('Control+z');
   await expect(placement.getByLabel('Physics')).toHaveValue('normal');

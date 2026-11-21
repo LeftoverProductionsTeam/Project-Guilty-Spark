@@ -15,17 +15,31 @@ export function verifyForerunnerHostPhysics() {
     'Hosted Forge', 'hosted Forge Fixed and Phased physics');
 }
 
-async function verifyForerunnerForge(required: string[], mode: string, support: string) {
+export async function verifyForerunnerGuestForge(requiresPhysics: boolean) {
+  const placements = 'forge.guest_placements.v1';
+  const required = ['forge.hmv_base_placements.v1', 'forge.guest_rotate.v1'];
+  if (requiresPhysics) required.push('forge.hmv_host_physics.v1');
+  const profile = await verifyForerunnerForge(required, 'guest Forge',
+    requiresPhysics ? 'guest Forge editing and hosted Fixed and Phased physics' : 'guest Forge editing', placements);
+  return {
+    profile: runtimeProfileLabel(profile),
+    placements: profile.reviewedCompanion?.capabilities.native_features?.includes(placements) ?? false,
+  };
+}
+
+async function verifyForerunnerForge(required: string[], mode: string, support: string, prefer?: string) {
   const { call } = await import('./api');
   const profiles = await call<RuntimeRegistration[]>('list_runtime_registrations');
   const candidates = profiles.filter(profile => profile.runtimeId === 'openCe'
     && required.every(feature => profile.reviewedCompanion?.capabilities.native_features?.includes(feature)));
   if (!candidates.length) throw Error(`Review a Forerunner build with ${support} in Games & Tools.`);
+  if (prefer) candidates.sort((a, b) => Number(b.reviewedCompanion?.capabilities.native_features?.includes(prefer) ?? false)
+    - Number(a.reviewedCompanion?.capabilities.native_features?.includes(prefer) ?? false));
   for (const registration of candidates) {
     try {
       const result = await call<import('./types').RuntimeInstallation>('inspect_runtime_registration', { registration });
       if (result.validation === 'pass' && result.registrationId === registration.id
-        && result.executableSha256 === registration.reviewedCompanion?.executableSha256) return;
+        && result.executableSha256 === registration.reviewedCompanion?.executableSha256) return registration;
     } catch {
       // A stale profile must not prevent a second intact reviewed profile from being used.
     }
