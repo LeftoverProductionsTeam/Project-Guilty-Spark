@@ -423,6 +423,38 @@ fn installed_compiled_extraction_checks_all_hub_starts_and_native_bindings() {
     let before=maps::hash_file(&path).unwrap();let map=maps::inspect_map(&path,None).unwrap();
     assert!(creative::compiled_extraction_mode(&path,&map).unwrap());
     let markers=maps::scenario_logic_readback(&path,&map).unwrap();
+    let faction_pad = markers.volumes.iter().any(|row| row.name == "spirit_return")
+        && markers.names.iter().any(|row| row.name == "extraction_spirit");
+    if faction_pad {
+        let features = creative::compiled_extraction_requirements(&path, &map).unwrap().unwrap();
+        assert!(features.iter().any(|feature| feature == creative::FACTION_LANDING_ZONES_FEATURE));
+        let shared_field = markers.volumes.iter().find(|row| row.name == "extraction_zone").unwrap();
+        let mut wrong = markers.clone();
+        let pad = wrong.volumes.iter_mut().find(|row| row.name == "spirit_return").unwrap();
+        pad.geometry.clone_from(&shared_field.geometry);
+        assert!(l::validate_compiled_extraction_layout(&map, &wrong).unwrap_err().to_string().contains("intersects"));
+        let mut alternate = markers.clone();
+        let (call, binding) = alternate.names.iter_mut().enumerate().find(|(_, row)| row.name == "extraction_activate").unwrap();
+        binding.name = "extraction_pelican_activate".into();
+        alternate.volumes.iter_mut().find(|row| row.name == "extraction_zone").unwrap().name = "extraction_pelican_zone".into();
+        assert!(l::validate_compiled_extraction_layout(&map, &alternate).is_err(), "A named Spirit needs its own pair in the absence of a shared route");
+        let mut spirit = alternate.devices.iter().find(|row| row.class == "ctrl" && row.name_index == call as i16).unwrap().clone();
+        spirit.index = 99;
+        spirit.name_index = alternate.names.len() as i16;
+        alternate.names.push(maps::ScenarioLogicName { name: "extraction_spirit_activate".into(), object_type: 8, object_index: 99 });
+        alternate.devices.push(spirit);
+        let mut spirit_field = shared_field.clone();
+        spirit_field.name = "extraction_spirit_zone".into();
+        alternate.volumes.push(spirit_field);
+        assert!(l::validate_compiled_extraction_layout(&map, &alternate).unwrap(), "Complete native pairs can replace the shared field");
+        let mut wrong = alternate.clone();
+        wrong.devices.iter_mut().find(|row| row.index == 99).unwrap().interaction_disabled = Some(true);
+        assert!(l::validate_compiled_extraction_layout(&map, &wrong).is_err());
+        let mut wrong = alternate;
+        wrong.vehicles.retain(|row| !markers.names.iter().enumerate().any(|(index, name)|
+            name.name == "extraction_spirit" && row.name_index == index as i16));
+        assert!(l::validate_compiled_extraction_layout(&map, &wrong).is_err());
+    }
     l::validate_compiled_extraction_layout(&map,&markers).unwrap();
     for fault in 0..9 {
         let mut wrong=markers.clone();

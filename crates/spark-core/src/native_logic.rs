@@ -602,29 +602,87 @@ pub fn validate_extraction_layout(doc:&QuickForgeDocument,activation_powered:boo
 }
 /// Read-only compiled marker/start admission for the existing Forerunner mode.
 /// The engine still owns control-use behavior, collision, settlement and gameplay.
-pub fn validate_compiled_extraction_layout(map:&crate::maps::MapInspection,read:&crate::maps::ScenarioLogicReadback)->Result<()> {
-    if map.diagnostics.iter().any(|d|d.code=="PLAYER_SPAWNS_UNREADABLE"){return invalid("Compiled Extraction player starts are unreadable");}
-    let volume=|name:&str|->Result<TriggerGeometry>{
-        let rows=read.volumes.iter().filter(|v|v.name==name).collect::<Vec<_>>();
-        if rows.len()!=1||rows[0].kind!=1{return invalid(format!("Compiled Extraction needs one readable rotational {name} volume"));}
-        let g=rows[0].geometry.as_ref().ok_or_else(||crate::SparkError::Invalid("Compiled Extraction volume geometry is unavailable".into()))?;
-        Ok(TriggerGeometry{forward:g.forward,up:g.up,corner:g.corner,dimensions:g.dimensions})
+pub fn validate_compiled_extraction_layout(map: &crate::maps::MapInspection, read: &crate::maps::ScenarioLogicReadback) -> Result<bool> {
+    if map.diagnostics.iter().any(|d| d.code == "PLAYER_SPAWNS_UNREADABLE") {
+        return invalid("Compiled Extraction player starts are unreadable");
+    }
+    let has_name = |name: &str| read.names.iter().any(|row| row.name == name);
+    let has_volume = |name: &str| read.volumes.iter().any(|row| row.name == name);
+    let volume = |name: &str| -> Result<&TriggerGeometry> {
+        let rows = read.volumes.iter().filter(|row| row.name == name).collect::<Vec<_>>();
+        if rows.len() != 1 || rows[0].kind != 1 {
+            return invalid(format!("Compiled Extraction needs one readable rotational {name} volume"));
+        }
+        rows[0].geometry.as_ref().filter(|geometry| geometry.valid())
+            .ok_or_else(|| crate::SparkError::Invalid(format!("Compiled Extraction volume {name} has invalid geometry")))
     };
-    let hub=volume("extraction_return")?;let field=volume("extraction_zone")?;
-    for name in ["extraction_deploy","extraction_activate"] {
-        let rows=read.names.iter().enumerate().filter(|(_,n)|n.name==name).collect::<Vec<_>>();
-        if rows.len()!=1||rows[0].1.object_type!=8||rows[0].1.object_index<0{return invalid(format!("Compiled Extraction control {name} is missing, ambiguous or has the wrong native type"));}
-        let (name_index,binding)=rows[0];let devices=read.devices.iter().filter(|d|d.class=="ctrl"&&d.index==binding.object_index as usize&&d.name_index==name_index as i16).collect::<Vec<_>>();
-        if devices.len()!=1{return invalid("Compiled Extraction control reverse binding is invalid");}
+    let control = |name: &str| -> Result<[f32; 3]> {
+        let rows = read.names.iter().enumerate().filter(|(_, row)| row.name == name).collect::<Vec<_>>();
+        if rows.len() != 1 || rows[0].1.object_type != 8 || rows[0].1.object_index < 0 {
+            return invalid(format!("Compiled Extraction control {name} is missing, ambiguous or has the wrong native type"));
+        }
+        let (index, binding) = rows[0];
+        let devices = read.devices.iter().filter(|d| d.class == "ctrl"
+            && d.index == binding.object_index as usize && d.name_index == index as i16).collect::<Vec<_>>();
+        if devices.len() != 1 {
+            return invalid(format!("Compiled Extraction control {name} has an invalid reverse binding"));
+        }
         if devices[0].interaction_disabled != Some(false) {
             return invalid(format!("Compiled Extraction control {name} blocks player interaction or its placement flag is unreadable"));
         }
-        let point=devices[0].position;
-        if name=="extraction_deploy"&&(!hub.contains(point)||field.contains(point))||name=="extraction_activate"&&!field.contains(point){return invalid("Compiled Extraction controls are outside their hub/activation areas");}
+        Ok(devices[0].position)
+    };
+    let hub = volume("extraction_return")?;
+    let deploy = control("extraction_deploy")?;
+    let mut field_zones = Vec::new();
+    let shared = has_name("extraction_activate") || has_volume("extraction_zone");
+    if shared {
+        let field = volume("extraction_zone")?;
+        if !field.contains(control("extraction_activate")?) {
+            return invalid("Compiled Extraction shared control is outside its activation area");
+        }
+        field_zones.push(field);
     }
-    let starts=map.objects.iter().filter(|o|o.kind=="Player spawn").collect::<Vec<_>>();
-    if starts.is_empty()||starts.iter().any(|s|!hub.contains(s.position)||field.contains(s.position)){return invalid("Every compiled player start must be inside the safe hub and outside activation");}
-    Ok(())
+    let mut faction_zones = false;
+    for (ship, call, field) in [
+        ("extraction_pelican", "extraction_pelican_activate", "extraction_pelican_zone"),
+        ("extraction_spirit", "extraction_spirit_activate", "extraction_spirit_zone"),
+    ] {
+        let override_route = has_name(call) || has_volume(field);
+        if !override_route && (shared || !has_name(ship)) { continue; }
+        let named_ship = read.names.iter().enumerate().filter(|(_, row)| row.name == ship).collect::<Vec<_>>();
+        if named_ship.len() != 1 || named_ship[0].1.object_type != 1 ||
+            !read.vehicles.iter().any(|vehicle| vehicle.class == "vehi" && vehicle.name_index == named_ship[0].0 as i16
+                && i16::try_from(vehicle.index).ok() == Some(named_ship[0].1.object_index))
+        {
+            return invalid(format!("Compiled Extraction route {call} needs its named native vehicle {ship}"));
+        }
+        let zone = volume(field)?;
+        if !zone.contains(control(call)?) {
+            return invalid(format!("Compiled Extraction control {call} is outside {field}"));
+        }
+        field_zones.push(zone);
+        faction_zones = true;
+    }
+    if field_zones.is_empty() {
+        return invalid("Compiled Extraction needs a shared field route or a complete route for every named dropship");
+    }
+    if has_name("extraction_spirit") && has_volume("spirit_return") {
+        let pad = volume("spirit_return")?;
+        if field_zones.iter().any(|field| pad.intersects(field)) {
+            return invalid("Compiled Spirit return pad intersects a field Extraction zone");
+        }
+        faction_zones = true;
+    }
+    let in_field = |point| field_zones.iter().any(|field| field.contains(point));
+    if !hub.contains(deploy) || in_field(deploy) {
+        return invalid("Compiled Extraction deployment control must be inside the hub and outside field zones");
+    }
+    let mut starts = map.objects.iter().filter(|object| object.kind == "Player spawn").peekable();
+    if starts.peek().is_none() || starts.any(|spawn| !hub.contains(spawn.position) || in_field(spawn.position)) {
+        return invalid("Every compiled player start must be inside the safe hub and outside activation");
+    }
+    Ok(faction_zones)
 }
 
 pub fn scenario_commands(doc: &QuickForgeDocument, scenario: &str) -> Result<Vec<ForgeCommand>> {

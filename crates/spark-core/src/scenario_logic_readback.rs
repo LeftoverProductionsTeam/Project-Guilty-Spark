@@ -23,6 +23,34 @@ pub struct ScenarioLogicVolume {pub name:String,pub kind:u16,pub geometry:Option
 pub struct ScenarioLogicVolumeGeometry {pub forward:[f32;3],pub up:[f32;3],pub corner:[f32;3],pub dimensions:[f32;3]}
 impl ScenarioLogicVolumeGeometry {
     pub(crate) fn valid(&self)->bool{self.contains(self.corner)&&self.corner.iter().chain(self.dimensions.iter()).all(|v|v.abs()<=1e6)}
+    /// Separating-axis test for two validated native oriented trigger boxes.
+    pub(crate) fn intersects(&self, other: &Self) -> bool {
+        let cross = |a: [f64; 3], b: [f64; 3]| {
+            [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
+        };
+        let dot = |a: [f64; 3], b: [f64; 3]| a.into_iter().zip(b).map(|(x,y)| x*y).sum::<f64>();
+        let basis = |g: &Self| {
+            let forward = g.forward.map(f64::from);
+            let up = g.up.map(f64::from);
+            [forward, cross(up, forward), up]
+        };
+        let a = basis(self);
+        let b = basis(other);
+        let bounds = |g: &Self, basis: [[f64; 3]; 3], axis| {
+            let start = dot(g.corner.map(f64::from), axis);
+            basis.into_iter().zip(g.dimensions).fold((start, start), |(min, max), (side, width)| {
+                let offset = dot(side, axis) * f64::from(width);
+                (min + offset.min(0.), max + offset.max(0.))
+            })
+        };
+        let axes = a.into_iter().chain(b).chain(a.into_iter().flat_map(|x| b.map(|y| cross(x,y))));
+        !axes.filter(|&axis| dot(axis,axis) > 1e-20).any(|axis| {
+            let (low_a, high_a) = bounds(self, a, axis);
+            let (low_b, high_b) = bounds(other, b, axis);
+            high_a < low_b || high_b < low_a
+        })
+    }
+
     pub(crate) fn contains(&self,point:[f32;3])->bool {
         let dot=|a:[f32;3],b:[f32;3]|a.iter().zip(b).map(|(x,y)|x*y).sum::<f32>();
         if point.iter().chain(self.forward.iter()).chain(self.up.iter()).chain(self.corner.iter()).chain(self.dimensions.iter()).any(|v|!v.is_finite())

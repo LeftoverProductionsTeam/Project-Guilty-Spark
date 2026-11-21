@@ -130,6 +130,11 @@ fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>
     let output = build.output.as_ref().ok_or("Validated native output is missing")?;
     let inspection = maps::inspect_map(output, None).map_err(error)?;
     let header = &inspection.header;
+    if scenario_type == 1 && header.version == 609 && header.scenario_type == 0
+        && core::creative::compiled_extraction_mode(output, &inspection).map_err(error)?
+    {
+        return Err("This compiled mission uses Forerunner’s native Extraction settlement. Select the reviewed Forerunner profile and Start staged solo test.".into());
+    }
     if header.version != 609 || header.scenario_type != scenario_type || header.extended
         || !core::ce_host::map_selector(&header.name)
         || output.file_stem().and_then(|n|n.to_str()) != Some(header.name.as_str()) {

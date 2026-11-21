@@ -419,6 +419,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
 /// A recovered native mission may lack Studio metadata. Admit the existing
 /// engine mode from its compiled callback/markers, never from a project label.
 pub const SQUAD_OBJECTIVES_FEATURE:&str="extraction.squad_objectives.v1";
+pub const FACTION_LANDING_ZONES_FEATURE: &str = "extraction.faction_landing_zones.v1";
 /// Native interface names from the reviewed Forerunner contract. This detects
 /// required engine behavior, not mission completion, membership or gameplay.
 fn squad_interface_number(name:&str,prefix:&str,suffix:&str)->Result<Option<u8>> {
@@ -452,8 +453,10 @@ pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps:
     for script in &map.scripts{if let Some(number)=squad_interface_number(&script.name,"forerunner_squad_","_complete")?{if !settled.insert(number){return invalid("Native squad completion callbacks must be unique");}}}
     let squad=!queries.is_empty()||!ready.is_empty()||!terminals.is_empty()||!settled.is_empty();
     if callbacks.is_empty()&&!squad{return Ok(None);}
-    crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
-    let features=if squad{vec![SQUAD_OBJECTIVES_FEATURE.into()]}else{vec![]};
+    let faction_landing_zones = crate::native_logic::validate_compiled_extraction_layout(map, &markers)?;
+    let mut features = Vec::new();
+    if squad { features.push(SQUAD_OBJECTIVES_FEATURE.into()); }
+    if faction_landing_zones { features.push(FACTION_LANDING_ZONES_FEATURE.into()); }
     Ok(Some(features))
 }
 pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<bool> {

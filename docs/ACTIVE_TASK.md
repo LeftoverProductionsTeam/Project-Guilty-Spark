@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Black Echo two-player native acceptance
+Task: Black Echo native Extraction gameplay
 Status: awaiting human verification
-Starting revision: 1ab199467fb862ceadf327599a42c22c8fe30536, canonical master.
-Latest verified revision: Recovered controls and machines now support reviewed startup state through independent CE609 readback. Spark checks Forerunner live Forge physics. The exact Spark switch fixture loaded in both Forerunner clients with separate living spawns and a native Use offer, but scripted E did not change position.
-Next action: Exercise the exact reopened Spark-authored switch build with physical or independently verified E input and observe both peers and collision without using the guest console. Preserve the companion’s accepted guest switch, collision and live Forge physics evidence. Exact Black Echo 04d9ccd1 still awaits two authenticated human players.
+Starting revision: c066bd30301127ce052f6667b0395addb559d132, canonical master.
+Latest verified revision: 20 Nov: exact Elite 04d9ccd1 passes Windows stage/readback on reviewed Forerunner b18889ff. The new native guard checks the Spirit pad and faction landing capability. The current test did not run the game. See RUNTIME_INTEGRATION_20261107 for hashes, refusals, and boundaries. Unverified device-group edits remain parked.
+Next action: From the outer Spirit flank, defeat the defender, verify gs_extraction_armed, call the craft, board, bank and redeploy. Repeat for UNSC with two authenticated human players. Advance original Zombie carrier release and Timberland–Sidewinder traversal independently.
 
 ## Acceptance
 
