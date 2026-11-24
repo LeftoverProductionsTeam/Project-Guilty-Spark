@@ -13,6 +13,10 @@ const invader = value('--invader');
 const output = value('--output');
 const diagnosePlacement = args.includes('--diagnose-corrupt-placement');
 const repairMixedPalettes = args.includes('--repair-mixed-palettes');
+const repairShieldNoise = args.includes('--repair-shield-noise');
+const repairSurvivorSpawn = args.includes('--repair-survivor-spawn');
+if (repairSurvivorSpawn && !repairShieldNoise) throw new Error('Survivor-spawn recovery requires the shield-noise repair');
+if (repairShieldNoise && !repairMixedPalettes) throw new Error('Shield-noise recovery requires the mixed-palette repair');
 if (repairMixedPalettes && !diagnosePlacement) throw new Error('Mixed-palette recovery requires the earlier corrupt-placement diagnosis');
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const hashFile = (file) => sha(fs.readFileSync(file));
@@ -32,7 +36,7 @@ fs.mkdirSync(tags); fs.mkdirSync(maps);
 const manifest = {
   schemaVersion: 1, profile: 'Recovery edition — missing event audio omitted', faithful: false, playable: false,
   source, sourceSha256: originalSha, resources, resourceSha256: resourceHashes, tools: executables,
-  diagnosticPlacementChangesEnabled: diagnosePlacement, mixedPaletteRepairEnabled: repairMixedPalettes, changes: [], commands: [], results: [],
+  diagnosticPlacementChangesEnabled: diagnosePlacement, mixedPaletteRepairEnabled: repairMixedPalettes, shieldNoiseRepairEnabled: repairShieldNoise, survivorSpawnRepairEnabled: repairSurvivorSpawn, changes: [], commands: [], results: [],
   exclusions: ['sound\\dialog\\multiplayer1\\scorpion.sound', 'sound\\dialog\\multiplayer1\\hill_occupied.sound'],
   limitations: ['Two custom event sounds are absent, not restored', 'No game installation or archived executable is used', 'A successful compile would still require independent validation and target-game load testing'],
 };
@@ -56,6 +60,11 @@ const run = (tool, parameters, name) => {
   return { exitCode: result.status, stdout: result.stdout ?? '', log, incomplete: !!result.error };
 };
 const scenarioTag = "fonzie's zombie apocalypse.scenario";
+function editTag(tag, parameters, step) {
+  const result = run('edit', ['-t', tags, ...parameters, tag], step);
+  if (result.exitCode !== 0 || result.incomplete) throw new Error(step + ' failed');
+  return result.stdout.replaceAll('\r\n', '\n').replace(/\n$/, '').split('\n');
+}
 const compile = (name, target = 'mcc-cea', destination = maps) => {
   const result = run('build', ['-g', target, '-t', tags, '-m', destination, '--resource-usage', 'none', "fonzie's zombie apocalypse"], name);
   const state = result.exitCode === 0 && !result.incomplete ? 'compiled-unverified' : 'blocked';
@@ -65,13 +74,9 @@ const compile = (name, target = 'mcc-cea', destination = maps) => {
 function recoverMixedPalettes() {
   const scenario = path.join(tags, scenarioTag);
   const beforeSha256 = hashFile(scenario);
-  const native = (operation, parameters, step) => {
-    const result = run('edit', ['-t', tags, ...parameters, scenarioTag], step);
-    if (result.exitCode !== 0 || result.incomplete) throw new Error(operation + ' failed');
-    return result.stdout.replaceAll('\r\n', '\n').replace(/\n$/, '').split('\n');
-  };
+  const native = (parameters, step) => editTag(scenarioTag, parameters, step);
   const paths = ['scenery_palette[*].name', 'scenery[*].type', 'biped_palette[*].name'];
-  const query = (field, step) => native('Read ' + field, ['-G', field], step);
+  const query = (field, step) => native(['-G', field], step);
   const read = (phase) => paths.map((field, index) => query(field, phase + '-palette-' + index));
   const [scenery, placements, bipeds] = read('before');
   const legacySlots = [10, 15, 22];
@@ -82,13 +87,13 @@ function recoverMixedPalettes() {
   const expectedTags = [spawner, spawner, marine];
   if (scenery.length !== 39 || bipeds.length !== 1
     || legacySlots.some((slot, index) => scenery[slot]?.toLowerCase() !== expectedTags[index] || JSON.stringify(uses(slot)) !== JSON.stringify(expectedPlacements[index]))
-    || native('Count existing bipeds', ['-C', 'bipeds'], 'biped-count')[0] !== '0') {
+    || native(['-C', 'bipeds'], 'biped-count')[0] !== '0') {
     throw new Error('The audited mixed palette or Marine placement changed');
   }
   const commonFields = ['name', 'not_placed.automatically', 'not_placed.on_easy', 'not_placed.on_normal',
     'not_placed.on_hard', 'not_placed.use_player_appearance', 'desired_permutation', 'position',
     'rotation', 'appearance_player_index'];
-  const commonValues = native('Read Marine placement', commonFields.flatMap(field => ['-G', 'scenery[95].' + field]), 'marine-read');
+  const commonValues = native(commonFields.flatMap(field => ['-G', 'scenery[95].' + field]), 'marine-read');
   if (commonValues.length !== commonFields.length) throw new Error('Marine placement fields could not be read');
   const rotation = commonValues[commonFields.indexOf('rotation')].split(',').map(Number);
   if (rotation.length !== 3 || !rotation.every(Number.isFinite)) throw new Error('Invalid Marine rotation');
@@ -119,9 +124,9 @@ function recoverMixedPalettes() {
     ...removeScenery.slice().reverse().flatMap(index => ['-E', 'scenery_palette[' + index + ']']),
     ...reindexed.flatMap((type, index) => ['-S', 'scenery[' + index + '].type', type === '65535' ? '-1' : type]),
   ];
-  native('Repair scenario palettes', edits, 'mixed-palette-repair');
+  native(edits, 'mixed-palette-repair');
   const [afterScenery, afterPlacements, afterBipeds] = read('after');
-  const moved = native('Read native biped placement', [...commonFields, 'type'].flatMap(field => ['-G', 'bipeds[0].' + field]), 'marine-readback');
+  const moved = native([...commonFields, 'type'].flatMap(field => ['-G', 'bipeds[0].' + field]), 'marine-readback');
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
   const rotationIndex = commonFields.indexOf('rotation');
   const nativeRotation = moved[rotationIndex]?.split(',').map(Number);
@@ -136,6 +141,79 @@ function recoverMixedPalettes() {
   }
   manifest.changes.push({tag:scenarioTag, reason:'Move the existing Hiding Marine to the native biped block, remove now-unused invalid palette entries and reindex scenery',
     sourceScenery:95, destinationBiped:0, removedSceneryPalette:removeScenery, beforeSha256, afterSha256:hashFile(scenario)});
+  save();
+}
+
+function recoverShieldNoise() {
+  const shader = 'mgm/fonzie/sparky/tags/player/survivor/shield hit.shader_transparent_plasma';
+  const bitmap = 'characters/floodcombat elite/bitmaps/flood tentacles.bitmap';
+  const volume = 'spark_recovery/zombie/shield noise volume.bitmap';
+  const asDependency = (tag) => tag.replaceAll('/', '\\');
+  const duplicateFile = path.join(tags, volume);
+  const original = fs.readFileSync(path.join(tags, bitmap));
+  const bindingFields = ['primary_noise_map', 'secondary_noise_map'];
+  const bitmapFields = ['type', 'bitmap_data[0].type', 'bitmap_data[0].depth',
+    'bitmap_data[0].width', 'bitmap_data[0].height', 'bitmap_data[0].format', 'bitmap_data[0].mipmap_count'];
+  const read = (tag, fields, step) => editTag(tag, fields.flatMap(field => ['-G', field]), step);
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const before = read(bitmap, bitmapFields, 'shield-original-bitmap');
+  const expected = ['2d_textures', '2d_texture', '1', '128', '128', 'dxt3', '7'];
+  if (!same(before, expected) || !same(editTag(bitmap, ['-C', 'bitmap_data'], 'shield-original-image-count'), ['1'])
+    || original.length !== 22156 || !same(read(shader, bindingFields, 'shield-before-binding'), [asDependency(bitmap), asDependency(bitmap)])) {
+    throw new Error('The audited single-slice shield source or its two dependency paths changed');
+  }
+  fs.mkdirSync(path.dirname(duplicateFile), { recursive: true });
+  fs.copyFileSync(path.join(tags, bitmap), duplicateFile, fs.constants.COPYFILE_EXCL);
+  editTag(volume, ['-n', '-S', 'type', '3d_textures', '-S', 'bitmap_data[0].type', '3d_texture'], 'shield-create-volume');
+  const converted = fs.readFileSync(duplicateFile);
+  const typeOffsets = [65, 22119]; // audited bitmap tag and image record enum bytes
+  if (!same(read(volume, bitmapFields, 'shield-volume-readback'), ['3d_textures', '3d_texture', ...expected.slice(2)])
+    || converted.length !== original.length
+    || typeOffsets.some(offset => original[offset] !== 0 || converted[offset] !== 1)
+    || original.some((byte, offset) => byte !== converted[offset] && !(offset >= 40 && offset <= 43) && !typeOffsets.includes(offset))) {
+    throw new Error('Native shield volume changed bytes outside its two type enums and tag checksum');
+  }
+  const shieldFile = path.join(tags, shader);
+  const oldShader = hashFile(shieldFile);
+  const otherShaderFields = (step) => editTag(shader, ['-L'], step)
+    .filter(line => !/\b(?:primary|secondary)_noise_map \(/.test(line));
+  const otherBefore = otherShaderFields('shield-original-material');
+  editTag(shader, bindingFields.flatMap(field => ['-S', field, volume]), 'shield-bind-volume');
+  if (!same(read(shader, bindingFields, 'shield-binding-readback'), [asDependency(volume), asDependency(volume)])
+    || !same(otherShaderFields('shield-material-readback'), otherBefore)
+    || !fs.readFileSync(path.join(tags, bitmap)).equals(original)) {
+    throw new Error('Shield bindings, unaffected material fields or original Flood bitmap changed unexpectedly');
+  }
+  manifest.changes.push({tag:shader, reason:'Bind the Survivor shield to a separate depth-one native volume containing the original DXT3 mip chain',
+    originalBitmap:bitmap, originalBitmapSha256:sha(original), volume, volumeSha256:sha(converted), preservedPixelBytes:true,
+    beforeSha256:oldShader, afterSha256:hashFile(shieldFile)});
+  save();
+}
+
+function recoverSurvivorSpawn() {
+  const biped = 'mgm/fonzie/sparky/tags/player/survivor.biped';
+  const effect = 'effects/coop teleport.effect';
+  const originalEffectSha256 = hashFile(path.join(tags, effect));
+  const bipedFile = path.join(tags, biped);
+  const beforeSha256 = hashFile(bipedFile);
+  const fields = ['spawned_actor', 'spawned_actor_count', 'spawned_velocity'];
+  const read = step => editTag(biped, fields.flatMap(field => ['-G', field]), step);
+  const otherFields = step => editTag(biped, ['-L'], step).filter(line => !/\bspawned_actor\s+(?:\(|dependency\b)/.test(line));
+  const before = read('survivor-spawn-source');
+  if (JSON.stringify(before) !== JSON.stringify(['effects\\coop teleport.effect', '0,0', '0.000000'])) {
+    throw new Error('The audited Survivor actor-spawn field is no longer dormant');
+  }
+  const otherBefore = otherFields('survivor-original');
+  editTag(biped, ['-S', 'spawned_actor', '.actor_variant'], 'survivor-clear-dormant-spawn');
+  const after = read('survivor-spawn-readback');
+  if (JSON.stringify(after) !== JSON.stringify(['.actor_variant', ...before.slice(1)])
+    || JSON.stringify(otherFields('survivor-fields-readback')) !== JSON.stringify(otherBefore)
+    || hashFile(path.join(tags, effect)) !== originalEffectSha256) {
+    throw new Error('Survivor spawn normalization changed another field or the teleport effect');
+  }
+  manifest.changes.push({tag:biped, reason:'Clear a cross-class spawn dependency whose authored actor count is zero',
+    previousDependency:effect, effectSha256:originalEffectSha256, spawnCount:[0,0],
+    beforeSha256, afterSha256:hashFile(bipedFile)});
   save();
 }
 
@@ -167,6 +245,22 @@ try {
       const destination = path.join(maps, target);
       fs.mkdirSync(destination);
       compile('compile-mixed-' + target, target, destination);
+    }
+  }
+  if (repairShieldNoise) {
+    recoverShieldNoise();
+    for (const target of ['gbx-custom', 'mcc-cea']) {
+      const destination = path.join(maps, target + '-shield');
+      fs.mkdirSync(destination);
+      compile('compile-shield-' + target, target, destination);
+    }
+  }
+  if (repairSurvivorSpawn) {
+    recoverSurvivorSpawn();
+    for (const target of ['gbx-custom', 'mcc-cea']) {
+      const destination = path.join(maps, target + '-survivor');
+      fs.mkdirSync(destination);
+      compile('compile-survivor-' + target, target, destination);
     }
   }
 } catch (error) {

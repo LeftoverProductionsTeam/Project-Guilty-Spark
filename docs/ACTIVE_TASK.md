@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Original Zombie recovery preserves the misplaced Hiding Marine in a native biped placement and gets both CE and MCC compilers past the invalid scenery palette. Both now stop at Survivor shield-hit Noise map compatibility. The Black Echo recording guard and frozen map are unchanged.
-Next action: Preserve the original Zombie Survivor shield effect while resolving the rejected 2D noise references in its native plasma shader. Black Echo still needs map-specific controller capture and a verified CE609 handoff before the focused Forerunner landing and full faction replay. Physical MegaWorld connections remain next.
+Latest verified revision: Original Zombie Recovery CE/MCC builds pass the moved Marine, shield volume and dormant spawn dependency. Both now stop at the original rounds HUD selecting missing sequences. Black Echo baseline remains unchanged.
+Next action: Recover the intended original Zombie rounds HUD image sequence for both static elements without guessing a replacement. Black Echo still needs map-specific controller capture and a verified CE609 handoff before focused Forerunner landing and full faction replay. Physical MegaWorld connections follow.
 
 ## Acceptance
 
