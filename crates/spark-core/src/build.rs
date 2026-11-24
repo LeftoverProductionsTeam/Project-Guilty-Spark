@@ -940,6 +940,37 @@ pub fn run_build(
     cancel: Arc<AtomicBool>,
     on_event: impl Fn(JobEvent) + Send + Sync,
 ) -> Result<BuildRecord> {
+    run_build_with_retention(project, inspection, tools, jobs_root, job_id, cancel, on_event, true)
+}
+
+pub fn run_batch_map(
+    project: &Project,
+    inspection: &MapInspection,
+    tools: &Toolchain,
+    jobs_root: &Path,
+    job_id: &str,
+    cancel: Arc<AtomicBool>,
+    on_event: impl Fn(JobEvent) + Send + Sync,
+) -> Result<BuildRecord> {
+    if selected_ce_source(project) {
+        return invalid("Numeric batch compilation requires the imported-map MCC route");
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return invalid("Build cancelled");
+    }
+    run_build_with_retention(project, inspection, tools, jobs_root, job_id, cancel, on_event, false)
+}
+
+fn run_build_with_retention(
+    project: &Project,
+    inspection: &MapInspection,
+    tools: &Toolchain,
+    jobs_root: &Path,
+    job_id: &str,
+    cancel: Arc<AtomicBool>,
+    on_event: impl Fn(JobEvent) + Send + Sync,
+    retain: bool,
+) -> Result<BuildRecord> {
     uuid::Uuid::parse_str(job_id)
         .map_err(|_| SparkError::Invalid("Job ID is not a UUID".into()))?;
     if selected_ce_source(project){return run_ce_source_build(project,inspection,tools,jobs_root,job_id,cancel,on_event);}
@@ -1236,7 +1267,7 @@ pub fn run_build(
             "error"
         },
     );
-    if record.status=="validated"{storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;}else{drop(storage_lease);}
+    if record.status=="validated"{storage_lease.finish(retain,Some(record.project_fingerprint.clone()))?;}else{drop(storage_lease);}
     Ok(record)
 }
 

@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Black Echo, Live Link and immersive map editing
+Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
-Starting revision: 56a421578a04bca3afbf3240da49cecde6cf9b45, canonical master.
-Latest verified revision: 7026f5fa passed UNSC defense, field Use and ten-second extraction readiness. The Pelican circled the hub. Diagnostic 3564bca8 stopped the orbit, then failed native landed at up.k 0.939. See RUNTIME_INTEGRATION_20261107.
-Next action: Author an aligned airborne final approach to the original hub pad near (53.34, -102.54), facing east-southeast before descent. Keep native landed checks. Verify hub return, field recall/boarding and banking. Covenant defense, human peers and physical VR stay open.
+Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
+Latest verified revision: Black Echo 40d2ce85 boarded/departed; occupied hub landing open. Ubuntu Debian create/Save/restart/reopen and a10/b30 native numeric readback passed. See RUNTIME_INTEGRATION_20261107.
+Next action: Align the occupied return through the reviewed hub pad, then verify banking and redeployment. Prove desktop batch publication/interruption, then advance Covenant, Live Link and VR.
 
 ## Acceptance
 

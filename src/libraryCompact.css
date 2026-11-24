@@ -230,3 +230,10 @@
     font-size: 11px;
   }
 }
+
+.multi-map-batch { margin-block: .75rem; }
+.multi-map-batch fieldset { border: 0; margin: .5rem 0; padding: 0; }
+.multi-map-batch fieldset label { display: inline-flex; align-items: center; gap: .4rem; margin: .25rem .5rem .25rem 0; }
+.multi-map-batch fieldset select { max-width: min(45rem, 100%); }
+.multi-map-batch .batch-map-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+.multi-map-batch li { overflow-wrap: anywhere; }

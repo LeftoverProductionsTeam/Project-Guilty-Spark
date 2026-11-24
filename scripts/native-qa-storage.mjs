@@ -1479,7 +1479,7 @@ export async function withDevelopmentWorkspace(
     throw error;
   }
   const directory = await finish.createScratch('output');
-  // Pinned Tauri still emits four ACL schemas at a hard-coded source-relative
+  // Pinned Tauri still emits ACL schemas at a hard-coded source-relative
   // path. Preserve pre-existing bytes in RAM and retire only this build's new
   // output, even though its supported compiler/frontend paths are external.
   const restoreSchemas = reservationBytes > 1024 ** 3 ? await retainGeneratedSchemaState() : async () => {};
@@ -1648,6 +1648,7 @@ export async function retainGeneratedSchemaState(checkout = projectRoot) {
     'capabilities.json',
     'desktop-schema.json',
     'windows-schema.json',
+    'linux-schema.json',
   ]) {
     const file = path.join(directory, name);
     await noLinks(file);

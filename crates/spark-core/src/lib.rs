@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod batch_edit;
 pub mod appearance;
 pub mod assets;
 pub mod asset_transfer;

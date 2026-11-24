@@ -1,0 +1,101 @@
+# PROJECT GUILTY SPARK — DEVELOPMENT RESTART
+## November 23, 2026 — ALL THE TOOLS, AND THEN SOME.
+
+Continue the existing project toward complete, usable Halo 1 creator workflows. This is an implementation assignment, not a request to rewrite plans.
+
+**Repository:** `D:\Project Guilty Spark`, established local `master`. Public reference: `4249988`.
+
+### First: recover the actual engineering state
+
+Read `AGENTS.md`, `docs/ENGINEERING_CONTRACT.md`, `docs/ACTIVE_TASK.md`, `docs/PENDING_REQUESTS.md` and the master feature ledger.
+
+Check actual HEAD, uncommitted edits, active owned processes and the latest native evidence. Local work may be newer than GitHub. Do not reset or overwrite it.
+
+Recheck the historical Windows/Linux CI problems through focused local compilation. The last visible hosted CI failure was in Rust tests, but the current cause must be reproduced rather than assumed. Do not initiate billable hosted CI.
+
+### P0: Complete Black Echo
+
+Continue the current UNSC source, not a new map.
+
+The verified UNSC candidate `7026f5fa` has reached defense completion, field control use and the ten-second extraction readiness gate.
+
+The next blocker is the returning Pelican's hub landing.
+
+- Inspect the existing airborne route, native landing checks, command lists, actual pad geometry and vehicle orientation.
+- The previous diagnostic reported an aircraft landing orientation `up.k = 0.939`, below the native landing requirement. Correct the approach and alignment rather than bypassing the requirement.
+- Work from the existing original hub pad near `(53.34, -102.54)`. Verify its actual geometry and viable approach before changing the route.
+- Prove physical return, landing, boarding, departure, persistent banking and redeployment.
+- Complete the corresponding Covenant Spirit path and Elite character requirements.
+- Preserve the Silent Cartographer-inspired insertion sequence, replaceable creator audio, faction-dependent player appearance and independently chosen Elite armor colors.
+
+Never substitute fake boarding, objective forcing, teleports or altered landing thresholds for real gameplay.
+
+Keep the existing map revisions and previous-good results intact.
+
+### P1: Build Multi Map Batch Editing
+
+**NEW FLAGSHIP FEATURE — name it exactly "Multi Map Batch Editing".**
+
+Build it into the existing Spark UI and native core. Do not create a separate application, editor engine or competing project-storage system.
+
+The user must be able to select multiple Halo maps, including an entire campaign, and apply approved changes across all selected maps.
+
+Required workflows:
+
+- Select individual maps, a campaign collection or compatible map subsets.
+- Search for common tags, objects, weapons, vehicles, shaders, models, sounds and supported variables.
+- Change numeric fields and settings across matching maps.
+- Replace or duplicate tags, swap models and import assets with complete compatible dependency handling.
+- Preview matches, differences, missing tags, incompatible fields and resulting edits **for every selected map**.
+- Apply one reusable rule set across selected maps without requiring the user to repeat the edit manually.
+- Run native compilation for each supported map and prepare the completed campaign mod outputs.
+
+**Critical engineering requirements:**
+
+Match tags by validated class, source path, resource identity and applicable schema—not raw numeric tag IDs shared between maps. IDs can differ.
+
+Preserve native format differences. Do not pretend an MCC, Xbox, PC and CE cache share identical fields or build pipelines.
+
+Reuse `mapDocuments.ts`, `project.rs`, existing tag editing/renaming/duplication, native dependency staging, `build.rs`, project history and preservation guards.
+
+Implement a reviewable, hash-bound batch plan. Every proposed change must identify its target, original value, new value, source revision and compatibility result.
+
+Stage outputs separately. Validate each map, preserve originals, retain previous-good builds, and publish the complete batch only after the selected acceptance policy succeeds. Never silently omit failed maps or leave a half-published campaign.
+
+Support explicit cancellation, resumable verified work where safe, bounded memory/disk use, recovery and a useful per-map results report.
+
+**First vertical milestone:** Two legitimate campaign maps, one shared supported field change, per-map preview, independent staged compilation, readback and unchanged source hashes. Include negative cases for missing fields, mismatched revisions and interrupted builds.
+
+Then expand to tag/model replacement, full campaign coverage and optional Excession-compatible packaging handoff. Do not rebuild Excession.
+
+### Continue the existing completion roadmap
+
+Once the current connected milestone is closed, advance the highest-impact outstanding work:
+
+- Complete native tag/model/sound/animation editors and dependency-aware rebuilds.
+- Complete BSP terrain, tunnels, natural seams, connected worlds and native lightmapping.
+- Finish actual game-capable Firefight, Zombie Apocalypse, Extraction, campaign and cinematic authoring.
+- Expand safe Live Link, SparkLink and Live Rebuild with Forerunner and compatible upstream runtimes.
+- Complete target-specific Xbox, PC, CE, MCC, Mac and Linux pipelines without pretending universal conversion exists.
+- Complete standalone native tools, Halo Tool/OpenTool integration, reviewed tool synchronization, installation, accessibility and releases.
+
+Preserve all 475 historical requirement identities and Operation 110% / M1–M6.
+
+### Working rules
+
+1. Make one meaningful end-to-end improvement at a time.
+2. Prioritize actual working user features over more infrastructure or documentation.
+3. Run focused tests and compilation after meaningful changes; broader suites only at appropriate milestones.
+4. Verify genuine desktop interactions, Save/Undo/Redo, source preservation and native compilation/readback where the change requires them.
+5. If native game or physical-user proof is unavailable, state that explicitly and continue independently executable work.
+6. Inspect upstream implementations before duplicating them. Preserve contributors and license boundaries.
+7. Never alter original Halo maps, ISO files, installations, editing kits, saved assets or user data. Preserve source files even when inside the repository.
+8. No unauthorized cleanup, resets, new branches/worktrees, external code execution, paid CI, public upload or Git push.
+9. Spark owns authoring. Forerunner is read-only. Record any required engine change in the existing integration contract.
+10. Commit verified work locally, with clear evidence and an exact next action.
+
+**At each meaningful checkpoint, explain in plain English what the user can now do, what code changed, what passed, what is untested, and what remains.**
+
+Start with the real current blocker. Implement it. Prove it. Continue advancing the product.
+
+**ALL THE TOOLS, AND THEN SOME.**

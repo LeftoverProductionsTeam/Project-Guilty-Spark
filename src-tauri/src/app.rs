@@ -4,6 +4,7 @@ use sha2::Digest;
 #[path="workspace_windows.rs"] mod workspace_windows;
 #[path="workspace_history_native.rs"] mod workspace_history_native;
 #[path="megaworld_native.rs"] mod megaworld_native;
+#[path="batch_edit_native.rs"] mod batch_edit_native;
 #[path="inspection_cache.rs"] mod inspection_cache;
 use serde::{Deserialize, Serialize};
 use spark_core::{
@@ -2217,6 +2218,18 @@ fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Re
             }
             expected
         },
+        "mapBatch" => {
+            let batch_id = id.ok_or("Missing batch ID")?;
+            if uuid::Uuid::parse_str(&batch_id).map_err(error)?.to_string() != batch_id {
+                return Err("Invalid batch ID".into());
+            }
+            let path = state.root.join("map-batches").join(&batch_id);
+            let receipt: serde_json::Value = serde_json::from_slice(&bounded_read(&path.join("receipt.json"), 1024 * 1024)?).map_err(error)?;
+            if receipt["batchId"].as_str() != Some(&batch_id) {
+                return Err("Batch receipt does not match this output".into());
+            }
+            path
+        },
         "tagExchange" => {
             let job_id = id.ok_or("Missing tag extraction ID")?;
             uuid::Uuid::parse_str(&job_id).map_err(error)?;
@@ -3696,6 +3709,9 @@ pub fn run() {
             choose_peer_manifest,
             export_peer_manifest,
             create_peer_manifest,
+            batch_edit_native::search_batch_fields,
+            batch_edit_native::preview_numeric_batch,
+            batch_edit_native::build_numeric_batch,
             reveal_folder
         ];
             move |invoke:tauri::ipc::Invoke<tauri::Wry>| {

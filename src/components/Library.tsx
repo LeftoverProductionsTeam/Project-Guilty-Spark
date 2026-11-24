@@ -1,6 +1,7 @@
 import HomeModel from './HomeModel';
 import HomeRuntimes from './HomeRuntimes';
 import FlagshipOverview from './FlagshipOverview';
+import MultiMapBatchEditing from './MultiMapBatchEditing';
 import {
   ArrowDownToLine,
   Box,
@@ -159,6 +160,7 @@ export default function Library({
           </button>
         </div>
       </div>
+      <MultiMapBatchEditing entries={data.entries} />
       {entries.length ? (
         <div className="map-grid">
           {entries.map((entry) => {

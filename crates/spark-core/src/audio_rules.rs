@@ -54,7 +54,9 @@ pub fn verify(cache: &Path, map: &maps::MapInspection) -> Result<Audit> {
     if scenery.is_empty() {
         return Ok(audit);
     }
-    let bsps = crate::bsp_audio::inspect_ambience(cache, &map.sha256)?;
+    // The sound-class audit follows cluster background references. Listener
+    // collision geometry belongs to spatial preview and has a separate budget.
+    let bsps = crate::bsp_audio::inspect(cache, &map.sha256)?;
     let mut backgrounds = BTreeSet::new();
     for bsp in &bsps.bsps {
         for cluster in &bsp.clusters {

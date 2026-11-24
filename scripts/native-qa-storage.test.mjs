@@ -326,10 +326,12 @@ test('Tauri incidental schemas are disposed while pre-existing input and unrelat
     const restore = await retainGeneratedSchemaState(parent);
     await fs.writeFile(path.join(schemas, 'capabilities.json'), '{"generated":true}');
     await fs.writeFile(path.join(schemas, 'desktop-schema.json'), '{"generated":true}');
+    await fs.writeFile(path.join(schemas, 'linux-schema.json'), '{"generated":true}');
     await fs.writeFile(path.join(schemas, 'unrelated.txt'), 'user input');
     await restore();
     assert.deepEqual(await fs.readFile(path.join(schemas, 'capabilities.json')), original);
     await assert.rejects(fs.stat(path.join(schemas, 'desktop-schema.json')), { code: 'ENOENT' });
+    await assert.rejects(fs.stat(path.join(schemas, 'linux-schema.json')), { code: 'ENOENT' });
     assert.equal(await fs.readFile(path.join(schemas, 'unrelated.txt'), 'utf8'), 'user input');
   }));
 
