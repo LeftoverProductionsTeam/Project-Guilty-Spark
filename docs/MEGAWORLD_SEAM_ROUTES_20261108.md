@@ -217,3 +217,27 @@ Forerunner 376af46d at executable SHA-256 87606ab108d796632914925d6e22d25f2c7ffb
 Invader compiled a disposable native multiplayer fixture from the verified six-region source, with two BSP references and existing-style trigger volumes bsp0,1 and bsp1,0. Cache cabbd6659a70aee225da11ab2a78412cfd45663070ad61f988b4444c5a580c5d contained the exact resulting 0→1 and 1→0 entries, passed CRC, and reported 16.97 MiB across both BSPs while only 14.69 of 23.00 MiB counted toward resident tag space. The [pinned Invader source](https://github.com/SnowyMouse/invader/blob/696830ff80af227e84e7237c2ef26eb2301ed110/src/tag/parser/compile/scenario/pre_compile.cpp#L800) derives these fields from the ordinary trigger volume names. [Halo 1 BSP documentation](https://c20.reclaimers.net/h1/tags/scenario_structure_bsp/#bsp-transitions) describes one resident BSP and identifies stock multiplayer synchronization as an open limitation for this use. The fixture proves compilation and encoding. Runtime transition and multiplayer synchronization require separate evidence. Spark now retains Invader’s tag-space report in build status and the native receipt. Its focused native world source test passed.
 
 The alternate Ice Fields approach (bearing 300) produced six open edges. A generated collision fan triangle near the tunnel exit measured 0.00227 cm in altitude and accounted for three edges. The other three matched the same translated donor-wall loop as the earlier southwest attempt, where a two-sided surface borders the one-sided hull. Danger Canyon at bearing 120 passed source route clearance and failed native structure with seven open edges, each adjacent to the same two-sided donor material. Three border the sky roof and four border the lower donor surfaces. WRL SHA-256 values are 1d8c15de90b78c5f9821eb3755b8680d451dffb271ffaa37b6cef16638ee3767 and cb52cce38fabb528123541331a6f255cbb139beae1072967301e8a27e84763fb. Use the [WRL repair procedure](https://c20.reclaimers.net/h1/guides/levels/bsp-troubleshooting/#error-edge-is-open-red) to close the structural winding and repair the generated sliver while preserving authored collision properties. The installed HCEEK archive contains both scenarios and native BSP tags. It contains no corresponding original editable JMS for those maps.
+
+
+## 24 November - Longest and the Danger Canyon structural repair
+
+Longest compiled and baked at bearing 180. Timberland, Sidewinder, Blood Gulch, Battle Creek, Rat Race, Wizard and Longest now share one resident CE609 BSP. Cache SHA-256 1d05ce00c146f6f7a7d7ba0cb0bbe714ba86eda792455ca9d04884f925f08705 is 93,665,520 bytes. Independent readback passed 2,323 samples on eight paths and found 31,870 collision triangles. Invader reported 15.07 of 23.00 MiB tag space (65.54%). The pinned read-only map, route plans and receipt are at %TEMP%\GuiltySpark-Traversal-Handoff\seven-regions-SsP1wt\ready.
+
+Forerunner c55c7c90, executable cb1063473de096a952c83f32fa946efb08d0e70ab2678af8ece0d91e957d6f4b, admitted the exact Longest cache on two private peers. The guest verified the same cache size and hash and reached tick 540. The host reached 660. Both exited without fatal errors. The separate dual-BSP diagnostic cache 9e7cc521247808812df0fc1d026e94285226ec2e5a17b1261c53c0f04f206464 loaded in both peers, but neither exposed an active BSP result. No runtime switch or synchronization acceptance derives from that session.
+
+The two Danger Canyon WRL loops needed three native +seamsealer faces. Halo Tool accepted the disposable structure (SHA-256 98c34a784eb254c08fc746990b62632b717f1a46d4d636f393543c968c506b76) and independent inspection still found the source two-sided material. Spark’s existing connected BSP editor now accepts ordered vertices of reviewed native boundary loops. It validates them against exact merged-mesh edges beside the two-sided donor faces, keeps their original material flags, and includes the repaired collision in preview, native JMS, and route validation. The normal Spark pipeline passed structure with these authored seals. Lighting and final cache readback are pending.
+
+Danger Canyon north fork, exact six-region parent ee2c7b1f, bearing 120. Enter these world-space loops one per seal in Native boundary seals. Apply connection, then Preview joined seam & clearance. The original Tool diagnostics used JMS coordinates at 100 units per world unit.
+
+```text
+-134.306445 292.548223 3.471387
+-126.299209 282.113164 3.471387
+-130.497852 286.307090 3.471387
+
+-128.812197 285.388066 -5.268812
+-130.497852 286.307090 -5.651225
+-126.299209 282.113164 -6.226707
+-128.799453 285.371484 -5.263043
+```
+
+Focused BSP checks passed 87 with four existing ignored tests, and frontend types passed. The UI remains subject to desktop interaction verification.

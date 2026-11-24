@@ -73,6 +73,9 @@ pub struct BspAssembly {
     pub arch_segments:Option<u8>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visibility_zones: Vec<crate::bsp_visibility::VisibilityZone>,
+    /// Ordered world-space boundaries reviewed against a native Tool diagnostic.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub native_seals: Vec<Vec<V>>,
 }
 fn is_false(value: &bool) -> bool { !*value }
 impl BspAssembly {
@@ -110,6 +113,12 @@ impl BspAssembly {
         }
         if self.sections.len()>8||self.arch_segments.is_some_and(|n|!(2..=12).contains(&n))||self.arch_segments.is_some()&&(self.open_road||self.terrain_seam.is_some()) {
             return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
+        }
+        if self.native_seals.len() > 8 || self.native_seals.iter().any(|seal| {
+            !matches!(seal.len(), 3 | 4)
+                || seal.iter().flatten().any(|p| !p.is_finite() || p.abs() > 2048.)
+        }) {
+            return invalid("Use up to eight native seals with three or four finite world-space vertices each");
         }
         let mut section_ids=BTreeSet::new();
         for section in &self.sections {
@@ -164,7 +173,7 @@ impl BspAssembly {
         route.infantry_tunnel = None; route.high_ground = None; route.open_road = false; route.terrain_seam=None;route.sections.clear();route.arch_segments=None;
         route.tunnel_points = tunnel.points.clone(); route.tunnel_width = tunnel.width;
         route.tunnel_height = tunnel.height; route.tunnel_shader_path = tunnel.shader_path.clone();
-        route.visibility_zones.clear(); route
+        route.visibility_zones.clear(); route.native_seals.clear(); route
     }
     fn high_ground_plan(&self, ridge: &InfantryTunnel) -> Self {
         let mut route = self.infantry_plan(ridge); route.open_road = true; route
@@ -738,6 +747,9 @@ pub fn generate(
     crate::bsp_triangulate::improve(&mut gl);
     for material in passage_materials.into_iter().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
+    seam_sections::append_native_seals(
+        &assembly.native_seals, &mut mesh, &mut materials, &mut triangle_materials,
+    )?;
     let route_clearance = crate::bsp_clearance::RouteChecker::new(&mesh)?.verify_details(assembly)?;
     let walk_samples = route_clearance.iter().map(|route|route.walk_samples).sum();
     for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
@@ -801,7 +813,12 @@ fn visibility_solid(mesh:&MeshData,slots:&[usize],materials:&[AssemblyMaterial])
     let mut gl=MeshGL64{num_prop:3,..Default::default()};
     for (face,t) in mesh.indices.chunks_exact(3).enumerate(){
         let material=materials.get(slots[face]).ok_or_else(||SparkError::Invalid("Visibility source material is missing".into()))?;
-        if !material.collision_only&&material.shader_path.is_some(){continue;}
+        // The portal sectioner operates on the original manifold. Reviewed
+        // native seals close holes that Tool introduces when it omits two-sided
+        // faces from its structural hull.
+        if material.name == "+seamsealer" || !material.collision_only && material.shader_path.is_some() {
+            continue;
+        }
         let start=gl.num_vert() as u64;
         for id in [t[0],t[2],t[1]]{gl.vert_properties.extend(mesh.positions[id as usize*3..id as usize*3+3].iter().map(|&v|f64::from(v)));}
         gl.tri_verts.extend([start,start+1,start+2]);gl.face_id.push(0);
@@ -1168,6 +1185,7 @@ pub fn plan_in_direction(
         terrain_seam: None,
         sections:vec![],arch_segments:None,
         visibility_zones: vec![],
+        native_seals: vec![],
     };
     plan.validate()?;
     Ok(plan)

@@ -5,7 +5,7 @@ import {selectedSeamEdge} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, Vec3 } from '../types';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -31,6 +31,7 @@ export default function BspAssembly({
   const sourceShaders=inspection&&project.source&&inspection.sha256===project.source.sha256?inspection.tags.filter(tag=>tag.class==='senv'):[];
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
+  const [sealText, setSealText] = useMapState(project.id, 'bsp.nativeSealVertices', '');
   const [edgeTarget,setEdgeTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
@@ -321,6 +322,27 @@ export default function BspAssembly({
                 </div>
                 <p role="status">{edgeTarget?`Click an edge on ${edgeTarget==='base'?'this region, then an edge on the donor':'the donor region'}.`:`Edges: ${edgePicks.base?'this BSP selected':'pick this BSP'} · ${edgePicks.donor?'donor selected':'pick donor'}.`} Apply the donor first. Each section keeps its own width, path and roof; original architecture stays intact outside the cut.</p>
               </fieldset>
+              <details>
+                <summary>Native boundary seals{draft.nativeSeals?.length ? ' · ' + draft.nativeSeals.length : ''}</summary>
+                <p>Enter the ordered vertices of a reviewed Halo Tool opening in world units. Divide WRL coordinates by 100. Choose Apply connection, then Preview joined seam &amp; clearance to check the seal.</p>
+                <label>Boundary vertices
+                  <textarea rows={4} maxLength={512} value={sealText} onChange={event => setSealText(event.target.value)} />
+                </label>
+                <div className="bsp-actions">
+                  <button disabled={busy || !sealText.trim() || (draft.nativeSeals?.length ?? 0) >= 8} onClick={() => {
+                    try {
+                      update({ nativeSeals: [...(draft.nativeSeals ?? []), nativeSealVertices(sealText)] });
+                      setSealText('');
+                    } catch (error) {
+                      setError(String(error));
+                    }
+                  }}>Add boundary seal</button>
+                  {draft.nativeSeals?.map((seal, index) => <button type="button" key={JSON.stringify(seal)} disabled={busy}
+                    onClick={() => update({ nativeSeals: draft.nativeSeals!.filter((_, i) => i !== index) })}>
+                    Remove seal {index + 1}
+                  </button>)}
+                </div>
+              </details>
               <div className="bsp-actions" aria-label="Connection routes">
                 <label>Route <select aria-label="Connection route" value={selectedSection?`section:${selectedSection.id}`:infantry?'infantry':ridge?'highGround':'primary'} onChange={e=>setRouteView(e.target.value as typeof routeView)} disabled={busy}>
                   <option value="primary">{draft.openRoad?'Primary road':'Primary tunnel'}</option>

@@ -1,5 +1,152 @@
 //! Optional edge-selected seam sections, all rebuilt by the existing native CSG pipeline.
 use super::*;
+
+/// Fill reviewed Tool openings with Halo's native seam-sealer material.
+/// Use the mesh's own edge positions and preserve the two-sided donor faces.
+pub(super) fn append_native_seals(
+    seals: &[Vec<V>],
+    mesh: &mut MeshData,
+    materials: &mut Vec<AssemblyMaterial>,
+    slots: &mut Vec<usize>,
+) -> Result<()> {
+    if seals.is_empty() {
+        return Ok(());
+    }
+    let slot = materials.len();
+    materials.push(AssemblyMaterial {
+        name: "+seamsealer".into(),
+        source: 0,
+        shader_path: None,
+        shader_class: None,
+        flags: 0,
+        collision_only: true,
+    });
+    let close = |a: V, b: V| {
+        let delta = sub(a, b);
+        dot(delta, delta) <= 0.00085_f64.powi(2)
+    };
+
+    for (index, seal) in seals.iter().enumerate() {
+        let missing = || SparkError::Invalid(format!(
+            "Native seal {} must follow an exact open Tool boundary beside a two-sided donor face",
+            index + 1,
+        ));
+        let mut edges = Vec::with_capacity(seal.len());
+        let mut forward = None;
+        for (&from, &to) in seal.iter().zip(seal.iter().cycle().skip(1)) {
+            if close(from, to) {
+                return Err(missing());
+            }
+            let mut structural = None;
+            let mut two_sided = 0;
+            for (triangle, &material) in mesh.indices.chunks_exact(3).zip(slots.iter()) {
+                let material = &materials[material];
+                let points: [V; 3] = std::array::from_fn(|n| {
+                    let start = triangle[n] as usize * 3;
+                    std::array::from_fn(|i| f64::from(mesh.positions[start + i]))
+                });
+                for (&a, &b) in points.iter().zip(points.iter().cycle().skip(1)) {
+                    let same = close(a, from) && close(b, to);
+                    if !same && !(close(a, to) && close(b, from)) {
+                        continue;
+                    }
+                    if material.flags & 1 != 0 {
+                        if material.source == 1 {
+                            two_sided += 1;
+                        }
+                    } else {
+                        let edge = if same { [a, b] } else { [b, a] };
+                        if structural.replace((edge, same)).is_some() {
+                            return Err(missing());
+                        }
+                    }
+                }
+            }
+            let (edge, same) = structural.ok_or_else(missing)?;
+            if two_sided != 1 || forward.is_some_and(|previous| previous != same) {
+                return Err(missing());
+            }
+            forward = Some(same);
+            edges.push(edge);
+        }
+        if edges.iter().zip(edges.iter().cycle().skip(1)).any(|(a, b)| a[1] != b[0]) {
+            return Err(missing());
+        }
+        let mut points: Vec<_> = edges.into_iter().map(|edge| edge[0]).collect();
+        if forward == Some(true) {
+            points[1..].reverse();
+        }
+        let mut faces = vec![[points[0], points[1], points[2]]];
+        if points.len() == 4 {
+            faces.push([points[0], points[2], points[3]]);
+        }
+        let normals: Vec<_> = faces.iter().map(|p| normal(p[0], p[1], p[2])).collect();
+        let too_thin = faces.iter().any(|[a, b, c]| {
+            let ab = sub(*b, *a);
+            let ac = sub(*c, *a);
+            let bc = sub(*c, *b);
+            let area = cross(ab, ac);
+            let longest_squared = dot(ab, ab).max(dot(ac, ac)).max(dot(bc, bc));
+            dot(area, area) <= longest_squared * 0.001_f64.powi(2)
+        });
+        if too_thin
+            || normals.len() == 2 && dot(normals[0], normals[1]) < 0.5
+            || mesh.indices.len() / 3 + faces.len() > MAX_OUTPUT_TRIANGLES
+        {
+            return Err(missing());
+        }
+        for (points, surface_normal) in faces.into_iter().zip(normals) {
+            let first = (mesh.positions.len() / 3) as u32;
+            for point in points {
+                mesh.positions.extend(point.map(|value| value as f32));
+                mesh.normals.extend(surface_normal.map(|value| value as f32));
+                mesh.uvs.extend([0., 0.]);
+            }
+            mesh.indices.extend(first..first + 3);
+            slots.push(slot);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn native_seal_closes_only_edges_bordered_by_two_sided_donor_faces() {
+    let points = [[0., 0., 0.], [2., 0., 0.], [0., 2., 0.]];
+    let mut mesh = MeshData::default();
+    let mut slots = Vec::new();
+    let mut materials = vec![
+        AssemblyMaterial {
+            name: "+sky".into(), source: 0, shader_path: None, shader_class: None,
+            flags: 0, collision_only: false,
+        },
+        AssemblyMaterial {
+            name: "pdoubled".into(), source: 1,
+            shader_path: Some("fixture/doubled".into()), shader_class: Some("senv".into()),
+            flags: 3, collision_only: true,
+        },
+    ];
+    for i in 0..3 {
+        let a = points[i];
+        let b = points[(i + 1) % 3];
+        for (slot, triangle) in [(0, [a, b, [8., 8., 4.]]), (1, [b, a, [1., 1., -4.]])] {
+            let first = (mesh.positions.len() / 3) as u32;
+            mesh.positions.extend(triangle.into_iter().flatten().map(|value| value as f32));
+            mesh.indices.extend(first..first + 3);
+            slots.push(slot);
+        }
+    }
+    let seal = vec![points.to_vec()];
+    let source = mesh.positions.clone();
+    append_native_seals(&seal, &mut mesh, &mut materials, &mut slots).unwrap();
+    assert_eq!(&mesh.positions[..source.len()], &source);
+    assert_eq!(&mesh.positions[source.len()..], &[0., 0., 0., 0., 2., 0., 2., 0., 0.]);
+    assert_eq!(slots.len(), 7);
+    assert_eq!(materials[1].flags, 3);
+    assert_eq!(materials[2].name, "+seamsealer");
+    assert!(append_native_seals(&seal, &mut mesh, &mut materials, &mut slots).is_err());
+}
+
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct SeamEdge {

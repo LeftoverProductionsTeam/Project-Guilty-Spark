@@ -21,6 +21,7 @@ export interface BspAssembly {
   highGround?: {points:Vec3[];width:number;height:number;shaderPath:string};
   sections?:SeamSection[];
   archSegments?:number;
+  nativeSeals?: Vec3[][];
   visibilityZones?: import('./visibilityZones').VisibilityZone[];
 }
 export interface BspOption {
@@ -56,8 +57,18 @@ export function assemblySignature(plan: BspAssembly | null): string {
   // f64 world coordinates and source identities must retain full precision.
   const route=(value:BspAssembly['infantryTunnel'])=>value?{...value,width:Math.fround(value.width),height:Math.fround(value.height)}:undefined;
   return JSON.stringify(
-    ordered(plan ? { ...plan, sections:plan.sections?.length?plan.sections.map(section=>({...route(section),openRoad:section.openRoad??false})):undefined, archSegments:plan.archSegments??undefined, tunnelWidth:Math.fround(plan.tunnelWidth), tunnelHeight:Math.fround(plan.tunnelHeight), visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false, openRoad: plan.openRoad || undefined, infantryTunnel: route(plan.infantryTunnel), terrainSeam:plan.terrainSeam??undefined, highGround:route(plan.highGround) } : null),
+    ordered(plan ? { ...plan, sections:plan.sections?.length?plan.sections.map(section=>({...route(section),openRoad:section.openRoad??false})):undefined, archSegments:plan.archSegments??undefined, tunnelWidth:Math.fround(plan.tunnelWidth), tunnelHeight:Math.fround(plan.tunnelHeight), nativeSeals: plan.nativeSeals?.length ? plan.nativeSeals : undefined, visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false, openRoad: plan.openRoad || undefined, infantryTunnel: route(plan.infantryTunnel), terrainSeam:plan.terrainSeam??undefined, highGround:route(plan.highGround) } : null),
   );
+}
+export function nativeSealVertices(text: string): Vec3[] {
+  const rows = text.trim().split(/\r?\n/);
+  const points = rows.map(row => row.trim().split(/[ ,\t]+/).filter(Boolean).map(Number));
+  if (points.length < 3 || points.length > 4 || points.some(point =>
+    point.length !== 3 || point.some(n => !Number.isFinite(n) || Math.abs(n) > 2048)
+  )) {
+    throw new Error('Enter three or four boundary vertices as X Y Z, one per line.');
+  }
+  return points as Vec3[];
 }
 function moveMouth(points:Vec3[],before:Vec3,after:Vec3,angle:number):Vec3[] {
   const last=points.at(-1)!,relative=last.map((v,i)=>v-before[i]),c=Math.cos(angle),s=Math.sin(angle);

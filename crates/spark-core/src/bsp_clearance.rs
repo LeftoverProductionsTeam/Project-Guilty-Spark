@@ -442,6 +442,7 @@ mod tests {
             terrain_seam: None,
             sections:vec![],arch_segments:None,
             visibility_zones: vec![],
+            native_seals: vec![],
         }
     }
     fn quad(mesh: &mut MeshData, p: [V; 4]) {
