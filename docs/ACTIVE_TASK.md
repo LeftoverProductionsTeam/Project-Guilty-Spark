@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Forerunner 858a8f39 proved one d113e9db dedicated-pad bank and exact-ID reissue after restart. Spark’s 26f0b0d2 stop experiment compiled and entered the full occupied return, but landed outside the pad. The editor’s Stop without facing review passed browser tests.
-Next action: Measure compiled terrain and Pelican hull clearance along the occupied hub descent before another route change. Keep d113e9db as the proven bank/restart reference. Covenant seat 8, repeat mission, batch resume and authenticated humans remain open.
+Latest verified revision: Forerunner 858a8f39 banked and reissued exact item IDs on d113e9db. The surveyed CE609 b947dc53 alternate passed independent readback. On 14caa7d4 the unchanged empty approach circled with sustained throttle, leaving the revised occupied route untested.
+Next action: Isolate sustained throttle during the unchanged empty return on a stable reviewed runtime before rerunning b947dc53. Keep d113e9db as the proven bank/restart reference. Covenant seat 8, repeat mission, batch resume and authenticated humans remain open.
 
 ## Acceptance
 

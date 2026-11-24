@@ -3,6 +3,38 @@ use spark_core::{maps,Result};
 use std::{collections::BTreeMap,path::Path};
 fn main()->Result<()>{
  let args:Vec<_>=std::env::args().skip(1).collect();
+ if args.first().is_some_and(|arg| arg == "--flight-route") {
+  if !matches!(args.len(), 3 | 6) {
+   return spark_core::invalid("qa_bsp_mesh --flight-route <owned.map> <command-list> [start-x start-y start-z]");
+  }
+  let file = Path::new(&args[1]);
+  let inspection = maps::inspect_map(file, None)?;
+  let routes = maps::scenario_command_readback(file, &inspection)?;
+  let mut matches = routes.iter().filter(|route| route.name == args[2]);
+  let route = match (matches.next(), matches.next()) {
+   (Some(route), None) => route,
+   _ => return spark_core::invalid("The map must have one command list with the requested name"),
+  };
+  let origin = if args.len() == 6 {
+   let parse = |index: usize| args[index].parse::<f32>().map_err(|_| {
+    spark_core::SparkError::Invalid("Flight start needs three numeric coordinates".into())
+   });
+   Some([parse(3)?, parse(4)?, parse(5)?])
+  } else {
+   None
+  };
+  let review = maps::bsp_geometry_review(file, &inspection, &route.points, None, Some(route), origin)?;
+  if maps::hash_file(file)? != inspection.sha256 {
+   return spark_core::invalid("Compiled map changed during flight review");
+  }
+  println!("{}", serde_json::json!({
+   "sourceSha256": inspection.sha256,
+   "scenario": inspection.scenario_path,
+   "commandList": route.name,
+   "review": review,
+  }));
+  return Ok(());
+ }
  if args.first().is_some_and(|arg|arg=="--export-collision") {
   if args.len()<3||args.len()%2!=1 {return spark_core::invalid("qa_bsp_mesh --export-collision <owned.map> <fresh.json> [...]");}
   for pair in args[1..].chunks_exact(2){
