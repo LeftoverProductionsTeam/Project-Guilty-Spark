@@ -775,6 +775,8 @@ pub(crate) struct PreparedPartitions {
     pub switches: [bsp_assembly::PartitionSwitch; 2],
     pub overlap: [[f64; 3]; 2],
     pub scenery: Vec<crate::bsp_scenery::Placement>,
+    pub donor_tag: String,
+    pub donor_environment: Option<crate::bsp_audio::DonorEnvironment>,
 }
 
 fn bind_partition_scenario(
@@ -835,7 +837,8 @@ pub(crate) fn prepare_partition_structure(
     let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
     namespace_materials(tags, &bsp_tag(inspection, 0)?, 0, &parts.base, &[], tools, runner, workspace, tags, None)?;
     let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
-    namespace_materials(&plan.donor_tags_directory, &bsp_tag(&donor, plan.donor_bsp_index)?, 1, &parts.donor, &scenery,
+    let donor_source_bsp = bsp_tag(&donor, plan.donor_bsp_index)?;
+    namespace_materials(&plan.donor_tags_directory, &donor_source_bsp, 1, &parts.donor, &scenery,
         tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let edit = find_tool(tools, "invader-edit")?;
@@ -856,6 +859,27 @@ pub(crate) fn prepare_partition_structure(
             bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
         }
     }
+    let donor_tag = format!("{}.scenario_structure_bsp", built[1].0);
+    let donor_environment = if bind {
+        let source = format!("gsbsp_{}_1\\{}.scenario_structure_bsp", &runner.id[..8], donor_source_bsp);
+        let invoke = |tag: &str, fields: Vec<String>| {
+            let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+            args.extend(fields);
+            args.push(tag.into());
+            runner.run(&edit, &args, workspace, "partition-environment", 65)
+        };
+        let source_path = tags.join(safe_relative(&source)?);
+        let source_hash = maps::hash_file(&source_path)?;
+        let environment = crate::bsp_audio::stage_donor_environment(
+            |args| invoke(&source, args), |args| invoke(&donor_tag, args), plan.yaw_degrees)?;
+        if maps::hash_file(&source_path)? != source_hash {
+            return invalid("Staged original donor BSP changed during ambience transfer");
+        }
+        if environment.is_none() {
+            runner.emit("partition-environment", "Donor sky, fog or mixed ambience needs a reviewed cluster mapping", 66, "info");
+        }
+        environment
+    } else { None };
     let structures = regions.into_iter().zip(built).map(|((name, geometry), (bsp, jms, compiled))| {
         let restored = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
         Ok(serde_json::json!({"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
@@ -864,7 +888,7 @@ pub(crate) fn prepare_partition_structure(
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
         "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
         "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, scenery })
+    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, scenery, donor_tag, donor_environment })
 }
 
 pub fn prepare_native(

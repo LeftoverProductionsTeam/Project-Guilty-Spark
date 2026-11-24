@@ -46,6 +46,27 @@ function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string
   </section>;
 }
 
+function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['nativeGameplayBudget']> }) {
+  const rows = [
+    { label: 'Player starts', ...budget.playerStarts },
+    { label: 'Multiplayer item placements', ...budget.netgameEquipment },
+    { label: 'Multiplayer flags and teleporter endpoints', ...budget.netgameFlags },
+  ];
+  return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
+    <summary>Native gameplay placement limits</summary>
+    <p>Projected counts if both maps’ gameplay placements are kept. These limits are shared by the entire scenario across its BSPs.</p>
+    <ul>
+      {rows.map(({ label, existing, donor, limit }) => {
+        const total = existing + donor;
+        return <li key={label}>
+          {label} · {existing} base + {donor} donor = {total} / {limit}
+          {total > limit && <strong> · {total - limit} over the native limit</strong>}
+        </li>;
+      })}
+    </ul>
+  </details>;
+}
+
 export default function BspAssembly({
   project,
   inspection,
@@ -667,6 +688,8 @@ export default function BspAssembly({
                   {(report.donorScenery ?? 0) > 0 && (
                     <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
                   )}
+                  {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget} />}
+                  {report.nativeGameplayBudgetError && <p>Gameplay placement budget unavailable. {report.nativeGameplayBudgetError}</p>}
                   {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
                   <p>Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.</p>
                   {report.warnings.map((w) => (

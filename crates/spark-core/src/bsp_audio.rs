@@ -599,6 +599,146 @@ fn indices(output: &str, count: usize) -> Result<Vec<Option<usize>>> {
         })
         .collect()
 }
+// The compiler preserves these native palettes independently of BSP geometry.
+// Field names follow Invader's pinned ScenarioStructureBSP schema.
+const REGION_PALETTES: [(&str, &str, &[&str]); 3] = [
+    ("background_sound_palette", "background_sound", &["name", "background_sound", "scale_function"]),
+    ("sound_environment_palette", "sound_environment", &["name", "sound_environment"]),
+    ("weather_palette", "weather", &["name", "particle_system", "particle_system_scale_function",
+        "wind", "wind_direction", "wind_magnitude", "wind_scale_function"]),
+];
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RegionPalette {
+    assigned_palette_index: Option<usize>,
+    rows: Vec<Vec<String>>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub(crate) struct DonorEnvironment {
+    background: RegionPalette,
+    acoustics: RegionPalette,
+    weather: RegionPalette,
+}
+
+impl DonorEnvironment {
+    fn palettes(&self) -> [&RegionPalette; 3] {
+        [&self.background, &self.acoustics, &self.weather]
+    }
+
+    fn read(run: &impl Fn(Vec<String>) -> Result<String>) -> Result<Option<Self>> {
+        let count = |key: &str, limit: usize| -> Result<usize> {
+            let text = run(vec!["-C".into(), key.into()])?;
+            text.trim().parse::<usize>().ok().filter(|n| *n <= limit)
+                .ok_or_else(|| SparkError::Invalid(format!("Unexpected native count for {key}")))
+        };
+        let clusters = count("clusters", 8192)?;
+        if clusters == 0 {
+            return invalid("Native environment source has no clusters");
+        }
+        let cluster = |key: &str| indices(&run(vec!["-G".into(), format!("clusters[*].{key}")])?, clusters);
+        // Nonuniform settings and geometry-bound sky or fog need a verified
+        // source-to-output cluster mapping. Never blend them implicitly.
+        if ["sky", "fog"].into_iter().map(cluster).collect::<Result<Vec<_>>>()?
+            .iter().flatten().any(Option::is_some)
+        {
+            return Ok(None);
+        }
+        let mut palettes = Vec::with_capacity(REGION_PALETTES.len());
+        for (palette, field, fields) in REGION_PALETTES {
+            let assignments = cluster(field)?;
+            let assigned_palette_index = assignments[0];
+            if assignments.iter().any(|&value| value != assigned_palette_index) {
+                return Ok(None);
+            }
+            let len = count(palette, 64)?;
+            if assigned_palette_index.is_some_and(|index| index >= len) {
+                return invalid(format!("Native {field} assignment is outside its palette"));
+            }
+            let mut rows = Vec::with_capacity(len);
+            for index in 0..len {
+                let mut args: Vec<_> = fields.iter().flat_map(|field| {
+                    ["-G".into(), format!("{palette}[{index}].{field}")]
+                }).collect();
+                // Runner trims the final newline. A trailing numeric query
+                // preserves empty string values at the end of a palette row.
+                args.extend(["-C".into(), "clusters".into()]);
+                let text = run(args)?;
+                let (row, sentinel) = text.rsplit_once('\n')
+                    .ok_or_else(|| SparkError::Invalid(format!("Missing native {palette} readback")))?;
+                let values: Vec<_> = row.split('\n').map(str::to_owned).collect();
+                if sentinel != clusters.to_string() || values.len() != fields.len() {
+                    return invalid(format!("Incomplete native {palette} readback"));
+                }
+                rows.push(values);
+            }
+            palettes.push(RegionPalette { assigned_palette_index, rows });
+        }
+        let [background, acoustics, weather] = palettes.try_into()
+            .map_err(|_| SparkError::Invalid("Missing native environment palette".into()))?;
+        Ok(Some(Self { background, acoustics, weather }))
+    }
+
+    pub(crate) fn verify(&self, run: impl Fn(Vec<String>) -> Result<String>) -> Result<()> {
+        if Self::read(&run)?.as_ref() != Some(self) {
+            return invalid("Native donor environment differs from its reviewed audio and weather");
+        }
+        Ok(())
+    }
+}
+
+/// Copy uniform, sky-free and fog-free donor ambience into the generated tag.
+/// All calls use the existing native tag editor on an owned staging tree.
+pub(crate) fn stage_donor_environment(
+    source: impl Fn(Vec<String>) -> Result<String>,
+    target: impl Fn(Vec<String>) -> Result<String>,
+    yaw_degrees: f64,
+) -> Result<Option<DonorEnvironment>> {
+    let Some(mut expected) = DonorEnvironment::read(&source)? else { return Ok(None) };
+    let empty = DonorEnvironment::read(&target)?.ok_or_else(|| SparkError::Invalid(
+        "Generated donor BSP already has geometry-bound or mixed ambience".into()))?;
+    if empty.palettes().iter().any(|palette| !palette.rows.is_empty() || palette.assigned_palette_index.is_some()) {
+        return invalid("Generated donor environment is not empty");
+    }
+    for row in &mut expected.weather.rows {
+        let vector = row[4].split(',').map(str::parse::<f64>).collect::<std::result::Result<Vec<_>, _>>();
+        let vector = vector.ok().filter(|v| v.len() == 3 && v.iter().all(|x| x.is_finite()))
+            .ok_or_else(|| SparkError::Invalid("Invalid native wind vector".into()))?;
+        let (sin, cos) = yaw_degrees.to_radians().sin_cos();
+        row[4] = format!("{:.6},{:.6},{:.6}", cos * vector[0] - sin * vector[1],
+            sin * vector[0] + cos * vector[1], vector[2]);
+    }
+    let clusters: usize = target(vec!["-C".into(), "clusters".into()])?.parse()
+        .map_err(|_| SparkError::Invalid("Generated BSP cluster count is invalid".into()))?;
+    for (palette, (key, field, fields)) in expected.palettes().into_iter().zip(REGION_PALETTES) {
+        if !palette.rows.is_empty() {
+            target(vec!["-I".into(), key.into(), palette.rows.len().to_string(), "end".into()])?;
+        }
+        for (index, row) in palette.rows.iter().enumerate() {
+            let args: Vec<_> = fields.iter().zip(row).filter(|(field, value)| {
+                !value.is_empty() && !(
+                    matches!(**field, "background_sound" | "sound_environment" | "particle_system" | "wind")
+                    && value.starts_with('.')
+                )
+            }).flat_map(|(field, value)| {
+                ["-S".into(), format!("{key}[{index}].{field}"), value.clone()]
+            }).collect();
+            if !args.is_empty() { target(args)?; }
+        }
+        if let Some(index) = palette.assigned_palette_index {
+            for start in (0..clusters).step_by(32) {
+                let args = (start..(start + 32).min(clusters)).flat_map(|cluster| {
+                    ["-S".into(), format!("clusters[{cluster}].{field}"), index.to_string()]
+                }).collect();
+                target(args)?;
+            }
+        }
+    }
+    expected.verify(target)?;
+    Ok(Some(expected))
+}
+
 /// Changes only a fresh job's copied BSP. The source tag tree remains hash-pinned by working_tags.
 pub(crate) fn apply(
     request: &Request,

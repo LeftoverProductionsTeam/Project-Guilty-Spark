@@ -600,6 +600,17 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         let mut result=serde_json::to_value(&geometry.report).map_err(error)?;
         if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No saved BSP connection")?;
             let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref()).map_err(error)?;
+            if let Some(source) = &p.source {
+                let standard_multiplayer = [&i, &donor].into_iter().all(|map| {
+                    matches!(map.header.version, 609 | 13) && !map.header.extended && map.header.scenario_type == 1
+                });
+                if standard_multiplayer {
+                    match maps::scenario_gameplay_merge_budget(&source.preserved_path, &i, &plan.donor_source.preserved_path, &donor) {
+                        Ok(budget) => result["nativeGameplayBudget"] = serde_json::to_value(budget).map_err(error)?,
+                        Err(e) => result["nativeGameplayBudgetError"] = serde_json::json!(e.to_string()),
+                    }
+                }
+            }
             result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
         }
         Ok(result)

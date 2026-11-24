@@ -112,6 +112,50 @@ fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Rea
     if at<space.begin||at.checked_add(0x5b0).is_none_or(|end|end>space.end){return invalid("Compiled Logic scenario body escapes its tag region");}
     decode(&r,&space,at)
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioPlacementBudget {
+    existing: usize,
+    donor: usize,
+    limit: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioGameplayBudget {
+    player_starts: ScenarioPlacementBudget,
+    netgame_equipment: ScenarioPlacementBudget,
+    netgame_flags: ScenarioPlacementBudget,
+}
+
+// Standard HEK scenario reflexives. Extra BSP references share these arrays.
+fn native_gameplay_counts(reader: &Reader, space: &Space, scenario: usize) -> Result<[usize; 3]> {
+    Ok([
+        space.block(reader, scenario + 0x354, 52, 32767)?.1,
+        space.block(reader, scenario + 0x384, 144, 32767)?.1,
+        space.block(reader, scenario + 0x378, 148, 32767)?.1,
+    ])
+}
+
+/// Project the standard limits if both native scenarios' gameplay is kept.
+pub fn scenario_gameplay_merge_budget(
+    base_path: &Path, base: &MapInspection, donor_path: &Path, donor: &MapInspection,
+) -> Result<ScenarioGameplayBudget> {
+    if [base, donor].iter().any(|map| !matches!(map.header.version, 609 | 13)
+        || map.header.extended || map.header.scenario_type != 1)
+    {
+        return invalid("Gameplay placement budgets require standard CE609 or MCC13 multiplayer sources");
+    }
+    let existing = with_scenario(base_path, base, native_gameplay_counts)?;
+    let donor = with_scenario(donor_path, donor, native_gameplay_counts)?;
+    let row = |index: usize, limit| ScenarioPlacementBudget { existing: existing[index], donor: donor[index], limit };
+    Ok(ScenarioGameplayBudget {
+        player_starts: row(0, 256),
+        netgame_equipment: row(1, 200),
+        netgame_flags: row(2, 200),
+    })
+}
+
 /// Native scenario input streams are retained as identities, without exposing gameplay input bytes.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -383,6 +427,32 @@ fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "Requires two explicitly selected legitimate multiplayer caches"]
+    fn installed_native_gameplay_merge_budget() {
+        let base = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_BASE_CACHE").unwrap());
+        let donor = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_DONOR_CACHE").unwrap());
+        let base_inspection = inspect_map(&base, base.parent()).unwrap();
+        let donor_inspection = inspect_map(&donor, donor.parent()).unwrap();
+        let budget = scenario_gameplay_merge_budget(&base, &base_inspection, &donor, &donor_inspection).unwrap();
+        assert_eq!(base_inspection.sha256, hash_file(&base).unwrap());
+        assert_eq!(donor_inspection.sha256, hash_file(&donor).unwrap());
+        println!("Native scenario budgets {}", serde_json::to_string(&budget).unwrap());
+    }
+
+    #[test]
+    fn native_gameplay_counts_use_distinct_bounded_scenario_arrays() {
+        let mut bytes = vec![0u8; 8192];
+        for (block, count, start) in [(0x354, 3u32, 0x600u32), (0x384, 5, 0x800), (0x378, 9, 0x1000)] {
+            bytes[block..block + 4].copy_from_slice(&count.to_le_bytes());
+            bytes[block + 4..block + 8].copy_from_slice(&start.to_le_bytes());
+        }
+        let space = Space { begin: 0, end: bytes.len(), address: 0 };
+        assert_eq!(native_gameplay_counts(&Reader(&bytes), &space, 0).unwrap(), [3, 5, 9]);
+        bytes[0x37c..0x380].copy_from_slice(&8000u32.to_le_bytes());
+        assert!(native_gameplay_counts(&Reader(&bytes), &space, 0).is_err());
+    }
+
     #[test]
     fn native_camera_cache_offsets_and_bounds_are_independent_of_devices(){
         let mut bytes=vec![0u8;4096];bytes[0x4f0..0x4f4].copy_from_slice(&1u32.to_le_bytes());bytes[0x4f4..0x4f8].copy_from_slice(&0x800u32.to_le_bytes());bytes[0x804..0x809].copy_from_slice(b"intro");for(offset,value)in [(40,1f32),(44,2.),(48,3.),(52,0.5),(56,-0.2),(60,0.1),(64,1.2)]{bytes[0x800+offset..0x804+offset].copy_from_slice(&value.to_le_bytes());}

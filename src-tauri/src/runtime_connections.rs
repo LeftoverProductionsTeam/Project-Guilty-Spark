@@ -383,7 +383,7 @@ pub(super) fn verify_companion_review(executable:&Path,review:&runtime::Companio
     review.validate(&maps::hash_file(executable).map_err(error)?).map_err(error)?;
     if runtime::companion_dependency_sha256(executable,&review.capabilities).map_err(error)?!=review.dependency_sha256{return Err("Forerunner library changed before contract review".into());}
     let actual=query_companion_capabilities(executable,&review.executable_sha256)?;
-    if actual!=review.capabilities||runtime::companion_dependency_sha256(executable,&actual).map_err(error)?!=review.dependency_sha256{return Err("Forerunner contract or dependency changed during review; inspect and review this build again".into());}
+    if !actual.matches_reviewed(&review.capabilities)||runtime::companion_dependency_sha256(executable,&actual).map_err(error)?!=review.dependency_sha256{return Err("Forerunner contract or dependency changed during review; inspect and review this build again".into());}
     Ok(())
 }
 #[tauri::command]

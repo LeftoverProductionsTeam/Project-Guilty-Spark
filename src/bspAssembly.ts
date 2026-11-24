@@ -29,6 +29,11 @@ export interface BspOption {
   name: string;
   triangles: number;
 }
+interface ScenarioPlacementBudget {
+  existing: number;
+  donor: number;
+  limit: number;
+}
 export interface AssemblyReport {
   inputTriangles: number;
   outputTriangles: number;
@@ -37,6 +42,12 @@ export interface AssemblyReport {
   walkSamples: number;
   portalCount: number;
   donorScenery?: number;
+  nativeGameplayBudget?: {
+    playerStarts: ScenarioPlacementBudget;
+    netgameEquipment: ScenarioPlacementBudget;
+    netgameFlags: ScenarioPlacementBudget;
+  };
+  nativeGameplayBudgetError?: string;
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number}[];
   warnings: string[];
   viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;surfaces:{source:number;mesh:import('./types').MeshData}[]};

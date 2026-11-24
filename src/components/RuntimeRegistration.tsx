@@ -352,6 +352,18 @@ export default function Registration({
           <p>{companion.capabilities.build.platform} / {companion.capabilities.build.architecture} · build <code>{companion.capabilities.build.commit}</code></p>
           <p>Advertised operations: {companion.capabilities.operations.join(', ')}</p>
           <p>Declared native features: {companion.capabilities.native_features?.join(', ')||'None advertised'}. Map requirements are checked separately; declaration is not gameplay acceptance.</p>
+          {!!companion.capabilities.map_targets?.length && <>
+            <p>Declared map targets</p>
+            <ul>
+              {companion.capabilities.map_targets.map(target => <li key={target.cache_version + ':' + target.invader_engine}>
+                {target.cache_version === 609 ? 'Custom Edition (CE609)' :
+                  target.cache_version === 13 ? 'MCC Halo 1 (MCC13)' : 'Cache version ' + target.cache_version}
+                {' · '}{(target.tag_space_bytes / 1048576).toLocaleString()} MiB{target.default ? ' · Default' : ''}
+                {target.required_feature && <> · Requires <code>{target.required_feature}</code></>}
+              </li>)}
+            </ul>
+            <p className="subtle">Map target declarations describe the loader. The reviewed startup contract below controls which maps Spark can launch.</p>
+          </>}
           <p>Network version {companion.capabilities.network.advertised_version} · native layout {companion.capabilities.network.native_layout_version}. These values do not prove peer compatibility.</p>
           {companion.capabilities.startup_map?<>
             <p>Advertised startup: {companion.capabilities.startup_map.selector} · cache {companion.capabilities.startup_map.cache_version} · {companion.capabilities.startup_map.scenario_type}. Profile: {companion.capabilities.startup_map.profile}.</p>

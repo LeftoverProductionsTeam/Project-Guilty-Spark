@@ -281,6 +281,32 @@ pub struct CapabilityEvidence {
         for fault in 0..10{let mut bad=good.clone();match fault{0=>bad.contract_version=2,1=>bad.build.platform="Linux".into(),2=>bad.build.architecture="arm64".into(),3=>bad.simulation_hz=60,4=>bad.network.native_layout_version=45,5=>bad.startup_map.as_mut().unwrap().network_host=true,6=>bad.startup_map.as_mut().unwrap().fresh_start=false,7=>bad.startup_map.as_mut().unwrap().environment="ARBITRARY_ARGUMENT".into(),8=>bad.startup_map.as_mut().unwrap().cache_version=13,_=>bad.startup_map.as_mut().unwrap().selector="path".into()}assert!(bad.profile_machine().is_err(),"contract fault{fault}");}
         let mut older=good;older.startup_map=None;older.profile_machine().unwrap();let mut invalid=CompanionReview{executable_sha256:"a".repeat(64),dependency_sha256:"b".repeat(64),capabilities:older};assert!(invalid.validate(&"a".repeat(64)).is_ok());invalid.dependency_sha256="not-a-hash".into();assert!(invalid.validate(&"a".repeat(64)).is_err());
     }
+    #[test]
+    fn native_map_targets_extend_discovery_without_changing_reviewed_startup() {
+        let previous = reviewed_capabilities();
+        let mut current = previous.clone();
+        let classic = CompanionMapTarget {
+            cache_version: 609, tag_space_bytes: 23 << 20, invader_engine: "gbx-custom".into(),
+            required_feature: None, is_default: true,
+        };
+        let expanded = CompanionMapTarget {
+            cache_version: 13, tag_space_bytes: 64 << 20, invader_engine: "mcc-cea".into(),
+            required_feature: Some("maps.mcc13_tag_space_64m.v1".into()), is_default: false,
+        };
+        current.map_targets = vec![classic, expanded];
+        current.profile_machine().unwrap();
+        assert!(current.matches_reviewed(&previous));
+        assert_eq!(serde_json::to_value(&current).unwrap()["map_targets"][1]["tag_space_bytes"], 64 << 20);
+        let reviewed = current.clone();
+        current.map_targets[1].tag_space_bytes -= 1;
+        assert!(!current.matches_reviewed(&reviewed));
+        current.startup_map.as_mut().unwrap().cache_version = 13;
+        assert!(current.profile_machine().is_err());
+        assert!(!current.matches_reviewed(&previous));
+        current.map_targets.push(current.map_targets[0].clone());
+        assert!(current.validate().is_err());
+    }
+
     #[test]fn reviewed_profile_checks_real_pe_roles_architecture_and_dependency_hash(){
         let dir=tempfile::tempdir().unwrap();let exe=dir.path().join("halo.exe");let dll=dir.path().join("SDL3.dll");
         let image=|machine:u16,is_dll:bool|{let mut bytes=vec![0u8;128];bytes[..2].copy_from_slice(b"MZ");bytes[60..64].copy_from_slice(&64u32.to_le_bytes());bytes[64..68].copy_from_slice(b"PE\0\0");bytes[68..70].copy_from_slice(&machine.to_le_bytes());bytes[86..88].copy_from_slice(&(if is_dll{0x2000u16}else{0u16}).to_le_bytes());bytes};
@@ -329,10 +355,22 @@ pub struct CompanionCapabilities {
     pub operations: Vec<String>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub native_features: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub map_targets: Vec<CompanionMapTarget>,
     pub process_entrypoints: Vec<String>,
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub startup_map: Option<CompanionStartupMap>,
     pub upstream_projects: Vec<String>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompanionMapTarget {
+    pub cache_version: u32,
+    pub tag_space_bytes: u32,
+    pub invader_engine: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_feature: Option<String>,
+    #[serde(rename = "default")]
+    pub is_default: bool,
 }
 // Advertised metadata is retained for inspection, never used as launch permission.
 // Old admitted binaries omit it; unknown additive JSON fields stay ignorable.
@@ -357,7 +395,17 @@ impl CompanionCapabilities {
             return invalid("Unsupported companion schema or version; no downgrade or live operation was attempted");
         }
         let text=|value:&str|!value.is_empty()&&value.len()<=256&&!value.chars().any(char::is_control);
-        if !(1..=1000).contains(&self.simulation_hz) ||
+        let identifier = |value: &str| !value.is_empty() && value.len() <= 96 &&
+            value.bytes().all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c));
+        let mut targets = std::collections::BTreeSet::new();
+        let invalid_targets = self.map_targets.len() > 16 ||
+            self.map_targets.iter().filter(|row| row.is_default).count() > 1 ||
+            self.map_targets.iter().any(|row| {
+                row.cache_version == 0 || row.tag_space_bytes == 0 || !identifier(&row.invader_engine) ||
+                row.required_feature.as_deref().is_some_and(|name| !identifier(name)) ||
+                !targets.insert((row.cache_version, row.invader_engine.as_str()))
+            });
+        if invalid_targets || !(1..=1000).contains(&self.simulation_hz) ||
             [&self.build.upstream_version,&self.build.commit,&self.build.platform,&self.build.architecture].iter().any(|value|!text(value)) ||
             self.operations.is_empty()||self.operations.len()>64||!self.operations.iter().any(|value|value=="runtime.discover")||
             self.operations.iter().any(|value|value.is_empty()||value.len()>96||!value.bytes().all(|c|c.is_ascii_alphanumeric()||b"._-".contains(&c)))||
@@ -373,6 +421,13 @@ impl CompanionCapabilities {
         }
         Ok(())
     }
+    /// Older reviews omitted map discovery metadata. Executable and DLL
+    /// identity are still pinned by the caller, and startup checks stay exact.
+    pub fn matches_reviewed(&self, reviewed: &Self) -> bool {
+        self == reviewed || (reviewed.map_targets.is_empty() &&
+            Self { map_targets: Vec::new(), ..self.clone() } == *reviewed)
+    }
+
     pub fn require_native_features(&self,required:&[String])->Result<()>{
         for feature in required{if !self.native_features.contains(feature){return invalid(format!("This map requires native feature {feature}, which the selected Forerunner build does not advertise. Select a verified compatible build; no playtest was started"));}}
         Ok(())

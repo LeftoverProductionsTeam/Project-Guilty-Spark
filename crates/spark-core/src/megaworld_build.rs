@@ -151,6 +151,9 @@ fn partition_preview(
     let bake = stage == PartitionStage::Lighting;
     uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid build identity".into()))?;
     let tools = preflight(project, inspection)?;
+    if bind && build::tool_path(&tools, "invader-extract").is_none() {
+        return invalid("Native partition environment readback requires invader-extract");
+    }
     let source_tags = tools.base_tags_directory.as_ref().unwrap();
     let source = project.source.as_ref().unwrap();
     let plan = project.bsp_assembly.as_ref().unwrap();
@@ -178,7 +181,8 @@ fn partition_preview(
     let receipt = if bind {
         let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
         serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
-            "regionEnvironmentVerified": false, "donorGameplayPlacementsImported": false, "gameplayVerified": false})
+            "donorEnvironment": prepared.donor_environment, "regionEnvironmentVerified": false,
+            "donorGameplayPlacementsImported": false, "gameplayVerified": false})
     } else { prepared.receipt };
     for input in [source, &plan.donor_source] {
         if maps::hash_file(&input.preserved_path)? != input.sha256 {
@@ -246,13 +250,28 @@ fn build_partition_probes(
         }
         let collision = crate::bsp_assembly::verify_bound_partition_collision(&path, &map, plan, &project.inherited_bsp_connections, prepared.overlap)?;
         let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
+        if let Some(environment) = &prepared.donor_environment {
+            let readback = output.join("environment-tags");
+            fs::create_dir(&readback)?;
+            let extract = build::tool_path(tools, "invader-extract").unwrap();
+            runner.run(&extract, &["-t".into(), readback.to_string_lossy().into_owned(), "-s".into(),
+                prepared.donor_tag.clone(), path.to_string_lossy().into_owned()], workspace, "partition-environment-readback", 91)?;
+            let edit = build::tool_path(tools, "invader-edit").unwrap();
+            environment.verify(|fields| {
+                let mut args = vec!["-t".into(), readback.to_string_lossy().into_owned()];
+                args.extend(fields);
+                args.push(prepared.donor_tag.clone());
+                runner.run(&edit, &args, workspace, "partition-environment-readback", 91)
+            })?;
+        }
         let lightmap_pages = if bake {
             crate::native_lighting::verify_cache(project, &path, &map)?;
             Some([crate::native_lighting::verify_bsp_lightmaps(&path, &map, 0)?,
                 crate::native_lighting::verify_bsp_lightmaps(&path, &map, 1)?])
         } else { None };
         Ok(serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
-            "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages}))
+            "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages,
+            "donorEnvironmentVerified": prepared.donor_environment.is_some()}))
     }).collect()
 }
 
