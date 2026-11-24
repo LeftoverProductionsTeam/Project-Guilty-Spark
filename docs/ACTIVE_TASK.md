@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: The disposable Black Echo recording fixture opened in native Sapien and rendered the map, aircraft and marker in the Game window. The exact scenario stayed unchanged. Spark now reviews and stages the missing Sapien editor-marker tags through the existing tool launch path. The frozen CE candidate still matches d113e9db.
-Next action: Capture mission-specific Pelican and Spirit clips in the verified Sapien fixture once a Windows XInput controller is available. Transfer recording entries to reviewed CE source, verify their stream hashes, and run isolated Forerunner landing and settlement before the full two-player mission. While capture input is unavailable, advance the original Zombie Classic CE build route and MegaWorld physical traversal.
+Latest verified revision: Spark verified the Black Echo recording fixture in Sapien and preserved CE candidate d113e9db. In parallel, native H1A Tool compiled the exact original Zombie standard carrier with a rig-matched idle. Invader independently verified the carrier binding and unchanged Pistol flash. See ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.md for source and cache hashes.
+Next action: Capture the reusable Pelican and Spirit clips when Windows XInput becomes available. Meanwhile, locate original matching audio for the five damaged Vorbis permutations and run the restored standard carrier in isolated Forerunner. The Classic CE path needs the reviewed Gearbox Tool. Keep MegaWorld physical traversal and Multi Map Batch Editing active.
 
 ## Acceptance
 

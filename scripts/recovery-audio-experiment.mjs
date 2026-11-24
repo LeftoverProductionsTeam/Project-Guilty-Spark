@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertQaOutputPath } from './native-qa-storage.mjs';
+import { carrierAnimationSource } from './recover-zombie-carriers-native.mjs';
 
 const args = process.argv.slice(2);
 const value = (key) => { const i = args.indexOf(key); if (i < 0 || !args[i + 1]) throw new Error(`Required: ${key}`); return path.resolve(args[i + 1]); };
@@ -18,6 +19,8 @@ const repairShieldNoise = args.includes('--repair-shield-noise');
 const repairSurvivorSpawn = args.includes('--repair-survivor-spawn');
 const repairRoundsHud = args.includes('--repair-rounds-hud');
 const nativeMccTool = args.includes('--mcc-tool') ? value('--mcc-tool') : null;
+const repairStandardCarrier = args.includes('--repair-standard-carrier');
+if (repairStandardCarrier && !nativeMccTool) throw new Error('Standard carrier repair requires the reviewed native MCC Tool');
 const mccPinIndex = args.indexOf('--mcc-tool-sha256');
 const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
 if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
@@ -301,7 +304,117 @@ function recoverRoundsHud() {
   save();
 }
 
-function compileOfficialMcc() {
+function hashTagInventory() {
+  const hashes = {};
+  if (!fs.lstatSync(tags).isDirectory()) throw new Error('Derived tag root is not a regular directory');
+  const root = fs.realpathSync(tags);
+  const pending = [root];
+  while (pending.length) {
+    const directory = pending.pop();
+    for (const name of fs.readdirSync(directory)) {
+      const file = path.join(directory, name);
+      const info = fs.lstatSync(file);
+      if (info.isSymbolicLink() || !inside(fs.realpathSync(file), root)) {
+        throw new Error('Derived tag tree contains a link');
+      }
+      if (info.isDirectory()) pending.push(file);
+      else if (info.isFile()) hashes[path.relative(root, file)] = hashFile(file);
+      else throw new Error('Derived tag tree contains an unexpected file type');
+    }
+  }
+  return hashes;
+}
+
+const standardCarrier = 'mgm/fonzie/sparky/tags/zombie container.vehicle';
+const recoveredCarrierStem = 'spark_recovery/zombie_carrier';
+const recoveredCarrierGraph = recoveredCarrierStem + '/zombie_carrier.model_animations';
+const modelNodeFields = ['name', 'first_child_node_index', 'next_sibling_node_index'];
+const normalizeNativePath = value => value.replaceAll('\\', '/');
+const noNode = value => Number(value) === 65535 ? -1 : Number(value);
+
+function readCarrierGraph(directory, phase) {
+  const fields = [
+    'units[0].label', 'units[0].weapons[0].name', 'units[0].weapons[0].animations[0].animation',
+    'animations[0].name', 'animations[0].node_list_checksum', 'animations[0].node_count',
+    'animations[0].frame_count',
+    ...Array.from({ length: 5 }, (_, i) => modelNodeFields.map(key => 'nodes[' + i + '].' + key)).flat(),
+  ];
+  const result = run('edit', ['-t', directory, '-C', 'nodes', '-C', 'units', '-C', 'animations',
+    ...fields.flatMap(field => ['-G', field]), recoveredCarrierGraph], phase);
+  if (result.exitCode !== 0 || result.incomplete) throw new Error('Native carrier graph readback failed');
+  return result.stdout.trimEnd().split(/\r?\n/);
+}
+
+function recoverStandardCarrier() {
+  const model = 'weapons/gravity rifle/gravity rifle.gbxmodel';
+  const originalGraph = 'mgm/fonzie/sparky/tags/zombie container.model_animations';
+  const pins = {
+    [standardCarrier]: 'e2904fb8fab3ee57c1a0a4ed5f96f2ad7ff4b478f127f4c026c900363ed7c467',
+    [model]: '45a8dab6c1769364ce42e6e91323a35ae8a94cbe2e6f07aa41d354319014e83f',
+    [originalGraph]: '6d98fd7563522e41f0c42ada1e56512531685b9b835ab6c12c443023085e5d36',
+  };
+  const carrierFile = path.join(tags, standardCarrier);
+  if (Object.entries(pins).some(([tag, pin]) => hashFile(path.join(tags, tag)) !== pin) ||
+      editTag(standardCarrier, ['-G', 'model', '-G', 'animation_graph'], 'carrier-original-binding')
+        .map(normalizeNativePath).join('\n') !== [model, originalGraph].join('\n')) {
+    throw new Error('The original standard carrier model and graph identities changed');
+  }
+  const keys = [...modelNodeFields, 'default_translation', 'default_rotation'];
+  const nodeQuery = Array.from({ length: 5 }, (_, i) => keys.map(key => 'nodes[' + i + '].' + key)).flat();
+  const [count, checksum, ...values] = editTag(model, ['-C', 'nodes', '-G', 'node_list_checksum',
+    ...nodeQuery.flatMap(key => ['-G', key])], 'carrier-model-rig');
+  if (count !== '5' || checksum !== '1344912864' || values.length !== 25) {
+    throw new Error('The original standard carrier rig is no longer the reviewed five-node rig');
+  }
+  const nodes = Array.from({ length: 5 }, (_, i) => {
+    const [name, child, sibling, translation, rotation] = values.slice(i * 5, i * 5 + 5);
+    return { name, child: noNode(child), sibling: noNode(sibling),
+      translation: translation.split(',').map(Number), rotation: rotation.split(',').map(Number) };
+  });
+  const sourceDirectory = path.join(output, 'data', recoveredCarrierStem, 'animations');
+  fs.mkdirSync(sourceDirectory, { recursive: true });
+  fs.writeFileSync(path.join(sourceDirectory, 'stand unarmed idle.jma'),
+    carrierAnimationSource(nodes, Number(checksum)), { flag: 'wx' });
+
+  const before = hashTagInventory();
+  const graphFile = path.join(tags, recoveredCarrierGraph);
+  if (fs.existsSync(graphFile)) throw new Error('The derived carrier graph already exists');
+  fs.mkdirSync(path.dirname(graphFile), { recursive: true });
+  const built = run('mcc', ['-tags_dir', 'tags', '-data_dir', 'data', '-game_root_dir', '.',
+    'animations', recoveredCarrierStem.replaceAll('/', '\\')], 'carrier-native-animation');
+  if (built.exitCode !== 0 || built.incomplete || /exception halt|### failed/i.test(built.log) || !fs.lstatSync(graphFile).isFile()) {
+    throw new Error('H1A Tool did not compile the derived carrier idle graph');
+  }
+  const readback = readCarrierGraph(tags, 'carrier-source-graph-readback');
+  const rig = values.filter((_, i) => i % 5 < 3);
+  const expected = ['5', '1', '1', 'stand', 'unarmed', '0', 'stand unarmed idle', checksum, '5', '1', ...rig];
+  if (JSON.stringify(readback) !== JSON.stringify(expected)) throw new Error('Compiled carrier idle state or node hierarchy differs');
+
+  const originalListing = editTag(standardCarrier, ['-L'], 'carrier-before-rebind');
+  editTag(standardCarrier, ['-S', 'animation_graph', recoveredCarrierGraph], 'carrier-rebind');
+  const updatedListing = editTag(standardCarrier, ['-L'], 'carrier-after-rebind');
+  const withoutBinding = listing => listing.filter(line => !line.trimStart().startsWith('animation_graph '));
+  const binding = editTag(standardCarrier, ['-G', 'animation_graph'], 'carrier-source-binding')[0];
+  if (normalizeNativePath(binding) !== recoveredCarrierGraph ||
+      JSON.stringify(withoutBinding(originalListing)) !== JSON.stringify(withoutBinding(updatedListing))) {
+    throw new Error('Rebinding changed authored carrier fields outside its animation reference');
+  }
+  const after = hashTagInventory();
+  const graphKey = path.normalize(recoveredCarrierGraph);
+  const vehicleKey = path.normalize(standardCarrier);
+  if (Object.keys(after).length !== Object.keys(before).length + 1 || !after[graphKey] ||
+      Object.keys(before).some(tag => tag !== vehicleKey && before[tag] !== after[tag]) ||
+      hashFile(executables.mcc.path) !== executables.mcc.sha256) {
+    throw new Error('Carrier recovery changed an unreviewed tag or native tool');
+  }
+  manifest.changes.push({tag:standardCarrier, reason:'Bind the original five-node carrier to a separate native stand/unarmed idle graph',
+    beforeSha256:pins[standardCarrier], afterSha256:hashFile(carrierFile), retainedOriginalGraphSha256:pins[originalGraph],
+    graph:recoveredCarrierGraph, graphSha256:hashFile(graphFile), modelSha256:pins[model], checksum:Number(checksum)});
+  save();
+  return readback;
+}
+
+function compileOfficialMcc(carrierReadback) {
   const scenario = "fonzie's zombie apocalypse";
   const effect = 'weapons/pistol/melee.damage_effect';
   const readFields = ['type', 'maximum_intensity', 'damage_lower_bound', 'damage_upper_bound', 'radius', 'duration'];
@@ -313,33 +426,13 @@ function compileOfficialMcc() {
   const authored = read(tags, 'mcc-original-melee');
   const expected = ['lighten', '3.000000', '400.000000', '400.000000,400.000000', '4.000000,4.000000', '3.000000'];
   if (JSON.stringify(authored) !== JSON.stringify(expected)) throw new Error('Audited pistol melee values changed');
-  const inventory = () => {
-    const hashes = {};
-    if (!fs.lstatSync(tags).isDirectory()) throw new Error('Derived tag root is not a regular directory');
-    const root = fs.realpathSync(tags);
-    const pending = [root];
-    while (pending.length) {
-      const directory = pending.pop();
-      for (const name of fs.readdirSync(directory)) {
-        const file = path.join(directory, name);
-        const info = fs.lstatSync(file);
-        if (info.isSymbolicLink() || !inside(fs.realpathSync(file), root)) {
-          throw new Error('Derived tag tree contains a link');
-        }
-        if (info.isDirectory()) pending.push(file);
-        else if (info.isFile()) hashes[path.relative(root, file)] = hashFile(file);
-        else throw new Error('Derived tag tree contains an unexpected file type');
-      }
-    }
-    return hashes;
-  };
-  const before = inventory();
-  fs.mkdirSync(path.join(output, 'data'));
+  const before = hashTagInventory();
+  fs.mkdirSync(path.join(output, 'data'), { recursive: true });
   const nativeMaps = path.join(output, 'maps');
   fs.mkdirSync(nativeMaps);
   const result = run('mcc', ['-data_dir', 'data', '-tags_dir', 'tags', '-game_root_dir', '.',
     'build-cache-file', scenario, 'classic', 'none'], 'compile-official-mcc');
-  const after = inventory();
+  const after = hashTagInventory();
   if (Object.keys(before).length !== Object.keys(after).length
     || Object.keys(before).some(file => before[file] !== after[file])
     || hashFile(executables.mcc.path) !== executables.mcc.sha256) {
@@ -366,9 +459,18 @@ function compileOfficialMcc() {
   }
   const derived = path.join(output, 'mcc-readback-tags');
   fs.mkdirSync(derived);
-  const extracted = run('extract', ['-t', derived, '-G', '-s', effect, map], 'official-mcc-extract-melee');
-  if (extracted.exitCode !== 0 || extracted.incomplete || !/Extracted 1 out of 1 matched tag\b/.test(extracted.log)) {
-    throw new Error('Official cache melee effect could not be independently extracted');
+  const selected = carrierReadback ? [effect, standardCarrier, recoveredCarrierGraph] : [effect];
+  const extracted = run('extract', ['-t', derived, '-G', ...selected.flatMap(tag => ['-s', tag]), map], 'official-mcc-extract-readback');
+  if (extracted.exitCode !== 0 || extracted.incomplete || /Failed to extract|ERROR:/.test(extracted.log) ||
+      !new RegExp('Extracted ' + selected.length + ' out of ' + selected.length + ' matched tags?\\b').test(extracted.log)) {
+    throw new Error('Compiled native effects and carrier data could not be independently extracted');
+  }
+  if (carrierReadback) {
+    const binding = run('edit', ['-t', derived, '-G', 'animation_graph', standardCarrier], 'mcc-compiled-carrier-binding');
+    if (binding.exitCode !== 0 || binding.incomplete || normalizeNativePath(binding.stdout.trim()) !== recoveredCarrierGraph ||
+        JSON.stringify(readCarrierGraph(derived, 'mcc-compiled-carrier-graph')) !== JSON.stringify(carrierReadback)) {
+      throw new Error('The compiled cache dropped or changed its reviewed standard carrier animation binding');
+    }
   }
   const compiled = read(derived, 'mcc-compiled-melee');
   if (JSON.stringify(compiled) !== JSON.stringify(authored) || hashFile(map) !== mapSha256) {
@@ -376,6 +478,7 @@ function compileOfficialMcc() {
   }
   manifest.results.push({step:'compile-official-mcc', target:'mcc-cea', reportedEngine:engine, state:'compiled-melee-verified', playable:false,
     cacheSha256:mapSha256, tagCount:Object.keys(before).length, inputTagsUnchanged:true,
+    ...(carrierReadback && { standardCarrier: { graph: recoveredCarrierGraph, nodes: 5, idle: 'stand unarmed idle' } }),
     damageEffect:Object.fromEntries(readFields.map((field, index) => [field, compiled[index]]))});
   save();
 }
@@ -434,7 +537,8 @@ try {
       compile('compile-rounds-' + target, target, destination);
     }
   }
-  if (nativeMccTool) compileOfficialMcc();
+  const carrierReadback = repairStandardCarrier ? recoverStandardCarrier() : null;
+  if (nativeMccTool) compileOfficialMcc(carrierReadback);
 } catch (error) {
   manifest.error = String(error); process.exitCode = 1;
 } finally {

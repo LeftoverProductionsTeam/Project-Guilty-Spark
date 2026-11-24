@@ -90,12 +90,20 @@ function checkedNodes(nodes) {
     }
   }
 }
-export function carrierSources(nodes, checksum, mesh, regions, nodeByRegion) {
+export function carrierAnimationSource(nodes, checksum) {
   checkedNodes(nodes);
+  if (!Number.isSafeInteger(checksum) || checksum < -2147483648 || checksum > 4294967295) {
+    throw Error('Invalid carrier node checksum');
+  }
+  const jma = ['16392', '2', '30', '1', 'carrier', String(nodes.length), String(checksum)];
+  for (const n of nodes) jma.push(n.name, String(n.child), String(n.sibling));
+  for (let frame = 0; frame < 2; frame++)
+    for (const n of nodes) jma.push(n.translation.map((v) => v * 100).join('\t'), n.rotation.join('\t'), '1');
+  return jma.join('\n') + '\n';
+}
+export function carrierSources(nodes, checksum, mesh, regions, nodeByRegion) {
+  const jma = carrierAnimationSource(nodes, checksum);
   if (
-    !Number.isSafeInteger(checksum) ||
-    checksum < -2147483648 ||
-    checksum > 4294967295 ||
     !regions.length ||
     regions.length > 8 ||
     regions.length !== nodeByRegion.length ||
@@ -153,11 +161,7 @@ export function carrierSources(nodes, checksum, mesh, regions, nodeByRegion) {
   for (let region = 0; region < regions.length; region++)
     for (const t of mesh.triangles)
       jms.push(String(region), '0', t.map((i) => i + region * mesh.points.length).join('\t'));
-  const jma = ['16392', '2', '30', '1', 'carrier', String(nodes.length), String(checksum)];
-  for (const n of nodes) jma.push(n.name, String(n.child), String(n.sibling));
-  for (let frame = 0; frame < 2; frame++)
-    for (const n of nodes) jma.push(n.translation.map((v) => v * 100).join('\t'), n.rotation.join('\t'), '1');
-  return { jms: jms.join('\n') + '\n', jma: jma.join('\n') + '\n' };
+  return { jms: jms.join('\n') + '\n', jma };
 }
 
 async function regular(file, max = 512 * 1024 * 1024) {
