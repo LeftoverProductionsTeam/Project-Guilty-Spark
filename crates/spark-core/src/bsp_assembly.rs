@@ -752,6 +752,13 @@ pub fn generate(
     )?;
     let route_clearance = crate::bsp_clearance::RouteChecker::new(&mesh)?.verify_details(assembly)?;
     let walk_samples = route_clearance.iter().map(|route|route.walk_samples).sum();
+    // At native render precision, another diagonal can eliminate a sliver
+    // without moving the exported positions or crossing a material/UV seam.
+    // The collision hull and its original surface flags are already sealed.
+    for value in &mut gl.vert_properties {
+        *value = f64::from(*value as f32);
+    }
+    crate::bsp_triangulate::improve_native_render(&mut gl);
     for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
         let slot = gl.face_id[face] as usize;
         if slot >= materials.len() {

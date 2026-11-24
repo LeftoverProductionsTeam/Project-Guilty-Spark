@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Seven-region CE609 1d05ce00 adds Longest and passes native collision readback on all eight paths. CE tag space is 15.07 of 23.00 MiB. Private Forerunner peers verify exact host/guest map identity. Physical traversal beyond the accepted two-region baseline remains open.
-Next action: Collect the native Danger Canyon build 31739 with the reviewed seals after structure and scenery staging. Continue the Ice Fields seal and width trial from the exact seven-map parent. Verify whole-map collision, materials, lighting and runtime on each accepted extension. Keep synchronized native BSP transitions open and preserve Zombie CE609 and recorded Black Echo work.
+Latest verified revision: Eight-region CE609 d2f2b2e6 adds Chill Out. Independent readback passed all nine paths and measured 15.78 of 23.00 MiB CE tag space. Two isolated Forerunner peers verified the exact cache. Physical traversal beyond the accepted two-region baseline remains open.
+Next action: Collect Danger Canyon 90088 and Ice Fields 58665. Danger Canyon’s two measured radiosity triangles are absent from regenerated source. Ice Fields passed source clearance with the reviewed seal and adjusted tunnel against the exact eight-region parent. Require native bake, independent collision/material readback and exact private runtime admission before acceptance. Keep multiplayer BSP synchronization, later routes, Zombie CE609 and recorded Black Echo work open.
 
 ## Acceptance
 

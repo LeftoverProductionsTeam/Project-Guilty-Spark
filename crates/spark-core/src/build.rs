@@ -569,6 +569,11 @@ impl Runner<'_> {
         // A requested cancellation/soft timeout is honored *between* write
         // phases, after the current native process exits by itself.
         let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario" | "bsp-structure" | "bsp-lightmaps" | "logic-names" | "logic-scenario" | "logic-script");
+        // Native radiosity on a connected world can legitimately finish
+        // past ten minutes. Keep a finite phase deadline and the same
+        // between-writes cancellation and owned-storage checks.
+        let soft_limit_minutes = if matches!(phase, "lightmaps" | "bsp-lightmaps") { 30 } else { 10 };
+        let soft_limit = Duration::from_secs(soft_limit_minutes * 60);
         let mut deferred_cancel = false;
         let mut deferred_timeout = false;
         let mut output = String::new();
@@ -603,7 +608,7 @@ impl Runner<'_> {
             // of inventing an empty shader or leaving an unbounded process.
             if interactive_shader{let _=child.kill();let _=child.wait();break invalid("Halo Tool could not resolve a material and requested an interactive shader type. The isolated job was stopped; repair its shader binding before rebuilding");}
             let cancel_requested = self.cancel.load(Ordering::Relaxed);
-            let soft_timed_out = start.elapsed() > Duration::from_secs(600);
+            let soft_timed_out = start.elapsed() > soft_limit;
             if protected_write_phase {
                 if cancel_requested && !deferred_cancel {
                     deferred_cancel = true;
@@ -611,7 +616,7 @@ impl Runner<'_> {
                 }
                 if soft_timed_out && !deferred_timeout {
                     deferred_timeout = true;
-                    self.emit(phase, "Ten-minute soft limit reached during tag writing. Waiting for Tool to finish naturally; remaining stages will be skipped.".to_string(), progress, "warning");
+                    self.emit(phase, format!("{soft_limit_minutes}-minute soft limit reached during tag writing. Waiting for Tool to finish naturally; remaining stages will be skipped."), progress, "warning");
                 }
             } else if cancel_requested || soft_timed_out {
                 let _ = child.kill();

@@ -241,3 +241,16 @@ Danger Canyon north fork, exact six-region parent ee2c7b1f, bearing 120. Enter t
 ```
 
 Focused BSP checks passed 87 with four existing ignored tests, and frontend types passed. The UI remains subject to desktop interaction verification.
+
+
+## 24 November - Chill Out and the native lightmap deadline
+
+Chill Out compiled and baked at bearing 120 in the exact seven-region parent. The eight-region CE609 cache SHA-256 is d2f2b2e6c0da30120d323d86efb459182d783d547b3084f2386456a0fb12bac3 (99,416,084 bytes). Independent readback passed 2,628 collision samples across nine paths and found 34,674 collision triangles. Invader reported 15.78 of 23.00 MiB tag space (68.59%). The read-only map, source-bound plans and receipt are at %TEMP%\GuiltySpark-Traversal-Handoff\eight-regions-DyMmJP\ready.
+
+Forerunner 90fec016 at executable SHA-256 58a684cbf62780cd2b81531da5637060693aa7d599facd476c8b08fcf753e855 admitted the exact eight-map cache. Both isolated peers exited normally. The guest confirmed matching host map size and hash and reached tick 510, and the host reached 630. Physical traversal of the newer paths remains open.
+
+The first Chill Out, narrowed Danger Canyon, and Prisoner lightmap runs each finished after Spark’s old ten-minute soft limit. Their remaining compile and readback stages were cancelled. Spark now allows 30 minutes for native lightmap writes with the same between-phase cancellation and storage checks and the same native validation. The corrected Chill Out run reached complete readback and cleaned its disposable output.
+
+Danger Canyon’s initial blue lightmap witness cf41750fa266b3814b1750183945226f17635472ae7452e1cd7723b35247c49f identified two floor wedges on the donor ground shader. The shader’s native simple parameterization flag is enabled. Adjusting the tunnel width to 2.25 world units removed the entrance wedge. Spark now reruns its existing coplanar diagonal repair at export precision and handles a small UV-chart error only on near-collinear render faces, keeping the vertex coordinates, UV values, material and collision faces. The measured same-shader floor quad had a UV error of 0.000320 and alternate triangle altitudes of 188.51 and 126.77 cm. The original blue triangles are absent from exact regenerated source (75,238 triangles). Ten focused triangulation tests passed. The updated full Danger Canyon bake remains under verification.
+
+Ice Fields at bearing 300 passed native structure with its reviewed donor closure and a 2.25-unit passage. The earlier full run stopped in native radiosity. The new run starts from the eight-region cache and captures the lightmap-specific WRL if the solver rejects it again.

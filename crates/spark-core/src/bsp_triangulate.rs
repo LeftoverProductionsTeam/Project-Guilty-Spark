@@ -27,7 +27,7 @@ fn face(m: &MeshGL64, t: [u64; 3]) -> (V, f64) {
     let max = dot(a, a).max(dot(b, b)).max(dot(sub(a, b), sub(a, b)));
     (n.map(|v| v / size.max(1e-30)), size / max.max(1e-30))
 }
-fn affine(m: &MeshGL64, t: [u64; 3], d: u64) -> bool {
+fn affine(m: &MeshGL64, t: [u64; 3], d: u64, uv_tolerance: f64) -> bool {
     if m.num_prop == 3 {
         return true;
     }
@@ -45,11 +45,12 @@ fn affine(m: &MeshGL64, t: [u64; 3], d: u64) -> bool {
     (3..m.num_prop as usize).all(|k| {
         let value = |id: u64| m.vert_properties[id as usize * m.num_prop as usize + k];
         let projected = value(t[0]) * (1. - x - y) + value(t[1]) * x + value(t[2]) * y;
-        (projected - value(d)).abs() < 1e-6 * (1. + value(d).abs())
+        (projected - value(d)).abs() < uv_tolerance.max(1e-6 * (1. + value(d).abs()))
     })
 }
-pub(crate) fn improve(m: &mut MeshGL64) -> usize { improve_material(m,None) }
-fn improve_material(m: &mut MeshGL64, selected:Option<u64>) -> usize {
+pub(crate) fn improve(m: &mut MeshGL64) -> usize { improve_material(m, None, false) }
+pub(crate) fn improve_native_render(m: &mut MeshGL64) -> usize { improve_material(m, None, true) }
+fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool) -> usize {
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
         return 0;
     }
@@ -84,10 +85,21 @@ fn improve_material(m: &mut MeshGL64, selected:Option<u64>) -> usize {
             let other = [b, a, d];
             let (n, q) = face(m, old);
             let (n2, q2) = face(m, other);
-            if dot(n, n2) < 1. - 1e-10
-                || dot(sub(at(m, d), at(m, a)), n).abs() > 1e-7
-                || !affine(m, old, d)
-            {
+            // Check the fourth UV against the better-conditioned chart.
+            // Projecting from a nearly collinear triangle magnifies rounding
+            // and can reject a valid diagonal in the same affine chart.
+            if dot(n, n2) < 1. - 1e-10 || dot(sub(at(m, d), at(m, a)), n).abs() > 1e-7 {
+                continue;
+            }
+            // Only exported render slivers may vary slightly within the same
+            // shared UV chart. The original UVs and source seams stay fixed.
+            let uv_tolerance = if native_render && q.min(q2) < 0.001 { 1. / 2048. } else { 0. };
+            let compatible_uv = if q < q2 {
+                affine(m, other, c, uv_tolerance)
+            } else {
+                affine(m, old, d, uv_tolerance)
+            };
+            if !compatible_uv {
                 continue;
             }
             let left = [c, d, b];
@@ -159,12 +171,36 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
             m.tri_verts.extend([midpoint,b,c]);m.face_id.push(material);
         }
         splits += 1;
-        improve_material(m,Some(generated_material));
+        improve_material(m, Some(generated_material), false);
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_render_retriangulates_the_danger_canyon_radiosity_sliver() {
+        // Measured native floor quad from Halo Tool's blue WRL witness.
+        let mut input = MeshGL64 {
+            num_prop: 5,
+            tri_verts: vec![0, 1, 2, 2, 3, 0],
+            face_id: vec![65, 65],
+            vert_properties: vec![
+                -127.265605, 242.831484, -14.702904, 0.244777, 0.336563,
+                -127.266943, 239.524141, -14.702904, 0.243454, 0.307545,
+                -127.266943, 236.216797, -14.702904, 0.242760, 0.278797,
+                -123.854912, 244.438457, -14.702904, 0.217012, 0.351287,
+            ],
+            ..Default::default()
+        };
+        let authored = input.vert_properties.clone();
+        assert_eq!(improve(&mut input), 0);
+        assert_eq!(improve_native_render(&mut input), 1);
+        assert_eq!(input.vert_properties, authored);
+        assert_eq!(input.face_id, [65, 65]);
+        assert!(input.tri_verts.chunks_exact(3).all(|t| face(&input, [t[0], t[1], t[2]]).1 > 0.08));
+    }
+
     fn needle() -> MeshGL64 {
         let mut m = MeshGL64 {
             num_prop: 5,
@@ -204,10 +240,10 @@ mod tests {
         m.tri_verts.extend(second.tri_verts.iter().map(|id| id + 4));
         m.face_id = vec![17,17,29,29];
         let positions=m.vert_properties.clone();let other=m.tri_verts[6..].to_vec();
-        assert!(improve_material(&mut m,Some(17))>0);
+        assert!(improve_material(&mut m, Some(17), false)>0);
         assert_eq!(m.vert_properties,positions);
         assert_eq!(&m.tri_verts[6..],&other);
-        assert!(improve_material(&mut m,Some(29))>0);
+        assert!(improve_material(&mut m, Some(29), false)>0);
         assert_eq!(m.face_id,vec![17,17,29,29]);
     }
     #[test]
