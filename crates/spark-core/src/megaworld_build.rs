@@ -181,8 +181,10 @@ fn partition_preview(
     let receipt = if bind {
         let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
         serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
-            "donorEnvironment": prepared.donor_environment, "regionEnvironmentVerified": false,
-            "donorGameplayPlacementsImported": false, "gameplayVerified": false})
+            "donorEnvironment": prepared.donor_environment, "allRegionEnvironmentsVerified": false,
+            "donorPickups": prepared.pickups.as_ref().map(|pickups| pickups.donor_count()),
+            "pickupDependencies": prepared.pickups.as_ref().map(|pickups| pickups.dependency_summary()),
+            "gameplayVerified": false})
     } else { prepared.receipt };
     for input in [source, &plan.donor_source] {
         if maps::hash_file(&input.preserved_path)? != input.sha256 {
@@ -210,6 +212,17 @@ fn build_partition_probes(
     [CLASSIC, MCC].into_iter().map(|target| {
         let output = workspace.join(target.engine);
         fs::create_dir(&output)?;
+        // Compile the classic cache before adding donor flags to the job's
+        // staged scenario. Original sources and the CE output stay immutable.
+        let regional = target.version == MCC.version;
+        if regional {
+            if let Some(flags) = &prepared.netgame_flags {
+                flags.append(&source.scenario_path, tools, runner, workspace)?;
+            }
+            if let Some(starts) = &prepared.player_starts {
+                starts.append(&source.scenario_path, tools, runner, workspace)?;
+            }
+        }
         runner.run(&compiler, &["-g".into(), target.engine.into(), "-t".into(), tags.to_string_lossy().into_owned(),
             "-m".into(), output.to_string_lossy().into_owned(), "--resource-usage".into(), "none".into(), source.scenario_path.clone()],
             workspace, "partition-cache", 75)?;
@@ -248,6 +261,15 @@ fn build_partition_probes(
                 return invalid("Compiled partition switch differs from the reviewed markerless volume");
             }
         }
+        let world = crate::bsp_audio::inspect_ambience(&path, &map.sha256)?;
+        let [base, donor] = world.bsps.as_slice() else { return invalid("Expected both compiled placement collision trees") };
+        let [Some(base_tree), Some(donor_tree)] = [base.listener_tree.as_ref(), donor.listener_tree.as_ref()] else {
+            return invalid("Missing compiled placement collision tree");
+        };
+        let trees = [base_tree, donor_tree];
+        let donor_pickups_in_region = prepared.pickups.as_ref().map(|pickups| pickups.verify(&path, &map, trees)).transpose()?;
+        let native_flags = prepared.netgame_flags.as_ref().map(|flags| flags.verify(&path, &map, regional, trees)).transpose()?;
+        let native_starts = prepared.player_starts.as_ref().map(|starts| starts.verify(&path, &map, regional, trees)).transpose()?;
         let collision = crate::bsp_assembly::verify_bound_partition_collision(&path, &map, plan, &project.inherited_bsp_connections, prepared.overlap)?;
         let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
         if let Some(environment) = &prepared.donor_environment {
@@ -271,7 +293,8 @@ fn build_partition_probes(
         } else { None };
         Ok(serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
             "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages,
-            "donorEnvironmentVerified": prepared.donor_environment.is_some()}))
+            "donorEnvironmentVerified": prepared.donor_environment.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
+            "netgameFlags": native_flags, "playerStarts": native_starts}))
     }).collect()
 }
 

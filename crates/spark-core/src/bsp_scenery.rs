@@ -37,14 +37,9 @@ fn transformed(mut row: Placement, assembly: &BspAssembly) -> Result<Placement> 
     {
         return invalid("Donor scenery has non-finite placement coordinates");
     }
-    let angle = assembly.yaw_degrees.to_radians();
-    let (s, c) = angle.sin_cos();
-    let [x, y, z] = row.position.map(f64::from);
-    let position = [
-        c * x - s * y + assembly.translation[0],
-        s * x + c * y + assembly.translation[1],
-        z + assembly.translation[2],
-    ];
+    let position = crate::bsp_assembly::transform(
+        row.position.map(f64::from), assembly.translation, assembly.yaw_degrees,
+    );
     if position.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
         return invalid(format!(
             "Donor scenery {} falls outside the supported world bounds",
@@ -52,9 +47,7 @@ fn transformed(mut row: Placement, assembly: &BspAssembly) -> Result<Placement> 
         ));
     }
     row.position = position.map(|v| v as f32);
-    row.rotation[0] = ((f64::from(row.rotation[0]) + angle + std::f64::consts::PI)
-        .rem_euclid(std::f64::consts::TAU)
-        - std::f64::consts::PI) as f32;
+    row.rotation[0] = crate::bsp_assembly::transform_facing(row.rotation[0], assembly.yaw_degrees);
     Ok(row)
 }
 pub(crate) fn plan(assembly: &BspAssembly, donor: &MapInspection) -> Result<Vec<Placement>> {

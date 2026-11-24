@@ -777,6 +777,9 @@ pub(crate) struct PreparedPartitions {
     pub scenery: Vec<crate::bsp_scenery::Placement>,
     pub donor_tag: String,
     pub donor_environment: Option<crate::bsp_audio::DonorEnvironment>,
+    pub pickups: Option<crate::bsp_pickups::PreparedPickups>,
+    pub netgame_flags: Option<crate::bsp_netgame_flags::PreparedFlags>,
+    pub player_starts: Option<crate::bsp_player_starts::PreparedStarts>,
 }
 
 fn bind_partition_scenario(
@@ -848,11 +851,23 @@ pub(crate) fn prepare_partition_structure(
         compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)
     };
     let built = [compile(0)?, compile(1)?];
-    if bind {
+    let netgame_flags = if bind {
+        let base_source = project.source.as_ref()
+            .ok_or_else(|| SparkError::Invalid("Missing partition base source".into()))?;
+        Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor)?)
+    } else { None };
+    let player_starts = if bind {
+        Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor)?)
+    } else { None };
+    let pickups = if bind {
         let names = [built[0].0.clone(), built[1].0.clone()];
         bind_partition_scenario(inspection, &edit, runner, workspace, tags, &names, &parts.switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
-    }
+        Some(crate::bsp_pickups::stage(
+            project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?,
+            inspection, plan, &donor, tools, runner, workspace, tags,
+        )?)
+    } else { None };
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
         for (name, _) in regions {
@@ -888,7 +903,7 @@ pub(crate) fn prepare_partition_structure(
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
         "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
         "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, scenery, donor_tag, donor_environment })
+    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(

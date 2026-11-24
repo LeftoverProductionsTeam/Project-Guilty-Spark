@@ -71,6 +71,31 @@ pub struct ListenerTree {
     pub planes: Vec<[f32; 4]>,
     pub leaf_clusters: Vec<Option<usize>>,
 }
+impl ListenerTree {
+    fn contains(&self, position: [f32; 3]) -> bool {
+        let mut child = 0u32;
+        for _ in 0..=self.nodes.len() {
+            if child == u32::MAX { return false; }
+            if child & 0x8000_0000 != 0 {
+                return self.leaf_clusters.get((child & 0x7fff_ffff) as usize).is_some_and(Option::is_some);
+            }
+            let Some(&[plane, back, front]) = self.nodes.get(child as usize) else { return false };
+            let Some(&[x, y, z, distance]) = self.planes.get(plane as usize) else { return false };
+            let side = x * position[0] + y * position[1] + z * position[2] - distance;
+            child = if side >= 0. { front } else { back };
+        }
+        false
+    }
+
+    /// Floor-plane origins retain their authored position. The second query is
+    /// only for determining which BSP owns a native placement.
+    pub(crate) fn contains_placement(&self, mut position: [f32; 3]) -> bool {
+        if self.contains(position) { return true; }
+        position[2] += 0.05;
+        self.contains(position)
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Inspection {

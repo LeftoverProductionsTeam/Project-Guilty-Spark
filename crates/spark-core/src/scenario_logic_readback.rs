@@ -126,7 +126,15 @@ pub struct ScenarioGameplayBudget {
     player_starts: ScenarioPlacementBudget,
     netgame_equipment: ScenarioPlacementBudget,
     netgame_flags: ScenarioPlacementBudget,
+    mcc13_regional_flags: ScenarioPlacementBudget,
 }
+
+// Published Forerunner MCC loader bound. Invader's native ScenarioNetgameFlags
+// schema permits 32767 extended rows, but the runtime's lower limit wins.
+pub(crate) const MCC13_REGIONAL_FLAG_LIMIT: usize = 4096;
+pub(crate) const CLASSIC_NETGAME_FLAG_LIMIT: usize = 200;
+pub(crate) const NETGAME_EQUIPMENT_LIMIT: usize = 200;
+pub(crate) const PLAYER_START_LIMIT: usize = 256;
 
 // Standard HEK scenario reflexives. Extra BSP references share these arrays.
 fn native_gameplay_counts(reader: &Reader, space: &Space, scenario: usize) -> Result<[usize; 3]> {
@@ -150,9 +158,147 @@ pub fn scenario_gameplay_merge_budget(
     let donor = with_scenario(donor_path, donor, native_gameplay_counts)?;
     let row = |index: usize, limit| ScenarioPlacementBudget { existing: existing[index], donor: donor[index], limit };
     Ok(ScenarioGameplayBudget {
-        player_starts: row(0, 256),
-        netgame_equipment: row(1, 200),
-        netgame_flags: row(2, 200),
+        player_starts: row(0, PLAYER_START_LIMIT),
+        netgame_equipment: row(1, NETGAME_EQUIPMENT_LIMIT),
+        netgame_flags: row(2, CLASSIC_NETGAME_FLAG_LIMIT),
+        mcc13_regional_flags: row(2, MCC13_REGIONAL_FLAG_LIMIT),
+    })
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NativeNetgamePickup {
+    pub collection: String,
+    pub flags: u32,
+    pub spawn_types: [u16; 4],
+    pub team_index: i16,
+    pub spawn_time: i16,
+    pub position: [f32; 3],
+    pub facing: f32,
+}
+
+pub(crate) fn scenario_netgame_pickups(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeNetgamePickup>> {
+    with_scenario(path, inspection, |reader, space, scenario| {
+        let (start, count) = space.block(reader, scenario + 0x384, 144, NETGAME_EQUIPMENT_LIMIT)?;
+        (0..count).map(|index| {
+            let row = start + index * 144;
+            let id = reader.u32(row + 92)?;
+            let collection = inspection.tags.iter().find(|tag| tag.id == id && tag.class == "itmc" && !tag.external)
+                .filter(|_| reader.fourcc(row + 80).is_ok_and(|class| class == "itmc"))
+                .ok_or_else(|| SparkError::Invalid(format!("Pickup {index} has no native item collection")))?;
+            let position = vec3(reader, row + 64)?;
+            let facing = reader.f32(row + 76)?;
+            if position.iter().any(|v| !v.is_finite()) || !facing.is_finite() {
+                return invalid(format!("Pickup {index} has a non-finite native pose"));
+            }
+            Ok(NativeNetgamePickup {
+                collection: collection.path.replace('\\', "/").to_ascii_lowercase(),
+                flags: reader.u32(row)?,
+                spawn_types: [reader.u16(row + 4)?, reader.u16(row + 6)?, reader.u16(row + 8)?, reader.u16(row + 10)?],
+                team_index: reader.u16(row + 12)? as i16,
+                spawn_time: reader.u16(row + 14)? as i16,
+                position, facing,
+            })
+        }).collect()
+    })
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct NativeItemCollection {
+    pub spawn_seconds: i16,
+    pub permutations: Vec<(u32, String)>,
+}
+
+/// Read collection contents directly from the final cache tag window.
+pub(crate) fn native_item_collections(
+    path: &Path, inspection: &MapInspection, names: &std::collections::BTreeSet<String>,
+) -> Result<std::collections::BTreeMap<String, NativeItemCollection>> {
+    with_scenario(path, inspection, |reader, space, _| {
+        names.iter().map(|name| {
+            let tag = inspection.tags.iter().find(|tag| {
+                tag.class == "itmc" && !tag.external && tag.path.replace('\\', "/").eq_ignore_ascii_case(name)
+            }).ok_or_else(|| SparkError::Invalid(format!("Native item collection is missing: {name}")))?;
+            let at = tag.data_offset.filter(|offset| {
+                *offset >= space.begin && offset.checked_add(92).is_some_and(|end| end <= space.end)
+            }).ok_or_else(|| SparkError::Invalid("Item collection escapes its native tag window".into()))?;
+            let (start, count) = space.block(reader, at, 84, 32)?;
+            let mut permutations = Vec::with_capacity(count);
+            for index in 0..count {
+                let row = start + index * 84;
+                let class = reader.fourcc(row + 36)?;
+                let id = reader.u32(row + 48)?;
+                let item = inspection.tags.iter().find(|tag| tag.id == id && tag.class == class && !tag.external)
+                    .ok_or_else(|| SparkError::Invalid(format!("Unresolved native item in {name}")))?;
+                let extension = crate::tag_exchange::extension(&class)?;
+                permutations.push((reader.u32(row + 32)?,
+                    format!("{}.{}", item.path.replace('\\', "/").to_ascii_lowercase(), extension)));
+            }
+            Ok((name.clone(), NativeItemCollection { spawn_seconds: reader.u16(at + 12)? as i16, permutations }))
+        }).collect()
+    })
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct NativeNetgameFlag {
+    pub position: [f32; 3],
+    pub facing: f32,
+    pub kind: u16,
+    pub usage_id: i16,
+    pub weapon_group: Option<String>,
+}
+
+pub(crate) fn scenario_netgame_flags(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeNetgameFlag>> {
+    let limit = if inspection.header.version == 13 { MCC13_REGIONAL_FLAG_LIMIT } else { CLASSIC_NETGAME_FLAG_LIMIT };
+    with_scenario(path, inspection, |reader, space, scenario| {
+        let (start, count) = space.block(reader, scenario + 0x378, 148, limit)?;
+        (0..count).map(|index| {
+            let row = start + index * 148;
+            let position = vec3(reader, row)?;
+            let facing = reader.f32(row + 12)?;
+            if position.iter().any(|v| !v.is_finite()) || !facing.is_finite() {
+                return invalid(format!("Native multiplayer flag {index} has a non-finite pose"));
+            }
+            let id = reader.u32(row + 32)?;
+            let weapon_group = if id == u32::MAX { None } else {
+                let tag = inspection.tags.iter().find(|tag| tag.id == id && tag.class == "itmc")
+                    .ok_or_else(|| SparkError::Invalid(format!("Native flag {index} has an unresolved item collection")))?;
+                Some(tag.path.replace('\\', "/").to_ascii_lowercase())
+            };
+            Ok(NativeNetgameFlag { position, facing, kind: reader.u16(row + 16)?,
+                usage_id: reader.u16(row + 18)? as i16, weapon_group })
+        }).collect()
+    })
+}
+
+pub(crate) const NATIVE_SPAWN_TYPES: [Option<&str>; 15] = [
+    Some("none"), Some("ctf"), Some("slayer"), Some("oddball"), Some("king_of_the_hill"),
+    Some("race"), Some("terminator"), None, None, None, None, None, Some("all_games"),
+    Some("all_except_ctf"), Some("all_except_race_and_ctf"),
+];
+
+#[derive(Clone)]
+pub(crate) struct NativeRegionStart {
+    pub position: [f32; 3],
+    pub facing: f32,
+    pub team_index: i16,
+    pub bsp_index: i16,
+    pub spawn_types: [u16; 4],
+}
+
+pub(crate) fn scenario_region_starts(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeRegionStart>> {
+    with_scenario(path, inspection, |reader, space, scenario| {
+        let (start, count) = space.block(reader, scenario + 0x354, 52, PLAYER_START_LIMIT)?;
+        (0..count).map(|index| {
+            let row = start + index * 52;
+            let position = vec3(reader, row)?;
+            let facing = reader.f32(row + 12)?;
+            if position.iter().any(|v| !v.is_finite()) || !facing.is_finite() {
+                return invalid(format!("Native player start {index} has a non-finite pose"));
+            }
+            Ok(NativeRegionStart { position, facing, team_index: reader.u16(row + 16)? as i16,
+                bsp_index: reader.u16(row + 18)? as i16,
+                spawn_types: [reader.u16(row + 20)?, reader.u16(row + 22)?, reader.u16(row + 24)?, reader.u16(row + 26)?] })
+        }).collect()
     })
 }
 

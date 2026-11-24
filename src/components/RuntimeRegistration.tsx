@@ -359,6 +359,7 @@ export default function Registration({
                 {target.cache_version === 609 ? 'Custom Edition (CE609)' :
                   target.cache_version === 13 ? 'MCC Halo 1 (MCC13)' : 'Cache version ' + target.cache_version}
                 {' · '}{(target.tag_space_bytes / 1048576).toLocaleString()} MiB{target.default ? ' · Default' : ''}
+                {target.max_netgame_flags != null && ` · ${target.max_netgame_flags.toLocaleString()} multiplayer flags`}
                 {target.required_feature && <> · Requires <code>{target.required_feature}</code></>}
               </li>)}
             </ul>

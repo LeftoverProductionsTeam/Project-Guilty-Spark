@@ -3,7 +3,8 @@ import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import {selectedSeamEdge} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
-import type { LibraryEntry, MapInspection, Project, Vec3 } from '../types';
+import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
+import { runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
 import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge } from '../bspAssembly';
@@ -47,6 +48,16 @@ function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string
 }
 
 function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['nativeGameplayBudget']> }) {
+  const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]);
+  useEffect(() => {
+    if (!native) return;
+    let active = true;
+    void call<RuntimeRegistration[]>('list_runtime_registrations')
+      .then(rows => { if (active) setProfiles(rows ?? []); })
+      .catch(() => {}); // The native schema budget stays visible when profiles are unavailable.
+    return () => { active = false; };
+  }, []);
+  const regional = budget.mcc13RegionalFlags;
   const rows = [
     { label: 'Player starts', ...budget.playerStarts },
     { label: 'Multiplayer item placements', ...budget.netgameEquipment },
@@ -54,7 +65,7 @@ function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['
   ];
   return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
     <summary>Native gameplay placement limits</summary>
-    <p>Projected counts if both maps’ gameplay placements are kept. These limits are shared by the entire scenario across its BSPs.</p>
+    <p>Projected counts if both maps’ gameplay placements are kept. Classic CE609 limits are shared across the entire scenario.</p>
     <ul>
       {rows.map(({ label, existing, donor, limit }) => {
         const total = existing + donor;
@@ -64,6 +75,22 @@ function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['
         </li>;
       })}
     </ul>
+    {regional && <>
+      <p>MCC13 regional flags · {regional.existing + regional.donor} / {regional.limit} · Reviewed native build limit</p>
+      {profiles.map(profile => {
+        const capabilities = profile.reviewedCompanion?.capabilities;
+        const target = capabilities?.map_targets?.find(row => row.cache_version === 13 && row.invader_engine === 'mcc-cea');
+        if (target?.max_netgame_flags == null) return null;
+        if (target.required_feature && !capabilities?.native_features?.includes(target.required_feature)) return null;
+        const limit = Math.min(regional.limit, target.max_netgame_flags);
+        const total = regional.existing + regional.donor;
+        return <p key={profile.id}>
+          {runtimeProfileLabel(profile)} · {total} / {limit} · Saved runtime review
+          {total > limit && <strong> · {total - limit} over the build or runtime limit</strong>}
+        </p>;
+      })}
+      <p>Regional gameplay needs a compatible multiplayer runtime and multiple native BSPs.</p>
+    </>}
   </details>;
 }
 

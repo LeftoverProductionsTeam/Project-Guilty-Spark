@@ -305,12 +305,16 @@ fn planar_uv(point: V, n: V) -> [f64; 2] {
 fn vertex(mesh: &MeshData, index: u32) -> V {
     std::array::from_fn(|i| mesh.positions[index as usize * 3 + i] as f64)
 }
-fn transform(p: V, translation: V, yaw: f64) -> V {
+pub(crate) fn transform(p: V, translation: V, yaw: f64) -> V {
     let (s, c) = yaw.to_radians().sin_cos();
     add(
         [c * p[0] - s * p[1], s * p[0] + c * p[1], p[2]],
         translation,
     )
+}
+pub(crate) fn transform_facing(facing: f32, yaw: f64) -> f32 {
+    ((f64::from(facing) + yaw.to_radians() + std::f64::consts::PI)
+        .rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI) as f32
 }
 fn checked(solid: Manifold, phase: &str) -> Result<Manifold> {
     if solid.status() != Error::NoError || solid.is_empty() {

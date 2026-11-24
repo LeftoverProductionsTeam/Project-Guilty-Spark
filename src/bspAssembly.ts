@@ -46,6 +46,7 @@ export interface AssemblyReport {
     playerStarts: ScenarioPlacementBudget;
     netgameEquipment: ScenarioPlacementBudget;
     netgameFlags: ScenarioPlacementBudget;
+    mcc13RegionalFlags?: ScenarioPlacementBudget;
   };
   nativeGameplayBudgetError?: string;
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number}[];

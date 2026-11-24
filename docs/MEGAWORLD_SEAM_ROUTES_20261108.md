@@ -371,3 +371,35 @@ BSP Assembly’s existing seam preview reports projected gameplay totals from bo
 Forerunner runtime discovery now displays declared cache targets from its existing versioned response, including the 23 MiB CE default and optional 64 MiB MCC target. The focused review regression preserves earlier saved profile behavior and checks that the declared expanded target does not authorize a new startup mode. The live query on executable 203cf9253476607acefd7892fccda0926db51a9720cb1ac40a1d3f1e9eebd301 returned the expanded feature. The file changed before the follow-up query and was rejected at the hash boundary. The freshly installed profile requires its own reviewed executable and dependency identities before launch.
 
 Focused BSP audio tests passed (seven, one explicit platform fixture skipped), the bounded and exact-map scenario count tests passed, the runtime declaration regression passed, Windows Tauri and TypeScript checks passed, and the existing Assembly draft and Undo browser regression passed. Original cache identities held and the source repo retains no new build scratch.
+
+### Chiron pickups and regional gameplay placements
+
+The native donor import retained all 42 Chiron pickups and 56 base pickups. Independent CE609 and MCC13 readback verified positions, orientation, native game-mode rules, spawn time and the eleven donor collections, including all-powerups. Collection order, native item references, permutation weights and default spawn times passed. Invader recovered exact direct particle tags after recursive extraction skipped them. A short Windows staging alias allowed native shader dependency inspection. The reviewed closure shared 564 unchanged tags and isolated 302 donor tags with different content or references. Existing tag and map identities held.
+
+| Collision probe | SHA-256 | Resident bytes | Starts | Netgame flags |
+| --- | --- | ---: | ---: | ---: |
+| CE609 | f87759f9eeb6b7a4b5c36d50979548ce67229eb4fd6da0b422ff818f9dfeea26 | 22,379,544 / 24,117,248 | 68 base | 150 base |
+| MCC13 | bcea054d8cc445f0889532a353b6d6269ba1c3041ce429aa785de8590ac09503 | 16,094,236 / 67,108,864 | 68 base + 59 Chiron | 150 base + 134 Chiron |
+
+Both unlit probes preserved 32 scenery placements, Chiron ambience, both native switches, 291 base and 161 donor route samples in each direction, and all eleven inherited routes. The 20 common floor measurements differed by at most 0.000001039 world units. The 42 Chiron pickups and all 60 teleporter endpoints have unambiguous donor collision membership. All 127 explicit MCC13 player-start BSP bindings and original team and game-mode fields passed independent readback. CE609 kept its original start and flag arrays. The disposable collision builds were retired.
+
+Forerunner source f14196dbd scopes native placements by an MCC13 multiplayer cache with multiple native BSP references. Spark does not add a custom map marker. A hash-checked Windows x64 discovery query on runtime 649ac5da, executable b5d1671458240e6822ff2f9ee76c76c55ac3e5e2e4dc54875eb3735d77b81f9f and SDL3 1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0, advertised 4,096 MCC13 flags. Its startup contract still advertises only a CE609 solo selector. Spark displays saved reviewed runtime limits alongside its native build limit, without using either as multiplayer launch authorization. The flag capacity is separate from native mode ceilings and simultaneous regional occupancy. This evidence includes no Chiron gameplay or multiplayer result.
+
+### Next regional connections
+
+The eastward Chiron–Derelict draft exported two closed BSP source halves. The 2 × 1.6 infantry route runs from (31.694, −24.693, 1.000) to (104.214, −24.693, 1.000) in Chiron-local coordinates. H1A Tool then exited 13 during donor collision BSP creation with open edges 969, 2230 and 2404. The donor WRL SHA-256 was 48854592171e88a940232122b3810857544c83ed246059ba2b9295f6623d30a1. This reproduces a three-edge donor failure against a different parent. The source hashes and the three CE banks held. The next investigation is those native edge coordinates against the stock Derelict boundary and triangulation, without discarding material flags.
+
+The alternate Chiron–Boarding Action draft stopped in source clearance before Tool. Its route had no continuous floor near (100.06, −24.69, 1.00), just beyond the corridor cap. No fourteenth region was compiled. Both bounded QA workspaces retired their generated data.
+
+### Thirteen-region native lightmap readback
+
+The separate H1A draft-radiosity build including all pickups and the target-specific flags finished successfully. Independent Invader and Spark readback passed CRC, protection, stubs, self-contained resources, 12 base and 9 donor lightmap pages, original Chiron ambience, 42 donor pickups, 32 scenery placements, paired switches and both directions of the corridor. Both owned cache outputs were retired after verification.
+
+| Lit probe | SHA-256 | Resident bytes |
+| --- | --- | ---: |
+| CE609 | bb31061554f9f1e168e00c43414f608a59775413f2dfd005b70b3f2d4836cdd1 | 24,051,428 / 24,117,248 |
+| MCC13 | 64e3feca908e3e5c7bed7d71c558a45e70820d1d4eaea4a5167fa157fc06a26b | 16,097,160 / 67,108,864 |
+
+Classic CE retains 65,820 bytes of observed headroom. The lit MCC13 cache retains 284 flags including 30 Chiron teleporter channels. This bake began before the regional-start change. A single retained lit artifact containing the new starts still needs validation. Both BSPs still share linked address ranges, so native compile evidence does not establish simultaneous occupancy.
+
+Focused Rust checks passed for runtime-target review and eight native scenario readback cases. Two opt-in fixtures were skipped. TypeScript passed. The native placement and lighting probes used hash-checked originals and retired their generated outputs.
