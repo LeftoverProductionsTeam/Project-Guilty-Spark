@@ -762,9 +762,9 @@ mod resident_tag_window_tests {
     }
 }
 
-/// Read the simple clip-plane portals of an exact, single-BSP connected cache.
+/// Read the clip-plane portals of an exact, single-BSP connected cache.
 /// Layout follows the native ScenarioStructureBSPClusterPortal definition.
-pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> Result<Vec<Vec<[f64; 3]>>> {
+pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> Result<Vec<(u32, Vec<[f64; 3]>)>> {
     let (header, bytes, sha) = read_cache_snapshot_shared(path)?;
     if sha != inspection.sha256 {
         return invalid("Connected cache changed before its visibility cuts were read");
@@ -786,16 +786,14 @@ pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> 
     let mut rings = Vec::with_capacity(count);
     for index in 0..count {
         let row = portals + index * 64;
-        if reader.u32(row + 24)? != 0 {
-            return invalid("A retained visibility cut has native flags requiring a source portal review");
-        }
+        let flags = reader.u32(row + 24)?;
         let (vertices, count) = bsp.block(&reader, row + 52, 12, 128)?;
         let mut ring = Vec::with_capacity(count);
         for vertex in 0..count {
             let at = vertices + vertex * 12;
             ring.push(vec3(&reader, at)?.map(f64::from));
         }
-        rings.push(ring);
+        rings.push((flags, ring));
     }
     Ok(rings)
 }
