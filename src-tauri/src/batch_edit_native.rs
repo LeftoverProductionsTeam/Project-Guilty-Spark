@@ -87,6 +87,33 @@ struct BuildResult {
     sha256: Option<String>,
 }
 
+fn verify_publish_inputs(stage: &Path, results: &[BuildResult]) -> Reply<()> {
+    let expected = results.iter().map(|row| {
+        let name = row.output.as_deref().ok_or("A batch map has no staged output")?;
+        let sha = row.sha256.as_deref().ok_or("A batch map has no verified checksum")?;
+        Ok::<_, String>((name, sha))
+    }).collect::<Reply<HashMap<_, _>>>()?;
+    if expected.len() != results.len() || expected.is_empty() {
+        return Err("The batch has missing or duplicate output names".into());
+    }
+    let mut checked = 0;
+    for entry in fs::read_dir(stage).map_err(error)? {
+        let entry = entry.map_err(error)?;
+        let name = entry.file_name();
+        let sha = name.to_str().and_then(|name| expected.get(name))
+            .ok_or("An unexpected file appeared in the staged batch")?;
+        core::reject_links(&entry.path()).map_err(error)?;
+        if !entry.file_type().map_err(error)?.is_file() || maps::hash_file(&entry.path()).map_err(error)? != *sha {
+            return Err(format!("Staged batch map changed before publication: {}", name.to_string_lossy()));
+        }
+        checked += 1;
+    }
+    if checked != expected.len() {
+        return Err("A verified map is missing from the staged batch".into());
+    }
+    Ok(())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Outcome {
@@ -216,20 +243,60 @@ fn build(
             outcome.problem = Some("A reviewed source changed during compilation".into());
         }
     }
-    if cancel.load(Ordering::Relaxed) {
-        outcome.problem.get_or_insert_with(|| "Batch cancelled".into());
+    if outcome.problem.is_none() {
+        let owned_stage = lease.owned_staging_root().map_err(error)?;
+        verify_publish_inputs(&owned_stage, &outcome.rows)?;
     }
     let receipt = serde_json::to_vec_pretty(&serde_json::json!({
         "schemaVersion": 1, "batchId": batch_id, "target": "mcc-cea",
         "rule": rule, "review": preview, "results": outcome.rows,
     })).map_err(error)?;
     project::atomic_write(&stage.join("receipt.json"), &receipt, false).map_err(error)?;
+    // Cancellation and visibility share the job lock. Once publication
+    // starts, cancel_build must not acknowledge a cancellation of this job.
+    let mut jobs = lock(&state.jobs)?;
+    if cancel.load(Ordering::Relaxed) {
+        outcome.problem.get_or_insert_with(|| "Batch cancelled".into());
+    }
     if outcome.problem.is_none() {
         lease.adopt(&destination).map_err(error)?;
         lease.finish(true, Some(review_sha256.into())).map_err(error)?;
         outcome.published = true;
+        jobs.remove(batch_id);
     } else {
+        drop(jobs);
         lease.finish_disposable().map_err(error)?;
     }
     Ok(outcome)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publication_rechecks_every_payload_and_rejects_unexpected_content() {
+        let root = tempfile::tempdir().unwrap();
+        let results = ["a10.map", "b30.map"].map(|name| {
+            let path = root.path().join(name);
+            fs::write(&path, name.as_bytes()).unwrap();
+            BuildResult {
+                project_id: name.into(),
+                status: "verified".into(),
+                detail: String::new(),
+                output: Some(name.into()),
+                sha256: Some(maps::hash_file(&path).unwrap()),
+            }
+        });
+        verify_publish_inputs(root.path(), &results).unwrap();
+
+        let b30 = root.path().join("b30.map");
+        fs::write(&b30, b"changed bytes").unwrap();
+        assert!(verify_publish_inputs(root.path(), &results).unwrap_err().contains("changed"));
+        fs::remove_file(&b30).unwrap();
+        assert!(verify_publish_inputs(root.path(), &results).unwrap_err().contains("missing"));
+        fs::write(&b30, b"b30.map").unwrap();
+        fs::write(root.path().join("other.map"), b"unreviewed").unwrap();
+        assert!(verify_publish_inputs(root.path(), &results).unwrap_err().contains("unexpected"));
+    }
 }

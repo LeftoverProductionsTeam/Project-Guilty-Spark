@@ -4,7 +4,7 @@ Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Black Echo 40d2ce85 boarded/departed; occupied hub landing open. Ubuntu Debian create/Save/restart/reopen and a10/b30 native numeric readback passed. See RUNTIME_INTEGRATION_20261107.
-Next action: Align the occupied return through the reviewed hub pad, then verify banking and redeployment. Prove desktop batch publication/interruption, then advance Covenant, Live Link and VR.
+Next action: Test surveyed east-pad approach after radius-only failed empty landing. Keep 40d2ce85 and native gates. Then banking/redeployment and desktop batch interruption.
 
 ## Acceptance
 
