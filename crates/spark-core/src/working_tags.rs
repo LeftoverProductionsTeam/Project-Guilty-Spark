@@ -161,6 +161,22 @@ fn verify_recorded_streams(
     if !result.starts_with(parent) {
         return invalid("Working-tag compilation changed or removed an existing native recording; the previous cache was retained");
     }
+    // A creator can record and rebuild before generating the transport script.
+    // New recordings must have unique names and real input even at that step.
+    let mut names: std::collections::HashSet<_> =
+        parent.iter().map(|row| row.name.to_ascii_lowercase()).collect();
+    for row in &result[parent.len()..] {
+        if row.name.trim().is_empty()
+            || !names.insert(row.name.to_ascii_lowercase())
+            || row.stream_bytes == 0
+            || row.stream_sha256.is_none()
+        {
+            return invalid(format!(
+                "New native recording {:?} needs a unique name and a nonempty event stream; the previous cache was retained",
+                row.name
+            ));
+        }
+    }
     for name in required {
         let mut matches = result.iter().filter(|row| row.name.eq_ignore_ascii_case(name));
         let usable = matches.next().is_some_and(|row| {
@@ -1713,10 +1729,8 @@ fn run_with(
             .map(|attachment| recorded_transport_names(&attachment.content))
             .transpose()?.unwrap_or_default();
         let parent_recordings = maps::scenario_recording_readback(&prepared.parent_output, &prepared.parent_inspection)?;
-        if !parent_recordings.is_empty() || !reviewed_recordings.is_empty() {
-            let compiled_recordings = maps::scenario_recording_readback(&output, &inspected)?;
-            verify_recorded_streams(&parent_recordings, &compiled_recordings, &reviewed_recordings)?;
-        }
+        let compiled_recordings = maps::scenario_recording_readback(&output, &inspected)?;
+        verify_recorded_streams(&parent_recordings, &compiled_recordings, &reviewed_recordings)?;
         if let Some(binding)=&receipt.mission_readback {
             let retained=receipt.generated_mission_hud.as_ref().map(|hud|(hud.tag_path.as_str(),hud.messages.as_slice()))
                 .or_else(||retained_mission_hud.as_ref().map(|(path,source)|(path.as_str(),source.messages.as_slice())));
@@ -1911,7 +1925,7 @@ mod tests {
     #[test]
     fn existing_recorded_streams_cannot_be_replaced_by_empty_or_different_bytes() {
         let make = |index, name: &str, hash: Option<&str>| maps::NativeScenarioRecording {
-            index, name: name.into(), version: 4, control_version: 0, ticks: 100,
+            index, name: name.into(), version: 4, raw_animation_data: 0, control_version: 0, ticks: 100,
             stream_bytes: if hash.is_some() { 80 } else { 0 }, stream_sha256: hash.map(str::to_owned),
         };
         let original = make(0, "stock", Some("original"));
@@ -1922,6 +1936,14 @@ mod tests {
         assert!(verify_recorded_streams(std::slice::from_ref(&original), &[original.clone(), make(1, "land", None)], &required).is_err());
         assert!(verify_recorded_streams(std::slice::from_ref(&original), &[make(0, "stock", Some("changed")), valid.clone()], &required).is_err());
         assert!(verify_recorded_streams(std::slice::from_ref(&original), &[original.clone(), valid, make(2, "LAND", Some("other"))], &required).is_err());
+
+        let without_controller = Default::default();
+        assert!(verify_recorded_streams(&[], &[make(0, "new_clip", Some("capture"))], &without_controller).is_ok());
+        assert!(verify_recorded_streams(&[], &[make(0, "new_clip", None)], &without_controller).is_err());
+        assert!(verify_recorded_streams(&[], &[make(0, "new_clip", Some("capture")), make(1, "NEW_CLIP", Some("other"))], &without_controller).is_err());
+        let mut changed_format = original.clone();
+        changed_format.raw_animation_data = 1;
+        assert!(verify_recorded_streams(&[original], &[changed_format], &without_controller).is_err());
     }
 
     #[test]
