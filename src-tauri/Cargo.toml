@@ -29,4 +29,4 @@ name = "GuiltySpark"
 path = "src/main.rs"
 
 [dev-dependencies]
-zip = { version = "=9.1.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "=9.8.1", default-features = false, features = ["deflate-flate2"] }
