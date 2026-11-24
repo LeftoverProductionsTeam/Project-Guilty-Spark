@@ -7,7 +7,7 @@ type Edit = { before: number; after: number; kind: string; unit: string; sourceS
 type Preview = { rows: { projectId: string; edit: Edit | null; problem: string | null }[]; reviewSha256: string | null };
 type Outcome = { batchId: string; published: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
 
-export default function MultiMapBatchEditing({ entries }: { entries: LibraryEntry[] }) {
+export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entries: LibraryEntry[]; onOpenMccTools: () => void }) {
   const savedMaps = entries.filter((entry) => entry.version != null && !entry.sessionOnly);
   const [selected, setSelected] = useState<string[]>([]);
   const ids = selected.filter((id) => savedMaps.some((entry) => entry.id === id));
@@ -53,6 +53,11 @@ export default function MultiMapBatchEditing({ entries }: { entries: LibraryEntr
       <p>Review one numeric tag change across saved imported maps and build a separate set of MCC map files.</p>
       {!native ? <p>Batch review and compilation are available in the desktop app.</p> : (
         <>
+          <button type="button" disabled={pending || Boolean(job)} onClick={() => {
+            setPreview(undefined);
+            setProblem('');
+            onOpenMccTools();
+          }}>MCC editing tools</button>
           <fieldset disabled={pending || Boolean(job)}>
             <legend>Source maps · {ids.length} selected</legend>
             <label>Find saved maps <input value={mapQuery} onChange={(event) => setMapQuery(event.target.value)} /></label>

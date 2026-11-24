@@ -160,7 +160,7 @@ export default function Library({
           </button>
         </div>
       </div>
-      <MultiMapBatchEditing entries={data.entries} />
+      <MultiMapBatchEditing entries={data.entries} onOpenMccTools={() => onRuntime('mccSteam')} />
       {entries.length ? (
         <div className="map-grid">
           {entries.map((entry) => {

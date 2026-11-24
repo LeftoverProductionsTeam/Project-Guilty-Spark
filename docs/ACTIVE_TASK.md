@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Black Echo split-return CE609 571f9479 banked twice offline. The second native gear record stayed byte-identical across a process restart. Forerunner eefe6b83 refused redeployment because the active saved profile could not be resolved. Batch cancellation repair c89b1c5 passed targeted tests and the Windows Map library workflow with saved a10 and b30. The SDK log fix passed genuine archive preparation. Covenant a0514689 selected the Elite; deployment offer remains open.
-Next action: Determine why Forerunner cannot resolve the same saved profile on CE direct restart. Verify the Covenant Elite’s approach to the deploy terminal, then Spirit flight and combat. Resume batch testing during actual compilation; early UI cancellation passed. See RUNTIME_INTEGRATION_20261107.
+Latest verified revision: Windows batch cancellation passed during native MCC Tool compilation. Forerunner verified same-session banked-kit redeployment on 40d2ce85 and Covenant Spirit recall on a0514689. Exact 571f9479 bank bytes survived restart on Windows eefe6b83; the active profile refused deployment there. Forerunner 2e39d3f Linux verified fresh startup with its profile scan fix.
+Next action: Verify exact 571f9479 post-bank restart on a reviewed Windows Forerunner build containing 2e39d3f or a later profile fix. Covenant a0514689 needs measured seat 8 approach, loaded Spirit return and banking. Batch resume and authenticated human acceptance remain open.
 
 ## Acceptance
 
