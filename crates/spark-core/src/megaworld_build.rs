@@ -14,20 +14,23 @@ struct CacheTarget {
     name: &'static str,
 }
 
+const CLASSIC: CacheTarget = CacheTarget {
+    engine: "gbx-custom", version: 609, tag_base: 0x4044_0000,
+    tag_capacity: 23 * 1024 * 1024, name: "Custom Edition CE609",
+};
+const MCC: CacheTarget = CacheTarget {
+    engine: "mcc-cea", version: 13, tag_base: 0x5000_0000,
+    tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
+};
+
 fn cache_target(project: &Project) -> Option<CacheTarget> {
     project.bsp_assembly.as_ref()?;
     let profile = project.build_targets.iter().find(|t| Some(&t.id) == project.active_build_target.as_ref())?;
     match profile.runtime_id {
-        RuntimeId::HaloCustomEdition | RuntimeId::ChupathingyCe => Some(CacheTarget {
-            engine: "gbx-custom", version: 609, tag_base: 0x4044_0000,
-            tag_capacity: 23 * 1024 * 1024, name: "Custom Edition CE609",
-        }),
+        RuntimeId::HaloCustomEdition | RuntimeId::ChupathingyCe => Some(CLASSIC),
         RuntimeId::MccSteam if project.source.as_ref().is_some_and(|source| {
             source.cache_version == 609 || (source.cache_version == 13 && !project.inherited_bsp_connections.is_empty())
-        }) => Some(CacheTarget {
-            engine: "mcc-cea", version: 13, tag_base: 0x5000_0000,
-            tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
-        }),
+        }) => Some(MCC),
         _ => None,
     }
 }
@@ -126,6 +129,22 @@ pub fn preview_partitions(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
     cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
 ) -> Result<serde_json::Value> {
+    partition_preview(project, inspection, jobs, id, cancel, event, false)
+}
+
+/// Explicit collision-and-transition probe. Its maps are not adopted as
+/// build records. Lighting and region-specific environment still need review.
+pub fn probe_partition_scenario(
+    project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
+    cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
+) -> Result<serde_json::Value> {
+    partition_preview(project, inspection, jobs, id, cancel, event, true)
+}
+
+fn partition_preview(
+    project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
+    cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync, bind: bool,
+) -> Result<serde_json::Value> {
     uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid build identity".into()))?;
     let tools = preflight(project, inspection)?;
     let source_tags = tools.base_tags_directory.as_ref().unwrap();
@@ -144,7 +163,19 @@ pub fn preview_partitions(
     let tags = workspace.join("tags");
     let input_hashes = crate::forge_build::stage_tags(source_tags, &tags, &cancel, |_, _, _, _| {})?;
     let runner = Runner { id, project: &project.id, cancel: &cancel, event: &event };
-    let receipt = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags)?;
+    if bind {
+        if !crate::bsp_compile::connected_additions(project, inspection)?.is_empty() {
+            return invalid("Partition probes require an unchanged import list. Keep new authored assets in the source project.");
+        }
+        let edit = build::tool_path(&tools, "invader-edit").unwrap();
+        crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
+    }
+    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, bind)?;
+    let receipt = if bind {
+        let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags)?;
+        serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": false,
+            "regionEnvironmentVerified": false, "donorGameplayPlacementsImported": false, "gameplayVerified": false})
+    } else { prepared.receipt };
     for input in [source, &plan.donor_source] {
         if maps::hash_file(&input.preserved_path)? != input.sha256 {
             return invalid("An original region changed during partition compilation");
@@ -156,6 +187,64 @@ pub fn preview_partitions(
     project::atomic_write(&workspace.join("partition-structure.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;
     lease.finish(true, Some(project.fingerprint()?))?;
     Ok(receipt)
+}
+
+fn build_partition_probes(
+    project: &Project, source: &MapInspection, prepared: &crate::bsp_compile::PreparedPartitions,
+    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path,
+) -> Result<Vec<serde_json::Value>> {
+    let plan = project.bsp_assembly.as_ref().unwrap();
+    let preserved_path = &project.source.as_ref().unwrap().preserved_path;
+    let existing = maps::scenario_volume_readback(preserved_path, source)?;
+    let compiler = build::tool_path(tools, "invader-build").unwrap();
+    let info = build::tool_path(tools, "invader-info").unwrap();
+    let name = source.scenario_path.rsplit(['\\', '/']).next().ok_or_else(|| SparkError::Invalid("Missing scenario filename".into()))?;
+    [CLASSIC, MCC].into_iter().map(|target| {
+        let output = workspace.join(target.engine);
+        fs::create_dir(&output)?;
+        runner.run(&compiler, &["-g".into(), target.engine.into(), "-t".into(), tags.to_string_lossy().into_owned(),
+            "-m".into(), output.to_string_lossy().into_owned(), "--resource-usage".into(), "none".into(), source.scenario_path.clone()],
+            workspace, "partition-cache", 75)?;
+        let path = output.join(format!("{name}.map"));
+        let map = maps::inspect_map(&path, None)?;
+        if map.header.version != target.version || map.header.scenario_type != source.header.scenario_type
+            || map.scenario_path != source.scenario_path || map.mesh.parts.len() != 2
+            || map.tags.iter().any(|tag| tag.external) || map.resources.iter().any(|resource| resource.required) {
+            return invalid("Native partition probe differs from the authored scenario, format or self-contained resource policy");
+        }
+        for field in ["crc32_mismatched", "is_protected", "stub_count"] {
+            let value = runner.run(&info, &["-T".into(), field.into(), path.to_string_lossy().into_owned()],
+                workspace, "partition-cache-check", 90)?;
+            if !["0", "false"].contains(&value.trim().to_lowercase().as_str()) {
+                return invalid(format!("Partition probe {field} failed: {value}"));
+            }
+        }
+        crate::bsp_compile::verify_compiled_base(project, source, &map)?;
+        if !prepared.scenery.is_empty() {
+            crate::bsp_scenery::verify_compiled(source, &map, &path, &prepared.scenery, &format!("gsbsp_{}_1", &runner.id[..8]), 0)?;
+        }
+        let volumes = maps::scenario_volume_readback(&path, &map)?;
+        let transitions = maps::scenario_bsp_transitions(&path, &map)?;
+        if volumes.len() != existing.len() + prepared.switches.len() || volumes[..existing.len()] != existing[..]
+            || transitions.bsp_count != 2 || transitions.transitions.len() != 2 {
+            return invalid("Partition probe lost original volumes or compiled an unexpected BSP switch set");
+        }
+        for (index, expected) in prepared.switches.iter().enumerate() {
+            let volume_index = existing.len() + index;
+            let volume = &volumes[volume_index];
+            let (from, to) = maps::native_bsp_switch_name(&expected.name).unwrap();
+            if volume.name != expected.name || volume.kind != 1 || volume.geometry.as_ref().is_none_or(|geometry| {
+                !crate::native_operations::volume_geometry_close(geometry, &expected.geometry)
+            }) || !transitions.transitions.iter().any(|row| row.trigger_index == volume_index
+                && row.trigger_name == expected.name && row.source_bsp == from && row.destination_bsp == to && row.arrival_marker.is_none()) {
+                return invalid("Compiled partition switch differs from the reviewed markerless volume");
+            }
+        }
+        let collision = crate::bsp_assembly::verify_bound_partition_collision(&path, &map, plan, &project.inherited_bsp_connections, prepared.overlap)?;
+        let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
+        Ok(serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
+            "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions}))
+    }).collect()
 }
 
 pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{

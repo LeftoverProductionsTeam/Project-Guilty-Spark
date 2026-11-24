@@ -754,30 +754,91 @@ fn compile_structure(
     Ok((bsp, source, compiled))
 }
 
-/// Stage independently compiled source structures for review. The partition
-/// is not bound into a scenario until its environment and objects are reviewed.
+pub(crate) struct PreparedPartitions {
+    pub receipt: serde_json::Value,
+    pub switches: [bsp_assembly::PartitionSwitch; 2],
+    pub overlap: [[f64; 3]; 2],
+    pub scenery: Vec<crate::bsp_scenery::Placement>,
+}
+
+fn bind_partition_scenario(
+    inspection: &MapInspection, edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
+    structures: &[String; 2], switches: &[bsp_assembly::PartitionSwitch; 2],
+) -> Result<()> {
+    let scenario = format!("{}.scenario", inspection.scenario_path);
+    let scenario_file = tags.join(safe_relative(&scenario)?);
+    let tags_arg = tags.to_string_lossy().into_owned();
+    let run = |mut fields: Vec<String>| {
+        let mut args = vec!["-t".into(), tags_arg.clone()];
+        args.append(&mut fields);
+        args.push(scenario.clone());
+        runner.run(edit, &args, workspace, "partition-scenario", 58)
+    };
+    let bsp_count = || run(vec!["-C".into(), "structure_bsps".into()]);
+    if bsp_count()?.trim() != "1" { return invalid("Partition binding needs the original single BSP scenario"); }
+    let mut args = vec!["-I".into(), "structure_bsps".into(), "1".into(), "end".into()];
+    for (index, bsp) in structures.iter().enumerate() {
+        args.extend(["-S".into(), format!("structure_bsps[{index}].structure_bsp"), format!("{bsp}.scenario_structure_bsp")]);
+    }
+    run(args)?;
+    if bsp_count()?.trim() != "2" { return invalid("Native partition count did not match the staged pair"); }
+    for (index, bsp) in structures.iter().enumerate() {
+        let observed = run(vec!["-G".into(), format!("structure_bsps[{index}].structure_bsp")])?;
+        if !observed.trim().eq_ignore_ascii_case(&format!("{bsp}.scenario_structure_bsp")) {
+            return invalid("Native scenario did not bind the expected partition structure");
+        }
+    }
+    let mut before = run(vec!["-L".into()])?;
+    for transition in switches {
+        let count = crate::native_operations::scenario_volume_choices(&before)?.len();
+        let index = u16::try_from(count).map_err(|_| SparkError::Invalid("Too many native trigger volumes".into()))?;
+        let operation = crate::native_operations::Operation::TriggerVolume {
+            append: true, index, name: transition.name.clone(), geometry: transition.geometry.clone(),
+            source_sha256: maps::hash_file(&scenario_file)?,
+        };
+        operation.validate("scnr", &scenario)?;
+        let args = operation.arguments_with_fields(tags, "scnr", &scenario, &before)?;
+        runner.run(edit, &args, workspace, "partition-switches", 59)?;
+        let after = run(vec!["-L".into()])?;
+        crate::native_operations::reviewed_difference(&before, &after, &operation)?;
+        before = after;
+    }
+    Ok(())
+}
+
+/// Stage each native structure. Only the explicit scenario probe binds the
+/// pair and appends the reviewed switches to the owned scenario copy.
 pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
-    runner: &Runner, workspace: &Path, tags: &Path,
-) -> Result<serde_json::Value> {
+    runner: &Runner, workspace: &Path, tags: &Path, bind: bool,
+) -> Result<PreparedPartitions> {
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
     let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
     let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
     namespace_materials(tags, &bsp_tag(inspection, 0)?, 0, &parts.base, &[], tools, runner, workspace, tags, None)?;
-    namespace_materials(&plan.donor_tags_directory, &bsp_tag(&donor, plan.donor_bsp_index)?, 1, &parts.donor, &[],
+    let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
+    namespace_materials(&plan.donor_tags_directory, &bsp_tag(&donor, plan.donor_bsp_index)?, 1, &parts.donor, &scenery,
         tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let edit = find_tool(tools, "invader-edit")?;
     let mut structures = vec![];
-    for (name, geometry) in [("base", &parts.base), ("donor", &parts.donor)] {
+    let mut names = [String::new(), String::new()];
+    for (index, (name, geometry)) in [("base", &parts.base), ("donor", &parts.donor)].into_iter().enumerate() {
         let (bsp, jms, compiled) = compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)?;
         let restored = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
+        names[index] = bsp.clone();
         structures.push(serde_json::json!({"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
             "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": restored, "report": geometry.report}));
     }
-    Ok(serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
-        "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta, "switches": parts.switches, "structures": structures, "scenarioBound": false}))
+    if bind {
+        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &names, &parts.switches)?;
+        append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
+    }
+    let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
+        "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
+        "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
+    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, scenery })
 }
 
 pub fn prepare_native(

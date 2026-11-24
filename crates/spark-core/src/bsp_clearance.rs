@@ -82,27 +82,22 @@ struct Index {
     root: Node,
 }
 impl Index {
-    fn new(mesh: &MeshData) -> Result<Self> {
+    fn new(mesh: &MeshData, indices: &[u32]) -> Result<Self> {
         if mesh.positions.len() % 3 != 0
-            || mesh.indices.len() % 3 != 0
-            || mesh.indices.len() > 1_800_000
+            || indices.len() % 3 != 0
+            || indices.len() > 1_800_000
             || mesh
                 .positions
                 .iter()
                 .any(|v| !v.is_finite() || v.abs() > 4096.)
-            || mesh
-                .indices
-                .iter()
-                .any(|id| *id as usize >= mesh.positions.len() / 3)
+            || indices.iter().any(|id| *id as usize >= mesh.positions.len() / 3)
         {
             return invalid("Compiled route geometry is malformed or exceeds its clearance budget");
         }
-        if mesh.indices.is_empty() {
+        if indices.is_empty() {
             return invalid("No collision triangles are available for this connection");
         }
-        let triangles: Vec<Tri> = mesh
-            .indices
-            .chunks_exact(3)
+        let triangles: Vec<Tri> = indices.chunks_exact(3)
             .map(|t| {
                 std::array::from_fn(|v| {
                     std::array::from_fn(|k| mesh.positions[t[v] as usize * 3 + k] as f64)
@@ -258,7 +253,15 @@ fn closest(p: V, t: Tri) -> V {
 }
 pub(crate) struct RouteChecker { index: Index }
 impl RouteChecker {
-    pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh)? }) }
+    pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh, &mesh.indices)? }) }
+
+    pub(crate) fn for_part(mesh: &MeshData, index: usize) -> Result<Self> {
+        let part = mesh.parts.get(index).ok_or_else(|| SparkError::Invalid("Missing compiled partition collision".into()))?;
+        let indices = part.index_start.checked_add(part.index_count)
+            .and_then(|end| mesh.indices.get(part.index_start..end))
+            .ok_or_else(|| SparkError::Invalid("Compiled partition exceeds its collision index bounds".into()))?;
+        Ok(Self { index: Index::new(mesh, indices)? })
+    }
     /// Independent triangle projection for native ground-bound waypoint review.
     /// The compiler remains authoritative for collision-surface/cluster binding.
     pub(crate) fn native_surface_z(&self,point:[f32;3])->Option<f32>{self.index.nearby_surface(point.map(f64::from),0.5).map(|z|z as f32)}

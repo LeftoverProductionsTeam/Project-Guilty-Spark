@@ -1142,6 +1142,31 @@ pub fn generate_partitioned_project(
         overlap: [seam.overlap_before, seam.overlap_after], overlap_samples, max_floor_delta,
     })
 }
+pub(crate) fn verify_bound_partition_collision(
+    cache: &Path, map: &MapInspection, plan: &BspAssembly, inherited: &[BspAssembly], overlap: [V; 2],
+) -> Result<serde_json::Value> {
+    let (collision, _) = maps::collision_source(cache, map)?;
+    if collision.parts.len() != 2 || plan.tunnel_points.len() != 2 {
+        return invalid("Partition readback requires the authored straight passage and exactly two native BSPs");
+    }
+    let original = crate::bsp_clearance::RouteChecker::for_part(&collision, 0)?;
+    let extension = crate::bsp_clearance::RouteChecker::for_part(&collision, 1)?;
+    let mut approach = plan.clone();
+    approach.tunnel_points = vec![plan.tunnel_points[0], overlap[1]];
+    let base_samples = [original.verify(&approach)?, original.verify_return(&approach)?];
+    approach.tunnel_points = vec![overlap[0], plan.tunnel_points[1]];
+    let donor_samples = [extension.verify(&approach)?, extension.verify_return(&approach)?];
+    let floor_a = original.floor_profile(overlap)?;
+    let floor_b = extension.floor_profile(overlap)?;
+    let overlap_samples = floor_a.len();
+    let max_delta = floor_a.into_iter().zip(floor_b).map(|(a, b)| (a-b).abs()).fold(0., f64::max);
+    if max_delta > 0.02 { return invalid("The two compiled corridor floors are misaligned"); }
+    let inherited_samples = inherited.iter().map(|route| original.verify(route)).collect::<Result<Vec<_>>>()?;
+    Ok(serde_json::json!({"bspCollisionTriangles": collision.parts.iter().map(|part| part.index_count / 3).collect::<Vec<_>>(),
+        "baseSamples": base_samples, "donorSamples": donor_samples, "overlapSamples": overlap_samples,
+        "maxFloorDelta": max_delta, "inheritedSamples": inherited_samples}))
+}
+
 fn verify_entrance(
     mesh: &MeshData,
     faces: &[CollisionFace],

@@ -326,3 +326,16 @@ Spark’s existing assembly generator now splits a straight enclosed passage int
 The exact twelve-region parent da222bf1 and stock Chiron passed source clearance on a 45° path with a 0.02-unit rise. Twenty samples along the common 4.60-unit run agreed to 0.000001087 units. The overlap runs from (708.6261, 27.7980, −18.1935) to (711.8788, 31.0506, −18.1926). Source review passed 4,219 biped samples on 14 base approaches, including inherited routes, and 161 samples on the Chiron half. The base retained six previous tunnel portal cuts and added two. The donor has two new cuts. Independent source JMS SHA-256 values are 7eb639551a2257ea6856f2952699ed0758dac30198aa089cff8e1426a525674c and bc2442dbb4dbc688b61d09d69f45c62f4b835ecdbb578701042b1ea395290820.
 
 H1A Tool compiled both native structure tags. In the disposable job their SHA-256 values were 24551b3b545cc878db7bbb204108dd1dc1a71b94189e8409205c30b60a33f249 and 7cc001a9a1b58db617f7a2bec42e1485f71c2e6c4315d9209ba4c31c28b44be5. Both passed the existing native collision flag checks. The 21 assembly and 12 clearance tests passed. The later inherited-route verification passed against the same source geometry, with identical triangle and portal counts. Original map hashes matched. Owned scratch was removed. Native scenario binding, environment transfer, lightmaps, cache readback and live crossings are still unverified for the paired corridor.
+
+### Chiron native scenario binding
+
+The owner-only qa_megaworld_ce --partition-scenario-probe compiled the two generated Halo Tool structures together. Spark appended the reviewed native trigger volumes to the staged scenario. Independent readback found markerless switches bsp0,1 and bsp1,0 at trigger rows 0 and 1, preserved all reviewed base placements and verified 32 transformed Chiron scenery placements. Both caches passed Invader CRC, protection and stub checks, with no required external banks.
+
+| Cache | SHA-256 | Static bytes | Largest BSP bytes | One-BSP resident limit |
+| --- | --- | ---: | ---: | ---: |
+| CE609 | 8178d8fd5d2808cc80b6c02ac49968f2edc63b2e1ef145207a89bf6422a90e7b | 7,318,300 | 13,901,168 | 20.24 / 23 MiB |
+| MCC13 | 8be4aa095516c92fd78fae697400e5e6033b55073aaea63adbf39ca3960ec505 | 7,593,620 | 7,317,640 | 14.22 / 64 MiB |
+
+Per-BSP indexes independently checked 56,944 base and 9,034 donor collision triangles. Both travel directions passed 291 samples on the base approach and 161 on the Chiron approach. The 20 shared floor samples agreed within 0.000001039 units and the eleven inherited connections passed on BSP 0. Both QA examples built after correcting a Rust callback type. All 21 assembly and 12 clearance tests passed. Source hashes matched and the 1.71 GB disposable run was cleaned up.
+
+Lighting, per-region ambience and remaining donor gameplay placements are still open. These caches were not loaded in-game. Invader linked both BSPs at the same tag-window end, so these probes exercise the regular global switch layout. Forerunner’s read-only integration contract now documents per-BSP MCC geometry ownership and admission of two disjoint ranges. Spatial simulation, independent occupancy and replicated gameplay remain separate from that memory work.

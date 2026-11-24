@@ -172,6 +172,8 @@ pub struct NativeBspTransition {
     pub trigger_name: String,
     pub source_bsp: usize,
     pub destination_bsp: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arrival_marker: Option<u16>,
 }
 
 #[derive(Debug, Serialize)]
@@ -217,6 +219,7 @@ pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<Nati
                 trigger_name: reader.string(trigger_start + trigger_index * 96 + 4, 32)?,
                 source_bsp,
                 destination_bsp,
+                arrival_marker: match reader.u16(at + 6)? { u16::MAX => None, marker => Some(marker) },
             })
         }).collect::<Result<Vec<_>>>()?;
         Ok(NativeBspTransitions { cache_sha256: map.sha256.clone(), bsp_count, transitions })
