@@ -130,7 +130,7 @@ fn namespace_materials(
     #[cfg(windows)] let source_arg=source_alias.path().to_string_lossy().into_owned();
     #[cfg(not(windows))] let source_arg=source.to_string_lossy().into_owned();
     let dependency = find_tool(tools, "invader-dependency")?;
-    let refactor = find_tool(tools, "invader-refactor")?;
+    let reuse_base = source_index == 0 && source == destination && scenery.is_empty() && recovery.is_none();
     let working = workspace.join(format!("bsp-dependencies-{source_index}"));
     // Invader's recursive renamer does not handle Windows verbatim roots
     // consistently. Its cwd is the owned job, so keep these paths relative.
@@ -291,6 +291,10 @@ fn namespace_materials(
             return invalid("BSP material dependencies exceed 128 MiB per file or 1 GiB total");
         }
         let hash = maps::hash_file(&input)?;
+        if reuse_base {
+            hashes.insert(relative, hash);
+            continue;
+        }
         let output = working.join(safe_relative(&relative)?);
         fs::create_dir_all(output.parent().unwrap()).map_err(|e| SparkError::Invalid(format!("Cannot prepare BSP destination directory {}: {e}",output.parent().unwrap().display())))?;
         let expected = if let Some((source_hash, prepared_hash)) = prepared.get(&relative) {
@@ -311,6 +315,42 @@ fn namespace_materials(
         hashes.insert(relative, hash);
     }
     let namespace = format!("gsbsp_{}_{}", &runner.id[..8], source_index);
+    if reuse_base {
+        // The destination already owns the entire verified base tag tree.
+        // Halo references those paths from the tag root, so only the shaders
+        // named by the JMS need aliases. Renaming the rest at each extension
+        // repeatedly lengthens the same inherited dependency paths.
+        let alias_root = destination.join(&namespace);
+        crate::reject_links(&alias_root)?;
+        fs::create_dir(&alias_root)?;
+        let aliases = alias_root.join("materials");
+        fs::create_dir(&aliases)?;
+        for material in geometry.materials.iter().filter(|m| m.source == source_index) {
+            let (Some(path), Some(class)) = (&material.shader_path, &material.shader_class) else {
+                continue;
+            };
+            let ext = extension(class)?;
+            let relative = format!("{path}.{ext}").replace('\\', "/");
+            let expected = hashes.get(&relative).ok_or_else(|| {
+                SparkError::Invalid(format!("Base shader is missing from the verified dependency closure: {relative}"))
+            })?;
+            let original = source.join(safe_relative(&relative)?);
+            let alias = aliases.join(safe_relative(&format!("{}.{ext}", material.name))?);
+            crate::reject_links(&original)?;
+            {
+                let mut input = fs::File::open(&original)?;
+                let mut output = fs::OpenOptions::new().create_new(true).write(true).open(&alias)?;
+                std::io::copy(&mut input, &mut output)?;
+            }
+            if maps::hash_file(&original)? != *expected || maps::hash_file(&alias)? != *expected {
+                return invalid("Base shader changed while preparing its native material alias");
+            }
+        }
+        runner.emit("bsp-shaders", "Reused verified base dependency paths and staged only the native shader aliases", 44, "info");
+        return Ok(NamespacedDependencies { hashes, model_reference_changes });
+    }
+
+    let refactor = find_tool(tools, "invader-refactor")?;
     if working.join(&namespace).exists() {
         return invalid("BSP dependency namespace collides with an input path");
     }
