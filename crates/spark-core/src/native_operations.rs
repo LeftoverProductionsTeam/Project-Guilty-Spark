@@ -422,7 +422,7 @@ impl Operation {
                 }
             }
             Self::DevicePlacement{device,source_sha256}=>{if class!="scnr"||!device.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Device editing needs an exact native placement identity/source, finite pose and bounded group indices");}}
-            Self::TriggerVolume{index,name,geometry,source_sha256,append}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||*append&&!crate::creative::script_ident(name)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
+            Self::TriggerVolume{index,name,geometry,source_sha256,append}=>{if class!="scnr"||*index>=1024||name.len()>32||name.chars().any(char::is_control)||*append&&crate::maps::native_bsp_switch_name(name).is_none()&&!crate::creative::script_ident(name)||!geometry.valid()||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Trigger editing needs an exact source/index/name and a finite orthonormal box with positive dimensions");}}
             Self::CutsceneFlag{point,source_sha256,..}=>{
                 if class!="scnr"||point.index>=512||point.name.len()>32||point.name.chars().any(char::is_control)||point.position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||point.facing_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU+1e-6)||source_sha256.len()!=64||!source_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return invalid("Flag editing needs exact source/index/name and finite XYZ/yaw/pitch");}
             }
@@ -756,6 +756,12 @@ impl Operation {
             let (row,point)=selected_native_start(before,*encounter,*squad,*start)?;
             if row.encounter_name!=*encounter_name||row.name!=*squad_name{return invalid("Native encounter/squad identity changed before start editing");}
             let heading_changed=if let Some(value)=facing_radians {let original=point.facing_radians.ok_or_else(||crate::SparkError::Invalid("Native starting facing is unavailable; only position editing is supported for this source".into()))?;!facings_close(original,*value)}else{false};
+                if let Some((from, to)) = crate::maps::native_bsp_switch_name(name) {
+                    let bsp_count = array_listing(before, "structure_bsps")?.count;
+                    if from >= bsp_count || to >= bsp_count {
+                        return invalid("A native BSP switch needs two existing structure BSP indices");
+                    }
+                }
             let position_changed=!positions_close(point.position,*position);
             let command_changed=if let Some(index)=command_list{let old=point.command_list.ok_or_else(||crate::SparkError::Invalid("Native starting command list is unavailable".into()))?;if *index>=0&&!scenario_command_list_choices(before)?.iter().any(|list|list.index==*index as u16){return invalid("Selected native command list is missing; refresh source");}old!=*index}else{false};
             if !position_changed&&!heading_changed&&!command_changed{return invalid("The AI starting pose/command list already matches; no candidate was written");}
@@ -1358,7 +1364,19 @@ impl ScenarioSquadReadback {
         if let Some(expected)=&self.named_objects{let actual=crate::maps::scenario_named_object_readback(path,map)?;if expected.len()!=actual.len()||expected.iter().zip(&actual).any(|(a,b)|a.name!=b.name||a.class!=b.class||a.index!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)){return invalid("Compiled named object identity, asset or position differs from reviewed source");}}
         if let Some(expected)=&self.cutscene_flags{let actual=crate::maps::scenario_flag_readback(path,map)?;if expected.len()!=actual.len()||expected.iter().zip(&actual).any(|(a,b)|!flag_points_close(a,b)){return invalid("Compiled cutscene flags differ from reviewed source");}}if let Some(expected)=&self.extraction_squads{factions::verify_squad_cache(expected,path,map)?;}if let Some(expected)=&self.faction_kits{factions::verify_cache(expected,path,map)?;}if let Some(expected)=&self.transports{transport::verify_cache(expected,path,map)?;}if let Some(expected)=&self.command_lists{let actual=crate::maps::scenario_command_readback(path,map)?;if expected.len()!=actual.len()||expected.iter().zip(&actual).any(|(a,b)|!a.close(b)){return invalid("Compiled command lists/actions/parameters/references/points differ from reviewed source");}}if let Some(expected)=&self.devices{verify_devices_cache(expected,path,map)?;}
         if let Some(expected) = &self.device_groups { verify_device_groups_cache(expected, path, map)?; }
-        if let Some(expected)=&self.volumes{let actual=crate::maps::scenario_volume_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(actual).any(|(a,b)|a.name!=b.name||a.kind!=b.kind||match(&a.geometry,&b.geometry){(Some(a),Some(b))=>!volume_geometry_close(a,b),(None,None)=>false,_=>true}){return invalid("Compiled trigger inventory, identity or geometry differs from reviewed source");}}if let Some(expected)=&self.cameras{let actual=crate::maps::scenario_camera_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(&actual).any(|(a,b)|!camera_points_close(a,b)){return invalid("Compiled native camera inventory/name/pose/lens differs from reviewed source");}}Ok(())
+        if let Some(expected)=&self.volumes{let actual=crate::maps::scenario_volume_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(actual).any(|(a,b)|a.name!=b.name||a.kind!=b.kind||match(&a.geometry,&b.geometry){(Some(a),Some(b))=>!volume_geometry_close(a,b),(None,None)=>false,_=>true}){return invalid("Compiled trigger inventory, identity or geometry differs from reviewed source");}
+            let switches = expected.iter().enumerate().filter_map(|(index, volume)| {
+                crate::maps::native_bsp_switch_name(&volume.name).map(|(from, to)| (index, from, to))
+            }).collect::<Vec<_>>();
+            if !switches.is_empty() {
+                let compiled = crate::maps::scenario_bsp_transitions(path, map)?;
+                if switches.iter().any(|&(index, from, to)| !compiled.transitions.iter().any(|row| {
+                    row.trigger_index == index && row.source_bsp == from && row.destination_bsp == to
+                })) {
+                    return invalid("Compiled BSP switch rows differ from the reviewed trigger names");
+                }
+            }
+        }if let Some(expected)=&self.cameras{let actual=crate::maps::scenario_camera_readback(path,map)?;if actual.len()!=expected.len()||expected.iter().zip(&actual).any(|(a,b)|!camera_points_close(a,b)){return invalid("Compiled native camera inventory/name/pose/lens differs from reviewed source");}}Ok(())
     }
     pub fn verify_map(&self,map:&crate::maps::MapInspection)->Result<()> {
         self.validate()?;
@@ -2194,6 +2212,27 @@ mod tests {
         assert!(reviewed_difference(&before,&after.replace("name (squad_a)","name (other)"),&operation).is_err());
         assert!(operation.arguments_with_fields(Path::new("owned-tags"),"scnr","level.scenario",&before.replace("name (original)","name (other)")).is_err());
         let unavailable=before.replace("position (1,2,3)","position (NaN,2,3)");
+    #[test]
+    fn native_bsp_trigger_append_requires_two_existing_indices() {
+        let operation = |name: &str| Operation::TriggerVolume {
+            index: 0, name: name.into(), append: true, source_sha256: "a".repeat(64),
+            geometry: crate::maps::ScenarioLogicVolumeGeometry {
+                forward: [1., 0., 0.], up: [0., 0., 1.], corner: [4., 4., 0.], dimensions: [2., 2., 3.],
+            },
+        };
+        let tags = Path::new("owned");
+        let inventory = "trigger_volumes[0] array\nstructure_bsps[2] array\n";
+        let switch = operation("bsp0,1");
+        operation("bsp 0,1").validate("scnr", "owned.scenario").unwrap();
+        switch.validate("scnr", "owned.scenario").unwrap();
+        let arguments = switch.arguments_with_fields(tags, "scnr", "owned.scenario", inventory).unwrap();
+        assert!(arguments.windows(3).any(|row| row == ["-S", "trigger_volumes[0].name", "bsp0,1"]));
+        assert!(operation("bsp1,2").arguments_with_fields(tags, "scnr", "owned.scenario", inventory).is_err());
+        for name in ["bsp0,0", "bsp00,1", "bsp0,16", "bsp0,1extra"] {
+            assert!(operation(name).validate("scnr", "owned.scenario").is_err(), "{name}");
+        }
+    }
+
         assert!(scenario_squad_choices(&unavailable).is_ok(),"count-only inspection must not require position telemetry");
         assert!(scenario_squad_start_choices(&unavailable).is_err());
     }

@@ -27,6 +27,12 @@ fn main() -> Result<()> {
         if report.starts.iter().any(|s| s.issue.is_some()) { std::process::exit(2); }
         return Ok(());
     }
+    if a.len() == 3 && a[1] == "--read-native-transitions" {
+        let file = Path::new(&a[2]);
+        let map = maps::inspect_map(file, None)?;
+        println!("{}", serde_json::to_string(&maps::scenario_bsp_transitions(file, &map)?)?);
+        return Ok(());
+    }
     if a.len() >= 4 && a[1] == "--verify-cache" {
         if a.len() - 3 > bsp_assembly::MAX_COMPILED_CONNECTIONS {
             return spark_core::invalid(format!("Choose at most {} connection projects", bsp_assembly::MAX_COMPILED_CONNECTIONS));
@@ -78,6 +84,7 @@ fn main() -> Result<()> {
     }
     if a.len() != 6 {
         eprintln!("qa_bsp_assembly [--plan-only] [--direction <degrees>] [--terrain | --edge-section <branch offset>] <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
+        eprintln!("qa_bsp_assembly --read-native-transitions <compiled.map>");
         eprintln!("qa_bsp_assembly --verify-cache <compiled.map> <connection-project.gsproject> [...]");
         eprintln!("qa_bsp_assembly --verify-walkthrough <compiled.map> <connection-project.gsproject>");
         std::process::exit(2);

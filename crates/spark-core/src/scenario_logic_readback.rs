@@ -165,6 +165,64 @@ fn parse_recordings(r: &Reader, space: &Space, scenario: usize) -> Result<Vec<Na
 #[serde(rename_all="camelCase")]
 pub struct NativeScriptGlobal {pub name:String,pub value_type:u16}
 pub fn scenario_global_readback(path:&Path,map:&MapInspection)->Result<Vec<NativeScriptGlobal>>{with_scenario(path,map,|r,space,sc|{let(at,count)=space.block(r,sc+0x4a8,92,4096)?;(0..count).map(|index|{let p=at+index*92;Ok(NativeScriptGlobal{name:r.string(p,32)?,value_type:r.u16(p+32)?})}).collect()})}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeBspTransition {
+    pub trigger_index: usize,
+    pub trigger_name: String,
+    pub source_bsp: usize,
+    pub destination_bsp: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeBspTransitions {
+    pub cache_sha256: String,
+    pub bsp_count: usize,
+    pub transitions: Vec<NativeBspTransition>,
+}
+
+/// Native authoring form, including the optional space used by stock scenarios.
+pub fn native_bsp_switch_name(name: &str) -> Option<(usize, usize)> {
+    let indices = name.strip_prefix("bsp")?;
+    let (from, to) = indices.strip_prefix(' ').unwrap_or(indices).split_once(',')?;
+    let index = |value: &str| {
+        let parsed = value.parse::<usize>().ok()?;
+        (parsed < 16 && parsed.to_string() == value).then_some(parsed)
+    };
+    let (from, to) = (index(from)?, index(to)?);
+    (from != to).then_some((from, to))
+}
+
+/// Read native compiled switch rows. The compiler derives these from ordinary
+/// scenario trigger volumes. Each row describes a global BSP switch.
+pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<NativeBspTransitions> {
+    if !matches!(map.header.version, 609 | 13) {
+        return invalid("Native BSP transition review supports CE609 and MCC13 caches");
+    }
+    with_scenario(path, map, |reader, tags, scenario| {
+        let (_, bsp_count) = tags.block(reader, scenario + 0x5a4, 32, 16)?;
+        let (trigger_start, trigger_count) = tags.block(reader, scenario + 0x360, 96, 4096)?;
+        let (switch_start, switch_count) = tags.block(reader, scenario + 0x39c, 8, 256)?;
+        let transitions = (0..switch_count).map(|index| {
+            let at = switch_start + index * 8;
+            let trigger_index = usize::from(reader.u16(at)?);
+            let source_bsp = usize::from(reader.u16(at + 2)?);
+            let destination_bsp = usize::from(reader.u16(at + 4)?);
+            if trigger_index >= trigger_count || source_bsp >= bsp_count || destination_bsp >= bsp_count {
+                return invalid(format!("Compiled BSP transition {index} points outside the native scenario arrays"));
+            }
+            Ok(NativeBspTransition {
+                trigger_index,
+                trigger_name: reader.string(trigger_start + trigger_index * 96 + 4, 32)?,
+                source_bsp,
+                destination_bsp,
+            })
+        }).collect::<Result<Vec<_>>>()?;
+        Ok(NativeBspTransitions { cache_sha256: map.sha256.clone(), bsp_count, transitions })
+    })
+}
+
 pub fn scenario_volume_readback(path:&Path,inspection:&MapInspection)->Result<Vec<ScenarioLogicVolume>> {with_scenario(path,inspection,parse_volumes)}
 fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolume>> {
     let (at,count)=space.block(r,at+0x360,96,4096)?;let mut volumes=vec![];

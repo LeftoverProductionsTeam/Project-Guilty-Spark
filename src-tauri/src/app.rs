@@ -572,6 +572,22 @@ async fn open_bsp_assembly_donor(app:tauri::AppHandle,project_id:String)->Reply<
     }).await.map_err(error)?
 }
 #[tauri::command]
+async fn inspect_native_bsp_transitions(
+    app: tauri::AppHandle, project_id: String, source_sha256: String,
+) -> Reply<maps::NativeBspTransitions> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.as_ref().ok_or("Open a compiled CE609 or MCC13 source map")?;
+        if source.sha256 != source_sha256 {
+            return Err("The source map changed. Reopen its native BSP transition report.".into());
+        }
+        let map = inspect(&state, &project)?;
+        maps::scenario_bsp_transitions(&source.preserved_path, &map).map_err(error)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
 async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>)->Reply<serde_json::Value>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
         if let Some(draft)=draft {
@@ -3534,6 +3550,7 @@ pub fn run() {
             plan_bsp_assembly,
             create_megaworld_project,
             preview_bsp_assembly,
+            inspect_native_bsp_transitions,
             open_bsp_assembly_donor,
             workspace_windows::claim_project_document,
             workspace_history_native::read_workspace_history,

@@ -4,9 +4,9 @@ Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Twelve-region CE609 da222bf1 and recovered-source MCC13 040b5da5 passed native readback and private Forerunner peers. CE609 uses 21.81 of 23 MiB. MCC13 uses 14.20 of 64 MiB with identical collision totals and route sample counts.
-Next action: Extend the exact twelve-region baseline with a donor that clears native geometry. Derelict’s reviewed seal replaced three open edges with a coplanar overlap. Ice Fields still hits Tool’s leaf-map allocation. A cache above 23 MiB, independent occupancy, expanded driving and automatic Forerunner MCC13 launch remain open.
+Next action: Author a physically aligned two-BSP corridor with overlapping walkable approaches and paired native switch volumes. The separate twelve-region and original Chiron BSP fixture compiled in CE609 and MCC13. Preserve original sky, lighting, sound, weather, AI and placements. Live passenger traversal and independent regional occupancy remain Forerunner acceptance gates.
 
-Operation 110% V2 immediate priority overlay, 24 November 2026. P0 is the complete 19-region MegaWorld, including reusable BSP Assembly, classic 23 MiB CE609, optional 64 MiB MCC13 and honest per-runtime compatibility. Forerunner owns MCC loading, regional occupancy and synchronized multiplayer state, including guest vehicle traversal. P1 is the original Zombie Apocalypse conversion and survival gameplay. P2 is repeatable Black Echo and persistent multiplayer Extraction. All permanent scope, 475 records, M1–M6, completed evidence and unresolved acceptance gates remain in force.
+Operation 110% V2 immediate priorities, 24 November 2026. P0 completes the 19-region MegaWorld using native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity and per-target budgets. Forerunner owns pickup and passenger reconnect, simultaneous occupancy and synchronized world state. P1 is original Zombie Apocalypse. P2 is repeatable Black Echo and persistent multiplayer Extraction. Continue all remaining permanent requirements afterward. Preserve all 475 records and M1–M6.
 
 ## Acceptance
 

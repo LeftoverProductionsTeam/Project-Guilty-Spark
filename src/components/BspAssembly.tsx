@@ -12,6 +12,40 @@ import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 import MegaworldAtlas from './MegaworldAtlas';
 import { useWorkspaceActivity } from './WorkspaceActivity';
+interface NativeBspTransitions {
+  cacheSha256: string;
+  bspCount: number;
+  transitions: {triggerIndex: number; triggerName: string; sourceBsp: number; destinationBsp: number}[];
+}
+
+function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string; sourceSha256: string}) {
+  const [report, setReport] = useState<NativeBspTransitions | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function inspectTransitions() {
+    setBusy(true);
+    setError('');
+    try {
+      const result = await call<NativeBspTransitions>('inspect_native_bsp_transitions', {projectId, sourceSha256});
+      if (result.cacheSha256 !== sourceSha256) throw Error('The native readback belongs to another map.');
+      setReport(result);
+    } catch (issue) {
+      setReport(null);
+      setError(String(issue));
+    } finally { setBusy(false); }
+  }
+  return <section aria-label="Native BSP transitions">
+    <p>Review the switch volumes compiled into this map. BSP indices start at 0. The switch changes the active BSP for the whole scenario. Independent regional simulation needs runtime support.</p>
+    <button type="button" disabled={!native || busy} onClick={() => void inspectTransitions()}>{busy ? "Reading native scenario…" : "Inspect native BSP transitions"}</button>
+    {error && <p role="alert" className="bsp-error">{error}</p>}
+    {report && <details open>
+      <summary>{report.bspCount} BSPs · {report.transitions.length} compiled switches</summary>
+      {report.transitions.length > 0 ? <ul>{report.transitions.map((row, index) => <li key={index}>BSP {row.sourceBsp} → BSP {row.destinationBsp} · {row.triggerName || "Unnamed volume"} (volume {row.triggerIndex})</li>)}</ul>
+        : <p>This scenario has no compiled trigger-volume switches.</p>}
+    </details>}
+  </section>;
+}
+
 export default function BspAssembly({
   project,
   inspection,
@@ -28,6 +62,9 @@ export default function BspAssembly({
   onBuild: () => void;
 }) {
   const {active}=useWorkspaceActivity();
+  const sourceSha256 = project.source?.sha256;
+  const nativePartitioned = sourceSha256 && inspection?.sha256 === sourceSha256
+    && (inspection.mesh.parts?.length ?? 0) > 1 && [609, 13].includes(inspection.header.version);
   const sourceShaders=inspection&&project.source&&inspection.sha256===project.source.sha256?inspection.tags.filter(tag=>tag.class==='senv'):[];
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
@@ -102,7 +139,7 @@ export default function BspAssembly({
     let cancelled = false;
     setSectionList(null);
     setOptionsError('');
-    if (native && open && donor)
+    if (native && open && donor && !nativePartitioned)
       void call<BspOption[]>('bsp_assembly_options', { projectId: donor, assemblyProjectId: project.id }).then(
         (value) => {
           if (!cancelled) {
@@ -117,7 +154,7 @@ export default function BspAssembly({
     return () => {
       cancelled = true;
     };
-  }, [donor, open]);
+  }, [donor, open, nativePartitioned]);
   async function perform(action: (current: () => boolean) => Promise<void>) {
     const request = ++operation.current,
       owner = project.id;
@@ -206,13 +243,14 @@ export default function BspAssembly({
   return (
     <details className="bsp-assembly" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>
-        Connect another map’s BSP{project.bspAssembly ? ` · ${project.bspAssembly.donorTitle}` : ''}
+        {nativePartitioned ? 'Native BSP transitions' : 'Connect another map’s BSP'}{project.bspAssembly ? ` · ${project.bspAssembly.donorTitle}` : ''}
       </summary>
       {open && (
         <div className="bsp-assembly-body">
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · full source: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
+          {nativePartitioned ? <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!}/> : <>
           <p>
             Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one native world
             with collision and new lightmaps. Your original maps stay preserved. Campaign actors and scripts
@@ -643,6 +681,7 @@ export default function BspAssembly({
               {error}
             </p>
           )}
+          </>}
         </div>
       )}
     </details>

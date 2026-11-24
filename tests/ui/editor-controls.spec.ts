@@ -130,6 +130,22 @@ test('existing trigger geometry keeps native identity and rejects invalid or sta
  await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(x).toBeDisabled();await expect(preview).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();await expect(x).toHaveValue('2');await expect(preview).toBeDisabled();
 });
 
+test('native BSP trigger names preview an append without renaming existing areas', async ({page}) => {
+  await page.goto('/tests/ui/fixtures/editorControls.html?native-volume');
+  const form = page.locator('.native-trigger-volumes');
+  await form.locator(':scope > summary').click();
+  await form.getByRole('button', {name: 'Add native trigger area', exact: true}).click();
+  const name = form.getByRole('textbox', {name: 'New native area name', exact: true});
+  const preview = form.getByRole('button', {name: 'Preview trigger geometry', exact: true});
+  await name.fill('bsp0,0');
+  await expect(preview).toBeDisabled();
+  await name.fill('bsp0,1');
+  await preview.click();
+  const operation = JSON.parse((await page.getByTestId('volume-operation').textContent())!);
+  expect(operation).toMatchObject({kind: 'triggerVolume', index: 1, name: 'bsp0,1', append: true, sourceSha256: 'a'.repeat(64)});
+  await expect(form.getByRole('option', {name: '0 · intro_area', exact: true})).toHaveCount(1);
+});
+
 test('existing native device poses retain bindings and refuse dirty invalid or stale proposals',async({page})=>{
  await page.goto('/tests/ui/fixtures/editorControls.html?native-device');const form=page.locator('.native-device-placements');await form.locator(':scope > summary').click();const x=form.getByRole('spinbutton',{name:'Device position X',exact:true}),yaw=form.getByRole('spinbutton',{name:'Device yaw',exact:true});await x.fill('4');await yaw.fill('90');await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
  const op=JSON.parse((await page.getByTestId('device-operation').textContent())!);expect(op).toMatchObject({kind:'devicePlacement',sourceSha256:'a'.repeat(64),device:{class:'ctrl',index:0,nameIndex:0,name:'terminal',tagPath:'devices/terminal',position:[4,2,3]}});expect(op.device.rotationRadians[0]).toBeCloseTo(Math.PI/2,6);
