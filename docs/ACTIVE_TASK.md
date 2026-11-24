@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Black Echo split-return CE609 571f9479 completed one offline UNSC evacuation and checksum-valid native bank record check. Ubuntu Debian and native a10/b30 roundtrips also passed.
-Next action: Use retained 571f9479 to verify restart, redeployment and authenticated two-player settlement. Then Covenant gameplay and desktop batch interruption. See RUNTIME_INTEGRATION_20261107.
+Latest verified revision: Black Echo split-return CE609 571f9479 banked twice offline. The second native gear record stayed byte-identical across a process restart. Forerunner eefe6b83 refused redeployment because the active saved profile could not be resolved. Batch cancellation repair c89b1c5 passed targeted Windows tests.
+Next action: Confirm Forerunner can resolve the same saved profile after CE direct startup and redeploy with the banked kit. Keep the exact candidate for the paired human test. Advance offline Covenant a0514689 and repeat desktop batch cancellation with two explicitly saved projects. See RUNTIME_INTEGRATION_20261107.
 
 ## Acceptance
 
