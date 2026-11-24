@@ -3,6 +3,16 @@ use spark_core::{maps,Result};
 use std::{collections::BTreeMap,path::Path};
 fn main()->Result<()>{
  let args:Vec<_>=std::env::args().skip(1).collect();
+ if args.first().is_some_and(|arg| arg == "--flight-recordings") {
+  if args.len() != 2 {
+   return spark_core::invalid("qa_bsp_mesh --flight-recordings <owned.map>");
+  }
+  let file = Path::new(&args[1]);
+  let inspection = maps::inspect_map(file, None)?;
+  let recordings = maps::scenario_recording_readback(file, &inspection)?;
+  println!("{}", serde_json::json!({"sourceSha256":inspection.sha256,"recordings":recordings}));
+  return Ok(());
+ }
  if args.first().is_some_and(|arg| arg == "--flight-route") {
   if !matches!(args.len(), 3 | 6) {
    return spark_core::invalid("qa_bsp_mesh --flight-route <owned.map> <command-list> [start-x start-y start-z]");

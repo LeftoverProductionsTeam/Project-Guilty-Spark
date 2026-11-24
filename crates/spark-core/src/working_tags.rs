@@ -133,6 +133,47 @@ fn parse_controller_binding(content:&str)->Result<Option<crate::firefight::Nativ
         let Some(json)=line.strip_prefix("; Spark source encounter bindings: ") else{return Ok(None);};
         let binding:crate::firefight::NativeControllerBinding=serde_json::from_str(json)?;binding.validate()?;Ok(Some(binding))
 }
+fn recorded_transport_names(source: &str) -> Result<std::collections::BTreeSet<String>> {
+    let mut lines = source.lines();
+    if lines.next() != Some("; Spark native transport controller v1") {
+        return Ok(Default::default());
+    }
+    let binding = lines.next().and_then(|line| line.strip_prefix("; configuration: "))
+        .ok_or_else(|| SparkError::Invalid("Generated transport source lost its configuration".into()))?;
+    #[derive(Deserialize)]
+    struct Clip { landing: String, hover: Option<String> }
+    #[derive(Deserialize)]
+    struct Transport { #[serde(default)] recordings: BTreeMap<String, Clip> }
+    let transport: Transport = serde_json::from_str(binding)?;
+    let mut names = std::collections::BTreeSet::new();
+    for clip in transport.recordings.into_values() {
+        names.insert(clip.landing);
+        names.extend(clip.hover);
+    }
+    Ok(names)
+}
+
+fn verify_recorded_streams(
+    parent: &[maps::NativeScenarioRecording],
+    result: &[maps::NativeScenarioRecording],
+    required: &std::collections::BTreeSet<String>,
+) -> Result<()> {
+    if !result.starts_with(parent) {
+        return invalid("Working-tag compilation changed or removed an existing native recording; the previous cache was retained");
+    }
+    for name in required {
+        let mut matches = result.iter().filter(|row| row.name.eq_ignore_ascii_case(name));
+        let usable = matches.next().is_some_and(|row| {
+            row.name == *name && (1..=4).contains(&row.version)
+                && (1..=i16::MAX as u16).contains(&row.ticks) && row.stream_sha256.is_some()
+        });
+        if !usable || matches.next().is_some() {
+            return invalid(format!("Compiled transport recording {name} has no unique nonempty native stream; the previous cache was retained"));
+        }
+    }
+    Ok(())
+}
+
 impl ScriptAttachment {
     fn controller_binding(&self)->Result<Option<crate::firefight::NativeControllerBinding>> {parse_controller_binding(&self.content)}
     fn relative_path(&self,scenario:&str)->Result<PathBuf> {
@@ -1668,6 +1709,14 @@ fn run_with(
         {
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
         }
+        let reviewed_recordings = input.script_attachment.as_ref()
+            .map(|attachment| recorded_transport_names(&attachment.content))
+            .transpose()?.unwrap_or_default();
+        let parent_recordings = maps::scenario_recording_readback(&prepared.parent_output, &prepared.parent_inspection)?;
+        if !parent_recordings.is_empty() || !reviewed_recordings.is_empty() {
+            let compiled_recordings = maps::scenario_recording_readback(&output, &inspected)?;
+            verify_recorded_streams(&parent_recordings, &compiled_recordings, &reviewed_recordings)?;
+        }
         if let Some(binding)=&receipt.mission_readback {
             let retained=receipt.generated_mission_hud.as_ref().map(|hud|(hud.tag_path.as_str(),hud.messages.as_slice()))
                 .or_else(||retained_mission_hud.as_ref().map(|(path,source)|(path.as_str(),source.messages.as_slice())));
@@ -1859,6 +1908,22 @@ mod test_fixture;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn existing_recorded_streams_cannot_be_replaced_by_empty_or_different_bytes() {
+        let make = |index, name: &str, hash: Option<&str>| maps::NativeScenarioRecording {
+            index, name: name.into(), version: 4, control_version: 0, ticks: 100,
+            stream_bytes: if hash.is_some() { 80 } else { 0 }, stream_sha256: hash.map(str::to_owned),
+        };
+        let original = make(0, "stock", Some("original"));
+        let source = "; Spark native transport controller v1\n; configuration: {\"recordings\":{\"inbound\":{\"landing\":\"land\"}}}";
+        let required = recorded_transport_names(source).unwrap();
+        let valid = make(1, "land", Some("new"));
+        assert!(verify_recorded_streams(std::slice::from_ref(&original), &[original.clone(), valid.clone()], &required).is_ok());
+        assert!(verify_recorded_streams(std::slice::from_ref(&original), &[original.clone(), make(1, "land", None)], &required).is_err());
+        assert!(verify_recorded_streams(std::slice::from_ref(&original), &[make(0, "stock", Some("changed")), valid.clone()], &required).is_err());
+        assert!(verify_recorded_streams(std::slice::from_ref(&original), &[original.clone(), valid, make(2, "LAND", Some("other"))], &required).is_err());
+    }
+
     #[test]
     fn reviewed_append_pose_revision_keeps_other_groups_and_rejects_unowned_changes(){
         use crate::native_operations::Operation;

@@ -112,6 +112,53 @@ fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Rea
     if at<space.begin||at.checked_add(0x5b0).is_none_or(|end|end>space.end){return invalid("Compiled Logic scenario body escapes its tag region");}
     decode(&r,&space,at)
 }
+/// Native scenario input streams are retained as identities, without exposing gameplay input bytes.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeScenarioRecording {
+    pub index: usize,
+    pub name: String,
+    pub version: u8,
+    pub control_version: u8,
+    pub ticks: u16,
+    pub stream_bytes: usize,
+    pub stream_sha256: Option<String>,
+}
+
+pub fn scenario_recording_readback(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeScenarioRecording>> {
+    with_scenario(path, inspection, parse_recordings)
+}
+
+fn parse_recordings(r: &Reader, space: &Space, scenario: usize) -> Result<Vec<NativeScenarioRecording>> {
+    // ScenarioRecordedAnimation: 64 bytes, with an in-tag TagDataOffset at 44.
+    let (start, count) = space.block(r, scenario + 0x36c, 64, 1024)?;
+    let mut total_stream_bytes = 0usize;
+    (0..count).map(|index| {
+        let at = start + index * 64;
+        let version = r.bytes(at + 32, 4)?;
+        let stream_bytes = r.u32(at + 44)? as usize;
+        total_stream_bytes = total_stream_bytes.saturating_add(stream_bytes);
+        if stream_bytes > 2 * 1024 * 1024 || total_stream_bytes > space.end - space.begin {
+            return invalid("Compiled recording streams exceed their native data bounds");
+        }
+        let stream_sha256 = if stream_bytes == 0 {
+            None
+        } else {
+            let stream = space.pointer(r.u32(at + 56)?, stream_bytes)?;
+            Some(crate::hex_bytes(Sha256::digest(r.bytes(stream, stream_bytes)?)))
+        };
+        Ok(NativeScenarioRecording {
+            index,
+            name: r.string(at, 32)?,
+            version: version[0],
+            control_version: version[2],
+            ticks: r.u16(at + 36)?,
+            stream_bytes,
+            stream_sha256,
+        })
+    }).collect()
+}
+
 #[derive(Clone,Debug,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct NativeScriptGlobal {pub name:String,pub value_type:u16}
