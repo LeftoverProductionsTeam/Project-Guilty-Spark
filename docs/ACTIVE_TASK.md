@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Windows batch cancellation passed during native MCC Tool compilation. Forerunner verified same-session banked-kit redeployment on 40d2ce85 and Covenant Spirit recall on a0514689. Exact 571f9479 bank bytes survived restart on Windows eefe6b83; the active profile refused deployment there. Forerunner 2e39d3f Linux verified fresh startup with its profile scan fix.
-Next action: Verify exact 571f9479 post-bank restart on a reviewed Windows Forerunner build containing 2e39d3f or a later profile fix. Covenant a0514689 needs measured seat 8 approach, loaded Spirit return and banking. Batch resume and authenticated human acceptance remain open.
+Latest verified revision: Exact 571f9479 banked and reissued both weapon paths after a clean Windows restart in Forerunner ce49113d evidence. Windows batch mid-compile cancellation and MCC setup round trip passed.
+Next action: Author and verify the dedicated Pelican return pad with Forerunner 5278f942 or its reviewed successor. Distinguish runtime support for the Pelican override from older faction-pad support. Covenant boarding and loaded return, exact item IDs, repeat mission, batch resume and two authenticated humans remain open.
 
 ## Acceptance
 

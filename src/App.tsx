@@ -1398,6 +1398,7 @@ export default function App() {
           onWorkspace={setWorkspace}
           onImport={() => void importFiles()}
           onRuntime={id=>{setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');}}
+          onMccTools={()=>{setDependencyRuntime('mccSteam');openDependencySetup();}}
           onNew={() => setCreateModal(true)}
           onNewMap={() => setCreateModal('multiplayer')}
           onFindMaps={() => setWorkspace('map-finder')}

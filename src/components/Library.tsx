@@ -32,6 +32,7 @@ export default function Library({
   onInbox,
   onInitializeInbox,
   onRuntime,
+  onMccTools,
   onWorkspace,
   busy,
 }: {
@@ -44,6 +45,7 @@ export default function Library({
   onInbox: () => void;
   onInitializeInbox: () => void;
   onRuntime: (id: RuntimeId) => void;
+  onMccTools: () => void;
   onWorkspace: (workspace:Workspace) => void;
   busy: boolean;
 }) {
@@ -160,7 +162,7 @@ export default function Library({
           </button>
         </div>
       </div>
-      <MultiMapBatchEditing entries={data.entries} onOpenMccTools={() => onRuntime('mccSteam')} />
+      <MultiMapBatchEditing entries={data.entries} onOpenMccTools={onMccTools} />
       {entries.length ? (
         <div className="map-grid">
           {entries.map((entry) => {
