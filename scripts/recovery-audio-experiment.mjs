@@ -21,8 +21,10 @@ const repairRoundsHud = args.includes('--repair-rounds-hud');
 const nativeMccTool = args.includes('--mcc-tool') ? value('--mcc-tool') : null;
 const repairStandardCarrier = args.includes('--repair-standard-carrier');
 const repairCarrierInertia = args.includes('--repair-carrier-inertia');
+const repairLegacyTitle = args.includes('--repair-legacy-title');
 if (repairStandardCarrier && !nativeMccTool) throw new Error('Standard carrier repair requires the reviewed native MCC Tool');
 if (repairCarrierInertia && !repairStandardCarrier) throw new Error('Carrier inertia repair requires the reviewed original carrier build');
+if (repairLegacyTitle && !repairCarrierInertia) throw new Error('Legacy title repair requires the reviewed inertia-corrected cache');
 const mccPinIndex = args.indexOf('--mcc-tool-sha256');
 const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
 if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
@@ -421,6 +423,25 @@ function recoverStandardCarrier() {
   return readback;
 }
 
+function writeCrcCheckedDerivative(map, sourceSha256, staged, folderName, phase) {
+  const folder = path.join(output, folderName);
+  fs.mkdirSync(folder);
+  const candidate = path.join(folder, path.basename(map));
+  fs.writeFileSync(candidate, staged, { flag: 'wx' });
+  const crc = run('crc', ['--fix-header', candidate], phase + '-crc');
+  const readback = fs.readFileSync(candidate);
+  if (crc.exitCode !== 0 || crc.incomplete || !readback.subarray(0, 0x64).equals(staged.subarray(0, 0x64))
+      || !readback.subarray(0x68).equals(staged.subarray(0x68)) || hashFile(map) !== sourceSha256
+      || hashFile(executables.crc.path) !== executables.crc.sha256) {
+    throw new Error(phase + ' changed bytes outside the reviewed change and CRC fields');
+  }
+  const info = run('info', ['-T', 'crc32_mismatched', candidate], phase + '-readback-crc');
+  if (info.exitCode !== 0 || info.incomplete || !['0', 'false'].includes(info.stdout.trim().toLowerCase())) {
+    throw new Error('Independent readback rejected the repaired cache CRC');
+  }
+  return { path: candidate, cacheSha256: sha(readback) };
+}
+
 function writeReviewedCarrierInverse(map, nativeSha256) {
   // These native MCC offsets apply only to the exact original-carrier recovery build.
   const reviewedSha256 = 'd520d509aa6a23a3fa67d37c28cc74459835ae53c0a4dae615f910e87b60b958';
@@ -457,23 +478,32 @@ function writeReviewedCarrierInverse(map, nativeSha256) {
   if (inverse.some(value => !Number.isFinite(value))) throw new Error('The carrier inverse contains a nonfinite value');
   const staged = Buffer.from(original);
   inverse.forEach((value, i) => staged.writeFloatLE(value, inverseAt + i * 4));
-  const folder = path.join(output, 'mcc-carrier-inertia');
-  fs.mkdirSync(folder);
-  const candidate = path.join(folder, path.basename(map));
-  fs.writeFileSync(candidate, staged, { flag: 'wx' });
-  const crc = run('crc', ['--fix-header', candidate], 'carrier-inertia-crc');
-  const readback = fs.readFileSync(candidate);
-  if (crc.exitCode !== 0 || crc.incomplete || !readback.subarray(0, 0x64).equals(staged.subarray(0, 0x64))
-      || !readback.subarray(0x68).equals(staged.subarray(0x68)) || hashFile(map) !== nativeSha256
-      || hashFile(executables.crc.path) !== executables.crc.sha256) {
-    throw new Error('Inertia recovery changed bytes outside the reviewed inverse and CRC fields');
+  const candidate = writeCrcCheckedDerivative(map, nativeSha256, staged, 'mcc-carrier-inertia', 'carrier-inertia');
+  manifest.results.push({ step: 'repair-carrier-inertia', ...candidate, sourceCacheSha256: nativeSha256,
+    inverseOffset: inverseAt, massPoints: pointsCount, inverse, playable: false });
+  save();
+  return candidate;
+}
+
+function writeReviewedLegacyTitle(parent) {
+  // Score-hint slot 100 is a custom title in this exact cache, not a stock hint.
+  const reviewedSha256 = '95bd7990b2aa3259f44119f4caa63d3b393e61186e19bd1faf8e65a53e8206d2';
+  const original = fs.readFileSync(parent.path);
+  if (parent.cacheSha256 !== reviewedSha256 || sha(original) !== reviewedSha256) {
+    throw new Error('The inertia-corrected cache differs from the reviewed legacy title layout');
   }
-  const info = run('info', ['-T', 'crc32_mismatched', candidate], 'carrier-inertia-readback-crc');
-  if (info.exitCode !== 0 || info.incomplete || !['0', 'false'].includes(info.stdout.trim().toLowerCase())) {
-    throw new Error('Independent readback rejected the repaired cache CRC');
+  const start = 89_024_390;
+  const expected = Buffer.from('Zombie Apocalypse   ', 'utf16le');
+  if (!original.subarray(start, start + expected.length).equals(expected)) {
+    throw new Error('The title slot does not contain the reviewed padded string');
   }
-  manifest.results.push({ step: 'repair-carrier-inertia', path: candidate, sourceCacheSha256: nativeSha256,
-    cacheSha256: sha(readback), inverseOffset: inverseAt, massPoints: pointsCount, inverse, playable: false });
+  const offset = start + expected.length - 2;
+  const staged = Buffer.from(original);
+  staged.writeUInt16LE(0, offset);
+  const candidate = writeCrcCheckedDerivative(parent.path, reviewedSha256, staged, 'mcc-legacy-title', 'legacy-title');
+  manifest.results.push({ step: 'repair-legacy-title', ...candidate, sourceCacheSha256: reviewedSha256,
+    tag: 'ui/multiplayer_game_text.unicode_string_list', slot: 100, offset,
+    title: 'Zombie Apocalypse', replacedTrailingPaddingBytes: 1, playable: false });
   save();
 }
 
@@ -544,7 +574,10 @@ function compileOfficialMcc(carrierReadback) {
     ...(carrierReadback && { standardCarrier: { graph: recoveredCarrierGraph, nodes: 5, idle: 'stand unarmed idle' } }),
     damageEffect:Object.fromEntries(readFields.map((field, index) => [field, compiled[index]]))});
   save();
-  if (repairCarrierInertia) writeReviewedCarrierInverse(map, mapSha256);
+  if (repairCarrierInertia) {
+    const fixedInertia = writeReviewedCarrierInverse(map, mapSha256);
+    if (repairLegacyTitle) writeReviewedLegacyTitle(fixedInertia);
+  }
 }
 
 try {
