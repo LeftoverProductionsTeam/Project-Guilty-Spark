@@ -54,48 +54,116 @@ struct PendingTool {
     created: Instant,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all="camelCase")]
-struct ToolResource { relative_path:String, sha256:String, bytes:u64 }
+#[derive(Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct ToolResource {
+    relative_path: String,
+    sha256: String,
+    bytes: u64,
+    #[serde(skip)]
+    source: PathBuf,
+}
 
-/// H1A's rasterizer reads these relative to its current directory. Keep the
-/// derived job as cwd (short relative tag paths), with only the exact installed
-/// kit's shader resources. Never copy a complete kit or overwrite user files.
-fn tool_resources(kit:&Path)->Reply<Vec<ToolResource>> {
-    let mut files=vec!["shaders/fx.bin","shaders/psh.bin","shaders/vsh.bin"];
-    // The publisher's Steam tool identity is resolved relative to cwd by
-    // SteamAPI_Init. Preserve that exact installed file for isolated launches;
-    // never invent an application ID or copy authentication/session data.
-    let app_id=kit.join("steam_appid.txt");core::reject_links(&app_id).map_err(error)?;
+// Sapien's renderer loads these marker tags outside the scenario graph.
+const SAPIEN_EDITOR_TAGS: &[&str] = &[
+    "ui/editor/markers/fire/fire.gbxmodel",
+    "ui/editor/markers/fire/fire.placeholder",
+    "ui/editor/markers/move/move.gbxmodel",
+    "ui/editor/markers/move/move.placeholder",
+    "ui/editor/markers/normal/normal.gbxmodel",
+    "ui/editor/markers/normal/normal.placeholder",
+    "ui/editor/markers/normal/bitmaps/marker color.bitmap",
+    "ui/editor/markers/normal/shaders/cyan.shader_model",
+    "ui/editor/markers/normal/shaders/magenta.shader_model",
+    "ui/editor/markers/normal/shaders/selection ball.shader_model",
+    "ui/editor/markers/normal/shaders/x.shader_model",
+    "ui/editor/markers/normal/shaders/y.shader_model",
+    "ui/editor/markers/normal/shaders/yellow.shader_model",
+    "ui/editor/markers/normal/shaders/z.shader_model",
+];
+
+fn sapien_sdk_tags(action: &str, settings: &Settings, kit: &Path) -> Option<PathBuf> {
+    (action == "editLevel").then(|| {
+        settings.hek_tags_directory.clone().unwrap_or_else(|| kit.join("tags"))
+    })
+}
+
+fn tool_resources(kit: &Path, workspace: &Path, editor_tags: Option<&Path>) -> Reply<Vec<ToolResource>> {
+    let mut files = vec!["shaders/fx.bin", "shaders/psh.bin", "shaders/vsh.bin"];
+    // Use the publisher's Steam tool identity, resolved relative to cwd.
+    let app_id = kit.join("steam_appid.txt");
+    core::reject_links(&app_id).map_err(error)?;
     if app_id.try_exists().map_err(error)? {
-        let bytes=bounded_read(&app_id,64)?;
-        if std::str::from_utf8(&bytes).map_err(error)?.trim()!="1532190" {return Err("The selected H1A kit has an unexpected Steam tool identity; verify its official installation".into());}
+        let bytes = bounded_read(&app_id, 64)?;
+        if std::str::from_utf8(&bytes).map_err(error)?.trim() != "1532190" {
+            return Err("The selected H1A kit has an unexpected Steam tool identity. Verify its official installation.".into());
+        }
         files.push("steam_appid.txt");
     }
-    files.into_iter().map(|relative|{
-        let file=kit.join(relative);core::reject_links(&file).map_err(error)?;
-        let metadata=fs::metadata(&file).map_err(error)?;
-        if !metadata.is_file()||!(1..=16*1024*1024).contains(&metadata.len()){return Err("H1A shader resource is missing or exceeds 16 MiB; verify the installed kit".into());}
-        Ok(ToolResource{relative_path:relative.into(),sha256:maps::hash_file(&file).map_err(error)?,bytes:metadata.len()})
+    let mut paths: Vec<(String, PathBuf)> = files.into_iter()
+        .map(|name| (name.into(), kit.join(name))).collect();
+    if let Some(sdk) = editor_tags {
+        for name in SAPIEN_EDITOR_TAGS {
+            let relative = format!("tags/{name}");
+            let working = workspace.join(&relative);
+            core::reject_links(&working).map_err(error)?;
+            let source = if working.try_exists().map_err(error)? { working } else { sdk.join(name) };
+            paths.push((relative, source));
+        }
+    }
+    paths.into_iter().map(|(relative_path, source)| {
+        core::reject_links(&source).map_err(error)?;
+        let metadata = fs::metadata(&source).map_err(|cause| {
+            format!("H1A resource {relative_path} could not be read. Verify the selected H1A kit and SDK tags. {cause}")
+        })?;
+        if !metadata.is_file() || !(1..=16 * 1024 * 1024).contains(&metadata.len()) {
+            return Err(format!("H1A resource {relative_path} is not a regular file within 16 MiB."));
+        }
+        if relative_path.starts_with("tags/") {
+            use std::io::Read;
+            let mut header = [0u8; 64];
+            fs::File::open(&source).and_then(|mut file| file.read_exact(&mut header)).map_err(error)?;
+            let class = std::str::from_utf8(&header[36..40]).map_err(error)?;
+            let expected = Path::new(&relative_path).extension().and_then(|part| part.to_str());
+            if &header[60..64] != b"blam" || core::tag_exchange::extension(class).ok() != expected {
+                return Err(format!("Sapien resource {relative_path} has the wrong native tag class."));
+            }
+        }
+        Ok(ToolResource { relative_path, sha256: maps::hash_file(&source).map_err(error)?, bytes: metadata.len(), source })
     }).collect()
 }
-fn stage_tool_resources(kit:&Path,workspace:&Path,pins:&[ToolResource])->Reply<()> {
-    // Review the whole input/destination set before creating anything.
-    let current=tool_resources(kit)?;
-    if serde_json::to_value(&current).map_err(error)?!=serde_json::to_value(pins).map_err(error)? {return Err("H1A shader resources changed after the launch preview; prepare it again".into());}
-    for pin in pins {
-        let target=workspace.join(&pin.relative_path);core::reject_links(&target).map_err(error)?;
-        if target.exists()&&(!target.is_file()||maps::hash_file(&target).map_err(error)?!=pin.sha256){return Err("The working folder contains different shader resources; no file was overwritten".into());}
+
+fn stage_tool_resources(kit: &Path, workspace: &Path, editor_tags: Option<&Path>, pins: &[ToolResource]) -> Reply<()> {
+    // Recheck the whole reviewed set before writing a missing resource.
+    if tool_resources(kit, workspace, editor_tags)? != pins {
+        return Err("H1A resources changed after launch review. Prepare a fresh launch.".into());
     }
     for pin in pins {
-        let target=workspace.join(&pin.relative_path);
-        if !target.exists(){
-            let bytes=bounded_read(&kit.join(&pin.relative_path),16*1024*1024)?;
-            if bytes.len() as u64!=pin.bytes||core::hex_bytes(sha2::Sha256::digest(&bytes))!=pin.sha256{return Err("H1A shader resource changed during staging".into());}
-            fs::create_dir_all(target.parent().ok_or("Shader resource has no parent")?).map_err(error)?;
-            project::atomic_write(&target,&bytes,false).map_err(error)?;
+        let target = workspace.join(&pin.relative_path);
+        core::reject_links(&target).map_err(error)?;
+        if target.try_exists().map_err(error)? && (!target.is_file() || maps::hash_file(&target).map_err(error)? != pin.sha256) {
+            return Err(format!("The working copy of {} differs from the launch review.", pin.relative_path));
         }
-        if maps::hash_file(&target).map_err(error)?!=pin.sha256{return Err("Staged shader resource readback differed".into());}
+    }
+    for pin in pins {
+        let target = workspace.join(&pin.relative_path);
+        if !target.try_exists().map_err(error)? {
+            use std::io::Write;
+            let bytes = bounded_read(&pin.source, 16 * 1024 * 1024)?;
+            if bytes.len() as u64 != pin.bytes || core::hex_bytes(sha2::Sha256::digest(&bytes)) != pin.sha256 {
+                return Err(format!("H1A resource {} changed during staging.", pin.relative_path));
+            }
+            let parent = target.parent().ok_or("Tool resource has no parent")?;
+            fs::create_dir_all(parent).map_err(error)?;
+            core::reject_links(&target).map_err(error)?;
+            let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(error)?;
+            temporary.write_all(&bytes).map_err(error)?;
+            temporary.as_file().sync_all().map_err(error)?;
+            temporary.persist_noclobber(&target).map_err(error)?;
+        }
+        if maps::hash_file(&target).map_err(error)? != pin.sha256 {
+            return Err(format!("Staged resource {} did not match its reviewed hash.", pin.relative_path));
+        }
     }
     Ok(())
 }
@@ -976,7 +1044,10 @@ pub(super) async fn prepare_runtime_tool(
             if action_id=="editLevel"{arguments.extend(["-multipleinstance".into(),"-data_dir".into(),"data".into()]);}
             arguments.push(format!("tags\\{}.scenario",context.scenario_path.replace('/',"\\")));None
         };
-        let resources=if action_id=="editTags"{vec![]}else{tool_resources(&kit)?};
+        let editor_tags = sapien_sdk_tags(&action_id, &settings, &kit);
+        let resources = if action_id == "editTags" { vec![] } else {
+            tool_resources(&kit, &context.workspace, editor_tags.as_deref())?
+        };
         let view=ToolLaunchPlan{id:id.clone(),runtime_id,action_id,project_id,build_id:context.build.id,executable,executable_sha256,executable_architecture,working_directory:context.workspace,tags_directory:context.tags,scenario_file:context.scenario,arguments,startup_script:startup_script.clone(),resources,expires_at_unix:now()+90,
             detail:"Uses this map's derived build-job tags. External tools can edit those working files; source caches and SDK master tags are not selected. Close the tools, use Build working tag edits in dock details, then open that compiled map to bring changes into Spark. The ordinary source build regenerates its own tags. Standalone scene tests do not certify retail MCC or multiplayer.".into()};
         let mut workbench=lock(&state.runtime_workbench)?;
@@ -1019,7 +1090,10 @@ pub(super) async fn launch_runtime_tool(
             if workbench.processes.len()>=16{return Err("Close an existing tool before opening another (16 running tool limit)".into());}
         }
         if plan.view.action_id=="testScene"{core::forge_build::h1a_scene_preflight(&context.tags,source_scenario_type(&state,&project)?).map_err(error)?;}
-        if !plan.view.resources.is_empty(){stage_tool_resources(&kit,&context.workspace,&plan.view.resources)?;}
+        if !plan.view.resources.is_empty() {
+            let editor_tags = sapien_sdk_tags(&plan.view.action_id, &settings, &kit);
+            stage_tool_resources(&kit, &context.workspace, editor_tags.as_deref(), &plan.view.resources)?;
+        }
         if let Some(contents)=&plan.startup_script {
             let script=context.workspace.join(format!("spark-scene-{}.txt",plan.view.id));
             project::atomic_write(&script,contents.as_bytes(),false).map_err(error)?;
@@ -1598,24 +1672,72 @@ mod tests {
         }
     }
     #[test]
+    fn native_tool_resources_stage_sapien_markers_without_replacing_working_tags() {
+        let temp = tempfile::tempdir().unwrap();
+        let kit = temp.path().join("kit");
+        let sdk = temp.path().join("sdk");
+        let job = temp.path().join("job");
+        fs::create_dir_all(kit.join("shaders")).unwrap();
+        fs::create_dir(&job).unwrap();
+        for name in ["fx.bin", "psh.bin", "vsh.bin"] {
+            fs::write(kit.join("shaders").join(name), name.as_bytes()).unwrap();
+        }
+        for name in SAPIEN_EDITOR_TAGS {
+            let path = sdk.join(name);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let class = match path.extension().unwrap().to_str().unwrap() {
+                "gbxmodel" => b"mod2",
+                "placeholder" => b"plac",
+                "bitmap" => b"bitm",
+                "shader_model" => b"soso",
+                other => panic!("Unexpected native fixture class {other}"),
+            };
+            let mut tag = [0u8; 65];
+            tag[36..40].copy_from_slice(class);
+            tag[60..64].copy_from_slice(b"blam");
+            fs::write(path, tag).unwrap();
+        }
+        let custom = SAPIEN_EDITOR_TAGS[0];
+        let custom_working = job.join("tags").join(custom);
+        fs::create_dir_all(custom_working.parent().unwrap()).unwrap();
+        let mut original = fs::read(sdk.join(custom)).unwrap();
+        original[64] = 1;
+        fs::write(&custom_working, &original).unwrap();
+        assert_eq!(tool_resources(&kit, &job, None).unwrap().len(), 3);
+        let pins = tool_resources(&kit, &job, Some(&sdk)).unwrap();
+        let changed = sdk.join(SAPIEN_EDITOR_TAGS[1]);
+        let mut publisher = fs::read(&changed).unwrap();
+        publisher[64] = 2;
+        fs::write(&changed, &publisher).unwrap();
+        assert!(stage_tool_resources(&kit, &job, Some(&sdk), &pins).is_err());
+        assert!(!job.join("shaders").exists());
+
+        let refreshed = tool_resources(&kit, &job, Some(&sdk)).unwrap();
+        stage_tool_resources(&kit, &job, Some(&sdk), &refreshed).unwrap();
+        assert_eq!(fs::read(custom_working).unwrap(), original);
+        assert_eq!(fs::read(job.join("tags").join(SAPIEN_EDITOR_TAGS[1])).unwrap(), publisher);
+        assert_eq!(fs::read(&changed).unwrap(), publisher);
+    }
+
+    #[test]
     fn native_shader_staging_rechecks_kit_and_never_overwrites_other_working_files() {
         let temp=tempfile::tempdir().unwrap();let kit=temp.path().join("kit");let job=temp.path().join("job");
         fs::create_dir_all(kit.join("shaders")).unwrap();fs::create_dir(&job).unwrap();
         for name in ["fx.bin","psh.bin","vsh.bin"]{fs::write(kit.join("shaders").join(name),name.as_bytes()).unwrap();}
         fs::write(kit.join("shaders/unrelated.exe"),b"never copy").unwrap();
         fs::write(kit.join("steam_appid.txt"),b"1532190\r\n").unwrap();
-        let pins=tool_resources(&kit).unwrap();assert_eq!(pins.len(),4);
+        let pins=tool_resources(&kit,&job,None).unwrap();assert_eq!(pins.len(),4);
         fs::write(kit.join("steam_appid.txt"),b"480").unwrap();
-        assert!(stage_tool_resources(&kit,&job,&pins).is_err());assert!(!job.join("steam_appid.txt").exists());
+        assert!(stage_tool_resources(&kit,&job,None,&pins).is_err());assert!(!job.join("steam_appid.txt").exists());
         fs::write(kit.join("steam_appid.txt"),b"1532190\r\n").unwrap();
         fs::write(kit.join("shaders/vsh.bin"),b"changed").unwrap();
-        assert!(stage_tool_resources(&kit,&job,&pins).is_err());assert!(!job.join("shaders").exists());
+        assert!(stage_tool_resources(&kit,&job,None,&pins).is_err());assert!(!job.join("shaders").exists());
         fs::write(kit.join("shaders/vsh.bin"),b"vsh.bin").unwrap();
         fs::create_dir(job.join("shaders")).unwrap();fs::write(job.join("shaders/vsh.bin"),b"user data").unwrap();
-        assert!(stage_tool_resources(&kit,&job,&pins).is_err());
+        assert!(stage_tool_resources(&kit,&job,None,&pins).is_err());
         assert_eq!(fs::read(job.join("shaders/vsh.bin")).unwrap(),b"user data");assert!(!job.join("shaders/fx.bin").exists());
         let clean=temp.path().join("clean-job");fs::create_dir(&clean).unwrap();
-        stage_tool_resources(&kit,&clean,&pins).unwrap();stage_tool_resources(&kit,&clean,&pins).unwrap();
+        stage_tool_resources(&kit,&clean,None,&pins).unwrap();stage_tool_resources(&kit,&clean,None,&pins).unwrap();
         assert_eq!(fs::read_dir(clean.join("shaders")).unwrap().count(),3);
         for pin in pins{assert_eq!(maps::hash_file(&clean.join(&pin.relative_path)).unwrap(),pin.sha256);assert_eq!(maps::hash_file(&kit.join(&pin.relative_path)).unwrap(),pin.sha256);}
     }

@@ -1433,6 +1433,21 @@ export default function RuntimeDock({
               <dt>Scenario</dt>
               <dd>{plan.scenarioFile}</dd>
             </dl>
+            {plan.actionId === 'editLevel' && (
+              <div className="button-row">
+                <button type="button" onClick={async () => {
+                  try {
+                    const path = /^\\\\\?\\[A-Za-z]:\\/.test(plan.scenarioFile)
+                      ? plan.scenarioFile.slice(4) : plan.scenarioFile;
+                    await navigator.clipboard.writeText(path);
+                    setNotice('Scenario path copied. Paste it into Sapien’s File name field.');
+                  } catch {
+                    setNotice('Clipboard unavailable. Select and copy the scenario path shown above.');
+                  }
+                }}>Copy scenario path</button>
+                <small>If Sapien asks for a scenario, open this working copy.</small>
+              </div>
+            )}
             <details>
               <summary>Exact launch arguments and startup script</summary>
               <pre>

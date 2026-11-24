@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: The pinned official H1A Tool compiled a disposable Black Echo recording fixture after exact MCC source normalization, complete short-path extraction and three reviewed SDK substitutions in the fixture. The capture cache passed independent engine and CRC checks. The frozen CE candidate still matches d113e9db. Recording-only CE609 transfer and original Zombie MCC compile/readback remain verified.
-Next action: Open the isolated H1A capture fixture in Sapien and verify scene loading. The Windows session reports zero connected XInput controllers. Capture mission-specific Pelican and Spirit clips when suitable input is available, transfer only the entries to the CE working scenario, and run isolated transport acceptance before two-player faction replay. Keep original Zombie Classic CE compilation and MegaWorld traversal active.
+Latest verified revision: The disposable Black Echo recording fixture opened in native Sapien and rendered the map, aircraft and marker in the Game window. The exact scenario stayed unchanged. Spark now reviews and stages the missing Sapien editor-marker tags through the existing tool launch path. The frozen CE candidate still matches d113e9db.
+Next action: Capture mission-specific Pelican and Spirit clips in the verified Sapien fixture once a Windows XInput controller is available. Transfer recording entries to reviewed CE source, verify their stream hashes, and run isolated Forerunner landing and settlement before the full two-player mission. While capture input is unavailable, advance the original Zombie Classic CE build route and MegaWorld physical traversal.
 
 ## Acceptance
 
