@@ -26,7 +26,10 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
   const title = (id: string) => entries.find((entry) => entry.id === id)?.title ?? id;
   const rule = field && { class: field.class, path: field.path, field: field.field, value: Number(value) };
   const filtered = savedMaps.filter((entry) => `${entry.title} ${entry.engine}`.toLowerCase().includes(mapQuery.toLowerCase()));
-  const missing = field ? ids.filter((id) => !field.matchingProjectIds.includes(id) && !search?.unreadableMaps.some((map) => map.projectId === id)) : [];
+  const unreadable = search?.unreadableMaps.filter((map) => ids.includes(map.projectId)) ?? [];
+  const compatible = field ? ids.filter((id) => field.matchingProjectIds.includes(id)) : [];
+  const missing = field ? ids.filter((id) => !compatible.includes(id) && !unreadable.some((map) => map.projectId === id)) : [];
+  const canReview = !!rule && !!value.trim() && Number.isFinite(rule.value);
 
   function select(next: string[]) {
     setSelected(next);
@@ -45,6 +48,16 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
     } finally {
       setPending(false);
     }
+  }
+
+  function review(maps: string[]) {
+    if (!canReview || !rule || maps.length < 2 || maps.length > 32) return;
+    setSelected(maps);
+    setPreview(undefined);
+    setOutcome(undefined);
+    void perform(async () => {
+      setPreview(await call<Preview>('preview_numeric_batch', { ids: maps, rule }));
+    });
   }
 
   return (
@@ -92,28 +105,31 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
               <button type="submit" disabled={!ids.length || ids.length > 32}>Find fields and check selected maps</button>
             </form>
             {search && <label>
-              Field
-              <select value={field ? JSON.stringify(field) : ''} onChange={(event) => {
+              Numeric tag field
+              <select aria-label="Numeric tag field" value={field ? JSON.stringify(field) : ''} onChange={(event) => {
                 setField(search.fields.find((match) => JSON.stringify(match) === event.target.value));
                 setPreview(undefined);
               }}>
                 <option value="">Choose a field</option>
-                {search.fields.map((match) => <option key={JSON.stringify(match)} value={JSON.stringify(match)}>{match.label} · {match.path} ({match.class}) · {match.matchingProjectIds.length}/{ids.length} maps</option>)}
+                {search.fields.map((match) => {
+                  const count = ids.filter((id) => match.matchingProjectIds.includes(id)).length;
+                  return count > 0 && <option key={JSON.stringify(match)} value={JSON.stringify(match)}>{match.label} · {match.path} ({match.class}) · {count}/{ids.length} maps</option>;
+                })}
               </select>
             </label>}
             {search?.fields.length === 0 && <p>No editable numeric fields match in {title(ids[0])}.</p>}
-            {search?.unreadableMaps.map((map) => <p key={map.projectId} role="status">{title(map.projectId)} · {map.problem}</p>)}
+            {unreadable.map((map) => <p key={map.projectId} role="status">{title(map.projectId)} · {map.problem}</p>)}
             {missing.length > 0 && <p>Missing or incompatible field in {missing.map(title).join(', ')}.</p>}
             <label>New value <input type="number" step="any" value={value} onChange={(event) => {
               setValue(event.target.value);
               setPreview(undefined);
             }} /></label>
-            <button type="button" disabled={!rule || !value.trim() || !Number.isFinite(Number(value)) || ids.length < 2 || ids.length > 32}
-              onClick={() => void perform(async () => {
-                setPreview(undefined);
-                setOutcome(undefined);
-                setPreview(await call<Preview>('preview_numeric_batch', { ids, rule }));
-              })}>Review every map</button>
+            <button type="button" disabled={!canReview || ids.length < 2 || ids.length > 32}
+              onClick={() => review(ids)}>Review every map</button>
+            {compatible.length >= 2 && compatible.length < ids.length && (
+              <button type="button" disabled={!canReview}
+                onClick={() => review(compatible)}>Review {compatible.length} compatible maps</button>
+            )}
           </fieldset>
           {preview && (
             <>
