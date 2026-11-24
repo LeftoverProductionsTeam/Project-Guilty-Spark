@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: In 711aa74, H1A Tool compiled the exact original Zombie carrier with a rig-matched idle, independently read back by Invader. Batch Editing now searches all readable selected maps, with the dirty-first-map review path tested in the browser and Windows desktop compilation checked. The published local d113e9db candidate and frozen comparison files rehashed exactly.
-Next action: Capture the reusable Pelican and Spirit clips when Windows XInput becomes available. Use the frozen Forerunner transport baseline 64c8d93d with the preserved d113e9db map for comparative trials. The historic successful executable 9486e339 is receipt-only. Seek matching original audio for the five invalid Zombie Vorbis cues before full Forerunner load; reviewed Gearbox Tool is needed for Classic CE. Retest actual two-way foot and Warthog traversal when a reviewed MegaWorld candidate is available.
+Latest verified revision: In 711aa74, H1A Tool compiled the exact original Zombie carrier with a rig-matched idle, independently read back by Invader. Batch Editing now searches all readable selected maps, with the dirty-first-map review path tested in the browser and Windows desktop compilation checked. The retained d113e9db candidate and frozen comparison files rehashed exactly.
+Next action: Capture Pelican and Spirit clips when Windows XInput is available. Keep d113e9db and frozen Forerunner 64c8d93d for comparisons. Seek matching Zombie audio and the reviewed Gearbox Tool. The default two-region road now compiles. Resume the authored three-route plan for physical foot and Warthog testing on a reviewed runtime. See MEGAWORLD_SEAM_ROUTES_20261108.md.
 
 ## Acceptance
 
