@@ -15,6 +15,8 @@ const diagnosePlacement = args.includes('--diagnose-corrupt-placement');
 const repairMixedPalettes = args.includes('--repair-mixed-palettes');
 const repairShieldNoise = args.includes('--repair-shield-noise');
 const repairSurvivorSpawn = args.includes('--repair-survivor-spawn');
+const repairRoundsHud = args.includes('--repair-rounds-hud');
+if (repairRoundsHud && !repairSurvivorSpawn) throw new Error('Rounds HUD recovery requires the Survivor-spawn repair');
 if (repairSurvivorSpawn && !repairShieldNoise) throw new Error('Survivor-spawn recovery requires the shield-noise repair');
 if (repairShieldNoise && !repairMixedPalettes) throw new Error('Shield-noise recovery requires the mixed-palette repair');
 if (repairMixedPalettes && !diagnosePlacement) throw new Error('Mixed-palette recovery requires the earlier corrupt-placement diagnosis');
@@ -36,7 +38,7 @@ fs.mkdirSync(tags); fs.mkdirSync(maps);
 const manifest = {
   schemaVersion: 1, profile: 'Recovery edition — missing event audio omitted', faithful: false, playable: false,
   source, sourceSha256: originalSha, resources, resourceSha256: resourceHashes, tools: executables,
-  diagnosticPlacementChangesEnabled: diagnosePlacement, mixedPaletteRepairEnabled: repairMixedPalettes, shieldNoiseRepairEnabled: repairShieldNoise, survivorSpawnRepairEnabled: repairSurvivorSpawn, changes: [], commands: [], results: [],
+  diagnosticPlacementChangesEnabled: diagnosePlacement, mixedPaletteRepairEnabled: repairMixedPalettes, shieldNoiseRepairEnabled: repairShieldNoise, survivorSpawnRepairEnabled: repairSurvivorSpawn, roundsHudRepairEnabled: repairRoundsHud, changes: [], commands: [], results: [],
   exclusions: ['sound\\dialog\\multiplayer1\\scorpion.sound', 'sound\\dialog\\multiplayer1\\hill_occupied.sound'],
   limitations: ['Two custom event sounds are absent, not restored', 'No game installation or archived executable is used', 'A successful compile would still require independent validation and target-game load testing'],
 };
@@ -217,6 +219,66 @@ function recoverSurvivorSpawn() {
   save();
 }
 
+function recoverRoundsHud() {
+  const black = 'ui/shell/bitmaps/black.bitmap';
+  const blackLight = 'levels/test/prisoner/bitmaps/black light.bitmap';
+  const bitmapHashes = {};
+  const same = (actual, expected) => JSON.stringify(actual) === JSON.stringify(expected);
+  for (const [index, bitmap] of [black, blackLight].entries()) {
+    const shape = editTag(bitmap, ['-C', 'bitmap_group_sequence', '-C', 'bitmap_data',
+      '-G', 'bitmap_group_sequence[0].first_bitmap_index', '-G', 'bitmap_group_sequence[0].bitmap_count',
+      '-C', 'bitmap_group_sequence[0].sprites'], 'hud-bitmap-sequence-' + index);
+    if (!same(shape, ['1', '1', '0', '1', '0'])) {
+      throw new Error('The audited HUD bitmap no longer resolves to one nonsprite sequence: ' + bitmap);
+    }
+    bitmapHashes[bitmap] = hashFile(path.join(tags, bitmap));
+  }
+  const audited = [
+    { id: 'rounds', hud: 'ui/hud/master rounds.weapon_hud_interface',
+      groups: [{ array: 'static_elements', bitmapField: 'interface_bitmap', bitmaps: [black, black], sequences: ['1', '2'] }] },
+    { id: 'main', hud: 'mgm/fonzie/sparky/tags/zombie apocalypse hud.weapon_hud_interface',
+      groups: [
+        { array: 'static_elements', bitmapField: 'interface_bitmap', bitmaps: [black, blackLight, blackLight], sequences: ['6', '0', '0'] },
+        { array: 'meter_elements', bitmapField: 'meter_bitmap', bitmaps: [blackLight], sequences: ['6'] },
+      ] },
+  ];
+  for (const { id, hud, groups } of audited) {
+    const hudFile = path.join(tags, hud);
+    const original = fs.readFileSync(hudFile);
+    const readArguments = groups.flatMap(({ array, bitmapField }) => ['-C', array,
+      '-G', array + '[*].' + bitmapField, '-G', array + '[*].sequence_index']);
+    const read = phase => editTag(hud, readArguments, id + '-hud-' + phase);
+    const shape = source => groups.flatMap(({ bitmaps, sequences }) =>
+      [String(bitmaps.length), ...bitmaps.map(tag => tag.replaceAll('/', '\\')), ...sequences.map(source)]);
+    if (!same(read('before'), shape(value => value))) throw new Error('Audited HUD bindings changed: ' + hud);
+    // Both native drawing paths reduce positive indices modulo the sequence
+    // count. These nonsprite texture groups select the same image at zero.
+    const fields = groups.flatMap(({ array, sequences }) => sequences.flatMap((value, index) =>
+      value === '0' ? [] : [{ field: array + '[' + index + '].sequence_index', index: Number(value) }]));
+    editTag(hud, fields.flatMap(({ field }) => ['-S', field, '0']), id + '-hud-wrap');
+    const after = fs.readFileSync(hudFile);
+    const oldIndices = fields.map(({ index }) => index);
+    const changedPayload = [];
+    for (let offset = 64; offset < original.length; offset++) {
+      if (original[offset] !== after[offset]) changedPayload.push([original[offset], after[offset]]);
+    }
+    if (!same(read('readback'), shape(() => '0')) || original.length !== after.length
+      || !original.subarray(0, 40).equals(after.subarray(0, 40))
+      || !original.subarray(44, 64).equals(after.subarray(44, 64))
+      || changedPayload.some(([, value]) => value !== 0)
+      || !same(changedPayload.map(([value]) => value).sort(), oldIndices.slice().sort())) {
+      throw new Error('HUD normalization changed a field outside the audited sequence references: ' + hud);
+    }
+    manifest.changes.push({tag:hud, reason:'Use the same authored image already selected by native static/meter drawing',
+      bitmapHashes, fields:fields.map(({field})=>field), oldSequenceIndices:oldIndices,
+      newSequenceIndices:fields.map(()=>0), beforeSha256:sha(original), afterSha256:sha(after)});
+  }
+  if (Object.entries(bitmapHashes).some(([tag, hash]) => hashFile(path.join(tags, tag)) !== hash)) {
+    throw new Error('An original HUD bitmap changed during normalization');
+  }
+  save();
+}
+
 try {
   const extraction = run('extract', ['-t', tags, '-m', resources, ...manifest.exclusions.flatMap((s) => ['-e', s]), input], 'extract');
   if (extraction.exitCode !== 0 || extraction.incomplete || /^(?:ERROR:|FATAL ERROR:|Failed to extract )/m.test(extraction.log) || !/Extracted 2823 out of 2823 matched tags/.test(extraction.log)) throw new Error('Complete 2823-tag extraction was not established');
@@ -261,6 +323,14 @@ try {
       const destination = path.join(maps, target + '-survivor');
       fs.mkdirSync(destination);
       compile('compile-survivor-' + target, target, destination);
+    }
+  }
+  if (repairRoundsHud) {
+    recoverRoundsHud();
+    for (const target of ['gbx-custom', 'mcc-cea']) {
+      const destination = path.join(maps, target + '-rounds');
+      fs.mkdirSync(destination);
+      compile('compile-rounds-' + target, target, destination);
     }
   }
 } catch (error) {

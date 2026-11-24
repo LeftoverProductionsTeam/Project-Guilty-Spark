@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Original Zombie Recovery CE/MCC builds pass the moved Marine, shield volume and dormant spawn dependency. Both now stop at the original rounds HUD selecting missing sequences. Black Echo baseline remains unchanged.
-Next action: Recover the intended original Zombie rounds HUD image sequence for both static elements without guessing a replacement. Black Echo still needs map-specific controller capture and a verified CE609 handoff before focused Forerunner landing and full faction replay. Physical MegaWorld connections follow.
+Latest verified revision: Original Zombie CE and MCC compiler probes pass the audited static and meter HUD references. Both now stop at the active pistol melee screen-flash limit. No cache emitted. Black Echo remains unchanged.
+Next action: Determine whether the matching native Tool can preserve the original Zombie pistol melee lighten flash at maximum intensity 3 without altering the separate damage fields. Black Echo still needs map-specific controller capture and a verified CE609 handoff before focused Forerunner landing and full faction replay. Physical MegaWorld connections follow.
 
 ## Acceptance
 
