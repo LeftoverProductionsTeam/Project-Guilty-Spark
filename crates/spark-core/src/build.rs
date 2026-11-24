@@ -499,6 +499,12 @@ impl Runner<'_> {
         let scenario_review = phase == "squad-readback"
             && executable.file_stem().is_some_and(|name| name == "invader-edit")
             && args.iter().any(|arg| arg == "-L");
+        // Inventory and detail output is machine input for validation.
+        // Emitting it line by line can stall the WebView and rotate useful logs.
+        let log_tool_line = |stderr: bool, line: &str| {
+            stderr || (!scenario_review && !matches!(phase, "bsp-detail" | "sdk-inventory")
+                && (phase != "bsp-index" || !line.bytes().all(|byte| byte.is_ascii_digit())))
+        };
         let (tx, rx) = std::sync::mpsc::channel();
         let incomplete_output = Arc::new(AtomicBool::new(false));
         let reader = |pipe: Box<dyn std::io::Read + Send>,
@@ -588,7 +594,7 @@ impl Runner<'_> {
                     compile_errors.extend(native_compile_errors(&line));
                 }
                 let display = line.trim();
-                if (!scenario_review||err)&&(phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())){
+                if log_tool_line(err, display){
                     self.emit(phase, display, progress, if err { "tool" } else { "info" });
                 }
             }
@@ -653,7 +659,7 @@ impl Runner<'_> {
                 compile_errors.extend(native_compile_errors(&line));
             }
             let display = line.trim();
-            if (!scenario_review||err)&&(phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!display.bytes().all(|b|b.is_ascii_digit())) {
+            if log_tool_line(err, display) {
                 self.emit(phase, display, progress, if err { "tool" } else { "info" });
             }
         }
@@ -1514,6 +1520,28 @@ mod tests {
         assert!(events.iter().any(|line| line == "diagnostic"));
         assert!(events.iter().all(|line| line == line.trim()));
     }
+    #[cfg(windows)]
+    #[test]
+    fn sdk_inventory_keeps_stdout_for_validation_and_reports_stderr() {
+        let dir = tempfile::tempdir().unwrap();
+        let cancel = AtomicBool::new(false);
+        let events = std::sync::Mutex::new(Vec::new());
+        let runner = Runner {
+            id: "sdk-inventory-test",
+            project: "test",
+            cancel: &cancel,
+            event: &|event| events.lock().unwrap().push(event),
+        };
+        let output = runner.run(Path::new("powershell.exe"), &[
+            "-NoProfile".into(), "-NonInteractive".into(), "-Command".into(),
+            "[Console]::Out.WriteLine(('Path = tags/globals/{0}.globals' -f 1)); [Console]::Error.WriteLine(('archive {0}' -f 'diagnostic'))".into(),
+        ], dir.path(), "sdk-inventory", 5).unwrap();
+        assert_eq!(output, "Path = tags/globals/1.globals");
+        let events = events.into_inner().unwrap();
+        assert!(events.iter().all(|event| event.message != "Path = tags/globals/1.globals"));
+        assert!(events.iter().any(|event| event.severity == "tool" && event.message == "archive diagnostic"));
+    }
+
     #[cfg(windows)]
     #[test]
     fn zero_exit_sound_failure_on_either_stream_refuses_the_build_and_retains_previous_output() {
