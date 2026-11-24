@@ -1,4 +1,4 @@
-//! Real native CE assembly and extension acceptance. Player proof is separate.
+//! Real native CE609 or MCC13 assembly and extension acceptance. Player proof is separate.
 use spark_core::{bsp_assembly::{self, BspAssembly},library::Library,project::{self,EngineBuildTarget,Project},runtime::RuntimeId,Result,SparkError};
 use std::{fs,io::Read,path::Path,sync::{Arc,atomic::AtomicBool}};
 
@@ -37,8 +37,10 @@ fn reviewed_plan(path: &Path, base: &Project) -> Result<(BspAssembly, Vec<BspAss
 }
 
 fn main()->Result<()>{
-    let a=std::env::args().skip(1).collect::<Vec<_>>();
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    let mut a=std::env::args().skip(1).collect::<Vec<_>>();
+    let mcc = a.first().is_some_and(|arg| arg == "--mcc13");
+    if mcc { a.remove(0); }
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
@@ -115,7 +117,7 @@ fn main()->Result<()>{
     p.title = format!("{} + {} · CE", p.title, plan.donor_title);
     while p.title.len() > 180 { p.title.pop(); }
     p.bsp_assembly=Some(plan);
-    let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:"Reviewed CE source for Chupathingy".into(),runtime_id:RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
+    let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:if mcc { "MCC13 from reviewed CE source" } else { "Reviewed CE source for Chupathingy" }.into(),runtime_id:if mcc { RuntimeId::MccSteam } else { RuntimeId::ChupathingyCe },builder:if mcc { "h1a-tool" } else { "invader-ce" }.into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
     project::save_project(&out.join("connection.gsproject"),&p)?;lib.save(&p,Some(&i))?;
     let id=uuid::Uuid::new_v4().to_string();let log=out.join("native-events.jsonl");
     let record=spark_core::megaworld_build::run(&p,&i,&out.join("library/jobs"),&id,Arc::new(AtomicBool::new(false)),|event|{
@@ -123,5 +125,5 @@ fn main()->Result<()>{
     })?;
     p.builds.push(record.clone());lib.save(&p,Some(&i))?;project::save_project(&out.join("compiled.gsproject"),&p)?;
     project::atomic_write(&out.join("acceptance.json"),&serde_json::to_vec_pretty(&serde_json::json!({"build":record,"projectId":p.id,"gameplayVerified":false,"streaming":false}))?,false)?;
-    println!("Validated CE cache {}",record.sha256.unwrap());Ok(())
+    println!("Validated {} cache {}",record.target,record.sha256.unwrap());Ok(())
 }

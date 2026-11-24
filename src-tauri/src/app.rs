@@ -1672,7 +1672,14 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
         let p = lock(&state.library)?.get(&id).map_err(error)?;
         let i = inspect(&state, &p)?;
         let origin_issue=asset_import_native::guard_import_sources(&state,&p).err();
-        if core::megaworld_build::selected(&p){let mut blockers=core::megaworld_build::preflight(&p,&i).err().map(|e|vec![e.to_string()]).unwrap_or_default();if let Some(reason)=origin_issue{blockers.push(reason);}return Ok(build::CompatibilityReport{target:"gbx-custom".into(),pipeline:"Original CE regions → authored merged geometry → H1A structure/lightmaps → Invader CE cache → CRC/collision/scenery readback".into(),ready:blockers.is_empty(),blockers,warnings:vec!["One resident BSP; native compilation is separate from player traversal. Painted detail payloads are refused until transformed native preservation is implemented.".into()],bitmap_dependencies:None});}
+        if core::megaworld_build::selected(&p) {
+            let mut report = core::megaworld_build::compatibility(&p, &i);
+            if let Some(reason) = origin_issue {
+                report.blockers.push(reason);
+                report.ready = false;
+            }
+            return Ok(report);
+        }
         let tools=project_tools(&state,&p)?;
         let resolved=native_resources_native::for_project(&state,&p,&i).unwrap_or_else(|_|p.clone());
         let mut report=build::compatibility(&resolved, &i, &tools);

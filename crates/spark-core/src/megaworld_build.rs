@@ -1,9 +1,52 @@
-//! Bounded CE acceptance path for extending connected regions. Reuses the existing
+//! Native CE609 and MCC13 acceptance for connected CE-authored regions. Reuses the existing
 //! native assembly exporter, namespace/dependency checks and collision verifier.
 //! It never treats scenario BSP references as streaming.
 use crate::{build::{self,JobEvent,Runner,Toolchain},maps::{self,MapInspection},project::{self,Project,BuildRecord},invalid,Result,SparkError};
 use std::{fs,path::Path,sync::{Arc,atomic::{AtomicBool,Ordering}},time::Instant};
-pub fn selected(project:&Project)->bool{project.bsp_assembly.is_some()&&project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).is_some_and(|t|matches!(t.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe))}
+use crate::runtime::RuntimeId;
+
+#[derive(Clone, Copy)]
+struct CacheTarget {
+    engine: &'static str,
+    version: u32,
+    tag_base: u32,
+    tag_capacity: u32,
+    name: &'static str,
+}
+
+fn cache_target(project: &Project) -> Option<CacheTarget> {
+    project.bsp_assembly.as_ref()?;
+    let profile = project.build_targets.iter().find(|t| Some(&t.id) == project.active_build_target.as_ref())?;
+    match profile.runtime_id {
+        RuntimeId::HaloCustomEdition | RuntimeId::ChupathingyCe => Some(CacheTarget {
+            engine: "gbx-custom", version: 609, tag_base: 0x4044_0000,
+            tag_capacity: 23 * 1024 * 1024, name: "Custom Edition CE609",
+        }),
+        RuntimeId::MccSteam if project.source.as_ref().is_some_and(|source| source.cache_version == 609) => Some(CacheTarget {
+            engine: "mcc-cea", version: 13, tag_base: 0x5000_0000,
+            tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
+        }),
+        _ => None,
+    }
+}
+
+pub fn selected(project: &Project) -> bool {
+    cache_target(project).is_some()
+}
+
+pub fn compatibility(project: &Project, inspection: &MapInspection) -> build::CompatibilityReport {
+    let target = cache_target(project).expect("selected connected-region target");
+    let blockers = preflight(project, inspection).err().map(|e| vec![e.to_string()]).unwrap_or_default();
+    let mut warnings = vec!["One resident BSP. Native compilation is separate from player traversal. Painted detail requires native preservation support.".into()];
+    if target.version == 13 {
+        warnings.push("MCC13 requires an MCC cache loader. Forerunner runtime and multiplayer acceptance are separate from Spark build validation.".into());
+    }
+    build::CompatibilityReport {
+        target: target.engine.into(),
+        pipeline: format!("Authored CE regions → H1A structure and lightmaps → Invader {} → native readback", target.name),
+        ready: blockers.is_empty(), blockers, warnings, bitmap_dependencies: None,
+    }
+}
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExtensionSource {
@@ -44,16 +87,20 @@ pub fn extension_tags(job: &Path, build: &BuildRecord) -> Result<Option<std::pat
 
 pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     project.validate()?;
-    let target=project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).ok_or_else(||SparkError::Invalid("Choose an explicit CE build target".into()))?;
-    crate::forge_build::tools_for_target(project,Default::default())?;
-    if !matches!(target.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe)||target.hek_flavor.as_deref()!=Some("h1aEk"){return invalid("Connected CE regions require the reviewed H1A authoring / Invader CE profile");}
+    if cache_target(project).is_none() {
+        return invalid("Select an explicit Custom Edition, Chupathingy or MCC target for the connected CE regions");
+    }
+    let target = crate::forge_build::tools_for_target(project, Default::default())?;
+    if target.hek_flavor.as_deref() != Some("h1aEk") {
+        return invalid("Connected regions require the reviewed H1A authoring kit and matching editable base tags");
+    }
     let plan=project.bsp_assembly.as_ref().ok_or_else(||SparkError::Invalid("Author a connected BSP plan first".into()))?;plan.validate()?;
     let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("Import an original CE map first".into()))?;
     if source.sha256!=inspection.sha256||source.scenario_path!=inspection.scenario_path{return invalid("The base inspection belongs to another source revision");}
     if source.cache_version!=609||plan.donor_source.cache_version!=609||inspection.header.version!=609||inspection.mesh.parts.len()!=1||inspection.header.scenario_type!=1{return invalid("Initial CE Megaworld acceptance needs a single-BSP CE multiplayer base and a CE donor; cross-runtime source conversion is a separate step");}
     crate::bsp_compile::base_transforms(project,inspection)?;
     if !project.tag_edits.is_empty()||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.conversion_profile.is_some(){return invalid("Connected CE builds support original scenario position/rotation edits and validated scenery imports. Tag edits, other structural placement/asset/audio changes and conversion profiles still require their validated native authoring path; nothing is silently omitted");}
-    let tools=Toolchain{h1a_directory:target.hek_directory.clone(),base_tags_directory:target.tags_directory.clone(),invader_directory:target.invader_directory.clone(),..Default::default()};
+    let tools=Toolchain{h1a_directory:target.hek_directory,base_tags_directory:target.hek_tags_directory,invader_directory:target.invader_directory,..Default::default()};
     if tools.base_tags_directory.as_ref().is_none_or(|p|!p.is_dir())||crate::conversion::native_tool(&tools).is_none(){return invalid("Select matching extracted CE source tags and the installed H1A authoring kit");}
     for name in ["invader-edit","invader-build","invader-info","invader-dependency","invader-refactor"]{if build::tool_path(&tools,name).is_none(){return invalid(format!("{name} is required for connected CE source"));}}
     Ok(tools)
@@ -61,6 +108,7 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
 pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{
     uuid::Uuid::parse_str(id).map_err(|_|SparkError::Invalid("Invalid build identity".into()))?;
     let tools=preflight(project,inspection)?;let started=Instant::now();
+    let target = cache_target(project).expect("preflight checked the connected-region target");
     let source=project.source.as_ref().unwrap();let plan=project.bsp_assembly.as_ref().unwrap();
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("An original region changed after planning");}}
     crate::reject_links(jobs)?;fs::create_dir_all(jobs)?;let dir=jobs.join(id);
@@ -95,7 +143,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     crate::native_asset_imports::append_scenario(project,inspection,&tags,&edit,&dir,&runner)?;
     let output=dir.join("output");fs::create_dir(&output)?;
     let build=build::tool_path(&tools,"invader-build").unwrap();
-    let compile_output = runner.run(&build,&["-g".into(),"gbx-custom".into(),"-t".into(),tags.to_string_lossy().into_owned(),"-m".into(),output.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),inspection.scenario_path.clone()],&dir,"compile-ce",80)?;
+    let compile_output = runner.run(&build,&["-g".into(),target.engine.into(),"-t".into(),tags.to_string_lossy().into_owned(),"-m".into(),output.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),inspection.scenario_path.clone()],&dir,"compile-cache",80)?;
     // Use Invader’s native total, which includes the largest BSP. The
     // tag-data length in the cache header alone omits that memory.
     let tag_space = compile_output.lines().find_map(|line| {
@@ -103,8 +151,12 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     });
     let name=inspection.scenario_path.rsplit(['\\','/']).next().ok_or_else(||SparkError::Invalid("No native scenario filename".into()))?;
     let file=output.join(format!("{name}.map"));let compiled=maps::inspect_map(&file,None)?;crate::bsp_compile::verify_compiled_base(project,inspection,&compiled)?;crate::native_asset_imports::verify_compiled(project,&compiled)?;
-    if compiled.header.version!=609||compiled.header.scenario_type!=1||compiled.mesh.parts.len()!=1||compiled.scenario_path!=inspection.scenario_path{return invalid("Native output has the wrong CE identity or resident BSP count");}
-    let info=build::tool_path(&tools,"invader-info").unwrap();for field in ["crc32_mismatched","is_protected","stub_count"]{let value=runner.run(&info,&["-T".into(),field.into(),file.to_string_lossy().into_owned()],&dir,"validate-ce",90)?;if !["0","false"].contains(&value.trim().to_lowercase().as_str()){return invalid(format!("Native CE cache {field} failed: {value}"));}}
+    if compiled.header.version!=target.version||compiled.header.scenario_type!=1||compiled.mesh.parts.len()!=1||compiled.scenario_path!=inspection.scenario_path{return invalid("Native output has the wrong cache identity or resident BSP count");}
+    if compiled.tags.iter().any(|tag| tag.external) || compiled.resources.iter().any(|resource| resource.required) {
+        return invalid("The connected build references external resource banks. Rebuild with embedded resources");
+    }
+    let memory = maps::verify_resident_tag_window(&file, &compiled, target.tag_base, target.tag_capacity)?;
+    let info=build::tool_path(&tools,"invader-info").unwrap();for field in ["crc32_mismatched","is_protected","stub_count"]{let value=runner.run(&info,&["-T".into(),field.into(),file.to_string_lossy().into_owned()],&dir,"validate-cache",90)?;if !["0","false"].contains(&value.trim().to_lowercase().as_str()){return invalid(format!("{} cache {field} failed: {value}", target.name));}}
     let mut connection_plans = project.inherited_bsp_connections.clone();
     connection_plans.push(plan.clone());
     let routes = crate::bsp_assembly::verify_compiled_routes(&file, &connection_plans)?;
@@ -120,17 +172,16 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported scenery source changed while the world was compiling; the previous-good build was retained");}
     crate::native_lighting::verify_cache(project,&file,&compiled)?;
     let sha=maps::hash_file(&file)?;if sha!=compiled.sha256{return invalid("Compiled connected cache changed during validation");}
-    let mut message = format!("One CE BSP compiled and all {} connections passed native collision checks.", connection_plans.len());
-    if let Some(capacity) = tag_space {
-        message.push_str(&format!(" CE tag space {capacity}."));
-    }
-    message.push_str(" Player traversal remains unverified.");
-    let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message,project_fingerprint:project.fingerprint()?};
+    let message = format!(
+        "{} · one resident BSP · {:.2} / {:.2} MiB tag space. All {} connections passed native collision checks. Runtime traversal remains unverified.",
+        target.name, f64::from(memory.resident_bytes) / 1048576.0, f64::from(target.tag_capacity) / 1048576.0, connection_plans.len(),
+    );
+    let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:target.engine.into(),output:Some(file),sha256:Some(sha),message,project_fingerprint:project.fingerprint()?};
     let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
-    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"ceTagSpace":tag_space,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
+    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"ceTagSpace":if target.version == 609 { tag_space } else { None },"compilerTagSpace":tag_space,"tagMemory":memory,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
     storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
-    runner.emit("validated","CE source compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)
+    runner.emit("validated","Native compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)
 }
 
 

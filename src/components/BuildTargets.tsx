@@ -21,6 +21,20 @@ export default function BuildTargets({
   const [open, setOpen] = useMapState(project.id, 'tools.targetsOpen', false);
   const targets = project.buildTargets ?? [];
   const active = targets.find((t) => t.id === project.activeBuildTarget);
+  const connectedCe = Boolean(project.bspAssembly && project.source?.cacheVersion === 609);
+  const canCopyToMcc = connectedCe && active?.builder === 'invader-ce' &&
+    active.ceCompatibleTagset && active.hekFlavor === 'h1aEk' && Boolean(active.tagsDirectory) &&
+    !targets.some((t) => t.runtimeId === 'mccSteam' && t.tagsDirectory === active.tagsDirectory);
+  function addConnectedMccTarget() {
+    if (!canCopyToMcc || !active) return;
+    onChange({
+      ...project,
+      buildTargets: [...targets, {
+        ...active, id: crypto.randomUUID(), name: 'MegaWorld MCC13', runtimeId: 'mccSteam',
+        builder: 'h1a-tool', ceCompatibleTagset: false,
+      }],
+    });
+  }
   function update(target: EngineBuildTarget, change: Partial<EngineBuildTarget>) {
     onChange({
       ...project,
@@ -80,6 +94,12 @@ export default function BuildTargets({
         Keep a separate editable tagset and tool configuration for each engine. Every build uses a fresh
         job/output folder. Existing projects continue to use Settings until a target is selected.
       </p>
+      {connectedCe && (
+        <p>Use the same connected world with a Custom Edition or Chupathingy target for 23 MiB CE609,
+          or add an MCC Halo 1 target for 64 MiB MCC13. Select the matching editable CE tags and H1A
+          kit for either build. The build result reports actual tag usage.</p>
+      )}
+      {canCopyToMcc && <button type="button" onClick={addConnectedMccTarget}>Add MCC13 target with these tags</button>}
       <div className="analysis-actions">
         <label>
           Target runtime

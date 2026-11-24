@@ -640,6 +640,128 @@ fn cache_tag_space(r:&Reader,header:&MapHeader)->Result<Space> {
     Ok(Space{begin,end,address})
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResidentTagMemory {
+    base_address: u32,
+    end_address: u32,
+    capacity_bytes: u32,
+    tag_data_bytes: u32,
+    largest_bsp_bytes: u32,
+    pub(crate) resident_bytes: u32,
+}
+
+/// Verify the exact Invader cache's linked address window and resident cost.
+/// External banks must already have been excluded by the caller.
+pub(crate) fn verify_resident_tag_window(
+    path: &Path,
+    inspection: &MapInspection,
+    base: u32,
+    capacity: u32,
+) -> Result<ResidentTagMemory> {
+    let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
+    if hash != inspection.sha256 {
+        return invalid("Cache changed before tag memory validation");
+    }
+    let scenario = inspection.tags.iter()
+        .find(|tag| tag.class == "scnr" && tag.path == inspection.scenario_path)
+        .and_then(|tag| tag.data_offset)
+        .ok_or_else(|| SparkError::Invalid("Resident scenario data is unavailable".into()))?;
+    resident_tag_window(&Reader(&bytes), &header, scenario as usize, base, capacity)
+}
+
+fn resident_tag_window(
+    reader: &Reader,
+    header: &MapHeader,
+    scenario: usize,
+    base: u32,
+    capacity: u32,
+) -> Result<ResidentTagMemory> {
+    let tags = cache_tag_space(reader, header)?;
+    let end = base.checked_add(capacity)
+        .ok_or_else(|| SparkError::Invalid("Tag window address overflow".into()))?;
+    let static_end = base.checked_add(header.tag_size)
+        .ok_or_else(|| SparkError::Invalid("Tag data address overflow".into()))?;
+    if tags.address != base || static_end > end || scenario < tags.begin
+        || scenario.checked_add(0x5b0).is_none_or(|offset| offset > tags.end)
+    {
+        return invalid("Tag data or scenario is outside the target's linked address window");
+    }
+
+    let (table, count) = tags.block(reader, scenario + 0x5a4, 32, 16)?;
+    if count == 0 {
+        return invalid("Connected cache has no resident structure BSP");
+    }
+    let mut largest_bsp_bytes = 0;
+    for index in 0..count {
+        let row = table + index * 32;
+        let begin = reader.u32(row)? as usize;
+        let size = reader.u32(row + 4)?;
+        let address = reader.u32(row + 8)?;
+        let bsp_end = begin.checked_add(size as usize)
+            .ok_or_else(|| SparkError::Invalid("Structure BSP file range overflow".into()))?;
+        if size < 24 || begin < 2048 || (begin < tags.end && bsp_end > tags.begin)
+            || address < static_end || address.checked_add(size) != Some(end)
+        {
+            return invalid("Structure BSP crosses tag data or its linked address window");
+        }
+        reader.bytes(begin, size as usize)?;
+        let bsp = Space { begin, end: bsp_end, address };
+        bsp.pointer(reader.u32(begin)?, 648)?;
+        largest_bsp_bytes = largest_bsp_bytes.max(size);
+    }
+    Ok(ResidentTagMemory {
+        base_address: base,
+        end_address: end,
+        capacity_bytes: capacity,
+        tag_data_bytes: header.tag_size,
+        largest_bsp_bytes,
+        resident_bytes: header.tag_size + largest_bsp_bytes,
+    })
+}
+
+#[cfg(test)]
+mod resident_tag_window_tests {
+    use super::*;
+
+    #[test]
+    fn native_tag_windows_reject_overlap_wrong_layout_and_escaping_pointers() {
+        const NEW_BSP: usize = 4096;
+        const BSP_SIZE: u32 = 1024;
+        const TAGS: usize = 2048;
+        const SCENARIO: usize = TAGS + 0x40;
+        const REF: usize = 3904;
+        for (version, base, capacity) in [(609u32, 0x4044_0000u32, 23 << 20), (13, 0x5000_0000, 64 << 20)] {
+            let mut bytes = vec![0u8; NEW_BSP + BSP_SIZE as usize];
+            let put = |bytes: &mut [u8], at, value: u32| bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
+            put(&mut bytes, 0, 0x6865_6164);
+            put(&mut bytes, 4, version);
+            put(&mut bytes, 0x10, TAGS as u32);
+            put(&mut bytes, 0x14, (NEW_BSP - TAGS) as u32);
+            bytes[0x20..0x23].copy_from_slice(b"map");
+            put(&mut bytes, 0x7fc, 0x666f_6f74);
+            put(&mut bytes, TAGS, base + 40);
+            put(&mut bytes, TAGS + 36, 0x7461_6773);
+            put(&mut bytes, SCENARIO + 0x5a4, 1);
+            put(&mut bytes, SCENARIO + 0x5a8, base + (REF - TAGS) as u32);
+            put(&mut bytes, REF, NEW_BSP as u32);
+            put(&mut bytes, REF + 4, BSP_SIZE);
+            let address = base + capacity - BSP_SIZE;
+            put(&mut bytes, REF + 8, address);
+            put(&mut bytes, NEW_BSP, address + 24);
+            let header = parse_header(&bytes, bytes.len() as u64).unwrap();
+            let validated = resident_tag_window(&Reader(&bytes), &header, SCENARIO, base, capacity).unwrap();
+            assert_eq!(validated.resident_bytes, (NEW_BSP - TAGS) as u32 + BSP_SIZE);
+            assert!(resident_tag_window(&Reader(&bytes), &header, SCENARIO, base, 32 << 20).is_err());
+            for (at, invalid) in [(REF, TAGS as u32), (REF + 4, u32::MAX), (REF + 8, base + 1), (NEW_BSP, address + 800)] {
+                let mut broken = bytes.clone();
+                put(&mut broken, at, invalid);
+                assert!(resident_tag_window(&Reader(&broken), &header, SCENARIO, base, capacity).is_err());
+            }
+        }
+    }
+}
+
 /// Read the real scenario HUD reference and resident HMT payload from the same
 /// content identity as inspection. No resource-map guessing or fallback strings.
 /// Native layout: scenario dependency 0x594; HMT root128, elements2, messages64.

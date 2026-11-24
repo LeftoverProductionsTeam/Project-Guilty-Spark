@@ -3,8 +3,10 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Eight-region CE609 d2f2b2e6 adds Chill Out. Independent readback passed all nine paths and measured 15.78 of 23.00 MiB CE tag space. Two isolated Forerunner peers verified the exact cache. Physical traversal beyond the accepted two-region baseline remains open.
-Next action: Collect Danger Canyon 90088 and Ice Fields 58665. Danger Canyon’s two measured radiosity triangles are absent from regenerated source. Ice Fields passed source clearance with the reviewed seal and adjusted tunnel against the exact eight-region parent. Require native bake, independent collision/material readback and exact private runtime admission before acceptance. Keep multiplayer BSP synchronization, later routes, Zombie CE609 and recorded Black Echo work open.
+Latest verified revision: Prisoner extends the connected CE609 baseline to nine regions at 548e3c1c. Native compile, route readback and private Forerunner peer admission passed. Danger Canyon separately extends the same eight-region parent to 7d2039da with native compile and route readback. The two nine-region artifacts overlap.
+Next action: Verify the ten-region merge of Prisoner and Danger Canyon, then extend through the remaining regions. Complete the existing BSP Assembly CE609/MCC13 export and verify an MCC13 map above 23 MiB in Forerunner separately from world residency. Ice Fields still needs the documented native radiosity UV repair.
+
+Operation 110% V2 immediate priority overlay, 24 November 2026. P0 is the complete 19-region MegaWorld, including reusable BSP Assembly, classic 23 MiB CE609, optional 64 MiB MCC13 and honest per-runtime compatibility. Forerunner owns MCC loading, regional occupancy and synchronized multiplayer state, including guest vehicle traversal. P1 is the original Zombie Apocalypse conversion and survival gameplay. P2 is repeatable Black Echo and persistent multiplayer Extraction. All permanent scope, 475 records, M1–M6, completed evidence and unresolved acceptance gates remain in force.
 
 ## Acceptance
 
