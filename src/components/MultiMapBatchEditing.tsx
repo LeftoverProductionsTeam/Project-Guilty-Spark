@@ -5,8 +5,8 @@ import type { LibraryEntry } from '../types';
 type Field = { class: string; path: string; field: string; label: string; matchingProjectIds: string[] };
 type FieldSearch = { fields: Field[]; unreadableMaps: { projectId: string; problem: string }[] };
 type Edit = { before: number; after: number; kind: string; unit: string; sourceSha256: string; cacheVersion: number };
-type Preview = { rows: { projectId: string; edit: Edit | null; problem: string | null }[]; reviewSha256: string | null };
-type Outcome = { batchId: string; published: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
+type Preview = { rows: { projectId: string; edit: Edit | null; problem: string | null }[]; reviewSha256: string | null; recoverable: boolean };
+type Outcome = { batchId: string; published: boolean; recoverable: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
 
 export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entries: LibraryEntry[]; onOpenMccTools: () => void }) {
   const savedMaps = entries.filter((entry) => entry.version != null && !entry.sessionOnly);
@@ -131,12 +131,14 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
                 setOutcome(undefined);
                 void perform(async () => {
                   try {
-                    setOutcome(await call<Outcome>('build_numeric_batch', { ids, rule, reviewSha256: preview.reviewSha256, batchId }));
+                    const result = await call<Outcome>('build_numeric_batch', { ids, rule, reviewSha256: preview.reviewSha256, batchId });
+                    setOutcome(result);
+                    setPreview({ ...preview, recoverable: result.recoverable });
                   } finally {
                     setJob(undefined);
                   }
                 });
-              }}>Build and verify batch</button>
+              }}>{preview.recoverable ? 'Resume and verify batch' : 'Build and verify batch'}</button>
             </>
           )}
           {job && <button type="button" disabled={cancelRequested} onClick={() => {
@@ -151,6 +153,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
           {outcome && (
             <>
               <p role="status">{outcome.published ? 'Batch published to your local Spark data folder.' : outcome.problem}</p>
+              {outcome.recoverable && <p>Verified maps were kept privately. Resume this same review to continue.</p>}
               {outcome.published && <button type="button" onClick={() => void call('reveal_folder', { kind: 'mapBatch', id: outcome.batchId }).catch((error) => setProblem(String(error)))}>Open batch output</button>}
               <ul aria-label="Per-map build results">
                 {outcome.rows.map((row) => <li key={row.projectId}>{title(row.projectId)} · {row.status} · {row.detail}{outcome.published && row.sha256 && <> · {row.output} <code title={row.sha256}>{row.sha256.slice(0, 12)}</code></>}</li>)}

@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
+Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Forerunner independently reproduced the empty-return turn with exe 697fdc8a on unchanged d113e9db. The successful bank/restart cache and historical executable hashes are pinned in the integration evidence. Multi Map Batch Editing now checks field availability across the selection.
-Next action: Await a controlled Forerunner flight/braking correction on the pinned d113e9db empty return before another full mission. Continue batch selection, resumable builds and existing Covenant, gameplay and human acceptance gates independently.
+Latest verified revision: Stock b30 native readback and CE HaloScript compilation confirm the recorded hover and departure pattern. The pinned Black Echo bank/restart map is preserved. Batch resume now revalidates a controlled stop through the existing storage lease.
+Next action: Wire source-backed recording selection into the existing Black Echo transport editor, using authored map-specific recordings and the existing native pad/seat gates. Focused Forerunner landing precedes full faction replay. Next restore the original Zombie Apocalypse and advance physical MegaWorld connections. Verify native batch resume where it accelerates those goals.
 
 ## Acceptance
 

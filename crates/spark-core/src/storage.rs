@@ -419,53 +419,12 @@ impl Store {
         }
         let _guard = lock(&self.root.join("catalog.lock"))?;
         let mut entries = self.entries()?;
-        let limits = self.limits()?;
         let parent = entries
             .iter()
             .filter(|e| e.state == "active" && path.starts_with(&e.path))
             .max_by_key(|e| e.path.components().count())
             .cloned();
-        let total = entries
-            .iter()
-            .filter(|e| e.parent_id.is_none())
-            .map(cost)
-            .sum::<u64>();
-        let category_bytes = entries
-            .iter()
-            .filter(|e| e.parent_id.is_none() && e.category == category)
-            .map(cost)
-            .sum::<u64>();
-        let cap = match category {
-            Category::Preview => limits.preview_bytes,
-            Category::Staging => limits.staging_bytes,
-            Category::Diagnostics => limits.diagnostics_bytes,
-            Category::Compiler => limits.compiler_bytes,
-        };
-        let additional = if parent.is_some() { 0 } else { bytes };
-        if let Some(parent) = &parent {
-            let claimed = entries
-                .iter()
-                .filter(|e| e.parent_id.as_deref() == Some(&parent.id))
-                .map(|e| e.reserved_bytes)
-                .sum::<u64>();
-            if claimed.saturating_add(bytes) > parent.reserved_bytes {
-                return invalid(
-                    "Native child staging exceeds its parent job reservation; no files were copied",
-                );
-            }
-        }
-        if entries.len() >= MAX_RECORDS
-            || bytes > limits.per_operation_bytes
-            || total.saturating_add(additional) > limits.total_bytes
-            || category_bytes.saturating_add(additional) > cap
-        {
-            return invalid(format!("Storage budget would be exceeded before copying. This operation reserves {} MiB; {} MiB is already accounted. Review Storage & Cache or raise its limit. Active sources and previous-good builds were not removed.",bytes/MIB,total/MIB));
-        }
-        if free_bytes(&self.root)
-            .is_some_and(|free| free < bytes.saturating_add(limits.minimum_free_bytes))
-        {
-            return invalid(format!("Not enough free disk space: reserve {} MiB plus {} MiB safety space before native staging",bytes/MIB,limits.minimum_free_bytes/MIB));
-        }
+        self.check_reservation(&entries, parent.as_ref(), bytes, bytes, category)?;
         if entries.iter().any(|e| e.path == path) {
             return invalid("Generated output already has a storage owner");
         }
@@ -496,6 +455,88 @@ impl Store {
             held: Some(held),
             finished: false,
         })
+    }
+    fn check_reservation(
+        &self, entries: &[Entry], parent: Option<&Entry>, bytes: u64,
+        additional_disk: u64, category: Category,
+    ) -> Result<()> {
+        let limits = self.limits()?;
+        let total = entries
+            .iter()
+            .filter(|e| e.parent_id.is_none())
+            .map(cost)
+            .sum::<u64>();
+        let category_bytes = entries
+            .iter()
+            .filter(|e| e.parent_id.is_none() && e.category == category)
+            .map(cost)
+            .sum::<u64>();
+        let cap = match category {
+            Category::Preview => limits.preview_bytes,
+            Category::Staging => limits.staging_bytes,
+            Category::Diagnostics => limits.diagnostics_bytes,
+            Category::Compiler => limits.compiler_bytes,
+        };
+        let additional = if parent.is_some() { 0 } else { bytes };
+        if let Some(parent) = parent {
+            let claimed = entries
+                .iter()
+                .filter(|e| e.parent_id.as_deref() == Some(&parent.id))
+                .map(|e| e.reserved_bytes)
+                .sum::<u64>();
+            if claimed.saturating_add(bytes) > parent.reserved_bytes {
+                return invalid(
+                    "Native child staging exceeds its parent job reservation; no files were copied",
+                );
+            }
+        }
+        if entries.len() >= MAX_RECORDS
+            || bytes > limits.per_operation_bytes
+            || total.saturating_add(additional) > limits.total_bytes
+            || category_bytes.saturating_add(additional) > cap
+        {
+            return invalid(format!("Storage budget would be exceeded before copying. This operation reserves {} MiB; {} MiB is already accounted. Review Storage & Cache or raise its limit. Active sources and previous-good builds were not removed.",bytes/MIB,total/MIB));
+        }
+        if free_bytes(&self.root)
+            .is_some_and(|free| free < additional_disk.saturating_add(limits.minimum_free_bytes))
+        {
+            return invalid(format!("Not enough free disk space: reserve {} MiB plus {} MiB safety space before native staging",additional_disk/MIB,limits.minimum_free_bytes/MIB));
+        }
+        Ok(())
+    }
+    /// Reopen a producer-certified checkpoint in place without making a second
+    /// copy or granting ownership based on a path or receipt alone.
+    pub fn resume_staging(&self, path: &Path, bytes: u64, revision: &str) -> Result<Lease> {
+        reject_links(path)?;
+        let path = fs::canonicalize(path)?;
+        let _guard = lock(&self.root.join("catalog.lock"))?;
+        let mut entries = self.entries()?;
+        let index = entries.iter().position(|row| {
+            row.path == path && row.category == Category::Staging
+                && row.state == "recoverable" && !row.protected && row.parent_id.is_none()
+                && row.source_revision.as_deref() == Some(revision)
+        }).ok_or_else(|| fail("No completed staging checkpoint matches this review"))?;
+        let mut row = entries.swap_remove(index);
+        let held = lock(&self.root.join("leases").join(format!("{}.lock", row.id)))?;
+        let owner: Owner = read_json(&marker(&path))?;
+        if owner.id != row.id || owner.path != path || owner.store != self.root
+            || row.snapshot.is_empty() || row.content_snapshot.is_empty()
+            || measure(&path)?.fingerprint != row.snapshot
+            || content_snapshot(&path, self.limits()?.per_operation_bytes)? != row.content_snapshot
+            || measure(&path)?.fingerprint != row.snapshot
+        {
+            return invalid("Staging checkpoint ownership or bytes changed; retained");
+        }
+        let bytes = bytes.max(cost(&row));
+        let retained_allocation = row.allocated_bytes.unwrap_or(0).min(row.logical_bytes);
+        self.check_reservation(&entries, None, bytes, bytes.saturating_sub(retained_allocation), row.category)?;
+        row.state = "active".into();
+        row.reserved_bytes = bytes;
+        row.modified = now();
+        let id = row.id.clone();
+        entries.push(row);
+        write(&self.root.join("entries.json"), &entries)?;
+        Ok(Lease { store: self.clone(), id, path, held: Some(held), finished: false })
     }
     fn update(
         &self,
@@ -605,7 +646,9 @@ impl Store {
                 && (row.state == "failed"
                     || row.state == "active" && now().saturating_sub(row.modified) >= age
                     || row.category == Category::Preview && row.state == "ready"
-                    || row.category == Category::Staging && row.state == "disposable");
+                    || row.category == Category::Staging && row.state == "disposable"
+                    || row.category == Category::Staging && row.state == "recoverable"
+                        && now().saturating_sub(row.modified) >= age);
             // Accepted trees can contain thousands of files. Never walk protected
             // output merely to decide that it is protected.
             let can = possible
@@ -860,6 +903,14 @@ impl Lease {
     pub fn finish(mut self, protected: bool, revision: Option<String>) -> Result<()> {
         self.mark_owned()?;
         self.store.update(&self.id, "ready", protected, revision)?;
+        self.finished = true;
+        self.held.take();
+        Ok(())
+    }
+    /// Retain bounded, verified staging without making it visible as a build.
+    pub fn finish_recoverable(mut self, revision: String) -> Result<()> {
+        self.owned_staging_root()?;
+        self.store.update(&self.id, "recoverable", false, Some(revision))?;
         self.finished = true;
         self.held.take();
         Ok(())
@@ -1491,6 +1542,33 @@ pub fn unique_file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path)
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn recoverable_staging_reopens_only_unchanged_owned_bytes_for_that_revision() {
+        let workspace = tempfile::tempdir().unwrap();
+        let store_path = workspace.path().join("store");
+        let stage = workspace.path().join("pending");
+        let store = Store::open(&store_path).unwrap();
+        store.set_limits(&Limits { minimum_free_bytes: 0, ..Limits::default() }).unwrap();
+        let lease = store.reserve(&stage, None, MIB, Category::Staging, "batch fixture").unwrap();
+        fs::create_dir(&stage).unwrap();
+        lease.mark_owned().unwrap();
+        let map = stage.join("a10.map");
+        fs::write(&map, b"verified").unwrap();
+        lease.finish_recoverable("reviewed".into()).unwrap();
+
+        let reopened = Store::open(&store_path).unwrap();
+        assert!(reopened.cleanup_plan().unwrap().eligible.is_empty());
+        assert!(reopened.resume_staging(&stage, MIB, "stale review").is_err());
+        let active = reopened.resume_staging(&stage, MIB, "reviewed").unwrap();
+        assert!(reopened.resume_staging(&stage, MIB, "reviewed").is_err());
+        assert_eq!(fs::read(&map).unwrap(), b"verified");
+        active.finish_recoverable("reviewed".into()).unwrap();
+        fs::write(&map, b"modified").unwrap();
+        assert!(reopened.resume_staging(&stage, MIB, "reviewed").is_err());
+        assert_eq!(fs::read(&map).unwrap(), b"modified");
+        assert!(reopened.cleanup_plan().unwrap().eligible.is_empty());
+    }
+
     use super::*;
     // Deterministically schedule another ordinary catalog owner at the last
     // pre-lock boundary. Thread-local state cannot affect parallel fixtures.

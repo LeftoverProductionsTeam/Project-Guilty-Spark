@@ -172,7 +172,9 @@ pub fn verify_compiled(path: &Path, rule: &Rule, row: &Row, expected_sha: &str) 
     let (_, field) = one_field(&compiled.tags, rule)?;
     let actual = field.value.as_f64().ok_or_else(|| SparkError::Invalid("Compiled field is not numeric".into()))?;
     let expected = if row.kind == "f32" { f64::from(rule.value as f32) } else { rule.value };
+    let scenario = compiled.scenario_path.rsplit(['\\', '/']).next().unwrap_or("");
     if compiled.sha256 != expected_sha || compiled.header.version != 13
+        || format!("{}.map", scenario.to_ascii_lowercase()) != row.map_name
         || field.kind != row.kind || field.unit != row.unit || actual != expected
     {
         return invalid("Native readback did not preserve the reviewed numeric field and cache identity");
