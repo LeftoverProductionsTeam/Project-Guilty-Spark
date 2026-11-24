@@ -526,11 +526,11 @@ async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String,assembly_pr
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>)->Reply<core::bsp_assembly::BspAssembly>{
+async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>,direction_degrees:Option<f64>)->Reply<core::bsp_assembly::BspAssembly>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=if let Some(donor)=core::bsp_assembly::referenced_donor(&base,&donor_project_id).map_err(error)?{donor}else{lock(&state.library)?.get(&donor_project_id).map_err(error)?};let tags=base.bsp_assembly.as_ref().filter(|plan|plan.donor_project_id==donor_project_id).map(|plan|plan.donor_tags_directory.clone()).or(editing_tools(&state,&donor)?.base_tags_directory).ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;if let Some(edges)=edges {
             let plan=base.bsp_assembly.as_ref().filter(|p|p.donor_project_id==donor_project_id&&p.donor_bsp_index==donor_bsp_index).ok_or("Apply the current donor connection before adding edge-selected sections")?;
             return core::bsp_assembly::append_edge_section(&base.source.as_ref().ok_or("Original destination source unavailable")?.preserved_path,&i,plan,edges).map_err(error);
-        }if terrain_seam.unwrap_or(false){core::bsp_assembly::plan_terrain(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}else{core::bsp_assembly::plan(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}}).await.map_err(error)?
+        }if terrain_seam.unwrap_or(false){core::bsp_assembly::plan_terrain(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}else{core::bsp_assembly::plan_in_direction(&base,&i,&donor,&j,donor_bsp_index,tags,direction_degrees.unwrap_or(0.)).map_err(error)}}).await.map_err(error)?
 }
 #[tauri::command]
 async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<OpenProject>{

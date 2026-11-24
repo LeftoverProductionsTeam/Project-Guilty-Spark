@@ -1,15 +1,16 @@
-//! Real two-original-region native CE compiler acceptance. Player proof is separate.
+//! Real native CE assembly and extension acceptance. Player proof is separate.
 use spark_core::{bsp_assembly::{self, BspAssembly},library::Library,project::{self,EngineBuildTarget,Project},runtime::RuntimeId,Result,SparkError};
 use std::{fs,io::Read,path::Path,sync::{Arc,atomic::AtomicBool}};
 
-fn reviewed_plan(path: &Path, base: &Project) -> Result<BspAssembly> {
+fn reviewed_plan(path: &Path, base: &Project) -> Result<(BspAssembly, Vec<BspAssembly>)> {
     let source = base.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
     if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
         spark_core::reject_links(path)?;
         let mut bytes = Vec::new();
-        fs::File::open(path)?.take(256 * 1024 + 1).read_to_end(&mut bytes)?;
-        if bytes.len() > 256 * 1024 {
-            return spark_core::invalid("Reviewed seam receipt is larger than 256 KiB");
+        const MAX_REVIEW_BYTES: u64 = 4 * 1024 * 1024;
+        fs::File::open(path)?.take(MAX_REVIEW_BYTES + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_REVIEW_BYTES {
+            return spark_core::invalid("Reviewed seam receipt exceeds the size limit");
         }
         let receipt: serde_json::Value = serde_json::from_slice(&bytes)?;
         let base_name = source.original_path.file_name().and_then(|name| name.to_str());
@@ -21,13 +22,17 @@ fn reviewed_plan(path: &Path, base: &Project) -> Result<BspAssembly> {
         }
         let plan = receipt.pointer("/recipe/plan")
             .ok_or_else(|| SparkError::Invalid("Reviewed seam receipt has no authored plan".into()))?;
-        Ok(serde_json::from_value(plan.clone())?)
+        let inherited = receipt.pointer("/recipe/inheritedConnections")
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()?.unwrap_or_default();
+        Ok((serde_json::from_value(plan.clone())?, inherited))
     } else {
         let prior = project::load_project(path)?;
         if prior.source.as_ref().map(|source| source.sha256.as_str()) != Some(&source.sha256) {
             return spark_core::invalid("Previous connection belongs to a different base cache");
         }
-        prior.bsp_assembly.ok_or_else(|| SparkError::Invalid("Previous project has no connection".into()))
+        let plan = prior.bsp_assembly.ok_or_else(|| SparkError::Invalid("Previous project has no connection".into()))?;
+        Ok((plan, prior.inherited_bsp_connections))
     }
 }
 
@@ -42,7 +47,8 @@ fn main()->Result<()>{
     let reviewed = if matches!(a[6].as_str(), "auto" | "terrain") {
         None
     } else {
-        let plan = reviewed_plan(recipe_path, &p)?;
+        let (plan, inherited_connections) = reviewed_plan(recipe_path, &p)?;
+        p.inherited_bsp_connections = inherited_connections;
         let source = donor.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing donor source".into()))?;
         if plan.donor_source.sha256 != source.sha256 || plan.donor_bsp_index != 0
             || plan.donor_source.resource_sha256 != source.resource_sha256 {
@@ -106,7 +112,9 @@ fn main()->Result<()>{
     };
     if matches!(a[6].as_str(), "auto" | "terrain") { plan.include_donor_scenery = true; }
     plan.validate()?;
-    p.bsp_assembly=Some(plan);p.title="C43 Timberland + Sidewinder CE".into();
+    p.title = format!("{} + {} · CE", p.title, plan.donor_title);
+    while p.title.len() > 180 { p.title.pop(); }
+    p.bsp_assembly=Some(plan);
     let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:"Reviewed CE source for Chupathingy".into(),runtime_id:RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
     project::save_project(&out.join("connection.gsproject"),&p)?;lib.save(&p,Some(&i))?;
     let id=uuid::Uuid::new_v4().to_string();let log=out.join("native-events.jsonl");

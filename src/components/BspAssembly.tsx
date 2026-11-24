@@ -54,6 +54,7 @@ export default function BspAssembly({
     ),
     [routeView,setRouteView]=useMapState<'primary'|'infantry'|'highGround'|`section:${string}`>(project.id,'bsp.route','primary'),
     [entrancePivot, setEntrancePivot] = useMapState(project.id, 'bsp.entrancePivot', false),
+    [direction, setDirection] = useMapState(project.id, 'bsp.tunnelDirection', 0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
@@ -137,7 +138,7 @@ export default function BspAssembly({
       const request={...latest.current};
       const matches=()=>current()&&latest.current.signature===request.signature&&latest.current.donor===request.donor&&latest.current.index===request.index;
       await onSave();if(!matches())return;
-      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,terrainSeam});
+      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,terrainSeam,...(!terrainSeam&&direction!==0?{directionDegrees:direction}:{})});
       if(matches()){setDraft(plan);setRouteView('primary');setReport(null);}
     });
   }
@@ -263,6 +264,17 @@ export default function BspAssembly({
                     {p.name}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label>
+              Tunnel direction
+              <select value={direction} disabled={busy} onChange={(event) => setDirection(Number(event.target.value))}>
+                <option value={0}>East</option>
+                <option value={60}>Northeast</option>
+                <option value={120}>Northwest</option>
+                <option value={180}>West</option>
+                <option value={240}>Southwest</option>
+                <option value={300}>Southeast</option>
               </select>
             </label>
             <button

@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Forerunner tested the exact CE609 two-region map ce043863 in both directions on road, cave and ridge, including guest Warthog driving. Spark extended that baseline to Blood Gulch as CE609 4733768f, with all existing and new connections passing native collision checks. Zombie MCC 12649191 played on two Forerunner peers. Its legacy spawner wrapper compiled separately.
-Next action: Finish the Battle Creek connector from the preserved 4733768f map and verify the native four-region world before adding the remaining 15. Keep the 19-source layout and actual travel tests active. Continue the standalone Zombie CE609 compiler path and reusable recovery. Record Black Echo flight when XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
+Latest verified revision: Timberland, Sidewinder, Blood Gulch and Battle Creek share one compiled CE609 map f66931cd with all five paths passing native collision readback. Two Forerunner peers loaded the exact map and agreed through tick 540. Full physical traversal was verified on the preserved two-region baseline. All 19 original CE inputs are present.
+Next action: Finish the Ice Fields branch from f66931cd, then connect the remaining original regions and verify real player and vehicle travel. Continue standalone Zombie CE609 and reusable recovery after the MegaWorld priority. Record Black Echo flight when XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
 
 ## Acceptance
 

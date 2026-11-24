@@ -3,6 +3,15 @@ use spark_core::{bsp_assembly, library::Library, maps, Result};
 use std::{fs, path::Path, sync::atomic::AtomicBool};
 fn main() -> Result<()> {
     let mut a: Vec<_> = std::env::args().collect();
+    let plan_only = a.get(1).is_some_and(|arg| arg == "--plan-only");
+    if plan_only { a.remove(1); }
+    let direction = if a.get(1).is_some_and(|arg| arg == "--direction") {
+        a.remove(1);
+        let angle = a.get(1).and_then(|arg| arg.parse::<f64>().ok())
+            .ok_or_else(|| spark_core::SparkError::Invalid("Missing tunnel direction in degrees".into()))?;
+        a.remove(1);
+        angle
+    } else { 0. };
     let terrain=a.get(1).is_some_and(|v|v=="--terrain");if terrain{a.remove(1);}
     let edge_section = if a.get(1).is_some_and(|v| v == "--edge-section") {
         a.remove(1);
@@ -68,7 +77,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
     if a.len() != 6 {
-        eprintln!("qa_bsp_assembly [--terrain | --edge-section <branch offset>] <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
+        eprintln!("qa_bsp_assembly [--plan-only] [--direction <degrees>] [--terrain | --edge-section <branch offset>] <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
         eprintln!("qa_bsp_assembly --verify-cache <compiled.map> <connection-project.gsproject> [...]");
         eprintln!("qa_bsp_assembly --verify-walkthrough <compiled.map> <connection-project.gsproject>");
         std::process::exit(2);
@@ -92,7 +101,7 @@ fn main() -> Result<()> {
     let index = a[3]
         .parse()
         .map_err(|_| spark_core::SparkError::Invalid("Invalid BSP index".into()))?;
-    let plan = if terrain{bsp_assembly::plan_terrain(&p,&i,&d,&j,index,fs::canonicalize(&a[4])?)?}else{bsp_assembly::plan(&p, &i, &d, &j, index, fs::canonicalize(&a[4])?)?};
+    let plan = if terrain{bsp_assembly::plan_terrain(&p,&i,&d,&j,index,fs::canonicalize(&a[4])?)?}else{bsp_assembly::plan_in_direction(&p, &i, &d, &j, index, fs::canonicalize(&a[4])?, direction)?};
     let plan = if let Some(offset) = edge_section {
         // Exercise genuine rendered source edges, never manufactured points or
         // a shortcut around the same entrance checks used by viewport picks.
@@ -112,6 +121,7 @@ fn main() -> Result<()> {
     eprintln!("plan {}", serde_json::to_string(&plan)?);
     p.bsp_assembly = Some(plan);
     spark_core::project::save_project(&out.join("project.gsproject"), &p)?;
+    if plan_only { return Ok(()); }
     let geometry = bsp_assembly::generate_project(&p, &i, &AtomicBool::new(false))?;
     fs::write(
         out.join("combined.jms"),

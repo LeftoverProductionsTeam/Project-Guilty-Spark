@@ -975,25 +975,23 @@ fn verify_entrance(
     }
     invalid("A tunnel mouth is not on visible walkable source ground. Move it onto the map terrain; sky and invisible boundary floors cannot serve as entrances")
 }
-fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, east: bool) -> Result<(V, usize)> {
+fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, toward: V) -> Result<(V, usize)> {
     let range = mesh
         .parts
         .get(part)
         .ok_or_else(|| SparkError::Invalid("BSP selection is unavailable".into()))?;
+    let lateral = [-toward[1], toward[0], 0.];
+    let projected = |p: V| [dot(p, toward), dot(p, lateral), p[2]];
     let mut low = [f64::INFINITY; 3];
     let mut high = [f64::NEG_INFINITY; 3];
     for id in &mesh.indices[range.index_start..range.index_start + range.index_count] {
-        let p = vertex(mesh, *id);
+        let p = projected(vertex(mesh, *id));
         for k in 0..3 {
             low[k] = low[k].min(p[k]);
             high[k] = high[k].max(p[k]);
         }
     }
-    let target = [
-        if east { high[0] - 5. } else { low[0] + 5. },
-        (low[1] + high[1]) / 2.,
-        low[2] + 1.,
-    ];
+    let target = [high[0] - 5., (low[1] + high[1]) / 2., low[2] + 1.];
     mesh.indices[range.index_start..range.index_start + range.index_count]
         .chunks_exact(3)
         .enumerate()
@@ -1013,7 +1011,7 @@ fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, east: bool) -> 
                 return None;
             }
             let center = mul(add(add(p[0], p[1]), p[2]), 1. / 3.);
-            let d = sub(center, target);
+            let d = sub(projected(center), target);
             Some((
                 center,
                 range.index_start / 3 + index,
@@ -1085,6 +1083,26 @@ pub fn plan(
     index: usize,
     tags: PathBuf,
 ) -> Result<BspAssembly> {
+    plan_in_direction(base_project, base, donor_project, donor, index, tags, 0.)
+}
+
+/// Seed a physical tunnel on a chosen side of the existing world.
+/// Both supports come from the same native collision selection as the default.
+pub fn plan_in_direction(
+    base_project: &Project,
+    base: &MapInspection,
+    donor_project: &Project,
+    donor: &MapInspection,
+    index: usize,
+    tags: PathBuf,
+    direction_degrees: f64,
+) -> Result<BspAssembly> {
+    if !direction_degrees.is_finite() || direction_degrees.abs() > 360. {
+        return invalid("Tunnel direction must be a finite angle within 360 degrees");
+    }
+    let (y, x) = direction_degrees.to_radians().sin_cos();
+    let toward = [x, y, 0.];
+    let crosswise = [-y, x, 0.];
     if index >= donor.mesh.parts.len() {return invalid("Choose an existing donor BSP section");}
     if base.mesh.parts.len() != 1 || base_project.id == donor_project.id {
         return invalid("Choose a different donor map and a destination with one BSP");
@@ -1109,24 +1127,23 @@ pub fn plan(
             .map(|o| o.position.map(f64::from))
             .collect::<Vec<_>>()
     };
-    let (start, face) = playable_anchor(&base_mesh, &faces, 0, true, &starts(base))?;
-    let (end, _) = playable_anchor(&donor_mesh, &donor_faces, index, false, &starts(donor))?;
+    let (start, face) = playable_anchor(&base_mesh, &faces, 0, toward, &starts(base))?;
+    let (end, _) = playable_anchor(&donor_mesh, &donor_faces, index, mul(toward, -1.), &starts(donor))?;
     let donor_part = &donor_mesh.parts[index];
     let donor_min = donor_mesh.indices
         [donor_part.index_start..donor_part.index_start + donor_part.index_count]
         .iter()
-        .map(|i| vertex(&donor_mesh, *i)[0])
+        .map(|i| dot(vertex(&donor_mesh, *i), toward))
         .fold(f64::INFINITY, f64::min);
     let base_max = base_mesh
         .positions
         .chunks_exact(3)
-        .map(|p| p[0] as f64)
+        .map(|p| dot([p[0] as f64, p[1] as f64, p[2] as f64], toward))
         .fold(f64::NEG_INFINITY, f64::max);
-    let translation = [
-        base_max + 64. - donor_min,
-        start[1] - end[1],
-        start[2] - end[2],
-    ];
+    let translation = add(
+        mul(toward, base_max + 64. - donor_min),
+        add(mul(crosswise, dot(sub(start, end), crosswise)), [0., 0., start[2] - end[2]]),
+    );
     let shader = connection_shader(&base.tags, faces[face].shader, &base.header.name)
         .ok_or_else(|| {
             SparkError::Invalid("Choose a real environment shader for the tunnel".into())
@@ -1244,10 +1261,10 @@ fn playable_anchor(
     mesh: &MeshData,
     faces: &[CollisionFace],
     part: usize,
-    east: bool,
+    toward: V,
     starts: &[V],
 ) -> Result<(V, usize)> {
-    let fallback = anchor(mesh, faces, part, east)?;
+    let fallback = anchor(mesh, faces, part, toward)?;
     let range = &mesh.parts[part];
     let mut candidates = vec![];
     for start in starts {
@@ -1690,9 +1707,16 @@ mod tests {
             };
             3
         ];
-        assert!(anchor(&mesh, &faces, 0, false).unwrap().0[0] < 5.);
-        assert!(anchor(&mesh, &faces, 0, true).unwrap().0[0] > 17.);
-        let authored = playable_anchor(&mesh, &faces, 0, false, &[[11., 0., 0.05]]).unwrap();
+        assert!(anchor(&mesh, &faces, 0, [-1., 0., 0.]).unwrap().0[0] < 5.);
+        assert!(anchor(&mesh, &faces, 0, [1., 0., 0.]).unwrap().0[0] > 17.);
+        let mut north = mesh.clone();
+        for point in north.positions.chunks_exact_mut(3) {
+            let x = point[0];
+            point[0] = -point[1];
+            point[1] = x;
+        }
+        assert!(anchor(&north, &faces, 0, [0., 1., 0.]).unwrap().0[1] > 17.);
+        let authored = playable_anchor(&mesh, &faces, 0, [-1., 0., 0.], &[[11., 0., 0.05]]).unwrap();
         assert_eq!(
             authored.0,
             [11., 0., 0.],
@@ -1700,13 +1724,13 @@ mod tests {
         );
         faces[0].flags = 2;
         assert!(
-            anchor(&mesh, &faces, 0, false).unwrap().0[0] > 5.,
+            anchor(&mesh, &faces, 0, [-1., 0., 0.]).unwrap().0[0] > 5.,
             "Invisible player-clip floors cannot be map entrances"
         );
         faces[0].flags = 0;
         faces[0].shader = None;
         assert!(
-            anchor(&mesh, &faces, 0, false).unwrap().0[0] > 5.,
+            anchor(&mesh, &faces, 0, [-1., 0., 0.]).unwrap().0[0] > 5.,
             "Sky boundaries cannot be map entrances"
         );
     }
@@ -1720,7 +1744,7 @@ mod tests {
         }
         mesh.parts.push(maps::MeshPart{name:"joined world".into(),index_start:0,index_count:6});
         let faces=vec![CollisionFace{shader:Some(1),flags:0,normal:[0.,0.,1.]};2];
-        let entrance=playable_anchor(&mesh,&faces,0,true,&[[1.,0.,0.05]]).unwrap();
+        let entrance=playable_anchor(&mesh,&faces,0,[1.,0.,0.],&[[1.,0.,0.05]]).unwrap();
         assert!(entrance.0[0]>199.,"Inherited starts in a remote map must not pull a new tunnel across the joined world");
     }
     #[test]
