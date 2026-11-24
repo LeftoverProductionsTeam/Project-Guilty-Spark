@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canHandoff, listingExpired, relocateRuntimeRegistration } from './runtimeWorkbench';
+import { canHandoff, listingExpired, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
 import type { CommunityJoinAssessment, CommunityListingView } from './runtimeWorkbench';
 
 const view: CommunityListingView = {
@@ -65,4 +65,41 @@ it('labels installed OpenH1 and Faber separately without changing their validate
  expect(runtimeProfileName(profile)).toBe('OpenH1');expect(runtimeProfileLabel(profile)).toBe('OpenH1 · openh1');
  expect(runtimeProfileName({...profile,id:'engine-faber-v2.3.4',root:'C:/Owned/Faber',version:'v2.3.4'})).toBe('Faber');
  expect(profile.runtimeId).toBe('openCe');
+});
+
+describe('native Extraction route review', () => {
+  const route = (name: string, ...arrivalVolumes: string[]) => ({
+    name, points: 2, commands: 2, finalPosition: [1, 2, 3] as [number, number, number],
+    arrivalVolumes, issue: null,
+  });
+  const legacy = {
+    faction: 'unsc' as const,
+    hub: 'extraction_return',
+    field: 'extraction_zone',
+    outbound: 'field',
+    inbound: 'loaded',
+    returnAfterInsertion: true,
+    emptyInbound: 'empty',
+  };
+
+  it('keeps shared runtime areas for legacy transports', () => {
+    const volumes = ['extraction_return', 'extraction_zone'];
+    const routes = [route('field', 'extraction_zone'), route('loaded', 'extraction_return'), route('empty', 'extraction_return')];
+    expect(nativeTransportRouteIssue(legacy, volumes, routes)).toBeNull();
+  });
+
+  it.each([
+    ['unsc', 'pelican'],
+    ['covenant', 'spirit'],
+  ] as const)('binds both return routes to the native %s pad', (faction, aircraft) => {
+    const hub = aircraft + '_return';
+    const field = 'extraction_' + aircraft + '_zone';
+    const volumes = ['extraction_return', hub, field];
+    const routes = [route('field', field), route('loaded', hub), route('empty', hub)];
+    const options = { ...legacy, faction, hub, field };
+    expect(nativeTransportRouteIssue(options, volumes, routes)).toBeNull();
+    expect(nativeTransportRouteIssue({ ...options, hub: 'extraction_return' }, volumes, routes)).toContain('Select ' + hub);
+    expect(nativeTransportRouteIssue(options, volumes, [...routes.slice(0, 2), route('empty', 'extraction_return')])).toContain('not verified inside pad ' + hub);
+    expect(nativeTransportRouteIssue(options, volumes, [routes[0], route('loaded', hub, field), routes[2]])).toContain('outside ' + field);
+  });
 });

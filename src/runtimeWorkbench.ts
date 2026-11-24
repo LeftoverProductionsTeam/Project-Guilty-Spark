@@ -1,6 +1,7 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
 import type { NativePlayerProfile } from './firefight';
 import type { NativeOperation } from './nativeOperations';
+import type { NativeTransportOptions } from './haloScript';
 
 const localForgeFeature = 'forge.hmv_local_devices.v1';
 const localForgePhysicsFeature = 'forge.hmv_local_physics.v1';
@@ -171,6 +172,46 @@ export interface WorkingScriptSources {
   modules:{filename:string;sha256:string;bytes:number;unavailable:string|null}[];
 }
 export interface WorkingScriptSource {selection:WorkingScriptSources;script:NativeScriptAttachment}
+
+export function nativeTransportRouteIssue(
+  options: Pick<NativeTransportOptions, 'faction' | 'outbound' | 'inbound' | 'hub' | 'field' | 'returnAfterInsertion' | 'emptyInbound'>,
+  volumes: readonly string[],
+  routes: NonNullable<WorkingScriptSources['transportReview']>['flightRoutes'],
+): string | null {
+  if (!routes) return 'Read native transport source to inspect the actual flight commands and pad bounds.';
+  const aircraft = options.faction === 'unsc' ? 'pelican' : 'spirit';
+  const dedicatedHub = aircraft + '_return';
+  const dedicatedField = 'extraction_' + aircraft + '_zone';
+  const hub = volumes.includes(dedicatedHub) ? dedicatedHub : 'extraction_return';
+  const field = volumes.includes(dedicatedField) ? dedicatedField : 'extraction_zone';
+  if (hub === dedicatedHub && options.hub !== hub) {
+    return 'Select ' + hub + ' as the Hub pad volume so the controller and native settlement use the same pad.';
+  }
+
+  const hubZones = ['extraction_return', 'pelican_return', 'spirit_return'];
+  const fieldZones = ['extraction_zone', 'extraction_pelican_zone', 'extraction_spirit_zone'];
+  const checked = [
+    { name: options.outbound, pad: options.field, required: field, opposite: hubZones },
+    { name: options.inbound, pad: options.hub, required: hub, opposite: fieldZones },
+  ];
+  if (options.returnAfterInsertion && options.emptyInbound && options.emptyInbound !== options.inbound) {
+    checked.push({ name: options.emptyInbound, pad: options.hub, required: hub, opposite: fieldZones });
+  }
+  for (const { name, pad, required, opposite } of checked) {
+    const selected = routes.filter(route => route.name === name);
+    if (selected.length !== 1) return 'Choose a unique native flight route for ' + (pad || 'each pad') + '.';
+    const [route] = selected;
+    if (route.issue) return route.issue;
+    if (!route.finalPosition || !route.arrivalVolumes.includes(pad)) {
+      return 'Route ' + name + ' final aircraft-origin point is not verified inside pad ' + pad + '. Review its final point and the pad geometry; fixed or unreadable volumes cannot be certified by this profile.';
+    }
+    const conflictingArea = opposite.find(area => route.arrivalVolumes.includes(area));
+    if (!route.arrivalVolumes.includes(required) || conflictingArea) {
+      return 'Forerunner extraction requires route ' + name + ' to finish inside ' + required + ' and outside ' + (conflictingArea ?? opposite[0]) + '. A custom pad must have its final route point inside the supported runtime mission area.';
+    }
+  }
+  return null;
+}
 export interface ToolLaunchPlan {
   id: string;
   runtimeId: RuntimeId;

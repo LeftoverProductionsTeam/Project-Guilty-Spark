@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Dedicated Pelican pad CE609 d113e9db compiled and passed independent readback and Spark’s compiled-map validator. Exact 571f9479 remains the verified Windows banked-weapon restart candidate.
-Next action: Register a reviewed Forerunner build advertising extraction.pelican_return_pad.v1, then test d113e9db for occupied touchdown and banking. Covenant boarding/loaded return, repeat mission, exact item IDs, batch resume and peer acceptance remain open.
+Latest verified revision: CE609 d113e9db staged and played on Forerunner f94fc443 through recall and physical Pelican seat 4. The dedicated pad withheld banking when the occupied approach drifted outside. Both factions’ authoring route checks passed focused tests.
+Next action: Adjust the occupied hub_loaded approach and deceleration on a new candidate. Preserve the measured empty return, dedicated pad and native landing gate. Then retest touchdown/banking, Covenant return, repeat mission, exact item IDs, batch resume and peer acceptance.
 
 ## Acceptance
 

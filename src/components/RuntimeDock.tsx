@@ -39,7 +39,7 @@ import type {
   ToolLaunchPlan,
   ToolProcessView,
 } from '../runtimeWorkbench';
-import { availabilityLabel, evidenceLabel, runtimeNames } from '../runtimeWorkbench';
+import { availabilityLabel, evidenceLabel, nativeTransportRouteIssue, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
 import { integrityBlocks, type NativeTagIntegrityReport } from '../nativeTagIntegrity';
@@ -231,18 +231,7 @@ export default function RuntimeDock({
     return null;
   }
   function transportRouteIssue(options:NativeTransportOptions){
-    const routes=modules?.transportReview?.flightRoutes;
-    if(!routes)return 'Read native transport source to inspect the actual flight commands and pad bounds.';
-    const checked=[[options.outbound,options.field,"extraction_zone","extraction_return"],[options.inbound,options.hub,"extraction_return","extraction_zone"]];
-    if(options.returnAfterInsertion&&options.emptyInbound&&options.emptyInbound!==options.inbound)checked.push([options.emptyInbound,options.hub,"extraction_return","extraction_zone"]);
-    for(const [name,pad,required,opposite]of checked){
-      const selected=routes.filter(route=>route.name===name);
-      if(selected.length!==1)return 'Choose a unique native flight route for '+(pad||'each pad')+'.';
-      const route=selected[0];if(route.issue)return route.issue;
-      if(!route.finalPosition||!route.arrivalVolumes.includes(pad))return 'Route '+name+' final aircraft-origin point is not verified inside pad '+pad+'. Review its final point and the pad geometry; fixed or unreadable volumes cannot be certified by this profile.';
-      if(!route.arrivalVolumes.includes(required)||route.arrivalVolumes.includes(opposite))return 'Forerunner extraction requires route '+name+' to finish inside '+required+' and outside '+opposite+'. A custom pad must have its final route point inside the supported shared mission area. Review the route and shared areas; custom pad names alone do not change runtime settlement.';
-    }
-    return null;
+    return nativeTransportRouteIssue(options,nativeCameras?.triggerVolumes??[],modules?.transportReview?.flightRoutes);
   }
   function transportPilotIssue(options:NativeTransportOptions){
     if(!options.pilot||!options.pilotSeat)return 'Choose a real native pilot and driver seat, then review their animation binding.';
