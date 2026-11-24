@@ -164,6 +164,10 @@ pub struct Project {
     pub gameplay_controls:Option<crate::gameplay::Controls>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub bsp_assembly:Option<crate::bsp_assembly::BspAssembly>,
+    /// Routes already present in this project's preserved compiled source.
+    /// Native CE extensions recheck them alongside the new editable assembly.
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub inherited_bsp_connections:Vec<crate::bsp_assembly::BspAssembly>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub megaworld_layout:Option<crate::megaworld::Layout>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
@@ -230,6 +234,7 @@ impl Project {
             source: None,
             gameplay_controls:None,
             bsp_assembly:None,
+            inherited_bsp_connections:vec![],
             megaworld_layout:None,
             conversion_profile:None,
             render_features:None,
@@ -278,6 +283,16 @@ impl Project {
         crate::powerups::validate(&self.powerups)?;
         if let Some(controls)=&self.gameplay_controls{controls.validate()?;}
         if let Some(layout)=&self.megaworld_layout{layout.validate()?;}
+        if !self.inherited_bsp_connections.is_empty() {
+            let total = self.inherited_bsp_connections.len() + usize::from(self.bsp_assembly.is_some());
+            if total > crate::bsp_assembly::MAX_COMPILED_CONNECTIONS
+                || self.source.as_ref().is_none_or(|source| source.cache_version != 609)
+                || self.quick_forge.is_some()
+            {
+                return invalid("Inherited connections require a preserved CE world within the native route limit");
+            }
+            for route in &self.inherited_bsp_connections { route.validate()?; }
+        }
         if let Some(assembly)=&self.bsp_assembly{assembly.validate()?;if self.source.is_none()||self.quick_forge.is_some(){return invalid("A BSP assembly needs a preserved destination map");}}
         if let Some(features)=&self.render_features{features.validate()?;}
         if self.animations.len()>128||self.animation_assignments.len()>128{return invalid("Animation library exceeds 128 assets or assignments");}

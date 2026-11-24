@@ -217,6 +217,12 @@ export default function BspAssembly({
             are separate.
           </p>
           {!native && <p>Open the desktop app to inspect and compile owned Halo geometry.</p>}
+          {Boolean(project.inheritedBspConnections?.length) && (
+            <p className="subtle">
+              The next native build rechecks {project.inheritedBspConnections?.length} inherited
+              {' '}connections alongside the new route.
+            </p>
+          )}
           <div className="bsp-actions">
             <label>
               Donor map

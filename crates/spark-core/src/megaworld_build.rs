@@ -1,9 +1,47 @@
-//! Bounded CE acceptance path for two original regions. Reuses the existing
+//! Bounded CE acceptance path for extending connected regions. Reuses the existing
 //! native assembly exporter, namespace/dependency checks and collision verifier.
 //! It never treats scenario BSP references as streaming.
 use crate::{build::{self,JobEvent,Runner,Toolchain},maps::{self,MapInspection},project::{self,Project,BuildRecord},invalid,Result,SparkError};
 use std::{fs,path::Path,sync::{Arc,atomic::{AtomicBool,Ordering}},time::Instant};
 pub fn selected(project:&Project)->bool{project.bsp_assembly.is_some()&&project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).is_some_and(|t|matches!(t.runtime_id,crate::runtime::RuntimeId::HaloCustomEdition|crate::runtime::RuntimeId::ChupathingyCe))}
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExtensionSource {
+    schema_version: u32,
+    build: BuildRecord,
+    #[serde(default)]
+    compiled_tag_hashes: Option<std::collections::BTreeMap<String, String>>,
+}
+
+/// Check the loose tags sealed by the same native job as the selected map.
+pub fn extension_tags(job: &Path, build: &BuildRecord) -> Result<Option<std::path::PathBuf>> {
+    use std::io::Read;
+    const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
+    let receipt = job.join("megaworld-receipt.json");
+    if !receipt.try_exists()? { return Ok(None); }
+    crate::reject_links(&receipt)?;
+    let mut bytes = Vec::new();
+    fs::File::open(&receipt)?.take(MAX_RECEIPT_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_RECEIPT_BYTES {
+        return invalid("Connected-world source receipt exceeds its size limit");
+    }
+    let source: ExtensionSource = serde_json::from_slice(&bytes)?;
+    if source.schema_version != 1 || source.build.id != build.id
+        || source.build.target != "gbx-custom" || build.target != "gbx-custom"
+        || source.build.status != "validated" || build.status != "validated"
+        || source.build.sha256.is_none() || source.build.sha256 != build.sha256
+        || source.build.project_fingerprint != build.project_fingerprint
+    {
+        return invalid("Connected-world source receipt differs from the selected validated cache");
+    }
+    let Some(expected) = source.compiled_tag_hashes else { return Ok(None); };
+    let tags = job.join("tags");
+    if crate::tool_transaction::inventory(&tags)? != expected {
+        return invalid("Connected-world editable tags differ from the native build");
+    }
+    Ok(Some(tags))
+}
+
 pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     project.validate()?;
     let target=project.build_targets.iter().find(|t|Some(&t.id)==project.active_build_target.as_ref()).ok_or_else(||SparkError::Invalid("Choose an explicit CE build target".into()))?;
@@ -62,7 +100,9 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     let file=output.join(format!("{name}.map"));let compiled=maps::inspect_map(&file,None)?;crate::bsp_compile::verify_compiled_base(project,inspection,&compiled)?;crate::native_asset_imports::verify_compiled(project,&compiled)?;
     if compiled.header.version!=609||compiled.header.scenario_type!=1||compiled.mesh.parts.len()!=1||compiled.scenario_path!=inspection.scenario_path{return invalid("Native output has the wrong CE identity or resident BSP count");}
     let info=build::tool_path(&tools,"invader-info").unwrap();for field in ["crc32_mismatched","is_protected","stub_count"]{let value=runner.run(&info,&["-T".into(),field.into(),file.to_string_lossy().into_owned()],&dir,"validate-ce",90)?;if !["0","false"].contains(&value.trim().to_lowercase().as_str()){return invalid(format!("Native CE cache {field} failed: {value}"));}}
-    let routes=crate::bsp_assembly::verify_compiled_routes(&file,std::slice::from_ref(plan))?;
+    let mut connection_plans = project.inherited_bsp_connections.clone();
+    connection_plans.push(plan.clone());
+    let routes = crate::bsp_assembly::verify_compiled_routes(&file, &connection_plans)?;
     let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
     let materials:Vec<crate::bsp_assembly::AssemblyMaterial>=serde_json::from_value(manifest["materials"].clone())?;
     let expected:std::collections::BTreeMap<_,_>=materials.iter().filter(|m|m.collision_only).map(|m|(m.name.as_str(),m.flags&15)).collect();
@@ -75,9 +115,50 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported scenery source changed while the world was compiling; the previous-good build was retained");}
     crate::native_lighting::verify_cache(project,&file,&compiled)?;
     let sha=maps::hash_file(&file)?;if sha!=compiled.sha256{return invalid("Compiled connected cache changed during validation");}
-    let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message:"Two source regions and their authored connection compiled into one CE BSP; native dependencies, CRC and collision route checked. Player traversal remains unverified.".into(),project_fingerprint:project.fingerprint()?};
-    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
+    let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message:format!("One CE BSP compiled and all {} connections passed native collision checks. Player traversal remains unverified.", connection_plans.len()),project_fingerprint:project.fingerprint()?};
+    let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
+    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
     storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated","CE source compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::extension_tags;
+    use crate::{project::BuildRecord, tool_transaction};
+    use std::fs;
+
+    #[test]
+    fn extension_source_requires_the_exact_build_and_unchanged_tags() {
+        let job = tempfile::tempdir().unwrap();
+        let tags = job.path().join("tags");
+        fs::create_dir(&tags).unwrap();
+        let scenario = tags.join("test.scenario");
+        fs::write(&scenario, b"original stage").unwrap();
+        let mut build = BuildRecord {
+            id: uuid::Uuid::new_v4().to_string(),
+            timestamp: String::new(),
+            status: "validated".into(),
+            target: "gbx-custom".into(),
+            output: None,
+            sha256: Some("1".repeat(64)),
+            message: String::new(),
+            project_fingerprint: "2".repeat(64),
+        };
+        assert!(extension_tags(job.path(), &build).unwrap().is_none());
+        let receipt = serde_json::json!({
+            "schemaVersion": 1,
+            "build": build,
+            "compiledTagHashes": tool_transaction::inventory(&tags).unwrap(),
+        });
+        fs::write(job.path().join("megaworld-receipt.json"), receipt.to_string()).unwrap();
+        assert_eq!(extension_tags(job.path(), &build).unwrap(), Some(tags));
+        build.sha256 = Some("3".repeat(64));
+        assert!(extension_tags(job.path(), &build).is_err());
+        build.sha256 = Some("1".repeat(64));
+        fs::write(&scenario, b"changed stage").unwrap();
+        assert!(extension_tags(job.path(), &build).is_err());
+    }
 }

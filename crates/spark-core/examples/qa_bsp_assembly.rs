@@ -19,8 +19,8 @@ fn main() -> Result<()> {
         return Ok(());
     }
     if a.len() >= 4 && a[1] == "--verify-cache" {
-        if a.len() > 19 {
-            return Err(spark_core::SparkError::Invalid("Choose at most 16 connection projects".into()));
+        if a.len() - 3 > bsp_assembly::MAX_COMPILED_CONNECTIONS {
+            return spark_core::invalid(format!("Choose at most {} connection projects", bsp_assembly::MAX_COMPILED_CONNECTIONS));
         }
         let file = Path::new(&a[2]);
         let mut projects = vec![];

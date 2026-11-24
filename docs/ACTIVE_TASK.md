@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Forerunner e82a58db played exact Zombie MCC 12649191 on two Windows peers, with audio conversion, replicated carriers and guest combat. The optional legacy spawner overlay compiled as MCC13 26201365 and passed nine independent tag readbacks. Local CE609 handoff bb36c99c preserves all three authored routes and verifies both Warthog starts. Its map and traversal receipt are staged locally for Forerunner.
-Next action: Build standalone Classic CE with a verified Gearbox toolchain and test the legacy carriers in Chupathingy. Recover two absent cues, prove Evolved egress and finish a full round. Complete MegaWorld traversal and guest driving. Capture Black Echo clips when Windows XInput is available (all four slots returned 1167 on 24 November). Preserve d113e9db and Forerunner 64c8d93d.
+Latest verified revision: Forerunner tested the exact CE609 two-region map ce043863 in both directions on road, cave and ridge, including guest Warthog driving. Spark extended that baseline to Blood Gulch as CE609 4733768f, with all existing and new connections passing native collision checks. Zombie MCC 12649191 played on two Forerunner peers. Its legacy spawner wrapper compiled separately.
+Next action: Finish the Battle Creek connector from the preserved 4733768f map and verify the native four-region world before adding the remaining 15. Keep the 19-source layout and actual travel tests active. Continue the standalone Zombie CE609 compiler path and reusable recovery. Record Black Echo flight when XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
 
 ## Acceptance
 

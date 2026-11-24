@@ -1039,6 +1039,8 @@ pub fn source_project(title:&str,base:&Project,inspection:&MapInspection)->Resul
     let mut project=Project::new(title);
     project.source=Some(source.clone());project.scene=inspection.objects.clone();
     project.build_targets=base.build_targets.clone();project.active_build_target=base.active_build_target.clone();
+    project.inherited_bsp_connections.clone_from(&base.inherited_bsp_connections);
+    project.megaworld_layout.clone_from(&base.megaworld_layout);
     project.provenance=base.provenance.clone();
     project.provenance.description=format!("New connected-world source based on {} ({}). Original map and project retained.",base.title,source.sha256);
     project.validate()?;Ok(project)
@@ -1209,11 +1211,14 @@ pub fn verify_compiled_walkthrough(path: &Path, route: &BspAssembly) -> Result<C
         collision_triangles: collision.indices.len()/3, forward_samples, return_samples, starts,
         player_traversal_verified: false })
 }
+
+pub const MAX_COMPILED_CONNECTIONS: usize = 64;
+
 /// Recheck earlier connections after extending a world. Routes must use the
 /// compiled world's coordinates; BSP checks do not include scenery or physics.
 pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<CompiledRouteReport> {
-    if routes.is_empty() || routes.len() > 16 {
-        return invalid("Choose 1-16 connection routes to check in the compiled cache");
+    if routes.is_empty() || routes.len() > MAX_COMPILED_CONNECTIONS {
+        return invalid(format!("Choose 1–{MAX_COMPILED_CONNECTIONS} connections to check in the compiled cache"));
     }
     for route in routes { route.validate()?; }
     let inspection = maps::inspect_map(path, path.parent())?;

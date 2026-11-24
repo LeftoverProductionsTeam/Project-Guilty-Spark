@@ -387,6 +387,18 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
         // Native revisions consult library settings. Resolve before taking the
         // import lock so opening a compiled map cannot recursively lock it.
         let inherited_tags=if build.target=="mcc-cea"{runtime_workbench::compiled_tags(&state,&source,&build).ok()}else{None};
+        let inherited_ce_target = if build.target == "gbx-custom" && source.bsp_assembly.is_some() {
+            let tags = core::megaworld_build::extension_tags(&state.root.join("jobs").join(&build.id), &build)
+                .ok().flatten();
+            tags.and_then(|tags| {
+                let mut target = source.build_targets.iter()
+                    .find(|target| Some(&target.id) == source.active_build_target.as_ref())?.clone();
+                target.id = uuid::Uuid::new_v4().to_string();
+                target.name = "Compiled CE world".into();
+                target.tags_directory = Some(tags);
+                Some(target)
+            })
+        } else { None };
         let direct_copy=core::smart_edit::is_direct_target(&build.target);
         let direct_resources=if direct_copy{source.source.as_ref().and_then(|native|native.resource_directory.clone())}else{None};
         let library=lock(&state.library)?;
@@ -411,6 +423,26 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
                   }
                 }
             }
+        }
+        let inherited_routes = build.target == "gbx-custom"
+            && project.inherited_bsp_connections.is_empty()
+            && source.bsp_assembly.is_some();
+        if inherited_routes {
+            project.inherited_bsp_connections.clone_from(&source.inherited_bsp_connections);
+            project.inherited_bsp_connections.extend(source.bsp_assembly.iter().cloned());
+            if project.megaworld_layout.is_none() {
+                project.megaworld_layout.clone_from(&source.megaworld_layout);
+            }
+        }
+        let mut bound_ce_source = false;
+        if project.build_targets.is_empty() && project.active_build_target.is_none() {
+            if let Some(target) = inherited_ce_target {
+                project.active_build_target = Some(target.id.clone());
+                project.build_targets.push(target);
+                bound_ce_source = true;
+            }
+        }
+        if !existed || inherited_routes || bound_ce_source {
             library.save(&project,Some(&inspection)).map_err(error)?;
         }
         // Every open-built-map entrypoint publishes the new library identity,
