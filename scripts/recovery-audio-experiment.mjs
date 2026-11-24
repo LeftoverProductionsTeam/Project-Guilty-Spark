@@ -547,8 +547,28 @@ function writeReviewedVorbisTails(parent) {
       offset, length, beforeSha256, afterSha256, verifiedFrames, sampleRate: 44100, channels: 2 };
   });
   const candidate = writeCrcCheckedDerivative(parent.path, reviewedSha256, staged, 'mcc-vorbis-restored', 'vorbis-tail');
+  // Native Invader serialization makes the same repairs available as an
+  // overlay for future source builds, without rewriting the recovered tag tree.
+  const sourceOverlay = path.join(output, 'vorbis-native-tags');
+  fs.mkdirSync(sourceOverlay);
+  const extracted = run('extract', ['-t', sourceOverlay, '-G',
+    ...restored.flatMap(({ tag }) => ['-s', tag]), candidate.path], 'vorbis-native-tag-overlay');
+  if (extracted.exitCode !== 0 || extracted.incomplete || /Failed to extract|ERROR:/.test(extracted.log)
+      || !/Extracted 5 out of 5 matched tags?\b/.test(extracted.log)) {
+    throw new Error('Native extraction did not export all five repaired sound tags');
+  }
+  for (const sound of restored) {
+    const file = path.join(sourceOverlay, sound.tag);
+    const tag = fs.readFileSync(file);
+    const sample = staged.subarray(sound.offset + 1 - sound.length, sound.offset + 1);
+    const at = tag.indexOf(sample);
+    if (!fs.lstatSync(file).isFile() || at < 0 || tag.indexOf(sample, at + 1) !== -1) {
+      throw new Error('Native source tag did not retain one exact repaired sample for ' + sound.tag);
+    }
+    sound.exportedTagSha256 = sha(tag);
+  }
   manifest.results.push({ step: 'repair-vorbis-tail', ...candidate, sourceCacheSha256: reviewedSha256,
-    restored, replacedPayloadBytes: restored.length, playable: false });
+    restored, sourceOverlay, replacedPayloadBytes: restored.length, playable: false });
   save();
 }
 
