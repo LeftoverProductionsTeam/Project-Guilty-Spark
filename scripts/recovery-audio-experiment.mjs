@@ -22,9 +22,11 @@ const nativeMccTool = args.includes('--mcc-tool') ? value('--mcc-tool') : null;
 const repairStandardCarrier = args.includes('--repair-standard-carrier');
 const repairCarrierInertia = args.includes('--repair-carrier-inertia');
 const repairLegacyTitle = args.includes('--repair-legacy-title');
+const repairVorbisTail = args.includes('--repair-vorbis-tail');
 if (repairStandardCarrier && !nativeMccTool) throw new Error('Standard carrier repair requires the reviewed native MCC Tool');
 if (repairCarrierInertia && !repairStandardCarrier) throw new Error('Carrier inertia repair requires the reviewed original carrier build');
 if (repairLegacyTitle && !repairCarrierInertia) throw new Error('Legacy title repair requires the reviewed inertia-corrected cache');
+if (repairVorbisTail && !repairLegacyTitle) throw new Error('Vorbis tail recovery requires the reviewed title-corrected cache');
 const mccPinIndex = args.indexOf('--mcc-tool-sha256');
 const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
 if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
@@ -505,6 +507,49 @@ function writeReviewedLegacyTitle(parent) {
     tag: 'ui/multiplayer_game_text.unicode_string_list', slot: 100, offset,
     title: 'Zombie Apocalypse', replacedTrailingPaddingBytes: 1, playable: false });
   save();
+  return candidate;
+}
+
+function writeReviewedVorbisTails(parent) {
+  // Each final Ogg page keeps its original checksum. A single changed payload
+  // byte independently restores that checksum and the complete decoded sample.
+  const reviewedSha256 = 'dca4f32e3d74d27db6bc761fb3ddff317280c19147e9b37f4a121e8abe28d73c';
+  const original = fs.readFileSync(parent.path);
+  if (parent.cacheSha256 !== reviewedSha256 || sha(original) !== reviewedSha256) {
+    throw new Error('The title-corrected cache differs from the reviewed Vorbis payload layout');
+  }
+  const gameModeBefore = '2829fc18637767d6c155bd5d5fbbef10e0803dc5ae7fbf0249c3de1d1ab0de6c';
+  const gameModeAfter = '12a8d073b0d798a6b74f998085c731106fa07f702016b3a61084afdf1b7a3021';
+  const reviewed = [
+    ['double_kill', 57_970_691, 31_651,
+      '04c3946a26f8b2cef14b27f683d1f574faa2a755c7e427d8d70f432e027d8769',
+      'e7543b75af071977b4483912b354a0a68169488baacf4f80f0b118bcb45f87e8', 406_528],
+    ['30_seconds_to_win', 63_880_899, 273_445,
+      'e3a11897764a650803907ef2c0d1ed15cf7500c153124b4a7c977f1fe27fc9a4',
+      '82999d6a9b6ea0b60a2fab556c81bccbdf7bca562e9ff80d3170d648d64a8ac2', 551_936],
+    ['blue_team_30_to_win', 64_211_064, 20_765,
+      '64bd0e55a98d303627124cac85e67d088ceef0e8230e0d41d250bc5113fd168c',
+      'ec6157aab5571a1f63332f32daaeed038c95dff2cbdb78bde48b5b8d84bb9b38', 215_040],
+    ['slayer', 64_423_182, 27_477, gameModeBefore, gameModeAfter, 233_472],
+    ['capture_the_flag', 64_450_659, 27_477, gameModeBefore, gameModeAfter, 233_472],
+  ];
+  const staged = Buffer.from(original);
+  const restored = reviewed.map(([name, start, length, beforeSha256, afterSha256, verifiedFrames]) => {
+    const offset = start + length - 1;
+    if (original[offset] !== 0 || sha(original.subarray(start, offset + 1)) !== beforeSha256) {
+      throw new Error('Unexpected original Vorbis bytes for ' + name);
+    }
+    staged[offset] = 0x0e;
+    if (sha(staged.subarray(start, offset + 1)) !== afterSha256) {
+      throw new Error('Restored Vorbis bytes do not match the full-decoding witness for ' + name);
+    }
+    return { tag: 'sound/dialog/multiplayer1/' + name + '.sound', pitchRange: 0, permutation: 0,
+      offset, length, beforeSha256, afterSha256, verifiedFrames, sampleRate: 44100, channels: 2 };
+  });
+  const candidate = writeCrcCheckedDerivative(parent.path, reviewedSha256, staged, 'mcc-vorbis-restored', 'vorbis-tail');
+  manifest.results.push({ step: 'repair-vorbis-tail', ...candidate, sourceCacheSha256: reviewedSha256,
+    restored, replacedPayloadBytes: restored.length, playable: false });
+  save();
 }
 
 function compileOfficialMcc(carrierReadback) {
@@ -576,7 +621,10 @@ function compileOfficialMcc(carrierReadback) {
   save();
   if (repairCarrierInertia) {
     const fixedInertia = writeReviewedCarrierInverse(map, mapSha256);
-    if (repairLegacyTitle) writeReviewedLegacyTitle(fixedInertia);
+    if (repairLegacyTitle) {
+      const fixedTitle = writeReviewedLegacyTitle(fixedInertia);
+      if (repairVorbisTail) writeReviewedVorbisTails(fixedTitle);
+    }
   }
 }
 

@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Zombie MCC derivative dca4f32e terminates the mission title and retains carrier animation/inertia. Invader readback and CRC passed. CE609 Warthog trial 59542651 preserves the authored BSP with 524 standing samples each way.
-Next action: Recover original Zombie sound payloads, verify legacy spawner delivery, and find the reviewed Gearbox Tool. Run the MegaWorld route and guest Warthog trial on a reviewed runtime. Capture Black Echo flight clips when Windows XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
+Latest verified revision: Zombie MCC 12649191 restores all five damaged Vorbis tails with full independent decode and CRC. The two external cues remain absent. CE609 Warthog trial 59542651 preserves the authored BSP with 524 standing samples each way.
+Next action: Use the verified multiplayer lobby to load Zombie 12649191. Recover two absent cues and implement legacy spawner delivery and Classic CE. Run the MegaWorld route and guest Warthog trial. Capture Black Echo clips when Windows XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
 
 ## Acceptance
 
