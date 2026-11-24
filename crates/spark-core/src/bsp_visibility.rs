@@ -183,6 +183,35 @@ pub fn portals_intersect(a: &[Point; 4], b: &[Point; 4]) -> bool {
     x.max(y).min(1.)-x.min(y).max(0.)>1e-6
 }
 
+/// Re-emit a native rectangular tunnel cut with Tool's existing solid overlap.
+pub(crate) fn retained_tunnel_quad(ring: &[Point]) -> Result<[Point; 4]> {
+    if ring.len() < 4 { return invalid("Retained tunnel portal needs a reviewed rectangular boundary"); }
+    let start = ring[0];
+    let end = ring.iter().copied().max_by(|a, b| {
+        (a[0] - start[0]).hypot(a[1] - start[1])
+            .total_cmp(&(b[0] - start[0]).hypot(b[1] - start[1]))
+    }).unwrap();
+    let size = (end[0] - start[0]).hypot(end[1] - start[1]);
+    if size < 0.5 { return invalid("Retained tunnel portal is too narrow to reconstruct"); }
+    let axis = [(end[0] - start[0]) / size, (end[1] - start[1]) / size];
+    let normal = [axis[1], -axis[0], 0.];
+    let bottom = ring.iter().map(|p| p[2]).fold(f64::INFINITY, f64::min);
+    let top = ring.iter().map(|p| p[2]).fold(f64::NEG_INFINITY, f64::max);
+    let local: Vec<_> = ring.iter().map(|p| {
+        let delta = [p[0] - start[0], p[1] - start[1]];
+        (delta[0] * axis[0] + delta[1] * axis[1], delta[0] * normal[0] + delta[1] * normal[1], p[2])
+    }).collect();
+    let tolerance = ring.iter().flatten().copied().map(f64::abs).fold(1., f64::max) * 8. * f64::from(f32::EPSILON);
+    let area = local.iter().zip(local.iter().cycle().skip(1))
+        .map(|(a, b)| a.0 * (b.2 - bottom) - b.0 * (a.2 - bottom)).sum::<f64>().abs() * 0.5;
+    if local.iter().any(|p| p.1.abs() > tolerance || p.0 < -tolerance || p.0 > size + tolerance)
+        || (area - size * (top - bottom)).abs() > tolerance * (size + top - bottom)
+    {
+        return invalid("A retained portal has a nonrectangular native boundary; review its original portal source");
+    }
+    authored_portal_quad([(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5, bottom], normal, size, top - bottom)
+}
+
 /// A portal follows the actual closed air volume, not a rectangle guessed from
 /// world bounds. Parallel road/ridge spaces can overlap and need one full cut.
 #[derive(Debug)]
@@ -314,6 +343,20 @@ mod tests {
 #[cfg(test)] mod native_section_tests {
     use super::*;use manifold_rust::{manifold::Manifold,linalg::Vec3};
     fn area(surface:&SourcePortal)->f64 {surface.triangles.iter().map(|ids|{let [a,b,c]=ids.map(|i|surface.points[i]);((b[1]-a[1])*(c[2]-a[2])-(b[2]-a[2])*(c[1]-a[1])).abs()*0.5}).sum()}
+    #[test]
+    fn retained_tunnel_keeps_native_cut_and_rejects_a_notched_outline() {
+        let mut ring = vec![
+            [10., 20., 0.], [10., 20., 2.], [10., 21., 2.], [10., 22., 2.],
+            [10., 22., 0.], [10., 21., 0.],
+        ];
+        let quad = retained_tunnel_quad(&ring).unwrap();
+        assert!(quad.iter().all(|p| (p[0] - 10.).abs() < 1e-9));
+        assert!(quad.iter().any(|p| p[1] < 20.) && quad.iter().any(|p| p[1] > 22.));
+        assert!(quad.iter().any(|p| p[2] < 0.) && quad.iter().any(|p| p[2] > 2.));
+        ring[2][2] = 1.;
+        assert!(retained_tunnel_quad(&ring).is_err());
+    }
+
     #[test] fn shared_road_ridge_portal_reaches_the_complete_closed_boundary(){
         let road=Manifold::cube(Vec3::new(12.,6.,10.),false).translate(Vec3::new(0.,-3.,0.));
         let ridge=Manifold::cube(Vec3::new(12.,4.,8.),false).translate(Vec3::new(0.,-5.,0.));

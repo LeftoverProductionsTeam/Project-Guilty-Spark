@@ -58,6 +58,7 @@ pub struct Bsp {
     pub background_palette: Vec<Palette>,
     pub environment_palette: Vec<Palette>,
     pub portal_count: usize,
+    pub max_cluster_subclusters: usize,
     pub pvs_sha256: String,
     pub pas_sha256: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -245,9 +246,11 @@ fn read_with_listener(
             Ok(Some(value as usize))
         };
         let mut clusters = vec![];
+        let mut max_cluster_subclusters = 0;
         for i in 0..count {
             let c = at + i * 104;
             let (sub, n) = space.block(&r, c + 52, 36, 4096)?;
+            max_cluster_subclusters = max_cluster_subclusters.max(n);
             total_subclusters += n;
             if total_subclusters > 131072 {
                 return invalid("BSP audio inspection exceeds its subcluster bound");
@@ -364,6 +367,7 @@ fn read_with_listener(
             background_palette,
             environment_palette,
             portal_count,
+            max_cluster_subclusters,
             pvs_sha256: data_hash(root + 0x140)?,
             pas_sha256: data_hash(root + 0x214)?,
             listener_tree,
@@ -935,6 +939,7 @@ mod tests {
             let report = read(&h, &b, "a".repeat(64)).unwrap();
             let bsp = &report.bsps[0];
             assert_eq!(bsp.clusters.len(), 2);
+            assert_eq!(bsp.max_cluster_subclusters, 1);
             assert_eq!(
                 bsp.clusters[0].bounds,
                 Some([[-1., -2., -3.], [1., 2., 3.]])

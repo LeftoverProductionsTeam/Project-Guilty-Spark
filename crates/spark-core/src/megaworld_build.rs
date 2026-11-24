@@ -169,6 +169,11 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     connection_plans.push(plan.clone());
     let routes = crate::bsp_assembly::verify_compiled_routes(&file, &connection_plans)?;
     let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
+    let structure = crate::bsp_audio::inspect(&file, &compiled.sha256)?;
+    let bsp = structure.bsps.first().ok_or_else(|| SparkError::Invalid("Native visibility metadata is missing".into()))?;
+    let visibility = serde_json::json!({
+        "clusters": bsp.clusters.len(), "portals": bsp.portal_count, "maxClusterSubclusters": bsp.max_cluster_subclusters,
+    });
     let materials:Vec<crate::bsp_assembly::AssemblyMaterial>=serde_json::from_value(manifest["materials"].clone())?;
     let expected:std::collections::BTreeMap<_,_>=materials.iter().filter(|m|m.collision_only).map(|m|(m.name.as_str(),m.flags&15)).collect();
     let (_,faces)=maps::collision_source(&file,&compiled)?;
@@ -181,12 +186,13 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     crate::native_lighting::verify_cache(project,&file,&compiled)?;
     let sha=maps::hash_file(&file)?;if sha!=compiled.sha256{return invalid("Compiled connected cache changed during validation");}
     let message = format!(
-        "{} · one resident BSP · {:.2} / {:.2} MiB tag space. All {} connections passed native collision checks. Runtime traversal remains unverified.",
-        target.name, f64::from(memory.resident_bytes) / 1048576.0, f64::from(target.tag_capacity) / 1048576.0, connection_plans.len(),
+        "{} · one resident BSP · {:.2} / {:.2} MiB tag space · {} clusters, {} portals, {} max subclusters per cluster. All {} connections passed native collision checks. Runtime traversal remains unverified.",
+        target.name, f64::from(memory.resident_bytes) / 1048576.0, f64::from(target.tag_capacity) / 1048576.0,
+        bsp.clusters.len(), bsp.portal_count, bsp.max_cluster_subclusters, connection_plans.len(),
     );
     let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:target.engine.into(),output:Some(file),sha256:Some(sha),message,project_fingerprint:project.fingerprint()?};
     let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
-    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"ceTagSpace":if target.version == 609 { tag_space } else { None },"compilerTagSpace":tag_space,"tagMemory":memory,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
+    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"ceTagSpace":if target.version == 609 { tag_space } else { None },"compilerTagSpace":tag_space,"tagMemory":memory,"visibility":visibility,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
     storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated","Native compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)

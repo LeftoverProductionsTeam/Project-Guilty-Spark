@@ -957,7 +957,30 @@ pub fn generate_project(
         .bsp_assembly
         .as_ref()
         .ok_or_else(|| SparkError::Invalid("No BSP assembly is authored".into()))?;
-    generate(&source.preserved_path, base, assembly, cancel)
+    let mut geometry = generate(&source.preserved_path, base, assembly, cancel)?;
+    if !project.inherited_bsp_connections.is_empty() {
+        let slot = geometry.materials.iter().position(|material| material.name == "+portal")
+            .ok_or_else(|| SparkError::Invalid("Connected world has no portal source material".into()))?;
+        let rings = maps::compiled_portal_rings(&source.preserved_path, base)?;
+        if geometry.mesh.indices.len() / 3 + rings.len() * 2 > MAX_OUTPUT_TRIANGLES {
+            return invalid("Retained portal cuts exceed the connected source triangle budget");
+        }
+        for ring in rings {
+            let points = crate::bsp_visibility::retained_tunnel_quad(&ring)?;
+            let n = normal(points[0], points[1], points[2]);
+            let start = geometry.mesh.positions.len() as u32 / 3;
+            for point in points {
+                geometry.mesh.positions.extend(point.map(|v| v as f32));
+                geometry.mesh.normals.extend(n.map(|v| v as f32));
+                geometry.mesh.uvs.extend([0., 0.]);
+            }
+            geometry.mesh.indices.extend([start, start + 1, start + 2, start, start + 2, start + 3]);
+            geometry.triangle_materials.extend([slot, slot]);
+            geometry.report.portal_count += 1;
+        }
+        geometry.report.output_triangles = geometry.mesh.indices.len() / 3;
+    }
+    Ok(geometry)
 }
 fn verify_entrance(
     mesh: &MeshData,
