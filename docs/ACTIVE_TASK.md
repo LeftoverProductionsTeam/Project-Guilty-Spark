@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: The five-region CE609 map b88e5201 adds Rat Race to Timberland, Sidewinder, Blood Gulch and Battle Creek. Independent readback passed all six paths. Two private Forerunner peers loaded that exact map and agreed on both player positions through guest tick 510. Physical traversal remains open for the three newer regions.
-Next action: Collect the owned sixth-region run 10117 from the exact b88e5201 parent. Wizard passed source clearance at bearing 240. Complete native readback and continue extending toward all 19. Ice Fields and Danger Canyon still fail native collision compilation. Preserve the two-region traversal baseline, Zombie CE609 and controller-blocked Black Echo.
+Latest verified revision: Six-region CE609 ee2c7b1f adds Wizard. All seven paths pass native collision readback, using 14.69 of 23.00 MiB tag space. Two private Forerunner peers verified the same map identity. Multiplayer traversal beyond the accepted two-region baseline remains open.
+Next action: Collect run 50986, which is building Longest after Ice Fields and Danger Canyon failed native structure. Repair the documented one-sided structural gaps while retaining the original two-sided surfaces. Confirm synchronized runtime behavior before using paired native BSP triggers for multiplayer. Continue all 19 and preserve Zombie CE609 and recorded Black Echo work.
 
 ## Acceptance
 
