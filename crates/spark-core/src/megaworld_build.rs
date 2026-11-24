@@ -40,8 +40,16 @@ pub fn compatibility(project: &Project, inspection: &MapInspection) -> build::Co
     let target = cache_target(project).expect("selected connected-region target");
     let blockers = preflight(project, inspection).err().map(|e| vec![e.to_string()]).unwrap_or_default();
     let mut warnings = vec!["One resident BSP. Native compilation is separate from player traversal. Painted detail requires native preservation support.".into()];
+    let readers: Vec<_> = RuntimeId::ALL.into_iter()
+        .filter(|&id| crate::runtime::supports_map_version(id, target.version))
+        .map(RuntimeId::name)
+        .collect();
+    warnings.push(format!(
+        "{} builds have a {} MiB resident tag limit. Declared cache-family readers are {}. The build result reports actual memory use.",
+        target.name, target.tag_capacity / (1024 * 1024), readers.join(", "),
+    ));
     if target.version == 13 {
-        warnings.push("MCC13 requires an MCC cache loader. Forerunner runtime and multiplayer acceptance are separate from Spark build validation.".into());
+        warnings.push("Forerunner can be tested with its native MCC loader. Its current Spark startup contract is CE609 solo only. Check the exact runtime build and map in a private session.".into());
     }
     build::CompatibilityReport {
         target: target.engine.into(),

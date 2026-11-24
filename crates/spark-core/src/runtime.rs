@@ -28,6 +28,20 @@ pub enum RuntimeId {
     HaloXbox,
 }
 impl RuntimeId {
+    pub(crate) const ALL: [Self; 11] = [
+        Self::MccSteam,
+        Self::ChupathingyCe,
+        Self::OpenCe,
+        Self::ArenaEvolved,
+        Self::HaloPc,
+        Self::HaloCustomEdition,
+        Self::MacRetail,
+        Self::MacDemo,
+        Self::HaloPcTrial,
+        Self::HaloMd,
+        Self::HaloXbox,
+    ];
+
     pub fn name(self) -> &'static str {
         match self {
             Self::MccSteam => "Steam MCC / Halo 1",
@@ -693,21 +707,8 @@ pub fn report(
     if registrations.len() > 32 {
         return invalid("Too many runtime registrations");
     }
-    let ids = [
-        RuntimeId::MccSteam,
-        RuntimeId::ChupathingyCe,
-        RuntimeId::OpenCe,
-        RuntimeId::ArenaEvolved,
-        RuntimeId::HaloPc,
-        RuntimeId::HaloCustomEdition,
-        RuntimeId::MacRetail,
-        RuntimeId::MacDemo,
-        RuntimeId::HaloPcTrial,
-        RuntimeId::HaloMd,
-        RuntimeId::HaloXbox,
-    ];
     let mut reports = Vec::new();
-    for id in ids {
+    for id in RuntimeId::ALL {
         let mut item = descriptor(id);
         if id == RuntimeId::MccSteam {
             if let Some(root) = &steam.mcc_path {
