@@ -123,6 +123,15 @@ pub(super) struct Outcome {
     problem: Option<String>,
 }
 
+impl Outcome {
+    fn ready_to_publish(&mut self, cancel: &AtomicBool) -> bool {
+        if cancel.load(Ordering::Relaxed) {
+            self.problem.get_or_insert_with(|| "Batch cancelled".into());
+        }
+        self.problem.is_none()
+    }
+}
+
 #[tauri::command]
 pub(super) async fn build_numeric_batch(
     app: tauri::AppHandle,
@@ -237,28 +246,25 @@ fn build(
         }
         outcome.rows.push(result);
     }
-    if outcome.problem.is_none() && !cancel.load(Ordering::Relaxed) {
+    if outcome.ready_to_publish(&cancel) {
         let verified = prepare(state, ids, rule)?;
         if verified.review_sha256.as_deref() != Some(review_sha256) {
             outcome.problem = Some("A reviewed source changed during compilation".into());
         }
     }
-    if outcome.problem.is_none() {
+    if outcome.ready_to_publish(&cancel) {
         let owned_stage = lease.owned_staging_root().map_err(error)?;
         verify_publish_inputs(&owned_stage, &outcome.rows)?;
+        let receipt = serde_json::to_vec_pretty(&serde_json::json!({
+            "schemaVersion": 1, "batchId": batch_id, "target": "mcc-cea",
+            "rule": rule, "review": preview, "results": outcome.rows,
+        })).map_err(error)?;
+        project::atomic_write(&owned_stage.join("receipt.json"), &receipt, false).map_err(error)?;
     }
-    let receipt = serde_json::to_vec_pretty(&serde_json::json!({
-        "schemaVersion": 1, "batchId": batch_id, "target": "mcc-cea",
-        "rule": rule, "review": preview, "results": outcome.rows,
-    })).map_err(error)?;
-    project::atomic_write(&stage.join("receipt.json"), &receipt, false).map_err(error)?;
     // Cancellation and visibility share the job lock. Once publication
     // starts, cancel_build must not acknowledge a cancellation of this job.
     let mut jobs = lock(&state.jobs)?;
-    if cancel.load(Ordering::Relaxed) {
-        outcome.problem.get_or_insert_with(|| "Batch cancelled".into());
-    }
-    if outcome.problem.is_none() {
+    if outcome.ready_to_publish(&cancel) {
         lease.adopt(&destination).map_err(error)?;
         lease.finish(true, Some(review_sha256.into())).map_err(error)?;
         outcome.published = true;
@@ -273,6 +279,33 @@ fn build(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancellation_blocks_publication_of_an_incomplete_batch() {
+        let cancel = AtomicBool::new(false);
+        let mut outcome = Outcome {
+            batch_id: "batch".into(),
+            published: false,
+            rows: vec![BuildResult {
+                project_id: "b30".into(),
+                status: "not built".into(),
+                detail: "Batch stopped before this map began".into(),
+                output: None,
+                sha256: None,
+            }],
+            problem: None,
+        };
+        assert!(outcome.ready_to_publish(&cancel));
+        cancel.store(true, Ordering::Relaxed);
+        assert!(!outcome.ready_to_publish(&cancel));
+        assert_eq!(outcome.problem.as_deref(), Some("Batch cancelled"));
+        assert_eq!(outcome.rows[0].status, "not built");
+        assert!(!outcome.published);
+
+        outcome.problem = Some("Compiler returned a diagnostic".into());
+        assert!(!outcome.ready_to_publish(&cancel));
+        assert_eq!(outcome.problem.as_deref(), Some("Compiler returned a diagnostic"));
+    }
 
     #[test]
     fn publication_rechecks_every_payload_and_rejects_unexpected_content() {
