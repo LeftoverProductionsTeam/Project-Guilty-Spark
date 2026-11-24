@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: A disposable standard CE609 build retained the exact 866-byte MCC recording stream on independent readback without changing the frozen Black Echo candidate. Spark now checks new native recordings before adopting a working-tag build, including before a controller is attached. Original Zombie recovery remains compiled and read back in MCC.
-Next action: Capture Black Echo-specific Pelican and Spirit recordings in an owned scenario with an XInput controller. Transfer recording entries only to the reviewed CE source, verify their independent stream hashes, and run the isolated Forerunner transport test before the full faction replay. The Classic CE Zombie compiler route and gameplay checks remain open. Physical MegaWorld connections follow.
+Latest verified revision: The pinned official H1A Tool compiled a disposable Black Echo recording fixture after exact MCC source normalization, complete short-path extraction and three reviewed SDK substitutions in the fixture. The capture cache passed independent engine and CRC checks. The frozen CE candidate still matches d113e9db. Recording-only CE609 transfer and original Zombie MCC compile/readback remain verified.
+Next action: Open the isolated H1A capture fixture in Sapien and verify scene loading. The Windows session reports zero connected XInput controllers. Capture mission-specific Pelican and Spirit clips when suitable input is available, transfer only the entries to the CE working scenario, and run isolated transport acceptance before two-player faction replay. Keep original Zombie Classic CE compilation and MegaWorld traversal active.
 
 ## Acceptance
 
