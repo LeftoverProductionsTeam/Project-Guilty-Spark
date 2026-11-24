@@ -40,7 +40,9 @@ fn main()->Result<()>{
     let mut a=std::env::args().skip(1).collect::<Vec<_>>();
     let mcc = a.first().is_some_and(|arg| arg == "--mcc13");
     if mcc { a.remove(0); }
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    let partition_structure = a.first().is_some_and(|arg| arg == "--partition-structure");
+    if partition_structure { a.remove(0); }
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
@@ -120,6 +122,12 @@ fn main()->Result<()>{
     let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:if mcc { "MCC13 from reviewed CE source" } else { "Reviewed CE source for Chupathingy" }.into(),runtime_id:if mcc { RuntimeId::MccSteam } else { RuntimeId::ChupathingyCe },builder:if mcc { "h1a-tool" } else { "invader-ce" }.into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
     project::save_project(&out.join("connection.gsproject"),&p)?;lib.save(&p,Some(&i))?;
     let id=uuid::Uuid::new_v4().to_string();let log=out.join("native-events.jsonl");
+    if partition_structure {
+        let result = spark_core::megaworld_build::preview_partitions(&p, &i, &out.join("library/jobs"), &id,
+            Arc::new(AtomicBool::new(false)), |event| eprintln!("{}: {}", event.phase, event.message))?;
+        project::atomic_write(&out.join("partition-structure.json"), &serde_json::to_vec_pretty(&result)?, false)?;
+        return Ok(());
+    }
     let record=spark_core::megaworld_build::run(&p,&i,&out.join("library/jobs"),&id,Arc::new(AtomicBool::new(false)),|event|{
         use std::io::Write;if let Ok(mut file)=fs::OpenOptions::new().create(true).append(true).open(&log){let _=writeln!(file,"{}",serde_json::to_string(&event).unwrap());}eprintln!("{}: {}",event.phase,event.message);
     })?;

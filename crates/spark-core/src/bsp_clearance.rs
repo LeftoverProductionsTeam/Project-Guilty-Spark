@@ -315,6 +315,21 @@ impl RouteChecker {
         }
         Ok(floor)
     }
+    /// Sample the same world points in each separately resident BSP.
+    pub(crate) fn floor_profile(&self, [start, end]: [V; 2]) -> Result<Vec<f64>> {
+        let delta = sub(end, start);
+        let steps = (dot(delta, delta).sqrt() / 0.25).ceil() as usize;
+        if !(1..=128).contains(&steps) {
+            return invalid("The shared passage exceeds its overlap review budget");
+        }
+        let mut scratch = vec![];
+        (0..=steps).map(|step| {
+            let point = add(start, mul(delta, step as f64 / steps as f64));
+            self.index.floor(point, &mut scratch).ok_or_else(|| SparkError::Invalid(format!(
+                "Shared passage has no floor in this BSP at {:.3}, {:.3}, {:.3}", point[0], point[1], point[2],
+            )))
+        }).collect()
+    }
     pub(crate) fn verify(&self, assembly: &BspAssembly) -> Result<usize> {
         Ok(self.verify_details(assembly)?.iter().map(|route|route.walk_samples).sum())
     }

@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Twelve-region CE609 da222bf1 and recovered-source MCC13 040b5da5 passed native readback and private Forerunner peers. CE609 uses 21.81 of 23 MiB. MCC13 uses 14.20 of 64 MiB with identical collision totals and route sample counts.
-Next action: Author a physically aligned two-BSP corridor with overlapping walkable approaches and paired native switch volumes. The separate twelve-region and original Chiron BSP fixture compiled in CE609 and MCC13. Preserve original sky, lighting, sound, weather, AI and placements. Live passenger traversal and independent regional occupancy remain Forerunner acceptance gates.
+Latest verified revision: CE609 da222bf1 and MCC13 040b5da5 remain the twelve-region gameplay baseline. H1A Tool compiled both separate Chiron corridor structures. Spark passed 14 base approaches and 20 common floor samples across the overlap. The structures remain unbound to a scenario.
+Next action: Bind the corridor halves and paired native switch volumes in a disposable scenario. Preserve each region's sky, lighting, weather, sounds, scenery and gameplay placements. Compile CE609 and MCC13, check compiled collision across the overlap, then test actual crossings. Independent regional residency remains a separate Forerunner gate.
 
 Operation 110% V2 immediate priorities, 24 November 2026. P0 completes the 19-region MegaWorld using native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity and per-target budgets. Forerunner owns pickup and passenger reconnect, simultaneous occupancy and synchronized world state. P1 is original Zombie Apocalypse. P2 is repeatable Black Echo and persistent multiplayer Extraction. Continue all remaining permanent requirements afterward. Preserve all 475 records and M1–M6.
 

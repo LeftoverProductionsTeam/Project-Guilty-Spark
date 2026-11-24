@@ -67,6 +67,22 @@ fn main() -> Result<()> {
         }));
         return Ok(());
     }
+    if a.len() == 4 && a[1] == "--export-partitions" {
+        let p = spark_core::project::load_project(Path::new(&a[2]))?;
+        let source = p.source.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("No preserved base map".into()))?;
+        let i = maps::inspect_map(&source.preserved_path, source.resource_directory.as_deref())?;
+        let parts = bsp_assembly::generate_partitioned_project(&p, &i, &AtomicBool::new(false))?;
+        let output = Path::new(&a[3]);
+        fs::create_dir(output)?;
+        for (name, geometry) in [("base", &parts.base), ("donor", &parts.donor)] {
+            fs::write(output.join(format!("{name}.jms")), bsp_assembly::export_jms(geometry)?)?;
+            fs::write(output.join(format!("{name}-materials.json")), serde_json::to_vec(&geometry.materials)?)?;
+        }
+        let receipt = serde_json::json!({"base":parts.base.report,"donor":parts.donor.report,"overlap":parts.overlap,"overlapSamples":parts.overlap_samples,"maxFloorDelta":parts.max_floor_delta,"switches":parts.switches});
+        fs::write(output.join("partitions.json"), serde_json::to_vec_pretty(&receipt)?)?;
+        println!("{receipt}");
+        return Ok(());
+    }
     if a.len() == 4 && a[1] == "--check" {
         let p = spark_core::project::load_project(Path::new(&a[2]))?;
         let source = p.source.as_ref().unwrap();
@@ -84,6 +100,7 @@ fn main() -> Result<()> {
     }
     if a.len() != 6 {
         eprintln!("qa_bsp_assembly [--plan-only] [--direction <degrees>] [--terrain | --edge-section <branch offset>] <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
+        eprintln!("qa_bsp_assembly --export-partitions <connection-project.gsproject> <fresh output directory>");
         eprintln!("qa_bsp_assembly --read-native-transitions <compiled.map>");
         eprintln!("qa_bsp_assembly --verify-cache <compiled.map> <connection-project.gsproject> [...]");
         eprintln!("qa_bsp_assembly --verify-walkthrough <compiled.map> <connection-project.gsproject>");

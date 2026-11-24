@@ -738,6 +738,48 @@ fn restore_collision_flags(
     }
     Ok(values.len())
 }
+fn compile_structure(
+    tool: &Path, runner: &Runner, workspace: &Path, tags: &Path,
+    parent: &str, name: &str, geometry: &AssemblyGeometry,
+) -> Result<(String, PathBuf, PathBuf)> {
+    let source = workspace.join("data").join(safe_relative(&format!("{parent}/models/{name}.jms"))?);
+    fs::create_dir_all(source.parent().unwrap())?;
+    project::atomic_write(&source, bsp_assembly::export_jms(geometry)?.as_bytes(), false)?;
+    native_step(tool, runner, workspace, &["structure".into(), parent.into(), name.into(), "true".into()], "bsp-structure")?;
+    let bsp = format!("{parent}\\{name}");
+    let compiled = tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
+    if !compiled.is_file() || fs::metadata(&compiled)?.len() < 648 {
+        return invalid("Tool did not produce a complete structure BSP");
+    }
+    Ok((bsp, source, compiled))
+}
+
+/// Stage independently compiled source structures for review. The partition
+/// is not bound into a scenario until its environment and objects are reviewed.
+pub(crate) fn prepare_partition_structure(
+    project: &Project, inspection: &MapInspection, tools: &Toolchain,
+    runner: &Runner, workspace: &Path, tags: &Path,
+) -> Result<serde_json::Value> {
+    let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
+    let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
+    let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
+    let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
+    namespace_materials(tags, &bsp_tag(inspection, 0)?, 0, &parts.base, &[], tools, runner, workspace, tags, None)?;
+    namespace_materials(&plan.donor_tags_directory, &bsp_tag(&donor, plan.donor_bsp_index)?, 1, &parts.donor, &[],
+        tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
+    let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
+    let edit = find_tool(tools, "invader-edit")?;
+    let mut structures = vec![];
+    for (name, geometry) in [("base", &parts.base), ("donor", &parts.donor)] {
+        let (bsp, jms, compiled) = compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)?;
+        let restored = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
+        structures.push(serde_json::json!({"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
+            "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": restored, "report": geometry.report}));
+    }
+    Ok(serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
+        "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta, "switches": parts.switches, "structures": structures, "scenarioBound": false}))
+}
+
 pub fn prepare_native(
     project: &Project,
     inspection: &MapInspection,
@@ -791,32 +833,7 @@ pub fn prepare_native(
     )?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let name = "connected";
-    let source = workspace
-        .join("data")
-        .join(safe_relative(&format!("{parent}/models/{name}.jms"))?);
-    fs::create_dir_all(source.parent().unwrap())?;
-    project::atomic_write(
-        &source,
-        bsp_assembly::export_jms(&geometry)?.as_bytes(),
-        false,
-    )?;
-    native_step(
-        &tool,
-        runner,
-        workspace,
-        &[
-            "structure".into(),
-            parent.clone(),
-            name.into(),
-            "true".into(),
-        ],
-        "bsp-structure",
-    )?;
-    let bsp = format!("{parent}\\{name}");
-    let compiled = tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
-    if !compiled.is_file() || fs::metadata(&compiled)?.len() < 648 {
-        return invalid("Tool did not produce a complete combined BSP");
-    }
+    let (bsp, source, compiled) = compile_structure(&tool, runner, workspace, tags, &parent, name, &geometry)?;
     let edit = find_tool(tools, "invader-edit")?;
     let scenario = format!("{}.scenario", inspection.scenario_path);
     runner.run(

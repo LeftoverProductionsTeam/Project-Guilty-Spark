@@ -121,6 +121,43 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     for name in ["invader-edit","invader-build","invader-info","invader-dependency","invader-refactor"]{if build::tool_path(&tools,name).is_none(){return invalid(format!("{name} is required for connected CE source"));}}
     Ok(tools)
 }
+/// Compile partition structure tags for owner review without publishing a map.
+pub fn preview_partitions(
+    project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
+    cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
+) -> Result<serde_json::Value> {
+    uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid build identity".into()))?;
+    let tools = preflight(project, inspection)?;
+    let source_tags = tools.base_tags_directory.as_ref().unwrap();
+    let source = project.source.as_ref().unwrap();
+    let plan = project.bsp_assembly.as_ref().unwrap();
+    crate::reject_links(jobs)?;
+    fs::create_dir_all(jobs)?;
+    let workspace = jobs.join(id);
+    let inputs = crate::native_staging::inventory(source_tags, &cancel)?;
+    let budget = crate::storage::estimate_copy(inputs.files.len(), inputs.bytes).saturating_add(2 * 1024 * 1024 * 1024);
+    let lease = crate::storage::Store::for_output(&workspace)?.reserve(&workspace, Some(source_tags), budget,
+        crate::storage::Category::Staging, "Owned native partition structure preview")?;
+    fs::create_dir(&workspace)?;
+    lease.mark_owned()?;
+    let workspace = fs::canonicalize(workspace)?;
+    let tags = workspace.join("tags");
+    let input_hashes = crate::forge_build::stage_tags(source_tags, &tags, &cancel, |_, _, _, _| {})?;
+    let runner = Runner { id, project: &project.id, cancel: &cancel, event: &event };
+    let receipt = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags)?;
+    for input in [source, &plan.donor_source] {
+        if maps::hash_file(&input.preserved_path)? != input.sha256 {
+            return invalid("An original region changed during partition compilation");
+        }
+    }
+    if crate::tool_transaction::inventory(source_tags)? != input_hashes {
+        return invalid("Editable input tags changed during partition compilation");
+    }
+    project::atomic_write(&workspace.join("partition-structure.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;
+    lease.finish(true, Some(project.fingerprint()?))?;
+    Ok(receipt)
+}
+
 pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{
     uuid::Uuid::parse_str(id).map_err(|_|SparkError::Invalid("Invalid build identity".into()))?;
     let tools=preflight(project,inspection)?;let started=Instant::now();
