@@ -129,22 +129,26 @@ pub fn preview_partitions(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
     cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
 ) -> Result<serde_json::Value> {
-    partition_preview(project, inspection, jobs, id, cancel, event, false)
+    partition_preview(project, inspection, jobs, id, cancel, event, crate::bsp_compile::PartitionStage::Structure)
 }
 
-/// Explicit collision-and-transition probe. Its maps are not adopted as
-/// build records. Lighting and region-specific environment still need review.
+/// Compile and inspect the staged scenario without advertising it as a playable build.
 pub fn probe_partition_scenario(
-    project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
+    project: &Project, inspection: &MapInspection, jobs: &Path, id: &str, bake: bool,
     cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
 ) -> Result<serde_json::Value> {
-    partition_preview(project, inspection, jobs, id, cancel, event, true)
+    use crate::bsp_compile::PartitionStage;
+    let stage = if bake { PartitionStage::Lighting } else { PartitionStage::Collision };
+    partition_preview(project, inspection, jobs, id, cancel, event, stage)
 }
 
 fn partition_preview(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
-    cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync, bind: bool,
+    cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync, stage: crate::bsp_compile::PartitionStage,
 ) -> Result<serde_json::Value> {
+    use crate::bsp_compile::PartitionStage;
+    let bind = stage != PartitionStage::Structure;
+    let bake = stage == PartitionStage::Lighting;
     uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid build identity".into()))?;
     let tools = preflight(project, inspection)?;
     let source_tags = tools.base_tags_directory.as_ref().unwrap();
@@ -170,10 +174,10 @@ fn partition_preview(
         let edit = build::tool_path(&tools, "invader-edit").unwrap();
         crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
     }
-    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, bind)?;
+    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage)?;
     let receipt = if bind {
-        let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags)?;
-        serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": false,
+        let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
+        serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
             "regionEnvironmentVerified": false, "donorGameplayPlacementsImported": false, "gameplayVerified": false})
     } else { prepared.receipt };
     for input in [source, &plan.donor_source] {
@@ -191,7 +195,7 @@ fn partition_preview(
 
 fn build_partition_probes(
     project: &Project, source: &MapInspection, prepared: &crate::bsp_compile::PreparedPartitions,
-    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path,
+    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path, bake: bool,
 ) -> Result<Vec<serde_json::Value>> {
     let plan = project.bsp_assembly.as_ref().unwrap();
     let preserved_path = &project.source.as_ref().unwrap().preserved_path;
@@ -242,8 +246,13 @@ fn build_partition_probes(
         }
         let collision = crate::bsp_assembly::verify_bound_partition_collision(&path, &map, plan, &project.inherited_bsp_connections, prepared.overlap)?;
         let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
+        let lightmap_pages = if bake {
+            crate::native_lighting::verify_cache(project, &path, &map)?;
+            Some([crate::native_lighting::verify_bsp_lightmaps(&path, &map, 0)?,
+                crate::native_lighting::verify_bsp_lightmaps(&path, &map, 1)?])
+        } else { None };
         Ok(serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
-            "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions}))
+            "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages}))
     }).collect()
 }
 

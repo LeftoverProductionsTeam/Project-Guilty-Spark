@@ -642,6 +642,14 @@ fn cache_tag_space(r:&Reader,header:&MapHeader)->Result<Space> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct LinkedBspRange {
+    file_offset: u32,
+    linked_address: u32,
+    bytes: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ResidentTagMemory {
     base_address: u32,
     end_address: u32,
@@ -649,6 +657,8 @@ pub(crate) struct ResidentTagMemory {
     tag_data_bytes: u32,
     largest_bsp_bytes: u32,
     pub(crate) resident_bytes: u32,
+    linked_bsp_ranges_overlap: bool,
+    bsp_ranges: Vec<LinkedBspRange>,
 }
 
 /// Verify the exact Invader cache's linked address window and resident cost.
@@ -693,9 +703,11 @@ fn resident_tag_window(
         return invalid("Connected cache has no resident structure BSP");
     }
     let mut largest_bsp_bytes = 0;
+    let mut bsp_ranges: Vec<LinkedBspRange> = Vec::with_capacity(count);
     for index in 0..count {
         let row = table + index * 32;
-        let begin = reader.u32(row)? as usize;
+        let file_offset = reader.u32(row)?;
+        let begin = file_offset as usize;
         let size = reader.u32(row + 4)?;
         let address = reader.u32(row + 8)?;
         let bsp_end = begin.checked_add(size as usize)
@@ -705,10 +717,18 @@ fn resident_tag_window(
         {
             return invalid("Structure BSP crosses tag data or its linked address window");
         }
+        if bsp_ranges.iter().any(|previous| {
+            let previous_start = u64::from(previous.file_offset);
+            u64::from(file_offset) < previous_start + u64::from(previous.bytes)
+                && previous_start < bsp_end as u64
+        }) {
+            return invalid("Structure BSP file ranges overlap");
+        }
         reader.bytes(begin, size as usize)?;
         let bsp = Space { begin, end: bsp_end, address };
         bsp.pointer(reader.u32(begin)?, 648)?;
         largest_bsp_bytes = largest_bsp_bytes.max(size);
+        bsp_ranges.push(LinkedBspRange { file_offset, linked_address: address, bytes: size });
     }
     Ok(ResidentTagMemory {
         base_address: base,
@@ -717,6 +737,9 @@ fn resident_tag_window(
         tag_data_bytes: header.tag_size,
         largest_bsp_bytes,
         resident_bytes: header.tag_size + largest_bsp_bytes,
+        // Every validated Invader BSP is linked against the same window end.
+        linked_bsp_ranges_overlap: bsp_ranges.len() > 1,
+        bsp_ranges,
     })
 }
 
@@ -752,6 +775,26 @@ mod resident_tag_window_tests {
             let header = parse_header(&bytes, bytes.len() as u64).unwrap();
             let validated = resident_tag_window(&Reader(&bytes), &header, SCENARIO, base, capacity).unwrap();
             assert_eq!(validated.resident_bytes, (NEW_BSP - TAGS) as u32 + BSP_SIZE);
+            assert!(!validated.linked_bsp_ranges_overlap);
+
+            let mut pair = bytes.clone();
+            let second = NEW_BSP + BSP_SIZE as usize;
+            pair.resize(second + BSP_SIZE as usize, 0);
+            put(&mut pair, SCENARIO + 0x5a4, 2);
+            put(&mut pair, REF + 32, second as u32);
+            put(&mut pair, REF + 36, BSP_SIZE);
+            put(&mut pair, REF + 40, address);
+            put(&mut pair, second, address + 24);
+            let pair_header = parse_header(&pair, pair.len() as u64).unwrap();
+            let validated_pair = resident_tag_window(&Reader(&pair), &pair_header, SCENARIO, base, capacity).unwrap();
+            assert_eq!(validated_pair.bsp_ranges.len(), 2);
+            assert_eq!(validated_pair.bsp_ranges[1].file_offset, second as u32);
+            assert_eq!(validated_pair.bsp_ranges[1].linked_address, address);
+            assert_eq!(validated_pair.resident_bytes, validated.resident_bytes);
+            assert!(validated_pair.linked_bsp_ranges_overlap);
+            put(&mut pair, REF + 32, NEW_BSP as u32);
+            assert!(resident_tag_window(&Reader(&pair), &pair_header, SCENARIO, base, capacity)
+                .err().unwrap().to_string().contains("file ranges overlap"));
             assert!(resident_tag_window(&Reader(&bytes), &header, SCENARIO, base, 32 << 20).is_err());
             for (at, invalid) in [(REF, TAGS as u32), (REF + 4, u32::MAX), (REF + 8, base + 1), (NEW_BSP, address + 800)] {
                 let mut broken = bytes.clone();

@@ -754,6 +754,22 @@ fn compile_structure(
     Ok((bsp, source, compiled))
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PartitionStage {
+    Structure,
+    Collision,
+    Lighting,
+}
+
+fn bake_structure_lightmaps(
+    project: &Project, tool: &Path, runner: &Runner, workspace: &Path, scenario: &str, bsp: &str,
+) -> Result<()> {
+    let quality = crate::native_lighting::request(project).map(|request| request.lightmap_quality()).unwrap_or(["0", "0.1"]);
+    native_step(tool, runner, workspace, &["lightmaps".into(), scenario.into(), bsp.into(), quality[0].into(), quality[1].into()],
+        "bsp-lightmaps")?;
+    Ok(())
+}
+
 pub(crate) struct PreparedPartitions {
     pub receipt: serde_json::Value,
     pub switches: [bsp_assembly::PartitionSwitch; 2],
@@ -810,8 +826,9 @@ fn bind_partition_scenario(
 /// pair and appends the reviewed switches to the owned scenario copy.
 pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
-    runner: &Runner, workspace: &Path, tags: &Path, bind: bool,
+    runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage,
 ) -> Result<PreparedPartitions> {
+    let bind = stage != PartitionStage::Structure;
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
     let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
@@ -822,19 +839,28 @@ pub(crate) fn prepare_partition_structure(
         tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let edit = find_tool(tools, "invader-edit")?;
-    let mut structures = vec![];
-    let mut names = [String::new(), String::new()];
-    for (index, (name, geometry)) in [("base", &parts.base), ("donor", &parts.donor)].into_iter().enumerate() {
-        let (bsp, jms, compiled) = compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)?;
-        let restored = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
-        names[index] = bsp.clone();
-        structures.push(serde_json::json!({"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
-            "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": restored, "report": geometry.report}));
-    }
+    let regions = [("base", &parts.base), ("donor", &parts.donor)];
+    let compile = |index: usize| {
+        let (name, geometry) = regions[index];
+        compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)
+    };
+    let built = [compile(0)?, compile(1)?];
     if bind {
+        let names = [built[0].0.clone(), built[1].0.clone()];
         bind_partition_scenario(inspection, &edit, runner, workspace, tags, &names, &parts.switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     }
+    if stage == PartitionStage::Lighting {
+        crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
+        for (name, _) in regions {
+            bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
+        }
+    }
+    let structures = regions.into_iter().zip(built).map(|((name, geometry), (bsp, jms, compiled))| {
+        let restored = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
+        Ok(serde_json::json!({"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
+            "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": restored, "report": geometry.report}))
+    }).collect::<Result<Vec<_>>>()?;
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
         "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
         "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
@@ -941,20 +967,7 @@ pub fn prepare_native(
     }
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
-    let bake_quality=crate::native_lighting::request(project).map(|r|r.lightmap_quality()).unwrap_or(["0","0.1"]);
-    native_step(
-        &tool,
-        runner,
-        workspace,
-        &[
-            "lightmaps".into(),
-            inspection.scenario_path.clone(),
-            name.into(),
-            bake_quality[0].into(),
-            bake_quality[1].into(),
-        ],
-        "bsp-lightmaps",
-    )?;
+    bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
     let restored_flags = restore_collision_flags(&geometry, &edit, runner, workspace, tags, &bsp)?;
     project::atomic_write(
         &workspace.join("bsp-assembly.json"),

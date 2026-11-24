@@ -85,12 +85,25 @@ pub(crate) fn apply(project:&Project,tags:&Path,scenario:&str,edit:&Path,runner:
     project::atomic_write(&workspace.join("native-lighting.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"request":request,"sourceSkySha256":source_hash,"authoredSky":name,"authoredSkySha256":maps::hash_file(&candidate)?,"nativeFieldReadback":true,"backdropColorApplied":false,"bakeStatus":"awaiting Tool radiosity and compiled-cache readback"}))?,false)?;
     Ok(())
 }
+pub(crate) fn verify_bsp_lightmaps(path: &Path, inspection: &maps::MapInspection, bsp_index: usize) -> Result<usize> {
+    let render = maps::render_bsp_source(path, inspection, bsp_index)?;
+    let pages = render.material_ranges.iter().filter_map(|range| {
+        (range.lightmap_page >= 0 && range.has_lightmap_uvs).then_some(())?;
+        let tag_id = range.lightmap_bitmap_tag_id?;
+        inspection.tags.iter().any(|tag| tag.id == tag_id && tag.class == "bitm")
+            .then_some((tag_id, range.lightmap_page))
+    }).collect::<std::collections::BTreeSet<_>>();
+    if pages.is_empty() {
+        return invalid(format!("Native lighting bake produced no readable lightmap pages and UVs for BSP {bsp_index}"));
+    }
+    Ok(pages.len())
+}
+
 pub(crate) fn verify_cache(project:&Project,path:&Path,inspection:&maps::MapInspection)->Result<()> {
     let Some(request)=request(project)else{return Ok(())};
     let actual=crate::appearance::inspect(path,&inspection.sha256,inspection)?;
     if actual.sky_path.as_ref().map(|p|p.replace('\\',"/"))!=Some(sky_path(project)?){return invalid("Compiled scenario did not retain its authored lighting sky");}
-    let render=maps::render_bsp_source(path,inspection,0)?;
-    if !render.material_ranges.iter().any(|range|range.lightmap_page>=0&&range.has_lightmap_uvs&&range.lightmap_bitmap_tag_id.is_some_and(|id|inspection.tags.iter().any(|tag|tag.id==id&&tag.class=="bitm"))){return invalid("Native lighting bake produced no independently readable BSP lightmap pages and UVs");}
+    verify_bsp_lightmaps(path, inspection, 0)?;
     let e=actual.environment.ok_or_else(||SparkError::Invalid("Compiled native sky could not be independently read".into()))?;let wanted=&request.environment;
     for (a,b) in [(e.ambient_color,wanted.ambient_color),(e.sun_color,wanted.sun_color),(e.fog_color,wanted.fog_color)] {floats(&a.iter().map(f32::to_string).collect::<Vec<_>>().join(","),&b)?;}
     floats(&format!("{},{},{},{}",e.ambient_intensity,e.sun_intensity,e.sun_azimuth,e.sun_elevation),&[wanted.ambient_intensity,wanted.sun_intensity,wanted.sun_azimuth,wanted.sun_elevation])?;

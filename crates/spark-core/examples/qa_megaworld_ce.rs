@@ -42,8 +42,9 @@ fn main()->Result<()>{
     if mcc { a.remove(0); }
     let partition_structure = a.first().is_some_and(|arg| arg == "--partition-structure");
     let partition_scenario = a.first().is_some_and(|arg| arg == "--partition-scenario-probe");
-    if partition_structure || partition_scenario { a.remove(0); }
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    let partition_lighting = a.first().is_some_and(|arg| arg == "--partition-lighting-probe");
+    if partition_structure || partition_scenario || partition_lighting { a.remove(0); }
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
@@ -123,11 +124,15 @@ fn main()->Result<()>{
     let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:if mcc { "MCC13 from reviewed CE source" } else { "Reviewed CE source for Chupathingy" }.into(),runtime_id:if mcc { RuntimeId::MccSteam } else { RuntimeId::ChupathingyCe },builder:if mcc { "h1a-tool" } else { "invader-ce" }.into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
     project::save_project(&out.join("connection.gsproject"),&p)?;lib.save(&p,Some(&i))?;
     let id=uuid::Uuid::new_v4().to_string();let log=out.join("native-events.jsonl");
-    if partition_structure || partition_scenario {
-        let prepare = if partition_scenario { spark_core::megaworld_build::probe_partition_scenario }
-            else { spark_core::megaworld_build::preview_partitions };
-        let result = prepare(&p, &i, &out.join("library/jobs"), &id,
-            Arc::new(AtomicBool::new(false)), |event: spark_core::build::JobEvent| eprintln!("{}: {}", event.phase, event.message))?;
+    if partition_structure || partition_scenario || partition_lighting {
+        let jobs = out.join("library/jobs");
+        let cancel = Arc::new(AtomicBool::new(false));
+        let event = |event: spark_core::build::JobEvent| eprintln!("{}: {}", event.phase, event.message);
+        let result = if partition_structure {
+            spark_core::megaworld_build::preview_partitions(&p, &i, &jobs, &id, cancel, event)?
+        } else {
+            spark_core::megaworld_build::probe_partition_scenario(&p, &i, &jobs, &id, partition_lighting, cancel, event)?
+        };
         project::atomic_write(&out.join("partition-structure.json"), &serde_json::to_vec_pretty(&result)?, false)?;
         return Ok(());
     }

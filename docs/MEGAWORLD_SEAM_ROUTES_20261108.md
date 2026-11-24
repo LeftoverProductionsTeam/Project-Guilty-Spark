@@ -339,3 +339,16 @@ The owner-only qa_megaworld_ce --partition-scenario-probe compiled the two gener
 Per-BSP indexes independently checked 56,944 base and 9,034 donor collision triangles. Both travel directions passed 291 samples on the base approach and 161 on the Chiron approach. The 20 shared floor samples agreed within 0.000001039 units and the eleven inherited connections passed on BSP 0. Both QA examples built after correcting a Rust callback type. All 21 assembly and 12 clearance tests passed. Source hashes matched and the 1.71 GB disposable run was cleaned up.
 
 Lighting, per-region ambience and remaining donor gameplay placements are still open. These caches were not loaded in-game. Invader linked both BSPs at the same tag-window end, so these probes exercise the regular global switch layout. Forerunner’s read-only integration contract now documents per-BSP MCC geometry ownership and admission of two disjoint ranges. Spatial simulation, independent occupancy and replicated gameplay remain separate from that memory work.
+
+### Native lightmaps on both Chiron corridor BSPs
+
+The owner-only qa_megaworld_ce --partition-lighting-probe reused Spark’s established H1A lightmaps step on base and donor separately after binding both into the same native scenario. Draft radiosity used 0.1. CE609 and MCC13 each decoded 12 base and 9 Chiron lightmap pages with real secondary UVs and bitmap references. Exact paired switches, 32 Chiron scenery placements, both path directions, 20 common floor samples and all inherited routes passed again. CRC, protection, stub and internal-resource validation passed both editions.
+
+| Cache | SHA-256 | Static bytes | Largest BSP bytes | One-BSP resident limit |
+| --- | --- | ---: | ---: | ---: |
+| CE609 | 6f6de0e956a6cc2f34c9e7a3885b39ee14434f3ef14e5a400e8787c901a48641 | 7,320,932 | 15,570,420 | 21.83 / 23 MiB |
+| MCC13 | 08b9a46693cc4c7b31ba462d0861c723bb46df2407640050ac55b4d1032758b6 | 7,596,252 | 7,321,000 | 14.23 / 64 MiB |
+
+Before the bake, native tag inspection found all nine stock Chiron clusters use its background loop, hallway acoustics and Put Put Wind. The wind is a real multiplayer.wind dependency, direction (1, 0, 0) and magnitude 2. The rebuilt donor has eleven clusters and empty background, sound environment and weather palettes. The recovered twelve-region parent has seven clusters and no corresponding palettes. Native Tool warned that the nine generated base clusters have no background sound or sound environment. Regional ambience and donor gameplay placements remain open. Neither lit diagnostic was loaded in a game. The 1.72 GB disposable run was cleaned, and protected source hashes matched.
+
+The tag-window report additionally records each BSP’s exact native file offset, length and linked address. It rejects intersecting raw file ranges. The current Invader layout requires every BSP to end at the same linked address and now reports that overlap explicitly. The existing range regression passed for both CE609 and MCC13 with shared virtual ranges and distinct raw ranges, then rejected aliasing raw ranges. Both QA examples compiled and all three focused native lighting tests passed.
