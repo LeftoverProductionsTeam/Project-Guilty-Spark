@@ -4,7 +4,7 @@ Task: Black Echo recorded transport, original Zombie Apocalypse conversion and M
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Timberland, Sidewinder, Blood Gulch and Battle Creek share one compiled CE609 map f66931cd with all five paths passing native collision readback. Two Forerunner peers loaded the exact map and agreed through tick 540. Full physical traversal was verified on the preserved two-region baseline. All 19 original CE inputs are present.
-Next action: Finish the Ice Fields branch from f66931cd, then connect the remaining original regions and verify real player and vehicle travel. Continue standalone Zombie CE609 and reusable recovery after the MegaWorld priority. Record Black Echo flight when XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
+Next action: Watch owned Danger Canyon build 29498. Compare Ice Fields Tool error geometry with its JMS to locate the dropped triangle and open edges. Continue all 19 regions and native traversal. Preserve Zombie CE609 and controller-blocked Black Echo.
 
 ## Acceptance
 
