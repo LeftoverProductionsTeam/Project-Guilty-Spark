@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Original Zombie CE and MCC compiler probes pass the audited static and meter HUD references. Both now stop at the active pistol melee screen-flash limit. No cache emitted. Black Echo remains unchanged.
-Next action: Determine whether the matching native Tool can preserve the original Zombie pistol melee lighten flash at maximum intensity 3 without altering the separate damage fields. Black Echo still needs map-specific controller capture and a verified CE609 handoff before focused Forerunner landing and full faction replay. Physical MegaWorld connections follow.
+Latest verified revision: The pinned MCC H1A Tool compiled the audited original Zombie recovery tags. Independent Invader readback verified the MCC engine, CRC and the original Pistol melee lighten flash at intensity 3 and damage 400. The original map, resource banks and all compiler input tags retained their hashes. Black Echo remains unchanged.
+Next action: Load the verified Zombie cache in an isolated MCC workflow and separately locate a matching Classic CE build route for Chupathingy and Forerunner. Black Echo needs map-specific controller capture and a verified CE609 handoff before focused landing and full faction replay. Physical MegaWorld connections follow.
 
 ## Acceptance
 

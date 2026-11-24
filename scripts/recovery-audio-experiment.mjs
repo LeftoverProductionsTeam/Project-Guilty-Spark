@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 
 const args = process.argv.slice(2);
 const value = (key) => { const i = args.indexOf(key); if (i < 0 || !args[i + 1]) throw new Error(`Required: ${key}`); return path.resolve(args[i + 1]); };
@@ -16,6 +17,13 @@ const repairMixedPalettes = args.includes('--repair-mixed-palettes');
 const repairShieldNoise = args.includes('--repair-shield-noise');
 const repairSurvivorSpawn = args.includes('--repair-survivor-spawn');
 const repairRoundsHud = args.includes('--repair-rounds-hud');
+const nativeMccTool = args.includes('--mcc-tool') ? value('--mcc-tool') : null;
+const mccPinIndex = args.indexOf('--mcc-tool-sha256');
+const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
+if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
+  || nativeMccTool && (!repairRoundsHud || !/^[a-f\d]{64}$/.test(mccPin ?? ''))) {
+  throw new Error('Native MCC recovery requires the full audited repair and an exact lowercase --mcc-tool-sha256');
+}
 if (repairRoundsHud && !repairSurvivorSpawn) throw new Error('Rounds HUD recovery requires the Survivor-spawn repair');
 if (repairSurvivorSpawn && !repairShieldNoise) throw new Error('Survivor-spawn recovery requires the shield-noise repair');
 if (repairShieldNoise && !repairMixedPalettes) throw new Error('Shield-noise recovery requires the mixed-palette repair');
@@ -31,7 +39,21 @@ const resourceHashes = Object.fromEntries(['bitmaps.map', 'sounds.map'].map((nam
 if (repairMixedPalettes && (resourceHashes['bitmaps.map'] !== '5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea' || resourceHashes['sounds.map'] !== '9426e8d19b662eeb5a6c516951e080758d8f77a0ee41f52bdf0ed0a929245a59')) {
   throw new Error('Mixed-palette recovery requires the audited Demo resource banks');
 }
-const executables = Object.fromEntries(['extract', 'build', 'edit'].map((name) => { const exe = path.join(invader, `invader-${name}${process.platform === 'win32' ? '.exe' : ''}`); return [name, { path: exe, sha256: hashFile(exe) }]; }));
+const executables = Object.fromEntries((nativeMccTool ? ['extract', 'build', 'edit', 'info'] : ['extract', 'build', 'edit']).map((name) => {
+  const exe = path.join(invader, `invader-${name}${process.platform === 'win32' ? '.exe' : ''}`);
+  return [name, { path: exe, sha256: hashFile(exe) }];
+}));
+if (nativeMccTool) {
+  const stat = fs.lstatSync(nativeMccTool);
+  const resolvedTool = fs.realpathSync(nativeMccTool);
+  if (!stat.isFile() || path.basename(resolvedTool).toLowerCase() !== 'tool.exe'
+    || inside(output, path.dirname(resolvedTool)) || inside(resolvedTool, output)
+    || hashFile(resolvedTool) !== mccPin) {
+    throw new Error('The reviewed installed MCC Tool or isolated output path changed');
+  }
+  await assertQaOutputPath(output, { reservationBytes: 512 * 1024 * 1024 });
+  executables.mcc = { path: resolvedTool, sha256: mccPin };
+}
 fs.mkdirSync(output); // Fail if any output directory already exists.
 const tags = path.join(output, 'tags'); const maps = path.join(output, 'output');
 fs.mkdirSync(tags); fs.mkdirSync(maps);
@@ -279,6 +301,85 @@ function recoverRoundsHud() {
   save();
 }
 
+function compileOfficialMcc() {
+  const scenario = "fonzie's zombie apocalypse";
+  const effect = 'weapons/pistol/melee.damage_effect';
+  const readFields = ['type', 'maximum_intensity', 'damage_lower_bound', 'damage_upper_bound', 'radius', 'duration'];
+  const read = (directory, phase) => {
+    const result = run('edit', ['-t', directory, ...readFields.flatMap(field => ['-G', field]), effect], phase);
+    if (result.exitCode !== 0 || result.incomplete) throw new Error('Pistol melee readback failed');
+    return result.stdout.trimEnd().split(/\r?\n/);
+  };
+  const authored = read(tags, 'mcc-original-melee');
+  const expected = ['lighten', '3.000000', '400.000000', '400.000000,400.000000', '4.000000,4.000000', '3.000000'];
+  if (JSON.stringify(authored) !== JSON.stringify(expected)) throw new Error('Audited pistol melee values changed');
+  const inventory = () => {
+    const hashes = {};
+    if (!fs.lstatSync(tags).isDirectory()) throw new Error('Derived tag root is not a regular directory');
+    const root = fs.realpathSync(tags);
+    const pending = [root];
+    while (pending.length) {
+      const directory = pending.pop();
+      for (const name of fs.readdirSync(directory)) {
+        const file = path.join(directory, name);
+        const info = fs.lstatSync(file);
+        if (info.isSymbolicLink() || !inside(fs.realpathSync(file), root)) {
+          throw new Error('Derived tag tree contains a link');
+        }
+        if (info.isDirectory()) pending.push(file);
+        else if (info.isFile()) hashes[path.relative(root, file)] = hashFile(file);
+        else throw new Error('Derived tag tree contains an unexpected file type');
+      }
+    }
+    return hashes;
+  };
+  const before = inventory();
+  fs.mkdirSync(path.join(output, 'data'));
+  const nativeMaps = path.join(output, 'maps');
+  fs.mkdirSync(nativeMaps);
+  const result = run('mcc', ['-data_dir', 'data', '-tags_dir', 'tags', '-game_root_dir', '.',
+    'build-cache-file', scenario, 'classic', 'none'], 'compile-official-mcc');
+  const after = inventory();
+  if (Object.keys(before).length !== Object.keys(after).length
+    || Object.keys(before).some(file => before[file] !== after[file])
+    || hashFile(executables.mcc.path) !== executables.mcc.sha256) {
+    throw new Error('Official Tool changed its own bytes or the reviewed tag inputs');
+  }
+  if (result.exitCode !== 0 || result.incomplete || !/successfully built cache file\./i.test(result.log)
+    || /### failed|exception halt/i.test(result.log)) {
+    throw new Error('Official MCC Tool did not establish a completed cache');
+  }
+  const map = path.join(nativeMaps, scenario + '.map');
+  if (!fs.lstatSync(map).isFile() || !inside(fs.realpathSync(map), fs.realpathSync(nativeMaps))) {
+    throw new Error('Official Tool output is not a regular file in its native output directory');
+  }
+  const mapSha256 = hashFile(map);
+  const info = (name) => {
+    const checked = run('info', ['-T', name, map], 'official-mcc-' + name);
+    if (checked.exitCode !== 0 || checked.incomplete) throw new Error('MCC cache validation failed for ' + name);
+    return checked.stdout.trim();
+  };
+  const engine = info('engine');
+  const crcMismatch = info('crc32_mismatched');
+  if (engine !== 'Halo: Combat Evolved Anniversary (MCC)' || !['0', 'false'].includes(crcMismatch.toLowerCase())) {
+    throw new Error('Official output has the wrong engine or a CRC mismatch: ' + engine + ', ' + crcMismatch);
+  }
+  const derived = path.join(output, 'mcc-readback-tags');
+  fs.mkdirSync(derived);
+  const extracted = run('extract', ['-t', derived, '-G', '-s', effect, map], 'official-mcc-extract-melee');
+  if (extracted.exitCode !== 0 || extracted.incomplete || !/Extracted 1 out of 1 matched tag\b/.test(extracted.log)) {
+    throw new Error('Official cache melee effect could not be independently extracted');
+  }
+  const compiled = read(derived, 'mcc-compiled-melee');
+  if (JSON.stringify(compiled) !== JSON.stringify(authored) || hashFile(map) !== mapSha256) {
+    throw new Error('Official cache changed the authored flash, damage effect or cache bytes');
+  }
+  manifest.results.push({step:'compile-official-mcc', target:'mcc-cea', reportedEngine:engine, state:'compiled-melee-verified', playable:false,
+    cacheSha256:mapSha256, tagCount:Object.keys(before).length, inputTagsUnchanged:true,
+    damageEffect:Object.fromEntries(readFields.map((field, index) => [field, compiled[index]]))});
+  save();
+}
+
 try {
   const extraction = run('extract', ['-t', tags, '-m', resources, ...manifest.exclusions.flatMap((s) => ['-e', s]), input], 'extract');
   if (extraction.exitCode !== 0 || extraction.incomplete || /^(?:ERROR:|FATAL ERROR:|Failed to extract )/m.test(extraction.log) || !/Extracted 2823 out of 2823 matched tags/.test(extraction.log)) throw new Error('Complete 2823-tag extraction was not established');
@@ -333,6 +434,7 @@ try {
       compile('compile-rounds-' + target, target, destination);
     }
   }
+  if (nativeMccTool) compileOfficialMcc();
 } catch (error) {
   manifest.error = String(error); process.exitCode = 1;
 } finally {
