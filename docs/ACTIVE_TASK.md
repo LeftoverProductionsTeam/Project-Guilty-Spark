@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
+Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Prisoner extends the connected CE609 baseline to nine regions at 548e3c1c. Native compile, route readback and private Forerunner peer admission passed. Danger Canyon separately extends the same eight-region parent to 7d2039da with native compile and route readback. The two nine-region artifacts overlap.
-Next action: Verify the ten-region merge of Prisoner and Danger Canyon, then extend through the remaining regions. Complete the existing BSP Assembly CE609/MCC13 export and verify an MCC13 map above 23 MiB in Forerunner separately from world residency. Ice Fields still needs the documented native radiosity UV repair.
+Latest verified revision: CE609 34776aa3 joins Prisoner and Danger Canyon in one ten-region world at 19.69 of 23 MiB. Native route readback and two private Forerunner peers passed. The separate nine-region Danger Canyon MCC13 output 04940e28 compiled and passed private Forerunner host and guest loading at 12.62 of 64 MiB.
+Next action: Finish Damnation from the ten-region cache, pursue the remaining region joins and repair the documented Ice Fields radiosity UV seam. Independent 64 MiB acceptance still needs a map above 23 MiB. Forerunner's Spark capability document advertises CE609 startup only, so its MCC13 loader is verified through private native tests. Coordinated region occupancy and expanded physical driving remain separate acceptance gates.
 
 Operation 110% V2 immediate priority overlay, 24 November 2026. P0 is the complete 19-region MegaWorld, including reusable BSP Assembly, classic 23 MiB CE609, optional 64 MiB MCC13 and honest per-runtime compatibility. Forerunner owns MCC loading, regional occupancy and synchronized multiplayer state, including guest vehicle traversal. P1 is the original Zombie Apocalypse conversion and survival gameplay. P2 is repeatable Black Echo and persistent multiplayer Extraction. All permanent scope, 475 records, M1–M6, completed evidence and unresolved acceptance gates remain in force.
 
