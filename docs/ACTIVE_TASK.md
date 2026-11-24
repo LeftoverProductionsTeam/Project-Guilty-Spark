@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Zombie MCC 12649191 and its five native sound overlay tags pass exact payload and full decode checks. The verified Forerunner lobby starts stock maps, while Zombie admission remains unconfirmed. CE609 Warthog trial 59542651 preserves the authored BSP with 524 standing samples each way.
-Next action: Trace the Zombie MCC lobby admission gate and use the verified sound overlay for Classic CE. Recover two absent cues and legacy spawner delivery. Run the MegaWorld route and guest Warthog trial. Capture Black Echo clips when Windows XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
+Latest verified revision: Forerunner e82a58db played exact Zombie MCC 12649191 on two Windows peers, with audio conversion, replicated carriers and guest combat. The optional legacy spawner overlay compiled as MCC13 26201365 and passed nine independent tag readbacks. CE609 Warthog trial 59542651 preserves all three authored routes.
+Next action: Build standalone Classic CE with a verified Gearbox toolchain and test the legacy carriers in Chupathingy. Recover two absent cues, prove Evolved egress and finish a full round. Complete MegaWorld traversal and guest driving. Capture Black Echo clips when Windows XInput is available. Preserve d113e9db and Forerunner 64c8d93d.
 
 ## Acceptance
 

@@ -23,10 +23,12 @@ const repairStandardCarrier = args.includes('--repair-standard-carrier');
 const repairCarrierInertia = args.includes('--repair-carrier-inertia');
 const repairLegacyTitle = args.includes('--repair-legacy-title');
 const repairVorbisTail = args.includes('--repair-vorbis-tail');
+const stageLegacySpawners = args.includes('--stage-legacy-spawners');
 if (repairStandardCarrier && !nativeMccTool) throw new Error('Standard carrier repair requires the reviewed native MCC Tool');
 if (repairCarrierInertia && !repairStandardCarrier) throw new Error('Carrier inertia repair requires the reviewed original carrier build');
 if (repairLegacyTitle && !repairCarrierInertia) throw new Error('Legacy title repair requires the reviewed inertia-corrected cache');
 if (repairVorbisTail && !repairLegacyTitle) throw new Error('Vorbis tail recovery requires the reviewed title-corrected cache');
+if (stageLegacySpawners && !repairVorbisTail) throw new Error('Legacy spawner staging requires the full reviewed source recovery');
 const mccPinIndex = args.indexOf('--mcc-tool-sha256');
 const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
 if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
@@ -98,8 +100,8 @@ const run = (tool, parameters, name) => {
   return { exitCode: result.status, stdout: result.stdout ?? '', log, incomplete: !!result.error };
 };
 const scenarioTag = "fonzie's zombie apocalypse.scenario";
-function editTag(tag, parameters, step) {
-  const result = run('edit', ['-t', tags, ...parameters, tag], step);
+function editTag(tag, parameters, step, directory = tags) {
+  const result = run('edit', ['-t', directory, ...parameters, tag], step);
   if (result.exitCode !== 0 || result.incomplete) throw new Error(step + ' failed');
   return result.stdout.replaceAll('\r\n', '\n').replace(/\n$/, '').split('\n');
 }
@@ -572,6 +574,76 @@ function writeReviewedVorbisTails(parent) {
   save();
 }
 
+function stageReviewedLegacySpawners() {
+  const editorSha = '02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12';
+  if (executables.edit.sha256 !== editorSha || hashFile(executables.edit.path) !== editorSha) {
+    throw new Error('Legacy spawner staging requires the reviewed native tag editor');
+  }
+  const reviewed = [
+    ['evolved', 'mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon',
+      'a19be43a61c567327d067b4f11b0dc5bcf7e690c63aaa91a9e405306cca6a7a9',
+      'mgm/fonzie/sparky/tags/evolved zombie container.vehicle'],
+    ['alpha', 'origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon',
+      'fd657f5f8727c8e3b44df345861596bf0e263379974478de8ca50f8259dcd468',
+      'mgm/fonzie/sparky/tags/alpha zombie containerorig.vehicle'],
+    ['standard', 'mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon',
+      '2d17c3a69b700e727825dac093b4f236c8f526d2d0ba7af89038a5a4fe3863c0', standardCarrier],
+  ];
+  const directory = path.join(output, 'legacy-spawner-tags');
+  fs.mkdirSync(directory);
+  const stem = 'spark_recovery/legacy_spawner/';
+  fs.mkdirSync(path.join(directory, stem), { recursive: true });
+  const trigger = 'triggers[0].projectile';
+  const edit = (tag, params, phase) => editTag(tag, params, phase, directory);
+  const expectValues = (actual, expected, label) => {
+    if (JSON.stringify(actual.map(normalizeNativePath)) !== JSON.stringify(expected)) {
+      throw new Error('Native legacy spawner readback differs: ' + label);
+    }
+  };
+  const spawners = [];
+  for (const [name, weapon, weaponSha256, carrier] of reviewed) {
+    const original = path.join(tags, weapon);
+    if (hashFile(original) !== weaponSha256 || !fs.lstatSync(path.join(tags, carrier)).isFile()) {
+      throw new Error('Original weapon or carrier identity differs: ' + name);
+    }
+    expectValues(editTag(weapon, ['-C', 'triggers', '-G', trigger], name + '-original-spawner'),
+      ['1', carrier], name + ' original');
+    const originalFields = editTag(weapon, ['-L'], name + '-original-spawner-fields');
+    const projectile = stem + name + '.projectile';
+    const effect = stem + name + '.effect';
+    edit(effect, ['-N', '-I', 'locations', '1', 'end', '-I', 'events', '1', 'end',
+      '-I', 'events[0].parts', '1', 'end', '-S', 'events[0].parts[0].location', '0',
+      '-S', 'events[0].parts[0].type', carrier], name + '-carrier-effect');
+    expectValues(edit(effect, ['-C', 'locations', '-C', 'events', '-C', 'events[0].parts',
+      '-C', 'events[0].particles', '-G', 'events[0].parts[0].location', '-G', 'events[0].parts[0].type'],
+    name + '-legacy-effect-readback'), ['1', '1', '1', '0', '0', carrier], name + ' effect');
+    edit(projectile, ['-N', '-S', 'creation_effect', effect, '-S', 'timer', '0.1,0.1'],
+      name + '-carrier-projectile');
+    expectValues(edit(projectile, ['-G', 'creation_effect', '-G', 'timer', '-G', 'detonation_timer_starts',
+      '-G', 'initial_velocity', '-G', 'final_velocity'], name + '-legacy-projectile-readback'),
+    [effect, '0.100000,0.100000', 'immediately', '0.000000', '0.000000'], name + ' projectile');
+    const copy = path.join(directory, weapon);
+    fs.mkdirSync(path.dirname(copy), { recursive: true });
+    fs.copyFileSync(original, copy, fs.constants.COPYFILE_EXCL);
+    edit(weapon, ['-S', trigger, projectile], name + '-bind-legacy-spawner');
+    expectValues(edit(weapon, ['-C', 'triggers', '-G', trigger], name + '-legacy-weapon-readback'),
+      ['1', projectile], name + ' weapon');
+    const updatedFields = edit(weapon, ['-L'], name + '-legacy-spawner-fields');
+    const triggerText = value => /projectile \([^()]+\.(?:projectile|vehicle)\)/.test(value);
+    if (originalFields.filter(triggerText).length !== 1 || updatedFields.filter(triggerText).length !== 1 ||
+        JSON.stringify(originalFields.filter(line => !triggerText(line))) !== JSON.stringify(updatedFields.filter(line => !triggerText(line))) ||
+        hashFile(original) !== weaponSha256) {
+      throw new Error('Legacy staging changed weapon fields outside the first trigger dependency: ' + name);
+    }
+    spawners.push({ name, weapon, projectile, effect, carrier, originalWeaponSha256: weaponSha256,
+      overlaySha256: Object.fromEntries([weapon, projectile, effect].map(tag => [tag, hashFile(path.join(directory, tag))])) });
+  }
+  if (hashFile(executables.edit.path) !== editorSha) throw new Error('Native tag editor changed during legacy staging');
+  manifest.results.push({ step: 'stage-legacy-spawners', directory, spawners, playable: false,
+    limitations: ['Native source overlay only. Carrier egress, collision and replication still need a separate engine trial.'] });
+  save();
+}
+
 function compileOfficialMcc(carrierReadback) {
   const scenario = "fonzie's zombie apocalypse";
   const effect = 'weapons/pistol/melee.damage_effect';
@@ -704,6 +776,7 @@ try {
   }
   const carrierReadback = repairStandardCarrier ? recoverStandardCarrier() : null;
   if (nativeMccTool) compileOfficialMcc(carrierReadback);
+  if (stageLegacySpawners) stageReviewedLegacySpawners();
 } catch (error) {
   manifest.error = String(error); process.exitCode = 1;
 } finally {
