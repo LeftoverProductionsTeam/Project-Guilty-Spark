@@ -276,6 +276,37 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
    }
    results.push({returnAfterInsertion,holdParkedPilot,checkPlayerSeats,scripts:names,source:sources,scenarioSha256:crypto.createHash('sha256').update(await fs.readFile(path.join(tags,scenario))).digest('hex')});
   }
+  const transportFiles=['gs_pelican_transport.hsc','gs_spirit_transport.hsc'].map(filename=>path.join(data,'scripts',filename));
+  const priorTransport=await Promise.all(transportFiles.map(file=>fs.readFile(file)));
+  const recordedNames=['approach_pelican','land_pelican','return_pelican','empty_pelican','approach_spirit','land_spirit','return_spirit','empty_spirit'];
+  await run('invader-edit',['-I','recorded_animations',String(recordedNames.length),'end',...recordedNames.flatMap((name,index)=>['-S','recorded_animations['+index+'].name',name]),scenario]);
+  for(const [faction,role,seat] of [['unsc','pelican','P-driver'],['covenant','spirit','CD-driver']]){
+   const options={faction,pilot:'pilot_'+role,pilotSeat:seat,outbound:'',inbound:'',hub:'extraction_return',field:'extraction_zone',
+    createPilot:true,holdParkedPilot:true,returnAfterInsertion:true,
+    recordings:{outbound:{hover:'approach_'+role,landing:'land_'+role},inbound:{landing:'return_'+role},emptyInbound:{landing:'empty_'+role}}};
+   const source=exportHaloCeTransport(options);
+   assert.deepEqual(readNativeTransportSource(source.content),options);
+   assert.ok(!source.content.includes('(ai_command_list '));
+   assert.ok(source.dependencies.includes('cutscene_recording:empty_'+role));
+   assert.throws(()=>exportHaloCeTransport({...options,holdParkedPilot:false}),/held pilot/);
+   assert.throws(()=>exportHaloCeTransport({...options,recordings:{...options.recordings,outbound:{hover:'land_'+role,landing:'land_'+role}}}),/separate approach/);
+   const start=source.content.indexOf('(recording_play_and_hover extraction_'+role+' approach_'+role+')');
+   const vent=source.content.indexOf('(vehicle_hover extraction_'+role+' false)',start);
+   const touchdown=source.content.indexOf('(recording_play_and_hover extraction_'+role+' land_'+role+')',vent);
+   assert.ok(start>=0&&vent>start&&touchdown>vent);
+   assert.ok(source.content.indexOf('(volume_test_object extraction_zone extraction_'+role+')',touchdown)>touchdown);
+   const {inbound:ignored,...mixedRecordings}=options.recordings;
+   const mixed=exportHaloCeTransport({...options,inbound:'hub_route',recordings:mixedRecordings});
+   assert.ok(mixed.content.includes('(vehicle_hover extraction_'+role+' false)\n  (ai_braindead pilot_'+role+' false)\n  (ai_command_list pilot_'+role+' hub_route)'));
+   await fs.writeFile(path.join(data,'scripts',source.filename),source.content);
+  }
+  await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  const compiledTransport=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/);
+  assert.ok(['gs_pelican_trip','gs_spirit_trip'].every(name=>compiledTransport.includes(name)));
+  // Restore the established AI-route fixture for recovery and mission composition below.
+  await Promise.all(transportFiles.map((file,index)=>fs.writeFile(file,priorTransport[index])));
+  await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  console.log('PASS: installed Invader compiled both recorded transport controllers and preserved grounded pad guards');
   const buildId='reviewed_source',project={id:'transport',quickForge:null,studio:emptyCreatorStudio(),builds:[{id:buildId,status:'validated'}]};
   const native={projectId:project.id,buildId,class:'scnr',sourceTarget:'gbx-custom',canAppendEncounter:true,tagSha256:'a'.repeat(64),
    scenarioVolumes:[...new Set([...volumes,'be_insert','be_artifact','be_extract'])].map(name=>({name,kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,4,4]}})),

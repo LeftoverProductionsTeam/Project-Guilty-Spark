@@ -22,8 +22,8 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,validNativeTransportSeats,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission } from '../haloScript';
-import type {NativeTransportOptions,NativeMissionReview} from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,nativeTransportLegs,nativeTransportAiRoute,validNativeTransportSeats,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission } from '../haloScript';
+import type {NativeTransportOptions,NativeTransportLeg,NativeMissionReview} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
 import { useMapState, readMapSession, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
 import type { Project, RuntimeId, Settings, Workspace } from '../types';
@@ -39,7 +39,7 @@ import type {
   ToolLaunchPlan,
   ToolProcessView,
 } from '../runtimeWorkbench';
-import { availabilityLabel, evidenceLabel, nativeTransportRouteIssue, runtimeNames } from '../runtimeWorkbench';
+import { availabilityLabel, evidenceLabel, nativeTransportRouteIssue, nativeTransportRecordingIssue, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
 import { integrityBlocks, type NativeTagIntegrityReport } from '../nativeTagIntegrity';
@@ -224,6 +224,7 @@ export default function RuntimeDock({
     const name=options.faction==='unsc'?'extraction_pelican':'extraction_spirit';
     const vehicles=modules?.transportReview?.vehicles.filter(vehicle=>vehicle.name===name);
     if(vehicles?.length!==1)return 'Read the actual named aircraft from native transport source.';
+    if (!nativeTransportLegs(options).some(leg=>nativeTransportAiRoute(options,leg)!==undefined)) return null;
     const {flight,flightIssue}=vehicles[0];
     if(flightIssue)return flightIssue;
     if(!flight)return 'Native human-plane flight settings have not been read.';
@@ -231,7 +232,14 @@ export default function RuntimeDock({
     return null;
   }
   function transportRouteIssue(options:NativeTransportOptions){
-    return nativeTransportRouteIssue(options,nativeCameras?.triggerVolumes??[],modules?.transportReview?.flightRoutes);
+    return nativeTransportRecordingIssue(options, modules?.transportRecordings)
+      ?? nativeTransportRouteIssue(options,nativeCameras?.triggerVolumes??[],modules?.transportReview?.flightRoutes);
+  }
+  function updateTransportRecording(leg: NativeTransportLeg, landing: string, hover?: string) {
+    const recordings = { ...transport.recordings };
+    if (landing) recordings[leg] = { landing, ...(hover ? { hover } : {}) };
+    else delete recordings[leg];
+    setTransport({ ...transport, recordings: Object.keys(recordings).length ? recordings : undefined });
   }
   function transportPilotIssue(options:NativeTransportOptions){
     if(!options.pilot||!options.pilotSeat)return 'Choose a real native pilot and driver seat, then review their animation binding.';
@@ -285,7 +293,10 @@ export default function RuntimeDock({
     return transportSeatsMatch(options)&&
       !transportCrewIssue(options)&&!transportCameraIssue(options)&&!transportPilotIssue(options)&&(!options.createPilot||refs.scriptCreatedPilots?.filter(name=>name===options.pilot).length===1)&&!transportFlightIssue(options)&&!transportRouteIssue(options)&&vehicles.length===1&&vehicles[0].pilotSeats?.filter(seat=>seat===options.pilotSeat).length===1&&refs.pilots.filter(value=>value===options.pilot).length===1&&
       [options.departureCue,options.arrivalCue].filter((cue):cue is string=>!!cue).every(cue=>nativeCameras?.scriptNames.filter(value=>value===cue).length===1)&&
-      [options.outbound,options.inbound,...(options.emptyInbound?[options.emptyInbound]:[])].every(route=>refs.routes.filter(value=>value===route).length===1)&&
+      nativeTransportLegs(options).every(leg=>{
+        const route = nativeTransportAiRoute(options, leg);
+        return route === undefined || refs.routes.filter(value=>value===route).length===1;
+      })&&
       ['_boarded','_called','_landed'].every(suffix=>refs.groups.includes(name+suffix));
   }
   let currentTransportIdentity:string|null=null, transportDraftSeatsChanged=false;
@@ -718,7 +729,7 @@ export default function RuntimeDock({
       const pilotIssue=transportPilotIssue(options);if(pilotIssue)throw Error(pilotIssue+' No draft was replaced.');
       const flightIssue=transportFlightIssue(options);if(flightIssue)throw Error(flightIssue+' Open AI & scenario → Edit native scenario & assets, select the matching native vehicle, then Native aircraft AI flight settings. Preview, Accept, Save/rebuild and read transport source again. No draft was replaced.');
       const routeIssue=transportRouteIssue(options);if(routeIssue)throw Error(routeIssue+' Open AI & scenario → Edit native scenario & assets → Map scenario → Existing AI command lists, review the route against the map, Preview/Accept, Save/rebuild and read transport source again. No draft was replaced.');
-      if(!transportReferencesMatch(reviewed))throw Error('Choose the actual named aircraft, one unique native pilot seat, a single-pilot encounter/squad with matching creation ownership, two nonempty native routes and all three dedicated signals. Read native transport source after authoring them; no source was replaced.');
+      if(!transportReferencesMatch(reviewed))throw Error('Choose the actual named aircraft, one unique native pilot seat, a single-pilot encounter/squad with matching creation ownership, reviewed native flight legs and all three dedicated signals. Read native transport source after authoring them; no source was replaced.');
       for(const name of [options.hub,options.field])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Missing or ambiguous native pad volume '+name+'. Author it with the existing scenario area tools, Save/rebuild and read source again.');
       const previous=inventory.modules.find(module=>module.filename.toLowerCase()===generated.filename.toLowerCase());
       let original:string|undefined;
@@ -1190,7 +1201,13 @@ export default function RuntimeDock({
                   </div>;})}
                   <button type="button" disabled={(transport.crew??[]).length>=8} onClick={()=>setTransport({...transport,crew:[...(transport.crew??[]),{group:'',seat:''}]})}>Add native crew assignment</button>
                 </details>
-                <label><input type="checkbox" checked={transport.returnAfterInsertion??false} onChange={event=>setTransport({...transport,returnAfterInsertion:event.target.checked,...(!event.target.checked?{trackPlayerInsertion:undefined,emptyInbound:undefined}:{})})}/>Return empty after insertion and recall for pickup</label>
+                <label><input type="checkbox" checked={transport.returnAfterInsertion??false} onChange={event=>{
+                  if (event.target.checked) { setTransport({...transport,returnAfterInsertion:true}); return; }
+                  const recordings = {...transport.recordings};
+                  delete recordings.emptyInbound;
+                  setTransport({...transport,returnAfterInsertion:false,trackPlayerInsertion:undefined,emptyInbound:undefined,
+                    recordings:Object.keys(recordings).length?recordings:undefined});
+                }}/>Return empty after insertion and recall for pickup</label>
                 {transport.returnAfterInsertion&&<label>Empty return command list<select aria-label="Empty return command list" value={transport.emptyInbound??''} onChange={event=>setTransport({...transport,emptyInbound:event.target.value||undefined})}>
                   <option value="">Reuse Return command list</option>
                   {transport.emptyInbound&&!modules?.transportReview?.routes.includes(transport.emptyInbound)&&<option value={transport.emptyInbound}>{transport.emptyInbound} · unavailable in current source</option>}
@@ -1198,6 +1215,29 @@ export default function RuntimeDock({
                 </select></label>}
                 <label><input type="checkbox" checked={transport.trackPlayerInsertion??false} disabled={!transport.returnAfterInsertion} onChange={event=>setTransport({...transport,trackPlayerInsertion:event.target.checked||undefined})}/>Confirm player insertion</label>
                 <p className="subtle">After every player passenger leaves and all permanent NPC crew remain correctly seated at the landing zone, the aircraft follows Empty return to the hub and waits there closed. If no separate route is selected, it follows Return. A real field recall sends it along Insertion again. Evacuation still requires actual boarding and the correct landing volume; gear settles only after the final return callback. Turn off to keep the aircraft at the landing zone. Reused routes must be safe in both phases; configure slower final approaches and real hull clearance.</p>
+                <details><summary>Recorded flight</summary>
+                  <p className="subtle">Choose recordings already embedded in this scenario for the selected aircraft and starting pose. An optional approach recording can hover before the landing recording starts. Author the landing clip to end with actual ground contact. A reviewed Forerunner build must report the native landed signal after playback cleanup.</p>
+                  {!modules?.transportRecordings?.length && <Notice>No suitable embedded recordings are available in the current native source. Read source again after authoring the scenario recordings.</Notice>}
+                  {nativeTransportLegs(transport).map(leg=>{
+                    const label = {outbound:'Insertion and recall',inbound:'Occupied return',emptyInbound:'Empty return'}[leg];
+                    const selected = transport.recordings?.[leg];
+                    const available = modules?.transportRecordings?.filter(row=>/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(row.name)) ?? [];
+                    const selectOptions = (value: string|undefined) => <>
+                      {value&&!available.some(row=>row.name===value)&&<option value={value}>Missing · {value}</option>}
+                      {available.map(row=><option key={row.name} value={row.name}>{row.name} · {row.ticks} ticks</option>)}
+                    </>;
+                    return <div key={leg}>
+                      <label>{label} landing recording<select value={selected?.landing??''} onChange={event=>updateTransportRecording(leg,event.target.value,selected?.hover)}>
+                        <option value="">{leg==='emptyInbound'?'Use configured return':'Use AI command list'}</option>
+                        {selectOptions(selected?.landing)}
+                      </select></label>
+                      {selected&&<label>{label} approach recording<select value={selected.hover??''} onChange={event=>updateTransportRecording(leg,selected.landing,event.target.value)}>
+                        <option value="">No intermediate hover</option>
+                        {selectOptions(selected.hover)}
+                      </select></label>}
+                    </div>;
+                  })}
+                </details>
                 <details><summary>Aircraft-relative cameras · optional</summary><p className="subtle">Select native points for insertion and evacuation departure. Their XYZ and orientation are offsets from the moving aircraft, not world positions. These shared cinematics affect all viewers, temporarily control input, then restore it; they are not private squad cameras. Empty returns and recall flights do not play them.</p>
                 {([['insertionCamera','Insertion relative camera'],['departureCamera','Departure relative camera']] as const).map(([field,label])=><div key={field}><label>{label}<select aria-label={label} value={transport[field]?.marker??''} onChange={event=>setTransport({...transport,[field]:event.target.value?{marker:event.target.value,durationMs:transport[field]?.durationMs??3000}:undefined})}><option value="">Off</option>{transport[field]&&!nativeCameras.cameras.some(point=>point.name===transport[field]?.marker)&&<option value={transport[field]!.marker}>Missing · {transport[field]!.marker}</option>}{nativeCameras.cameras.filter(point=>/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(point.name)).map(point=><option key={point.index} value={point.name}>{point.name}</option>)}</select></label>{transport[field]&&<><label>Duration · seconds<input aria-label={label+' duration'} type="number" min={0.1} max={30} step={0.1} value={transport[field]!.durationMs/1000} onChange={event=>setTransport({...transport,[field]:{...transport[field]!,durationMs:Math.round(Number(event.target.value)*1000)}})}/></label><p className="subtle">Native offset {nativeCameras.cameras.find(point=>point.name===transport[field]?.marker)?.position.join(', ')??'Unavailable'}. Edit pose/lens using AI & scenario → Edit native scenario & assets → Existing cutscene cameras. Add native camera point works when none exist; Preview → Accept → Save/rebuild → read source again.</p></>}</div>)}
                 </details>

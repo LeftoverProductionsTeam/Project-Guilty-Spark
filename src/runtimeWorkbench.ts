@@ -1,7 +1,7 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
 import type { NativePlayerProfile } from './firefight';
 import type { NativeOperation } from './nativeOperations';
-import type { NativeTransportOptions } from './haloScript';
+import { nativeTransportAiRoute, nativeTransportLegs, nativeTransportRecording, type NativeTransportOptions } from './haloScript';
 
 const localForgeFeature = 'forge.hmv_local_devices.v1';
 const localForgePhysicsFeature = 'forge.hmv_local_physics.v1';
@@ -165,6 +165,7 @@ export interface MissionHudSourcePlan {
 }
 export interface NativeScriptAttachment { filename:string;content:string;sha256:string;replacesSha256?:string|null }
 export interface WorkingScriptSources {
+  transportRecordings?: {name:string;version:number;ticks:number}[];
   missionReview?:{objects?:import('./nativeOperations').NativeNamedObject[]|null;objectIssue?:string|null;flags?:import('./nativeOperations').NativeCutsceneFlag[];extractionSquads?:{terminal:import('./nativeOperations').NativeSquadTerminal}[];weapons?:import('./nativeOperations').NativeMissionWeapon[];encounters:{name:string;initiallyCreated:boolean}[];squads:import('./nativeOperations').NativeScenarioSquad[];devices:import('./nativeOperations').NativeDevicePlacement[];protectedEncounters:string[];escortRoutes?:{name:string;finalPosition:[number,number,number]|null;arrivalVolumes:string[];issue:string|null}[]|null};
   transportReview?:{vehicles:{name:string;tagPath:string;seats:string[];pilotSeats?:string[];flight?:import('./nativeOperations').NativeVehicleFlight;flightIssue?:string}[];groups:string[];routes:string[];pilots:string[];scriptCreatedPilots?:string[];protectedGroups?:string[];pilotBindings?:{aircraft:string;pilot:string;actors:string[];animationGraphs:string[];seats:string[];issue:string|null;crewSeats?:string[];crewIssue?:string|null}[];flightRoutes?:{name:string;points:number;commands:number;finalPosition:[number,number,number]|null;arrivalVolumes:string[];issue:string|null}[]};
   cameraReview?:{tagIdentity:string;cameras:import('./nativeOperations').NativeCameraPoint[];scriptNames:string[];triggerVolumes:string[];scenarioType:number};
@@ -173,12 +174,30 @@ export interface WorkingScriptSources {
 }
 export interface WorkingScriptSource {selection:WorkingScriptSources;script:NativeScriptAttachment}
 
+export function nativeTransportRecordingIssue(
+  options: NativeTransportOptions,
+  recordings: WorkingScriptSources['transportRecordings'],
+): string | null {
+  for (const leg of nativeTransportLegs(options)) {
+    const recording = nativeTransportRecording(options, leg);
+    if (!recording) continue;
+    if (!options.holdParkedPilot) return 'Recorded flights need a dedicated deferred pilot with Hold parked pilot enabled.';
+    for (const name of [recording.landing, recording.hover]) {
+      if (name === undefined) continue;
+      if (!/^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(name)
+        || recordings?.filter(row => row.name.toLowerCase() === name.toLowerCase()).length !== 1
+        || !recordings.some(row => row.name === name)) return 'Refresh the native source and choose a unique embedded recording for ' + (name || 'the landing') + '.';
+    }
+    if (recording.landing.toLowerCase() === recording.hover?.toLowerCase()) return 'Choose a separate hover and landing recording.';
+  }
+  return null;
+}
+
 export function nativeTransportRouteIssue(
-  options: Pick<NativeTransportOptions, 'faction' | 'outbound' | 'inbound' | 'hub' | 'field' | 'returnAfterInsertion' | 'emptyInbound'>,
+  options: Pick<NativeTransportOptions, 'faction' | 'outbound' | 'inbound' | 'hub' | 'field' | 'returnAfterInsertion' | 'emptyInbound' | 'recordings'>,
   volumes: readonly string[],
   routes: NonNullable<WorkingScriptSources['transportReview']>['flightRoutes'],
 ): string | null {
-  if (!routes) return 'Read native transport source to inspect the actual flight commands and pad bounds.';
   const aircraft = options.faction === 'unsc' ? 'pelican' : 'spirit';
   const dedicatedHub = aircraft + '_return';
   const dedicatedField = 'extraction_' + aircraft + '_zone';
@@ -190,14 +209,19 @@ export function nativeTransportRouteIssue(
 
   const hubZones = ['extraction_return', 'pelican_return', 'spirit_return'];
   const fieldZones = ['extraction_zone', 'extraction_pelican_zone', 'extraction_spirit_zone'];
-  const checked = [
-    { name: options.outbound, pad: options.field, required: field, opposite: hubZones },
-    { name: options.inbound, pad: options.hub, required: hub, opposite: fieldZones },
-  ];
-  if (options.returnAfterInsertion && options.emptyInbound && options.emptyInbound !== options.inbound) {
-    checked.push({ name: options.emptyInbound, pad: options.hub, required: hub, opposite: fieldZones });
-  }
-  for (const { name, pad, required, opposite } of checked) {
+  for (const leg of nativeTransportLegs(options)) {
+    const insertion = leg === 'outbound';
+    const pad = insertion ? options.field : options.hub;
+    const required = insertion ? field : hub;
+    const opposite = insertion ? hubZones : fieldZones;
+    if (nativeTransportRecording(options, leg)) {
+      if (pad !== required || volumes.filter(volume => volume === pad).length !== 1) {
+        return 'Select ' + required + ' for the recorded flight so the controller and Forerunner use the same pad.';
+      }
+      continue;
+    }
+    if (!routes) return 'Read native transport source to inspect the actual flight commands and pad bounds.';
+    const name = nativeTransportAiRoute(options, leg);
     const selected = routes.filter(route => route.name === name);
     if (selected.length !== 1) return 'Choose a unique native flight route for ' + (pad || 'each pad') + '.';
     const [route] = selected;

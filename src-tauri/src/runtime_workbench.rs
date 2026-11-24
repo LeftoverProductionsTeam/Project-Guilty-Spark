@@ -356,6 +356,7 @@ pub(super) struct WorkingScriptSources {
     source_sha256:String,modules:Vec<WorkingScriptModule>,
     #[serde(skip_serializing_if="Option::is_none")] camera_review:Option<WorkingCameraReview>,
     #[serde(skip_serializing_if="Option::is_none")] transport_review:Option<core::native_operations::NativeTransportChoices>,
+    #[serde(skip_serializing_if="Option::is_none")] transport_recordings:Option<Vec<core::native_operations::NativeFlightRecording>>,
     #[serde(skip_serializing_if="Option::is_none")] mission_review:Option<WorkingMissionReview>,
 }
 #[derive(Serialize)]
@@ -395,7 +396,7 @@ fn working_script_inventory(state:&AppState,project_id:&str,build_id:&str,tags:&
         modules.push(WorkingScriptModule{filename:filename.into(),sha256,bytes,unavailable});
     }
     Ok((WorkingScriptSources{project_id:project.id,build_id:context.build.id,tags_directory:context.tags,
-        project_fingerprint:fingerprint.into(),source_sha256:identity,modules,camera_review:None,transport_review:None,mission_review:None},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
+        project_fingerprint:fingerprint.into(),source_sha256:identity,modules,camera_review:None,transport_review:None,transport_recordings:None,mission_review:None},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
 }
 #[tauri::command]
 pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:String,expected_build_id:String,
@@ -426,6 +427,7 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
                 choices.pilot_bindings=core::native_operations::native_transport_pilot_bindings(&values,&choices,|tag|native_operations_native::fields(&state,&project,&context.tags,tag).map_err(core::SparkError::Invalid),|tag|native_operations_native::animation_seats(&state,&project,&context.tags,tag).map_err(core::SparkError::Invalid)).map_err(error)?;
                 choices.protected_groups=native_operations_native::protected_transport_groups(&state,&project,&context.build)?.into_iter().collect();
                 choices.flight_routes=Some(core::native_operations::native_transport_routes(&values).map_err(error)?);
+                view.transport_recordings=core::native_operations::scenario_flight_recordings(&values).ok();
                 view.transport_review=Some(choices);
             }
             let latest=lock(&state.library)?.get(&project_id).map_err(error)?;if latest.fingerprint().map_err(error)?!=expected_project_fingerprint{return Err("Saved authoring changed during camera review".into());}let current=source_context(&state,&latest)?;

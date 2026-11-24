@@ -2,6 +2,54 @@
 //! field reader, reviewed source transaction and compiled marker decoder.
 use super::*;
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeFlightRecording {
+    pub name: String,
+    pub version: u8,
+    pub ticks: u16,
+}
+
+pub fn flight_recordings(fields: &str) -> Result<Vec<NativeFlightRecording>> {
+    let table = array_listing(fields, "recorded_animations")?;
+    if table.count > 1024 { return invalid("Recorded animation inventory exceeds 1024 entries"); }
+    let rows = array_items(&table, "recorded_animations")?;
+    let mut recordings = Vec::new();
+    let mut names = std::collections::HashSet::new();
+    let mut duplicates = std::collections::HashSet::new();
+    for row in rows {
+        let row = direct_struct_fields(row)?;
+        let name = native_name(&row)?;
+        let key = name.to_ascii_lowercase();
+        if !names.insert(key.clone()) { duplicates.insert(key); }
+        let version = number(&row, "version")?;
+        let ticks = number(&row, "length_of_animation")?;
+        if (1.0..=4.0).contains(&version) && version.fract() == 0.0
+            && (1.0..=i16::MAX as f64).contains(&ticks) && ticks.fract() == 0.0 {
+            recordings.push(NativeFlightRecording { name, version: version as u8, ticks: ticks as u16 });
+        }
+    }
+    recordings.retain(|row| !duplicates.contains(&row.name.to_ascii_lowercase()));
+    Ok(recordings)
+}
+
+#[cfg(test)]
+#[test]
+fn flight_inventory_rejects_unknown_versions_empty_durations_and_duplicate_names() {
+    let make = |index, name, version, ticks| format!(
+        "    recorded_animations[{index}] struct\n        name ({name}) string\n        version ({version}) int8\n        length_of_animation ({ticks}) int16\n"
+    );
+    let fields = "recorded_animations[5] array\n".to_string()
+        + &make(0, "land", 4, 90)
+        + &make(1, "approach", 4, 21)
+        + &make(2, "APPROACH", 6, 21)
+        + &make(3, "unknown", 6, 1)
+        + &make(4, "empty", 4, 0);
+    let rows = flight_recordings(&fields).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!((rows[0].name.as_str(), rows[0].version, rows[0].ticks), ("land", 4, 90));
+}
+
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct TransportAppend {pub name:String,pub tag_path:String,pub position:[f32;3],pub rotation_radians:[f32;3]}

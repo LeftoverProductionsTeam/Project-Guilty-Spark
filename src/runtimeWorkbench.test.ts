@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canHandoff, listingExpired, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
+import { canHandoff, listingExpired, nativeTransportRecordingIssue, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
 import type { CommunityJoinAssessment, CommunityListingView } from './runtimeWorkbench';
 
 const view: CommunityListingView = {
@@ -81,6 +81,21 @@ describe('native Extraction route review', () => {
     returnAfterInsertion: true,
     emptyInbound: 'empty',
   };
+
+  it('checks embedded recording identity and the native pad for a mixed flight', () => {
+    const options = {
+      ...legacy, createPilot: true, holdParkedPilot: true, pilot: 'pilot', pilotSeat: 'P-driver',
+      recordings: { outbound: { landing: 'land', hover: 'approach' } },
+    };
+    const recordings = ['land', 'approach'].map(name => ({ name, version: 4, ticks: 60 }));
+    const routes = [route('loaded', 'extraction_return'), route('empty', 'extraction_return')];
+    const volumes = ['extraction_return', 'extraction_zone'];
+    expect(nativeTransportRecordingIssue(options, recordings)).toBeNull();
+    expect(nativeTransportRecordingIssue(options, recordings.slice(0, 1))).toContain('approach');
+    expect(nativeTransportRecordingIssue(options, [...recordings, {...recordings[0], name: 'LAND'}])).toContain('unique');
+    expect(nativeTransportRouteIssue(options, volumes, routes)).toBeNull();
+    expect(nativeTransportRouteIssue({...options, field: 'other'}, volumes, routes)).toContain('extraction_zone');
+  });
 
   it('keeps shared runtime areas for legacy transports', () => {
     const volumes = ['extraction_return', 'extraction_zone'];

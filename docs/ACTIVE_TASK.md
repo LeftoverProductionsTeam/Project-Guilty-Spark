@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Stock b30 native readback and CE HaloScript compilation confirm the recorded hover and departure pattern. The pinned Black Echo bank/restart map is preserved. Batch resume now revalidates a controlled stop through the existing storage lease.
-Next action: Wire source-backed recording selection into the existing Black Echo transport editor, using authored map-specific recordings and the existing native pad/seat gates. Focused Forerunner landing precedes full faction replay. Next restore the original Zombie Apocalypse and advance physical MegaWorld connections. Verify native batch resume where it accelerates those goals.
+Latest verified revision: Spark selects reviewed embedded recordings for both faction transports. Native HaloScript compiled and read back both controllers. Forerunner 2f3df3586 gates landing on playback cleanup. Frozen Black Echo d113e9db is unchanged.
+Next action: Author or import Black Echo-specific Pelican and Spirit recordings. The retained reviewed scenario contains zero clips. Prove grounded landing using the pinned Forerunner fixture before full two-player faction replay. Original Zombie Apocalypse and physical MegaWorld connections follow in priority order.
 
 ## Acceptance
 
