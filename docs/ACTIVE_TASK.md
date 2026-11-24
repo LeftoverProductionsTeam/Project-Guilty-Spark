@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Black Echo 40d2ce85 boarded/departed; occupied hub landing open. Ubuntu Debian create/Save/restart/reopen and a10/b30 native numeric readback passed. See RUNTIME_INTEGRATION_20261107.
-Next action: Test surveyed east-pad approach after radius-only failed empty landing. Keep 40d2ce85 and native gates. Then banking/redeployment and desktop batch interruption.
+Latest verified revision: Black Echo split-return CE609 571f9479 completed one offline UNSC evacuation and checksum-valid native bank record check. Ubuntu Debian and native a10/b30 roundtrips also passed.
+Next action: Use retained 571f9479 to verify restart, redeployment and authenticated two-player settlement. Then Covenant gameplay and desktop batch interruption. See RUNTIME_INTEGRATION_20261107.
 
 ## Acceptance
 

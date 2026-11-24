@@ -205,25 +205,35 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   const scenario='transport.scenario',encounters=['pilot_pelican','pilot_spirit','be_covenant','be_marines','be_flood','be_defense'];
   const volumes=['extraction_return','extraction_zone','spirit_zone','be_survivors','be_containment'],devices=['extraction_deploy','extraction_activate'];
   await run('invader-edit',['-N',scenario]);
-  await run('invader-edit',['-n','-S','type','singleplayer','-I','vehicles','2','end','-I','controls','2','end','-I','object_names','4','end','-I','encounters',String(encounters.length),'end','-I','command_lists','2','end','-I','trigger_volumes',String(volumes.length),'end','-I','device_groups','6','end',scenario]);
+  await run('invader-edit',['-n','-S','type','singleplayer','-I','vehicles','2','end','-I','controls','2','end','-I','object_names','4','end','-I','encounters',String(encounters.length),'end','-I','command_lists','3','end','-I','trigger_volumes',String(volumes.length),'end','-I','device_groups','6','end',scenario]);
   const args=[];
   for(const [i,role]of ['pelican','spirit'].entries()){
    args.push('-S','object_names['+i+'].name','extraction_'+role,'-S','vehicles['+i+'].name',String(i));
    for(const [j,suffix]of ['boarded','called','landed'].entries())args.push('-S','device_groups['+(i*3+j)+'].name','extraction_'+role+'_'+suffix,'-S','device_groups['+(i*3+j)+'].initial_value','0');
   }
-  for(const[i,name]of ['field_route','hub_route'].entries())args.push('-S','command_lists['+i+'].name',name);
+  for(const[i,name]of ['field_route','hub_route','hub_empty'].entries())args.push('-S','command_lists['+i+'].name',name);
   for(const [i,name]of volumes.entries())args.push('-S','trigger_volumes['+i+'].name',name);
   for(const [i,name]of encounters.entries())args.push('-S','encounters['+i+'].name',name);
   for(const [i,name]of devices.entries())args.push('-S','object_names['+(i+2)+'].name',name,'-S','controls['+i+'].name',String(i+2));
   await run('invader-edit',['-n',...args,scenario]);
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');
   const results=[];
-  for(const [returnAfterInsertion,holdParkedPilot,checkPlayerSeats] of [[false,false,false],[true,false,false],[false,true,false],[true,true,false],[true,true,true]]){
+  for(const [returnAfterInsertion,holdParkedPilot,checkPlayerSeats,emptyRoute] of [[false,false,false],[true,false,false],[false,true,false],[true,true,false],[true,true,true],[true,true,true,true]]){
    const sources=[];
    for(const faction of ['unsc','covenant']){
     const role=faction==='unsc'?'pelican':'spirit';const options={faction,pilot:'pilot_'+role,pilotSeat:faction==='unsc'?'P-driver':'CD-driver',outbound:'field_route',inbound:'hub_route',hub:'extraction_return',field:faction==='covenant'?'spirit_zone':'extraction_zone',departureCue:'depart_cue',arrivalCue:'arrive_cue',...(returnAfterInsertion?{returnAfterInsertion:true,trackPlayerInsertion:true}:{}),...(holdParkedPilot?{createPilot:true,holdParkedPilot:true}:{})};
     if(checkPlayerSeats)options.occupancySeats=[options.pilotSeat,...Array.from({length:faction==='unsc'?7:12},(_,i)=>'passenger'+i),'gunseat'];
+    if(emptyRoute)options.emptyInbound='hub_empty';
     const source=exportHaloCeTransport(options);
+    if(emptyRoute){
+     const trip=source.content.slice(source.content.indexOf('(script continuous gs_'+role+'_trip'));
+     const flights=[...trip.matchAll(/\(ai_command_list [^ ]+ ([^ )]+)\)/g)].map(match=>match[1]);
+     assert.deepEqual(flights,['field_route','hub_empty','field_route','hub_route']);
+     assert.ok(source.dependencies.includes('command_list:hub_empty'));
+     assert.deepEqual(readNativeTransportSource(source.content),options);
+     assert.throws(()=>exportHaloCeTransport({...options,returnAfterInsertion:false,trackPlayerInsertion:false}),/empty return route requires/i);
+     assert.throws(()=>exportHaloCeTransport({...options,emptyInbound:'field_route'}),/must be distinct/);
+    }
     if(holdParkedPilot&&!checkPlayerSeats){
      assert.throws(()=>exportHaloCeTransport({...options,createPilot:false}),/dedicated deferred pilot/);
      const pilot=options.pilot,freeze='(ai_braindead '+pilot+' true)',resume='(ai_braindead '+pilot+' false)';

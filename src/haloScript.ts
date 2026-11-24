@@ -1002,8 +1002,10 @@ export interface NativeTransportOptions {
   departureCamera?:{marker:string;durationMs:number};
   /** Complete seat labels from the reviewed vehicle for player occupancy checks. */
   occupancySeats?:string[];
-  /** Reuse the reviewed return/insertion routes for empty hub return and recall. */
+  /** Return to the hub after insertion, then reuse the insertion route for recall. */
   returnAfterInsertion?:boolean;
+  /** Optional native hub route used only when returning without player passengers. */
+  emptyInbound?:string;
   /** Record an actual surviving rider leaving the first grounded insertion. */
   trackPlayerInsertion?:boolean;
   /** Explicit ownership of a not-initially-created native pilot. */
@@ -1023,7 +1025,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   return generateNativeTransport(options);
 }
 function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHold=false):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew','occupancySeats'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','returnAfterInsertion','emptyInbound','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew','occupancySeats'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
   if(options.createPilot!==undefined&&typeof options.createPilot!=='boolean')throw Error('Choose pilot creation ownership explicitly.');
@@ -1031,6 +1033,9 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
   const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
   const outbound=ensureName(options.outbound,'Insertion command list'),inbound=ensureName(options.inbound,'Return command list');
+  if(options.emptyInbound!==undefined&&!options.returnAfterInsertion)throw Error('An empty return route requires Return empty after insertion.');
+  const emptyInbound=options.emptyInbound===undefined?inbound:ensureName(options.emptyInbound,'Empty return command list');
+  if(emptyInbound===outbound)throw Error('The empty return and insertion command lists must be distinct.');
   const hub=ensureName(options.hub,'Hub volume'),field=ensureName(options.field,'Landing volume');
   if(hub===field||outbound===inbound)throw Error('Use distinct hub/landing volumes and insertion/return command lists.');
   if(!nativeSeatLabel(options.pilotSeat))
@@ -1170,7 +1175,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
       waitFor(fieldEmpty),
       ...confirmArrival,
       ...(occupancySeats&&options.trackPlayerInsertion&&!options.holdParkedPilot?[waitFor(fieldEmpty)]:[]),
-      ...depart(inbound,fieldEmpty),
+      ...depart(emptyInbound,fieldEmpty),
       ...arriveAt(hub),
       '  ; Keep the empty ship closed while the deployed field crew requests pickup.',
       waitFor(recall),
@@ -1190,6 +1195,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
     ')',''];
   return {filename:stem+'_transport.hsc',content:lines.join('\n'),generatedOnly:true,scenarioType:'singleplayer',
     dependencies:['native_vehicle:'+craft,'ai_encounter:'+pilot,'command_list:'+outbound,'command_list:'+inbound,
+      ...(emptyInbound===inbound?[]:['command_list:'+emptyInbound]),
       ...crew.map(member=>'ai_encounter:'+member.group),'trigger_volume:'+hub,'trigger_volume:'+field,...['_boarded','_called','_landed'].map(suffix=>'device_group:'+craft+suffix),
       ...cues.filter((cue):cue is string=>!!cue).map(cue=>'script:'+cue),...[options.insertionCamera,options.departureCamera].filter(camera=>!!camera).map(camera=>'cutscene_camera_point:'+camera!.marker)],
     warnings:['Forerunner native transport groups and crew callbacks are required. Legacy engines do not drive these outputs.',
