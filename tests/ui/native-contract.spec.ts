@@ -5153,11 +5153,11 @@ test('solo transport native names use actual asset instances, Save and Undo with
 });
 
 
-async function mockNativeCommandRoutes(page:Page){
- await mockDesktop(page);await page.evaluate(()=>{
+async function mockNativeCommandRoutes(page:Page,withFacing=false){
+ await mockDesktop(page);await page.evaluate(({withFacing})=>{
   const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;
   p.builds=[{id:'command-source',timestamp:'',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'c'.repeat(64),message:'Synthetic owned source'}];
-  const command={atom:'go_to',modifier:0,parameters:[0,0],point1:0,point2:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1};
+  const command={atom:withFacing?'go_to_and_face':'go_to',modifier:withFacing?1:0,parameters:[0,0],point1:0,point2:withFacing?1:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1};
   w.__sparkMock.commandLists=[{index:0,name:'pilot_insert',flags:[false,false,false,false,false,false],bsp:-1,commands:[command],points:[[0,0,1],[4,0,2]]},{index:1,name:'pilot_return',flags:[false,false,false,false,false,false],bsp:-1,commands:[command],points:[[2,3,1],[4,5,3],[8,8,1]]}];
   w.__sparkMock.commandOriginal=structuredClone(w.__sparkMock.commandLists);w.__sparkMock.commandSha='a'.repeat(64);w.__sparkMock.commandProtected=[];w.__sparkMock.commandPreviews=[];
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
@@ -5175,7 +5175,7 @@ async function mockNativeCommandRoutes(page:Page){
    }
    return invoke(command,args);
   };
- });
+ },{withFacing});
  await openFixture(page);await chooseTool(page,'AI & scenario');
  const native=page.locator('.native-tag-operations:visible');if(await native.getAttribute('open')===null)await native.locator(':scope > summary').click();
  const form=page.locator('.native-command-lists:visible');await form.locator(':scope > summary').click();return form;
@@ -5195,6 +5195,21 @@ test('native command arrival radius uses world units and refuses nonpositive aut
  await preview.click();
  const proposed=await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1));
  expect(proposed.list.commands[0]).toMatchObject({atom:'set_radius',parameters:[3.5,0]});
+});
+
+test('Stop without facing clears only the selected command heading',async({page})=>{
+ const form=await mockNativeCommandRoutes(page,true);
+ await expect(form.getByRole('combobox',{name:'Native command action',exact:true})).toHaveValue('go_to_and_face');
+ await form.locator('summary').filter({hasText:'Native references'}).click();
+ await expect(form.getByRole('spinbutton',{name:'Command Point 2',exact:true})).toHaveValue('1');
+ await form.getByRole('button',{name:'Stop without facing',exact:true}).click();
+ await expect(form.getByRole('combobox',{name:'Native command action',exact:true})).toHaveValue('go_to');
+ await expect(form.getByRole('combobox',{name:'Command go-to movement',exact:true})).toHaveValue('0');
+ await expect(form.getByRole('spinbutton',{name:'Command Point 2',exact:true})).toHaveValue('-1');
+ await form.getByRole('button',{name:'Preview command list',exact:true}).click();
+ const edit=await page.evaluate(()=>(window as any).__sparkMock.commandPreviews.at(-1));
+ expect(edit.list.commands).toEqual([{atom:'go_to',modifier:0,parameters:[0,0],point1:0,point2:-1,animation:-1,script:-1,recording:-1,command:-1,objectName:-1}]);
+ expect(edit.list.points).toEqual([[0,0,1],[4,0,2]]);
 });
 
 test('native command route points move visually and return to exact reviewed source and point',async({page},testInfo)=>{
