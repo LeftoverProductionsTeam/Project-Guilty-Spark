@@ -165,3 +165,12 @@ The existing qa_megaworld_ce command now accepts the local JSON evidence receipt
 The explicit recover-known-stock path compiled the saved 6.5-unit road, 2-unit infantry cave and 4-unit high-ground route with H1A Tool and Invader. CE609 cache SHA-256 0f86e1609d26f386d048e5642a60cf97a29f4ce3d96e058e344ceecbd0a49881. Invader reported zero CRC mismatches, protected status and stubs. Spark independently read back 16,124 collision triangles, one resident BSP, 42 donor scenery placements and 524 standing clearance samples: 133 road, 193 infantry cave and 198 ridge. The compiled receipt now reports those rows individually. Both originals and all three bank hashes matched the retained inputs. All 21 focused BSP tests passed. Owned scratch cleanup completed, disposing 1,115,676,705 logical bytes.
 
 No game session ran. Two-way pedestrian and Warthog traversal, dynamic scenery clearance, doors, sightlines and expansion from two regions remain open.
+
+
+## 24 November - Native two-way Warthog trial setup
+
+Run prepare-megaworld-walkthrough.mjs with the Invader folder, the exact validated native job directory, a fresh managed output path, and --drive <compiled.gsproject>. It confirms the parent CE cache hash and three authored routes, overlays only the scenario, and places the two original stock Warthogs enabled by default in Slayer and CTF at opposite approaches. Native readback verifies both original vehicle slots, type, team, eight spawn flags, position and rotation. The existing 68 start slots keep their gametype settings.
+
+The guided CE609 test map gsmegaroad.map SHA-256 is 59542651cd6bba4d447acea25cbe2e62299f7b19526d27ef0e95f3df50aed47d. Against parent cd24914cd931eb42b9e50a9c77991d8b651f9ada2ef48c6fe7bf3fcff35fe33c the native BSP extracted byte-identically. The CRC passed. Warthog slots 7 and 9 face east and west at (42.312,32.849,-21.075) and (68.100,36.049,-21.075). The independent collision check found 16,124 triangles, 68 clear starts and 524 samples each way.
+
+The first return check erroneously reversed the authored terrain seam and tripped its east-west source validation. The fix reverses sample order for every route, including seam sections, while keeping authored orientation. Twelve clearance and 21 assembly tests passed. Originals and all three resource banks rehashed exactly. The compile workspace and its alias were cleaned; only a bounded read-only handoff copy was staged for the companion. Actual game driving, walking, doors and peer acceptance remain open.

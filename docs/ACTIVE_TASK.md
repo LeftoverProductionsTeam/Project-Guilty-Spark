@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: The preserved authored road, cave and ridge recipe compiled to CE609 0f86e160. Named compiled clearance reports 133/193/198 standing samples. Evidence is in MEGAWORLD_SEAM_ROUTES_20261108.md. Zombie carrier 711aa74, Batch Editing f3f750a and frozen Black Echo d113e9db remain verified within their recorded scope.
-Next action: Verify two-way foot and Warthog traversal on the replayed three-route plan in a reviewed runtime. Capture Black Echo Pelican and Spirit clips when Windows XInput is available. Preserve d113e9db and frozen Forerunner 64c8d93d. Seek matching Zombie audio and the reviewed Gearbox Tool.
+Latest verified revision: Native CE609 Warthog trial 59542651 preserves the authored three-route BSP. Two original vehicles and 68 starts passed readback, with 524 samples in each direction. See MEGAWORLD_SEAM_ROUTES_20261108.md. The Zombie MCC carrier and frozen Black Echo d113e9db evidence remain intact.
+Next action: Run the private two-way infantry and guest Warthog trial on the reviewed runtime. Capture Black Echo Pelican and Spirit clips when Windows XInput is available. Preserve d113e9db and frozen Forerunner 64c8d93d. Add the reviewed Zombie carrier inertia correction; find the missing audio and Gearbox Tool.
 
 ## Acceptance
 

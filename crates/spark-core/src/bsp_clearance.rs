@@ -318,11 +318,20 @@ impl RouteChecker {
     pub(crate) fn verify(&self, assembly: &BspAssembly) -> Result<usize> {
         Ok(self.verify_details(assembly)?.iter().map(|route|route.walk_samples).sum())
     }
+    pub(crate) fn verify_return(&self, assembly: &BspAssembly) -> Result<usize> {
+        Ok(self.verify_details_in_order(assembly, true)?.iter().map(|route| route.walk_samples).sum())
+    }
     pub(crate) fn verify_details(&self, assembly: &BspAssembly) -> Result<Vec<crate::bsp_assembly::RouteClearance>> {
+        self.verify_details_in_order(assembly, false)
+    }
+    fn verify_details_in_order(&self, assembly: &BspAssembly, reverse: bool) -> Result<Vec<crate::bsp_assembly::RouteClearance>> {
         assembly.validate()?;
-        assembly.connection_routes().iter().enumerate().map(|(index, route)| {
+        assembly.connection_routes().into_iter().enumerate().map(|(index, mut route)| {
             let label = assembly.route_label(index);
-            self.verify_one(route, label == "High-ground route").map(|walk_samples|crate::bsp_assembly::RouteClearance {
+            // Direction changes the sample order. The authored seam must still
+            // keep its original orientation for boundary and material validation.
+            if reverse { route.tunnel_points.reverse(); }
+            self.verify_one(&route, label == "High-ground route").map(|walk_samples|crate::bsp_assembly::RouteClearance {
                 label:label.into(),width:route.tunnel_width,clear_height:route.tunnel_height,walk_samples,
             }).map_err(|e| SparkError::Invalid(format!("{label}: {e}")))
         }).collect()
@@ -490,6 +499,24 @@ mod tests {
         );
         let error = verify_route(&m, &plan()).unwrap_err().to_string();
         assert!(error.contains("clearance in segment 1 near 5.00, 0.00, 0.00"), "{error}");
+    }
+    #[test]
+    fn return_sampling_keeps_the_authored_terrain_orientation() {
+        let mut road = plan();
+        road.open_road = true;
+        road.tunnel_width = 6.;
+        road.tunnel_height = 4.;
+        road.terrain_seam = Some(crate::bsp_assembly::TerrainSeam {
+            shoulder_width: 8.,
+            bank_height: 0.,
+            base_shader_path: "fixture/grass".into(),
+            donor_shader_path: "fixture/snow".into(),
+        });
+        let mesh = corridor(road.tunnel_width.into(), road.tunnel_height.into());
+        let checker = RouteChecker::new(&mesh).unwrap();
+        assert_eq!(checker.verify(&road).unwrap(), checker.verify_return(&road).unwrap());
+        road.tunnel_points.reverse();
+        assert!(checker.verify_return(&road).unwrap_err().to_string().contains("east/west boundaries"));
     }
     #[test]
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {

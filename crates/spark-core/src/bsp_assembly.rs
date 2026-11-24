@@ -1195,11 +1195,7 @@ pub fn verify_compiled_walkthrough(path: &Path, route: &BspAssembly) -> Result<C
     let (collision, _) = maps::collision_source(path, &inspection)?;
     let checker = crate::bsp_clearance::RouteChecker::new(&collision)?;
     let forward_samples = checker.verify(route)?;
-    let mut reverse = route.clone();
-    reverse.tunnel_points.reverse();
-    if let Some(tunnel) = &mut reverse.infantry_tunnel { tunnel.points.reverse(); }
-    if let Some(ridge) = &mut reverse.high_ground { ridge.points.reverse(); }
-    let return_samples = checker.verify(&reverse)?;
+    let return_samples = checker.verify_return(route)?;
     let points = inspection.objects.iter().filter(|o| o.kind == "Player spawn").collect::<Vec<_>>();
     if points.is_empty() || points.len() > 4096 {
         return invalid("Walkthrough requires 1-4096 actual native player starts");
@@ -1898,8 +1894,7 @@ mod tests {
         assert_eq!(report.iter().map(|route|route.label.as_str()).collect::<Vec<_>>(),["Primary connection","Infantry tunnel","High-ground route"]);
         assert!(report.iter().all(|route|route.walk_samples>=400));
         let total=checker.verify(&plan).unwrap();assert_eq!(total,report.iter().map(|route|route.walk_samples).sum::<usize>());
-        let mut reverse=plan.clone();reverse.tunnel_points.reverse();reverse.infantry_tunnel.as_mut().unwrap().points.reverse();reverse.high_ground.as_mut().unwrap().points.reverse();
-        assert_eq!(checker.verify(&reverse).unwrap(),total);
+        assert_eq!(checker.verify_return(&plan).unwrap(),total);
         // Lower collision within the legacy floor-search tolerance must not
         // falsely certify an elevated sniper route.
         plan.high_ground.as_mut().unwrap().points=vec![[0.,-12.,7.],[100.,-12.,7.]];
