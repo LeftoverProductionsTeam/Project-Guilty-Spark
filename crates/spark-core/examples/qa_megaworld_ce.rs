@@ -1,15 +1,59 @@
 //! Real two-original-region native CE compiler acceptance. Player proof is separate.
-use spark_core::{bsp_assembly,library::Library,project::{self,EngineBuildTarget},runtime::RuntimeId,Result};
-use std::{fs,path::Path,sync::{Arc,atomic::AtomicBool}};
+use spark_core::{bsp_assembly::{self, BspAssembly},library::Library,project::{self,EngineBuildTarget,Project},runtime::RuntimeId,Result,SparkError};
+use std::{fs,io::Read,path::Path,sync::{Arc,atomic::AtomicBool}};
+
+fn reviewed_plan(path: &Path, base: &Project) -> Result<BspAssembly> {
+    let source = base.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
+    if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
+        spark_core::reject_links(path)?;
+        let mut bytes = Vec::new();
+        fs::File::open(path)?.take(256 * 1024 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() > 256 * 1024 {
+            return spark_core::invalid("Reviewed seam receipt is larger than 256 KiB");
+        }
+        let receipt: serde_json::Value = serde_json::from_slice(&bytes)?;
+        let base_name = source.original_path.file_name().and_then(|name| name.to_str());
+        if receipt["schemaVersion"].as_u64() != Some(1) || !receipt["originalSources"].as_array().is_some_and(|originals| {
+            originals.iter().any(|entry| entry["sha256"].as_str() == Some(&source.sha256)
+                && entry["name"].as_str().zip(base_name).is_some_and(|(recorded, actual)| recorded.eq_ignore_ascii_case(actual)))
+        }) {
+            return spark_core::invalid("Reviewed seam receipt belongs to a different base cache");
+        }
+        let plan = receipt.pointer("/recipe/plan")
+            .ok_or_else(|| SparkError::Invalid("Reviewed seam receipt has no authored plan".into()))?;
+        Ok(serde_json::from_value(plan.clone())?)
+    } else {
+        let prior = project::load_project(path)?;
+        if prior.source.as_ref().map(|source| source.sha256.as_str()) != Some(&source.sha256) {
+            return spark_core::invalid("Previous connection belongs to a different base cache");
+        }
+        prior.bsp_assembly.ok_or_else(|| SparkError::Invalid("Previous project has no connection".into()))
+    }
+}
+
 fn main()->Result<()>{
     let a=std::env::args().skip(1).collect::<Vec<_>>();
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous connection project or auto>");}
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
+    let recovered = matches!(a[2].as_str(), "recover" | "recover-known-stock");
+    let recipe_path = Path::new(&a[6]);
+    let reviewed = if matches!(a[6].as_str(), "auto" | "terrain") {
+        None
+    } else {
+        let plan = reviewed_plan(recipe_path, &p)?;
+        let source = donor.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing donor source".into()))?;
+        if plan.donor_source.sha256 != source.sha256 || plan.donor_bsp_index != 0
+            || plan.donor_source.resource_sha256 != source.resource_sha256 {
+            return spark_core::invalid("Previous donor cache, BSP or resource banks differ from this native build");
+        }
+        plan.validate()?;
+        Some(plan)
+    };
     // Use the existing source-bound extraction/receipts instead of copying an
     // SDK when verifying a joined pair of owner-installed original caches.
-    let (tags, donor_tags) = if matches!(a[2].as_str(), "recover" | "recover-known-stock") {
+    let (tags, donor_tags) = if recovered {
         let inputs = out.join("source-inputs");
         fs::create_dir(&inputs)?;
         let tools = spark_core::build::Toolchain { invader_directory: Some(fs::canonicalize(&a[4])?), ..Default::default() };
@@ -44,15 +88,25 @@ fn main()->Result<()>{
         } else { source };
         (tags, recover(&donor, &j, "sbsp")?)
     } else { let tags = fs::canonicalize(&a[2])?; (tags.clone(), tags) };
-    let mut plan=if a[6]=="terrain"{bsp_assembly::plan_terrain(&p,&i,&donor,&j,0,donor_tags.clone())?}else{bsp_assembly::plan(&p,&i,&donor,&j,0,donor_tags.clone())?};
-    if a[6]!="auto"&&a[6]!="terrain"{let prior=project::load_project(Path::new(&a[6]))?;let known=prior.bsp_assembly.ok_or_else(||spark_core::SparkError::Invalid("Previous plan has no connection".into()))?;
-        if !matches!(a[2].as_str(), "recover" | "recover-known-stock") {
-            if known.donor_source.sha256 != plan.donor_source.sha256 || known.donor_bsp_index != plan.donor_bsp_index { return spark_core::invalid("Previous donor input identity differs from this native build"); }
-            spark_core::reject_links(&known.donor_tags_directory)?;
-            plan.donor_tags_directory=fs::canonicalize(&known.donor_tags_directory)?;
+    let mut plan = match a[6].as_str() {
+        "terrain" => bsp_assembly::plan_terrain(&p,&i,&donor,&j,0,donor_tags)?,
+        "auto" => bsp_assembly::plan(&p,&i,&donor,&j,0,donor_tags)?,
+        _ => {
+            let mut known = reviewed.ok_or_else(|| SparkError::Invalid("Missing reviewed connection".into()))?;
+            known.donor_project_id.clone_from(&donor.id);
+            known.donor_source = donor.source.clone().ok_or_else(|| SparkError::Invalid("Missing donor source".into()))?;
+            if recovered || recipe_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
+                known.donor_tags_directory = donor_tags;
+            } else {
+                spark_core::reject_links(&known.donor_tags_directory)?;
+                known.donor_tags_directory = fs::canonicalize(&known.donor_tags_directory)?;
+            }
+            known
         }
-        plan.translation=known.translation;plan.yaw_degrees=known.yaw_degrees;plan.tunnel_points=known.tunnel_points;plan.tunnel_width=known.tunnel_width;plan.tunnel_height=known.tunnel_height;plan.tunnel_shader_path=known.tunnel_shader_path;plan.visibility_zones=known.visibility_zones;plan.open_road=known.open_road;plan.infantry_tunnel=known.infantry_tunnel;plan.high_ground=known.high_ground;plan.terrain_seam=known.terrain_seam;plan.sections=known.sections;plan.arch_segments=known.arch_segments;}
-    plan.include_donor_scenery=true;p.bsp_assembly=Some(plan);p.title="C43 Timberland + Sidewinder CE".into();
+    };
+    if matches!(a[6].as_str(), "auto" | "terrain") { plan.include_donor_scenery = true; }
+    plan.validate()?;
+    p.bsp_assembly=Some(plan);p.title="C43 Timberland + Sidewinder CE".into();
     let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:"Reviewed CE source for Chupathingy".into(),runtime_id:RuntimeId::ChupathingyCe,builder:"invader-ce".into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
     project::save_project(&out.join("connection.gsproject"),&p)?;lib.save(&p,Some(&i))?;
     let id=uuid::Uuid::new_v4().to_string();let log=out.join("native-events.jsonl");

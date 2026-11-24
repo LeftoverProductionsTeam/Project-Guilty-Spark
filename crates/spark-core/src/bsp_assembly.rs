@@ -1166,6 +1166,7 @@ pub struct CompiledRouteReport {
     pub cache_sha256: String,
     pub collision_triangles: usize,
     pub walk_samples: Vec<usize>,
+    pub route_clearance: Vec<Vec<RouteClearance>>,
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1223,15 +1224,19 @@ pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<Com
     let (collision, _) = maps::collision_source(path, &inspection)?;
     let checker = crate::bsp_clearance::RouteChecker::new(&collision)?;
     let mut walk_samples = Vec::with_capacity(routes.len());
+    let mut route_clearance = Vec::with_capacity(routes.len());
     for (index, route) in routes.iter().enumerate() {
-        walk_samples.push(checker.verify(route).map_err(|error| {
+        let details = checker.verify_details(route).map_err(|error| {
             SparkError::Invalid(format!("Connection {} ({}): {error}", index + 1, route.donor_title))
-        })?);
+        })?;
+        walk_samples.push(details.iter().map(|detail| detail.walk_samples).sum());
+        route_clearance.push(details);
     }
     Ok(CompiledRouteReport {
         cache_sha256: inspection.sha256,
         collision_triangles: collision.indices.len() / 3,
         walk_samples,
+        route_clearance,
     })
 }
 fn playable_anchor(
