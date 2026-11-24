@@ -431,6 +431,14 @@ async function prepareAllocationMeter(run, finish) {
           (error, stdout) => (error ? reject(error) : resolve(stdout)),
         ),
       );
+      // A successful child can occasionally close a Windows pipe before
+      // delivering its complete summary. Only a fresh, complete inventory
+      // can satisfy the budget checks below.
+      if (!text.trimEnd().endsWith('}')) {
+        if (attempt === 2) throw Error('Native allocation meter returned an incomplete summary in three scans');
+        await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 80 : 200));
+        continue;
+      }
       const value = JSON.parse(text);
       childCpuMs += value.processCpuMs ?? 0;
       const retryable = value.errors > 0 && value.errors === value.transientErrors + (value.busyErrors ?? 0) && !value.reparseEntries;

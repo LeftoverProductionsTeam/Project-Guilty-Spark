@@ -221,6 +221,47 @@ test('a monitor failure retires its completed receipt without turning failure in
   assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
 });
 
+test('native allocation monitoring repeats an incomplete summary and fails closed on repeated truncation', {skip: process.platform !== 'win32'}, async (t) => {
+  const compiler = path.join(process.env.SystemRoot ?? 'C:/Windows', 'Microsoft.NET/Framework64/v4.0.30319/csc.exe');
+  if (!(await fs.stat(compiler).catch(() => null))?.isFile()) {
+    t.skip('Native Windows metadata compiler unavailable');
+    return;
+  }
+  const env = {...process.env};
+  for (const key of ['CARGO_TARGET_DIR', 'SPARK_BUILD_WORKSPACE', 'SPARK_BUILD_NONCE', 'SPARK_GENERATED_ROOT', 'SPARK_QA_STORAGE_ROOT']) delete env[key];
+  const source = new URL('./native-qa-storage.mjs', import.meta.url).href;
+  const input = `
+    import processHelpers from 'node:child_process';
+    import {syncBuiltinESMExports} from 'node:module';
+    import assert from 'node:assert/strict';
+    const original = processHelpers.execFile;
+    let truncated = 0, complete = 0, persistent = false;
+    processHelpers.execFile = (file, args, options, callback) => original(file, args, options, (error, stdout, stderr) => {
+      if (!error && String(file).endsWith('allocation-meter.exe') && args[0] === '--summary') {
+        if (persistent || truncated === 0) {
+          truncated++;
+          callback(null, '{', stderr);
+          return;
+        }
+        complete++;
+      }
+      callback(error, stdout, stderr);
+    });
+    syncBuiltinESMExports();
+    const {withDevelopmentWorkspace} = await import(${JSON.stringify(source)});
+    const opts = {reservationBytes: 512 * 1024 ** 2};
+    await withDevelopmentWorkspace('allocation-truncated-once', async () => {}, opts);
+    assert.equal(truncated, 1);
+    assert.ok(complete > 0);
+    persistent = true;
+    await assert.rejects(withDevelopmentWorkspace('allocation-persistent-truncation', async () => {}, opts), /incomplete summary in three scans/);
+    assert.ok(truncated >= 4);
+  `;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', input], {env, encoding: 'utf8', windowsHide: true, timeout: 25000});
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal([...run.stdout.matchAll(/"temporaryOutputDisposed":true/g)].length, 2);
+});
+
 async function fixture(run) {
   const temporaryParent = await fs.realpath(os.tmpdir());
   const root = await fs.mkdtemp(path.join(temporaryParent, 'spark-qa-storage-'));
