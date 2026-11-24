@@ -27,6 +27,21 @@ pub struct Match {
     pub path: String,
     pub field: String,
     pub label: String,
+    pub kind: String,
+    pub unit: String,
+}
+
+impl Match {
+    pub fn present_in(&self, tags: &[Tag]) -> bool {
+        let identity = Rule {
+            class: self.class.clone(),
+            path: self.path.clone(),
+            field: self.field.clone(),
+            value: 0.0,
+        };
+        one_field(tags, &identity)
+            .is_ok_and(|(_, field)| field.kind == self.kind && field.unit == self.unit)
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -64,7 +79,10 @@ pub fn search(inspection: &MapInspection, query: &str) -> Vec<Match> {
             }
             let text = format!("{} {} {} {}", tag.class, normalized(&tag.path), field.key, field.label);
             query.split_whitespace().all(|term| text.to_ascii_lowercase().contains(term))
-                .then(|| Match { class: tag.class.clone(), path: normalized(&tag.path), field: field.key.clone(), label: field.label.clone() })
+                .then(|| Match {
+                    class: tag.class.clone(), path: normalized(&tag.path), field: field.key.clone(),
+                    label: field.label.clone(), kind: field.kind.clone(), unit: field.unit.clone(),
+                })
         }))
         .take(60)
         .collect()
@@ -202,6 +220,25 @@ mod tests {
         external.external = true;
         assert!(one_field(&[external], &rule()).is_err());
         assert!(one_field(&[tag(7), tag(21)], &rule()).is_err());
+    }
+
+    #[test]
+    fn field_search_availability_requires_one_matching_local_schema() {
+        let field = Match {
+            class: "weap".into(), path: "weapons/pistol/pistol".into(), field: "test-rate".into(),
+            label: "Rate".into(), kind: "f32".into(), unit: "rounds/s".into(),
+        };
+        assert!(field.present_in(&[tag(19)]));
+        assert!(!field.present_in(&[tag(19), tag(20)]));
+        let mut other = tag(19);
+        other.fields[0].unit = "seconds".into();
+        assert!(!field.present_in(&[other.clone()]));
+        other.fields[0].unit = field.unit.clone();
+        other.fields[0].kind = "i16".into();
+        assert!(!field.present_in(&[other.clone()]));
+        other.fields[0].kind = field.kind.clone();
+        other.external = true;
+        assert!(!field.present_in(&[other]));
     }
 
     #[test]

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { call, native } from '../api';
 import type { LibraryEntry } from '../types';
 
-type Field = { class: string; path: string; field: string; label: string };
+type Field = { class: string; path: string; field: string; label: string; matchingProjectIds: string[] };
+type FieldSearch = { fields: Field[]; unreadableMaps: { projectId: string; problem: string }[] };
 type Edit = { before: number; after: number; kind: string; unit: string; sourceSha256: string; cacheVersion: number };
 type Preview = { rows: { projectId: string; edit: Edit | null; problem: string | null }[]; reviewSha256: string | null };
 type Outcome = { batchId: string; published: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
@@ -13,8 +14,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
   const ids = selected.filter((id) => savedMaps.some((entry) => entry.id === id));
   const [mapQuery, setMapQuery] = useState('');
   const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<Field[]>([]);
-  const [searched, setSearched] = useState(false);
+  const [search, setSearch] = useState<FieldSearch>();
   const [field, setField] = useState<Field>();
   const [value, setValue] = useState('');
   const [preview, setPreview] = useState<Preview>();
@@ -26,11 +26,11 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
   const title = (id: string) => entries.find((entry) => entry.id === id)?.title ?? id;
   const rule = field && { class: field.class, path: field.path, field: field.field, value: Number(value) };
   const filtered = savedMaps.filter((entry) => `${entry.title} ${entry.engine}`.toLowerCase().includes(mapQuery.toLowerCase()));
+  const missing = field ? ids.filter((id) => !field.matchingProjectIds.includes(id) && !search?.unreadableMaps.some((map) => map.projectId === id)) : [];
 
   function select(next: string[]) {
     setSelected(next);
-    setMatches([]);
-    setSearched(false);
+    setSearch(undefined);
     setField(undefined);
     setPreview(undefined);
   }
@@ -80,26 +80,30 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
             <legend>Numeric tag edit</legend>
             <form onSubmit={(event) => {
               event.preventDefault();
-              if (!ids.length) return;
+              if (!ids.length || ids.length > 32) return;
+              setSearch(undefined);
+              setField(undefined);
+              setPreview(undefined);
               void perform(async () => {
-                setMatches(await call<Field[]>('search_batch_fields', { projectId: ids[0], query }));
-                setSearched(true);
+                setSearch(await call<FieldSearch>('search_batch_fields', { ids, query }));
               });
             }}>
               <label>Tag or field <input value={query} maxLength={192} onChange={(event) => setQuery(event.target.value)} /></label>
-              <button type="submit" disabled={!ids.length}>Find fields in first selected map</button>
+              <button type="submit" disabled={!ids.length || ids.length > 32}>Find fields and check selected maps</button>
             </form>
-            {searched && <label>
+            {search && <label>
               Field
               <select value={field ? JSON.stringify(field) : ''} onChange={(event) => {
-                setField(matches.find((match) => JSON.stringify(match) === event.target.value));
+                setField(search.fields.find((match) => JSON.stringify(match) === event.target.value));
                 setPreview(undefined);
               }}>
                 <option value="">Choose a field</option>
-                {matches.map((match) => <option key={JSON.stringify(match)} value={JSON.stringify(match)}>{match.label} · {match.path} ({match.class})</option>)}
+                {search.fields.map((match) => <option key={JSON.stringify(match)} value={JSON.stringify(match)}>{match.label} · {match.path} ({match.class}) · {match.matchingProjectIds.length}/{ids.length} maps</option>)}
               </select>
             </label>}
-            {searched && matches.length === 0 && <p>No editable numeric fields match this search.</p>}
+            {search?.fields.length === 0 && <p>No editable numeric fields match in {title(ids[0])}.</p>}
+            {search?.unreadableMaps.map((map) => <p key={map.projectId} role="status">{title(map.projectId)} · {map.problem}</p>)}
+            {missing.length > 0 && <p>Missing or incompatible field in {missing.map(title).join(', ')}.</p>}
             <label>New value <input type="number" step="any" value={value} onChange={(event) => {
               setValue(event.target.value);
               setPreview(undefined);

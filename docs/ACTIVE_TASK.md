@@ -3,8 +3,8 @@
 Task: Black Echo evacuation, Linux preview and Multi Map Batch Editing
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Forerunner 858a8f39 banked and reissued exact item IDs on d113e9db. The surveyed CE609 b947dc53 alternate passed independent readback. On 14caa7d4 the unchanged empty approach circled with sustained throttle, leaving the revised occupied route untested.
-Next action: Isolate sustained throttle during the unchanged empty return on a stable reviewed runtime before rerunning b947dc53. Keep d113e9db as the proven bank/restart reference. Covenant seat 8, repeat mission, batch resume and authenticated humans remain open.
+Latest verified revision: Forerunner independently reproduced the empty-return turn with exe 697fdc8a on unchanged d113e9db. The successful bank/restart cache and historical executable hashes are pinned in the integration evidence. Multi Map Batch Editing now checks field availability across the selection.
+Next action: Await a controlled Forerunner flight/braking correction on the pinned d113e9db empty return before another full mission. Continue batch selection, resumable builds and existing Covenant, gameplay and human acceptance gates independently.
 
 ## Acceptance
 

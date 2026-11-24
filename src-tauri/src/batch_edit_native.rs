@@ -34,10 +34,15 @@ fn prepare_one(state: &AppState, id: &str, rule: &batch::Rule) -> Reply<(batch::
     Ok((row, draft, inspection, tools))
 }
 
-fn prepare(state: &AppState, ids: &[String], rule: &batch::Rule) -> Reply<Preview> {
-    if !(2..=batch::MAX_MAPS).contains(&ids.len()) || ids.iter().collect::<HashSet<_>>().len() != ids.len() {
-        return Err(format!("Select 2–{} distinct saved maps", batch::MAX_MAPS));
+fn validate_selection(ids: &[String], minimum: usize) -> Reply<()> {
+    if !(minimum..=batch::MAX_MAPS).contains(&ids.len()) || ids.iter().collect::<HashSet<_>>().len() != ids.len() {
+        return Err(format!("Select {minimum}–{} distinct saved maps", batch::MAX_MAPS));
     }
+    Ok(())
+}
+
+fn prepare(state: &AppState, ids: &[String], rule: &batch::Rule) -> Reply<Preview> {
+    validate_selection(ids, 2)?;
     let mut rows = Vec::new();
     let mut accepted: Vec<batch::Row> = Vec::new();
     let mut names = HashSet::new();
@@ -61,14 +66,48 @@ fn prepare(state: &AppState, ids: &[String], rule: &batch::Rule) -> Reply<Previe
     Ok(Preview { rows, review_sha256 })
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct FieldSearch {
+    fields: Vec<FieldAvailability>,
+    unreadable_maps: Vec<ReviewRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FieldAvailability {
+    #[serde(flatten)]
+    field: batch::Match,
+    matching_project_ids: Vec<String>,
+}
+
 #[tauri::command]
-pub(super) async fn search_batch_fields(app: tauri::AppHandle, project_id: String, query: String) -> Reply<Vec<batch::Match>> {
+pub(super) async fn search_batch_fields(app: tauri::AppHandle, ids: Vec<String>, query: String) -> Reply<FieldSearch> {
+    validate_selection(&ids, 1)?;
     if query.len() > 192 { return Err("Search is limited to 192 bytes".into()); }
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        let project = saved(&state, &project_id)?;
-        let inspection = inspect(&state, &project)?;
-        Ok(batch::search(&inspection, &query))
+        let first = inspect(&state, &saved(&state, &ids[0])?)?;
+        let mut fields: Vec<_> = batch::search(&first, &query).into_iter()
+            .filter(|field| field.present_in(&first.tags))
+            .map(|field| FieldAvailability { field, matching_project_ids: vec![ids[0].clone()] })
+            .collect();
+        drop(first);
+        let mut unreadable_maps = Vec::new();
+        for id in &ids[1..] {
+            match saved(&state, id).and_then(|project| inspect(&state, &project)) {
+                Ok(map) => {
+                    for result in &mut fields {
+                        if result.field.present_in(&map.tags) {
+                            result.matching_project_ids.push(id.clone());
+                        }
+                    }
+                }
+                Err(problem) => unreadable_maps.push(ReviewRow { project_id: id.clone(), edit: None, problem: Some(problem) }),
+            }
+        }
+        fields.sort_by_key(|row| std::cmp::Reverse(row.matching_project_ids.len()));
+        Ok(FieldSearch { fields, unreadable_maps })
     }).await.map_err(error)?
 }
 
