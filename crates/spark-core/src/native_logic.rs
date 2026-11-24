@@ -632,6 +632,13 @@ pub fn validate_compiled_extraction_layout(map: &crate::maps::MapInspection, rea
         }
         Ok(devices[0].position)
     };
+    let bound_vehicle = |name: &str| {
+        let mut ships = read.names.iter().enumerate().filter(|(_, row)| row.name == name);
+        let Some((index, ship)) = ships.next() else { return false; };
+        ships.next().is_none() && ship.object_type == 1 &&
+            read.vehicles.iter().any(|vehicle| vehicle.class == "vehi" &&
+                vehicle.name_index == index as i16 && i16::try_from(vehicle.index).ok() == Some(ship.object_index))
+    };
     let hub = volume("extraction_return")?;
     let deploy = control("extraction_deploy")?;
     let mut field_zones = Vec::new();
@@ -650,11 +657,7 @@ pub fn validate_compiled_extraction_layout(map: &crate::maps::MapInspection, rea
     ] {
         let override_route = has_name(call) || has_volume(field);
         if !override_route && (shared || !has_name(ship)) { continue; }
-        let named_ship = read.names.iter().enumerate().filter(|(_, row)| row.name == ship).collect::<Vec<_>>();
-        if named_ship.len() != 1 || named_ship[0].1.object_type != 1 ||
-            !read.vehicles.iter().any(|vehicle| vehicle.class == "vehi" && vehicle.name_index == named_ship[0].0 as i16
-                && i16::try_from(vehicle.index).ok() == Some(named_ship[0].1.object_index))
-        {
+        if !bound_vehicle(ship) {
             return invalid(format!("Compiled Extraction route {call} needs its named native vehicle {ship}"));
         }
         let zone = volume(field)?;
@@ -673,6 +676,15 @@ pub fn validate_compiled_extraction_layout(map: &crate::maps::MapInspection, rea
             return invalid("Compiled Spirit return pad intersects a field Extraction zone");
         }
         faction_zones = true;
+    }
+    if has_volume("pelican_return") {
+        let pad = volume("pelican_return")?;
+        if !bound_vehicle("extraction_pelican") {
+            return invalid("Compiled Pelican return pad needs one valid native extraction_pelican vehicle binding");
+        }
+        if field_zones.iter().any(|field| pad.intersects(field)) {
+            return invalid("Compiled Pelican return pad intersects a field Extraction zone");
+        }
     }
     let in_field = |point| field_zones.iter().any(|field| field.contains(point));
     if !hub.contains(deploy) || in_field(deploy) {

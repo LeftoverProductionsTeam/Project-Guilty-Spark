@@ -420,6 +420,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
 /// engine mode from its compiled callback/markers, never from a project label.
 pub const SQUAD_OBJECTIVES_FEATURE:&str="extraction.squad_objectives.v1";
 pub const FACTION_LANDING_ZONES_FEATURE: &str = "extraction.faction_landing_zones.v1";
+pub const PELICAN_RETURN_PAD_FEATURE: &str = "extraction.pelican_return_pad.v1";
 /// Native interface names from the reviewed Forerunner contract. This detects
 /// required engine behavior, not mission completion, membership or gameplay.
 fn squad_interface_number(name:&str,prefix:&str,suffix:&str)->Result<Option<u8>> {
@@ -457,6 +458,9 @@ pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps:
     let mut features = Vec::new();
     if squad { features.push(SQUAD_OBJECTIVES_FEATURE.into()); }
     if faction_landing_zones { features.push(FACTION_LANDING_ZONES_FEATURE.into()); }
+    if markers.volumes.iter().any(|volume| volume.name == "pelican_return") {
+        features.push(PELICAN_RETURN_PAD_FEATURE.into());
+    }
     Ok(Some(features))
 }
 pub fn compiled_extraction_mode(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<bool> {
@@ -754,6 +758,23 @@ mod test_fixture;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[ignore = "Requires an explicitly selected owned CE609 Black Echo pad candidate"]
+    fn compiled_pelican_return_pad_requires_explicit_runtime_support() {
+        let cache = std::path::PathBuf::from(
+            std::env::var_os("SPARK_NATIVE_PELICAN_PAD_MAP").expect("Select the owned compiled pad fixture"),
+        );
+        let map = crate::maps::inspect_map(&cache, None).unwrap();
+        let features = super::compiled_extraction_requirements(&cache, &map).unwrap().unwrap();
+        assert!(features.iter().any(|feature| feature == super::PELICAN_RETURN_PAD_FEATURE));
+        let mut markers = crate::maps::scenario_logic_readback(&cache, &map).unwrap();
+        let field = markers.volumes.iter().find(|volume| volume.name == "extraction_zone").unwrap().geometry.clone();
+        let pad = markers.volumes.iter_mut().find(|volume| volume.name == "pelican_return").unwrap();
+        pad.geometry = field;
+        let error = crate::native_logic::validate_compiled_extraction_layout(&map, &markers).unwrap_err();
+        assert!(error.to_string().contains("Pelican return pad intersects"));
+    }
+
     use super::*;
     fn studio() -> CreatorStudio {
         CreatorStudio {
