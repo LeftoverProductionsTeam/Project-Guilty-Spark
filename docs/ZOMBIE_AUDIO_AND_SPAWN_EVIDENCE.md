@@ -124,3 +124,12 @@ Native gameplay on this exact cache remains open. Forerunner's earlier Alpha-rel
 
 
 Local source comparison extracted all five cue tags from the exact Demo and the installed Custom Edition, Chupathingy and OpenH1 Windows Blood Gulch caches. Custom Edition supplied complete stock Vorbis streams, but none matched even the first CRC-verified original audio packet after the three Vorbis headers. The two Xbox-derived ports did not supply Vorbis versions of the matching cues. No samples were substituted or changed. The owned comparison used under 1 MiB and disposed its output.
+
+
+## 24 November - Restore stored carrier inverse inertia
+
+The Forerunner contract identifies the shared physics tag and demonstrated Alpha release on its independent diagnostic correction. The exact Spark MCC13 carrier build d520d509aa6a23a3fa67d37c28cc74459835ae53c0a4dae615f910e87b60b958 reproduces all nine nonfinite inverse components in fzero/zombie/zombiephysics. The native data contains 15 positive mass points, total mass 10000, and an authored moment scale of zero.
+
+Add --repair-carrier-inertia to the existing audited --repair-standard-carrier recipe to produce a separate MCC13 derivative. It binds the correction to the exact compiler output and pinned CRC tool, reconstructs the point-mass tensor about the original center, writes only the nine inverse floats and updates the native CRC. It leaves the authored moment scale, forward matrix, mass points, carrier behavior data and original MCC build bytes untouched.
+
+Derivative SHA-256 95bd7990b2aa3259f44119f4caa63d3b393e61186e19bd1faf8e65a53e8206d2. On-disk readback multiplied the corrected inverse by the independently reconstructed point-mass tensor and matched the identity within 0.000001. Invader extracted the native physics tag and independently read a matching CRC. The audited original cache and banks remained unchanged; 360,261,408 logical scratch bytes were removed. This exact derivative still needs native gameplay and the remaining audio, spawn and Classic CE compatibility work.

@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Native CE609 Warthog trial 59542651 preserves the authored three-route BSP. Two original vehicles and 68 starts passed readback, with 524 samples in each direction. See MEGAWORLD_SEAM_ROUTES_20261108.md. The Zombie MCC carrier and frozen Black Echo d113e9db evidence remain intact.
-Next action: Run the private two-way infantry and guest Warthog trial on the reviewed runtime. Capture Black Echo Pelican and Spirit clips when Windows XInput is available. Preserve d113e9db and frozen Forerunner 64c8d93d. Add the reviewed Zombie carrier inertia correction; find the missing audio and Gearbox Tool.
+Latest verified revision: CE609 Warthog trial 59542651 preserves the authored BSP and has 524 standing samples each way. Zombie MCC derivative 95bd7990 stores the finite carrier inverse while retaining parent d520d509. Evidence is in the two existing feature receipts.
+Next action: Test all MegaWorld routes and guest Warthog traversal on a reviewed runtime. Capture Black Echo Pelican and Spirit clips when Windows XInput is available. Preserve d113e9db and frozen Forerunner 64c8d93d. Recover missing Zombie audio, finish spawner compatibility, and find the reviewed Gearbox Tool.
 
 ## Acceptance
 

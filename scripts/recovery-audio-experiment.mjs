@@ -20,7 +20,9 @@ const repairSurvivorSpawn = args.includes('--repair-survivor-spawn');
 const repairRoundsHud = args.includes('--repair-rounds-hud');
 const nativeMccTool = args.includes('--mcc-tool') ? value('--mcc-tool') : null;
 const repairStandardCarrier = args.includes('--repair-standard-carrier');
+const repairCarrierInertia = args.includes('--repair-carrier-inertia');
 if (repairStandardCarrier && !nativeMccTool) throw new Error('Standard carrier repair requires the reviewed native MCC Tool');
+if (repairCarrierInertia && !repairStandardCarrier) throw new Error('Carrier inertia repair requires the reviewed original carrier build');
 const mccPinIndex = args.indexOf('--mcc-tool-sha256');
 const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
 if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
@@ -42,10 +44,15 @@ const resourceHashes = Object.fromEntries(['bitmaps.map', 'sounds.map'].map((nam
 if (repairMixedPalettes && (resourceHashes['bitmaps.map'] !== '5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea' || resourceHashes['sounds.map'] !== '9426e8d19b662eeb5a6c516951e080758d8f77a0ee41f52bdf0ed0a929245a59')) {
   throw new Error('Mixed-palette recovery requires the audited Demo resource banks');
 }
-const executables = Object.fromEntries((nativeMccTool ? ['extract', 'build', 'edit', 'info'] : ['extract', 'build', 'edit']).map((name) => {
+const invaderCommands = nativeMccTool ? ['extract', 'build', 'edit', 'info'] : ['extract', 'build', 'edit'];
+if (repairCarrierInertia) invaderCommands.push('crc');
+const executables = Object.fromEntries(invaderCommands.map((name) => {
   const exe = path.join(invader, `invader-${name}${process.platform === 'win32' ? '.exe' : ''}`);
   return [name, { path: exe, sha256: hashFile(exe) }];
 }));
+if (repairCarrierInertia && executables.crc.sha256 !== 'b15603c344c590760a81816866d3834dbb117504a2c935e39c380d3c9ab391e9') {
+  throw new Error('Carrier inertia repair requires the exact reviewed Invader CRC tool');
+}
 if (nativeMccTool) {
   const stat = fs.lstatSync(nativeMccTool);
   const resolvedTool = fs.realpathSync(nativeMccTool);
@@ -414,6 +421,62 @@ function recoverStandardCarrier() {
   return readback;
 }
 
+function writeReviewedCarrierInverse(map, nativeSha256) {
+  // These native MCC offsets apply only to the exact original-carrier recovery build.
+  const reviewedSha256 = 'd520d509aa6a23a3fa67d37c28cc74459835ae53c0a4dae615f910e87b60b958';
+  const original = fs.readFileSync(map);
+  if (nativeSha256 !== reviewedSha256 || sha(original) !== reviewedSha256) {
+    throw new Error('The compiled Zombie cache differs from the reviewed carrier physics layout');
+  }
+  const physics = 86_351_258;
+  const inverseAt = 86_351_422;
+  const pointsCount = original.readUInt32LE(physics + 0x74);
+  const tagStart = original.readUInt32LE(0x10);
+  const points = tagStart + original.readUInt32LE(physics + 0x78) - (original.readUInt32LE(tagStart) - 0x28);
+  const triple = offset => [0, 4, 8].map(delta => original.readFloatLE(offset + delta));
+  const center = triple(physics + 12);
+  const mass = Array.from({ length: pointsCount }, (_, i) => original.readFloatLE(points + i * 128 + 0x2c));
+  const originalInverse = Array.from({ length: 9 }, (_, i) => original.readFloatLE(inverseAt + i * 4));
+  if (pointsCount !== 15 || mass.some(value => !Number.isFinite(value) || value <= 0) || originalInverse.some(Number.isFinite)) {
+    throw new Error('The reviewed carrier needs 15 positive masses and a fully nonfinite stored inverse');
+  }
+
+  // Reconstruct the point-mass tensor about the authored center, then invert it.
+  const relative = mass.map((_, i) => triple(points + i * 128 + 0x38).map((value, axis) => value - center[axis]));
+  const tensor = (row, column) => relative.reduce((sum, point, i) => sum + mass[i] * (
+    (row === column ? point.reduce((subtotal, value) => subtotal + value * value, 0) : 0) - point[row] * point[column]
+  ), 0);
+  const [xx, xy, xz, yy, yz, zz] = [[0,0], [0,1], [0,2], [1,1], [1,2], [2,2]].map(([row, column]) => tensor(row, column));
+  const cofactors = [yy*zz-yz*yz, xz*yz-xy*zz, xy*yz-xz*yy, xx*zz-xz*xz, xy*xz-xx*yz, xx*yy-xy*xy];
+  const [a,b,c,d,e,f] = cofactors;
+  const determinant = xx*a + xy*b + xz*c;
+  if (!Number.isFinite(determinant) || determinant <= 0 || xx <= 0 || f <= 0) {
+    throw new Error('The carrier masses do not yield a positive invertible inertia tensor');
+  }
+  const inverse = [a,b,c,b,d,e,c,e,f].map(value => Math.fround(value / determinant));
+  if (inverse.some(value => !Number.isFinite(value))) throw new Error('The carrier inverse contains a nonfinite value');
+  const staged = Buffer.from(original);
+  inverse.forEach((value, i) => staged.writeFloatLE(value, inverseAt + i * 4));
+  const folder = path.join(output, 'mcc-carrier-inertia');
+  fs.mkdirSync(folder);
+  const candidate = path.join(folder, path.basename(map));
+  fs.writeFileSync(candidate, staged, { flag: 'wx' });
+  const crc = run('crc', ['--fix-header', candidate], 'carrier-inertia-crc');
+  const readback = fs.readFileSync(candidate);
+  if (crc.exitCode !== 0 || crc.incomplete || !readback.subarray(0, 0x64).equals(staged.subarray(0, 0x64))
+      || !readback.subarray(0x68).equals(staged.subarray(0x68)) || hashFile(map) !== nativeSha256
+      || hashFile(executables.crc.path) !== executables.crc.sha256) {
+    throw new Error('Inertia recovery changed bytes outside the reviewed inverse and CRC fields');
+  }
+  const info = run('info', ['-T', 'crc32_mismatched', candidate], 'carrier-inertia-readback-crc');
+  if (info.exitCode !== 0 || info.incomplete || !['0', 'false'].includes(info.stdout.trim().toLowerCase())) {
+    throw new Error('Independent readback rejected the repaired cache CRC');
+  }
+  manifest.results.push({ step: 'repair-carrier-inertia', path: candidate, sourceCacheSha256: nativeSha256,
+    cacheSha256: sha(readback), inverseOffset: inverseAt, massPoints: pointsCount, inverse, playable: false });
+  save();
+}
+
 function compileOfficialMcc(carrierReadback) {
   const scenario = "fonzie's zombie apocalypse";
   const effect = 'weapons/pistol/melee.damage_effect';
@@ -481,6 +544,7 @@ function compileOfficialMcc(carrierReadback) {
     ...(carrierReadback && { standardCarrier: { graph: recoveredCarrierGraph, nodes: 5, idle: 'stand unarmed idle' } }),
     damageEffect:Object.fromEntries(readFields.map((field, index) => [field, compiled[index]]))});
   save();
+  if (repairCarrierInertia) writeReviewedCarrierInverse(map, mapSha256);
 }
 
 try {
