@@ -32,7 +32,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     'Halo tools required', 'library', false,
     [
       'Save the imported source maps. In Map library, expand Multi Map Batch Editing and select two or more saved maps. Select saved solo maps includes every saved campaign scenario in the library.',
-      'Find fields in the first selected map, choose a native field and enter its new value. Use Review every map to check the original values, source hashes and compatibility messages.',
+      'Find fields and check selected maps, then choose a native field and enter its new value. Results list how many readable selected maps have the matching field. Use Review every map to check original values, hashes and compatibility.',
       'Choose Build and verify batch. When every map passes, Open batch output opens the published local folder and receipt. Cancel batch stops the group without publishing partial output.',
     ],
     'The current workflow supports numeric fields on compatible imported CE or MCC caches using the MCC build route and matching toolchain. Tag or model replacement and other runtime targets have separate workflows. Game loading remains a separate check.',

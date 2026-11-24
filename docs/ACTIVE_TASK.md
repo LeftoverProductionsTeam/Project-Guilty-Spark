@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark verified the Black Echo recording fixture in Sapien and preserved CE candidate d113e9db. In parallel, native H1A Tool compiled the exact original Zombie standard carrier with a rig-matched idle. Invader independently verified the carrier binding and unchanged Pistol flash. See ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.md for source and cache hashes.
-Next action: Capture the reusable Pelican and Spirit clips when Windows XInput becomes available. Meanwhile, locate original matching audio for the five damaged Vorbis permutations and run the restored standard carrier in isolated Forerunner. The Classic CE path needs the reviewed Gearbox Tool. Keep MegaWorld physical traversal and Multi Map Batch Editing active.
+Latest verified revision: In 711aa74, H1A Tool compiled the exact original Zombie carrier with a rig-matched idle, independently read back by Invader. Batch Editing now searches all readable selected maps, with the dirty-first-map review path tested in the browser and Windows desktop compilation checked. The published local d113e9db candidate and frozen comparison files rehashed exactly.
+Next action: Capture the reusable Pelican and Spirit clips when Windows XInput becomes available. Use the frozen Forerunner transport baseline 64c8d93d with the preserved d113e9db map for comparative trials. The historic successful executable 9486e339 is receipt-only. Seek matching original audio for the five invalid Zombie Vorbis cues before full Forerunner load; reviewed Gearbox Tool is needed for Classic CE. Retest actual two-way foot and Warthog traversal when a reviewed MegaWorld candidate is available.
 
 ## Acceptance
 

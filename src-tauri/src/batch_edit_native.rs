@@ -1,6 +1,6 @@
 use super::*;
 use spark_core::{batch_edit as batch, storage};
-use std::{collections::HashSet, io::Read};
+use std::{collections::{BTreeMap, HashSet}, io::Read};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,6 +72,7 @@ fn prepare(state: &AppState, ids: &[String], rule: &batch::Rule) -> Reply<Previe
 pub(super) struct FieldSearch {
     fields: Vec<FieldAvailability>,
     unreadable_maps: Vec<ReviewRow>,
+    total_matches: usize,
 }
 
 #[derive(Serialize)]
@@ -88,27 +89,25 @@ pub(super) async fn search_batch_fields(app: tauri::AppHandle, ids: Vec<String>,
     if query.len() > 192 { return Err("Search is limited to 192 bytes".into()); }
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        let first = inspect(&state, &saved(&state, &ids[0])?)?;
-        let mut fields: Vec<_> = batch::search(&first, &query).into_iter()
-            .filter(|field| field.present_in(&first.tags))
-            .map(|field| FieldAvailability { field, matching_project_ids: vec![ids[0].clone()] })
-            .collect();
-        drop(first);
+        let mut available = BTreeMap::<batch::Match, Vec<String>>::new();
         let mut unreadable_maps = Vec::new();
-        for id in &ids[1..] {
-            match saved(&state, id).and_then(|project| inspect(&state, &project)) {
+        for id in ids {
+            match saved(&state, &id).and_then(|project| inspect(&state, &project)) {
                 Ok(map) => {
-                    for result in &mut fields {
-                        if result.field.present_in(&map.tags) {
-                            result.matching_project_ids.push(id.clone());
-                        }
+                    for field in batch::search(&map.tags, &query) {
+                        available.entry(field).or_default().push(id.clone());
                     }
                 }
-                Err(problem) => unreadable_maps.push(ReviewRow { project_id: id.clone(), edit: None, problem: Some(problem) }),
+                Err(problem) => unreadable_maps.push(ReviewRow { project_id: id, edit: None, problem: Some(problem) }),
             }
         }
+        let total_matches = available.len();
+        let mut fields: Vec<_> = available.into_iter()
+            .map(|(field, matching_project_ids)| FieldAvailability { field, matching_project_ids })
+            .collect();
         fields.sort_by_key(|row| std::cmp::Reverse(row.matching_project_ids.len()));
-        Ok(FieldSearch { fields, unreadable_maps })
+        fields.truncate(batch::MAX_SEARCH_RESULTS);
+        Ok(FieldSearch { fields, unreadable_maps, total_matches })
     }).await.map_err(error)?
 }
 

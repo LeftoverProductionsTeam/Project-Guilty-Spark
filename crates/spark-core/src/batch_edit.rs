@@ -1,5 +1,5 @@
 //! Reviewed numeric edits for the existing imported-map compiler.
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,6 +10,7 @@ use maps::{MapInspection, Tag, TagField};
 use project::{Project, TagEdit};
 
 pub const MAX_MAPS: usize = 32;
+pub const MAX_SEARCH_RESULTS: usize = 60;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +21,7 @@ pub struct Rule {
     pub value: f64,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Match {
     pub class: String,
@@ -29,19 +30,6 @@ pub struct Match {
     pub label: String,
     pub kind: String,
     pub unit: String,
-}
-
-impl Match {
-    pub fn present_in(&self, tags: &[Tag]) -> bool {
-        let identity = Rule {
-            class: self.class.clone(),
-            path: self.path.clone(),
-            field: self.field.clone(),
-            value: 0.0,
-        };
-        one_field(tags, &identity)
-            .is_ok_and(|(_, field)| field.kind == self.kind && field.unit == self.unit)
-    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -69,23 +57,31 @@ fn normalized(path: &str) -> String {
     path.replace('\\', "/").to_ascii_lowercase()
 }
 
-pub fn search(inspection: &MapInspection, query: &str) -> Vec<Match> {
+pub fn search(tags: &[Tag], query: &str) -> Vec<Match> {
     let query = query.to_ascii_lowercase();
-    inspection.tags.iter()
-        .filter(|tag| !tag.external && tag.data_offset.is_some())
-        .flat_map(|tag| tag.fields.iter().filter_map(|field| {
-            if !numeric(field) {
-                return None;
+    let terms: Vec<_> = query.split_whitespace().collect();
+    let mut indexed = HashMap::new();
+    for tag in tags {
+        let key = (tag.class.as_str(), normalized(&tag.path));
+        indexed.entry(key).and_modify(|tag| *tag = None).or_insert(Some(tag));
+    }
+    let mut fields = Vec::new();
+    for ((class, path), tag) in indexed {
+        let Some(tag) = tag.filter(|tag| !tag.external && tag.data_offset.is_some()) else { continue };
+        for field in tag.fields.iter().filter(|field| numeric(field)) {
+            if unique_field(tag, &field.key).is_err() {
+                continue;
             }
-            let text = format!("{} {} {} {}", tag.class, normalized(&tag.path), field.key, field.label);
-            query.split_whitespace().all(|term| text.to_ascii_lowercase().contains(term))
-                .then(|| Match {
-                    class: tag.class.clone(), path: normalized(&tag.path), field: field.key.clone(),
+            let text = format!("{class} {path} {} {}", field.key, field.label).to_ascii_lowercase();
+            if terms.iter().all(|term| text.contains(*term)) {
+                fields.push(Match {
+                    class: class.into(), path: path.clone(), field: field.key.clone(),
                     label: field.label.clone(), kind: field.kind.clone(), unit: field.unit.clone(),
-                })
-        }))
-        .take(60)
-        .collect()
+                });
+            }
+        }
+    }
+    fields
 }
 
 fn one_field<'a>(candidates: &'a [Tag], rule: &Rule) -> Result<(&'a Tag, &'a TagField)> {
@@ -95,12 +91,16 @@ fn one_field<'a>(candidates: &'a [Tag], rule: &Rule) -> Result<(&'a Tag, &'a Tag
     if tags.next().is_some() || tag.external || tag.data_offset.is_none() {
         return invalid("The matching tag must have exactly one locally stored native definition");
     }
-    let mut fields = tag.fields.iter().filter(|field| field.key == rule.field && numeric(field));
+    Ok((tag, unique_field(tag, &rule.field)?))
+}
+
+fn unique_field<'a>(tag: &'a Tag, key: &str) -> Result<&'a TagField> {
+    let mut fields = tag.fields.iter().filter(|field| field.key == key && numeric(field));
     let field = fields.next().ok_or_else(|| SparkError::Invalid("This tag has no matching supported numeric field".into()))?;
     if fields.next().is_some() {
         return invalid("The matching field is ambiguous");
     }
-    Ok((tag, field))
+    Ok(field)
 }
 
 pub fn check_source(project: &Project) -> Result<()> {
@@ -225,22 +225,22 @@ mod tests {
     }
 
     #[test]
-    fn field_search_availability_requires_one_matching_local_schema() {
-        let field = Match {
-            class: "weap".into(), path: "weapons/pistol/pistol".into(), field: "test-rate".into(),
-            label: "Rate".into(), kind: "f32".into(), unit: "rounds/s".into(),
-        };
-        assert!(field.present_in(&[tag(19)]));
-        assert!(!field.present_in(&[tag(19), tag(20)]));
+    fn field_search_requires_a_unique_local_definition_and_preserves_schema_identity() {
+        let first = search(&[tag(19)], "PISTOL rate");
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].path, "weapons/pistol/pistol");
+        assert!(search(&[tag(19), tag(20)], "rate").is_empty());
         let mut other = tag(19);
         other.fields[0].unit = "seconds".into();
-        assert!(!field.present_in(&[other.clone()]));
-        other.fields[0].unit = field.unit.clone();
+        assert_ne!(search(&[other.clone()], "rate"), first);
+        other.fields[0].unit.clone_from(&first[0].unit);
         other.fields[0].kind = "i16".into();
-        assert!(!field.present_in(&[other.clone()]));
-        other.fields[0].kind = field.kind.clone();
+        assert_ne!(search(&[other.clone()], "rate"), first);
+        other.fields.push(other.fields[0].clone());
+        assert!(search(&[other.clone()], "rate").is_empty());
+        other.fields.pop();
         other.external = true;
-        assert!(!field.present_in(&[other]));
+        assert!(search(&[other], "rate").is_empty());
     }
 
     #[test]

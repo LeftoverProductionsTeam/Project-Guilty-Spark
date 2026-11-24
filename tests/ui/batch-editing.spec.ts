@@ -24,18 +24,22 @@ test('batch review builds only the compatible maps explicitly reviewed', async (
           installation: { libraries: [], diagnostics: [], halo1Installed: false },
           dataDirectory: 'Fixture', inboxDirectory: 'Fixture', diagnostics: [], logs: [],
         };
-        if (command === 'search_batch_fields') return {
-          fields: [{ class: 'weap', path: 'weapons/pistol', field: 'velocity', label: 'Velocity', matchingProjectIds: ['a', 'c'] }],
-          unreadableMaps: [{ projectId: 'b', problem: 'Save this map and review again' }],
-        };
+        if (command === 'search_batch_fields') {
+          w.batchCalls.push({ command, ids: args.ids });
+          return {
+            fields: [{ class: 'weap', path: 'weapons/pistol', field: 'velocity', label: 'Velocity', kind: 'f32', unit: 'wu/s', matchingProjectIds: ['b', 'c'] }],
+            unreadableMaps: [{ projectId: 'a', problem: 'Save this map and review again' }],
+            totalMatches: 1,
+          };
+        }
         if (command === 'preview_numeric_batch') {
           w.batchCalls.push({ command, ids: args.ids });
           const edit = { before: 10, after: 25, kind: 'f32', unit: 'wu/s', sourceSha256: 'a'.repeat(64), cacheVersion: 13 };
           return {
-            rows: args.ids?.map((projectId) => projectId === 'b'
+            rows: args.ids?.map((projectId) => projectId === 'a'
               ? { projectId, edit: null, problem: 'Save this map and review again' }
               : { projectId, edit, problem: null }),
-            reviewSha256: args.ids?.includes('b') ? null : digest,
+            reviewSha256: args.ids?.includes('a') ? null : digest,
             recoverable: false,
           };
         }
@@ -56,25 +60,26 @@ test('batch review builds only the compatible maps explicitly reviewed', async (
   await page.getByText('Multi Map Batch Editing', { exact: true }).click();
   await page.getByRole('button', { name: 'Select saved solo maps' }).click();
   await page.getByRole('button', { name: 'Find fields and check selected maps' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Bravo · Save this map' })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Numeric tag field', exact: true }).selectOption({ label: 'Velocity · weapons/pistol (weap) · 2/3 maps' });
+  await expect(page.getByRole('status').filter({ hasText: 'Alpha · Save this map' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Numeric tag field', exact: true }).selectOption({ label: 'Velocity · weapons/pistol (weap) · f32 · wu/s · 2/3 maps' });
   await page.getByRole('spinbutton', { name: 'New value' }).fill('25');
   await page.getByRole('button', { name: 'Review every map' }).click();
   const review = page.getByRole('list', { name: 'Per-map review' });
-  await expect(review).toContainText('Bravo · Save this map and review again');
+  await expect(review).toContainText('Alpha · Save this map and review again');
   await expect(page.getByRole('button', { name: 'Build and verify batch' })).toBeDisabled();
 
   await page.getByRole('button', { name: 'Review 2 compatible maps' }).click();
-  await expect(page.getByRole('checkbox', { name: /Bravo/ })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Alpha/ })).not.toBeChecked();
   await expect(review.getByRole('listitem')).toHaveCount(2);
-  await expect(review).toContainText('Alpha');
+  await expect(review).toContainText('Bravo');
   await expect(review).toContainText('Charlie');
-  await expect(review).not.toContainText('Bravo');
+  await expect(review).not.toContainText('Alpha');
   await page.getByRole('button', { name: 'Build and verify batch' }).click();
   await expect(page.getByRole('button', { name: 'Open batch output' })).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & Record<string, any>).batchCalls)).toEqual([
+    { command: 'search_batch_fields', ids: ['a', 'b', 'c'] },
     { command: 'preview_numeric_batch', ids: ['a', 'b', 'c'] },
-    { command: 'preview_numeric_batch', ids: ['a', 'c'] },
-    { command: 'build_numeric_batch', ids: ['a', 'c'], reviewSha256: 'b'.repeat(64) },
+    { command: 'preview_numeric_batch', ids: ['b', 'c'] },
+    { command: 'build_numeric_batch', ids: ['b', 'c'], reviewSha256: 'b'.repeat(64) },
   ]);
 });

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { call, native } from '../api';
 import type { LibraryEntry } from '../types';
 
-type Field = { class: string; path: string; field: string; label: string; matchingProjectIds: string[] };
-type FieldSearch = { fields: Field[]; unreadableMaps: { projectId: string; problem: string }[] };
+type Field = { class: string; path: string; field: string; label: string; kind: string; unit: string; matchingProjectIds: string[] };
+type FieldSearch = { fields: Field[]; unreadableMaps: { projectId: string; problem: string }[]; totalMatches: number };
 type Edit = { before: number; after: number; kind: string; unit: string; sourceSha256: string; cacheVersion: number };
 type Preview = { rows: { projectId: string; edit: Edit | null; problem: string | null }[]; reviewSha256: string | null; recoverable: boolean };
 type Outcome = { batchId: string; published: boolean; recoverable: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
@@ -113,11 +113,16 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
                 <option value="">Choose a field</option>
                 {search.fields.map((match) => {
                   const count = ids.filter((id) => match.matchingProjectIds.includes(id)).length;
-                  return count > 0 && <option key={JSON.stringify(match)} value={JSON.stringify(match)}>{match.label} · {match.path} ({match.class}) · {count}/{ids.length} maps</option>;
+                  return count > 0 && <option key={JSON.stringify(match)} value={JSON.stringify(match)}>{match.label} · {match.path} ({match.class}) · {match.kind}{match.unit && ` · ${match.unit}`} · {count}/{ids.length} maps</option>;
                 })}
               </select>
             </label>}
-            {search?.fields.length === 0 && <p>No editable numeric fields match in {title(ids[0])}.</p>}
+            {search?.fields.length === 0 && <p>{unreadable.length === ids.length
+              ? 'Resolve the map issues below to search their fields.'
+              : 'No editable numeric fields match in the readable maps.'}</p>}
+            {search && search.totalMatches > search.fields.length && (
+              <p role="status">Showing {search.fields.length} of {search.totalMatches} matching fields. Refine the search to see other fields.</p>
+            )}
             {unreadable.map((map) => <p key={map.projectId} role="status">{title(map.projectId)} · {map.problem}</p>)}
             {missing.length > 0 && <p>Missing or incompatible field in {missing.map(title).join(', ')}.</p>}
             <label>New value <input type="number" step="any" value={value} onChange={(event) => {
