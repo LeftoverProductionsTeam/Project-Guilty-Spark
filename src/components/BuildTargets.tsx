@@ -100,6 +100,10 @@ export default function BuildTargets({
           kit for either build. The build result reports actual tag usage.</p>
       )}
       {canCopyToMcc && <button type="button" onClick={addConnectedMccTarget}>Add MCC13 target with these tags</button>}
+      {project.bspAssembly && project.source?.cacheVersion === 13 && (
+        <p>Keep the matching build tags to extend this MCC13 world. To continue the 23 MiB CE609
+          edition, open its saved CE project.</p>
+      )}
       <div className="analysis-actions">
         <label>
           Target runtime

@@ -22,7 +22,9 @@ fn cache_target(project: &Project) -> Option<CacheTarget> {
             engine: "gbx-custom", version: 609, tag_base: 0x4044_0000,
             tag_capacity: 23 * 1024 * 1024, name: "Custom Edition CE609",
         }),
-        RuntimeId::MccSteam if project.source.as_ref().is_some_and(|source| source.cache_version == 609) => Some(CacheTarget {
+        RuntimeId::MccSteam if project.source.as_ref().is_some_and(|source| {
+            source.cache_version == 609 || (source.cache_version == 13 && !project.inherited_bsp_connections.is_empty())
+        }) => Some(CacheTarget {
             engine: "mcc-cea", version: 13, tag_base: 0x5000_0000,
             tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
         }),
@@ -70,7 +72,7 @@ pub fn extension_tags(job: &Path, build: &BuildRecord) -> Result<Option<std::pat
     }
     let source: ExtensionSource = serde_json::from_slice(&bytes)?;
     if source.schema_version != 1 || source.build.id != build.id
-        || source.build.target != "gbx-custom" || build.target != "gbx-custom"
+        || !matches!(build.target.as_str(), "gbx-custom" | "mcc-cea") || source.build.target != build.target
         || source.build.status != "validated" || build.status != "validated"
         || source.build.sha256.is_none() || source.build.sha256 != build.sha256
         || source.build.project_fingerprint != build.project_fingerprint
@@ -87,9 +89,9 @@ pub fn extension_tags(job: &Path, build: &BuildRecord) -> Result<Option<std::pat
 
 pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     project.validate()?;
-    if cache_target(project).is_none() {
-        return invalid("Select an explicit Custom Edition, Chupathingy or MCC target for the connected CE regions");
-    }
+    let cache = cache_target(project).ok_or_else(|| {
+        SparkError::Invalid("Select an explicit Custom Edition, Chupathingy or MCC target for the connected regions".into())
+    })?;
     let target = crate::forge_build::tools_for_target(project, Default::default())?;
     if target.hek_flavor.as_deref() != Some("h1aEk") {
         return invalid("Connected regions require the reviewed H1A authoring kit and matching editable base tags");
@@ -97,7 +99,13 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     let plan=project.bsp_assembly.as_ref().ok_or_else(||SparkError::Invalid("Author a connected BSP plan first".into()))?;plan.validate()?;
     let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("Import an original CE map first".into()))?;
     if source.sha256!=inspection.sha256||source.scenario_path!=inspection.scenario_path{return invalid("The base inspection belongs to another source revision");}
-    if source.cache_version!=609||plan.donor_source.cache_version!=609||inspection.header.version!=609||inspection.mesh.parts.len()!=1||inspection.header.scenario_type!=1{return invalid("Initial CE Megaworld acceptance needs a single-BSP CE multiplayer base and a CE donor; cross-runtime source conversion is a separate step");}
+    let supported_base = source.cache_version == 609
+        || (source.cache_version == 13 && cache.version == 13 && !project.inherited_bsp_connections.is_empty());
+    if !supported_base || plan.donor_source.cache_version != 609 || inspection.header.version != source.cache_version
+        || inspection.mesh.parts.len() != 1 || inspection.header.scenario_type != 1
+    {
+        return invalid("Use a single-BSP CE multiplayer base or a reopened compiled MCC13 world with its build tags, and choose a CE donor");
+    }
     crate::bsp_compile::base_transforms(project,inspection)?;
     if !project.tag_edits.is_empty()||!project.tag_renames.is_empty()||!project.tag_duplicates.is_empty()||!project.powerups.is_empty()||!project.animation_assignments.is_empty()||!crate::native_audio::fingerprint_inputs(project).is_empty()||project.conversion_profile.is_some(){return invalid("Connected CE builds support original scenario position/rotation edits and validated scenery imports. Tag edits, other structural placement/asset/audio changes and conversion profiles still require their validated native authoring path; nothing is silently omitted");}
     let tools=Toolchain{h1a_directory:target.hek_directory,base_tags_directory:target.hek_tags_directory,invader_directory:target.invader_directory,..Default::default()};
@@ -215,6 +223,12 @@ mod tests {
             "compiledTagHashes": tool_transaction::inventory(&tags).unwrap(),
         });
         fs::write(job.path().join("megaworld-receipt.json"), receipt.to_string()).unwrap();
+        assert_eq!(extension_tags(job.path(), &build).unwrap(), Some(tags.clone()));
+        build.target = "mcc-cea".into();
+        assert!(extension_tags(job.path(), &build).is_err());
+        let mut mcc_receipt = receipt;
+        mcc_receipt["build"] = serde_json::to_value(&build).unwrap();
+        fs::write(job.path().join("megaworld-receipt.json"), mcc_receipt.to_string()).unwrap();
         assert_eq!(extension_tags(job.path(), &build).unwrap(), Some(tags));
         build.sha256 = Some("3".repeat(64));
         assert!(extension_tags(job.path(), &build).is_err());
