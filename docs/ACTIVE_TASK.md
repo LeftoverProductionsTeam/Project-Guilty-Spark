@@ -3,8 +3,8 @@
 Task: Black Echo recorded transport, original Zombie Apocalypse conversion and MegaWorld
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark checks embedded stream identities on working-tag rebuilds. The stock Xbox and MCC b30 extraction streams read back identically. Frozen Black Echo d113e9db still contains zero clips.
-Next action: Capture map-specific Pelican and Spirit clips in isolated H1A Sapien with an XInput controller and prove their CE609 handoff. Keep exact Forerunner transport inputs for focused landing before full faction replay. While capture is unavailable, advance original Zombie Apocalypse using the preserved C45 defect evidence, then MegaWorld physical connections.
+Latest verified revision: Original Zombie recovery preserves the misplaced Hiding Marine in a native biped placement and gets both CE and MCC compilers past the invalid scenery palette. Both now stop at Survivor shield-hit Noise map compatibility. The Black Echo recording guard and frozen map are unchanged.
+Next action: Preserve the original Zombie Survivor shield effect while resolving the rejected 2D noise references in its native plasma shader. Black Echo still needs map-specific controller capture and a verified CE609 handoff before the focused Forerunner landing and full faction replay. Physical MegaWorld connections remain next.
 
 ## Acceptance
 
