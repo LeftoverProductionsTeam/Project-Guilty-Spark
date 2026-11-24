@@ -17,7 +17,8 @@ export interface ToolLogReview {
   textLines: number;
   note: string;
 }
-const known: { id: string; pattern: RegExp; action: string; wrl: boolean }[] = [
+const known: { id: string; pattern: RegExp; action: string; wrl: boolean; fatal?: boolean }[] = [
+  {id:'LEAF_MAP_CAPACITY',pattern:/couldn.t (?:allocate leaf_map leaves|initialize leaf map)/i,action:'Tool exhausted its collision leaf map for this BSP. Review the native structure and WRL in smaller sections. Use separate native BSPs only where the target runtime supports transitions.',wrl:true,fatal:true},
   {id:'BSP_DEPTH',pattern:/global_plane_count\s*<\s*MAXIMUM_BSP3D_DEPTH|couldn.t build leaf map/i,action:'Collision BSP partitioning may exceed engine depth. Simplify dense geometry and complex curved collision; do not bypass compiler assertions.',wrl:false},
   {id:'EMPTY_COLLISION',pattern:/collision bsp is empty/i,action:'This JMS has no collidable geometry. Verify at least one sealed, collision-enabled source shell instead of only render-only (!) surfaces.',wrl:false},
   {id:'BSP_DIVIDING_EDGE',pattern:/dividing_edge->vertex_indices\[1\]\s*==\s*NONE/i,action:'Investigate near-coplanar or rounding-unstable collision source around the affected area. Recheck JMS scale; no automatic binary fix is safe.',wrl:false},
@@ -39,7 +40,7 @@ const known: { id: string; pattern: RegExp; action: string; wrl: boolean }[] = [
   {id:'BSP_OVERLAP',pattern:/\bcouldn.t build bsp because of overlapping surfaces\b/i,action:'Two collidable surfaces overlap. Remove coplanar duplicate faces or rebuild their topology; do not treat touching brushes as a boolean union.',wrl:true},
   {id:'VERTEX_BOUNDS',pattern:/\bvertex has a bad point\b/i,action:'A vertex may be farther than the Halo 1 BSP limit from the origin. Check scale and coordinates in the original source.',wrl:false},
   {id:'PORTAL_DUPLICATE',pattern:/\bfound duplicate triangle building connected geometry\b/i,action:'Check duplicate portal faces in the WRL and remove duplicates from authored portal source, not a compiled map.',wrl:true},
-  {id:'CLUSTER_COMPLEXITY',pattern:/\bcouldn.t allocate subcluster\b/i,action:'A cluster may exceed the triangle budget. Simplify collision geometry or redesign portal/cluster divisions.',wrl:false},
+  {id:'CLUSTER_COMPLEXITY',pattern:/\bcouldn.t allocate subcluster\b/i,action:'Tool ran out of subclusters while partitioning render geometry. Check that prior portal cuts survived the join and that each cut seals its passage.',wrl:true,fatal:true},
   {id:'SKY_CLUSTER',pattern:/\bcluster can see multiple skies\b/i,action:'Use a single sky within visible connected clusters or redesign sealed cluster separation.',wrl:false},
   {id:'PORTAL_UNEARTHED',pattern:/\bunearthed edge\b/i,action:'Seal the portal edge against BSP geometry or connect the portal to other portal vertices.',wrl:true},
 ];
@@ -57,7 +58,7 @@ export function analyzeHaloToolLog(input: string): ToolLogReview {
     if (!item && (isError || isWarning)) {unclassified++;if(isError)unclassifiedErrors++;}
     if (!item) return;
     if (diagnostics.length>=256) throw new Error('Tool log contains too many diagnostics');
-    diagnostics.push({line:index+1,level:isError?'error':'warning',code:item.id,
+    diagnostics.push({line:index+1,level:isError||item.fatal?'error':'warning',code:item.id,
       message:line.trim().slice(0,500),action:item.action,wrlUseful:item.wrl});
   });
   return {diagnostics,unclassified,containsFatal:diagnostics.some(d=>d.level==='error')||unclassifiedErrors>0,
