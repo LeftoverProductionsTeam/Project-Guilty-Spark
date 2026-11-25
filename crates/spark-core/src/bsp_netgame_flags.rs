@@ -43,6 +43,8 @@ fn exclusive_teleporter_home(trees: &[&crate::bsp_audio::ListenerTree], position
 }
 
 impl PreparedFlags {
+    pub(crate) fn base_count(&self) -> usize { self.base.len() }
+
     pub(crate) fn from_sources(
         base_source: &Source,
         base_map: &MapInspection,

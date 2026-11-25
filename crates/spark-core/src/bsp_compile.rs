@@ -5,7 +5,7 @@ use crate::{
     invalid,
     maps::{self, MapInspection},
     project::{self, Project},
-    safe_relative, Result, SparkError,
+    reject_links, safe_relative, Result, SparkError,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -883,8 +883,42 @@ pub(crate) fn prepare_partition_structure(
     } else { None };
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
+        let mut bake_only = None;
+        let original_flags = netgame_flags.as_ref().map_or(0, |flags| flags.base_count());
+        if parts.base.is_none() && original_flags > maps::CLASSIC_NETGAME_FLAG_LIMIT {
+            // Regional gameplay can exceed the HEK array that the native baker reads.
+            // The bake-only tag keeps the original geometry, scenery and sky references.
+            let scenario = format!("{}.scenario", inspection.scenario_path);
+            let source = tags.join(safe_relative(&scenario)?);
+            let before = maps::hash_file(&source)?;
+            let path = safe_relative(&inspection.scenario_path)?;
+            let copy = path.with_file_name(format!("gsbake_{}", &runner.id[..8]));
+            let copy = copy.to_string_lossy().replace('/', "\\");
+            let tag = format!("{copy}.scenario");
+            let file = tags.join(safe_relative(&tag)?);
+            reject_links(&file)?;
+            if file.try_exists()? { return invalid("The bake-only scenario path already exists"); }
+            let tags_arg = tags.to_string_lossy().into_owned();
+            runner.run(&edit, &["-t".into(), tags_arg.clone(), "-E".into(),
+                format!("netgame_flags[{}-{}]", maps::CLASSIC_NETGAME_FLAG_LIMIT, original_flags - 1),
+                "-O".into(), tag.clone(), scenario], workspace, "partition-bake-scenario", 64)?;
+            let count = runner.run(&edit, &["-t".into(), tags_arg, "-C".into(), "netgame_flags".into(), tag],
+                workspace, "partition-bake-scenario", 64)?;
+            if count.trim().parse::<usize>().ok() != Some(maps::CLASSIC_NETGAME_FLAG_LIMIT)
+                || maps::hash_file(&source)? != before
+            {
+                return invalid("The bake-only scenario did not keep the original regional scenario intact");
+            }
+            bake_only = Some((copy, file, source, before));
+        }
+        let scenario = bake_only.as_ref().map_or(inspection.scenario_path.as_str(), |entry| entry.0.as_str());
         for (name, _) in &regions {
-            bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
+            bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)?;
+        }
+        if let Some((_, file, source, before)) = bake_only {
+            if maps::hash_file(&source)? != before { return invalid("Native lighting changed the regional gameplay scenario"); }
+            reject_links(&file)?;
+            fs::remove_file(file)?;
         }
     }
     let donor_tag = format!("{}.scenario_structure_bsp", structure_tags.last().unwrap());

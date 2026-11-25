@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Native MCC13 Chiron ba57480a30c5121da3be111acc7d605a277b6809f5604b6e182bbf97c3f205af is retained and read-only in %TEMP%/GuiltySpark-Traversal-Handoff/thirteen-mcc13-YTz6Uc/ready. Two BSPs, 12 / 9 lightmap pages, 127 starts, 284 flags, 30 Chiron teleporter channels and 42 Chiron pickups passed independent readback. CE609 da222bf1 and MCC13 040b5da5 remain the twelve-region baselines.
-Next action: Author and check a Derelict overlap on retained outdoor BSP 0 using the exact lit Chiron cache. Keep the two original slots and switch rows. Forerunner can consume the pinned thirteen-region artifact now for Chiron crossings and guest-driven return.
+Latest verified revision: Lit MCC13 Derelict 71fc164876cafcece4de49c2b0563c79c6f772abfff308c7dc61d5a411b79e2b retained in %TEMP%/GuiltySpark-Traversal-Handoff/fourteen-mcc13-ubQ0YV/ready. Native readback matched both earlier BSPs, four switches, 12 / 9 / 3 lightmap pages, 190 starts and 363 flags. Exact lit Chiron ba57480a is retained separately for Forerunner acceptance.
+Next action: Check the Death Island approach against the exact retained fourteen-region world while Forerunner validates the pinned Chiron build. Keep Derelict mixed ambience, real traversal, guest driving and simultaneous occupancy open. Further all-region placement preservation needs reviewed expanded starts and pickup limits.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 
@@ -149,7 +149,7 @@ Historical: releases/black-echo-native-crew-20261117 retains partial native cand
 
 ## Operations and safe checkpoint
 
-The exact twelve- and thirteen-region MCC13 caches are verified in the approved handoff. The lit build and all Chiron-adjacent Derelict diagnostic output were retired after the final receipt and retained copy checks. The known east approach and eight rotated or shifted Chiron approaches failed source clearance. The outdoor BSP alternative is the next scoped validation. See MEGAWORLD_SEAM_ROUTES_20261108.md for the native readback, placement budgets, and independent format and runtime acceptance gates.
+The exact twelve- and thirteen-region MCC13 caches are verified in the approved handoff. The lit build and all Chiron-adjacent Derelict diagnostic output were retired after the final receipt and retained copy checks. The known east approach and eight rotated or shifted Chiron approaches failed source clearance. The outdoor BSP alternative passed both collision-only and full lit native compilation. A disposable scenario for the lightmap stage resolved the H1A flag limit while retaining the full scenario. Both production handoff caches are read-only and registered for retention. All build and probe scratch was retired. See MEGAWORLD_SEAM_ROUTES_20261108.md for the native readback, placement budgets, and independent format and runtime acceptance gates.
 
 18Nov control-side run-w9uCnP closed. Owned native output of 1,008,128,495 logical bytes was disposed and the root is absent. Existing game trials are tracked by their Forerunner receipts.
 
