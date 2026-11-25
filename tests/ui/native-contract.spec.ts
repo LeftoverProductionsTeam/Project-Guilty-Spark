@@ -6125,7 +6125,7 @@ test('unchanged CE cache uses native validation then the existing export control
    }
    if(command==='storage_export_map'){
     w.__sparkMock.calls.push({command,args:structuredClone(args)});
-    return {output:'Synthetic/Mods/test.map',credits:'Synthetic/Mods/CREDITS-5d61b56259c59eed.txt',sha256:p.source.sha256,bytes:128,cacheVersion:609,runtimeId:args.runtimeId,reused:false};
+    return {output:'Synthetic/Mods/test.map',modeMetadata:'Synthetic/Mods/test.spark-mode.json',gameplayMode:'multiplayer',credits:'Synthetic/Mods/CREDITS-5d61b56259c59eed.txt',sha256:p.source.sha256,bytes:128,cacheVersion:609,runtimeId:args.runtimeId,reused:false};
    }
    return original(command,args);
   };
@@ -6138,6 +6138,8 @@ test('unchanged CE cache uses native validation then the existing export control
  await expect(history).toContainText('ce-existing');await expect(history).toContainText('no compilation or game acceptance');
  await history.getByText(/^Export map/,{exact:true}).click();const select=history.getByRole('combobox',{name:'Map export runtime',exact:true});await revealPagedControl(select);await expect(select).toHaveValue('haloCustomEdition');await select.selectOption('openCe');await history.getByRole('button',{name:'Export to mods folder',exact:true}).click();
  await expect(history.getByRole('status')).toContainText('Native map exported and hash-verified');
+ await expect(history.getByRole('status')).toContainText('Game mode · Multiplayer');
+ await expect(history.getByRole('status')).toContainText('Synthetic/Mods/test.spark-mode.json');
  await expect(history.getByRole('status')).toContainText('Map attribution and permissions');
  await expect(history.getByRole('status')).toContainText('Synthetic/Mods/CREDITS-5d61b56259c59eed.txt');
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='storage_export_map').map((c:any)=>c.args))).toEqual([{projectId:'a',buildId:'ce-check',runtimeId:'openCe'}]);
